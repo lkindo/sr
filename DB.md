@@ -1,22 +1,37 @@
 # SR Management System - Database Design Document
 
-**문서 버전:** 1.0
+**문서 종류:** DB
+**문서 버전:** 1.1
 **작성일:** 2025-11-06
-**데이터베이스:** Supabase PostgreSQL
-**ORM:** Prisma
+**최종 수정일:** 2025-11-06
+**작성자:** Development Team
+**검수자:** [검수자 정보]
+
+---
+
+## 문서 개정 이력
+
+| 버전 | 작성자 | 변경 사항 | 작성일 | 검수자 |
+|------|--------|-----------|--------|--------|
+| 1.0 | Development Team | DB 설계 초안 작성 | 2025-11-06 | [검수자] |
+| 1.1 | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가 | 2025-11-06 | [검수자] |
 
 ---
 
 ## 목차
 
 1. [개요](#개요)
-2. [ERD (Entity Relationship Diagram)](#erd-entity-relationship-diagram)
-3. [테이블 명세](#테이블-명세)
-4. [DDL (Data Definition Language)](#ddl-data-definition-language)
-5. [인덱스 전략](#인덱스-전략)
-6. [제약 조건](#제약-조건)
-7. [초기 데이터](#초기-데이터)
-8. [마이그레이션 가이드](#마이그레이션-가이드)
+2. [데이터베이스 설계 원칙](#데이터베이스-설계-원칙)
+3. [ERD (Entity Relationship Diagram)](#erd-entity-relationship-diagram)
+4. [ENUM 정의](#enum-정의)
+5. [테이블 명세](#테이블-명세)
+6. [DDL (Data Definition Language)](#ddl-data-definition-language)
+7. [인덱스 전략](#인덱스-전략)
+8. [제약 조건](#제약-조건)
+9. [보안 고려사항](#보안-고려사항)
+10. [성능 고려사항](#성능-고려사항)
+11. [초기 데이터](#초기-데이터)
+12. [마이그레이션 가이드](#마이그레이션-가이드)
 
 ---
 
