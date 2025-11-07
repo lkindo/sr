@@ -7,9 +7,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 // ============================================================================
@@ -59,12 +58,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String? 
+  access_token      String? 
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String? 
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -99,14 +98,14 @@ model VerificationToken {
 // ============================================================================
 
 model Role {
-  id          String       @id @default(cuid())
-  name        String       @unique
+  id          String           @id @default(cuid())
+  name        String           @unique
   description String?
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
 
   users       UserRole[]
-  permissions Permission[]
+  permissions RolePermission[]
 
   @@map("roles")
 }
@@ -127,16 +126,30 @@ model UserRole {
 }
 
 model Permission {
-  id       String @id @default(cuid())
-  roleId   String @map("role_id")
-  resource String
-  action   String
+  id          String           @id @default(cuid())
+  resource    String
+  action      String
+  description String?
 
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  roles RolePermission[]
 
-  @@unique([roleId, resource, action])
-  @@index([roleId])
+  @@unique([resource, action])
   @@map("permissions")
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
 
 // ============================================================================
@@ -152,8 +165,8 @@ model Client {
   contactEmail      String?   @map("contact_email")
   contactPhone      String?   @map("contact_phone")
   address           String?
-  contractStartDate DateTime? @map("contract_start_date") @db.Date
-  contractEndDate   DateTime? @map("contract_end_date") @db.Date
+  contractStartDate DateTime? @map("contract_start_date") 
+  contractEndDate   DateTime? @map("contract_end_date") 
   isActive          Boolean   @default(true) @map("is_active")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
@@ -188,7 +201,7 @@ model ServiceCategory {
   id              String     @id @default(cuid())
   clientId        String     @map("client_id")
   categoryName    String     @map("category_name")
-  description     String?    @db.Text
+  description     String?    
   slaHours        Int        @map("sla_hours")
   priority        SRPriority @default(MEDIUM)
   handlerId       String?    @map("handler_id")
@@ -253,7 +266,7 @@ model SR {
   id                      String     @id @default(cuid())
   srNumber                String     @unique @map("sr_number")
   title                   String
-  description             String     @db.Text
+  description             String     
   status                  SRStatus   @default(REQUESTED)
   priority                SRPriority @default(MEDIUM)
 
@@ -270,11 +283,11 @@ model SR {
   expectedCompletionDate  DateTime? @map("expected_completion_date")
   actualCompletionDate    DateTime? @map("actual_completion_date")
 
-  resolutionDescription   String? @map("resolution_description") @db.Text
-  rejectionReason         String? @map("rejection_reason") @db.Text
+  resolutionDescription   String? @map("resolution_description") 
+  rejectionReason         String? @map("rejection_reason") 
 
   satisfactionRating      Int?    @map("satisfaction_rating")
-  additionalFeedback      String? @map("additional_feedback") @db.Text
+  additionalFeedback      String? @map("additional_feedback") 
 
   attachmentCount         Int @default(0) @map("attachment_count")
   commentCount            Int @default(0) @map("comment_count")
@@ -319,7 +332,7 @@ model SRActivity {
   srId        String         @map("sr_id")
   userId      String         @map("user_id")
   type        SRActivityType
-  description String         @db.Text
+  description String         
   metadata    Json?
   createdAt   DateTime       @default(now()) @map("created_at")
 
@@ -335,7 +348,7 @@ model SRComment {
   id         String   @id @default(cuid())
   srId       String   @map("sr_id")
   userId     String   @map("user_id")
-  content    String   @db.Text
+  content    String   
   isInternal Boolean  @default(false) @map("is_internal")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -386,7 +399,7 @@ model Notification {
   status     NotificationStatus @default(PENDING)
   recipient  String
   subject    String?
-  content    String             @db.Text
+  content    String             
   metadata   Json?
   sentAt     DateTime?          @map("sent_at")
   failReason String?            @map("fail_reason")
@@ -407,7 +420,7 @@ model SRStatusHistory {
   previousStatus SRStatus? @map("previous_status")
   currentStatus  SRStatus  @map("current_status")
   changedBy      String    @map("changed_by")
-  changeReason   String?   @map("change_reason") @db.Text
+  changeReason   String?   @map("change_reason") 
   changedAt      DateTime  @default(now()) @map("changed_at")
 
   sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
