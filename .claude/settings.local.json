@@ -18,7 +18,12 @@
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Prisma 및 데이터베이스 스키마 설정 완료\n\n- Prisma 설치 및 초기화\n- PostgreSQL 연결 설정 (Supabase 준비)\n- 전체 데이터베이스 스키마 정의:\n  * User, Account, Session (NextAuth 인증)\n  * Role, UserRole, Permission (RBAC)\n  * Client, UserClient, ServiceCategory (고객사 관리)\n  * SR, SRActivity, SRComment, SRAttachment (SR 관리)\n  * Notification, SRStatusHistory (알림 및 이력)\n- Prisma Client 생성 (src/generated/prisma)\n- Prisma Singleton 패턴 구현 (src/lib/prisma.ts)\n- dotenv 설정 (환경 변수 로드)\n- .env 파일 생성 (임시 설정)\n\nPhase 0.2 완료: 데이터베이스 설정\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(npx shadcn@latest init -d)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(\"C:\\Users\\sanle\\OneDrive\\문서\\GitHub\\sr\\src\\components\\layout\\Header.tsx\")",
+      "Bash(taskkill /F /FI \"WINDOWTITLE eq sr*\")",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []
