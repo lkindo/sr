@@ -11,7 +11,11 @@
       "Bash(pnpm install:*)",
       "Bash(pnpm dev)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Next.js 프로젝트 초기화 및 기본 설정 완료\n\n- Next.js 15 + React 19 + TypeScript 설정\n- Tailwind CSS 설정\n- ESLint 설정\n- 기본 디렉토리 구조 생성 (src/app, src/components, src/lib)\n- README.md 및 환경 변수 템플릿 추가\n- 개발 서버 실행 확인 완료 (http://localhost:3000)\n\nPhase 0.1 완료: 로컬 개발 환경 구축\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Next.js 프로젝트 초기화 및 기본 설정 완료\n\n- Next.js 15 + React 19 + TypeScript 설정\n- Tailwind CSS 설정\n- ESLint 설정\n- 기본 디렉토리 구조 생성 (src/app, src/components, src/lib)\n- README.md 및 환경 변수 템플릿 추가\n- 개발 서버 실행 확인 완료 (http://localhost:3000)\n\nPhase 0.1 완료: 로컬 개발 환경 구축\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(pnpm add:*)",
+      "Bash(npx prisma init:*)",
+      "Bash(npx prisma:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Prisma 및 데이터베이스 스키마 설정 완료\n\n- Prisma 설치 및 초기화\n- PostgreSQL 연결 설정 (Supabase 준비)\n- 전체 데이터베이스 스키마 정의:\n  * User, Account, Session (NextAuth 인증)\n  * Role, UserRole, Permission (RBAC)\n  * Client, UserClient, ServiceCategory (고객사 관리)\n  * SR, SRActivity, SRComment, SRAttachment (SR 관리)\n  * Notification, SRStatusHistory (알림 및 이력)\n- Prisma Client 생성 (src/generated/prisma)\n- Prisma Singleton 패턴 구현 (src/lib/prisma.ts)\n- dotenv 설정 (환경 변수 로드)\n- .env 파일 생성 (임시 설정)\n\nPhase 0.2 완료: 데이터베이스 설정\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []

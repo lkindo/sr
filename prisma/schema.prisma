@@ -1,0 +1,419 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+// 인증 및 사용자 관리
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  roles         UserRole[]
+  clients       UserClient[]
+
+  // SR Relations
+  createdSRs           SR[]              @relation("SRRequester")
+  assignedSRs          SR[]              @relation("SRAssignee")
+  srActivities         SRActivity[]
+  srComments           SRComment[]
+  srStatusHistory      SRStatusHistory[] @relation("StatusChangeUser")
+
+  // ServiceCategory Relations
+  handledCategories    ServiceCategory[] @relation("CategoryHandler")
+  backupCategories     ServiceCategory[] @relation("CategoryBackupHandler")
+
+  // ClientHandler Relations
+  clientHandlers       ClientHandler[]   @relation("ClientHandlerUser")
+  backupHandlers       ClientHandler[]   @relation("ClientHandlerBackup")
+
+  @@index([email])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================================================
+// 권한 관리 (RBAC)
+// ============================================================================
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  users       UserRole[]
+  permissions Permission[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@index([userId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model Permission {
+  id       String @id @default(cuid())
+  roleId   String @map("role_id")
+  resource String
+  action   String
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, resource, action])
+  @@index([roleId])
+  @@map("permissions")
+}
+
+// ============================================================================
+// 고객사 관리
+// ============================================================================
+
+model Client {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  name              String
+  industry          String?
+  contactPerson     String?   @map("contact_person")
+  contactEmail      String?   @map("contact_email")
+  contactPhone      String?   @map("contact_phone")
+  address           String?
+  contractStartDate DateTime? @map("contract_start_date") @db.Date
+  contractEndDate   DateTime? @map("contract_end_date") @db.Date
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  users             UserClient[]
+  srs               SR[]
+  serviceCategories ServiceCategory[]
+  clientHandlers    ClientHandler[]
+
+  @@index([name])
+  @@index([code])
+  @@index([isActive])
+  @@map("clients")
+}
+
+model UserClient {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  clientId  String   @map("client_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([userId])
+  @@index([clientId])
+  @@map("user_clients")
+}
+
+model ServiceCategory {
+  id              String     @id @default(cuid())
+  clientId        String     @map("client_id")
+  categoryName    String     @map("category_name")
+  description     String?    @db.Text
+  slaHours        Int        @map("sla_hours")
+  priority        SRPriority @default(MEDIUM)
+  handlerId       String?    @map("handler_id")
+  backupHandlerId String?    @map("backup_handler_id")
+  isActive        Boolean    @default(true) @map("is_active")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  client        Client @relation(fields: [clientId], references: [id])
+  handler       User?  @relation("CategoryHandler", fields: [handlerId], references: [id])
+  backupHandler User?  @relation("CategoryBackupHandler", fields: [backupHandlerId], references: [id])
+  srs           SR[]
+
+  @@index([clientId])
+  @@index([handlerId])
+  @@map("service_categories")
+}
+
+model ClientHandler {
+  id              String    @id @default(cuid())
+  clientId        String    @map("client_id")
+  userId          String    @map("user_id")
+  mattermostId    String?   @map("mattermost_id")
+  backupHandlerId String?   @map("backup_handler_id")
+  assignedDate    DateTime  @default(now()) @map("assigned_date")
+  unassignedDate  DateTime? @map("unassigned_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  client        Client @relation(fields: [clientId], references: [id])
+  user          User   @relation("ClientHandlerUser", fields: [userId], references: [id])
+  backupHandler User?  @relation("ClientHandlerBackup", fields: [backupHandlerId], references: [id])
+
+  @@unique([clientId, userId])
+  @@index([clientId])
+  @@index([userId])
+  @@map("client_handlers")
+}
+
+// ============================================================================
+// SR 관리
+// ============================================================================
+
+enum SRStatus {
+  REQUESTED
+  INTAKE
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CONFIRMED
+  REJECTED
+}
+
+enum SRPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model SR {
+  id                      String     @id @default(cuid())
+  srNumber                String     @unique @map("sr_number")
+  title                   String
+  description             String     @db.Text
+  status                  SRStatus   @default(REQUESTED)
+  priority                SRPriority @default(MEDIUM)
+
+  clientId                String  @map("client_id")
+  requesterId             String  @map("requester_id")
+  assigneeId              String? @map("assignee_id")
+  serviceCategoryId       String  @map("service_category_id")
+
+  requestedAt             DateTime  @default(now()) @map("requested_at")
+  intakeAt                DateTime? @map("intake_at")
+  completedAt             DateTime? @map("completed_at")
+  confirmedAt             DateTime? @map("confirmed_at")
+  dueDate                 DateTime? @map("due_date")
+  expectedCompletionDate  DateTime? @map("expected_completion_date")
+  actualCompletionDate    DateTime? @map("actual_completion_date")
+
+  resolutionDescription   String? @map("resolution_description") @db.Text
+  rejectionReason         String? @map("rejection_reason") @db.Text
+
+  satisfactionRating      Int?    @map("satisfaction_rating")
+  additionalFeedback      String? @map("additional_feedback") @db.Text
+
+  attachmentCount         Int @default(0) @map("attachment_count")
+  commentCount            Int @default(0) @map("comment_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  client          Client          @relation(fields: [clientId], references: [id])
+  requester       User            @relation("SRRequester", fields: [requesterId], references: [id])
+  assignee        User?           @relation("SRAssignee", fields: [assigneeId], references: [id])
+  serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
+  activities      SRActivity[]
+  comments        SRComment[]
+  attachments     SRAttachment[]
+  statusHistory   SRStatusHistory[]
+
+  @@index([clientId, status])
+  @@index([requesterId, createdAt])
+  @@index([assigneeId, status])
+  @@index([serviceCategoryId])
+  @@index([srNumber])
+  @@index([status, priority, createdAt])
+  @@map("srs")
+}
+
+enum SRActivityType {
+  CREATED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  ASSIGNED
+  REASSIGNED
+  COMMENTED
+  ATTACHMENT_ADDED
+  ATTACHMENT_REMOVED
+  REOPENED
+  COMPLETED
+  REJECTED
+}
+
+model SRActivity {
+  id          String         @id @default(cuid())
+  srId        String         @map("sr_id")
+  userId      String         @map("user_id")
+  type        SRActivityType
+  description String         @db.Text
+  metadata    Json?
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([srId, createdAt])
+  @@index([userId])
+  @@map("sr_activities")
+}
+
+model SRComment {
+  id         String   @id @default(cuid())
+  srId       String   @map("sr_id")
+  userId     String   @map("user_id")
+  content    String   @db.Text
+  isInternal Boolean  @default(false) @map("is_internal")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([srId, createdAt])
+  @@index([userId])
+  @@map("sr_comments")
+}
+
+model SRAttachment {
+  id         String   @id @default(cuid())
+  srId       String   @map("sr_id")
+  fileName   String   @map("file_name")
+  fileSize   Int      @map("file_size")
+  fileType   String   @map("file_type")
+  fileUrl    String   @map("file_url")
+  uploadedBy String   @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  sr SR @relation(fields: [srId], references: [id], onDelete: Cascade)
+
+  @@index([srId])
+  @@map("sr_attachments")
+}
+
+// ============================================================================
+// 알림 관리
+// ============================================================================
+
+enum NotificationType {
+  EMAIL
+  MATTERMOST
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model Notification {
+  id         String             @id @default(cuid())
+  type       NotificationType
+  status     NotificationStatus @default(PENDING)
+  recipient  String
+  subject    String?
+  content    String             @db.Text
+  metadata   Json?
+  sentAt     DateTime?          @map("sent_at")
+  failReason String?            @map("fail_reason")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  @@index([status, createdAt])
+  @@index([recipient])
+  @@map("notifications")
+}
+
+// ============================================================================
+// SR 상태 이력
+// ============================================================================
+
+model SRStatusHistory {
+  id             String    @id @default(cuid())
+  srId           String    @map("sr_id")
+  previousStatus SRStatus? @map("previous_status")
+  currentStatus  SRStatus  @map("current_status")
+  changedBy      String    @map("changed_by")
+  changeReason   String?   @map("change_reason") @db.Text
+  changedAt      DateTime  @default(now()) @map("changed_at")
+
+  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
+  user User @relation("StatusChangeUser", fields: [changedBy], references: [id])
+
+  @@index([srId, changedAt])
+  @@index([changedBy])
+  @@map("sr_status_history")
+}
