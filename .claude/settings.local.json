@@ -27,7 +27,9 @@
       "Bash(echo:*)",
       "Bash(.env.temp)",
       "Bash(move:*)",
-      "Bash(pnpm db:seed:*)"
+      "Bash(pnpm db:seed:*)",
+      "Bash(test:*)",
+      "Bash(timeout 5 pnpm build:*)"
     ],
     "deny": [],
     "ask": []
