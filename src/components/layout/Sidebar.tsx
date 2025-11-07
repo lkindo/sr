@@ -8,6 +8,7 @@ import {
   FileText,
   Building2,
   Users,
+  Shield,
   Settings,
 } from "lucide-react";
 
@@ -31,6 +32,11 @@ const sidebarItems = [
     title: "사용자 관리",
     href: "/users",
     icon: Users,
+  },
+  {
+    title: "역할 관리",
+    href: "/roles",
+    icon: Shield,
   },
   {
     title: "설정",

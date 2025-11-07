@@ -6,6 +6,7 @@ export const config = {
     "/srs/:path*",
     "/clients/:path*",
     "/users/:path*",
+    "/roles/:path*",
     "/settings/:path*",
   ],
 };
