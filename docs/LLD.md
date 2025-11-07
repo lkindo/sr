@@ -1,9 +1,23 @@
 # SR Management System - Low-Level Design (LLD)
 
-**문서 버전:** 1.0
+**문서 버전:** 1.1
 **작성일:** 2025-11-06
+**최종 수정일:** 2025-11-07
 **프로젝트:** SR 관리 시스템
 **기술 스택:** Next.js 14 + Supabase PostgreSQL + Vercel
+
+---
+
+## 📚 문서 간 참조 가이드
+
+| 문서 | 역할 | 주요 내용 |
+|------|------|-----------|
+| **[PRD.md](SR_Management_System_PRD.md)** | 비즈니스 요구사항 | 기능 정의, 사용자 역할, SR 프로세스 |
+| **[DB.md](DB.md)** | 데이터베이스 설계 | Prisma 스키마, ERD, 테이블 명세 |
+| **[TRD.md](TRD.md)** | 기술 명세 | 아키텍처, 기술 스택, 배포 전략 |
+| **[LLD.md](LLD.md)** | 구현 상세 | **코드, 컴포넌트, 테스트 전략** ⭐ |
+
+**권장 읽는 순서**: PRD → DB → TRD → LLD
 
 ---
 
@@ -48,47 +62,7 @@
 
 ### 계층 구조
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Presentation Layer                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Pages      │  │  Components  │  │   Layouts    │      │
-│  │ (App Router) │  │   (UI/Form)  │  │  (Shared)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                     API Layer (Next.js)                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │Server Actions│  │Route Handlers│  │  Middleware  │      │
-│  │  (RPC-like)  │  │  (REST API)  │  │    (Auth)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    Business Logic Layer                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  SR Service  │  │Auth Service  │  │Notification  │      │
-│  │  (CRUD+Flow) │  │(Permission)  │  │   Service    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                     Data Access Layer                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │Prisma Client │  │  Redis Cache │  │Supabase Store│      │
-│  │  (Database)  │  │   (Upstash)  │  │   (Files)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    Infrastructure Layer                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Supabase    │  │   Upstash    │  │   Vercel     │      │
-│  │  PostgreSQL  │  │    Redis     │  │  Functions   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-```
+시스템의 전체 아키텍처 및 레이어드 아키텍처에 대한 고수준 설명은 **[TRD.md](./TRD.md)** 문서를 참조하십시오. LLD에서는 아래의 상세 디렉토리 구조를 통해 구현 레벨의 구조를 설명합니다.
 
 ### 디렉토리 구조 상세
 
@@ -207,7 +181,7 @@ sr-management/
 │   │   ├── db.ts                    # Prisma Client 인스턴스
 │   │   ├── auth.ts                  # NextAuth 설정
 │   │   ├── redis.ts                 # Upstash Redis 클라이언트
-│   │   ├── storage.ts               # Supabase Storage 클라이언트
+│   │   ├── storage.ts               # Vercel Blob 클라이언트
 │   │   ├── utils.ts                 # 공통 유틸리티
 │   │   ├── validations.ts           # Zod 스키마
 │   │   └── constants.ts             # 상수 정의
@@ -288,360 +262,7 @@ sr-management/
 
 ## 데이터베이스 설계
 
-### Prisma Schema 완전 정의
-
-**prisma/schema.prisma**:
-
-```prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-// ============================================================================
-// 인증 및 사용자 관리
-// ============================================================================
-
-model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  password      String
-  emailVerified DateTime?
-  image         String?
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
-  accounts      Account[]
-  sessions      Session[]
-  roles         UserRole[]
-  clients       UserClient[]
-
-  // SR Relations
-  createdSRs    SR[]       @relation("SRRequester")
-  assignedSRs   SR[]       @relation("SRAssignee")
-  srActivities  SRActivity[]
-  srComments    SRComment[]
-
-  @@index([email])
-  @@index([isActive])
-  @@map("users")
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("sessions")
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-// ============================================================================
-// 권한 관리 (RBAC)
-// ============================================================================
-
-model Role {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  description String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  users       UserRole[]
-  permissions Permission[]
-
-  @@map("roles")
-}
-
-model UserRole {
-  id        String   @id @default(cuid())
-  userId    String
-  roleId    String
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
-  @@map("user_roles")
-}
-
-model Permission {
-  id       String @id @default(cuid())
-  roleId   String
-  resource String // 'sr', 'client', 'user', 'system'
-  action   String // 'create', 'read', 'update', 'delete', 'assign', 'admin'
-
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@unique([roleId, resource, action])
-  @@index([roleId])
-  @@map("permissions")
-}
-
-// ============================================================================
-// 고객사 관리
-// ============================================================================
-
-model Client {
-  id               String   @id @default(cuid())
-  name             String
-  industry         String?
-  contactPerson    String?
-  contactEmail     String?
-  contactPhone     String?
-  address          String?
-  contractStartDate DateTime?
-  contractEndDate   DateTime?
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  users UserClient[]
-  srs   SR[]
-
-  @@index([name])
-  @@index([isActive])
-  @@map("clients")
-}
-
-model UserClient {
-  id        String   @id @default(cuid())
-  userId    String
-  clientId  String
-  createdAt DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, clientId])
-  @@index([userId])
-  @@index([clientId])
-  @@map("user_clients")
-}
-
-// ============================================================================
-// SR 관리
-// ============================================================================
-
-enum SRStatus {
-  INTAKE      // 접수
-  BACKLOG     // 대기
-  IN_PROGRESS // 진행 중
-  ON_HOLD     // 보류
-  COMPLETED   // 완료
-  REJECTED    // 거절
-}
-
-enum SRPriority {
-  CRITICAL // 긴급 (4시간)
-  HIGH     // 높음 (24시간)
-  MEDIUM   // 보통 (72시간)
-  LOW      // 낮음 (168시간)
-}
-
-model SR {
-  id          String     @id @default(cuid())
-  srNumber    String     @unique // AUTO_INCREMENT 또는 커스텀 생성
-  title       String
-  description String     @db.Text
-  status      SRStatus   @default(INTAKE)
-  priority    SRPriority @default(MEDIUM)
-
-  clientId    String
-  requesterId String
-  assigneeId  String?
-
-  requestedAt DateTime   @default(now())
-  dueDate     DateTime?
-  completedAt DateTime?
-
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  // Relations
-  client      Client        @relation(fields: [clientId], references: [id])
-  requester   User          @relation("SRRequester", fields: [requesterId], references: [id])
-  assignee    User?         @relation("SRAssignee", fields: [assigneeId], references: [id])
-
-  activities  SRActivity[]
-  comments    SRComment[]
-  attachments SRAttachment[]
-
-  @@index([clientId, status])
-  @@index([requesterId, createdAt])
-  @@index([assigneeId, status])
-  @@index([srNumber])
-  @@index([status, priority, createdAt])
-  @@map("srs")
-}
-
-enum SRActivityType {
-  CREATED
-  STATUS_CHANGED
-  PRIORITY_CHANGED
-  ASSIGNED
-  REASSIGNED
-  COMMENTED
-  ATTACHMENT_ADDED
-  ATTACHMENT_REMOVED
-  REOPENED
-  COMPLETED
-  REJECTED
-}
-
-model SRActivity {
-  id          String         @id @default(cuid())
-  srId        String
-  userId      String
-  type        SRActivityType
-  description String         @db.Text
-  metadata    Json?          // 추가 정보 (이전 값, 새 값 등)
-  createdAt   DateTime       @default(now())
-
-  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([srId, createdAt])
-  @@index([userId])
-  @@map("sr_activities")
-}
-
-model SRComment {
-  id        String   @id @default(cuid())
-  srId      String
-  userId    String
-  content   String   @db.Text
-  isInternal Boolean @default(false) // 내부 메모인지 여부
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([srId, createdAt])
-  @@index([userId])
-  @@map("sr_comments")
-}
-
-model SRAttachment {
-  id        String   @id @default(cuid())
-  srId      String
-  fileName  String
-  fileSize  Int
-  fileType  String
-  fileUrl   String   // Supabase Storage URL
-  uploadedBy String
-  createdAt DateTime @default(now())
-
-  sr SR @relation(fields: [srId], references: [id], onDelete: Cascade)
-
-  @@index([srId])
-  @@map("sr_attachments")
-}
-
-// ============================================================================
-// 알림 관리
-// ============================================================================
-
-enum NotificationType {
-  EMAIL
-  MATTERMOST
-  IN_APP
-}
-
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-}
-
-model Notification {
-  id         String             @id @default(cuid())
-  type       NotificationType
-  status     NotificationStatus @default(PENDING)
-  recipient  String             // 이메일 주소 또는 사용자 ID
-  subject    String?
-  content    String             @db.Text
-  metadata   Json?              // 추가 정보
-  sentAt     DateTime?
-  failReason String?
-  createdAt  DateTime           @default(now())
-
-  @@index([status, createdAt])
-  @@index([recipient])
-  @@map("notifications")
-}
-```
-
-### 데이터베이스 인덱스 전략
-
-```typescript
-// 주요 쿼리 패턴별 인덱스
-
-// 1. SR 목록 조회 (고객사별, 상태별)
-@@index([clientId, status])
-
-// 2. 사용자별 SR 조회 (요청자, 최신순)
-@@index([requesterId, createdAt])
-
-// 3. 담당자별 SR 조회 (담당자, 상태별)
-@@index([assigneeId, status])
-
-// 4. SR 번호로 검색
-@@index([srNumber])
-
-// 5. SR 우선순위 및 상태 필터링
-@@index([status, priority, createdAt])
-
-// 6. 활동 내역 조회 (SR별, 시간순)
-@@index([srId, createdAt])
-
-// 7. 댓글 조회 (SR별, 시간순)
-@@index([srId, createdAt])
-```
+데이터베이스의 전체 스키마, ERD, 테이블 명세, 인덱스 전략 등은 데이터베이스 설계의 Single Source of Truth인 **[DB.md](./DB.md)** 문서를 참조하십시오.
 
 ### Connection Pooling 설정
 
@@ -702,6 +323,7 @@ const createSRSchema = z.object({
   title: z.string().min(5, '제목은 최소 5자 이상이어야 합니다').max(200),
   description: z.string().min(20, '설명은 최소 20자 이상이어야 합니다'),
   clientId: z.string().cuid(),
+  serviceCategoryId: z.string().cuid('서비스 카테고리를 선택해주세요'),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
 })
 
@@ -710,7 +332,7 @@ const updateSRSchema = z.object({
   title: z.string().min(5).max(200).optional(),
   description: z.string().min(20).optional(),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional(),
-  status: z.enum(['INTAKE', 'BACKLOG', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'REJECTED']).optional(),
+  status: z.enum(['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED']).optional(),
   assigneeId: z.string().cuid().nullable().optional(),
 })
 
@@ -721,7 +343,7 @@ const assignSRSchema = z.object({
 
 const updateSRStatusSchema = z.object({
   srId: z.string().cuid(),
-  status: z.enum(['INTAKE', 'BACKLOG', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'REJECTED']),
+  status: z.enum(['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED']),
   reason: z.string().optional(),
 })
 
@@ -754,6 +376,7 @@ export async function createSR(input: z.infer<typeof createSRSchema>) {
       clientId: validated.clientId,
       requesterId: session.user.id,
       priority: validated.priority as SRPriority,
+      serviceCategoryId: validated.serviceCategoryId,
       dueDate,
       activities: {
         create: {
@@ -1137,7 +760,7 @@ async function generateSRNumber(clientId: string): Promise<string> {
   // SR 번호 형식: CLIENT_CODE-YYYYMMDD-XXXX
   const today = new Date()
   const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
-  const clientCode = client.name.slice(0, 3).toUpperCase()
+  const clientCode = client.code // Client.code 필드 사용
 
   // 오늘 생성된 SR 개수 조회
   const count = await db.sR.count({
@@ -1174,12 +797,13 @@ function validateStateTransition(
   srData: { requesterId: string; assigneeId: string | null }
 ): { valid: boolean; error?: string } {
   const SR_STATE_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
-    INTAKE: ['BACKLOG', 'REJECTED'],
-    BACKLOG: ['IN_PROGRESS', 'ON_HOLD', 'REJECTED'],
-    IN_PROGRESS: ['COMPLETED', 'ON_HOLD', 'BACKLOG'],
-    ON_HOLD: ['IN_PROGRESS', 'BACKLOG'],
-    COMPLETED: ['INTAKE'], // Reopen
-    REJECTED: ['INTAKE'], // Reopen
+    REQUESTED: ['INTAKE', 'REJECTED'],           // 신청 → 접수 또는 거절
+    INTAKE: ['IN_PROGRESS', 'REJECTED'],         // 접수 → 진행 중 또는 거절
+    IN_PROGRESS: ['COMPLETED', 'ON_HOLD'],       // 진행 중 → 완료 또는 보류
+    ON_HOLD: ['IN_PROGRESS', 'REJECTED'],        // 보류 → 진행 중 또는 거절
+    COMPLETED: ['CONFIRMED'],                    // 완료 → 확인 완료
+    CONFIRMED: ['IN_PROGRESS', 'REJECTED'],      // 확인 완료 → 재오픈(진행 중) 또는 거절
+    REJECTED: ['INTAKE'],                        // 거절 → 재오픈(접수)
   }
 
   if (!SR_STATE_TRANSITIONS[currentStatus]?.includes(targetStatus)) {
@@ -1701,11 +1325,12 @@ const priorityColors = {
 } as const
 
 const statusColors = {
+  REQUESTED: 'default',
   INTAKE: 'secondary',
-  BACKLOG: 'default',
   IN_PROGRESS: 'blue',
   ON_HOLD: 'yellow',
   COMPLETED: 'green',
+  CONFIRMED: 'green',
   REJECTED: 'destructive',
 } as const
 
@@ -2153,12 +1778,7 @@ export class SRService {
 
     const today = new Date()
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
-    const clientCode = client.name
-      .split(' ')
-      .map((word) => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 3)
+    const clientCode = client.code // Client.code 필드 사용
 
     const todayStart = new Date(today.setHours(0, 0, 0, 0))
     const todayEnd = new Date(today.setHours(23, 59, 59, 999))
@@ -2284,21 +1904,23 @@ export class SRService {
 
     const [
       total,
+      requested,
       intake,
-      backlog,
       inProgress,
       onHold,
       completed,
+      confirmed,
       rejected,
       byPriority,
       recentSRs,
     ] = await Promise.all([
       db.sR.count({ where }),
+      db.sR.count({ where: { ...where, status: 'REQUESTED' } }),
       db.sR.count({ where: { ...where, status: 'INTAKE' } }),
-      db.sR.count({ where: { ...where, status: 'BACKLOG' } }),
       db.sR.count({ where: { ...where, status: 'IN_PROGRESS' } }),
       db.sR.count({ where: { ...where, status: 'ON_HOLD' } }),
       db.sR.count({ where: { ...where, status: 'COMPLETED' } }),
+      db.sR.count({ where: { ...where, status: 'CONFIRMED' } }),
       db.sR.count({ where: { ...where, status: 'REJECTED' } }),
       db.sR.groupBy({
         by: ['priority'],
@@ -2320,11 +1942,12 @@ export class SRService {
     return {
       total,
       byStatus: {
+        requested,
         intake,
-        backlog,
         inProgress,
         onHold,
         completed,
+        confirmed,
         rejected,
       },
       byPriority: byPriority.reduce(
@@ -2431,138 +2054,38 @@ export class NotificationService {
 }
 ```
 
----
-
-## 알림 시스템
-
-### Inngest Functions
-
-**inngest/client.ts**:
-
-```typescript
-import { Inngest } from 'inngest'
-
-export const inngest = new Inngest({
-  id: 'sr-management',
-  eventKey: process.env.INNGEST_EVENT_KEY,
-})
-```
+### Complete Inngest Functions Implementation
 
 **inngest/functions/send-email.ts**:
 
 ```typescript
-import { inngest } from '../client'
-import { Resend } from 'resend'
+import { inngest } from '@/inngest/client'
+import { sendEmail } from '@/server/email/send'
 import { NotificationService } from '@/server/services/notification-service'
-import { SRCreatedEmail } from '@/emails/sr-created'
-import { SRAssignedEmail } from '@/emails/sr-assigned'
-import { SRCompletedEmail } from '@/emails/sr-completed'
+import { db } from '@/lib/db'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
-export const sendSRCreatedEmail = inngest.createFunction(
-  { id: 'send-sr-created-email', retries: 3 },
-  { event: 'sr/created' },
+export const sendEmailFunction = inngest.createFunction(
+  { id: 'send-email' },
+  { event: 'notification/send' },
   async ({ event, step }) => {
-    const { srNumber, title, priority, requesterEmail, requesterName, clientName } = event.data
-
-    // 알림 레코드 생성
-    const notification = await step.run('create-notification', async () => {
-      return NotificationService.create({
-        type: 'EMAIL',
-        recipient: requesterEmail,
-        subject: `SR ${srNumber} 생성 완료`,
-        content: `SR이 성공적으로 생성되었습니다.`,
-        metadata: event.data,
-      })
-    })
-
-    // 이메일 발송
-    try {
-      await step.run('send-email', async () => {
-        const { error } = await resend.emails.send({
-          from: 'SR Management <noreply@yourdomain.com>',
-          to: requesterEmail,
-          subject: `SR ${srNumber} 생성 완료`,
-          react: SRCreatedEmail({
-            srNumber,
-            title,
-            priority,
-            requesterName,
-            clientName,
-            srUrl: `${process.env.NEXT_PUBLIC_APP_URL}/srs/${event.data.srId}`,
-          }),
-        })
-
-        if (error) throw error
-      })
-
-      // 발송 성공
-      await step.run('mark-as-sent', async () => {
-        return NotificationService.markAsSent(notification.id)
-      })
-
-      return { success: true, notificationId: notification.id }
-    } catch (error) {
-      // 발송 실패
-      await step.run('mark-as-failed', async () => {
-        return NotificationService.markAsFailed(
-          notification.id,
-          error instanceof Error ? error.message : 'Unknown error'
-        )
-      })
-
-      throw error
-    }
-  }
-)
-
-export const sendSRAssignedEmail = inngest.createFunction(
-  { id: 'send-sr-assigned-email', retries: 3 },
-  { event: 'sr/assigned' },
-  async ({ event, step }) => {
-    const { srNumber, title, assigneeEmail, assigneeName, priority, dueDate } = event.data
-
-    const notification = await step.run('create-notification', async () => {
-      return NotificationService.create({
-        type: 'EMAIL',
-        recipient: assigneeEmail,
-        subject: `SR ${srNumber} 할당됨`,
-        content: `새로운 SR이 할당되었습니다.`,
-        metadata: event.data,
-      })
-    })
+    const { notificationId, recipient, subject, content, template } = event.data
 
     try {
+      // 이메일 발송
       await step.run('send-email', async () => {
-        const { error } = await resend.emails.send({
-          from: 'SR Management <noreply@yourdomain.com>',
-          to: assigneeEmail,
-          subject: `SR ${srNumber} 할당됨`,
-          react: SRAssignedEmail({
-            srNumber,
-            title,
-            assigneeName,
-            priority,
-            dueDate,
-            srUrl: `${process.env.NEXT_PUBLIC_APP_URL}/srs/${event.data.srId}`,
-          }),
-        })
-
-        if (error) throw error
+        await sendEmail(recipient, subject, content, template)
       })
 
+      // 발송 성공 처리
       await step.run('mark-as-sent', async () => {
-        return NotificationService.markAsSent(notification.id)
+        await NotificationService.markAsSent(notificationId)
       })
 
-      return { success: true, notificationId: notification.id }
+      return { success: true, notificationId }
     } catch (error) {
+      // 발송 실패 처리
       await step.run('mark-as-failed', async () => {
-        return NotificationService.markAsFailed(
-          notification.id,
-          error instanceof Error ? error.message : 'Unknown error'
-        )
+        await NotificationService.markAsFailed(notificationId, error.message)
       })
 
       throw error
@@ -2574,28 +2097,37 @@ export const sendSRAssignedEmail = inngest.createFunction(
 **inngest/functions/send-mattermost.ts**:
 
 ```typescript
-import { inngest } from '../client'
-import { formatSRCreatedMessage, formatSRAssignedMessage } from '@/lib/notifications/mattermost'
-import { sendMattermostNotification } from '@/lib/notifications/send-mattermost'
+import { inngest } from '@/inngest/client'
+import { db } from '@/lib/db'
+import { NotificationService } from '@/server/services/notification-service'
+import { MattermostWebhookService } from '@/lib/mattermost'
 
-export const sendMattermostSRCreated = inngest.createFunction(
-  { id: 'send-mattermost-sr-created', retries: 3 },
-  { event: 'sr/created' },
+export const sendMattermostFunction = inngest.createFunction(
+  { id: 'send-mattermost' },
+  { event: 'notification/send-mattermost' },
   async ({ event, step }) => {
-    const message = formatSRCreatedMessage({
-      srNumber: event.data.srNumber,
-      title: event.data.title,
-      priority: event.data.priority,
-      requesterName: event.data.requesterName,
-      clientName: event.data.clientName,
-      srUrl: `${process.env.NEXT_PUBLIC_APP_URL}/srs/${event.data.srId}`,
-    })
+    const { notificationId, recipient, message } = event.data
 
-    await step.run('send-mattermost', async () => {
-      return sendMattermostNotification(process.env.MATTERMOST_WEBHOOK_URL!, message)
-    })
+    try {
+      // Mattermost 발송
+      await step.run('send-mattermost', async () => {
+        await MattermostWebhookService.sendMessage(recipient, message)
+      })
 
-    return { success: true }
+      // 발송 성공 처리
+      await step.run('mark-as-sent', async () => {
+        await NotificationService.markAsSent(notificationId)
+      })
+
+      return { success: true, notificationId }
+    } catch (error) {
+      // 발송 실패 처리
+      await step.run('mark-as-failed', async () => {
+        await NotificationService.markAsFailed(notificationId, error.message)
+      })
+
+      throw error
+    }
   }
 )
 ```
@@ -2603,54 +2135,807 @@ export const sendMattermostSRCreated = inngest.createFunction(
 **inngest/functions/sla-monitor.ts**:
 
 ```typescript
-import { inngest } from '../client'
-import { SRService } from '@/server/services/sr-service'
-import { formatSLABreachedMessage } from '@/lib/notifications/mattermost'
-import { sendMattermostNotification } from '@/lib/notifications/send-mattermost'
+import { inngest } from '@/inngest/client'
+import { db } from '@/lib/db'
+import { SRStatus, SRPriority } from '@prisma/client'
+import { NotificationService } from '@/server/services/notification-service'
 
-export const monitorSLA = inngest.createFunction(
-  { id: 'monitor-sla' },
-  { cron: '*/15 * * * *' }, // 15분마다 실행
+export const slaMonitorFunction = inngest.createFunction(
+  { id: 'sla-monitor' },
+  { cron: '0 */1 * * *' }, // 매시 시작 시 체크
   async ({ step }) => {
-    const breachedSRs = await step.run('get-breached-srs', async () => {
-      return SRService.getSLABreachedSRs()
+    // SLA 위반 임박 또는 위반된 SR 조회
+    const now = new Date()
+    const srs = await step.run('get-srs-nearing-sla', async () => {
+      return db.sR.findMany({
+        where: {
+          status: {
+            notIn: ['COMPLETED', 'CONFIRMED', 'REJECTED'],
+          },
+          OR: [
+            // 1시간 이내 SLA 초과 예정
+            { dueDate: { lte: new Date(now.getTime() + 60 * 60 * 1000) } },
+            // 이미 SLA 위반
+            { dueDate: { lt: now } },
+          ],
+        },
+        include: {
+          client: true,
+          requester: true,
+          assignee: true,
+        },
+      })
     })
 
-    for (const sr of breachedSRs) {
-      await step.run(`notify-sla-breach-${sr.id}`, async () => {
-        const message = formatSLABreachedMessage({
-          srNumber: sr.srNumber,
-          title: sr.title,
-          priority: sr.priority,
-          assigneeName: sr.assignee?.name || '미할당',
-          overdueDuration: calculateOverdueDuration(sr.createdAt, sr.priority),
-          srUrl: `${process.env.NEXT_PUBLIC_APP_URL}/srs/${sr.id}`,
-        })
+    const notifications = []
+    for (const sr of srs) {
+      const timeDiffHours = (sr.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60)
 
-        await sendMattermostNotification(process.env.MATTERMOST_WEBHOOK_URL!, message)
-      })
+      let type: 'SLA_WARNING' | 'SLA_VIOLATED' = 'SLA_WARNING'
+      let message = ''
+      
+      if (timeDiffHours < 0) {
+        type = 'SLA_VIOLATED'
+        message = `SR #${sr.srNumber}가 SLA를 ${Math.abs(Math.round(timeDiffHours))}시간 초과했습니다.`
+      } else if (timeDiffHours <= 1) {
+        message = `SR #${sr.srNumber}가 1시간 이내에 SLA를 초과합니다.`
+      } else {
+        // 1시간보다 더 남았으면 경고 보내지 않음
+        continue
+      }
+
+      // 관련자에게 알림
+      const recipients = [sr.assigneeId, sr.requesterId].filter(Boolean)
+      
+      for (const recipientId of recipients) {
+        const notification = await step.run(`create-notification-${sr.id}-${recipientId}`, async () => {
+          return NotificationService.create({
+            type: 'EMAIL',
+            recipient: recipientId,
+            subject: `SLA ${type === 'SLA_VIOLATED' ? '위반' : '임박'} 알림 - SR #${sr.srNumber}`,
+            content: message,
+            metadata: {
+              srId: sr.id,
+              srNumber: sr.srNumber,
+              type,
+              priority: sr.priority
+            }
+          })
+        })
+        notifications.push(notification)
+      }
     }
 
-    return { success: true, breachedCount: breachedSRs.length }
+    return { 
+      processed: srs.length,
+      notifications: notifications.length 
+    }
   }
 )
+```
 
-function calculateOverdueDuration(createdAt: Date, priority: string): string {
-  const SLA_HOURS = {
-    CRITICAL: 4,
-    HIGH: 24,
-    MEDIUM: 72,
-    LOW: 168,
+**inngest/functions/generate-reports.ts**:
+
+```typescript
+import { inngest } from '@/inngest/client'
+import { db } from '@/lib/db'
+import { PDFGenerator } from '@/lib/pdf'
+import { EmailService } from '@/server/services/email-service'
+import { SRStatus, SRPriority } from '@prisma/client'
+
+export const generateReportsFunction = inngest.createFunction(
+  { id: 'generate-reports' },
+  { cron: '0 9 * * 1' }, // 매주 월요일 오전 9시
+  async ({ step }) => {
+    const startOfWeek = new Date()
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()) // 지난 일요일
+    startOfWeek.setHours(0, 0, 0, 0)
+
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(endOfWeek.getDate() + 6) // 이번 토요일
+    endOfWeek.setHours(23, 59, 59, 999)
+
+    // 주간 리포트 생성
+    const reportData = await step.run('generate-report-data', async () => {
+      const [totalSRs, completedSRs, byPriority, byStatus, byClient] = await Promise.all([
+        db.sR.count({
+          where: {
+            createdAt: {
+              gte: startOfWeek,
+              lte: endOfWeek,
+            },
+          },
+        }),
+        db.sR.count({
+          where: {
+            status: 'COMPLETED',
+            completedAt: {
+              gte: startOfWeek,
+              lte: endOfWeek,
+            },
+          },
+        }),
+        db.sR.groupBy({
+          by: ['priority'],
+          where: {
+            createdAt: {
+              gte: startOfWeek,
+              lte: endOfWeek,
+            },
+          },
+          _count: true,
+        }),
+        db.sR.groupBy({
+          by: ['status'],
+          where: {
+            createdAt: {
+              gte: startOfWeek,
+              lte: endOfWeek,
+            },
+          },
+          _count: true,
+        }),
+        db.sR.groupBy({
+          by: ['clientId'],
+          where: {
+            createdAt: {
+              gte: startOfWeek,
+              lte: endOfWeek,
+            },
+          },
+          _count: true,
+        }),
+      ])
+
+      return {
+        totalSRs,
+        completedSRs,
+        byPriority: byPriority.reduce((acc, item) => {
+          acc[item.priority] = item._count
+          return acc
+        }, {}),
+        byStatus: byStatus.reduce((acc, item) => {
+          acc[item.status] = item._count
+          return acc
+        }, {}),
+        byClient: byClient.reduce((acc, item) => {
+          acc[item.clientId] = item._count
+          return acc
+        }, {}),
+        period: {
+          start: startOfWeek,
+          end: endOfWeek,
+        },
+      }
+    })
+
+    // PDF 리포트 생성
+    const pdfBuffer = await step.run('generate-pdf', async () => {
+      return PDFGenerator.generateWeeklyReport(reportData)
+    })
+
+    // 관리자에게 리포트 이메일 발송
+    const adminUsers = await step.run('get-admin-users', async () => {
+      return db.user.findMany({
+        where: {
+          roles: {
+            some: {
+              role: {
+                name: 'SYSTEM_ADMIN',
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+        },
+      })
+    })
+
+    const emailResults = []
+    for (const admin of adminUsers) {
+      const result = await step.run(`send-report-email-${admin.id}`, async () => {
+        return EmailService.sendWeeklyReport({
+          to: admin.email,
+          subject: `주간 SR 리포트 (${reportData.period.start.toLocaleDateString()} - ${reportData.period.end.toLocaleDateString()})`,
+          reportData,
+          pdfBuffer,
+        })
+      })
+      emailResults.push(result)
+    }
+
+    return { 
+      reportData,
+      emailsSent: emailResults.length,
+      success: emailResults.every(r => r.success)
+    }
+  }
+)
+```
+
+### Complete Email Template Implementations
+
+**emails/sr-created.tsx**:
+
+```tsx
+import React from 'react'
+import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components'
+
+interface SRCreatedEmailProps {
+  srNumber: string
+  title: string
+  requesterName: string
+  clientName: string
+  priority: string
+  dueDate?: string
+  srUrl: string
+}
+
+export const SRCreatedEmail = ({
+  srNumber = 'SR-001',
+  title = 'Sample SR Title',
+  requesterName = 'John Doe',
+  clientName = 'Sample Client',
+  priority = 'MEDIUM',
+  dueDate = '2025-01-01',
+  srUrl = 'https://example.com/sr/1'
+}: SRCreatedEmailProps) => {
+  const priorityColors = {
+    CRITICAL: '#dc2626', // red-600
+    HIGH: '#ea580c',     // orange-600
+    MEDIUM: '#ca8a04',   // yellow-600
+    LOW: '#166534',      // green-700
   }
 
-  const slaHours = SLA_HOURS[priority as keyof typeof SLA_HOURS]
-  const deadline = new Date(createdAt)
-  deadline.setHours(deadline.getHours() + slaHours)
+  return (
+    <Html>
+      <Head />
+      <Preview>New SR Created: {srNumber} - {title}</Preview>
+      <Body style={{ backgroundColor: '#f3f4f6', padding: '20px 0' }}>
+        <Container style={{ backgroundColor: '#ffffff', maxWidth: '600px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#1f2937', padding: '24px', textAlign: 'center' }}>
+            <Heading style={{ color: '#ffffff', margin: '0', fontSize: '24px' }}>
+              SR Management System
+            </Heading>
+          </div>
+          
+          <div style={{ padding: '32px 24px' }}>
+            <Heading style={{ color: '#111827', margin: '0 0 16px', fontSize: '20px' }}>
+              New Service Request Created
+            </Heading>
+            
+            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}>
+              <strong>SR #{srNumber}</strong> has been created by {requesterName} from {clientName}.
+            </Text>
+            
+            <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '16px', margin: '16px 0' }}>
+              <Text style={{ color: '#374151', margin: '0 0 8px', fontWeight: 'bold' }}>
+                Title: {title}
+              </Text>
+              <Text style={{ color: '#374151', margin: '0 0 8px' }}>
+                Priority: <span style={{ color: priorityColors[priority as keyof typeof priorityColors] || '#166534', fontWeight: 'bold' }}>{priority}</span>
+              </Text>
+              {dueDate && (
+                <Text style={{ color: '#374151', margin: '0' }}>
+                  Due Date: {dueDate}
+                </Text>
+              )}
+            </div>
+            
+            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}>
+              Please review the new SR and take appropriate action.
+            </Text>
+            
+            <Link 
+              href={srUrl}
+              style={{ 
+                display: 'inline-block', 
+                backgroundColor: '#3b82f6', 
+                color: '#ffffff', 
+                textDecoration: 'none', 
+                padding: '12px 24px', 
+                borderRadius: '4px',
+                fontWeight: 'bold'
+              }}
+            >
+              View SR Details
+            </Link>
+          </div>
+          
+          <div style={{ backgroundColor: '#f3f4f6', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+            <Text style={{ margin: '0' }}>
+              This email was sent by SR Management System
+            </Text>
+          </div>
+        </Container>
+      </Body>
+    </Html>
+  )
+}
 
-  const overdue = Date.now() - deadline.getTime()
-  const hours = Math.floor(overdue / (1000 * 60 * 60))
+export default SRCreatedEmail
+```
 
-  return `${hours}시간`
+**emails/sr-assigned.tsx**:
+
+```tsx
+import React from 'react'
+import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components'
+
+interface SRAssignedEmailProps {
+  srNumber: string
+  title: string
+  assigneeName: string
+  requesterName: string
+  clientName: string
+  priority: string
+  dueDate?: string
+  srUrl: string
+}
+
+export const SRAssignedEmail = ({
+  srNumber = 'SR-001',
+  title = 'Sample SR Title',
+  assigneeName = 'Jane Smith',
+  requesterName = 'John Doe',
+  clientName = 'Sample Client',
+  priority = 'MEDIUM',
+  dueDate = '2025-01-01',
+  srUrl = 'https://example.com/sr/1'
+}: SRAssignedEmailProps) => {
+  const priorityColors = {
+    CRITICAL: '#dc2626', // red-600
+    HIGH: '#ea580c',     // orange-600
+    MEDIUM: '#ca8a04',   // yellow-600
+    LOW: '#166534',      // green-700
+  }
+
+  return (
+    <Html>
+      <Head />
+      <Preview>SR #{srNumber} assigned to you - {title}</Preview>
+      <Body style={{ backgroundColor: '#f3f4f6', padding: '20px 0' }}>
+        <Container style={{ backgroundColor: '#ffffff', maxWidth: '600px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#1f2937', padding: '24px', textAlign: 'center' }}>
+            <Heading style={{ color: '#ffffff', margin: '0', fontSize: '24px' }}>
+              SR Management System
+            </Heading>
+          </div>
+          
+          <div style={{ padding: '32px 24px' }}>
+            <Heading style={{ color: '#111827', margin: '0 0 16px', fontSize: '20px' }}>
+              Service Request Assigned
+            </Heading>
+            
+            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}>
+              SR <strong>#{srNumber}</strong> has been assigned to <strong>{assigneeName}</strong> by {requesterName} from {clientName}.
+            </Text>
+            
+            <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '16px', margin: '16px 0' }}>
+              <Text style={{ color: '#374151', margin: '0 0 8px', fontWeight: 'bold' }}>
+                Title: {title}
+              </Text>
+              <Text style={{ color: '#374151', margin: '0 0 8px' }}>
+                Priority: <span style={{ color: priorityColors[priority as keyof typeof priorityColors] || '#166534', fontWeight: 'bold' }}>{priority}</span>
+              </Text>
+              {dueDate && (
+                <Text style={{ color: '#374151', margin: '0' }}>
+                  Due Date: {dueDate}
+                </Text>
+              )}
+            </div>
+            
+            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}>
+              The assigned user should review and process this SR as soon as possible.
+            </Text>
+            
+            <Link 
+              href={srUrl}
+              style={{ 
+                display: 'inline-block', 
+                backgroundColor: '#3b82f6', 
+                color: '#ffffff', 
+                textDecoration: 'none', 
+                padding: '12px 24px', 
+                borderRadius: '4px',
+                fontWeight: 'bold'
+              }}
+            >
+              View SR Details
+            </Link>
+          </div>
+          
+          <div style={{ backgroundColor: '#f3f4f6', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+            <Text style={{ margin: '0' }}>
+              This email was sent by SR Management System
+            </Text>
+          </div>
+        </Container>
+      </Body>
+    </Html>
+  )
+}
+
+export default SRAssignedEmail
+```
+
+**emails/sr-completed.tsx**:
+
+```tsx
+import React from 'react'
+import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components'
+
+interface SRCompletedEmailProps {
+  srNumber: string
+  title: string
+  assigneeName: string
+  requesterName: string
+  clientName: string
+  completedAt: string
+  resolutionDescription?: string
+  srUrl: string
+}
+
+export const SRCompletedEmail = ({
+  srNumber = 'SR-001',
+  title = 'Sample SR Title',
+  assigneeName = 'Jane Smith',
+  requesterName = 'John Doe',
+  clientName = 'Sample Client',
+  completedAt = '2025-01-01 10:00:00',
+  resolutionDescription = 'The issue has been resolved successfully.',
+  srUrl = 'https://example.com/sr/1'
+}: SRCompletedEmailProps) => {
+  return (
+    <Html>
+      <Head />
+      <Preview>SR #{srNumber} completed - {title}</Preview>
+      <Body style={{ backgroundColor: '#f3f4f6', padding: '20px 0' }}>
+        <Container style={{ backgroundColor: '#ffffff', maxWidth: '600px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#1f2937', padding: '24px', textAlign: 'center' }}>
+            <Heading style={{ color: '#ffffff', margin: '0', fontSize: '24px' }}>
+              SR Management System
+            </Heading>
+          </div>
+          
+          <div style={{ padding: '32px 24px' }}>
+            <Heading style={{ color: '#111827', margin: '0 0 16px', fontSize: '20px' }}>
+              Service Request Completed
+            </Heading>
+            
+            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}>
+              SR <strong>#{srNumber}</strong> has been completed by <strong>{assigneeName}</strong>.
+            </Text>
+            
+            <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '16px', margin: '16px 0' }}>
+              <Text style={{ color: '#374151', margin: '0 0 8px', fontWeight: 'bold' }}>
+                Title: {title}
+              </Text>
+              <Text style={{ color: '#374151', margin: '0 0 8px' }}>
+                Completed by: {assigneeName}
+              </Text>
+              <Text style={{ color: '#374151', margin: '0 0 8px' }}>
+                Completed at: {completedAt}
+              </Text>
+              {resolutionDescription && (
+                <Text style={{ color: '#374151', margin: '0' }}>
+                  Resolution: {resolutionDescription}
+                </Text>
+              )}
+            </div>
+            
+            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}>
+              The SR has been marked as completed. Please review and confirm the resolution.
+            </Text>
+            
+            <Link 
+              href={srUrl}
+              style={{ 
+                display: 'inline-block', 
+                backgroundColor: '#3b82f6', 
+                color: '#ffffff', 
+                textDecoration: 'none', 
+                padding: '12px 24px', 
+                borderRadius: '4px',
+                fontWeight: 'bold'
+              }}
+            >
+              View SR Details
+            </Link>
+          </div>
+          
+          <div style={{ backgroundColor: '#f3f4f6', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
+            <Text style={{ margin: '0' }}>
+              This email was sent by SR Management System
+            </Text>
+          </div>
+        </Container>
+      </Body>
+    </Html>
+  )
+}
+
+export default SRCompletedEmail
+```
+
+## 8. 알림 시스템
+
+### 🟡 Medium - 알림 발송 조건 상세화
+
+**PRD에 알림 트리거가 나열되어 있으나, 정확한 조건 불명확**
+
+**필요한 명세:**
+
+```typescript
+// src/server/services/notification-triggers.ts
+
+export enum NotificationTrigger {
+  SR_CREATED = 'SR_CREATED',
+  SR_ASSIGNED = 'SR_ASSIGNED',
+  SR_STATUS_CHANGED = 'SR_STATUS_CHANGED',
+  SR_COMPLETED = 'SR_COMPLETED',
+  SR_REJECTED = 'SR_REJECTED',
+  SR_REOPENED = 'SR_REOPENED',
+  SR_COMMENT_ADDED = 'SR_COMMENT_ADDED',
+  SLA_WARNING = 'SLA_WARNING',
+  SLA_VIOLATED = 'SLA_VIOLATED',
+  CONTRACT_EXPIRING = 'CONTRACT_EXPIRING'
+}
+
+/**
+ * 알림 발송 조건
+ */
+export interface NotificationCondition {
+  trigger: NotificationTrigger
+  description: string
+  recipients: (sr: SR) => Promise<string[]> // User IDs 또는 Emails
+  channels: ('EMAIL' | 'MATTERMOST' | 'IN_APP')[]
+  immediate: boolean // 즉시 발송 여부
+  template: string
+  enabled: boolean
+}
+
+export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCondition> = {
+  SR_CREATED: {
+    trigger: NotificationTrigger.SR_CREATED,
+    description: 'SR이 생성되었을 때',
+    recipients: async (sr) => {
+      // 해당 고객사의 담당자들
+      const handlers = await db.clientHandler.findMany({
+        where: { clientId: sr.clientId, unassignedDate: null },
+        select: { userId: true }
+      })
+      return handlers.map(h => h.userId)
+    },
+    channels: ['EMAIL', 'MATTERMOST'],
+    immediate: true,
+    template: 'sr-created',
+    enabled: true
+  },
+
+  SR_ASSIGNED: {
+    trigger: NotificationTrigger.SR_ASSIGNED,
+    description: 'SR이 담당자에게 배정되었을 때',
+    recipients: async (sr) => {
+      // 배정된 담당자
+      return sr.assigneeId ? [sr.assigneeId] : []
+    },
+    channels: ['EMAIL', 'MATTERMOST', 'IN_APP'],
+    immediate: true,
+    template: 'sr-assigned',
+    enabled: true
+  },
+
+  SR_STATUS_CHANGED: {
+    trigger: NotificationTrigger.SR_STATUS_CHANGED,
+    description: 'SR 상태가 변경되었을 때',
+    recipients: async (sr) => {
+      // 신청자 + 담당자
+      const recipients = [sr.requesterId]
+      if (sr.assigneeId) {
+        recipients.push(sr.assigneeId)
+      }
+      return recipients
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: true,
+    template: 'sr-status-changed',
+    enabled: true
+  },
+
+  SR_COMPLETED: {
+    trigger: NotificationTrigger.SR_COMPLETED,
+    description: 'SR이 완료되었을 때',
+    recipients: async (sr) => {
+      // 신청자
+      return [sr.requesterId]
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: true,
+    template: 'sr-completed',
+    enabled: true
+  },
+
+  SR_REJECTED: {
+    trigger: NotificationTrigger.SR_REJECTED,
+    description: 'SR이 거절되었을 때',
+    recipients: async (sr) => {
+      // 신청자
+      return [sr.requesterId]
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: true,
+    template: 'sr-rejected',
+    enabled: true
+  },
+
+  SR_COMMENT_ADDED: {
+    trigger: NotificationTrigger.SR_COMMENT_ADDED,
+    description: 'SR에 댓글이 추가되었을 때',
+    recipients: async (sr) => {
+      // 신청자 + 담당자 (댓글 작성자 제외)
+      const recipients = [sr.requesterId]
+      if (sr.assigneeId) {
+        recipients.push(sr.assigneeId)
+      }
+      return recipients
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: false, // 배치로 5분마다 발송
+    template: 'sr-comment-added',
+    enabled: true
+  },
+
+  SLA_WARNING: {
+    trigger: NotificationTrigger.SLA_WARNING,
+    description: 'SLA 위반 임박 (남은 시간 < 25%)',
+    recipients: async (sr) => {
+      // 담당자 + 고객사 관리자
+      const recipients: string[] = []
+
+      if (sr.assigneeId) {
+        recipients.push(sr.assigneeId)
+      }
+
+      // 고객사 관리자
+      const admins = await db.userClient.findMany({
+        where: {
+          clientId: sr.clientId,
+          user: {
+            roles: {
+              some: {
+                role: { name: 'CLIENT_ADMIN' }
+              }
+            }
+          }
+        },
+        select: { userId: true }
+      })
+
+      recipients.push(...admins.map(a => a.userId))
+
+      return [...new Set(recipients)] // 중복 제거
+    },
+    channels: ['EMAIL', 'MATTERMOST'],
+    immediate: true,
+    template: 'sla-warning',
+    enabled: true
+  },
+
+  SLA_VIOLATED: {
+    trigger: NotificationTrigger.SLA_VIOLATED,
+    description: 'SLA 위반',
+    recipients: async (sr) => {
+      // SLA_WARNING과 동일 + 시스템 관리자
+      const warningRecipients = await NOTIFICATION_CONDITIONS.SLA_WARNING.recipients(sr)
+
+      const sysAdmins = await db.user.findMany({
+        where: {
+          roles: {
+            some: {
+              role: { name: 'SYSTEM_ADMIN' }
+            }
+          }
+        },
+        select: { id: true }
+      })
+
+      return [...warningRecipients, ...sysAdmins.map(a => a.id)]
+    },
+    channels: ['EMAIL', 'MATTERMOST'],
+    immediate: true,
+    template: 'sla-violated',
+    enabled: true
+  },
+
+  CONTRACT_EXPIRING: {
+    trigger: NotificationTrigger.CONTRACT_EXPIRING,
+    description: '계약 만료 임박 (30일, 14일, 1일 전)',
+    recipients: async (sr) => {
+      // 고객사 관리자 + 시스템 관리자
+      const admins = await db.userClient.findMany({
+        where: {
+          clientId: sr.clientId,
+          user: {
+            roles: {
+              some: {
+                role: { name: 'CLIENT_ADMIN' }
+              }
+            }
+          }
+        },
+        select: { userId: true }
+      })
+
+      const sysAdmins = await db.user.findMany({
+        where: {
+          roles: {
+            some: {
+              role: { name: 'SYSTEM_ADMIN' }
+            }
+          }
+        },
+        select: { id: true }
+      })
+
+      return [...admins.map(a => a.userId), ...sysAdmins.map(a => a.id)]
+    },
+    channels: ['EMAIL'],
+    immediate: false, // 크론 작업으로 일일 체크
+    template: 'contract-expiring',
+    enabled: true
+  }
+}
+
+/**
+ * 알림 발송 함수
+ */
+export async function sendNotification(
+  trigger: NotificationTrigger,
+  sr: SR
+) {
+  const condition = NOTIFICATION_CONDITIONS[trigger]
+
+  if (!condition.enabled) {
+    return
+  }
+
+  const recipients = await condition.recipients(sr)
+
+  if (recipients.length === 0) {
+    return
+  }
+
+  // 각 채널별로 발송
+  for (const channel of condition.channels) {
+    for (const recipientId of recipients) {
+      await db.notification.create({
+        data: {
+          type: channel,
+          status: 'PENDING',
+          recipient: recipientId,
+          subject: `[SR#${sr.srNumber}] ${trigger}`,
+          content: await renderTemplate(condition.template, sr),
+          metadata: {
+            trigger,
+            srId: sr.id,
+            srNumber: sr.srNumber
+          }
+        }
+      })
+    }
+  }
+
+  // 즉시 발송이면 Inngest 트리거
+  if (condition.immediate) {
+    await inngest.send({
+      name: 'notification/send',
+      data: { trigger, srId: sr.id }
+    })
+  }
 }
 ```
 
@@ -2658,19 +2943,14 @@ function calculateOverdueDuration(createdAt: Date, priority: string): string {
 
 ## 파일 저장소
 
-### Supabase Storage Integration
+### Vercel Blob Integration
 
 **lib/storage.ts**:
 
 ```typescript
-import { createClient } from '@supabase/supabase-js'
+import { put, head, del, list } from '@vercel/blob'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export const BUCKETS = {
+export const STORAGE_PATHS = {
   SR_ATTACHMENTS: 'sr-attachments',
   USER_AVATARS: 'user-avatars',
   CLIENT_LOGOS: 'client-logos',
@@ -2680,73 +2960,80 @@ export const BUCKETS = {
  * 파일 업로드
  */
 export async function uploadFile(
-  bucket: string,
-  path: string,
+  pathname: string,
   file: File | Blob
-): Promise<{ url: string; path: string }> {
-  const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
-  })
+): Promise<{ url: string; downloadUrl: string; pathname: string }> {
+  try {
+    const blob = await put(pathname, file, {
+      access: 'public',
+      token: process.env.BLOB_READ_WRITE_TOKEN!,
+    })
 
-  if (error) {
-    throw new Error(`파일 업로드 실패: ${error.message}`)
-  }
-
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(bucket).getPublicUrl(data.path)
-
-  return {
-    url: publicUrl,
-    path: data.path,
+    return {
+      url: blob.url,
+      downloadUrl: blob.downloadUrl,
+      pathname: blob.pathname,
+    }
+  } catch (error) {
+    throw new Error(`파일 업로드 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
   }
 }
 
 /**
- * 파일 다운로드 URL 생성
+ * 파일 정보 조회
  */
-export function getFileUrl(bucket: string, path: string): string {
-  const {
-    data: { publicUrl },
-  } = supabase.storage.from(bucket).getPublicUrl(path)
+export async function getFileInfo(url: string) {
+  try {
+    const info = await head(url, {
+      token: process.env.BLOB_READ_WRITE_TOKEN!,
+    })
 
-  return publicUrl
+    return info
+  } catch (error) {
+    throw new Error(`파일 정보 조회 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+  }
 }
 
 /**
  * 파일 삭제
  */
-export async function deleteFile(bucket: string, path: string): Promise<void> {
-  const { error } = await supabase.storage.from(bucket).remove([path])
-
-  if (error) {
-    throw new Error(`파일 삭제 실패: ${error.message}`)
+export async function deleteFile(url: string): Promise<void> {
+  try {
+    await del(url, {
+      token: process.env.BLOB_READ_WRITE_TOKEN!,
+    })
+  } catch (error) {
+    throw new Error(`파일 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
   }
 }
 
 /**
  * 여러 파일 삭제
  */
-export async function deleteFiles(bucket: string, paths: string[]): Promise<void> {
-  const { error } = await supabase.storage.from(bucket).remove(paths)
-
-  if (error) {
-    throw new Error(`파일 삭제 실패: ${error.message}`)
+export async function deleteFiles(urls: string[]): Promise<void> {
+  try {
+    await del(urls, {
+      token: process.env.BLOB_READ_WRITE_TOKEN!,
+    })
+  } catch (error) {
+    throw new Error(`파일 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
   }
 }
 
 /**
- * 버킷의 모든 파일 조회
+ * 파일 목록 조회
  */
-export async function listFiles(bucket: string, path: string = '') {
-  const { data, error } = await supabase.storage.from(bucket).list(path)
+export async function listFiles(prefix: string = '') {
+  try {
+    const { blobs } = await list({
+      prefix,
+      token: process.env.BLOB_READ_WRITE_TOKEN!,
+    })
 
-  if (error) {
-    throw new Error(`파일 목록 조회 실패: ${error.message}`)
+    return blobs
+  } catch (error) {
+    throw new Error(`파일 목록 조회 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
   }
-
-  return data
 }
 
 /**
@@ -2755,12 +3042,12 @@ export async function listFiles(bucket: string, path: string = '') {
 export async function uploadSRAttachment(
   srId: string,
   file: File
-): Promise<{ url: string; path: string; size: number; type: string }> {
+): Promise<{ url: string; downloadUrl: string; pathname: string; size: number; type: string }> {
   const timestamp = Date.now()
   const fileName = `${timestamp}-${file.name}`
-  const path = `${srId}/${fileName}`
+  const pathname = `${STORAGE_PATHS.SR_ATTACHMENTS}/${srId}/${fileName}`
 
-  const result = await uploadFile(BUCKETS.SR_ATTACHMENTS, path, file)
+  const result = await uploadFile(pathname, file)
 
   return {
     ...result,
@@ -2782,7 +3069,7 @@ import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { checkSROwnership } from '@/lib/auth/permissions'
-import { uploadSRAttachment, deleteFile, BUCKETS } from '@/lib/storage'
+import { uploadSRAttachment, deleteFile } from '@/lib/storage'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
@@ -2851,9 +3138,8 @@ export async function deleteSRAttachment(id: string) {
     throw new Error('권한이 없습니다')
   }
 
-  // 파일 삭제
-  const path = `${attachment.srId}/${attachment.fileName}`
-  await deleteFile(BUCKETS.SR_ATTACHMENTS, path)
+  // 파일 삭제 (fileUrl을 사용)
+  await deleteFile(attachment.fileUrl)
 
   // DB에서 삭제
   await db.sRAttachment.delete({ where: { id } })

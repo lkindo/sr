@@ -1,11 +1,32 @@
 # SR Management System - Database Design Document
 
 **문서 종류:** DB
-**문서 버전:** 1.1
+**문서 버전:** 1.2
 **작성일:** 2025-11-06
-**최종 수정일:** 2025-11-06
+**최종 수정일:** 2025-11-07
 **작성자:** Development Team
 **검수자:** [검수자 정보]
+
+---
+
+## ⚠️ 중요 안내
+
+**본 문서는 Prisma 스키마 및 데이터베이스 구조의 유일한 정의 문서(Single Source of Truth)입니다.**
+
+다른 문서(PRD, TRD, LLD)에서 데이터베이스 관련 내용이 필요한 경우 본 문서를 참조하세요.
+
+---
+
+## 📚 문서 간 참조 가이드
+
+| 문서 | 역할 | 주요 내용 |
+|------|------|-----------|
+| **[PRD.md](SR_Management_System_PRD.md)** | 비즈니스 요구사항 | 기능 정의, 사용자 역할, SR 프로세스 |
+| **[DB.md](DB.md)** | 데이터베이스 설계 | **Prisma 스키마, ERD, 테이블 명세** ⭐ |
+| **[TRD.md](TRD.md)** | 기술 명세 | 아키텍처, 기술 스택, 배포 전략 |
+| **[LLD.md](LLD.md)** | 구현 상세 | 코드, 컴포넌트, 테스트 전략 |
+
+**권장 읽는 순서**: PRD → DB → TRD → LLD
 
 ---
 
@@ -15,6 +36,7 @@
 |------|--------|-----------|--------|--------|
 | 1.0 | Development Team | DB 설계 초안 작성 | 2025-11-06 | [검수자] |
 | 1.1 | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가 | 2025-11-06 | [검수자] |
+| 1.2 | Development Team | Single Source of Truth 명시, 문서 간 참조 가이드 추가 | 2025-11-07 | [검수자] |
 
 ---
 
@@ -531,7 +553,7 @@ SR(서비스 요청) 정보
 | updated_at | TIMESTAMP | NO | now() | 수정 시간 |
 
 **ENUM 타입:**
-- **status**: `INTAKE`, `BACKLOG`, `IN_PROGRESS`, `ON_HOLD`, `COMPLETED`, `REJECTED`
+- **status**: `REQUESTED`, `INTAKE`, `IN_PROGRESS`, `ON_HOLD`, `COMPLETED`, `CONFIRMED`, `REJECTED`
 - **priority**: `CRITICAL` (4h), `HIGH` (24h), `MEDIUM` (72h), `LOW` (168h)
 
 **인덱스:**
@@ -623,7 +645,7 @@ SR의 첨부파일 메타데이터
 | file_name | VARCHAR(255) | NO | - | 파일명 |
 | file_size | INTEGER | NO | - | 파일 크기 (bytes) |
 | file_type | VARCHAR(100) | NO | - | MIME 타입 |
-| file_url | TEXT | NO | - | Supabase Storage URL |
+| file_url | TEXT | NO | - | Vercel Blob URL |
 | uploaded_by | VARCHAR(30) | NO | - | 업로드한 사용자 ID |
 | created_at | TIMESTAMP | NO | now() | 생성 시간 |
 
@@ -634,7 +656,7 @@ SR의 첨부파일 메타데이터
 **외래 키:**
 - `sr_id` REFERENCES `srs(id)` ON DELETE CASCADE
 
-**저장 위치:** Supabase Storage - `sr-attachments` 버킷
+**저장 위치:** Vercel Blob - `sr-attachments` 경로
 
 ---
 
@@ -705,10 +727,19 @@ model User {
   clients       UserClient[]
 
   // SR Relations
-  createdSRs    SR[]       @relation("SRRequester")
-  assignedSRs   SR[]       @relation("SRAssignee")
-  srActivities  SRActivity[]
-  srComments    SRComment[]
+  createdSRs           SR[]              @relation("SRRequester")
+  assignedSRs          SR[]              @relation("SRAssignee")
+  srActivities         SRActivity[]
+  srComments           SRComment[]
+  srStatusHistory      SRStatusHistory[] @relation("StatusChangeUser")
+
+  // ServiceCategory Relations
+  handledCategories    ServiceCategory[] @relation("CategoryHandler")
+  backupCategories     ServiceCategory[] @relation("CategoryBackupHandler")
+
+  // ClientHandler Relations
+  clientHandlers       ClientHandler[]   @relation("ClientHandlerUser")
+  backupHandlers       ClientHandler[]   @relation("ClientHandlerBackup")
 
   @@index([email])
   @@index([isActive])
@@ -807,6 +838,7 @@ model Permission {
 
 model Client {
   id                String    @id @default(cuid())
+  code              String    @unique // SR 번호 생성에 사용되는 고유 코드 (예: "ACME", "BETA")
   name              String
   industry          String?
   contactPerson     String?   @map("contact_person")
@@ -819,10 +851,14 @@ model Client {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  users UserClient[]
-  srs   SR[]
+  // Relations
+  users             UserClient[]
+  srs               SR[]
+  serviceCategories ServiceCategory[]
+  clientHandlers    ClientHandler[]
 
   @@index([name])
+  @@index([code])
   @@index([isActive])
   @@map("clients")
 }
@@ -842,17 +878,64 @@ model UserClient {
   @@map("user_clients")
 }
 
+model ServiceCategory {
+  id              String     @id @default(cuid())
+  clientId        String     @map("client_id")
+  categoryName    String     @map("category_name")
+  description     String?    @db.Text
+  slaHours        Int        @map("sla_hours")        // SLA 시간 (시간 단위)
+  priority        SRPriority @default(MEDIUM)
+  handlerId       String?    @map("handler_id")       // 기본 담당자
+  backupHandlerId String?    @map("backup_handler_id") // 대체 담당자
+  isActive        Boolean    @default(true) @map("is_active")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  client        Client @relation(fields: [clientId], references: [id])
+  handler       User?  @relation("CategoryHandler", fields: [handlerId], references: [id])
+  backupHandler User?  @relation("CategoryBackupHandler", fields: [backupHandlerId], references: [id])
+  srs           SR[]
+
+  @@index([clientId])
+  @@index([handlerId])
+  @@map("service_categories")
+}
+
+model ClientHandler {
+  id              String    @id @default(cuid())
+  clientId        String    @map("client_id")
+  userId          String    @map("user_id")
+  mattermostId    String?   @map("mattermost_id")
+  backupHandlerId String?   @map("backup_handler_id")
+  assignedDate    DateTime  @default(now()) @map("assigned_date")
+  unassignedDate  DateTime? @map("unassigned_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  client        Client @relation(fields: [clientId], references: [id])
+  user          User   @relation("ClientHandlerUser", fields: [userId], references: [id])
+  backupHandler User?  @relation("ClientHandlerBackup", fields: [backupHandlerId], references: [id])
+
+  @@unique([clientId, userId])
+  @@index([clientId])
+  @@index([userId])
+  @@map("client_handlers")
+}
+
 // ============================================================================
 // SR 관리
 // ============================================================================
 
 enum SRStatus {
-  INTAKE
-  BACKLOG
-  IN_PROGRESS
-  ON_HOLD
-  COMPLETED
-  REJECTED
+  REQUESTED   // 신청 (초기 상태)
+  INTAKE      // 접수 (담당자 확인)
+  IN_PROGRESS // 진행 중
+  ON_HOLD     // 보류
+  COMPLETED   // 완료 (담당자 완료 처리)
+  CONFIRMED   // 확인 완료 (신청자 확인)
+  REJECTED    // 거절
 }
 
 enum SRPriority {
@@ -863,35 +946,57 @@ enum SRPriority {
 }
 
 model SR {
-  id          String     @id @default(cuid())
-  srNumber    String     @unique @map("sr_number")
-  title       String
-  description String     @db.Text
-  status      SRStatus   @default(INTAKE)
-  priority    SRPriority @default(MEDIUM)
+  id                      String     @id @default(cuid())
+  srNumber                String     @unique @map("sr_number")
+  title                   String
+  description             String     @db.Text
+  status                  SRStatus   @default(REQUESTED)
+  priority                SRPriority @default(MEDIUM)
 
-  clientId    String  @map("client_id")
-  requesterId String  @map("requester_id")
-  assigneeId  String? @map("assignee_id")
+  // FK 관계
+  clientId                String  @map("client_id")
+  requesterId             String  @map("requester_id")
+  assigneeId              String? @map("assignee_id")
+  serviceCategoryId       String  @map("service_category_id") // 추가: 서비스 카테고리
 
-  requestedAt DateTime  @default(now()) @map("requested_at")
-  dueDate     DateTime? @map("due_date")
-  completedAt DateTime? @map("completed_at")
+  // 날짜 필드
+  requestedAt             DateTime  @default(now()) @map("requested_at")
+  intakeAt                DateTime? @map("intake_at")
+  completedAt             DateTime? @map("completed_at")
+  confirmedAt             DateTime? @map("confirmed_at")         // 추가: 확인 완료 시간
+  dueDate                 DateTime? @map("due_date")
+  expectedCompletionDate  DateTime? @map("expected_completion_date")
+  actualCompletionDate    DateTime? @map("actual_completion_date")
+
+  // 완료 관련
+  resolutionDescription   String? @map("resolution_description") @db.Text
+  rejectionReason         String? @map("rejection_reason") @db.Text
+
+  // 만족도 (추가)
+  satisfactionRating      Int?    @map("satisfaction_rating") // 1~5
+  additionalFeedback      String? @map("additional_feedback") @db.Text
+
+  // 카운터
+  attachmentCount         Int @default(0) @map("attachment_count")
+  commentCount            Int @default(0) @map("comment_count")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  client      Client         @relation(fields: [clientId], references: [id])
-  requester   User           @relation("SRRequester", fields: [requesterId], references: [id])
-  assignee    User?          @relation("SRAssignee", fields: [assigneeId], references: [id])
-  activities  SRActivity[]
-  comments    SRComment[]
-  attachments SRAttachment[]
+  client          Client          @relation(fields: [clientId], references: [id])
+  requester       User            @relation("SRRequester", fields: [requesterId], references: [id])
+  assignee        User?           @relation("SRAssignee", fields: [assigneeId], references: [id])
+  serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
+  activities      SRActivity[]
+  comments        SRComment[]
+  attachments     SRAttachment[]
+  statusHistory   SRStatusHistory[]
 
   @@index([clientId, status])
   @@index([requesterId, createdAt])
   @@index([assigneeId, status])
+  @@index([serviceCategoryId])
   @@index([srNumber])
   @@index([status, priority, createdAt])
   @@map("srs")
@@ -992,6 +1097,28 @@ model Notification {
   @@index([status, createdAt])
   @@index([recipient])
   @@map("notifications")
+}
+
+// ============================================================================
+// SR 상태 이력
+// ============================================================================
+
+model SRStatusHistory {
+  id             String    @id @default(cuid())
+  srId           String    @map("sr_id")
+  previousStatus SRStatus? @map("previous_status")
+  currentStatus  SRStatus  @map("current_status")
+  changedBy      String    @map("changed_by")
+  changeReason   String?   @map("change_reason") @db.Text
+  changedAt      DateTime  @default(now()) @map("changed_at")
+
+  // Relations
+  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
+  user User @relation("StatusChangeUser", fields: [changedBy], references: [id])
+
+  @@index([srId, changedAt])
+  @@index([changedBy])
+  @@map("sr_status_history")
 }
 ```
 

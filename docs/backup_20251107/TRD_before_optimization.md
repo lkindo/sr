@@ -1,11 +1,24 @@
 # SR(Service Request) 관리 시스템 TRD
 
 **문서 종류:** TRD
-**문서 버전:** 1.1
+**문서 버전:** 1.2
 **작성일:** 2025-11-06
-**최종 수정일:** 2025-11-06
+**최종 수정일:** 2025-11-07
 **작성자:** Development Team
 **검수자:** [검수자 정보]
+
+---
+
+## 📚 문서 간 참조 가이드
+
+| 문서 | 역할 | 주요 내용 |
+|------|------|-----------|
+| **[PRD.md](SR_Management_System_PRD.md)** | 비즈니스 요구사항 | 기능 정의, 사용자 역할, SR 프로세스 |
+| **[DB.md](DB.md)** | 데이터베이스 설계 | Prisma 스키마, ERD, 테이블 명세 |
+| **[TRD.md](TRD.md)** | 기술 명세 | **아키텍처, 기술 스택, 배포 전략** ⭐ |
+| **[LLD.md](LLD.md)** | 구현 상세 | 코드, 컴포넌트, 테스트 전략 |
+
+**권장 읽는 순서**: PRD → DB → TRD → LLD
 
 ---
 
@@ -15,6 +28,7 @@
 |------|--------|-----------|--------|--------|
 | 1.0 | Development Team | TRD 초안 작성 | 2025-11-06 | [검수자] |
 | 1.1 | Development Team | SR 상태 ENUM 통합, 명명 규칙 정리, Prisma 스키마 업데이트 | 2025-11-06 | [검수자] |
+| 1.2 | Development Team | 문서 간 참조 가이드 추가, 중복 제거 최적화 | 2025-11-07 | [검수자] |
 
 ---
 
@@ -343,243 +357,9 @@ export interface SR {
 
 **prisma/schema.prisma**:
 
-```prisma
-generator client {
-  provider = "prisma-client-js"
-}
+**참고:** 전체 Prisma 스키마의 단일 원본(Single Source of Truth)은 `DB.md` 문서에 있습니다. 아래 내용은 주요 모델의 일부이며, 전체 스키마는 `DB.md`를 참조하십시오.
 
-datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
-}
-
-model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String   @map("password_hash")
-  username      String
-  phone         String
-  firstName     String?  @map("first_name")
-  lastName      String?  @map("last_name")
-  profileImage  String?  @map("profile_image_url")
-  status        UserStatus @default(ACTIVE)
-  lastLoginAt   DateTime? @map("last_login_at")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  clientUsers   ClientUser[]
-  requestedSRs  SR[]         @relation("RequesterSRs")
-  handledSRs    SR[]         @relation("HandlerSRs")
-
-  @@map("users")
-}
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  SLEEPING
-  DELETED
-}
-
-model Client {
-  id              String       @id @default(cuid())
-  clientCode      String       @unique @map("client_code")
-  clientName      String       @unique @map("client_name")
-  industryType    String?      @map("industry_type")
-  region          String?
-  contactEmail    String       @map("contact_email")
-  contactPhone    String       @map("contact_phone")
-  websiteUrl      String?      @map("website_url")
-  logoUrl         String?      @map("logo_url")
-  description     String?
-  contractStart   DateTime?    @map("contract_start_date")
-  contractEnd     DateTime?    @map("contract_end_date")
-  status          ClientStatus @default(ACTIVE)
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
-
-  // Relations
-  clientUsers     ClientUser[]
-  srs             SR[]
-  handlers        ClientHandler[]
-
-  @@map("clients")
-}
-
-enum ClientStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-  TERMINATED
-}
-
-model ClientUser {
-  id            String    @id @default(cuid())
-  userId        String    @map("user_id")
-  clientId      String    @map("client_id")
-  roleId        String    @map("role_id")
-  department    String?
-  team          String?
-  assignedDate  DateTime  @default(now()) @map("assigned_date")
-  unassignedDate DateTime? @map("unassigned_date")
-  isPrimary     Boolean   @default(false) @map("is_primary")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  user          User      @relation(fields: [userId], references: [id])
-  client        Client    @relation(fields: [clientId], references: [id])
-  role          Role      @relation(fields: [roleId], references: [id])
-
-  @@map("client_users")
-  @@index([userId])
-  @@index([clientId])
-}
-
-model SR {
-  id                    String      @id @default(cuid())
-  srCode                String      @unique @map("sr_code")
-  clientId              String      @map("client_id")
-  requesterId           String      @map("requester_id")
-  handlerId             String?     @map("handler_id")
-  title                 String
-  description           String      @db.Text
-  serviceCategoryId     String      @map("service_category_id")
-  status                SRStatus    @default(REQUESTED)
-  priority              SRPriority  @default(MEDIUM)
-  requestedAt           DateTime    @default(now()) @map("requested_at")
-  intakeAt              DateTime?   @map("intake_at")
-  completedAt           DateTime?   @map("completed_at")
-  confirmedAt           DateTime?   @map("confirmed_at")
-  expectedCompletionDate DateTime?  @map("expected_completion_date")
-  actualCompletionDate  DateTime?   @map("actual_completion_date")
-  resolutionDescription String?     @map("resolution_description") @db.Text
-  rejectionReason       String?     @map("rejection_reason") @db.Text
-  attachmentCount       Int         @default(0) @map("attachment_count")
-  commentCount          Int         @default(0) @map("comment_count")
-  satisfactionRating    Int?        @map("satisfaction_rating")
-  additionalFeedback    String?     @map("additional_feedback") @db.Text
-  createdAt             DateTime    @default(now()) @map("created_at")
-  updatedAt             DateTime    @updatedAt @map("updated_at")
-
-  // Relations
-  client                Client      @relation(fields: [clientId], references: [id])
-  requester             User        @relation("RequesterSRs", fields: [requesterId], references: [id])
-  handler               User?       @relation("HandlerSRs", fields: [handlerId], references: [id])
-  comments              SRComment[]
-  attachments           SRAttachment[]
-  statusHistory         SRStatusHistory[]
-
-  @@map("srs")
-  @@index([clientId])
-  @@index([requesterId])
-  @@index([handlerId])
-  @@index([status])
-  @@index([priority])
-  @@index([createdAt])
-}
-
-enum SRStatus {
-  REQUESTED
-  INTAKE
-  IN_PROGRESS
-  COMPLETED
-  CONFIRMED
-  REJECTED
-  ON_HOLD
-}
-
-enum SRPriority {
-  CRITICAL
-  HIGH
-  MEDIUM
-  LOW
-}
-
-model Role {
-  id          String   @id @default(cuid())
-  roleName    String   @unique @map("role_name")
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  clientUsers ClientUser[]
-  rolePermissions RolePermission[]
-
-  @@map("roles")
-}
-
-model Permission {
-  id              String   @id @default(cuid())
-  permissionName  String   @unique @map("permission_name")
-  description     String?
-  module          String
-  action          String
-  createdAt       DateTime @default(now()) @map("created_at")
-
-  // Relations
-  rolePermissions RolePermission[]
-
-  @@map("permissions")
-}
-
-model RolePermission {
-  id           String   @id @default(cuid())
-  roleId       String   @map("role_id")
-  permissionId String   @map("permission_id")
-  createdAt    DateTime @default(now()) @map("created_at")
-
-  // Relations
-  role         Role       @relation(fields: [roleId], references: [id])
-  permission   Permission @relation(fields: [permissionId], references: [id])
-
-  @@map("role_permissions")
-  @@unique([roleId, permissionId])
-}
-
-// NextAuth.js 관련 모델
-model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-```
+*전체 스키마는 `DB.md`에서 관리됩니다.*
 
 **Prisma Client 설정**:
 
@@ -1021,6 +801,635 @@ export async function POST(request: NextRequest) {
 }
 ```
 
+### 완전한 API 명세
+
+#### API 응답 형식 표준
+
+모든 Server Action은 다음 표준 응답 형식을 따릅니다:
+
+```typescript
+// 성공 응답
+interface SuccessResponse<T> {
+  success: true
+  data: T
+}
+
+// 에러 응답
+interface ErrorResponse {
+  success: false
+  error: {
+    code: string       // 에러 코드 (예: "ERR_1001")
+    message: string    // 사용자에게 표시할 메시지
+    details?: any      // 추가 디버깅 정보 (개발 환경에만)
+  }
+}
+
+type ActionResponse<T> = SuccessResponse<T> | ErrorResponse
+```
+
+### 5. 에러 코드 및 메시지 미정의
+
+#### 🟡 Medium - 표준 에러 코드 정의 필요
+
+**현재 상태:**
+- 에러 메시지가 하드코딩됨
+- 다국어 지원 불가
+- 프론트엔드에서 에러 처리 어려움
+
+**권장 해결책:**
+
+```typescript
+// src/types/errors.ts
+
+export enum ErrorCode {
+  // 인증 에러 (1000번대)
+  UNAUTHORIZED = 'ERR_1001',
+  INVALID_CREDENTIALS = 'ERR_1002',
+  EMAIL_NOT_VERIFIED = 'ERR_1003',
+  SESSION_EXPIRED = 'ERR_1004',
+
+  // 권한 에러 (2000번대)
+  FORBIDDEN = 'ERR_2001',
+  INSUFFICIENT_PERMISSION = 'ERR_2002',
+  CLIENT_ACCESS_DENIED = 'ERR_2003',
+
+  // 검증 에러 (3000번대)
+  VALIDATION_FAILED = 'ERR_3001',
+  INVALID_INPUT = 'ERR_3002',
+  REQUIRED_FIELD_MISSING = 'ERR_3003',
+  INVALID_FORMAT = 'ERR_3004',
+
+  // 리소스 에러 (4000번대)
+  NOT_FOUND = 'ERR_4001',
+  SR_NOT_FOUND = 'ERR_4002',
+  CLIENT_NOT_FOUND = 'ERR_4003',
+  USER_NOT_FOUND = 'ERR_4004',
+
+  // 비즈니스 로직 에러 (5000번대)
+  INVALID_STATE_TRANSITION = 'ERR_5001',
+  SR_ALREADY_COMPLETED = 'ERR_5002',
+  SLA_EXCEEDED = 'ERR_5003',
+  DUPLICATE_SR_NUMBER = 'ERR_5004',
+
+  // 파일 에러 (6000번대)
+  FILE_TOO_LARGE = 'ERR_6001',
+  INVALID_FILE_TYPE = 'ERR_6002',
+  UPLOAD_FAILED = 'ERR_6003',
+
+  // 시스템 에러 (9000번대)
+  INTERNAL_SERVER_ERROR = 'ERR_9001',
+  DATABASE_ERROR = 'ERR_9002',
+  EXTERNAL_SERVICE_ERROR = 'ERR_9003'
+}
+
+/**
+ * 에러 메시지 (한국어)
+ */
+export const ERROR_MESSAGES: Record<ErrorCode, string> = {
+  // 인증 에러
+  [ErrorCode.UNAUTHORIZED]: '인증이 필요합니다',
+  [ErrorCode.INVALID_CREDENTIALS]: '이메일 또는 비밀번호가 올바르지 않습니다',
+  [ErrorCode.EMAIL_NOT_VERIFIED]: '이메일 인증이 완료되지 않았습니다',
+  [ErrorCode.SESSION_EXPIRED]: '세션이 만료되었습니다. 다시 로그인해주세요',
+
+  // 권한 에러
+  [ErrorCode.FORBIDDEN]: '접근 권한이 없습니다',
+  [ErrorCode.INSUFFICIENT_PERMISSION]: '해당 작업을 수행할 권한이 없습니다',
+  [ErrorCode.CLIENT_ACCESS_DENIED]: '해당 고객사에 접근 권한이 없습니다',
+
+  // 검증 에러
+  [ErrorCode.VALIDATION_FAILED]: '입력값 검증에 실패했습니다',
+  [ErrorCode.INVALID_INPUT]: '유효하지 않은 입력값입니다',
+  [ErrorCode.REQUIRED_FIELD_MISSING]: '필수 항목이 누락되었습니다',
+  [ErrorCode.INVALID_FORMAT]: '형식이 올바르지 않습니다',
+
+  // 리소스 에러
+  [ErrorCode.NOT_FOUND]: '요청한 리소스를 찾을 수 없습니다',
+  [ErrorCode.SR_NOT_FOUND]: 'SR을 찾을 수 없습니다',
+  [ErrorCode.CLIENT_NOT_FOUND]: '고객사를 찾을 수 없습니다',
+  [ErrorCode.USER_NOT_FOUND]: '사용자를 찾을 수 없습니다',
+
+  // 비즈니스 로직 에러
+  [ErrorCode.INVALID_STATE_TRANSITION]: '현재 상태에서 해당 상태로 변경할 수 없습니다',
+  [ErrorCode.SR_ALREADY_COMPLETED]: '이미 완료된 SR입니다',
+  [ErrorCode.SLA_EXCEEDED]: 'SLA 기한이 초과되었습니다',
+  [ErrorCode.DUPLICATE_SR_NUMBER]: 'SR 번호가 중복되었습니다',
+
+  // 파일 에러
+  [ErrorCode.FILE_TOO_LARGE]: '파일 크기가 너무 큽니다 (최대 10MB)',
+  [ErrorCode.INVALID_FILE_TYPE]: '지원하지 않는 파일 형식입니다',
+  [ErrorCode.UPLOAD_FAILED]: '파일 업로드에 실패했습니다',
+
+  // 시스템 에러
+  [ErrorCode.INTERNAL_SERVER_ERROR]: '서버 오류가 발생했습니다',
+  [ErrorCode.DATABASE_ERROR]: '데이터베이스 오류가 발생했습니다',
+  [ErrorCode.EXTERNAL_SERVICE_ERROR]: '외부 서비스 연동 중 오류가 발생했습니다'
+}
+
+/**
+ * 표준 에러 응답
+ */
+export interface ErrorResponse {
+  success: false
+  error: {
+    code: ErrorCode
+    message: string
+    details?: any
+    timestamp: string
+  }
+}
+
+/**
+ * 에러 생성 헬퍼
+ */
+export function createErrorResponse(
+  code: ErrorCode,
+  details?: any
+): ErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      message: ERROR_MESSAGES[code],
+      details,
+      timestamp: new Date().toISOString()
+    }
+  }
+}
+```
+
+**사용 예시:**
+```typescript
+// Server Action에서
+if (!sr) {
+  return createErrorResponse(ErrorCode.SR_NOT_FOUND, { srId })
+}
+
+if (!canTransition(sr.status, newStatus)) {
+  return createErrorResponse(ErrorCode.INVALID_STATE_TRANSITION, {
+    currentStatus: sr.status,
+    targetStatus: newStatus
+  })
+}
+```
+
+#### SR 관리 API
+
+##### 1. createSR - SR 생성
+
+**경로**: `src/server/actions/sr.ts`
+
+**Input Schema**:
+```typescript
+const createSRSchema = z.object({
+  title: z.string()
+    .min(5, 'SR 제목은 최소 5자 이상이어야 합니다')
+    .max(200, 'SR 제목은 최대 200자까지 입력 가능합니다'),
+
+  description: z.string()
+    .min(20, 'SR 상세 설명은 최소 20자 이상이어야 합니다')
+    .max(5000, 'SR 상세 설명은 최대 5000자까지 입력 가능합니다'),
+
+  clientId: z.string().cuid('유효하지 않은 고객사 ID입니다'),
+
+  serviceCategoryId: z.string().cuid('유효하지 않은 서비스 카테고리 ID입니다'),
+
+  priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'])
+    .default('MEDIUM'),
+
+  attachments: z.array(z.object({
+    fileName: z.string(),
+    fileSize: z.number().max(100 * 1024 * 1024, '파일 크기는 100MB를 초과할 수 없습니다'),
+    fileType: z.string(),
+    fileUrl: z.string().url()
+  })).optional()
+})
+
+type CreateSRInput = z.infer<typeof createSRSchema>
+```
+
+**Output**:
+```typescript
+interface CreateSROutput {
+  id: string
+  srNumber: string
+  title: string
+  status: SRStatus
+  priority: SRPriority
+  createdAt: Date
+  dueDate: Date
+}
+```
+
+**권한**:
+- `CLIENT_USER`: 본인이 속한 고객사에만 생성 가능
+- `DEVELOPER`: 모든 고객사에 생성 가능
+- `CLIENT_ADMIN`: 본인이 속한 고객사에만 생성 가능
+- `SYSTEM_ADMIN`: 모든 고객사에 생성 가능
+
+**에러 코드**:
+- `ERR_1001`: Unauthorized (인증 실패)
+- `ERR_2001`: Forbidden (권한 없음)
+- `ERR_3001`: ValidationError (입력 검증 실패)
+- `ERR_4001`: NotFoundError (고객사 또는 카테고리 없음)
+
+---
+
+##### 2. getSR - SR 조회
+
+**Input**:
+```typescript
+interface GetSRInput {
+  id: string  // SR ID
+}
+```
+
+**Output**:
+```typescript
+interface GetSROutput {
+  id: string
+  srNumber: string
+  title: string
+  description: string
+  status: SRStatus
+  priority: SRPriority
+  client: {
+    id: string
+    name: string
+    code: string
+  }
+  requester: {
+    id: string
+    name: string
+    email: string
+  }
+  assignee: {
+    id: string
+    name: string
+    email: string
+  } | null
+  serviceCategory: {
+    id: string
+    categoryName: string
+  }
+  requestedAt: Date
+  intakeAt: Date | null
+  completedAt: Date | null
+  confirmedAt: Date | null
+  dueDate: Date
+  attachmentCount: number
+  commentCount: number
+  activities: SRActivity[]
+}
+```
+
+---
+
+##### 3. getSRList - SR 목록 조회
+
+**Input**:
+```typescript
+interface GetSRListInput {
+  // 필터
+  status?: SRStatus[]
+  priority?: SRPriority[]
+  clientId?: string
+  assigneeId?: string
+  requesterId?: string
+  search?: string  // 제목, SR 번호 검색
+
+  // 날짜 필터
+  requestedAfter?: Date
+  requestedBefore?: Date
+
+  // 정렬
+  sortBy?: 'createdAt' | 'updatedAt' | 'dueDate' | 'priority'
+  sortOrder?: 'asc' | 'desc'
+
+  // 페이지네이션
+  page?: number
+  limit?: number
+}
+```
+
+**Output**:
+```typescript
+interface GetSRListOutput {
+  data: SR[]
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
+}
+```
+
+---
+
+##### 4. updateSR - SR 수정
+
+**Input**:
+```typescript
+const updateSRSchema = z.object({
+  id: z.string().cuid(),
+  title: z.string().min(5).max(200).optional(),
+  description: z.string().min(20).optional(),
+  priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional(),
+  serviceCategoryId: z.string().cuid().optional(),
+})
+```
+
+**권한**:
+- `CLIENT_USER`: 본인이 생성한 SR만 수정 가능 (REQUESTED 상태에서만)
+- `DEVELOPER`: 할당된 SR 수정 가능
+- `SYSTEM_ADMIN`: 모든 SR 수정 가능
+
+---
+
+##### 5. updateSRStatus - SR 상태 변경
+
+**Input**:
+```typescript
+interface UpdateSRStatusInput {
+  srId: string
+  status: SRStatus
+  reason?: string  // REJECTED, ON_HOLD 시 필수
+  resolutionDescription?: string  // COMPLETED 시 필수
+}
+```
+
+**상태 전이 규칙**:
+```typescript
+const SR_STATE_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
+  REQUESTED: ['INTAKE', 'REJECTED'],
+  INTAKE: ['IN_PROGRESS', 'REJECTED'],
+  IN_PROGRESS: ['COMPLETED', 'ON_HOLD'],
+  ON_HOLD: ['IN_PROGRESS', 'REJECTED'],
+  COMPLETED: ['CONFIRMED'],
+  CONFIRMED: ['IN_PROGRESS', 'REJECTED'],
+  REJECTED: ['INTAKE'],
+}
+```
+
+---
+
+##### 6. assignSR - SR 담당자 배정
+
+**Input**:
+```typescript
+interface AssignSRInput {
+  srId: string
+  assigneeId: string
+}
+```
+
+**권한**:
+- `DEVELOPER`: 본인에게만 배정 가능
+- `CLIENT_ADMIN`: 해당 고객사 DEVELOPER에게 배정 가능
+- `SYSTEM_ADMIN`: 모든 DEVELOPER에게 배정 가능
+
+---
+
+#### SR 댓글 API
+
+##### 7. createSRComment - 댓글 작성
+
+**Input**:
+```typescript
+const createSRCommentSchema = z.object({
+  srId: z.string().cuid(),
+  content: z.string().min(1).max(2000),
+  isInternal: z.boolean().default(false)  // 내부 노트 여부
+})
+```
+
+**권한**:
+- `isInternal=true`: DEVELOPER, SYSTEM_ADMIN만 가능
+
+---
+
+##### 8. getSRComments - 댓글 목록 조회
+
+**Input**:
+```typescript
+interface GetSRCommentsInput {
+  srId: string
+  includeInternal?: boolean  // 내부 노트 포함 여부
+}
+```
+
+---
+
+#### SR 첨부파일 API
+
+##### 9. uploadSRAttachment - 첨부파일 업로드
+
+**Input** (FormData):
+```typescript
+{
+  srId: string
+  file: File  // 최대 100MB
+}
+```
+
+**Output**:
+```typescript
+interface UploadSRAttachmentOutput {
+  id: string
+  fileName: string
+  fileSize: number
+  fileType: string
+  fileUrl: string
+  uploadedAt: Date
+}
+```
+
+---
+
+##### 10. getSRAttachments - 첨부파일 목록
+
+**Input**:
+```typescript
+interface GetSRAttachmentsInput {
+  srId: string
+}
+```
+
+---
+
+#### 고객사 관리 API
+
+##### 11. createClient - 고객사 생성
+
+**Input**:
+```typescript
+const createClientSchema = z.object({
+  code: z.string()
+    .min(2, '고객사 코드는 최소 2자 이상이어야 합니다')
+    .max(10, '고객사 코드는 최대 10자까지 입력 가능합니다')
+    .regex(/^[A-Z0-9]+$/, '고객사 코드는 대문자 영문과 숫자만 가능합니다'),
+
+  name: z.string().min(2).max(100),
+
+  industry: z.string().optional(),
+
+  contactPerson: z.string().optional(),
+  contactEmail: z.string().email().optional(),
+  contactPhone: z.string().optional(),
+
+  contractStartDate: z.date().optional(),
+  contractEndDate: z.date().optional(),
+})
+```
+
+**권한**: `SYSTEM_ADMIN`만 가능
+
+---
+
+##### 12. getClientList - 고객사 목록
+
+**Input**:
+```typescript
+interface GetClientListInput {
+  isActive?: boolean
+  search?: string
+  page?: number
+  limit?: number
+}
+```
+
+---
+
+#### 서비스 카테고리 API
+
+##### 13. createServiceCategory - 카테고리 생성
+
+**Input**:
+```typescript
+const createServiceCategorySchema = z.object({
+  clientId: z.string().cuid(),
+  categoryName: z.string().min(2).max(100),
+  description: z.string().optional(),
+  slaHours: z.number().int().positive(),
+  priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
+  handlerId: z.string().cuid().optional(),
+  backupHandlerId: z.string().cuid().optional(),
+})
+```
+
+**권한**: `CLIENT_ADMIN`, `SYSTEM_ADMIN`
+
+---
+
+##### 14. getServiceCategories - 카테고리 목록
+
+**Input**:
+```typescript
+interface GetServiceCategoriesInput {
+  clientId?: string
+  isActive?: boolean
+}
+```
+
+---
+
+#### 사용자 관리 API
+
+##### 15. createUser - 사용자 생성
+
+**Input**:
+```typescript
+const createUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(2).max(100),
+  phone: z.string().optional(),
+  password: z.string().min(8),
+  roleId: z.string().cuid(),
+  clientIds: z.array(z.string().cuid()).optional(),
+})
+```
+
+**권한**: `SYSTEM_ADMIN`, `CLIENT_ADMIN`
+
+---
+
+##### 16. getUserList - 사용자 목록
+
+**Input**:
+```typescript
+interface GetUserListInput {
+  clientId?: string
+  roleId?: string
+  isActive?: boolean
+  search?: string
+  page?: number
+  limit?: number
+}
+```
+
+---
+
+#### 대시보드 API
+
+##### 17. getDashboardStats - 대시보드 통계
+
+**Output**:
+```typescript
+interface DashboardStatsOutput {
+  total: number
+  byStatus: {
+    requested: number
+    intake: number
+    inProgress: number
+    onHold: number
+    completed: number
+    confirmed: number
+    rejected: number
+  }
+  byPriority: {
+    CRITICAL: number
+    HIGH: number
+    MEDIUM: number
+    LOW: number
+  }
+  slaViolations: number
+  recentSRs: SR[]
+}
+```
+
+---
+
+##### 18. getMySRs - 내 SR 목록
+
+본인이 신청한 SR 목록을 조회합니다.
+
+**Output**: `GetSRListOutput`과 동일
+
+---
+
+##### 19. getAssignedSRs - 할당된 SR 목록
+
+본인에게 할당된 SR 목록을 조회합니다.
+
+**Output**: `GetSRListOutput`과 동일
+
+---
+
+##### 20. getSLAViolations - SLA 위반 SR 목록
+
+SLA를 위반한 SR 목록을 조회합니다.
+
+**Output**:
+```typescript
+interface SLAViolation {
+  sr: SR
+  violationType: 'INTAKE' | 'RESOLUTION'
+  deadline: Date
+  overdueDays: number
+}
+```
+
 ---
 
 ## 인증 및 보안
@@ -1345,214 +1754,279 @@ export async function listFiles(bucket: string, path?: string) {
 
 ## 알림 시스템
 
-### Resend + React Email
+### 🟡 Medium - 알림 발송 조건 상세화
 
-**이메일 템플릿 (emails/sr-created.tsx)**:
+**PRD에 알림 트리거가 나열되어 있으나, 정확한 조건 불명확**
 
-```typescript
-import {
-  Body,
-  Button,
-  Container,
-  Head,
-  Heading,
-  Hr,
-  Html,
-  Preview,
-  Section,
-  Text,
-} from '@react-email/components'
-
-interface SRCreatedEmailProps {
-  srCode: string
-  title: string
-  clientName: string
-  requesterName: string
-  priority: string
-  description: string
-  srUrl: string
-}
-
-export default function SRCreatedEmail({
-  srCode,
-  title,
-  clientName,
-  requesterName,
-  priority,
-  description,
-  srUrl,
-}: SRCreatedEmailProps) {
-  return (
-    <Html>
-      <Head />
-      <Preview>새로운 SR이 등록되었습니다 - {srCode}</Preview>
-      <Body style={main}>
-        <Container style={container}>
-          <Heading style={h1}>새로운 SR이 등록되었습니다</Heading>
-
-          <Text style={text}>안녕하세요,</Text>
-
-          <Text style={text}>
-            새로운 Service Request가 등록되었습니다. 확인 후 접수 처리 부탁드립니다.
-          </Text>
-
-          <Section style={infoBox}>
-            <Text style={infoLabel}>SR 번호:</Text>
-            <Text style={infoValue}>{srCode}</Text>
-
-            <Text style={infoLabel}>제목:</Text>
-            <Text style={infoValue}>{title}</Text>
-
-            <Text style={infoLabel}>고객사:</Text>
-            <Text style={infoValue}>{clientName}</Text>
-
-            <Text style={infoLabel}>신청자:</Text>
-            <Text style={infoValue}>{requesterName}</Text>
-
-            <Text style={infoLabel}>우선순위:</Text>
-            <Text style={infoValue}>{priority}</Text>
-
-            <Text style={infoLabel}>설명:</Text>
-            <Text style={infoValue}>{description}</Text>
-          </Section>
-
-          <Section style={buttonContainer}>
-            <Button style={button} href={srUrl}>
-              SR 상세 보기
-            </Button>
-          </Section>
-
-          <Hr style={hr} />
-
-          <Text style={footer}>
-            🤖 Generated with SR Management System
-          </Text>
-        </Container>
-      </Body>
-    </Html>
-  )
-}
-
-const main = {
-  backgroundColor: '#f6f9fc',
-  fontFamily:
-    '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
-}
-
-const container = {
-  backgroundColor: '#ffffff',
-  margin: '0 auto',
-  padding: '20px 0 48px',
-  marginBottom: '64px',
-}
-
-const h1 = {
-  color: '#333',
-  fontSize: '24px',
-  fontWeight: 'bold',
-  margin: '40px 0',
-  padding: '0',
-  textAlign: 'center' as const,
-}
-
-const text = {
-  color: '#333',
-  fontSize: '14px',
-  lineHeight: '24px',
-  padding: '0 48px',
-}
-
-const infoBox = {
-  backgroundColor: '#f4f4f5',
-  borderRadius: '4px',
-  margin: '16px 48px',
-  padding: '16px',
-}
-
-const infoLabel = {
-  color: '#71717a',
-  fontSize: '12px',
-  fontWeight: 'bold',
-  margin: '8px 0 4px',
-}
-
-const infoValue = {
-  color: '#18181b',
-  fontSize: '14px',
-  margin: '0 0 16px',
-}
-
-const buttonContainer = {
-  padding: '27px 0 27px',
-  textAlign: 'center' as const,
-}
-
-const button = {
-  backgroundColor: '#5469d4',
-  borderRadius: '4px',
-  color: '#fff',
-  fontSize: '15px',
-  textDecoration: 'none',
-  textAlign: 'center' as const,
-  display: 'block',
-  width: '210px',
-  padding: '14px 7px',
-  margin: '0 auto',
-}
-
-const hr = {
-  borderColor: '#e6ebf1',
-  margin: '20px 0',
-}
-
-const footer = {
-  color: '#8898aa',
-  fontSize: '12px',
-  lineHeight: '16px',
-  padding: '0 48px',
-  textAlign: 'center' as const,
-}
-```
-
-**이메일 전송 함수 (src/server/email/send.ts)**:
+**필요한 명세:**
 
 ```typescript
-import { Resend } from 'resend'
-import { render } from '@react-email/render'
-import SRCreatedEmail from '../../../emails/sr-created'
+// src/server/services/notification-triggers.ts
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+export enum NotificationTrigger {
+  SR_CREATED = 'SR_CREATED',
+  SR_ASSIGNED = 'SR_ASSIGNED',
+  SR_STATUS_CHANGED = 'SR_STATUS_CHANGED',
+  SR_COMPLETED = 'SR_COMPLETED',
+  SR_REJECTED = 'SR_REJECTED',
+  SR_REOPENED = 'SR_REOPENED',
+  SR_COMMENT_ADDED = 'SR_COMMENT_ADDED',
+  SLA_WARNING = 'SLA_WARNING',
+  SLA_VIOLATED = 'SLA_VIOLATED',
+  CONTRACT_EXPIRING = 'CONTRACT_EXPIRING'
+}
 
-export async function sendSRCreatedEmail(data: {
-  to: string
-  srCode: string
-  title: string
-  clientName: string
-  requesterName: string
-  priority: string
+/**
+ * 알림 발송 조건
+ */
+export interface NotificationCondition {
+  trigger: NotificationTrigger
   description: string
-  srUrl: string
-}) {
-  const emailHtml = render(
-    <SRCreatedEmail
-      srCode={data.srCode}
-      title={data.title}
-      clientName={data.clientName}
-      requesterName={data.requesterName}
-      priority={data.priority}
-      description={data.description}
-      srUrl={data.srUrl}
-    />
-  )
+  recipients: (sr: SR) => Promise<string[]> // User IDs 또는 Emails
+  channels: ('EMAIL' | 'MATTERMOST' | 'IN_APP')[]
+  immediate: boolean // 즉시 발송 여부
+  template: string
+  enabled: boolean
+}
 
-  const result = await resend.emails.send({
-    from: 'SR System <noreply@yourdomain.com>',
-    to: data.to,
-    subject: `[SR#${data.srCode}] 새로운 SR이 등록되었습니다`,
-    html: emailHtml,
-  })
+export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCondition> = {
+  SR_CREATED: {
+    trigger: NotificationTrigger.SR_CREATED,
+    description: 'SR이 생성되었을 때',
+    recipients: async (sr) => {
+      // 해당 고객사의 담당자들
+      const handlers = await db.clientHandler.findMany({
+        where: { clientId: sr.clientId, unassignedDate: null },
+        select: { userId: true }
+      })
+      return handlers.map(h => h.userId)
+    },
+    channels: ['EMAIL', 'MATTERMOST'],
+    immediate: true,
+    template: 'sr-created',
+    enabled: true
+  },
 
-  return result
+  SR_ASSIGNED: {
+    trigger: NotificationTrigger.SR_ASSIGNED,
+    description: 'SR이 담당자에게 배정되었을 때',
+    recipients: async (sr) => {
+      // 배정된 담당자
+      return sr.assigneeId ? [sr.assigneeId] : []
+    },
+    channels: ['EMAIL', 'MATTERMOST', 'IN_APP'],
+    immediate: true,
+    template: 'sr-assigned',
+    enabled: true
+  },
+
+  SR_STATUS_CHANGED: {
+    trigger: NotificationTrigger.SR_STATUS_CHANGED,
+    description: 'SR 상태가 변경되었을 때',
+    recipients: async (sr) => {
+      // 신청자 + 담당자
+      const recipients = [sr.requesterId]
+      if (sr.assigneeId) {
+        recipients.push(sr.assigneeId)
+      }
+      return recipients
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: true,
+    template: 'sr-status-changed',
+    enabled: true
+  },
+
+  SR_COMPLETED: {
+    trigger: NotificationTrigger.SR_COMPLETED,
+    description: 'SR이 완료되었을 때',
+    recipients: async (sr) => {
+      // 신청자
+      return [sr.requesterId]
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: true,
+    template: 'sr-completed',
+    enabled: true
+  },
+
+  SR_REJECTED: {
+    trigger: NotificationTrigger.SR_REJECTED,
+    description: 'SR이 거절되었을 때',
+    recipients: async (sr) => {
+      // 신청자
+      return [sr.requesterId]
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: true,
+    template: 'sr-rejected',
+    enabled: true
+  },
+
+  SR_COMMENT_ADDED: {
+    trigger: NotificationTrigger.SR_COMMENT_ADDED,
+    description: 'SR에 댓글이 추가되었을 때',
+    recipients: async (sr) => {
+      // 신청자 + 담당자 (댓글 작성자 제외)
+      const recipients = [sr.requesterId]
+      if (sr.assigneeId) {
+        recipients.push(sr.assigneeId)
+      }
+      return recipients
+    },
+    channels: ['EMAIL', 'IN_APP'],
+    immediate: false, // 배치로 5분마다 발송
+    template: 'sr-comment-added',
+    enabled: true
+  },
+
+  SLA_WARNING: {
+    trigger: NotificationTrigger.SLA_WARNING,
+    description: 'SLA 위반 임박 (남은 시간 < 25%)',
+    recipients: async (sr) => {
+      // 담당자 + 고객사 관리자
+      const recipients: string[] = []
+
+      if (sr.assigneeId) {
+        recipients.push(sr.assigneeId)
+      }
+
+      // 고객사 관리자
+      const admins = await db.userClient.findMany({
+        where: {
+          clientId: sr.clientId,
+          user: {
+            roles: {
+              some: {
+                role: { name: 'CLIENT_ADMIN' }
+              }
+            }
+          }
+        },
+        select: { userId: true }
+      })
+
+      recipients.push(...admins.map(a => a.userId))
+
+      return [...new Set(recipients)] // 중복 제거
+    },
+    channels: ['EMAIL', 'MATTERMOST'],
+    immediate: true,
+    template: 'sla-warning',
+    enabled: true
+  },
+
+  SLA_VIOLATED: {
+    trigger: NotificationTrigger.SLA_VIOLATED,
+    description: 'SLA 위반',
+    recipients: async (sr) => {
+      // SLA_WARNING과 동일 + 시스템 관리자
+      const warningRecipients = await NOTIFICATION_CONDITIONS.SLA_WARNING.recipients(sr)
+
+      const sysAdmins = await db.user.findMany({
+        where: {
+          roles: {
+            some: {
+              role: { name: 'SYSTEM_ADMIN' }
+            }
+          }
+        },
+        select: { id: true }
+      })
+
+      return [...warningRecipients, ...sysAdmins.map(a => a.id)]
+    },
+    channels: ['EMAIL', 'MATTERMOST'],
+    immediate: true,
+    template: 'sla-violated',
+    enabled: true
+  },
+
+  CONTRACT_EXPIRING: {
+    trigger: NotificationTrigger.CONTRACT_EXPIRING,
+    description: '계약 만료 임박 (30일, 14일, 1일 전)',
+    recipients: async (sr) => {
+      // 고객사 관리자 + 시스템 관리자
+      const admins = await db.userClient.findMany({
+        where: {
+          clientId: sr.clientId,
+          user: {
+            roles: {
+              some: {
+                role: { name: 'CLIENT_ADMIN' }
+              }
+            }
+          }
+        },
+        select: { userId: true }
+      })
+
+      const sysAdmins = await db.user.findMany({
+        where: {
+          roles: {
+            some: {
+              role: { name: 'SYSTEM_ADMIN' }
+            }
+          }
+        },
+        select: { id: true }
+      })
+
+      return [...admins.map(a => a.userId), ...sysAdmins.map(a => a.id)]
+    },
+    channels: ['EMAIL'],
+    immediate: false, // 크론 작업으로 일일 체크
+    template: 'contract-expiring',
+    enabled: true
+  }
+}
+
+/**
+ * 알림 발송 함수
+ */
+export async function sendNotification(
+  trigger: NotificationTrigger,
+  sr: SR
+) {
+  const condition = NOTIFICATION_CONDITIONS[trigger]
+
+  if (!condition.enabled) {
+    return
+  }
+
+  const recipients = await condition.recipients(sr)
+
+  if (recipients.length === 0) {
+    return
+  }
+
+  // 각 채널별로 발송
+  for (const channel of condition.channels) {
+    for (const recipientId of recipients) {
+      await db.notification.create({
+        data: {
+          type: channel,
+          status: 'PENDING',
+          recipient: recipientId,
+          subject: `[SR#${sr.srNumber}] ${trigger}`,
+          content: await renderTemplate(condition.template, sr),
+          metadata: {
+            trigger,
+            srId: sr.id,
+            srNumber: sr.srNumber
+          }
+        }
+      })
+    }
+  }
+
+  // 즉시 발송이면 Inngest 트리거
+  if (condition.immediate) {
+    await inngest.send({
+      name: 'notification/send',
+      data: { trigger, srId: sr.id }
+    })
+  }
 }
 ```
 
@@ -2718,12 +3192,13 @@ export function withPermission(action: PermissionAction) {
 import { SRStatus, SRPriority } from '@prisma/client'
 
 export const SR_STATE_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
-  INTAKE: ['BACKLOG', 'REJECTED'],
-  BACKLOG: ['IN_PROGRESS', 'ON_HOLD', 'REJECTED'],
-  IN_PROGRESS: ['COMPLETED', 'ON_HOLD', 'BACKLOG'],
-  ON_HOLD: ['IN_PROGRESS', 'BACKLOG'],
-  COMPLETED: ['INTAKE'], // Reopen
-  REJECTED: ['INTAKE'], // Reopen
+  REQUESTED: ['INTAKE', 'REJECTED'],           // 신청 → 접수 또는 거절
+  INTAKE: ['IN_PROGRESS', 'REJECTED'],         // 접수 → 진행 중 또는 거절
+  IN_PROGRESS: ['COMPLETED', 'ON_HOLD'],       // 진행 중 → 완료 또는 보류
+  ON_HOLD: ['IN_PROGRESS', 'REJECTED'],        // 보류 → 진행 중 또는 거절
+  COMPLETED: ['CONFIRMED'],                    // 완료 → 확인 완료
+  CONFIRMED: ['IN_PROGRESS', 'REJECTED'],      // 확인 완료 → 재오픈(진행 중) 또는 거절
+  REJECTED: ['INTAKE'],                        // 거절 → 재오픈(접수)
 }
 
 export function canTransitionTo(
