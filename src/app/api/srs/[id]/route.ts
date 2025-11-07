@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { sendSRStatusChangedEmail, sendSRAssignedEmail } from "@/lib/email";
 
 const srUpdateSchema = z.object({
   title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다.").optional(),
@@ -277,6 +278,47 @@ export async function PATCH(
         },
       },
     });
+
+    // Send email notifications (non-blocking)
+    if (process.env.RESEND_API_KEY) {
+      // Status changed email
+      if (validated.status && validated.status !== existingSr.status) {
+        sendSRStatusChangedEmail({
+          to: sr.requester.email,
+          srId: sr.id,
+          srNumber: sr.srNumber,
+          title: sr.title,
+          fromStatus: existingSr.status,
+          toStatus: validated.status,
+          changeReason: body.changeReason,
+          changedByName: session.user.name || "관리자",
+          clientName: sr.client.name,
+        }).catch((error) => {
+          console.error("Failed to send SR status changed email:", error);
+        });
+      }
+
+      // Assignment changed email
+      if (
+        validated.assignedToId &&
+        validated.assignedToId !== existingSr.assignedToId &&
+        sr.assignedTo
+      ) {
+        sendSRAssignedEmail({
+          to: sr.assignedTo.email,
+          srId: sr.id,
+          srNumber: sr.srNumber,
+          title: sr.title,
+          description: sr.description,
+          priority: sr.priority,
+          clientName: sr.client.name,
+          assignedToName: sr.assignedTo.name,
+          assignedByName: session.user.name || "관리자",
+        }).catch((error) => {
+          console.error("Failed to send SR assigned email:", error);
+        });
+      }
+    }
 
     return NextResponse.json(sr);
   } catch (error) {

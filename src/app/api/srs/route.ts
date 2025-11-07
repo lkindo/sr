@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { sendSRCreatedEmail } from "@/lib/email";
 
 const srSchema = z.object({
   title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다."),
@@ -179,6 +180,24 @@ export async function POST(request: NextRequest) {
         changeReason: "SR 생성",
       },
     });
+
+    // Send email notification (non-blocking)
+    if (process.env.RESEND_API_KEY) {
+      sendSRCreatedEmail({
+        to: sr.requester.email,
+        srId: sr.id,
+        srNumber: sr.srNumber,
+        title: sr.title,
+        description: sr.description,
+        priority: sr.priority,
+        clientName: sr.client.name,
+        requesterName: sr.requester.name,
+        requesterEmail: sr.requester.email,
+      }).catch((error) => {
+        console.error("Failed to send SR created email:", error);
+        // Don't fail the request if email sending fails
+      });
+    }
 
     return NextResponse.json(sr, { status: 201 });
   } catch (error) {

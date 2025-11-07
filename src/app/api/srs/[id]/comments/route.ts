@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { sendCommentNotificationEmail } from "@/lib/email";
 
 const commentSchema = z.object({
   content: z.string().min(1, "댓글 내용을 입력해주세요."),
@@ -58,9 +59,23 @@ export async function POST(
     const body = await request.json();
     const validated = commentSchema.parse(body);
 
-    // Check if SR exists
+    // Check if SR exists and get related data
     const sr = await prisma.sR.findUnique({
       where: { id: params.id },
+      include: {
+        requester: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
     });
 
     if (!sr) {
@@ -96,6 +111,35 @@ export async function POST(
         description: "댓글이 추가되었습니다.",
       },
     });
+
+    // Send email notifications to requester and assignee (non-blocking)
+    if (process.env.RESEND_API_KEY) {
+      const recipients = new Set<string>();
+
+      // Notify requester if not the commenter
+      if (sr.requester.id !== session.user.id) {
+        recipients.add(sr.requester.email);
+      }
+
+      // Notify assignee if exists and not the commenter
+      if (sr.assignedTo && sr.assignedTo.id !== session.user.id) {
+        recipients.add(sr.assignedTo.email);
+      }
+
+      // Send emails to all recipients
+      recipients.forEach((email) => {
+        sendCommentNotificationEmail({
+          to: email,
+          srId: sr.id,
+          srNumber: sr.srNumber,
+          title: sr.title,
+          commentAuthor: comment.user.name,
+          commentContent: validated.content,
+        }).catch((error) => {
+          console.error("Failed to send comment notification email:", error);
+        });
+      });
+    }
 
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
