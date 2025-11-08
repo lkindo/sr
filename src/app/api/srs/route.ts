@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
             email: true,
           },
         },
-        assignedTo: {
+        assignee: {
           select: {
             id: true,
             name: true,
@@ -128,11 +128,11 @@ export async function POST(request: NextRequest) {
         title: validated.title,
         description: validated.description,
         clientId: validated.clientId,
-        serviceCategoryId: validated.serviceCategoryId,
+        serviceCategoryId: validated.serviceCategoryId || "",
         requesterId: session.user.id,
         priority: validated.priority,
         status: "REQUESTED",
-        requestedCompletionDate: validated.requestedCompletionDate
+        expectedCompletionDate: validated.requestedCompletionDate
           ? new Date(validated.requestedCompletionDate)
           : undefined,
       },
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       data: {
         srId: sr.id,
         userId: session.user.id,
-        type: "STATUS_CHANGE",
+        type: "CREATED",
         description: "SR이 생성되었습니다.",
       },
     });
@@ -174,15 +174,15 @@ export async function POST(request: NextRequest) {
     await prisma.sRStatusHistory.create({
       data: {
         srId: sr.id,
-        fromStatus: "REQUESTED",
-        toStatus: "REQUESTED",
+        previousStatus: null,
+        currentStatus: "REQUESTED",
         changedBy: session.user.id,
         changeReason: "SR 생성",
       },
     });
 
     // Send email notification (non-blocking)
-    if (process.env.RESEND_API_KEY) {
+    if (process.env.RESEND_API_KEY && sr.requester) {
       sendSRCreatedEmail({
         to: sr.requester.email,
         srId: sr.id,
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
         title: sr.title,
         description: sr.description,
         priority: sr.priority,
-        clientName: sr.client.name,
+        clientName: sr.client?.name || "",
         requesterName: sr.requester.name,
         requesterEmail: sr.requester.email,
       }).catch((error) => {
@@ -202,8 +202,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(sr, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const firstError = error.issues?.[0];
       return NextResponse.json(
-        { error: error.errors[0].message },
+        { error: firstError?.message || "유효성 검사 실패" },
         { status: 400 }
       );
     }

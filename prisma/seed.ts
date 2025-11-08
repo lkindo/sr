@@ -1,4 +1,8 @@
+import { config } from "dotenv";
 import { PrismaClient } from "../src/generated/prisma";
+
+// 환경 변수 명시적 로드
+config({ override: true });
 
 const prisma = new PrismaClient();
 
@@ -258,6 +262,130 @@ async function main() {
       })),
     });
     console.log(`Assigned ${clientUserPermissions.length} permissions to CLIENT_USER role`);
+  }
+
+  // Create test users
+  console.log("Creating test users...");
+  
+  // Check if admin user already exists
+  const existingAdmin = await prisma.user.findUnique({
+    where: { email: "admin@example.com" },
+  });
+
+  let adminUser;
+  if (!existingAdmin) {
+    // Use bcrypt to hash password
+    const bcrypt = require("bcryptjs");
+    const hashedPassword = await bcrypt.hash("admin123", 10);
+
+    adminUser = await prisma.user.create({
+      data: {
+        email: "admin@example.com",
+        name: "Admin User",
+        password: hashedPassword,
+      },
+    });
+
+    // Assign ADMIN role to user
+    const adminRoleForUser = await prisma.role.findUnique({
+      where: { name: "ADMIN" },
+    });
+
+    if (adminRoleForUser) {
+      await prisma.userRole.create({
+        data: {
+          userId: adminUser.id,
+          roleId: adminRoleForUser.id,
+        },
+      });
+    }
+
+    console.log("Created admin user: admin@example.com / admin123");
+  } else {
+    adminUser = existingAdmin;
+    console.log("Admin user already exists");
+  }
+
+  // Create test clients
+  console.log("Creating test clients...");
+  
+  const existingClient = await prisma.client.findUnique({
+    where: { code: "TEST001" },
+  });
+
+  if (!existingClient) {
+    const testClient1 = await prisma.client.create({
+      data: {
+        code: "TEST001",
+        name: "테스트 고객사 A",
+        industry: "IT 서비스",
+        contactPerson: "김철수",
+        contactEmail: "contact@test-client-a.com",
+        contactPhone: "02-1234-5678",
+        isActive: true,
+        users: {
+          create: {
+            userId: adminUser.id,
+          },
+        },
+      },
+    });
+
+    const testClient2 = await prisma.client.create({
+      data: {
+        code: "TEST002",
+        name: "테스트 고객사 B",
+        industry: "제조업",
+        contactPerson: "이영희",
+        contactEmail: "contact@test-client-b.com",
+        contactPhone: "02-2345-6789",
+        isActive: true,
+        users: {
+          create: {
+            userId: adminUser.id,
+          },
+        },
+      },
+    });
+
+    console.log("Created 2 test clients");
+
+    // Create service categories for test clients
+    console.log("Creating service categories...");
+    
+    await prisma.serviceCategory.createMany({
+      data: [
+        {
+          clientId: testClient1.id,
+          categoryName: "기술 지원",
+          description: "기술적 문제 해결 및 지원",
+        },
+        {
+          clientId: testClient1.id,
+          categoryName: "버그 수정",
+          description: "소프트웨어 버그 수정 요청",
+        },
+        {
+          clientId: testClient1.id,
+          categoryName: "기능 개선",
+          description: "기존 기능 개선 및 최적화",
+        },
+        {
+          clientId: testClient2.id,
+          categoryName: "시스템 문의",
+          description: "시스템 관련 문의사항",
+        },
+        {
+          clientId: testClient2.id,
+          categoryName: "데이터 처리",
+          description: "데이터 처리 및 분석 요청",
+        },
+      ],
+    });
+
+    console.log("Created service categories");
+  } else {
+    console.log("Test clients already exist");
   }
 
   console.log("Seed completed successfully!");

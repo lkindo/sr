@@ -35,7 +35,7 @@ export async function sendSRCreatedEmail({
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {
-    const emailHtml = render(
+    const emailHtml = await render(
       SRCreatedEmail({
         srNumber,
         title,
@@ -94,7 +94,7 @@ export async function sendSRStatusChangedEmail({
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {
-    const emailHtml = render(
+    const emailHtml = await render(
       SRStatusChangedEmail({
         srNumber,
         title,
@@ -153,7 +153,7 @@ export async function sendSRAssignedEmail({
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {
-    const emailHtml = render(
+    const emailHtml = await render(
       SRAssignedEmail({
         srNumber,
         title,

@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SRComments } from "@/components/srs/SRComments";
 import { SRActivities } from "@/components/srs/SRActivities";
+import { SRAttachments } from "@/components/srs/SRAttachments";
 import { EditSRDialog } from "@/components/srs/EditSRDialog";
 import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -366,10 +367,16 @@ export default function SRDetailPage() {
           <TabsTrigger value="comments">
             댓글 ({sr._count?.comments || 0})
           </TabsTrigger>
+          <TabsTrigger value="attachments">
+            첨부파일 ({sr._count?.attachments || 0})
+          </TabsTrigger>
           <TabsTrigger value="activities">활동 이력</TabsTrigger>
         </TabsList>
         <TabsContent value="comments" className="mt-6">
           <SRComments srId={sr.id} />
+        </TabsContent>
+        <TabsContent value="attachments" className="mt-6">
+          <SRAttachments srId={sr.id} />
         </TabsContent>
         <TabsContent value="activities" className="mt-6">
           <SRActivities srId={sr.id} />

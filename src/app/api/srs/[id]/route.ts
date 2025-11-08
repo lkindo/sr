@@ -63,7 +63,7 @@ export async function GET(
             email: true,
           },
         },
-        assignedTo: {
+        assignee: {
           select: {
             id: true,
             name: true,
@@ -85,14 +85,6 @@ export async function GET(
           },
         },
         attachments: {
-          include: {
-            uploadedBy: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
           orderBy: {
             createdAt: "desc",
           },
@@ -113,7 +105,7 @@ export async function GET(
         },
         statusHistory: {
           include: {
-            changedByUser: {
+            user: {
               select: {
                 id: true,
                 name: true,
@@ -181,7 +173,7 @@ export async function PATCH(
     if (validated.priority !== undefined)
       updateData.priority = validated.priority;
     if (validated.assignedToId !== undefined)
-      updateData.assignedToId = validated.assignedToId;
+      updateData.assigneeId = validated.assignedToId;
     if (validated.estimatedHours !== undefined)
       updateData.estimatedHours = validated.estimatedHours;
     if (validated.actualHours !== undefined)
@@ -216,8 +208,8 @@ export async function PATCH(
       await prisma.sRStatusHistory.create({
         data: {
           srId: params.id,
-          fromStatus: existingSr.status,
-          toStatus: validated.status,
+          previousStatus: existingSr.status,
+          currentStatus: validated.status,
           changedBy: session.user.id,
           changeReason: body.changeReason || `상태 변경: ${existingSr.status} → ${validated.status}`,
         },
@@ -228,7 +220,7 @@ export async function PATCH(
         data: {
           srId: params.id,
           userId: session.user.id,
-          type: "STATUS_CHANGE",
+          type: "STATUS_CHANGED",
           description: `상태가 ${existingSr.status}에서 ${validated.status}로 변경되었습니다.`,
         },
       });
@@ -242,13 +234,13 @@ export async function PATCH(
     // Handle assignment change
     if (
       validated.assignedToId !== undefined &&
-      validated.assignedToId !== existingSr.assignedToId
+      validated.assignedToId !== existingSr.assigneeId
     ) {
       await prisma.sRActivity.create({
         data: {
           srId: params.id,
           userId: session.user.id,
-          type: "ASSIGNMENT",
+          type: "ASSIGNED",
           description: validated.assignedToId
             ? "담당자가 할당되었습니다."
             : "담당자 할당이 해제되었습니다.",
@@ -269,7 +261,7 @@ export async function PATCH(
             email: true,
           },
         },
-        assignedTo: {
+        assignee: {
           select: {
             id: true,
             name: true,
@@ -280,7 +272,7 @@ export async function PATCH(
     });
 
     // Send email notifications (non-blocking)
-    if (process.env.RESEND_API_KEY) {
+    if (process.env.RESEND_API_KEY && sr.requester) {
       // Status changed email
       if (validated.status && validated.status !== existingSr.status) {
         sendSRStatusChangedEmail({
@@ -301,18 +293,18 @@ export async function PATCH(
       // Assignment changed email
       if (
         validated.assignedToId &&
-        validated.assignedToId !== existingSr.assignedToId &&
-        sr.assignedTo
+        validated.assignedToId !== existingSr.assigneeId &&
+        sr.assignee
       ) {
         sendSRAssignedEmail({
-          to: sr.assignedTo.email,
+          to: sr.assignee.email,
           srId: sr.id,
           srNumber: sr.srNumber,
           title: sr.title,
           description: sr.description,
           priority: sr.priority,
-          clientName: sr.client.name,
-          assignedToName: sr.assignedTo.name,
+          clientName: sr.client?.name || "",
+          assignedToName: sr.assignee.name,
           assignedByName: session.user.name || "관리자",
         }).catch((error) => {
           console.error("Failed to send SR assigned email:", error);
@@ -323,8 +315,9 @@ export async function PATCH(
     return NextResponse.json(sr);
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const firstError = error.issues?.[0];
       return NextResponse.json(
-        { error: error.errors[0].message },
+        { error: firstError?.message || "유효성 검사 실패" },
         { status: 400 }
       );
     }

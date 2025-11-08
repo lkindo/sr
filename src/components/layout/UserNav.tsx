@@ -25,7 +25,10 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ 
+      callbackUrl: "/",
+      redirect: true 
+    });
   };
 
   const initials = user.name

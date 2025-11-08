@@ -6,9 +6,13 @@ import { z } from "zod";
 const categorySchema = z.object({
   categoryName: z.string().min(2, "카테고리 이름은 최소 2자 이상이어야 합니다."),
   description: z.string().optional(),
+  slaHours: z.number().min(1, "SLA는 최소 1시간 이상이어야 합니다."),
+  priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional().default("MEDIUM"),
+  handlerId: z.string().optional(),
+  backupHandlerId: z.string().optional(),
 });
 
-// GET /api/clients/[id]/categories - 고객사의 서비스 카테고리 조회
+// GET /api/clients/[id]/categories - 고객사의 서비스 카테고리 목록 조회
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -20,7 +24,26 @@ export async function GET(
     }
 
     const categories = await prisma.serviceCategory.findMany({
-      where: { clientId: params.id },
+      where: {
+        clientId: params.id,
+        isActive: true,
+      },
+      include: {
+        handler: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        backupHandler: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
@@ -30,13 +53,13 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching categories:", error);
     return NextResponse.json(
-      { error: "카테고리 목록을 불러오는 중 오류가 발생했습니다." },
+      { error: "서비스 카테고리 목록을 불러오는 중 오류가 발생했습니다." },
       { status: 500 }
     );
   }
 }
 
-// POST /api/clients/[id]/categories - 서비스 카테고리 추가
+// POST /api/clients/[id]/categories - 서비스 카테고리 생성
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -50,7 +73,7 @@ export async function POST(
     const body = await request.json();
     const validated = categorySchema.parse(body);
 
-    // Check if client exists
+    // 고객사 존재 확인
     const client = await prisma.client.findUnique({
       where: { id: params.id },
     });
@@ -62,41 +85,48 @@ export async function POST(
       );
     }
 
-    // Check if category already exists for this client
-    const existingCategory = await prisma.serviceCategory.findFirst({
-      where: {
-        clientId: params.id,
-        categoryName: validated.categoryName,
-      },
-    });
-
-    if (existingCategory) {
-      return NextResponse.json(
-        { error: "이미 존재하는 카테고리 이름입니다." },
-        { status: 400 }
-      );
-    }
-
+    // 카테고리 생성
     const category = await prisma.serviceCategory.create({
       data: {
         clientId: params.id,
         categoryName: validated.categoryName,
         description: validated.description,
+        slaHours: validated.slaHours,
+        priority: validated.priority,
+        handlerId: validated.handlerId || null,
+        backupHandlerId: validated.backupHandlerId || null,
+      },
+      include: {
+        handler: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        backupHandler: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
 
     return NextResponse.json(category, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const firstError = error.issues?.[0];
       return NextResponse.json(
-        { error: error.errors[0].message },
+        { error: firstError?.message || "유효성 검사 실패" },
         { status: 400 }
       );
     }
 
     console.error("Error creating category:", error);
     return NextResponse.json(
-      { error: "카테고리 생성 중 오류가 발생했습니다." },
+      { error: "서비스 카테고리 생성 중 오류가 발생했습니다." },
       { status: 500 }
     );
   }

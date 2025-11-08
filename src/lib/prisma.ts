@@ -1,16 +1,7 @@
-import { config } from 'dotenv'
 import { PrismaClient } from '@/generated/prisma'
-
-// Force override environment variables from .env file
-config({ override: true })
 
 const prismaClientSingleton = () => {
   return new PrismaClient({
-    datasources: {
-      db: {
-        url: process.env.DATABASE_URL,
-      },
-    },
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   })
 }

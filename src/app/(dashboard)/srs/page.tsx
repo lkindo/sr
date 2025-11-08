@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { CreateSRDialog } from "@/components/srs/CreateSRDialog";
 import { useToast } from "@/hooks/use-toast";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 interface SR {
   id: string;
@@ -153,10 +154,12 @@ export default function SRsPage() {
             서비스 요청(SR)을 관리합니다.
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          새 SR 생성
-        </Button>
+        <PermissionGuard resource="SR" action="CREATE">
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            새 SR 생성
+          </Button>
+        </PermissionGuard>
       </div>
 
       <Card>

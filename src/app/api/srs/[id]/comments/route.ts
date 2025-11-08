@@ -69,7 +69,7 @@ export async function POST(
             email: true,
           },
         },
-        assignedTo: {
+        assignee: {
           select: {
             id: true,
             email: true,
@@ -107,7 +107,7 @@ export async function POST(
       data: {
         srId: params.id,
         userId: session.user.id,
-        type: "COMMENT",
+        type: "COMMENTED",
         description: "댓글이 추가되었습니다.",
       },
     });
@@ -122,8 +122,8 @@ export async function POST(
       }
 
       // Notify assignee if exists and not the commenter
-      if (sr.assignedTo && sr.assignedTo.id !== session.user.id) {
-        recipients.add(sr.assignedTo.email);
+      if (sr.assignee && sr.assignee.id !== session.user.id) {
+        recipients.add(sr.assignee.email);
       }
 
       // Send emails to all recipients
@@ -144,8 +144,9 @@ export async function POST(
     return NextResponse.json(comment, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
+      const firstError = error.issues?.[0];
       return NextResponse.json(
-        { error: error.errors[0].message },
+        { error: firstError?.message || "유효성 검사 실패" },
         { status: 400 }
       );
     }
