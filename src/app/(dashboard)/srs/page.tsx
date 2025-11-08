@@ -97,16 +97,37 @@ export default function SRsPage() {
   const { toast } = useToast();
 
   const fetchSRs = async () => {
+    console.log("🔍 [Client] fetchSRs 시작");
     try {
+      console.log("🔍 [Client] fetch /api/srs 호출 중...");
       const response = await fetch("/api/srs");
-      if (!response.ok) throw new Error("Failed to fetch SRs");
+      console.log("🔍 [Client] 응답 받음:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("❌ [Client] API 에러 응답:", errorData);
+        throw new Error(
+          errorData.error || 
+          errorData.details || 
+          `HTTP ${response.status}: ${response.statusText}`
+        );
+      }
+
       const data = await response.json();
+      console.log("🔍 [Client] 데이터 받음:", { count: data.length });
       setSrs(data);
       setFilteredSrs(data);
+      console.log("✅ [Client] SR 목록 로드 성공!");
     } catch (error) {
+      console.error("❌ [Client] fetchSRs 에러:", error);
+      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
       toast({
         title: "오류",
-        description: "SR 목록을 불러오는데 실패했습니다.",
+        description: `SR 목록을 불러오는데 실패했습니다: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {

@@ -3,6 +3,9 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 
+// Force Node.js runtime (Prisma doesn't work in Edge Runtime)
+export const runtime = 'nodejs';
+
 const roleSchema = z.object({
   name: z.string().min(2, "역할 이름은 최소 2자 이상이어야 합니다."),
   description: z.string().optional(),

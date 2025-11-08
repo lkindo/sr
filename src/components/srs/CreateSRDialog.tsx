@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,12 @@ interface Client {
   }[];
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface CreateSRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -49,16 +55,20 @@ export function CreateSRDialog({
   const [categoryId, setCategoryId] = useState("");
   const [priority, setPriority] = useState<string>("MEDIUM");
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
   const [clients, setClients] = useState<Client[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     []
   );
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (open) {
       fetchClients();
+      fetchUsers();
     }
   }, [open]);
 
@@ -80,7 +90,7 @@ export function CreateSRDialog({
     } catch (error) {
       toast({
         title: "오류",
-        description: "고객사 목록을 불러오는데 실패했습니다.",
+        description: "고객사 목록을 불러오지 못했습니다.",
         variant: "destructive",
       });
     }
@@ -95,7 +105,22 @@ export function CreateSRDialog({
     } catch (error) {
       toast({
         title: "오류",
-        description: "서비스 카테고리 목록을 불러오는데 실패했습니다.",
+        description: "서비스 카테고리 목록을 불러오지 못했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("/api/users");
+      if (!response.ok) throw new Error("Failed to fetch users");
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "사용자 목록을 불러오지 못했습니다.",
         variant: "destructive",
       });
     }
@@ -131,28 +156,58 @@ export function CreateSRDialog({
       return;
     }
 
+    if (!categoryId) {
+      toast({
+        title: "오류",
+        description: "서비스 카테고리를 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
+    console.log(" [CreateSR] SR 생성 시작");
+    const requestBody = {
+      title,
+      description,
+      clientId,
+      serviceCategoryId: categoryId,
+      priority,
+      requestedCompletionDate: requestedCompletionDate || undefined,
+      dueDate: dueDate || undefined,
+      assigneeId: assigneeId || undefined,
+    };
+    console.log(" [CreateSR] 요청 데이터:", requestBody);
+
     try {
+      console.log(" [CreateSR] POST /api/srs 호출 중...");
       const response = await fetch("/api/srs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title,
-          description,
-          clientId,
-          categoryId: categoryId || undefined,
-          priority,
-          requestedCompletionDate: requestedCompletionDate || undefined,
-        }),
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log(" [CreateSR] 응답 받음:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to create SR");
+        console.error(" [CreateSR] API 에러 응답:", error);
+        throw new Error(
+          error.error ||
+            error.details ||
+            `HTTP ${response.status}: ${response.statusText}`
+        );
       }
+
+      const createdSR = await response.json();
+      console.log(" [CreateSR] SR 생성 성공!", createdSR);
 
       toast({
         title: "성공",
@@ -166,13 +221,17 @@ export function CreateSRDialog({
       setCategoryId("");
       setPriority("MEDIUM");
       setRequestedCompletionDate("");
+      setDueDate("");
+      setAssigneeId("");
 
       onCreated();
     } catch (error) {
+      console.error(" [CreateSR] SR 생성 실패:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "SR 생성에 실패했습니다.";
       toast({
         title: "오류",
-        description:
-          error instanceof Error ? error.message : "SR 생성에 실패했습니다.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -225,7 +284,7 @@ export function CreateSRDialog({
                   disabled={loading}
                 >
                   <SelectTrigger id="client">
-                    <SelectValue placeholder="고객사 선택" />
+                    <SelectValue placeholder="고객사를 선택" />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
@@ -238,14 +297,24 @@ export function CreateSRDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">서비스 카테고리</Label>
+                <Label htmlFor="category">서비스 카테고리 *</Label>
                 <Select
                   value={categoryId}
                   onValueChange={setCategoryId}
-                  disabled={loading || !clientId || categories.length === 0}
+                  disabled={
+                    loading || !clientId || categories.length === 0
+                  }
                 >
                   <SelectTrigger id="category">
-                    <SelectValue placeholder="카테고리 선택" />
+                    <SelectValue
+                      placeholder={
+                        !clientId
+                          ? "먼저 고객사를 선택하세요"
+                          : categories.length === 0
+                          ? "카테고리가 없습니다"
+                          : "카테고리를 선택"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
@@ -279,6 +348,31 @@ export function CreateSRDialog({
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="assignee">담당자</Label>
+                <Select
+                  value={assigneeId || "none"}
+                  onValueChange={(value) =>
+                    setAssigneeId(value === "none" ? "" : value)
+                  }
+                  disabled={loading}
+                >
+                  <SelectTrigger id="assignee">
+                    <SelectValue placeholder="담당자 선택 (선택사항)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">선택 안 함</SelectItem>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="requestedCompletionDate">
                   요청 완료 날짜
                 </Label>
@@ -286,7 +380,20 @@ export function CreateSRDialog({
                   id="requestedCompletionDate"
                   type="date"
                   value={requestedCompletionDate}
-                  onChange={(e) => setRequestedCompletionDate(e.target.value)}
+                  onChange={(e) =>
+                    setRequestedCompletionDate(e.target.value)
+                  }
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">마감일</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
                   disabled={loading}
                 />
               </div>

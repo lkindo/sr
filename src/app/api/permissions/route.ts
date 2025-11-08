@@ -1,7 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 
+
+// Force Node.js runtime (Prisma doesn't work in Edge Runtime)
+export const runtime = 'nodejs';
 // GET /api/permissions - 모든 권한 조회
 export async function GET(request: NextRequest) {
   try {

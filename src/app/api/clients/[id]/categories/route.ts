@@ -49,7 +49,13 @@ export async function GET(
       },
     });
 
-    return NextResponse.json(categories);
+    // Map categoryName to name for frontend compatibility
+    const mappedCategories = categories.map((cat) => ({
+      ...cat,
+      name: cat.categoryName,
+    }));
+
+    return NextResponse.json(mappedCategories);
   } catch (error) {
     console.error("Error fetching categories:", error);
     return NextResponse.json(

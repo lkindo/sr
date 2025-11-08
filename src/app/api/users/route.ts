@@ -4,6 +4,9 @@ import prisma from "@/lib/prisma";
 import { hash } from "bcryptjs";
 import { z } from "zod";
 
+// Force Node.js runtime (Prisma doesn't work in Edge Runtime)
+export const runtime = 'nodejs';
+
 const userSchema = z.object({
   name: z.string().min(2, "이름은 최소 2자 이상이어야 합니다."),
   email: z.string().email("유효한 이메일 주소를 입력해주세요."),

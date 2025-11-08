@@ -313,8 +313,10 @@ async function main() {
     where: { code: "TEST001" },
   });
 
+  let testClient1, testClient2;
+
   if (!existingClient) {
-    const testClient1 = await prisma.client.create({
+    testClient1 = await prisma.client.create({
       data: {
         code: "TEST001",
         name: "테스트 고객사 A",
@@ -331,7 +333,7 @@ async function main() {
       },
     });
 
-    const testClient2 = await prisma.client.create({
+    testClient2 = await prisma.client.create({
       data: {
         code: "TEST002",
         name: "테스트 고객사 B",
@@ -349,43 +351,69 @@ async function main() {
     });
 
     console.log("Created 2 test clients");
+  } else {
+    console.log("Test clients already exist");
+    testClient1 = existingClient;
+    testClient2 = await prisma.client.findUnique({
+      where: { code: "TEST002" },
+    });
+  }
 
-    // Create service categories for test clients
-    console.log("Creating service categories...");
-    
+  // Create service categories for test clients (always check)
+  console.log("Creating service categories...");
+  
+  const existingCategories = await prisma.serviceCategory.count({
+    where: {
+      clientId: {
+        in: [testClient1!.id, testClient2!.id],
+      },
+    },
+  });
+
+  if (existingCategories === 0) {
     await prisma.serviceCategory.createMany({
       data: [
         {
-          clientId: testClient1.id,
+          clientId: testClient1!.id,
           categoryName: "기술 지원",
           description: "기술적 문제 해결 및 지원",
+          slaHours: 24,
+          priority: "HIGH",
         },
         {
-          clientId: testClient1.id,
+          clientId: testClient1!.id,
           categoryName: "버그 수정",
           description: "소프트웨어 버그 수정 요청",
+          slaHours: 48,
+          priority: "MEDIUM",
         },
         {
-          clientId: testClient1.id,
+          clientId: testClient1!.id,
           categoryName: "기능 개선",
           description: "기존 기능 개선 및 최적화",
+          slaHours: 72,
+          priority: "LOW",
         },
         {
-          clientId: testClient2.id,
+          clientId: testClient2!.id,
           categoryName: "시스템 문의",
           description: "시스템 관련 문의사항",
+          slaHours: 24,
+          priority: "MEDIUM",
         },
         {
-          clientId: testClient2.id,
+          clientId: testClient2!.id,
           categoryName: "데이터 처리",
           description: "데이터 처리 및 분석 요청",
+          slaHours: 48,
+          priority: "MEDIUM",
         },
       ],
     });
 
-    console.log("Created service categories");
+    console.log("Created 5 service categories");
   } else {
-    console.log("Test clients already exist");
+    console.log(`Service categories already exist (${existingCategories} found)`);
   }
 
   console.log("Seed completed successfully!");

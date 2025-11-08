@@ -5,6 +5,9 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { existsSync } from "fs";
 
+// Force Node.js runtime (Prisma doesn't work in Edge Runtime)
+export const runtime = 'nodejs';
+
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "attachments");
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
