@@ -31,7 +31,7 @@
    | 항목 | 값 | 설명 |
    |------|-----|------|
    | **Name** | `sr-management` | 프로젝트 이름 (원하는 대로) |
-   | **Database Password** | 강력한 비밀번호 | **⚠️ 반드시 저장!** |
+   | **Database Password** | sr1234 | **⚠️ 반드시 저장!** |
    | **Region** | `Northeast Asia (Seoul)` | 한국에 가장 가까운 지역 |
    | **Pricing Plan** | `Free` | 무료 플랜 (500MB DB, 1GB 전송) |
 
@@ -109,56 +109,110 @@ NEXT_PUBLIC_APP_URL="http://localhost:3001"
 
 ---
 
-## 4. 데이터베이스 마이그레이션
+## 4. 데이터베이스 스키마 생성
 
-### 4.1 Prisma Client 재생성
+### 🎯 방법 1: Supabase SQL Editor 사용 (권장)
 
-```bash
-npx prisma generate
-```
+Connection Pooler를 사용할 때는 Prisma CLI 마이그레이션이 작동하지 않으므로 SQL Editor를 사용합니다.
 
-### 4.2 마이그레이션 실행
+#### 4.1 SQL Editor 열기
 
-**⚠️ 주의**: 이 명령은 Supabase에 실제 테이블을 생성합니다.
+1. Supabase Dashboard에서 좌측 메뉴 **"SQL Editor"** 클릭
+2. **"New query"** 버튼 클릭
 
-```bash
-npx prisma migrate deploy
-```
+#### 4.2 스키마 생성 SQL 실행
 
-또는 개발 환경에서 새 마이그레이션 생성:
+1. 프로젝트의 `supabase-init.sql` 파일 내용을 복사
+2. SQL Editor에 붙여넣기
+3. **"Run"** 버튼 클릭 또는 `Ctrl + Enter`
 
-```bash
-npx prisma migrate dev --name init_supabase
-```
-
-### 4.3 마이그레이션 확인
-
-Supabase Dashboard에서 확인:
+#### 4.3 스키마 생성 확인
 
 1. 좌측 메뉴 **"Table Editor"** 클릭
 2. 다음 테이블들이 생성되었는지 확인:
-   - `User`
-   - `Account`
-   - `Session`
-   - `Role`
-   - `Permission`
-   - `RolePermission`
-   - `Client`
-   - `ServiceCategory`
-   - `SR`
-   - `SRComment`
-   - `SRAttachment`
-   - `SRActivity`
-   - `SRStatusHistory`
-   - `Notification`
+   - `users`
+   - `accounts`
+   - `sessions`
+   - `verification_tokens`
+   - `roles`
+   - `user_roles`
+   - `permissions`
+   - `role_permissions`
+   - `clients`
+   - `user_clients`
+   - `service_categories`
+   - `client_handlers`
+   - `srs`
+   - `sr_activities`
+   - `sr_comments`
+   - `sr_attachments`
+   - `notifications`
+   - `sr_status_history`
+
+#### 4.4 Enum 타입 확인
+
+1. SQL Editor에서 다음 쿼리 실행:
+```sql
+SELECT typname FROM pg_type WHERE typtype = 'e';
+```
+
+2. 다음 Enum 타입들이 생성되었는지 확인:
+   - `SRStatus`
+   - `SRPriority`
+   - `SRActivityType`
+   - `NotificationType`
+   - `NotificationStatus`
+
+### ⚙️ 방법 2: Prisma CLI 사용 (Direct Connection 필요)
+
+Direct Connection URL이 있을 때만 사용 가능합니다.
+
+```bash
+# Prisma Client 재생성
+npx prisma generate
+
+# 마이그레이션 실행
+npx prisma db push
+```
+
+**⚠️ 주의**: Connection Pooler URL을 사용하면 다음 오류가 발생합니다:
+```
+Error: P1001: Can't reach database server
+```
 
 ---
 
 ## 5. 초기 데이터 생성
 
-### 5.1 Seed 스크립트 실행
+### 🎯 방법 1: Supabase SQL Editor 사용 (권장)
 
-기본 역할과 권한을 생성합니다:
+#### 5.1 SQL Editor에서 Seed 데이터 실행
+
+1. Supabase Dashboard에서 좌측 메뉴 **"SQL Editor"** 클릭
+2. **"New query"** 버튼 클릭
+3. 프로젝트의 `supabase-seed.sql` 파일 내용을 복사
+4. SQL Editor에 붙여넣기
+5. **"Run"** 버튼 클릭 또는 `Ctrl + Enter`
+
+#### 5.2 Seed 데이터 확인
+
+생성되는 데이터:
+- **31개 권한** (SR, CLIENT, USER, ROLE, COMMENT, ATTACHMENT)
+- **5개 기본 역할**:
+  - `ADMIN` - 시스템 관리자 (모든 권한)
+  - `MANAGER` - 매니저 (SR 관리 및 사용자 관리)
+  - `ENGINEER` - 엔지니어 (SR 처리)
+  - `CLIENT_ADMIN` - 고객사 관리자 (자사 SR 관리)
+  - `CLIENT_USER` - 고객사 사용자 (SR 생성 및 조회)
+
+Supabase Table Editor에서 확인:
+1. `roles` 테이블 → 5개 행 확인
+2. `permissions` 테이블 → 31개 행 확인
+3. `role_permissions` 테이블 → 매핑 데이터 확인
+
+### ⚙️ 방법 2: Prisma Seed Script 사용
+
+Node.js 환경에서 직접 실행:
 
 ```bash
 pnpm db:seed
@@ -170,26 +224,38 @@ pnpm db:seed
 npx tsx prisma/seed.ts
 ```
 
-### 5.2 Seed 데이터 확인
-
-생성되는 데이터:
-- **31개 권한** (SR, CLIENT, USER, ROLE, COMMENT 등)
-- **5개 기본 역할**:
-  - `ADMIN` - 시스템 관리자 (모든 권한)
-  - `MANAGER` - 매니저 (SR 관리 및 사용자 관리)
-  - `ENGINEER` - 엔지니어 (SR 처리)
-  - `CLIENT_ADMIN` - 고객사 관리자 (자사 SR 관리)
-  - `CLIENT_USER` - 고객사 사용자 (SR 생성 및 조회)
-
-Supabase Table Editor에서 확인:
-1. `Role` 테이블 → 5개 행 확인
-2. `Permission` 테이블 → 31개 행 확인
+**⚠️ 주의**: Connection Pooler를 사용 중이면 실행 시 오류가 발생할 수 있습니다. SQL Editor 사용을 권장합니다.
 
 ---
 
 ## 6. 연결 테스트
 
-### 6.1 Prisma Studio로 확인
+### 6.1 Health Check API로 데이터베이스 연결 확인
+
+1. 개발 서버 실행:
+```bash
+pnpm dev
+```
+
+2. Health check endpoint 호출:
+```bash
+curl http://localhost:3000/api/health
+```
+
+3. 성공 응답 예시:
+```json
+{
+  "status": "healthy",
+  "database": {
+    "connected": true,
+    "result": [{"connected": 1}],
+    "serverTime": [{"server_time": "2025-11-08T06:14:21.206Z"}]
+  },
+  "timestamp": "2025-11-08T06:14:22.963Z"
+}
+```
+
+### 6.2 Prisma Studio로 데이터 확인 (선택)
 
 ```bash
 npx prisma studio
@@ -197,21 +263,32 @@ npx prisma studio
 
 브라우저가 자동으로 열리고 Prisma Studio가 실행됩니다.
 - URL: http://localhost:5555
-- 모든 테이블 데이터 확인 가능
+- 모든 테이블 데이터를 GUI로 확인 가능
 
-### 6.2 애플리케이션 실행
+**⚠️ 주의**: Connection Pooler 사용 시 Prisma Studio가 작동하지 않을 수 있습니다.
 
-```bash
-pnpm dev
+### 6.3 애플리케이션에서 데이터베이스 확인
+
+1. 개발 서버 접속: http://localhost:3000
+2. 회원가입 페이지에서 새 계정 생성 (관리자 계정 권한은 직접 SQL로 부여)
+3. 로그인 후 Dashboard 접근 확인
+
+### 6.4 관리자 권한 부여 (필요 시)
+
+생성한 계정에 관리자 권한을 부여하려면:
+
+1. Supabase SQL Editor에서 실행:
+```sql
+-- 사용자 ID 확인
+SELECT id, email, name FROM users;
+
+-- 관리자 역할 부여 (사용자 ID를 실제 값으로 교체)
+INSERT INTO user_roles (id, user_id, role_id)
+VALUES (gen_random_uuid(), 'YOUR_USER_ID', 'role_admin')
+ON CONFLICT (user_id, role_id) DO NOTHING;
 ```
 
-앱이 정상적으로 실행되면 연결 성공!
-
-### 6.3 회원가입 및 로그인 테스트
-
-1. http://localhost:3001/register 접속
-2. 새 계정 생성
-3. 로그인 후 Dashboard 접근 확인
+2. 로그아웃 후 다시 로그인하여 권한 확인
 
 ---
 
