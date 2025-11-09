@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "postinstall": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
