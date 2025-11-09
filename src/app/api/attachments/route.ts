@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { existsSync } from "fs";
+import { uploadAttachmentBlob } from "@/lib/storage";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "attachments");
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 // POST /api/attachments - 파일 업로드
@@ -51,31 +48,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 파일 저장
-    const timestamp = Date.now();
-    const fileName = `${timestamp}-${file.name}`;
-    const filePath = path.join(UPLOAD_DIR, srId);
-
-    // 디렉토리 생성
-    if (!existsSync(filePath)) {
-      await mkdir(filePath, { recursive: true });
-    }
-
-    const fullPath = path.join(filePath, fileName);
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    await writeFile(fullPath, buffer);
+    // 파일 저장 (Vercel Blob)
+    const uploadResult = await uploadAttachmentBlob(srId, file);
 
     // DB에 첨부파일 정보 저장
-    const fileUrl = `/uploads/attachments/${srId}/${fileName}`;
     const attachment = await prisma.sRAttachment.create({
       data: {
         srId,
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
-        fileUrl,
+        fileUrl: uploadResult.url,
+        storagePath: uploadResult.pathname,
         uploadedBy: session.user.id,
       },
     });

@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { unlink } from "fs/promises";
-import path from "path";
-import { existsSync } from "fs";
-
-const UPLOAD_DIR = path.join(process.cwd(), "uploads", "attachments");
+import { deleteAttachmentBlob } from "@/lib/storage";
 
 // DELETE /api/attachments/[id] - 첨부파일 삭제
 export async function DELETE(
@@ -42,12 +38,14 @@ export async function DELETE(
       );
     }
 
-    // 파일 삭제 (파일 시스템에서)
-    const fileName = attachment.fileUrl.split("/").pop();
-    const filePath = path.join(UPLOAD_DIR, attachment.srId, fileName!);
-
-    if (existsSync(filePath)) {
-      await unlink(filePath);
+    // 파일 삭제 (Vercel Blob)
+    const pathname =
+      attachment.storagePath ??
+      (attachment.fileUrl.startsWith("http")
+        ? new URL(attachment.fileUrl).pathname.slice(1)
+        : "");
+    if (pathname) {
+      await deleteAttachmentBlob(pathname);
     }
 
     // DB에서 삭제

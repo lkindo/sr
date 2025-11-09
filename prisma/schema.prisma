@@ -369,6 +369,7 @@ model SRAttachment {
   fileSize   Int      @map("file_size")
   fileType   String   @map("file_type")
   fileUrl    String   @map("file_url")
+  storagePath String? @map("storage_path")
   uploadedBy String   @map("uploaded_by")
   createdAt  DateTime @default(now()) @map("created_at")
 
