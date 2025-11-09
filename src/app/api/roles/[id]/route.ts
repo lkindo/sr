@@ -12,19 +12,24 @@ const permissionAssignSchema = z.object({
   permissionIds: z.array(z.string()),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // GET /api/roles/[id] - 특정 역할 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const role = await prisma.role.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         permissions: {
           include: {
@@ -63,11 +68,10 @@ export async function GET(
 }
 
 // PATCH /api/roles/[id] - 역할 수정
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -78,7 +82,7 @@ export async function PATCH(
 
     // Check if role exists
     const existingRole = await prisma.role.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingRole) {
@@ -103,7 +107,7 @@ export async function PATCH(
     }
 
     const role = await prisma.role.update({
-      where: { id: params.id },
+      where: { id },
       data: validated,
       include: {
         permissions: {
@@ -132,11 +136,10 @@ export async function PATCH(
 }
 
 // DELETE /api/roles/[id] - 역할 삭제
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -144,7 +147,7 @@ export async function DELETE(
 
     // Check if role exists
     const existingRole = await prisma.role.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -170,7 +173,7 @@ export async function DELETE(
     }
 
     await prisma.role.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: "역할이 삭제되었습니다." });

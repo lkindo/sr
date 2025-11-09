@@ -11,19 +11,24 @@ const userUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // GET /api/users/[id] - 사용자 상세 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -65,11 +70,10 @@ export async function GET(
 }
 
 // PATCH /api/users/[id] - 사용자 수정
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -79,7 +83,7 @@ export async function PATCH(
     const validated = userUpdateSchema.parse(body);
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingUser) {
@@ -115,7 +119,7 @@ export async function PATCH(
     }
 
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       select: {
         id: true,
@@ -145,18 +149,17 @@ export async function PATCH(
 }
 
 // DELETE /api/users/[id] - 사용자 삭제 (비활성화)
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 본인은 삭제할 수 없음
-    if (session.user.id === params.id) {
+    if (session.user.id === id) {
       return NextResponse.json(
         { error: "본인 계정은 삭제할 수 없습니다." },
         { status: 400 }
@@ -164,7 +167,7 @@ export async function DELETE(
     }
 
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingUser) {
@@ -176,7 +179,7 @@ export async function DELETE(
 
     // 실제로는 삭제하지 않고 비활성화
     await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive: false },
     });
 

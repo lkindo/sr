@@ -7,12 +7,17 @@ const roleAssignSchema = z.object({
   roleIds: z.array(z.string()),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // POST /api/users/[id]/roles - 사용자에게 역할 할당
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,7 +28,7 @@ export async function POST(
 
     // Check if user exists
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!user) {
@@ -35,14 +40,14 @@ export async function POST(
 
     // Delete existing roles
     await prisma.userRole.deleteMany({
-      where: { userId: params.id },
+      where: { userId: id },
     });
 
     // Add new roles
     if (validated.roleIds.length > 0) {
       await prisma.userRole.createMany({
         data: validated.roleIds.map((roleId) => ({
-          userId: params.id,
+          userId: id,
           roleId,
         })),
       });
@@ -50,7 +55,7 @@ export async function POST(
 
     // Fetch updated user with roles
     const updatedUser = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,

@@ -4,20 +4,30 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 
 const categorySchema = z.object({
-  categoryName: z.string().min(2, "카테고리 이름은 최소 2자 이상이어야 합니다."),
+  categoryName: z
+    .string()
+    .min(2, "카테고리 이름은 최소 2자 이상이어야 합니다."),
   description: z.string().optional(),
   slaHours: z.number().min(1, "SLA는 최소 1시간 이상이어야 합니다."),
-  priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional().default("MEDIUM"),
+  priority: z
+    .enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"])
+    .optional()
+    .default("MEDIUM"),
   handlerId: z.string().optional(),
   backupHandlerId: z.string().optional(),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // GET /api/clients/[id]/categories - 고객사의 서비스 카테고리 목록 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +35,7 @@ export async function GET(
 
     const categories = await prisma.serviceCategory.findMany({
       where: {
-        clientId: params.id,
+        clientId: id,
         isActive: true,
       },
       include: {
@@ -66,11 +76,10 @@ export async function GET(
 }
 
 // POST /api/clients/[id]/categories - 서비스 카테고리 생성
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -81,7 +90,7 @@ export async function POST(
 
     // 고객사 존재 확인
     const client = await prisma.client.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!client) {
@@ -94,7 +103,7 @@ export async function POST(
     // 카테고리 생성
     const category = await prisma.serviceCategory.create({
       data: {
-        clientId: params.id,
+        clientId: id,
         categoryName: validated.categoryName,
         description: validated.description,
         slaHours: validated.slaHours,

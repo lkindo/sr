@@ -4,11 +4,21 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 
 const clientUpdateSchema = z.object({
-  code: z.string().min(2, "고객사 코드는 최소 2자 이상이어야 합니다.").optional(),
-  name: z.string().min(2, "고객사 이름은 최소 2자 이상이어야 합니다.").optional(),
+  code: z
+    .string()
+    .min(2, "고객사 코드는 최소 2자 이상이어야 합니다.")
+    .optional(),
+  name: z
+    .string()
+    .min(2, "고객사 이름은 최소 2자 이상이어야 합니다.")
+    .optional(),
   industry: z.string().optional(),
   contactPerson: z.string().optional(),
-  contactEmail: z.string().email("유효한 이메일 주소를 입력하세요.").optional().or(z.literal("")),
+  contactEmail: z
+    .string()
+    .email("유효한 이메일 주소를 입력하세요.")
+    .optional()
+    .or(z.literal("")),
   contactPhone: z.string().optional(),
   address: z.string().optional(),
   contractStartDate: z.string().optional().nullable(),
@@ -16,19 +26,24 @@ const clientUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // GET /api/clients/[id] - 특정 고객사 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const client = await prisma.client.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         serviceCategories: true,
         users: {
@@ -76,11 +91,10 @@ export async function GET(
 }
 
 // PATCH /api/clients/[id] - 고객사 수정
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -91,7 +105,7 @@ export async function PATCH(
 
     // Check if client exists
     const existingClient = await prisma.client.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingClient) {
@@ -138,7 +152,7 @@ export async function PATCH(
     }
 
     const client = await prisma.client.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         serviceCategories: true,
@@ -163,11 +177,10 @@ export async function PATCH(
 }
 
 // DELETE /api/clients/[id] - 고객사 삭제
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -175,7 +188,7 @@ export async function DELETE(
 
     // Check if client exists
     const existingClient = await prisma.client.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: {
@@ -204,7 +217,7 @@ export async function DELETE(
     }
 
     await prisma.client.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: "고객사가 삭제되었습니다." });

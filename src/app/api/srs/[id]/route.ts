@@ -9,18 +9,23 @@ export const runtime = 'nodejs';
 
 const srUpdateSchema = z.object({
   title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다.").optional(),
-  description: z.string().min(10, "설명은 최소 10자 이상이어야 합니다.").optional(),
+  description: z
+    .string()
+    .min(10, "설명은 최소 10자 이상이어야 합니다.")
+    .optional(),
   serviceCategoryId: z.string().optional().nullable(),
   priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  status: z.enum([
-    "REQUESTED",
-    "INTAKE",
-    "IN_PROGRESS",
-    "ON_HOLD",
-    "COMPLETED",
-    "CONFIRMED",
-    "REJECTED",
-  ]).optional(),
+  status: z
+    .enum([
+      "REQUESTED",
+      "INTAKE",
+      "IN_PROGRESS",
+      "ON_HOLD",
+      "COMPLETED",
+      "CONFIRMED",
+      "REJECTED",
+    ])
+    .optional(),
   assignedToId: z.string().optional().nullable(),
   requestedCompletionDate: z.string().optional().nullable(),
   actualCompletionDate: z.string().optional().nullable(),
@@ -32,12 +37,17 @@ const srUpdateSchema = z.object({
   additionalFeedback: z.string().optional().nullable(),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // GET /api/srs/[id] - SR 상세 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     // TODO: auth() 함수 임시 주석 처리
     /*
     const session = await auth();
@@ -47,7 +57,7 @@ export async function GET(
     */
 
     const sr = await prisma.sR.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         client: {
           select: {
@@ -143,11 +153,10 @@ export async function GET(
 }
 
 // PATCH /api/srs/[id] - SR 수정
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     // TODO: auth() 함수 임시 주석 처리
     /*
     const session = await auth();
@@ -175,7 +184,7 @@ export async function PATCH(
 
     // Get existing SR
     const existingSr = await prisma.sR.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingSr) {
@@ -230,7 +239,7 @@ export async function PATCH(
       // Create status history
       await prisma.sRStatusHistory.create({
         data: {
-          srId: params.id,
+          srId: id,
           previousStatus: existingSr.status,
           currentStatus: validated.status,
           changedBy: session.user.id,
@@ -241,7 +250,7 @@ export async function PATCH(
       // Create activity log
       await prisma.sRActivity.create({
         data: {
-          srId: params.id,
+          srId: id,
           userId: session.user.id,
           type: "STATUS_CHANGED",
           description: `상태가 ${existingSr.status}에서 ${validated.status}로 변경되었습니다.`,
@@ -261,7 +270,7 @@ export async function PATCH(
     ) {
       await prisma.sRActivity.create({
         data: {
-          srId: params.id,
+          srId: id,
           userId: session.user.id,
           type: "ASSIGNED",
           description: validated.assignedToId
@@ -272,7 +281,7 @@ export async function PATCH(
     }
 
     const sr = await prisma.sR.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         client: true,
@@ -357,11 +366,10 @@ export async function PATCH(
 }
 
 // DELETE /api/srs/[id] - SR 삭제
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     // TODO: auth() 함수 임시 주석 처리
     /*
     const session = await auth();
@@ -371,7 +379,7 @@ export async function DELETE(
     */
 
     const existingSr = await prisma.sR.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingSr) {
@@ -390,7 +398,7 @@ export async function DELETE(
     }
 
     await prisma.sR.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ message: "SR이 삭제되었습니다." });

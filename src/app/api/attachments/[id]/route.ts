@@ -3,19 +3,27 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { deleteAttachmentBlob } from "@/lib/storage";
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // DELETE /api/attachments/[id] - 첨부파일 삭제
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const attachment = await prisma.sRAttachment.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!attachment) {
@@ -50,7 +58,7 @@ export async function DELETE(
 
     // DB에서 삭제
     await prisma.sRAttachment.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     // 활동 내역 추가
@@ -86,16 +94,18 @@ export async function DELETE(
 // GET /api/attachments/[id] - 첨부파일 다운로드
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const attachment = await prisma.sRAttachment.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!attachment) {

@@ -4,9 +4,11 @@ import SRCreatedEmail from "@/emails/SRCreatedEmail";
 import SRStatusChangedEmail from "@/emails/SRStatusChangedEmail";
 import SRAssignedEmail from "@/emails/SRAssignedEmail";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "SR Management <noreply@sr-system.com>";
+const FROM_EMAIL =
+  process.env.EMAIL_FROM || "SR Management <noreply@sr-system.com>";
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
 
 interface SendSRCreatedEmailParams {
@@ -32,6 +34,11 @@ export async function sendSRCreatedEmail({
   requesterName,
   requesterEmail,
 }: SendSRCreatedEmailParams) {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    return null;
+  }
+
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {
@@ -91,6 +98,11 @@ export async function sendSRStatusChangedEmail({
   changedByName,
   clientName,
 }: SendSRStatusChangedEmailParams) {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    return null;
+  }
+
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {
@@ -150,6 +162,11 @@ export async function sendSRAssignedEmail({
   assignedToName,
   assignedByName,
 }: SendSRAssignedEmailParams) {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    return null;
+  }
+
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {
@@ -204,6 +221,11 @@ export async function sendCommentNotificationEmail({
   commentAuthor,
   commentContent,
 }: SendCommentNotificationEmailParams) {
+  if (!resend) {
+    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    return null;
+  }
+
   const srUrl = `${BASE_URL}/srs/${srId}`;
 
   try {

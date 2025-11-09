@@ -8,19 +8,24 @@ const commentSchema = z.object({
   content: z.string().min(1, "댓글 내용을 입력해주세요."),
 });
 
+type RouteContext = {
+  params: Promise<{
+    id: string;
+  }>;
+};
+
 // GET /api/srs/[id]/comments - SR 댓글 목록 조회
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const comments = await prisma.sRComment.findMany({
-      where: { srId: params.id },
+      where: { srId: id },
       include: {
         user: {
           select: {
@@ -46,11 +51,10 @@ export async function GET(
 }
 
 // POST /api/srs/[id]/comments - 새 댓글 추가
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, context: RouteContext) {
   try {
+    const { id } = await context.params;
+
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -61,7 +65,7 @@ export async function POST(
 
     // Check if SR exists and get related data
     const sr = await prisma.sR.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         requester: {
           select: {
@@ -87,7 +91,7 @@ export async function POST(
 
     const comment = await prisma.sRComment.create({
       data: {
-        srId: params.id,
+        srId: id,
         userId: session.user.id,
         content: validated.content,
       },
@@ -105,7 +109,7 @@ export async function POST(
     // Create activity log
     await prisma.sRActivity.create({
       data: {
-        srId: params.id,
+        srId: id,
         userId: session.user.id,
         type: "COMMENTED",
         description: "댓글이 추가되었습니다.",
