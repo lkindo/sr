@@ -1,4 +1,5 @@
 {
   "framework": "nextjs",
-  "regions": ["icn1"]
+  "regions": ["icn1"],
+  "buildCommand": "pnpm build"
 }
