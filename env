@@ -1,0 +1,42 @@
+
+# VITE_SUPABASE_URL=https://jafobjjmeisydllmukmu.supabase.co
+# VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphZm9iamptZWlzeWRsbG11a211Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0OTQwOTUsImV4cCI6MjA3ODA3MDA5NX0.KOn9gx5I99QeUKDgwYCaG9UbSzoc2ZmYa5ziFjBS028
+
+# Database (Supabase PostgreSQL)
+# Session Mode (port 5432) - Prisma와 호환성 최고
+DATABASE_URL="postgresql://postgres.jafobjjmeisydllmukmu:sr1234@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
+# Direct URL은 DATABASE_URL과 동일하게 설정
+DIRECT_URL="postgresql://postgres.jafobjjmeisydllmukmu:sr1234@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
+
+
+# Connect to Supabase via connection pooling (Transaction Mode - port 6543)
+# pgbouncer=true is required for Transaction Mode
+# DATABASE_URL="postgresql://postgres.jafobjjmeisydllmukmu:Sfire7072SS@aws-1-ap-northeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true&connect_timeout=15"
+
+# Direct connection to the database. Used for migrations (Session Mode - port 5432)
+# DIRECT_URL="postgresql://postgres.jafobjjmeisydllmukmu:Sfire7072SS@aws-1-ap-northeast-2.pooler.supabase.com:5432/postgres"
+
+
+# NextAuth
+NEXTAUTH_SECRET="sr management"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Vercel Blob (추후 설정)
+BLOB_READ_WRITE_TOKEN="vercel_blob_rw_NwePdnx5AlSPQhxW_vjRwXoOfkQVUVymVSsFvGKzF3GybUB"
+
+# Upstash Redis (추후 설정)
+# UPSTASH_REDIS_REST_URL=""
+# UPSTASH_REDIS_REST_TOKEN=""
+
+# Resend (이메일 발송 서비스 - https://resend.com에서 API 키 발급)
+# 개발 중에는 주석 처리하거나 테스트 키 사용
+RESEND_API_KEY=""
+EMAIL_FROM="SR Management <noreply@sr-system.com>"
+NEXT_PUBLIC_APP_URL="http://localhost:3001"
+
+# Inngest (추후 설정)
+# INNGEST_EVENT_KEY=""
+# INNGEST_SIGNING_KEY=""
+
+# Mattermost (선택사항)
+# MATTERMOST_WEBHOOK_URL=""
