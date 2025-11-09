@@ -46,7 +46,10 @@
       "Bash(node test-db.js:*)",
       "Bash(del test-db.js)",
       "Bash(powershell -Command \"Stop-Process -Name node -Force\")",
-      "Bash(node check-db.js:*)"
+      "Bash(node check-db.js:*)",
+      "Bash(if exist srcgenerated rmdir /s /q srcgenerated)",
+      "Bash(pnpm prisma generate:*)",
+      "Bash(pnpm build:*)"
     ],
     "deny": [],
     "ask": []
