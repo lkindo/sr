@@ -142,7 +142,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
-    return NextResponse.json(sr);
+    // Transform serviceCategory.categoryName to category.name for frontend compatibility
+    const transformedSr = {
+      ...sr,
+      category: sr.serviceCategory ? {
+        id: sr.serviceCategory.id,
+        name: sr.serviceCategory.categoryName,
+      } : null,
+      assignedTo: sr.assignee,
+      _count: {
+        comments: sr.comments?.length || 0,
+        attachments: sr.attachments?.length || 0,
+      }
+    };
+
+    return NextResponse.json(transformedSr);
   } catch (error) {
     console.error("Error fetching SR:", error);
     return NextResponse.json(
