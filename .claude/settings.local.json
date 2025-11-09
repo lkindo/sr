@@ -49,7 +49,12 @@
       "Bash(node check-db.js:*)",
       "Bash(if exist srcgenerated rmdir /s /q srcgenerated)",
       "Bash(pnpm prisma generate:*)",
-      "Bash(pnpm build:*)"
+      "Bash(pnpm build:*)",
+      "Bash(where:*)",
+      "Bash(node add-column.js:*)",
+      "Bash(del:*)",
+      "Bash(tasklist:*)",
+      "Bash(node test-sr-update.js:*)"
     ],
     "deny": [],
     "ask": []

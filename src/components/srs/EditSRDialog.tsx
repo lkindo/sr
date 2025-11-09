@@ -267,15 +267,15 @@ export function EditSRDialog({
               <div className="space-y-2">
                 <Label htmlFor="assignedTo">담당자</Label>
                 <Select
-                  value={assignedToId}
-                  onValueChange={setAssignedToId}
+                  value={assignedToId || "unassigned"}
+                  onValueChange={(value) => setAssignedToId(value === "unassigned" ? "" : value)}
                   disabled={loading}
                 >
                   <SelectTrigger id="assignedTo">
                     <SelectValue placeholder="담당자 선택" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">미배정</SelectItem>
+                    <SelectItem value="unassigned">미배정</SelectItem>
                     {users.map((user) => (
                       <SelectItem key={user.id} value={user.id}>
                         {user.name} ({user.email})
