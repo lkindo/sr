@@ -69,5 +69,14 @@
     "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^4.0.8"
-  }
+  },
+  "trustedDependencies": [
+    "@prisma/client",
+    "@prisma/engines",
+    "esbuild",
+    "msw",
+    "prisma",
+    "sharp",
+    "unrs-resolver"
+  ]
 }
