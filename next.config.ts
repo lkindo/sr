@@ -21,9 +21,6 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // 성능 최적화
-  swcMinify: true,
-
   // Webpack 설정 (Prisma 최적화)
   webpack: (config, { isServer }) => {
     if (isServer) {

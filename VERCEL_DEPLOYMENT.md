@@ -2,6 +2,39 @@
 
 이 문서는 SR Management 시스템을 Vercel에 배포하는 방법을 설명합니다.
 
+## 근본 문제 해결 완료 ✅
+
+### 배포 실패의 3가지 근본 원인과 해결책:
+
+#### 1. Prisma 커스텀 출력 경로 문제
+**문제:**
+- `prisma/schema.prisma`의 `output = "../src/generated/prisma"`가 Vercel 빌드 실패의 주 원인
+- 커스텀 경로는 로컬에서는 작동하지만 Vercel 환경에서 경로 충돌 발생
+
+**해결:**
+- Prisma 기본 경로 사용 (`node_modules/@prisma/client`)
+- 모든 import를 `@prisma/client`로 변경
+- `postinstall` 스크립트로 자동 생성 보장
+
+#### 2. vercel.json 과도한 설정
+**문제:**
+- 불필요한 `buildCommand`, `installCommand` 설정이 Vercel 기본 빌드와 충돌
+- `postinstall` 스크립트와 중복 실행으로 문제 발생
+
+**해결:**
+- vercel.json을 최소화 (framework, regions만)
+- Vercel의 자동 감지 및 최적화 기능 활용
+- 빌드 명령은 Next.js 기본값 사용
+
+#### 3. pnpm 캐싱 최적화 부재
+**문제:**
+- 803개 패키지를 매번 처음부터 다운로드
+- 빌드 시간이 과도하게 길어짐
+
+**해결:**
+- `.npmrc` 추가로 pnpm 설정 최적화
+- Vercel 캐시 활용 설정
+
 ## 배포 전 준비사항
 
 ### 1. 환경 변수 설정
@@ -19,7 +52,7 @@ DIRECT_URL=postgresql://user:password@host:5432/database
 NEXTAUTH_SECRET=your-secret-key-here
 NEXTAUTH_URL=https://your-domain.vercel.app
 
-# Vercel Blob
+# Vercel Blob (파일 업로드 사용 시)
 BLOB_READ_WRITE_TOKEN=your-blob-token
 ```
 
@@ -29,7 +62,7 @@ BLOB_READ_WRITE_TOKEN=your-blob-token
 # Email (Resend)
 RESEND_API_KEY=your-resend-key
 
-# Redis (Upstash)
+# Redis (Upstash - 세션/캐싱)
 UPSTASH_REDIS_REST_URL=your-upstash-url
 UPSTASH_REDIS_REST_TOKEN=your-upstash-token
 
@@ -39,63 +72,97 @@ NEXT_PUBLIC_AXIOM_TOKEN=your-axiom-token
 
 # Notifications
 MATTERMOST_WEBHOOK_URL=your-mattermost-webhook
-
-# Inngest
-INNGEST_EVENT_KEY=your-inngest-key
-INNGEST_SIGNING_KEY=your-inngest-signing-key
 ```
 
 ### 2. Vercel 프로젝트 설정
 
-1. **Vercel CLI 설치** (선택사항)
-   ```bash
-   pnpm add -g vercel
-   ```
+Vercel 대시보드에서:
+1. GitHub 저장소 연결
+2. Framework Preset: **Next.js** (자동 감지됨)
+3. Root Directory: `./` (기본값)
+4. Build Command: 비워두기 (자동: `pnpm build`)
+5. Install Command: 비워두기 (자동: `pnpm install`)
 
-2. **프로젝트 연결**
-   ```bash
-   vercel link
-   ```
+## 핵심 설정 파일
 
-3. **환경 변수 설정**
-   - Vercel 대시보드 → Settings → Environment Variables
-   - 또는 CLI를 통해: `vercel env add`
+### 1. prisma/schema.prisma
 
-## 배포 설정 파일
+```prisma
+generator client {
+  provider = "prisma-client-js"
+  // 커스텀 output 경로 사용 안 함 (Vercel 호환성)
+  // output = "../src/generated/prisma" ❌
+}
 
-### vercel.json
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+### 2. vercel.json (최소 설정)
 
 ```json
 {
-  "buildCommand": "pnpm prisma generate && pnpm build",
-  "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs",
-  "regions": ["icn1"],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "DIRECT_URL": "@direct_url",
-    "NEXTAUTH_SECRET": "@nextauth_secret",
-    "NEXTAUTH_URL": "@nextauth_url"
-  }
+  "regions": ["icn1"]
 }
 ```
 
 **설정 설명:**
-- `buildCommand`: Prisma 클라이언트를 생성한 후 Next.js 빌드
-- `installCommand`: 정확한 버전으로 의존성 설치 (보안 및 재현성)
-- `framework`: Next.js 프레임워크 명시
-- `regions`: 서울 리전 (icn1) 사용으로 한국 사용자에게 최적화
+- `framework`: Next.js 명시 (자동 최적화)
+- `regions`: 서울 리전 (한국 사용자 최적화)
+- buildCommand/installCommand 제거 (자동 감지)
 
-### next.config.ts
+### 3. .npmrc (pnpm 최적화)
+
+```
+auto-install-peers=true
+strict-peer-dependencies=false
+enable-pre-post-scripts=true
+shamefully-hoist=false
+store-dir=~/.pnpm-store
+```
+
+### 4. package.json
+
+```json
+{
+  "scripts": {
+    "postinstall": "prisma generate",
+    "build": "next build",
+    "start": "next start"
+  }
+}
+```
+
+**중요:** `postinstall`은 의존성 설치 후 자동으로 Prisma 클라이언트를 생성합니다.
+
+### 5. next.config.ts
 
 ```typescript
 const nextConfig: NextConfig = {
   output: 'standalone',  // Vercel 최적화
-  swcMinify: true,       // 번들 크기 최소화
+  
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.public.blob.vercel-storage.com',
+      },
+    ],
+  },
+
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
 
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Prisma를 외부 모듈로 처리하여 번들 크기 감소
+      // Prisma를 외부 모듈로 처리
       config.externals.push({
         '@prisma/client': 'commonjs @prisma/client',
         'prisma': 'commonjs prisma'
@@ -106,110 +173,134 @@ const nextConfig: NextConfig = {
 };
 ```
 
-### package.json
-
-```json
-{
-  "scripts": {
-    "postinstall": "prisma generate"
-  }
-}
-```
-
-**중요:** `postinstall` 스크립트는 의존성 설치 후 자동으로 Prisma 클라이언트를 생성합니다.
-
 ## 배포 프로세스
 
 ### 자동 배포 (추천)
 
-GitHub와 Vercel을 연결하면 자동으로 배포됩니다:
+1. 변경사항을 main 브랜치에 푸시
+```bash
+git add .
+git commit -m "fix: Vercel 배포 설정 완료"
+git push origin main
+```
 
-1. main 브랜치에 푸시
-2. Vercel이 자동으로 빌드 및 배포
-3. 배포 상태는 Vercel 대시보드에서 확인
+2. Vercel이 자동으로:
+   - 소스 코드 감지
+   - 의존성 설치 (`pnpm install`)
+   - Prisma 클라이언트 생성 (`postinstall`)
+   - Next.js 빌드 (`next build`)
+   - 배포
 
-### 수동 배포
+3. 배포 상태 확인:
+   - Vercel 대시보드 → Deployments
+   - 실시간 빌드 로그 확인
+
+### 수동 배포 (CLI)
 
 ```bash
-# 프로덕션 배포
-vercel --prod
+# Vercel CLI 설치
+npm i -g vercel
+
+# 프로젝트 연결
+vercel link
 
 # 프리뷰 배포
 vercel
+
+# 프로덕션 배포
+vercel --prod
 ```
-
-## 배포 후 확인사항
-
-### 1. 데이터베이스 연결 확인
-
-배포된 애플리케이션에서 다음을 확인:
-- 데이터베이스 연결 성공
-- Prisma 쿼리 정상 작동
-
-### 2. 인증 시스템 확인
-
-- NextAuth 로그인/로그아웃 테스트
-- 세션 관리 정상 작동
-
-### 3. 파일 업로드 확인
-
-- Vercel Blob 연동 정상 작동
-- 파일 업로드/다운로드 테스트
 
 ## 트러블슈팅
 
-### 빌드 실패: Prisma Client 에러
+### 1. Prisma Client 생성 실패
 
 **증상:**
 ```
 Error: @prisma/client did not initialize yet
 ```
 
-**해결방법:**
-1. `postinstall` 스크립트가 [package.json:11](package.json#L11)에 있는지 확인
-2. Vercel 환경 변수에 `DATABASE_URL`이 설정되었는지 확인
-3. 빌드 커맨드가 `pnpm prisma generate && pnpm build`인지 확인
+**해결:**
+1. `package.json`에 `postinstall` 스크립트 확인
+2. Vercel 환경 변수에 `DATABASE_URL` 설정 확인
+3. `prisma/schema.prisma`에 커스텀 output 경로 없는지 확인
 
-### 빌드 시간 초과
+### 2. 빌드 시간 초과
 
 **증상:**
 ```
 Build exceeded maximum time limit
 ```
 
-**해결방법:**
-1. [.vercelignore](.vercelignore) 파일로 불필요한 파일 제외
-2. 의존성 캐싱 활성화 (`--frozen-lockfile` 사용)
-3. 테스트 파일 및 개발 도구 제외
+**해결:**
+1. `.vercelignore` 파일로 불필요한 파일 제외
+2. `.npmrc` 설정 확인
+3. `node_modules` 삭제 후 재설치
 
-### 환경 변수 누락
+### 3. 환경 변수 누락
 
 **증상:**
 ```
-Error: Environment variable not found
+Environment variable not found: DATABASE_URL
 ```
 
-**해결방법:**
+**해결:**
 1. Vercel 대시보드 → Settings → Environment Variables
-2. 모든 필수 환경 변수 설정 확인
-3. Production/Preview/Development 환경별로 설정
+2. Production, Preview, Development 환경별로 설정
+3. 재배포 (Redeploy)
 
-### 데이터베이스 연결 실패
+### 4. Module not found
 
 **증상:**
 ```
-Can't reach database server
+Module not found: Can't resolve '@/generated/prisma'
 ```
 
-**해결방법:**
-1. Supabase에서 Vercel IP 허용 확인
-2. `DATABASE_URL`과 `DIRECT_URL` 설정 확인
-3. Supabase의 Pooler 연결 문자열 사용 (`?pgbouncer=true`)
+**해결:**
+1. 모든 Prisma import를 `@prisma/client`로 변경
+```typescript
+// ❌ 잘못된 import
+import { PrismaClient } from '@/generated/prisma'
 
-## 성능 최적화
+// ✅ 올바른 import
+import { PrismaClient } from '@prisma/client'
+```
 
-### 1. 이미지 최적화
+2. 로컬에서 재생성
+```bash
+rm -rf src/generated
+pnpm prisma generate
+```
 
+## 배포 후 확인사항
+
+### 1. 기본 동작 확인
+- [ ] 사이트 접속 가능
+- [ ] 로그인 페이지 로드
+- [ ] 정적 리소스 로드 (CSS, JS, 이미지)
+
+### 2. 데이터베이스 연결
+- [ ] Prisma 쿼리 정상 작동
+- [ ] 데이터 CRUD 테스트
+
+### 3. 인증 시스템
+- [ ] 로그인/로그아웃 테스트
+- [ ] 세션 관리 확인
+
+### 4. 성능 확인
+- [ ] Lighthouse 스코어 확인
+- [ ] Core Web Vitals 확인
+- [ ] 로딩 속도 테스트
+
+## 성능 최적화 팁
+
+### 1. Edge Functions 활용
+자주 호출되는 API는 Edge Runtime 사용:
+```typescript
+export const runtime = 'edge';
+```
+
+### 2. 이미지 최적화
 Next.js Image 컴포넌트 사용:
 ```tsx
 import Image from 'next/image'
@@ -219,66 +310,29 @@ import Image from 'next/image'
   alt="Description"
   width={500}
   height={300}
-  priority
+  priority  // LCP 최적화
 />
 ```
 
-### 2. 번들 크기 최적화
-
-```bash
-# 번들 분석
-pnpm add -D @next/bundle-analyzer
-```
-
 ### 3. 캐싱 전략
-
 - Static Generation (SSG) 우선 사용
 - Incremental Static Regeneration (ISR) 활용
 - SWR/React Query로 클라이언트 캐싱
 
-### 4. Edge Functions
-
-자주 사용되는 API는 Edge Functions로 배포:
-```typescript
-export const runtime = 'edge';
-```
-
 ## 모니터링
 
 ### Vercel Analytics
+프로젝트 설정 → Analytics 탭에서 활성화
 
-프로젝트 설정에서 Analytics 활성화
+### Speed Insights
+실시간 성능 모니터링 활성화
 
-### Sentry 통합
-
-환경 변수 설정:
-```bash
-NEXT_PUBLIC_SENTRY_DSN=your-sentry-dsn
-```
-
-### Axiom 로깅
-
-환경 변수 설정:
-```bash
-NEXT_PUBLIC_AXIOM_TOKEN=your-axiom-token
-```
-
-## 배포 체크리스트
-
-- [ ] 환경 변수 모두 설정
-- [ ] Supabase 데이터베이스 연결 확인
-- [ ] Prisma 스키마 마이그레이션 완료
-- [ ] NextAuth 설정 완료
-- [ ] Vercel Blob 설정 완료
-- [ ] 빌드 로컬에서 성공 확인 (`pnpm build`)
-- [ ] 타입 체크 통과 (`pnpm type-check`)
-- [ ] Git 푸시 및 자동 배포 확인
-- [ ] 배포된 사이트 기능 테스트
-- [ ] 모니터링 도구 연동 확인
+### 로그 확인
+Vercel 대시보드 → Logs에서 실시간 서버 로그 확인
 
 ## 추가 리소스
 
-- [Vercel 문서](https://vercel.com/docs)
+- [Vercel 공식 문서](https://vercel.com/docs)
 - [Next.js 배포 가이드](https://nextjs.org/docs/deployment)
 - [Prisma on Vercel](https://www.prisma.io/docs/guides/deployment/deployment-guides/deploying-to-vercel)
-- [Supabase + Vercel](https://supabase.com/docs/guides/platform/vercel)
+- [Supabase + Vercel 통합](https://supabase.com/docs/guides/platform/vercel)

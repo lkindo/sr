@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { PrismaClient } from "../src/generated/prisma";
+import { PrismaClient } from "@prisma/client";
 
 // 환경 변수 명시적 로드
 config({ override: true });

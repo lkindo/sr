@@ -1,12 +1,4 @@
 {
-  "buildCommand": "pnpm prisma generate && pnpm build",
-  "installCommand": "pnpm install --frozen-lockfile",
   "framework": "nextjs",
-  "regions": ["icn1"],
-  "env": {
-    "DATABASE_URL": "@database_url",
-    "DIRECT_URL": "@direct_url",
-    "NEXTAUTH_SECRET": "@nextauth_secret",
-    "NEXTAUTH_URL": "@nextauth_url"
-  }
+  "regions": ["icn1"]
 }
