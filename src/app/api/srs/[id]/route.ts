@@ -28,6 +28,7 @@ const srUpdateSchema = z.object({
     .optional(),
   assignedToId: z.string().optional().nullable(),
   requestedCompletionDate: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
   actualCompletionDate: z.string().optional().nullable(),
   estimatedHours: z.number().optional().nullable(),
   actualHours: z.number().optional().nullable(),
@@ -237,6 +238,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (validated.requestedCompletionDate !== undefined) {
       updateData.requestedCompletionDate = validated.requestedCompletionDate
         ? new Date(validated.requestedCompletionDate)
+        : null;
+    }
+
+    if (validated.dueDate !== undefined) {
+      updateData.dueDate = validated.dueDate
+        ? new Date(validated.dueDate)
         : null;
     }
 

@@ -12,6 +12,8 @@ const userSchema = z.object({
   email: z.string().email("유효한 이메일 주소를 입력해주세요."),
   password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다."),
   isActive: z.boolean().optional().default(true),
+  userType: z.enum(["ENGINEER", "CLIENT"]).optional().default("ENGINEER"),
+  clientIds: z.array(z.string()).optional().default([]),
 });
 
 // GET /api/users - 사용자 목록 조회
@@ -53,13 +55,30 @@ export async function GET(request: NextRequest) {
             role: true,
           },
         },
+        clients: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
         createdAt: "desc",
       },
     });
 
-    return NextResponse.json(users);
+    // 사용자 유형 결정 (클라이언트가 있으면 CLIENT, 없으면 ENGINEER)
+    const usersWithType = users.map((user) => ({
+      ...user,
+      userType: user.clients.length > 0 ? "CLIENT" : "ENGINEER",
+    }));
+
+    return NextResponse.json(usersWithType);
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
@@ -92,16 +111,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 고객사 사용자인 경우 고객사 검증
+    if (validated.userType === "CLIENT" && validated.clientIds.length === 0) {
+      return NextResponse.json(
+        { error: "고객사 사용자는 최소 1개 이상의 고객사를 선택해야 합니다." },
+        { status: 400 }
+      );
+    }
+
     // 비밀번호 해싱
     const hashedPassword = await hash(validated.password, 10);
 
-    // 사용자 생성
+    // 사용자 생성 (트랜잭션으로 고객사 할당까지 처리)
     const user = await prisma.user.create({
       data: {
         name: validated.name,
         email: validated.email,
         password: hashedPassword,
         isActive: validated.isActive,
+        clients: {
+          create: validated.clientIds.map((clientId) => ({
+            client: {
+              connect: { id: clientId },
+            },
+          })),
+        },
       },
       select: {
         id: true,
@@ -109,6 +143,17 @@ export async function POST(request: NextRequest) {
         email: true,
         isActive: true,
         createdAt: true,
+        clients: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
       },
     });
 

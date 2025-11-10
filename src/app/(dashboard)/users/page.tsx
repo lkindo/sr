@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus, Search, UserCheck, UserX, Shield } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -22,7 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AssignRolesDialog } from "@/components/users/AssignRolesDialog";
-import { usePermissions } from "@/hooks/use-permissions";
+import { UserDialog } from "@/components/users/UserDialog";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 interface User {
@@ -31,10 +32,18 @@ interface User {
   email: string;
   isActive: boolean;
   createdAt: string;
+  userType: "ENGINEER" | "CLIENT";
   roles: Array<{
     role: {
       id: string;
       name: string;
+    };
+  }>;
+  clients: Array<{
+    client: {
+      id: string;
+      name: string;
+      code: string;
     };
   }>;
 }
@@ -46,6 +55,7 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
+  const [userDialogOpen, setUserDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
@@ -115,6 +125,11 @@ export default function UsersPage() {
     setAssignRolesDialogOpen(true);
   };
 
+  const handleCreateUser = () => {
+    setSelectedUser(null);
+    setUserDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -133,7 +148,7 @@ export default function UsersPage() {
           </p>
         </div>
         <PermissionGuard roles={["ADMIN"]}>
-          <Button>
+          <Button onClick={handleCreateUser}>
             <Plus className="mr-2 h-4 w-4" />
             새 사용자 추가
           </Button>
@@ -167,6 +182,7 @@ export default function UsersPage() {
               <TableRow>
                 <TableHead>이름</TableHead>
                 <TableHead>이메일</TableHead>
+                <TableHead>유형</TableHead>
                 <TableHead>역할</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead>가입일</TableHead>
@@ -176,7 +192,7 @@ export default function UsersPage() {
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     {searchQuery
                       ? "검색 결과가 없습니다."
                       : "등록된 사용자가 없습니다."}
@@ -185,8 +201,26 @@ export default function UsersPage() {
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/users/${user.id}`}
+                        className="hover:underline text-primary"
+                      >
+                        {user.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          user.userType === "ENGINEER" ? "default" : "outline"
+                        }
+                      >
+                        {user.userType === "ENGINEER"
+                          ? "엔지니어"
+                          : "고객사"}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
                         {user.roles.length === 0 ? (
@@ -253,6 +287,13 @@ export default function UsersPage() {
         </CardContent>
       </Card>
 
+      <UserDialog
+        open={userDialogOpen}
+        onOpenChange={setUserDialogOpen}
+        user={selectedUser}
+        onSaved={fetchUsers}
+      />
+
       <AssignRolesDialog
         open={assignRolesDialogOpen}
         onOpenChange={setAssignRolesDialogOpen}
@@ -262,5 +303,3 @@ export default function UsersPage() {
     </div>
   );
 }
-
-

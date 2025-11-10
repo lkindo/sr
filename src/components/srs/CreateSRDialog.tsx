@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -64,6 +65,10 @@ export function CreateSRDialog({
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { data: session } = useSession();
+
+  // SR 할당 권한 확인
+  const canAssignSR = session?.user?.permissions?.includes("SR.ASSIGN") ?? false;
 
   useEffect(() => {
     if (open) {
@@ -113,14 +118,15 @@ export function CreateSRDialog({
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("/api/users");
-      if (!response.ok) throw new Error("Failed to fetch users");
+      // SR 처리 가능한 사용자만 조회 (SR 관련 모든 권한 보유)
+      const response = await fetch("/api/users/sr-handlers");
+      if (!response.ok) throw new Error("Failed to fetch SR handlers");
       const data = await response.json();
       setUsers(data);
     } catch (error) {
       toast({
         title: "오류",
-        description: "사용자 목록을 불러오지 못했습니다.",
+        description: "SR 담당자 목록을 불러오지 못했습니다.",
         variant: "destructive",
       });
     }
@@ -348,16 +354,23 @@ export function CreateSRDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="assignee">담당자</Label>
+                <Label htmlFor="assignee">
+                  담당자 (선택사항)
+                  {!canAssignSR && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      (할당 권한 없음)
+                    </span>
+                  )}
+                </Label>
                 <Select
                   value={assigneeId || "none"}
                   onValueChange={(value) =>
                     setAssigneeId(value === "none" ? "" : value)
                   }
-                  disabled={loading}
+                  disabled={loading || !canAssignSR}
                 >
                   <SelectTrigger id="assignee">
-                    <SelectValue placeholder="담당자 선택 (선택사항)" />
+                    <SelectValue placeholder={canAssignSR ? "담당자 선택 (선택사항)" : "할당 권한이 없습니다"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">선택 안 함</SelectItem>

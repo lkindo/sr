@@ -9,6 +9,8 @@ const userUpdateSchema = z.object({
   email: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
   password: z.string().min(8, "비밀번호는 최소 8자 이상이어야 합니다.").optional(),
   isActive: z.boolean().optional(),
+  userType: z.enum(["ENGINEER", "CLIENT"]).optional(),
+  clientIds: z.array(z.string()).optional(),
 });
 
 type RouteContext = {
@@ -45,6 +47,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
                     permission: true,
                   },
                 },
+              },
+            },
+          },
+        },
+        clients: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
               },
             },
           },
@@ -107,6 +120,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
+    // 고객사 사용자 검증
+    if (validated.userType === "CLIENT" && validated.clientIds && validated.clientIds.length === 0) {
+      return NextResponse.json(
+        { error: "고객사 사용자는 최소 1개 이상의 고객사를 선택해야 합니다." },
+        { status: 400 }
+      );
+    }
+
     const updateData: any = {};
 
     if (validated.name) updateData.name = validated.name;
@@ -118,6 +139,23 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       updateData.password = await hash(validated.password, 10);
     }
 
+    // 고객사 업데이트 (clientIds가 제공된 경우)
+    if (validated.clientIds !== undefined) {
+      // 기존 고객사 연결 삭제 후 새로 생성
+      await prisma.userClient.deleteMany({
+        where: { userId: id },
+      });
+
+      if (validated.clientIds.length > 0) {
+        await prisma.userClient.createMany({
+          data: validated.clientIds.map((clientId) => ({
+            userId: id,
+            clientId: clientId,
+          })),
+        });
+      }
+    }
+
     const user = await prisma.user.update({
       where: { id },
       data: updateData,
@@ -127,6 +165,17 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         email: true,
         isActive: true,
         updatedAt: true,
+        clients: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
       },
     });
 

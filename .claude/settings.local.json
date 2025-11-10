@@ -54,7 +54,8 @@
       "Bash(node add-column.js:*)",
       "Bash(del:*)",
       "Bash(tasklist:*)",
-      "Bash(node test-sr-update.js:*)"
+      "Bash(node test-sr-update.js:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

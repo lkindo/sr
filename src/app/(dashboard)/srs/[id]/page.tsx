@@ -30,6 +30,7 @@ interface SR {
   status: string;
   priority: string;
   requestedCompletionDate?: string;
+  dueDate?: string;
   actualCompletionDate?: string;
   client: {
     id: string;
@@ -300,32 +301,46 @@ export default function SRDetailPage() {
               </div>
             </div>
 
-            {(sr.requestedCompletionDate || sr.actualCompletionDate) && (
+            {(sr.requestedCompletionDate || sr.dueDate || sr.actualCompletionDate) && (
               <>
                 <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  {sr.requestedCompletionDate && (
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                        요청 완료 날짜
-                      </h3>
-                      <p className="text-sm">
-                        {new Date(
-                          sr.requestedCompletionDate
-                        ).toLocaleDateString("ko-KR")}
-                      </p>
-                    </div>
-                  )}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {sr.requestedCompletionDate && (
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                          요청 완료 날짜
+                        </h3>
+                        <p className="text-sm">
+                          {new Date(
+                            sr.requestedCompletionDate
+                          ).toLocaleDateString("ko-KR")}
+                        </p>
+                      </div>
+                    )}
+                    {sr.dueDate && (
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                          마감일
+                        </h3>
+                        <p className="text-sm">
+                          {new Date(sr.dueDate).toLocaleDateString("ko-KR")}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                   {sr.actualCompletionDate && (
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                        실제 완료 날짜
-                      </h3>
-                      <p className="text-sm">
-                        {new Date(sr.actualCompletionDate).toLocaleDateString(
-                          "ko-KR"
-                        )}
-                      </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                          실제 완료 날짜
+                        </h3>
+                        <p className="text-sm">
+                          {new Date(sr.actualCompletionDate).toLocaleDateString(
+                            "ko-KR"
+                          )}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

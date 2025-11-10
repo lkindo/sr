@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,6 +30,7 @@ interface SR {
   status: string;
   priority: string;
   requestedCompletionDate?: string;
+  dueDate?: string;
   assignedTo?: {
     id: string;
   } | null;
@@ -59,10 +61,15 @@ export function EditSRDialog({
   const [priority, setPriority] = useState("");
   const [assignedToId, setAssignedToId] = useState("");
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [changeReason, setChangeReason] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { data: session } = useSession();
+
+  // SR 할당 권한 확인
+  const canAssignSR = session?.user?.permissions?.includes("SR.ASSIGN") ?? false;
 
   useEffect(() => {
     if (open && sr) {
@@ -76,6 +83,11 @@ export function EditSRDialog({
           ? new Date(sr.requestedCompletionDate).toISOString().split("T")[0]
           : ""
       );
+      setDueDate(
+        sr.dueDate
+          ? new Date(sr.dueDate).toISOString().split("T")[0]
+          : ""
+      );
       setChangeReason("");
       fetchUsers();
     }
@@ -83,14 +95,15 @@ export function EditSRDialog({
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("/api/users");
-      if (!response.ok) throw new Error("Failed to fetch users");
+      // SR 처리 가능한 사용자만 조회 (SR 관련 모든 권한 보유)
+      const response = await fetch("/api/users/sr-handlers");
+      if (!response.ok) throw new Error("Failed to fetch SR handlers");
       const data = await response.json();
       setUsers(data);
     } catch (error) {
       toast({
         title: "오류",
-        description: "사용자 목록을 불러오는데 실패했습니다.",
+        description: "SR 담당자 목록을 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     }
@@ -142,6 +155,7 @@ export function EditSRDialog({
           priority,
           assignedToId: assignedToId || null,
           requestedCompletionDate: requestedCompletionDate || null,
+          dueDate: dueDate || null,
           changeReason: changeReason || undefined,
         }),
       });
@@ -263,28 +277,35 @@ export function EditSRDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="assignedTo">담당자</Label>
-                <Select
-                  value={assignedToId || "unassigned"}
-                  onValueChange={(value) => setAssignedToId(value === "unassigned" ? "" : value)}
-                  disabled={loading}
-                >
-                  <SelectTrigger id="assignedTo">
-                    <SelectValue placeholder="담당자 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unassigned">미배정</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="assignedTo">
+                담당자
+                {!canAssignSR && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    (할당 권한 없음)
+                  </span>
+                )}
+              </Label>
+              <Select
+                value={assignedToId || "unassigned"}
+                onValueChange={(value) => setAssignedToId(value === "unassigned" ? "" : value)}
+                disabled={loading || !canAssignSR}
+              >
+                <SelectTrigger id="assignedTo">
+                  <SelectValue placeholder={canAssignSR ? "담당자 선택" : "할당 권한이 없습니다"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">미배정</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name} ({user.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="requestedCompletionDate">요청 완료 날짜</Label>
                 <Input
@@ -292,6 +313,17 @@ export function EditSRDialog({
                   type="date"
                   value={requestedCompletionDate}
                   onChange={(e) => setRequestedCompletionDate(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">마감일</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
                   disabled={loading}
                 />
               </div>

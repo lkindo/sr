@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -147,7 +148,14 @@ export default function ClientsPage() {
                 clients.map((client) => (
                   <TableRow key={client.id}>
                     <TableCell className="font-medium">{client.code}</TableCell>
-                    <TableCell>{client.name}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={`/clients/${client.id}`}
+                        className="hover:underline text-primary"
+                      >
+                        {client.name}
+                      </Link>
+                    </TableCell>
                     <TableCell>{client.industry || "-"}</TableCell>
                     <TableCell>{client.contactPerson || "-"}</TableCell>
                     <TableCell>{client.contactEmail || "-"}</TableCell>
@@ -169,6 +177,15 @@ export default function ClientsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        asChild
+                      >
+                        <Link href={`/clients/${client.id}`}>
+                          상세보기
+                        </Link>
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
