@@ -34,12 +34,21 @@ interface SR {
   assignedTo?: {
     id: string;
   } | null;
+  category?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface User {
   id: string;
   name: string;
   email: string;
+}
+
+interface ServiceCategory {
+  id: string;
+  categoryName: string;
 }
 
 interface EditSRDialogProps {
@@ -59,11 +68,13 @@ export function EditSRDialog({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [assignedToId, setAssignedToId] = useState("");
   const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [changeReason, setChangeReason] = useState("");
   const [users, setUsers] = useState<User[]>([]);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { data: session } = useSession();
@@ -77,6 +88,7 @@ export function EditSRDialog({
       setDescription(sr.description);
       setStatus(sr.status);
       setPriority(sr.priority);
+      setCategoryId(sr.category?.id || "");
       setAssignedToId(sr.assignedTo?.id || "");
       setRequestedCompletionDate(
         sr.requestedCompletionDate
@@ -90,6 +102,7 @@ export function EditSRDialog({
       );
       setChangeReason("");
       fetchUsers();
+      fetchCategories();
     }
   }, [open, sr]);
 
@@ -104,6 +117,21 @@ export function EditSRDialog({
       toast({
         title: "오류",
         description: "SR 담당자 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch("/api/service-categories");
+      if (!response.ok) throw new Error("Failed to fetch categories");
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "서비스 카테고리 목록을 불러오지 못했습니다.",
         variant: "destructive",
       });
     }
@@ -153,6 +181,7 @@ export function EditSRDialog({
           description,
           status,
           priority,
+          serviceCategoryId: categoryId || null,
           assignedToId: assignedToId || null,
           requestedCompletionDate: requestedCompletionDate || null,
           dueDate: dueDate || null,
@@ -217,6 +246,32 @@ export function EditSRDialog({
                 disabled={loading}
                 rows={5}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">서비스 카테고리 *</Label>
+              <Select
+                value={categoryId}
+                onValueChange={setCategoryId}
+                disabled={loading || categories.length === 0}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue
+                    placeholder={
+                      categories.length === 0
+                        ? "카테고리가 없습니다"
+                        : "카테고리를 선택"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.categoryName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
