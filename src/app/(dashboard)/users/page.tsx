@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Search, UserCheck, UserX, Shield } from "lucide-react";
+import { Plus, Search, UserCheck, UserX, Shield, Filter } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { AssignRolesDialog } from "@/components/users/AssignRolesDialog";
@@ -48,11 +55,21 @@ interface User {
   }>;
 }
 
+interface Role {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
@@ -60,7 +77,14 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("/api/users");
+      // 쿼리 파라미터 구성
+      const params = new URLSearchParams();
+      if (searchQuery) params.append("search", searchQuery);
+      if (userTypeFilter !== "all") params.append("userType", userTypeFilter);
+      if (roleFilter !== "all") params.append("roleId", roleFilter);
+      if (statusFilter !== "all") params.append("isActive", statusFilter);
+
+      const response = await fetch(`/api/users?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
       setUsers(data);
@@ -76,22 +100,25 @@ export default function UsersPage() {
     }
   };
 
+  const fetchRoles = async () => {
+    try {
+      const response = await fetch("/api/roles");
+      if (!response.ok) throw new Error("Failed to fetch roles");
+      const data = await response.json();
+      setRoles(data);
+    } catch (error) {
+      console.error("역할 목록 조회 실패:", error);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchRoles();
   }, []);
 
   useEffect(() => {
-    if (searchQuery === "") {
-      setFilteredUsers(users);
-    } else {
-      const filtered = users.filter(
-        (user) =>
-          user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredUsers(filtered);
-    }
-  }, [searchQuery, users]);
+    fetchUsers();
+  }, [searchQuery, userTypeFilter, roleFilter, statusFilter]);
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
     try {
@@ -157,22 +184,70 @@ export default function UsersPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>사용자 목록</CardTitle>
-              <CardDescription>
-                총 {users.length}명의 사용자가 있습니다.
-                {searchQuery && ` (검색 결과: ${filteredUsers.length}명)`}
-              </CardDescription>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>사용자 목록</CardTitle>
+                <CardDescription>
+                  총 {filteredUsers.length}명의 사용자가 있습니다.
+                </CardDescription>
+              </div>
             </div>
-            <div className="flex items-center gap-2 w-full max-w-sm">
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="이름 또는 이메일로 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1"
-              />
+
+            {/* 검색 및 필터 영역 */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-end">
+              {/* 검색 */}
+              <div className="flex items-center gap-2 flex-1">
+                <Search className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="이름 또는 이메일로 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+
+              {/* 필터들 */}
+              <div className="flex gap-2 flex-wrap md:flex-nowrap">
+                {/* 유형 필터 */}
+                <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="유형 전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">유형 전체</SelectItem>
+                    <SelectItem value="ENGINEER">엔지니어</SelectItem>
+                    <SelectItem value="CLIENT">고객사</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* 역할 필터 */}
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="역할 전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">역할 전체</SelectItem>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* 상태 필터 */}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="상태 전체" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">상태 전체</SelectItem>
+                    <SelectItem value="true">활성</SelectItem>
+                    <SelectItem value="false">비활성</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>

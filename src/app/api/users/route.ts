@@ -27,6 +27,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search");
     const isActive = searchParams.get("isActive");
+    const userType = searchParams.get("userType");
+    const roleId = searchParams.get("roleId");
 
     const where: any = {};
 
@@ -37,8 +39,17 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    if (isActive !== null) {
+    if (isActive !== null && isActive !== "") {
       where.isActive = isActive === "true";
+    }
+
+    // 역할별 필터링
+    if (roleId && roleId !== "all") {
+      where.roles = {
+        some: {
+          roleId: roleId,
+        },
+      };
     }
 
     const users = await prisma.user.findMany({
@@ -73,10 +84,15 @@ export async function GET(request: NextRequest) {
     });
 
     // 사용자 유형 결정 (클라이언트가 있으면 CLIENT, 없으면 ENGINEER)
-    const usersWithType = users.map((user) => ({
+    let usersWithType = users.map((user) => ({
       ...user,
       userType: user.clients.length > 0 ? "CLIENT" : "ENGINEER",
     }));
+
+    // 유형별 필터링 (클라이언트 측에서도 가능하지만 서버에서 처리)
+    if (userType && userType !== "all") {
+      usersWithType = usersWithType.filter((user) => user.userType === userType);
+    }
 
     return NextResponse.json(usersWithType);
   } catch (error) {

@@ -33,7 +33,6 @@ export async function GET(request: NextRequest) {
     const clients = await prisma.client.findMany({
       where: isActive !== null ? { isActive: isActive === "true" } : undefined,
       include: {
-        serviceCategories: true,
         _count: {
           select: {
             users: true,
@@ -95,9 +94,6 @@ export async function POST(request: NextRequest) {
           ? new Date(validated.contractEndDate)
           : undefined,
         isActive: validated.isActive ?? true,
-      },
-      include: {
-        serviceCategories: true,
       },
     });
 

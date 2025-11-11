@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ClientDialog } from "@/components/clients/ClientDialog";
-import { DeleteClientDialog } from "@/components/clients/DeleteClientDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface Client {
@@ -43,7 +42,6 @@ export default function ClientsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchClients = async () => {
@@ -72,24 +70,9 @@ export default function ClientsPage() {
     setIsClientDialogOpen(true);
   };
 
-  const handleEditClient = (client: Client) => {
-    setSelectedClient(client);
-    setIsClientDialogOpen(true);
-  };
-
-  const handleDeleteClient = (client: Client) => {
-    setSelectedClient(client);
-    setIsDeleteDialogOpen(true);
-  };
-
   const handleClientSaved = () => {
     fetchClients();
     setIsClientDialogOpen(false);
-  };
-
-  const handleClientDeleted = () => {
-    fetchClients();
-    setIsDeleteDialogOpen(false);
   };
 
   if (loading) {
@@ -134,13 +117,12 @@ export default function ClientsPage() {
                 <TableHead>사용자</TableHead>
                 <TableHead>SR</TableHead>
                 <TableHead>상태</TableHead>
-                <TableHead className="text-right">작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {clients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     등록된 고객사가 없습니다.
                   </TableCell>
                 </TableRow>
@@ -151,7 +133,7 @@ export default function ClientsPage() {
                     <TableCell>
                       <Link
                         href={`/clients/${client.id}`}
-                        className="hover:underline text-primary"
+                        className="hover:underline text-primary font-medium"
                       >
                         {client.name}
                       </Link>
@@ -176,35 +158,6 @@ export default function ClientsPage() {
                         {client.isActive ? "활성" : "비활성"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        asChild
-                      >
-                        <Link href={`/clients/${client.id}`}>
-                          상세보기
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditClient(client)}
-                      >
-                        수정
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteClient(client)}
-                        disabled={
-                          (client._count?.users || 0) > 0 ||
-                          (client._count?.srs || 0) > 0
-                        }
-                      >
-                        삭제
-                      </Button>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -218,13 +171,6 @@ export default function ClientsPage() {
         onOpenChange={setIsClientDialogOpen}
         client={selectedClient}
         onSaved={handleClientSaved}
-      />
-
-      <DeleteClientDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        client={selectedClient}
-        onDeleted={handleClientDeleted}
       />
     </div>
   );

@@ -201,9 +201,9 @@ model UserClient {
 
 model ServiceCategory {
   id              String     @id @default(cuid())
-  clientId        String     @map("client_id")
+  clientId        String?    @map("client_id")
   categoryName    String     @map("category_name")
-  description     String?    
+  description     String?
   slaHours        Int        @map("sla_hours")
   priority        SRPriority @default(MEDIUM)
   handlerId       String?    @map("handler_id")
@@ -212,9 +212,9 @@ model ServiceCategory {
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
 
-  client        Client @relation(fields: [clientId], references: [id])
-  handler       User?  @relation("CategoryHandler", fields: [handlerId], references: [id])
-  backupHandler User?  @relation("CategoryBackupHandler", fields: [backupHandlerId], references: [id])
+  client        Client? @relation(fields: [clientId], references: [id])
+  handler       User?   @relation("CategoryHandler", fields: [handlerId], references: [id])
+  backupHandler User?   @relation("CategoryBackupHandler", fields: [backupHandlerId], references: [id])
   srs           SR[]
 
   @@index([clientId])
