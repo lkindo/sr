@@ -1,0 +1,97 @@
+export function getDaysUntilDue(dueDate: string | null | undefined): number | null {
+  if (!dueDate) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+
+  const diffTime = due.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  return diffDays;
+}
+
+export function getDueDateStatus(dueDate: string | null | undefined): {
+  label: string;
+  variant: "default" | "secondary" | "destructive";
+  isOverdue: boolean;
+  isUrgent: boolean;
+} | null {
+  const daysUntil = getDaysUntilDue(dueDate);
+
+  if (daysUntil === null) {
+    return null;
+  }
+
+  if (daysUntil < 0) {
+    return {
+      label: `${Math.abs(daysUntil)}일 지연`,
+      variant: "destructive",
+      isOverdue: true,
+      isUrgent: false,
+    };
+  }
+
+  if (daysUntil === 0) {
+    return {
+      label: "오늘 마감",
+      variant: "destructive",
+      isOverdue: false,
+      isUrgent: true,
+    };
+  }
+
+  if (daysUntil === 1) {
+    return {
+      label: "내일 마감",
+      variant: "destructive",
+      isOverdue: false,
+      isUrgent: true,
+    };
+  }
+
+  if (daysUntil <= 3) {
+    return {
+      label: `D-${daysUntil}`,
+      variant: "destructive",
+      isOverdue: false,
+      isUrgent: true,
+    };
+  }
+
+  if (daysUntil <= 7) {
+    return {
+      label: `D-${daysUntil}`,
+      variant: "secondary",
+      isOverdue: false,
+      isUrgent: false,
+    };
+  }
+
+  return {
+    label: `D-${daysUntil}`,
+    variant: "default",
+    isOverdue: false,
+    isUrgent: false,
+  };
+}
+
+export function formatDate(date: string | Date): string {
+  return new Date(date).toLocaleDateString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+export function formatDateTime(date: string | Date): string {
+  return new Date(date).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

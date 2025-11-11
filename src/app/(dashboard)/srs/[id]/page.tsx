@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,6 +101,59 @@ export default function SRDetailPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+
+  // 통계 계산
+  const calculateStatistics = () => {
+    if (!sr) return null;
+
+    const createdAt = new Date(sr.createdAt);
+    const now = new Date();
+
+    // 경과 시간 (일)
+    const elapsedDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+    // 완료까지 남은 시간
+    let remainingDays: number | null = null;
+    if (sr.dueDate) {
+      const dueDate = new Date(sr.dueDate);
+      remainingDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    // 실제 소요 시간
+    let actualDays: number | null = null;
+    if (sr.actualCompletionDate) {
+      const completionDate = new Date(sr.actualCompletionDate);
+      actualDays = Math.floor((completionDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    // 예상 대비 진행률
+    let progressRate: number | null = null;
+    if (sr.dueDate && !sr.actualCompletionDate) {
+      const dueDate = new Date(sr.dueDate);
+      const totalDays = (dueDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24);
+      if (totalDays > 0) {
+        progressRate = Math.min(100, Math.round((elapsedDays / totalDays) * 100));
+      }
+    }
+
+    // SLA 준수 여부
+    let slaCompliance: "onTime" | "delayed" | "pending" = "pending";
+    if (sr.actualCompletionDate && sr.dueDate) {
+      const completionDate = new Date(sr.actualCompletionDate);
+      const dueDate = new Date(sr.dueDate);
+      slaCompliance = completionDate <= dueDate ? "onTime" : "delayed";
+    }
+
+    return {
+      elapsedDays,
+      remainingDays,
+      actualDays,
+      progressRate,
+      slaCompliance,
+    };
+  };
+
+  const stats = calculateStatistics();
 
   const fetchSR = async () => {
     try {
@@ -349,11 +402,12 @@ export default function SRDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
+<Card>
           <CardHeader>
             <CardTitle>통계</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* 기본 통계 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -373,6 +427,106 @@ export default function SRDetailPage() {
                 {sr._count?.attachments || 0}
               </span>
             </div>
+
+            {/* 시간 통계 */}
+            {stats && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">경과 시간</span>
+                  </div>
+                  <span className="text-2xl font-bold">
+                    {stats.elapsedDays}일
+                  </span>
+                </div>
+
+                {stats.remainingDays !== null && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">남은 시간</span>
+                      </div>
+                      <span
+                        className={`text-2xl font-bold ${
+                          stats.remainingDays < 0
+                            ? "text-destructive"
+                            : stats.remainingDays <= 3
+                            ? "text-orange-500"
+                            : ""
+                        }`}
+                      >
+                        {stats.remainingDays < 0
+                          ? `${Math.abs(stats.remainingDays)}일 초과`
+                          : `${stats.remainingDays}일`}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {stats.actualDays !== null && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <History className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">처리 소요</span>
+                      </div>
+                      <span className="text-2xl font-bold">
+                        {stats.actualDays}일
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {stats.progressRate !== null && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">진행률</span>
+                        <span className="text-sm font-medium">
+                          {stats.progressRate}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-secondary rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full transition-all ${
+                            stats.progressRate > 100
+                              ? "bg-destructive"
+                              : stats.progressRate > 80
+                              ? "bg-orange-500"
+                              : "bg-primary"
+                          }`}
+                          style={{ width: `${Math.min(stats.progressRate, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {stats.slaCompliance !== "pending" && (
+                  <>
+                    <Separator />
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">SLA 준수</span>
+                      <span
+                        className={`text-sm font-medium ${
+                          stats.slaCompliance === "onTime"
+                            ? "text-green-600"
+                            : "text-destructive"
+                        }`}
+                      >
+                        {stats.slaCompliance === "onTime" ? "준수" : "미준수"}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

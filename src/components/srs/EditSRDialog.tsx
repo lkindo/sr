@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { FileUpload } from "@/components/ui/file-upload";
 
 interface SR {
   id: string;
@@ -29,7 +30,7 @@ interface SR {
   description: string;
   status: string;
   priority: string;
-  requestedCompletionDate?: string;
+  expectedCompletionDate?: string;
   dueDate?: string;
   assignedTo?: {
     id: string;
@@ -70,9 +71,10 @@ export function EditSRDialog({
   const [priority, setPriority] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [assignedToId, setAssignedToId] = useState("");
-  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
+  const [expectedCompletionDate, setExpectedCompletionDate] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [changeReason, setChangeReason] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -90,9 +92,9 @@ export function EditSRDialog({
       setPriority(sr.priority);
       setCategoryId(sr.category?.id || "");
       setAssignedToId(sr.assignedTo?.id || "");
-      setRequestedCompletionDate(
-        sr.requestedCompletionDate
-          ? new Date(sr.requestedCompletionDate).toISOString().split("T")[0]
+      setExpectedCompletionDate(
+        sr.expectedCompletionDate
+          ? new Date(sr.expectedCompletionDate).toISOString().split("T")[0]
           : ""
       );
       setDueDate(
@@ -101,6 +103,7 @@ export function EditSRDialog({
           : ""
       );
       setChangeReason("");
+      setFiles([]);
       fetchUsers();
       fetchCategories();
     }
@@ -137,6 +140,31 @@ export function EditSRDialog({
     }
   };
 
+  const uploadAttachments = async (srId: string, files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    try {
+      const response = await fetch(`/api/srs/${srId}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload attachments");
+      }
+    } catch (error) {
+      console.error("첨부파일 업로드 실패:", error);
+      toast({
+        title: "경고",
+        description: "SR은 수정되었으나 첨부파일 업로드에 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -168,6 +196,21 @@ export function EditSRDialog({
       return;
     }
 
+    // 날짜 유효성 검증
+    if (expectedCompletionDate && dueDate) {
+      const expectedDate = new Date(expectedCompletionDate);
+      const dueDateValue = new Date(dueDate);
+
+      if (dueDateValue < expectedDate) {
+        toast({
+          title: "오류",
+          description: "마감일은 예상 완료일과 같거나 이후여야 합니다.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -183,7 +226,7 @@ export function EditSRDialog({
           priority,
           serviceCategoryId: categoryId || null,
           assignedToId: assignedToId || null,
-          requestedCompletionDate: requestedCompletionDate || null,
+          expectedCompletionDate: expectedCompletionDate || null,
           dueDate: dueDate || null,
           changeReason: changeReason || undefined,
         }),
@@ -192,6 +235,11 @@ export function EditSRDialog({
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to update SR");
+      }
+
+      // Upload attachments if any
+      if (files.length > 0) {
+        await uploadAttachments(sr.id, files);
       }
 
       toast({
@@ -362,12 +410,12 @@ export function EditSRDialog({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="requestedCompletionDate">요청 완료 날짜</Label>
+                <Label htmlFor="expectedCompletionDate">예상 완료일</Label>
                 <Input
-                  id="requestedCompletionDate"
+                  id="expectedCompletionDate"
                   type="date"
-                  value={requestedCompletionDate}
-                  onChange={(e) => setRequestedCompletionDate(e.target.value)}
+                  value={expectedCompletionDate}
+                  onChange={(e) => setExpectedCompletionDate(e.target.value)}
                   disabled={loading}
                 />
               </div>
@@ -382,6 +430,17 @@ export function EditSRDialog({
                   disabled={loading}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>첨부파일 추가 (선택사항)</Label>
+              <FileUpload
+                value={files}
+                onChange={setFiles}
+                maxSize={10}
+                maxFiles={5}
+                disabled={loading}
+              />
             </div>
           </div>
           <DialogFooter>

@@ -56,7 +56,8 @@
       "Bash(tasklist:*)",
       "Bash(node test-sr-update.js:*)",
       "Bash(node:*)",
-      "Bash(\"src\\app\\api\\clients\\[id]\\route.ts\")"
+      "Bash(\"src\\app\\api\\clients\\[id]\\route.ts\")",
+      "Bash(if not exist publicuploadsattachments mkdir publicuploadsattachments)"
     ],
     "deny": [],
     "ask": []

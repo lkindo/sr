@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { FileUpload } from "@/components/ui/file-upload";
 
 interface Client {
   id: string;
@@ -33,11 +34,6 @@ interface Client {
   }[];
 }
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-}
 
 interface CreateSRDialogProps {
   open: boolean;
@@ -55,25 +51,19 @@ export function CreateSRDialog({
   const [clientId, setClientId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [priority, setPriority] = useState<string>("MEDIUM");
-  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
+  const [expectedCompletionDate, setExpectedCompletionDate] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [assigneeId, setAssigneeId] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
     []
   );
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { data: session } = useSession();
-
-  // SR 할당 권한 확인
-  const canAssignSR = session?.user?.permissions?.includes("SR.ASSIGN") ?? false;
 
   useEffect(() => {
     if (open) {
       fetchClients();
-      fetchUsers();
       fetchCategories(); // 전체 서비스 카테고리 조회
     }
   }, [open]);
@@ -108,17 +98,26 @@ export function CreateSRDialog({
     }
   };
 
-  const fetchUsers = async () => {
+  const uploadAttachments = async (srId: string, files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
     try {
-      // SR 처리 가능한 사용자만 조회 (SR 관련 모든 권한 보유)
-      const response = await fetch("/api/users/sr-handlers");
-      if (!response.ok) throw new Error("Failed to fetch SR handlers");
-      const data = await response.json();
-      setUsers(data);
+      const response = await fetch(`/api/srs/${srId}/attachments`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload attachments");
+      }
     } catch (error) {
+      console.error("첨부파일 업로드 실패:", error);
       toast({
-        title: "오류",
-        description: "SR 담당자 목록을 불러오지 못했습니다.",
+        title: "경고",
+        description: "SR은 생성되었으나 첨부파일 업로드에 실패했습니다.",
         variant: "destructive",
       });
     }
@@ -163,6 +162,31 @@ export function CreateSRDialog({
       return;
     }
 
+    // 날짜 유효성 검증
+    if (expectedCompletionDate && dueDate) {
+      const expectedDate = new Date(expectedCompletionDate);
+      const dueDateValue = new Date(dueDate);
+
+      if (dueDateValue < expectedDate) {
+        toast({
+          title: "오류",
+          description: "마감일은 예상 완료일과 같거나 이후여야 합니다.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // 과거 날짜 검증 (선택사항 - 필요시 주석 해제)
+    // const today = new Date();
+    // today.setHours(0, 0, 0, 0);
+    // if (dueDate && new Date(dueDate) < today) {
+    //   toast({
+    //     title: "경고",
+    //     description: "마감일이 과거 날짜입니다.",
+    //   });
+    // }
+
     setLoading(true);
 
     console.log(" [CreateSR] SR 생성 시작");
@@ -172,9 +196,8 @@ export function CreateSRDialog({
       clientId,
       serviceCategoryId: categoryId,
       priority,
-      requestedCompletionDate: requestedCompletionDate || undefined,
+      expectedCompletionDate: expectedCompletionDate || undefined,
       dueDate: dueDate || undefined,
-      assigneeId: assigneeId || undefined,
     };
     console.log(" [CreateSR] 요청 데이터:", requestBody);
 
@@ -207,6 +230,11 @@ export function CreateSRDialog({
       const createdSR = await response.json();
       console.log(" [CreateSR] SR 생성 성공!", createdSR);
 
+      // Upload attachments if any
+      if (files.length > 0) {
+        await uploadAttachments(createdSR.id, files);
+      }
+
       toast({
         title: "성공",
         description: "SR이 생성되었습니다.",
@@ -218,9 +246,9 @@ export function CreateSRDialog({
       setClientId("");
       setCategoryId("");
       setPriority("MEDIUM");
-      setRequestedCompletionDate("");
+      setExpectedCompletionDate("");
       setDueDate("");
-      setAssigneeId("");
+      setFiles([]);
 
       onCreated();
     } catch (error) {
@@ -321,68 +349,36 @@ export function CreateSRDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="priority">우선순위 *</Label>
-                <Select
-                  value={priority}
-                  onValueChange={setPriority}
-                  disabled={loading}
-                >
-                  <SelectTrigger id="priority">
-                    <SelectValue placeholder="우선순위 선택" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CRITICAL">긴급</SelectItem>
-                    <SelectItem value="HIGH">높음</SelectItem>
-                    <SelectItem value="MEDIUM">보통</SelectItem>
-                    <SelectItem value="LOW">낮음</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="assignee">
-                  담당자 (선택사항)
-                  {!canAssignSR && (
-                    <span className="text-xs text-muted-foreground ml-2">
-                      (할당 권한 없음)
-                    </span>
-                  )}
-                </Label>
-                <Select
-                  value={assigneeId || "none"}
-                  onValueChange={(value) =>
-                    setAssigneeId(value === "none" ? "" : value)
-                  }
-                  disabled={loading || !canAssignSR}
-                >
-                  <SelectTrigger id="assignee">
-                    <SelectValue placeholder={canAssignSR ? "담당자 선택 (선택사항)" : "할당 권한이 없습니다"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">선택 안 함</SelectItem>
-                    {users.map((user) => (
-                      <SelectItem key={user.id} value={user.id}>
-                        {user.name} ({user.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">우선순위 *</Label>
+              <Select
+                value={priority}
+                onValueChange={setPriority}
+                disabled={loading}
+              >
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="우선순위 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CRITICAL">긴급</SelectItem>
+                  <SelectItem value="HIGH">높음</SelectItem>
+                  <SelectItem value="MEDIUM">보통</SelectItem>
+                  <SelectItem value="LOW">낮음</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="requestedCompletionDate">
-                  요청 완료 날짜
+                <Label htmlFor="expectedCompletionDate">
+                  예상 완료일
                 </Label>
                 <Input
-                  id="requestedCompletionDate"
+                  id="expectedCompletionDate"
                   type="date"
-                  value={requestedCompletionDate}
+                  value={expectedCompletionDate}
                   onChange={(e) =>
-                    setRequestedCompletionDate(e.target.value)
+                    setExpectedCompletionDate(e.target.value)
                   }
                   disabled={loading}
                 />
@@ -398,6 +394,17 @@ export function CreateSRDialog({
                   disabled={loading}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>첨부파일 (선택사항)</Label>
+              <FileUpload
+                value={files}
+                onChange={setFiles}
+                maxSize={10}
+                maxFiles={5}
+                disabled={loading}
+              />
             </div>
           </div>
           <DialogFooter>

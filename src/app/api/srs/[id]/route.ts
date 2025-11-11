@@ -27,11 +27,9 @@ const srUpdateSchema = z.object({
     ])
     .optional(),
   assignedToId: z.string().optional().nullable(),
-  requestedCompletionDate: z.string().optional().nullable(),
+  expectedCompletionDate: z.string().optional().nullable(),
   dueDate: z.string().optional().nullable(),
   actualCompletionDate: z.string().optional().nullable(),
-  estimatedHours: z.number().optional().nullable(),
-  actualHours: z.number().optional().nullable(),
   resolutionDescription: z.string().optional().nullable(),
   rejectionReason: z.string().optional().nullable(),
   satisfactionRating: z.number().min(1).max(5).optional().nullable(),
@@ -215,16 +213,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (validated.title !== undefined) updateData.title = validated.title;
     if (validated.description !== undefined)
       updateData.description = validated.description;
-    if (validated.serviceCategoryId !== undefined)
-      updateData.serviceCategoryId = validated.serviceCategoryId;
+    if (validated.serviceCategoryId !== undefined) {
+      if (validated.serviceCategoryId === null) {
+        updateData.serviceCategory = { disconnect: true };
+      } else {
+        updateData.serviceCategory = { connect: { id: validated.serviceCategoryId } };
+      }
+    }
     if (validated.priority !== undefined)
       updateData.priority = validated.priority;
-    if (validated.assignedToId !== undefined)
-      updateData.assigneeId = validated.assignedToId;
-    if (validated.estimatedHours !== undefined)
-      updateData.estimatedHours = validated.estimatedHours;
-    if (validated.actualHours !== undefined)
-      updateData.actualHours = validated.actualHours;
+    if (validated.assignedToId !== undefined) {
+      if (validated.assignedToId === null) {
+        updateData.assignee = { disconnect: true };
+      } else {
+        updateData.assignee = { connect: { id: validated.assignedToId } };
+      }
+    }
     if (validated.resolutionDescription !== undefined)
       updateData.resolutionDescription = validated.resolutionDescription;
     if (validated.rejectionReason !== undefined)
@@ -235,9 +239,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       updateData.additionalFeedback = validated.additionalFeedback;
 
     // Handle date fields
-    if (validated.requestedCompletionDate !== undefined) {
-      updateData.requestedCompletionDate = validated.requestedCompletionDate
-        ? new Date(validated.requestedCompletionDate)
+    if (validated.expectedCompletionDate !== undefined) {
+      updateData.expectedCompletionDate = validated.expectedCompletionDate
+        ? new Date(validated.expectedCompletionDate)
         : null;
     }
 

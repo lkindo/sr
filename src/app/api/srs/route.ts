@@ -15,7 +15,7 @@ const srSchema = z.object({
   clientId: z.string().min(1, "고객사를 선택해주세요."),
   serviceCategoryId: z.string().min(1, "서비스 카테고리를 선택해주세요."),
   priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
-  requestedCompletionDate: z.string().optional(),
+  expectedCompletionDate: z.string().optional(),
   dueDate: z.string().optional(),
   assigneeId: z.string().optional(),
 });
@@ -188,8 +188,8 @@ export async function POST(request: NextRequest) {
         assigneeId: validated.assigneeId || undefined,
         priority: validated.priority,
         status: "REQUESTED",
-        expectedCompletionDate: validated.requestedCompletionDate
-          ? new Date(validated.requestedCompletionDate)
+        expectedCompletionDate: validated.expectedCompletionDate
+          ? new Date(validated.expectedCompletionDate)
           : undefined,
         dueDate: validated.dueDate
           ? new Date(validated.dueDate)
