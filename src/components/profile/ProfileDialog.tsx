@@ -1,17 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Save, Lock, User as UserIcon } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Save, Lock, User as UserIcon } from "lucide-react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -47,8 +45,12 @@ interface UserProfile {
   clients: Client[];
 }
 
-export default function ProfilePage() {
-  const router = useRouter();
+interface ProfileDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const { toast } = useToast();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -85,8 +87,11 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (open) {
+      setLoading(true);
+      fetchProfile();
+    }
+  }, [open]);
 
   const handleUpdateProfile = async () => {
     setSaving(true);
@@ -166,19 +171,18 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading) {
+  if (loading || !profile) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">프로필을 찾을 수 없습니다.</p>
-      </div>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>프로필 설정</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center h-96">
+            <p className="text-muted-foreground">로딩 중...</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -189,28 +193,18 @@ export default function ProfilePage() {
     .toUpperCase() || profile.email[0].toUpperCase();
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">프로필 설정</h1>
-          <p className="text-muted-foreground">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>프로필 설정</DialogTitle>
+          <DialogDescription>
             개인 정보 및 보안 설정을 관리합니다.
-          </p>
-        </div>
-      </div>
+          </DialogDescription>
+        </DialogHeader>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {/* 프로필 카드 */}
-        <Card className="md:col-span-1">
-          <CardHeader>
-            <CardTitle>프로필 정보</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* 프로필 카드 */}
+          <div className="md:col-span-1 space-y-4">
             <div className="flex flex-col items-center gap-4">
               <Avatar className="h-24 w-24">
                 <AvatarImage src={profile.image || undefined} />
@@ -266,13 +260,11 @@ export default function ProfilePage() {
             <div className="text-xs text-muted-foreground">
               <p>가입일: {new Date(profile.createdAt).toLocaleDateString("ko-KR")}</p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* 설정 탭 */}
-        <Card className="md:col-span-2">
-          <Tabs defaultValue="profile" className="w-full">
-            <CardHeader>
+          {/* 설정 탭 */}
+          <div className="md:col-span-2">
+            <Tabs defaultValue="profile" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="profile">
                   <UserIcon className="h-4 w-4 mr-2" />
@@ -283,10 +275,8 @@ export default function ProfilePage() {
                   보안
                 </TabsTrigger>
               </TabsList>
-            </CardHeader>
 
-            <CardContent>
-              <TabsContent value="profile" className="space-y-4">
+              <TabsContent value="profile" className="space-y-4 mt-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">이름</Label>
@@ -333,7 +323,7 @@ export default function ProfilePage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="security" className="space-y-4">
+              <TabsContent value="security" className="space-y-4 mt-4">
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-lg font-medium mb-4">비밀번호 변경</h3>
@@ -391,10 +381,10 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </TabsContent>
-            </CardContent>
-          </Tabs>
-        </Card>
-      </div>
-    </div>
+            </Tabs>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
