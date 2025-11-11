@@ -33,9 +33,25 @@ export async function GET(request: NextRequest) {
     const clients = await prisma.client.findMany({
       where: isActive !== null ? { isActive: isActive === "true" } : undefined,
       include: {
+        users: {
+          include: {
+            user: {
+              select: {
+                roles: {
+                  include: {
+                    role: {
+                      select: {
+                        name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         _count: {
           select: {
-            users: true,
             srs: true,
           },
         },
@@ -45,7 +61,37 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(clients);
+    // ADMIN 사용자를 제외한 사용자 수 계산
+    const clientsWithUserCount = clients.map((client) => {
+      const nonAdminUsers = client.users.filter((userClient) => {
+        const hasAdminRole = userClient.user.roles.some(
+          (userRole) => userRole.role.name === "ADMIN"
+        );
+        return !hasAdminRole;
+      });
+
+      return {
+        id: client.id,
+        code: client.code,
+        name: client.name,
+        industry: client.industry,
+        contactPerson: client.contactPerson,
+        contactEmail: client.contactEmail,
+        contactPhone: client.contactPhone,
+        address: client.address,
+        contractStartDate: client.contractStartDate,
+        contractEndDate: client.contractEndDate,
+        isActive: client.isActive,
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
+        _count: {
+          users: nonAdminUsers.length,
+          srs: client._count.srs,
+        },
+      };
+    });
+
+    return NextResponse.json(clientsWithUserCount);
   } catch (error) {
     console.error("Error fetching clients:", error);
     return NextResponse.json(
