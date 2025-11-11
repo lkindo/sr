@@ -163,7 +163,7 @@ export function UserDialog({
     if (userType === "CLIENT" && selectedClientIds.length === 0) {
       toast({
         title: "오류",
-        description: "고객사 사용자는 최소 1개 이상의 고객사를 선택해야 합니다.",
+        description: "SR 요청자는 최소 1개 이상의 고객사를 선택해야 합니다.",
         variant: "destructive",
       });
       return;
@@ -275,8 +275,8 @@ export function UserDialog({
                   <SelectValue placeholder="사용자 유형 선택" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ENGINEER">SR 담당 엔지니어</SelectItem>
-                  <SelectItem value="CLIENT">고객사 사용자</SelectItem>
+                  <SelectItem value="ENGINEER">SR 처리자</SelectItem>
+                  <SelectItem value="CLIENT">SR 요청자</SelectItem>
                 </SelectContent>
               </Select>
             </div>
