@@ -94,7 +94,7 @@ export default function ClientsPage() {
         </div>
         <Button onClick={handleCreateClient}>
           <Plus className="mr-2 h-4 w-4" />
-          새 고객사 추가
+          등록
         </Button>
       </div>
 

@@ -213,7 +213,7 @@ export default function UsersPage() {
         <PermissionGuard roles={["ADMIN"]}>
           <Button onClick={handleCreateUser}>
             <Plus className="mr-2 h-4 w-4" />
-            새 사용자 추가
+            등록
           </Button>
         </PermissionGuard>
       </div>
