@@ -74,17 +74,9 @@ export function CreateSRDialog({
     if (open) {
       fetchClients();
       fetchUsers();
+      fetchCategories(); // 전체 서비스 카테고리 조회
     }
   }, [open]);
-
-  useEffect(() => {
-    if (clientId) {
-      fetchCategories(clientId);
-    } else {
-      setCategories([]);
-      setCategoryId("");
-    }
-  }, [clientId]);
 
   const fetchClients = async () => {
     try {
@@ -101,12 +93,12 @@ export function CreateSRDialog({
     }
   };
 
-  const fetchCategories = async (clientId: string) => {
+  const fetchCategories = async () => {
     try {
-      const response = await fetch(`/api/clients/${clientId}/categories`);
+      const response = await fetch("/api/service-categories");
       if (!response.ok) throw new Error("Failed to fetch categories");
       const data = await response.json();
-      setCategories(data);
+      setCategories(data.map((cat: any) => ({ id: cat.id, name: cat.categoryName })));
     } catch (error) {
       toast({
         title: "오류",
@@ -307,16 +299,12 @@ export function CreateSRDialog({
                 <Select
                   value={categoryId}
                   onValueChange={setCategoryId}
-                  disabled={
-                    loading || !clientId || categories.length === 0
-                  }
+                  disabled={loading || categories.length === 0}
                 >
                   <SelectTrigger id="category">
                     <SelectValue
                       placeholder={
-                        !clientId
-                          ? "먼저 고객사를 선택하세요"
-                          : categories.length === 0
+                        categories.length === 0
                           ? "카테고리가 없습니다"
                           : "카테고리를 선택"
                       }
