@@ -62,6 +62,37 @@ interface User {
   }>;
 }
 
+// 사용자 유형 판별 함수
+const getUserTypeLabel = (user: User): string => {
+  // 1. Admin 역할이 있으면 시스템 관리자
+  const hasAdminRole = user.roles.some((ur) => ur.role.name === "ADMIN");
+  if (hasAdminRole) {
+    return "시스템 관리자";
+  }
+
+  // 2. 고객사에 소속되어 있으면 SR 요청자
+  if (user.clients.length > 0) {
+    return "SR 요청자";
+  }
+
+  // 3. 고객사에 소속되지 않았으면 SR 처리자 (엔지니어)
+  return "SR 처리자";
+};
+
+// 유형별 배지 색상 결정
+const getUserTypeBadgeVariant = (typeLabel: string) => {
+  switch (typeLabel) {
+    case "시스템 관리자":
+      return "destructive" as const;
+    case "SR 처리자":
+      return "default" as const;
+    case "SR 요청자":
+      return "outline" as const;
+    default:
+      return "secondary" as const;
+  }
+};
+
 export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -203,12 +234,8 @@ export default function UserDetailPage() {
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
                   사용자 유형
                 </h3>
-                <Badge
-                  variant={
-                    user.clients.length > 0 ? "outline" : "default"
-                  }
-                >
-                  {user.clients.length > 0 ? "고객사 사용자" : "SR 담당 엔지니어"}
+                <Badge variant={getUserTypeBadgeVariant(getUserTypeLabel(user))}>
+                  {getUserTypeLabel(user)}
                 </Badge>
               </div>
               <div>

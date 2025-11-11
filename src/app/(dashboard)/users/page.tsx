@@ -61,6 +61,42 @@ interface Role {
   description?: string;
 }
 
+// 사용자 유형 판별 함수
+const getUserTypeLabel = (user: User): string => {
+  // 1. Admin 역할이 있으면 시스템 관리자
+  const hasAdminRole = user.roles.some((ur) => ur.role.name === "ADMIN");
+  if (hasAdminRole) {
+    return "시스템 관리자";
+  }
+
+  // 2. 엔지니어 타입이면 SR 처리자
+  if (user.userType === "ENGINEER") {
+    return "SR 처리자";
+  }
+
+  // 3. 고객사 타입이거나 고객사에 소속되어 있으면 SR 요청자
+  if (user.userType === "CLIENT" || user.clients.length > 0) {
+    return "SR 요청자";
+  }
+
+  // 기본값
+  return "미분류";
+};
+
+// 유형별 배지 색상 결정
+const getUserTypeBadgeVariant = (typeLabel: string) => {
+  switch (typeLabel) {
+    case "시스템 관리자":
+      return "destructive" as const;
+    case "SR 처리자":
+      return "default" as const;
+    case "SR 요청자":
+      return "outline" as const;
+    default:
+      return "secondary" as const;
+  }
+};
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -216,8 +252,8 @@ export default function UsersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">유형 전체</SelectItem>
-                    <SelectItem value="ENGINEER">엔지니어</SelectItem>
-                    <SelectItem value="CLIENT">고객사</SelectItem>
+                    <SelectItem value="ENGINEER">SR 처리자</SelectItem>
+                    <SelectItem value="CLIENT">SR 요청자</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -286,15 +322,14 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant={
-                          user.userType === "ENGINEER" ? "default" : "outline"
-                        }
-                      >
-                        {user.userType === "ENGINEER"
-                          ? "엔지니어"
-                          : "고객사"}
-                      </Badge>
+                      {(() => {
+                        const typeLabel = getUserTypeLabel(user);
+                        return (
+                          <Badge variant={getUserTypeBadgeVariant(typeLabel)}>
+                            {typeLabel}
+                          </Badge>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1 flex-wrap">
