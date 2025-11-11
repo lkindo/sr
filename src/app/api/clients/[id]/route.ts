@@ -42,6 +42,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
                   id: true,
                   name: true,
                   email: true,
+                  roles: {
+                    include: {
+                      role: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -93,9 +102,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "고객사를 찾을 수 없습니다." }, { status: 404 });
     }
 
-    // 고객사 정보에 전체 서비스 카테고리 추가
+    // ADMIN 역할을 가진 사용자 제외
+    const filteredUsers = client.users.filter((userClient) => {
+      const hasAdminRole = userClient.user.roles.some(
+        (userRole) => userRole.role.name === "ADMIN"
+      );
+      return !hasAdminRole;
+    });
+
+    // 고객사 정보에 전체 서비스 카테고리 추가 및 필터링된 사용자로 대체
     const clientWithCategories = {
       ...client,
+      users: filteredUsers,
       serviceCategories: allServiceCategories,
     };
 
