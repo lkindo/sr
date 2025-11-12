@@ -203,92 +203,95 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
+      {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">사용자 관리</h1>
-          <p className="text-muted-foreground">
+          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">사용자 관리</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             시스템 사용자를 관리합니다.
           </p>
         </div>
         <PermissionGuard roles={["ADMIN"]}>
-          <Button onClick={handleCreateUser}>
+          <Button onClick={handleCreateUser} className="sr-btn-template-primary">
             <Plus className="mr-2 h-4 w-4" />
             등록
           </Button>
         </PermissionGuard>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>사용자 목록</CardTitle>
-                <CardDescription>
-                  총 {filteredUsers.length}명의 사용자가 있습니다.
-                </CardDescription>
-              </div>
+      {/* 메인 컨텐츠 카드 */}
+      <div className="sr-card-template bg-white">
+        {/* 리스트 헤더 */}
+        <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+          <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))] mb-4">사용자 목록</h3>
+
+          {/* 검색 및 필터 영역 */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-end mb-4">
+            {/* 검색 */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="이름 또는 이메일로 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 sr-input-template"
+              />
             </div>
 
-            {/* 검색 및 필터 영역 */}
-            <div className="flex flex-col gap-4 md:flex-row md:items-end">
-              {/* 검색 */}
-              <div className="flex items-center gap-2 flex-1">
-                <Search className="h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="이름 또는 이메일로 검색..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1"
-                />
-              </div>
+            {/* 필터들 */}
+            <div className="flex gap-2 flex-wrap md:flex-nowrap">
+              {/* 유형 필터 */}
+              <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
+                <SelectTrigger className="w-[160px] sr-dropdown-template">
+                  <SelectValue placeholder="유형 전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">유형 전체</SelectItem>
+                  <SelectItem value="ENGINEER">SR 처리자</SelectItem>
+                  <SelectItem value="CLIENT">SR 요청자</SelectItem>
+                </SelectContent>
+              </Select>
 
-              {/* 필터들 */}
-              <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                {/* 유형 필터 */}
-                <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="유형 전체" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">유형 전체</SelectItem>
-                    <SelectItem value="ENGINEER">SR 처리자</SelectItem>
-                    <SelectItem value="CLIENT">SR 요청자</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* 역할 필터 */}
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-[160px] sr-dropdown-template">
+                  <SelectValue placeholder="역할 전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">역할 전체</SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                {/* 역할 필터 */}
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="역할 전체" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">역할 전체</SelectItem>
-                    {roles.map((role) => (
-                      <SelectItem key={role.id} value={role.id}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* 상태 필터 */}
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="상태 전체" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">상태 전체</SelectItem>
-                    <SelectItem value="true">활성</SelectItem>
-                    <SelectItem value="false">비활성</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* 상태 필터 */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px] sr-dropdown-template">
+                  <SelectValue placeholder="상태 전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">상태 전체</SelectItem>
+                  <SelectItem value="true">활성</SelectItem>
+                  <SelectItem value="false">비활성</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
+
+          {/* Total 카운트 */}
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{filteredUsers.length}</span> items
+            </div>
+          </div>
+        </div>
+
+        {/* 테이블 영역 */}
+        <div className="overflow-x-auto">
+          <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
                 <TableHead>이름</TableHead>
@@ -311,11 +314,11 @@ export default function UsersPage() {
                 </TableRow>
               ) : (
                 filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
+                  <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">
                       <Link
                         href={`/users/${user.id}`}
-                        className="hover:underline text-primary"
+                        className="text-primary hover:underline"
                       >
                         {user.name}
                       </Link>
@@ -361,6 +364,7 @@ export default function UsersPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleAssignRoles(user)}
+                            className="sr-btn-template"
                           >
                             <Shield className="mr-2 h-4 w-4" />
                             역할 관리
@@ -373,6 +377,7 @@ export default function UsersPage() {
                             onClick={() =>
                               handleToggleActive(user.id, user.isActive)
                             }
+                            className="sr-btn-template"
                           >
                             {user.isActive ? (
                               <>
@@ -394,8 +399,8 @@ export default function UsersPage() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <UserDialog
         open={userDialogOpen}

@@ -85,28 +85,35 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
+      {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">고객사 관리</h1>
-          <p className="text-muted-foreground">
+          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">고객사 관리</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             고객사 정보를 관리합니다.
           </p>
         </div>
-        <Button onClick={handleCreateClient}>
+        <Button onClick={handleCreateClient} className="sr-btn-template-primary">
           <Plus className="mr-2 h-4 w-4" />
           등록
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>고객사 목록</CardTitle>
-          <CardDescription>
-            {clients.length}개의 고객사가 등록되어 있습니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
+      {/* 메인 컨텐츠 카드 */}
+      <div className="sr-card-template bg-white">
+        {/* 리스트 헤더 */}
+        <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">고객사 목록</h3>
+            <div className="text-sm text-muted-foreground">
+              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{clients.length}</span> items
+            </div>
+          </div>
+        </div>
+
+        {/* 테이블 영역 */}
+        <div className="overflow-x-auto">
+          <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
                 <TableHead>코드</TableHead>
@@ -128,12 +135,12 @@ export default function ClientsPage() {
                 </TableRow>
               ) : (
                 clients.map((client) => (
-                  <TableRow key={client.id}>
+                  <TableRow key={client.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">{client.code}</TableCell>
                     <TableCell>
                       <Link
                         href={`/clients/${client.id}`}
-                        className="hover:underline text-primary font-medium"
+                        className="text-primary hover:underline font-medium"
                       >
                         {client.name}
                       </Link>
@@ -163,8 +170,8 @@ export default function ClientsPage() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <ClientDialog
         open={isClientDialogOpen}

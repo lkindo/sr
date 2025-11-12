@@ -121,28 +121,35 @@ export default function RolesPage() {
 
   return (
     <div className="space-y-6">
+      {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">역할 관리</h1>
-          <p className="text-muted-foreground">
+          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">역할 관리</h2>
+          <p className="text-sm text-muted-foreground mt-1">
             시스템 역할 및 권한을 관리합니다.
           </p>
         </div>
-        <Button onClick={handleCreateRole}>
+        <Button onClick={handleCreateRole} className="sr-btn-template-primary">
           <Plus className="mr-2 h-4 w-4" />
           등록
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>역할 목록</CardTitle>
-          <CardDescription>
-            {roles.length}개의 역할이 등록되어 있습니다.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
+      {/* 메인 컨텐츠 카드 */}
+      <div className="sr-card-template bg-white">
+        {/* 리스트 헤더 */}
+        <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">역할 목록</h3>
+            <div className="text-sm text-muted-foreground">
+              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{roles.length}</span> items
+            </div>
+          </div>
+        </div>
+
+        {/* 테이블 영역 */}
+        <div className="overflow-x-auto">
+          <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
                 <TableHead>역할 이름</TableHead>
@@ -161,7 +168,7 @@ export default function RolesPage() {
                 </TableRow>
               ) : (
                 roles.map((role) => (
-                  <TableRow key={role.id}>
+                  <TableRow key={role.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">{role.name}</TableCell>
                     <TableCell>{role.description || "-"}</TableCell>
                     <TableCell>
@@ -177,6 +184,7 @@ export default function RolesPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditRole(role)}
+                        className="sr-btn-template"
                       >
                         수정
                       </Button>
@@ -184,6 +192,7 @@ export default function RolesPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleManagePermissions(role)}
+                        className="sr-btn-template"
                       >
                         권한 관리
                       </Button>
@@ -192,6 +201,7 @@ export default function RolesPage() {
                         size="sm"
                         onClick={() => handleDeleteRole(role)}
                         disabled={role._count && role._count.users > 0}
+                        className="sr-btn-template"
                       >
                         삭제
                       </Button>
@@ -201,8 +211,8 @@ export default function RolesPage() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <RoleDialog
         open={isRoleDialogOpen}
