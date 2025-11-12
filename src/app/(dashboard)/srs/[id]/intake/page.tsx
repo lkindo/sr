@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -50,14 +50,14 @@ import { cn } from "@/lib/utils";
 // Intake 폼 스키마
 const intakeFormSchema = z.object({
   actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"], {
-    required_error: "실제 우선순위를 선택해주세요",
+    message: "실제 우선순위를 선택해주세요",
   }),
-  estimatedHours: z.coerce
+  estimatedHours: z
     .number()
     .positive("예상 작업 시간은 0보다 커야 합니다")
     .max(1000, "예상 작업 시간은 1000시간을 초과할 수 없습니다"),
   estimatedCompletionDate: z.date({
-    required_error: "예상 완료일을 선택해주세요",
+    message: "예상 완료일을 선택해주세요",
   }),
   intakeNotes: z.string().optional(),
   assigneeId: z.string().min(1, "담당자를 선택해주세요"),
@@ -123,7 +123,8 @@ const priorityColors: Record<string, "default" | "secondary" | "destructive"> = 
   LOW: "secondary",
 };
 
-export default function SRIntakePage({ params }: { params: { id: string } }) {
+export default function SRIntakePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const [sr, setSr] = useState<SRDetail | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +149,7 @@ export default function SRIntakePage({ params }: { params: { id: string } }) {
         setLoading(true);
 
         // SR 정보 조회
-        const srResponse = await fetch(`/api/srs/${params.id}/intake`);
+        const srResponse = await fetch(`/api/srs/${id}/intake`);
         if (!srResponse.ok) throw new Error("SR을 불러오는데 실패했습니다");
         const srData = await srResponse.json();
 
@@ -215,15 +216,15 @@ export default function SRIntakePage({ params }: { params: { id: string } }) {
     };
 
     fetchData();
-  }, [params.id, router, toast, form]);
+  }, [id, router, toast, form]);
 
   // 접수/수정 처리
   const onSubmit = async (values: IntakeFormValues) => {
     setSubmitting(true);
     try {
       const url = isEditMode
-        ? `/api/srs/${params.id}` // 수정 모드: PATCH 엔드포인트
-        : `/api/srs/${params.id}/intake`; // 접수 모드: POST 엔드포인트
+        ? `/api/srs/${id}` // 수정 모드: PATCH 엔드포인트
+        : `/api/srs/${id}/intake`; // 접수 모드: POST 엔드포인트
 
       const method = isEditMode ? "PATCH" : "POST";
 
@@ -498,6 +499,7 @@ export default function SRIntakePage({ params }: { params: { id: string } }) {
                         step="0.5"
                         placeholder="예: 8"
                         {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
                     <FormDescription>

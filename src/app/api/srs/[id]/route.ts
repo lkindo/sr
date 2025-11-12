@@ -372,7 +372,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         data: {
           srId: id,
           userId: session.user.id,
-          type: "UPDATED",
+          type: "COMMENTED",
           description: `SR 접수 정보가 수정되었습니다:\n${intakeChanges.join('\n')}`,
           metadata: {
             actualPriority: validated.actualPriority,

@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       usersWithType = usersWithType.filter((user) => user.userType === userType);
     }
 
-    return NextResponse.json({ users: usersWithType });
+    return NextResponse.json(usersWithType);
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(

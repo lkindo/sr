@@ -119,14 +119,11 @@ export async function GET(request: NextRequest) {
         case "IN_PROGRESS":
           progressPercentage = 50;
           break;
-        case "RESOLVED":
-          progressPercentage = 90;
-          break;
         case "COMPLETED":
         case "CONFIRMED":
           progressPercentage = 100;
           break;
-        case "CANCELLED":
+        case "REJECTED":
           progressPercentage = 0;
           break;
       }

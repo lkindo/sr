@@ -205,13 +205,7 @@ export async function POST(request: NextRequest) {
             email: true,
           },
         },
-        assignee: validated.assigneeId ? {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        } : undefined,
+        assignee: true,
       },
     });
     console.log("🔍 [POST /api/srs] SR 생성 성공! ID:", sr.id);
