@@ -151,14 +151,15 @@ export default function MyRequestsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
+      <div className="sr-loading">
+        <div className="sr-loading-spinner"></div>
+        <p className="text-muted-foreground">내 요청 SR을 불러오는 중...</p>
       </div>
     );
   }
 
   return (
-    <div className="sr-content-area space-y-6">
+    <div className="sr-content-area space-y-6 sr-fade-in">
       {/* 헤더 */}
       <div className="sr-list-head">
         <div>
@@ -265,18 +266,19 @@ export default function MyRequestsPage() {
       {/* SR 목록 */}
       <div className="space-y-4">
         {srs.length === 0 ? (
-          <Card className="sr-card">
-            <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 mx-auto text-[hsl(var(--sr-gray-medium))] mb-4" />
-              <p className="text-muted-foreground mb-4">요청한 SR이 없습니다.</p>
-              <Button
-                onClick={() => setCreateDialogOpen(true)}
-                className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
-              >
-                첫 SR 요청하기
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="sr-empty-state">
+            <FileText className="sr-empty-state-icon" />
+            <h3 className="sr-empty-state-title">요청한 SR이 없습니다</h3>
+            <p className="sr-empty-state-description">
+              아직 요청한 SR이 없습니다. 첫 SR을 요청하여 업무를 시작하세요.
+            </p>
+            <Button
+              onClick={() => setCreateDialogOpen(true)}
+              className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
+            >
+              첫 SR 요청하기
+            </Button>
+          </div>
         ) : (
           srs.map((sr) => (
             <Card key={sr.id} className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-blue))]">
