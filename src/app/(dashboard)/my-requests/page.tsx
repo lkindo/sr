@@ -158,54 +158,54 @@ export default function MyRequestsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="sr-content-area space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      <div className="sr-list-head">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">내 요청 SR</h1>
-          <p className="text-muted-foreground">
+          <h1 className="sr-list-title text-3xl">내 요청 SR</h1>
+          <p className="text-muted-foreground mt-1">
             내가 요청한 SR의 진행 상황을 확인하세요.
           </p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)}>새 SR 요청</Button>
+        <Button onClick={() => setCreateDialogOpen(true)} className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]">새 SR 요청</Button>
       </div>
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               전체 요청
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">{stats.total}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               접수 대기
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.requested}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">{stats.requested}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               진행 중
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.inProgress}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">{stats.inProgress}</div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               완료
@@ -218,10 +218,10 @@ export default function MyRequestsPage() {
       </div>
 
       {/* 필터 영역 */}
-      <Card>
+      <Card className="sr-card">
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="h-5 w-5" />
+          <CardTitle className="text-lg flex items-center gap-2 font-semibold">
+            <Filter className="h-5 w-5 text-[hsl(var(--sr-primary-dark))]" />
             필터 및 정렬
           </CardTitle>
         </CardHeader>
@@ -265,25 +265,28 @@ export default function MyRequestsPage() {
       {/* SR 목록 */}
       <div className="space-y-4">
         {srs.length === 0 ? (
-          <Card>
+          <Card className="sr-card">
             <CardContent className="py-12 text-center">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">요청한 SR이 없습니다.</p>
-              <Button className="mt-4" onClick={() => setCreateDialogOpen(true)}>
+              <FileText className="h-12 w-12 mx-auto text-[hsl(var(--sr-gray-medium))] mb-4" />
+              <p className="text-muted-foreground mb-4">요청한 SR이 없습니다.</p>
+              <Button
+                onClick={() => setCreateDialogOpen(true)}
+                className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
+              >
                 첫 SR 요청하기
               </Button>
             </CardContent>
           </Card>
         ) : (
           srs.map((sr) => (
-            <Card key={sr.id} className="hover:shadow-md transition-shadow">
+            <Card key={sr.id} className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-blue))]">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link
                         href={`/srs/${sr.id}`}
-                        className="text-xl font-semibold hover:underline"
+                        className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))] hover:text-[hsl(var(--sr-accent-orange))] hover:underline transition-colors"
                       >
                         {sr.srNumber}
                       </Link>
@@ -294,7 +297,7 @@ export default function MyRequestsPage() {
                         {priorityLabels[sr.requestedPriority]}
                       </Badge>
                     </div>
-                    <p className="text-lg font-medium">{sr.title}</p>
+                    <p className="text-lg font-medium text-foreground">{sr.title}</p>
                     <p className="text-sm text-muted-foreground line-clamp-2">
                       {sr.description}
                     </p>
@@ -307,8 +310,8 @@ export default function MyRequestsPage() {
                   {/* 진행률 */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">진행률</span>
-                      <span className="font-medium">{sr.progressPercentage}%</span>
+                      <span className="text-muted-foreground font-medium">진행률</span>
+                      <span className="font-semibold text-[hsl(var(--sr-accent-blue))]">{sr.progressPercentage}%</span>
                     </div>
                     <Progress value={sr.progressPercentage} className="h-2" />
                   </div>

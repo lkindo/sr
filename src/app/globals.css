@@ -50,30 +50,41 @@
     --sr-accent-blue: 228 31% 42%;
   }
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 232 28% 10%;
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 232 28% 12%;
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 232 28% 12%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+    --primary: 234 11% 93%;
+    --primary-foreground: 232 28% 24%;
+    --secondary: 232 28% 18%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+    --muted: 232 28% 16%;
+    --muted-foreground: 234 11% 71%;
+    --accent: 232 28% 20%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --border: 232 28% 22%;
+    --input: 232 28% 22%;
+    --ring: 234 11% 93%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* SR Management Design System Colors - Dark Mode */
+    --sr-primary-dark: 234 11% 93%;
+    --sr-primary-darker: 0 0% 98%;
+    --sr-gray-medium: 234 11% 71%;
+    --sr-gray-light: 234 11% 51%;
+    --sr-bg-light: 232 28% 16%;
+    --sr-bg-lighter: 232 28% 18%;
+    --sr-border: 232 28% 22%;
+    --sr-accent-orange: 16 100% 60%;
+    --sr-accent-blue: 228 50% 60%;
   }
 }
 
@@ -278,5 +289,81 @@
 
   .sr-priority-badge.low {
     @apply bg-gray-100 text-gray-800 border border-gray-200;
+  }
+
+  /* Icon Utility Classes */
+  .sr-icon-sm {
+    @apply w-4 h-4;
+  }
+
+  .sr-icon-md {
+    @apply w-5 h-5;
+  }
+
+  .sr-icon-lg {
+    @apply w-6 h-6;
+  }
+
+  .sr-icon-xl {
+    @apply w-8 h-8;
+  }
+
+  /* Icon Color Classes */
+  .sr-icon-primary {
+    @apply text-[hsl(var(--sr-primary-dark))];
+  }
+
+  .sr-icon-accent-orange {
+    @apply text-[hsl(var(--sr-accent-orange))];
+  }
+
+  .sr-icon-accent-blue {
+    @apply text-[hsl(var(--sr-accent-blue))];
+  }
+
+  .sr-icon-success {
+    @apply text-green-600;
+  }
+
+  .sr-icon-warning {
+    @apply text-orange-600;
+  }
+
+  .sr-icon-error {
+    @apply text-red-600;
+  }
+
+  .sr-icon-muted {
+    @apply text-muted-foreground;
+  }
+
+  /* Responsive Design Enhancements */
+  @media (max-width: 768px) {
+    .sr-content-area {
+      @apply px-2 py-4;
+    }
+
+    .sr-list-head {
+      @apply flex-col items-start gap-3;
+    }
+
+    .sr-header-nav-item {
+      @apply text-xs px-2 py-1.5;
+    }
+
+    .sr-table th,
+    .sr-table td {
+      @apply px-3 text-xs;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .sr-filter-button {
+      @apply text-xs px-3 py-1.5 h-8;
+    }
+
+    .sr-icon-button {
+      @apply w-8 h-8;
+    }
   }
 }

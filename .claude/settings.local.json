@@ -60,7 +60,8 @@
       "Bash(if not exist publicuploadsattachments mkdir publicuploadsattachments)",
       "Bash(set PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=A방법으로 진행해줘)",
       "Bash(tail:*)",
-      "Bash(if not exist \"src\\app\\api\\srs\\[id]\" mkdir \"src\\app\\api\\srs\\[id]\")"
+      "Bash(if not exist \"src\\app\\api\\srs\\[id]\" mkdir \"src\\app\\api\\srs\\[id]\")",
+      "Bash(if exist .next rmdir /s /q .next)"
     ],
     "deny": [],
     "ask": []

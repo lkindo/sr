@@ -162,61 +162,63 @@ export default function DashboardPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          SR 관리 시스템 대시보드에 오신 것을 환영합니다.
-        </p>
+    <div className="sr-content-area space-y-6">
+      <div className="sr-list-head">
+        <div>
+          <h1 className="sr-list-title text-3xl">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            SR 관리 시스템 대시보드에 오신 것을 환영합니다.
+          </p>
+        </div>
       </div>
 
       {/* Quick Access Cards */}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card className="sr-card cursor-pointer border-l-4 border-l-[hsl(var(--sr-accent-blue))]">
           <Link href="/my-requests">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ClipboardList className="h-5 w-5 text-blue-600" />
-                  <CardTitle className="text-lg">내 요청 SR</CardTitle>
+                <div className="flex items-center gap-3">
+                  <ClipboardList className="h-6 w-6 text-[hsl(var(--sr-accent-blue))]" />
+                  <CardTitle className="text-lg font-semibold">내 요청 SR</CardTitle>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
               </div>
-              <CardDescription>
+              <CardDescription className="mt-2">
                 내가 요청한 SR의 진행 상황을 확인하세요
               </CardDescription>
             </CardHeader>
           </Link>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card className="sr-card cursor-pointer border-l-4 border-l-[hsl(var(--sr-accent-orange))]">
           <Link href="/srs/intake-queue">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Inbox className="h-5 w-5 text-orange-600" />
-                  <CardTitle className="text-lg">SR 접수 대기</CardTitle>
+                <div className="flex items-center gap-3">
+                  <Inbox className="h-6 w-6 text-[hsl(var(--sr-accent-orange))]" />
+                  <CardTitle className="text-lg font-semibold">SR 접수 대기</CardTitle>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
               </div>
-              <CardDescription>
+              <CardDescription className="mt-2">
                 접수 대기 중인 SR을 검토하고 처리하세요
               </CardDescription>
             </CardHeader>
           </Link>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+        <Card className="sr-card cursor-pointer border-l-4 border-l-green-500">
           <Link href="/srs">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-green-600" />
-                  <CardTitle className="text-lg">SR 전체 목록</CardTitle>
+                <div className="flex items-center gap-3">
+                  <FileText className="h-6 w-6 text-green-600" />
+                  <CardTitle className="text-lg font-semibold">SR 전체 목록</CardTitle>
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                <ArrowRight className="h-5 w-5 text-muted-foreground" />
               </div>
-              <CardDescription>
+              <CardDescription className="mt-2">
                 모든 SR을 조회하고 관리하세요
               </CardDescription>
             </CardHeader>
@@ -226,58 +228,58 @@ export default function DashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 SR</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-5 w-5 text-[hsl(var(--sr-primary-dark))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.summary.total}</div>
-            <p className="text-xs text-muted-foreground">전체 SR 수</p>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">{stats.summary.total}</div>
+            <p className="text-xs text-muted-foreground mt-1">전체 SR 수</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">진행 중</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-5 w-5 text-[hsl(var(--sr-accent-blue))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
               {stats.summary.inProgress}
             </div>
-            <p className="text-xs text-muted-foreground">처리 중인 SR</p>
+            <p className="text-xs text-muted-foreground mt-1">처리 중인 SR</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">완료</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle className="h-5 w-5 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.summary.completed}</div>
-            <p className="text-xs text-muted-foreground">완료된 SR</p>
+            <div className="text-2xl font-bold text-green-600">{stats.summary.completed}</div>
+            <p className="text-xs text-muted-foreground mt-1">완료된 SR</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">대기 중</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <AlertCircle className="h-5 w-5 text-[hsl(var(--sr-accent-orange))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.summary.pending}</div>
-            <p className="text-xs text-muted-foreground">대기 중인 SR</p>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">{stats.summary.pending}</div>
+            <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts */}
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className="sr-card">
           <CardHeader>
-            <CardTitle>상태별 SR 분포</CardTitle>
+            <CardTitle className="font-semibold">상태별 SR 분포</CardTitle>
             <CardDescription>현재 SR의 상태별 분포입니다.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -308,9 +310,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="sr-card">
           <CardHeader>
-            <CardTitle>우선순위별 SR 분포</CardTitle>
+            <CardTitle className="font-semibold">우선순위별 SR 분포</CardTitle>
             <CardDescription>SR의 우선순위별 분포입니다.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -345,23 +347,24 @@ export default function DashboardPage() {
       </div>
 
       {/* Trend Chart */}
-      <Card>
+      <Card className="sr-card">
         <CardHeader>
-          <CardTitle>SR 생성 추이 (최근 30일)</CardTitle>
+          <CardTitle className="font-semibold">SR 생성 추이 (최근 30일)</CardTitle>
           <CardDescription>날짜별 SR 생성 수입니다.</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={stats.trend}>
-              <CartesianGrid strokeDasharray="3 3" />
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="date"
                 tickFormatter={(value) => {
                   const date = new Date(value);
                   return `${date.getMonth() + 1}/${date.getDate()}`;
                 }}
+                stroke="hsl(var(--muted-foreground))"
               />
-              <YAxis />
+              <YAxis stroke="hsl(var(--muted-foreground))" />
               <Tooltip
                 labelFormatter={(value) => {
                   const date = new Date(value);
@@ -371,8 +374,8 @@ export default function DashboardPage() {
               <Line
                 type="monotone"
                 dataKey="count"
-                stroke="#3b82f6"
-                strokeWidth={2}
+                stroke="hsl(var(--sr-accent-blue))"
+                strokeWidth={3}
                 name="SR 수"
               />
             </LineChart>
@@ -381,9 +384,9 @@ export default function DashboardPage() {
       </Card>
 
       {/* Recent SRs */}
-      <Card>
+      <Card className="sr-card">
         <CardHeader>
-          <CardTitle>최근 SR 활동</CardTitle>
+          <CardTitle className="font-semibold">최근 SR 활동</CardTitle>
           <CardDescription>
             최근 생성된 SR 목록입니다. (최근 10개)
           </CardDescription>
@@ -398,17 +401,17 @@ export default function DashboardPage() {
               {stats.recentSRs.map((sr) => (
                 <div
                   key={sr.id}
-                  className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0"
+                  className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0 hover:bg-muted/30 -mx-2 px-2 py-2 rounded transition-colors"
                 >
                   <div className="flex-1">
                     <Link
                       href={`/srs/${sr.id}`}
-                      className="font-medium hover:underline"
+                      className="font-medium text-[hsl(var(--sr-primary-dark))] hover:text-[hsl(var(--sr-accent-orange))] hover:underline transition-colors"
                     >
                       {sr.srNumber}
                     </Link>
-                    <p className="text-sm text-muted-foreground">{sr.title}</p>
-                    <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm text-muted-foreground mt-0.5">{sr.title}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
                       <span className="text-xs text-muted-foreground">
                         {sr.client.name}
                       </span>
