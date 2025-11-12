@@ -337,6 +337,142 @@
     @apply text-muted-foreground;
   }
 
+  /* Loading and Empty States */
+  .sr-loading {
+    @apply flex flex-col items-center justify-center;
+    @apply min-h-96 gap-4;
+  }
+
+  .sr-loading-spinner {
+    @apply w-8 h-8 border-4 border-border border-t-primary rounded-full;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Animation Utilities */
+  .sr-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .sr-slide-in {
+    animation: slideIn 0.4s ease-out;
+  }
+
+  .sr-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .sr-empty-state {
+    @apply flex flex-col items-center justify-center;
+    @apply py-16 px-4 text-center;
+  }
+
+  .sr-empty-state-icon {
+    @apply w-16 h-16 mb-4;
+    @apply text-muted-foreground opacity-50;
+  }
+
+  .sr-empty-state-title {
+    @apply text-lg font-semibold text-foreground mb-2;
+  }
+
+  .sr-empty-state-description {
+    @apply text-sm text-muted-foreground mb-6 max-w-md;
+  }
+
+  /* Error States */
+  .sr-error-state {
+    @apply flex flex-col items-center justify-center;
+    @apply py-16 px-4 text-center;
+    @apply bg-destructive/5 border border-destructive/20 rounded-lg;
+  }
+
+  .sr-error-icon {
+    @apply w-16 h-16 mb-4 text-destructive;
+  }
+
+  .sr-error-title {
+    @apply text-lg font-semibold text-destructive mb-2;
+  }
+
+  .sr-error-message {
+    @apply text-sm text-destructive/80 mb-6 max-w-md;
+  }
+
+  /* Form Elements */
+  .sr-input {
+    @apply h-10 px-3 py-2;
+    @apply border border-input rounded;
+    @apply bg-background text-foreground;
+    @apply transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .sr-input:hover:not(:disabled) {
+    @apply border-primary/50;
+  }
+
+  .sr-input-error {
+    @apply border-destructive focus:ring-destructive;
+  }
+
+  .sr-textarea {
+    @apply min-h-20 px-3 py-2;
+    @apply border border-input rounded;
+    @apply bg-background text-foreground;
+    @apply transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply resize-y;
+  }
+
+  .sr-select {
+    @apply h-10 px-3 py-2;
+    @apply border border-input rounded;
+    @apply bg-background text-foreground;
+    @apply transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply cursor-pointer;
+  }
+
+  .sr-label {
+    @apply text-sm font-medium text-foreground;
+    @apply mb-1.5 block;
+  }
+
+  .sr-label-required::after {
+    content: " *";
+    @apply text-destructive;
+  }
+
+  .sr-field-error {
+    @apply text-xs text-destructive mt-1;
+  }
+
+  .sr-field-hint {
+    @apply text-xs text-muted-foreground mt-1;
+  }
+
   /* Responsive Design Enhancements */
   @media (max-width: 768px) {
     .sr-content-area {

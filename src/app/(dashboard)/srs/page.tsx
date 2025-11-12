@@ -561,7 +561,7 @@ export default function SRsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="sr-table">
             <TableHeader>
               <TableRow>
                 <TableHead>

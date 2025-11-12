@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -204,44 +204,57 @@ export default function SRDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
+      <div className="sr-loading">
+        <div className="sr-loading-spinner"></div>
+        <p className="text-muted-foreground">SR 정보를 불러오는 중...</p>
       </div>
     );
   }
 
   if (!sr) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">SR을 찾을 수 없습니다.</p>
+      <div className="sr-empty-state">
+        <AlertCircle className="sr-empty-state-icon" />
+        <h3 className="sr-empty-state-title">SR을 찾을 수 없습니다</h3>
+        <p className="sr-empty-state-description">
+          요청하신 SR이 존재하지 않거나 삭제되었을 수 있습니다.
+        </p>
+        <Button asChild>
+          <Link href="/srs">SR 목록으로 돌아가기</Link>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="sr-content-area space-y-6 sr-fade-in">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="sr-icon-button">
             <Link href="/srs">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
               {sr.srNumber}
             </h1>
-            <p className="text-muted-foreground">{sr.title}</p>
+            <p className="text-muted-foreground mt-1">{sr.title}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
+          <Button
+            variant="outline"
+            onClick={() => setIsEditDialogOpen(true)}
+            className="hover:bg-[hsl(var(--sr-accent-blue))] hover:text-white transition-colors"
+          >
             <Pencil className="mr-2 h-4 w-4" />
             수정
           </Button>
           <Button
             variant="outline"
             onClick={() => setIsDeleteDialogOpen(true)}
+            className="hover:bg-destructive hover:text-destructive-foreground transition-colors"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             삭제
@@ -250,9 +263,9 @@ export default function SRDetailPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2">
+        <Card className="md:col-span-2 sr-card">
           <CardHeader>
-            <CardTitle>SR 상세 정보</CardTitle>
+            <CardTitle className="font-semibold">SR 상세 정보</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div>
@@ -402,7 +415,7 @@ export default function SRDetailPage() {
           </CardContent>
         </Card>
 
-<Card>
+        <Card className="sr-card">
           <CardHeader>
             <CardTitle>통계</CardTitle>
           </CardHeader>
