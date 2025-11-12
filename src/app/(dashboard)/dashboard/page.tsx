@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   PieChart,
   Pie,
@@ -23,7 +24,7 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import { FileText, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { FileText, Clock, CheckCircle, AlertCircle, Inbox, ClipboardList, ArrowRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
@@ -167,6 +168,60 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">
           SR 관리 시스템 대시보드에 오신 것을 환영합니다.
         </p>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Link href="/my-requests">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5 text-blue-600" />
+                  <CardTitle className="text-lg">내 요청 SR</CardTitle>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <CardDescription>
+                내가 요청한 SR의 진행 상황을 확인하세요
+              </CardDescription>
+            </CardHeader>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Link href="/srs/intake-queue">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Inbox className="h-5 w-5 text-orange-600" />
+                  <CardTitle className="text-lg">SR 접수 대기</CardTitle>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <CardDescription>
+                접수 대기 중인 SR을 검토하고 처리하세요
+              </CardDescription>
+            </CardHeader>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          <Link href="/srs">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-green-600" />
+                  <CardTitle className="text-lg">SR 전체 목록</CardTitle>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <CardDescription>
+                모든 SR을 조회하고 관리하세요
+              </CardDescription>
+            </CardHeader>
+          </Link>
+        </Card>
       </div>
 
       {/* Summary Cards */}

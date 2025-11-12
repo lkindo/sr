@@ -10,6 +10,8 @@ import {
   Users,
   Shield,
   Settings,
+  Inbox,
+  ClipboardList,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -30,7 +32,19 @@ const sidebarItems: SidebarItem[] = [
     // Dashboard는 모든 사용자 접근 가능
   },
   {
-    title: "SR 관리",
+    title: "내 요청 SR",
+    href: "/my-requests",
+    icon: ClipboardList,
+    // 모든 사용자가 자신이 요청한 SR 확인 가능
+  },
+  {
+    title: "SR 접수 대기",
+    href: "/srs/intake-queue",
+    icon: Inbox,
+    roles: ["ADMIN", "ENGINEER", "MANAGER"], // 접수 처리자만 접근
+  },
+  {
+    title: "SR 전체 목록",
     href: "/srs",
     icon: FileText,
     permission: { resource: "SR", action: "READ" },

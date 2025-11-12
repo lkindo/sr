@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -106,6 +107,7 @@ type SortField = "srNumber" | "title" | "client" | "priority" | "status" | "crea
 type SortOrder = "asc" | "desc";
 
 export default function SRsPage() {
+  const router = useRouter();
   const [srs, setSrs] = useState<SR[]>([]);
   const [filteredSrs, setFilteredSrs] = useState<SR[]>([]);
   const [loading, setLoading] = useState(true);
@@ -562,12 +564,13 @@ export default function SRsPage() {
                     {getSortIcon("createdAt")}
                   </Button>
                 </TableHead>
+                <TableHead>작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSrs.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8">
+                  <TableCell colSpan={11} className="text-center py-8">
                     {srs.length === 0
                       ? "등록된 SR이 없습니다."
                       : "필터 조건에 맞는 SR이 없습니다."}
@@ -618,6 +621,20 @@ export default function SRsPage() {
                       </TableCell>
                       <TableCell>
                         {new Date(sr.createdAt).toLocaleDateString("ko-KR")}
+                      </TableCell>
+                      <TableCell>
+                        {sr.status === "IN_PROGRESS" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/srs/${sr.id}/intake`);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

@@ -14,10 +14,8 @@ const srSchema = z.object({
   description: z.string().min(10, "설명은 최소 10자 이상이어야 합니다."),
   clientId: z.string().min(1, "고객사를 선택해주세요."),
   serviceCategoryId: z.string().min(1, "서비스 카테고리를 선택해주세요."),
-  priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
-  expectedCompletionDate: z.string().optional(),
-  dueDate: z.string().optional(),
-  assigneeId: z.string().optional(),
+  requestedPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
+  requestedCompletionDate: z.string().optional(),
 });
 
 // GET /api/srs - SR 목록 조회
@@ -185,15 +183,11 @@ export async function POST(request: NextRequest) {
         clientId: validated.clientId,
         serviceCategoryId: validated.serviceCategoryId,
         requesterId: session.user.id,
-        assigneeId: validated.assigneeId || undefined,
-        priority: validated.priority,
+        requestedPriority: validated.requestedPriority,
+        requestedCompletionDate: validated.requestedCompletionDate
+          ? new Date(validated.requestedCompletionDate)
+          : undefined,
         status: "REQUESTED",
-        expectedCompletionDate: validated.expectedCompletionDate
-          ? new Date(validated.expectedCompletionDate)
-          : undefined,
-        dueDate: validated.dueDate
-          ? new Date(validated.dueDate)
-          : undefined,
       },
       include: {
         client: {

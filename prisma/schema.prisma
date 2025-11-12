@@ -37,6 +37,7 @@ model User {
   // SR Relations
   createdSRs           SR[]              @relation("SRRequester")
   assignedSRs          SR[]              @relation("SRAssignee")
+  intakedSRs           SR[]              @relation("SRIntakeBy")
   srActivities         SRActivity[]
   srComments           SRComment[]
   srStatusHistory      SRStatusHistory[] @relation("StatusChangeUser")
@@ -268,14 +269,25 @@ model SR {
   id                      String     @id @default(cuid())
   srNumber                String     @unique @map("sr_number")
   title                   String
-  description             String     
+  description             String
   status                  SRStatus   @default(REQUESTED)
   priority                SRPriority @default(MEDIUM)
+
+  // ===== 요청자 입력 필드 =====
+  requestedPriority       SRPriority @default(MEDIUM) @map("requested_priority")
+  requestedCompletionDate DateTime?  @map("requested_completion_date")
 
   clientId                String  @map("client_id")
   requesterId             String  @map("requester_id")
   assigneeId              String? @map("assignee_id")
   serviceCategoryId       String  @map("service_category_id")
+
+  // ===== 접수자 분석 필드 =====
+  intakeById              String?     @map("intake_by_id")
+  actualPriority          SRPriority? @map("actual_priority")
+  intakeNotes             String?     @map("intake_notes")
+  estimatedHours          Float?      @map("estimated_hours")
+  estimatedCompletionDate DateTime?   @map("estimated_completion_date")
 
   requestedAt             DateTime  @default(now()) @map("requested_at")
   intakeAt                DateTime? @map("intake_at")
@@ -285,11 +297,11 @@ model SR {
   expectedCompletionDate  DateTime? @map("expected_completion_date")
   actualCompletionDate    DateTime? @map("actual_completion_date")
 
-  resolutionDescription   String? @map("resolution_description") 
-  rejectionReason         String? @map("rejection_reason") 
+  resolutionDescription   String? @map("resolution_description")
+  rejectionReason         String? @map("rejection_reason")
 
   satisfactionRating      Int?    @map("satisfaction_rating")
-  additionalFeedback      String? @map("additional_feedback") 
+  additionalFeedback      String? @map("additional_feedback")
 
   attachmentCount         Int @default(0) @map("attachment_count")
   commentCount            Int @default(0) @map("comment_count")
@@ -300,6 +312,7 @@ model SR {
   client          Client          @relation(fields: [clientId], references: [id])
   requester       User            @relation("SRRequester", fields: [requesterId], references: [id])
   assignee        User?           @relation("SRAssignee", fields: [assigneeId], references: [id])
+  intakeBy        User?           @relation("SRIntakeBy", fields: [intakeById], references: [id])
   serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
   activities      SRActivity[]
   comments        SRComment[]
@@ -312,6 +325,7 @@ model SR {
   @@index([serviceCategoryId])
   @@index([srNumber])
   @@index([status, priority, createdAt])
+  @@index([intakeById])
   @@map("srs")
 }
 

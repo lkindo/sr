@@ -34,6 +34,12 @@ const srUpdateSchema = z.object({
   rejectionReason: z.string().optional().nullable(),
   satisfactionRating: z.number().min(1).max(5).optional().nullable(),
   additionalFeedback: z.string().optional().nullable(),
+  // 접수 처리 관련 필드 추가
+  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
+  estimatedHours: z.number().positive("예상 작업 시간은 0보다 커야 합니다").optional(),
+  estimatedCompletionDate: z.string().optional(),
+  intakeNotes: z.string().optional(),
+  assigneeId: z.string().min(1, "담당자를 선택해주세요").optional(),
 });
 
 type RouteContext = {
@@ -209,6 +215,48 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const updateData: any = {};
 
+    // 접수 처리 관련 필드 먼저 처리
+    if (validated.actualPriority !== undefined) {
+      updateData.actualPriority = validated.actualPriority;
+
+      // 우선순위 변경 시 마감일 재계산
+      if (validated.actualPriority !== existingSr.actualPriority) {
+        const serviceCategory = await prisma.serviceCategory.findUnique({
+          where: { id: existingSr.serviceCategoryId || "" }
+        });
+
+        if (serviceCategory) {
+          const priorityMultiplier: Record<string, number> = {
+            CRITICAL: 0.5,
+            HIGH: 0.75,
+            MEDIUM: 1.0,
+            LOW: 1.5
+          };
+
+          const adjustedHours = serviceCategory.slaHours * priorityMultiplier[validated.actualPriority];
+          const dueDate = new Date(existingSr.intakeAt || new Date());
+          dueDate.setHours(dueDate.getHours() + adjustedHours);
+          updateData.dueDate = dueDate;
+        }
+      }
+    }
+
+    if (validated.estimatedHours !== undefined) {
+      updateData.estimatedHours = validated.estimatedHours;
+    }
+
+    if (validated.estimatedCompletionDate !== undefined) {
+      updateData.estimatedCompletionDate = new Date(validated.estimatedCompletionDate);
+    }
+
+    if (validated.intakeNotes !== undefined) {
+      updateData.intakeNotes = validated.intakeNotes;
+    }
+
+    if (validated.assigneeId !== undefined) {
+      updateData.assigneeId = validated.assigneeId;
+    }
+
     // Handle field updates
     if (validated.title !== undefined) updateData.title = validated.title;
     if (validated.description !== undefined)
@@ -288,19 +336,49 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
     }
 
-    // Handle assignment change
+    // Handle assignment change (assignedToId 또는 assigneeId 둘 다 지원)
+    const newAssigneeId = validated.assigneeId || validated.assignedToId;
     if (
-      validated.assignedToId !== undefined &&
-      validated.assignedToId !== existingSr.assigneeId
+      newAssigneeId !== undefined &&
+      newAssigneeId !== existingSr.assigneeId
     ) {
       await prisma.sRActivity.create({
         data: {
           srId: id,
           userId: session.user.id,
           type: "ASSIGNED",
-          description: validated.assignedToId
+          description: newAssigneeId
             ? "담당자가 할당되었습니다."
             : "담당자 할당이 해제되었습니다.",
+        },
+      });
+    }
+
+    // 접수 정보 수정 Activity 로그 생성
+    const intakeChanges: string[] = [];
+    if (validated.actualPriority && validated.actualPriority !== existingSr.actualPriority) {
+      intakeChanges.push(`우선순위 변경: ${existingSr.actualPriority} → ${validated.actualPriority}`);
+    }
+    if (validated.estimatedHours !== undefined && validated.estimatedHours !== existingSr.estimatedHours) {
+      intakeChanges.push(`예상 작업 시간 변경: ${existingSr.estimatedHours}시간 → ${validated.estimatedHours}시간`);
+    }
+    if (validated.estimatedCompletionDate &&
+        new Date(validated.estimatedCompletionDate).getTime() !== existingSr.estimatedCompletionDate?.getTime()) {
+      intakeChanges.push(`예상 완료일 변경`);
+    }
+
+    if (intakeChanges.length > 0) {
+      await prisma.sRActivity.create({
+        data: {
+          srId: id,
+          userId: session.user.id,
+          type: "UPDATED",
+          description: `SR 접수 정보가 수정되었습니다:\n${intakeChanges.join('\n')}`,
+          metadata: {
+            actualPriority: validated.actualPriority,
+            estimatedHours: validated.estimatedHours,
+            estimatedCompletionDate: validated.estimatedCompletionDate,
+          }
         },
       });
     }

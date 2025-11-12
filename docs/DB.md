@@ -1,9 +1,9 @@
 # SR Management System - Database Design Document
 
 **문서 종류:** DB
-**문서 버전:** 1.2
+**문서 버전:** 1.3
 **작성일:** 2025-11-06
-**최종 수정일:** 2025-11-07
+**최종 수정일:** 2025-01-12
 **작성자:** Development Team
 **검수자:** [검수자 정보]
 
@@ -37,6 +37,7 @@
 | 1.0 | Development Team | DB 설계 초안 작성 | 2025-11-06 | [검수자] |
 | 1.1 | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가 | 2025-11-06 | [검수자] |
 | 1.2 | Development Team | Single Source of Truth 명시, 문서 간 참조 가이드 추가 | 2025-11-07 | [검수자] |
+| 1.3 | Development Team | SR 요청/접수 프로세스 분리를 위한 필드 추가 (요청자/접수자 역할 분리) | 2025-01-12 | [검수자] |
 
 ---
 
@@ -538,17 +539,35 @@ SR(서비스 요청) 정보
 | 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
 |--------|-------------|------|--------|------|
 | id | VARCHAR(30) | NO | cuid() | SR 고유 ID (PK) |
-| sr_number | VARCHAR(50) | NO | - | SR 번호 (UK, 형식: ABC-20251106-0001) |
+| sr_number | VARCHAR(50) | NO | - | SR 번호 (UK, 형식: SR-20251106-0001) |
 | title | VARCHAR(200) | NO | - | SR 제목 |
 | description | TEXT | NO | - | SR 상세 설명 |
-| status | VARCHAR(20) | NO | 'INTAKE' | 상태 (ENUM) |
+| status | VARCHAR(20) | NO | 'REQUESTED' | 상태 (ENUM) |
 | priority | VARCHAR(20) | NO | 'MEDIUM' | 우선순위 (ENUM) |
+| **requested_priority** | VARCHAR(20) | NO | 'MEDIUM' | **[신규] 요청자 희망 우선순위 (ENUM)** |
+| **requested_completion_date** | TIMESTAMP | YES | NULL | **[신규] 요청자 희망 완료일** |
 | client_id | VARCHAR(30) | NO | - | 고객사 ID (FK) |
 | requester_id | VARCHAR(30) | NO | - | 요청자 ID (FK) |
 | assignee_id | VARCHAR(30) | YES | NULL | 담당자 ID (FK) |
+| service_category_id | VARCHAR(30) | NO | - | 서비스 카테고리 ID (FK) |
+| **intake_by_id** | VARCHAR(30) | YES | NULL | **[신규] 접수 처리자 ID (FK)** |
+| **actual_priority** | VARCHAR(20) | YES | NULL | **[신규] 실제 우선순위 (접수자 결정, ENUM)** |
+| **intake_notes** | TEXT | YES | NULL | **[신규] 접수 메모/분석 내용** |
+| **estimated_hours** | FLOAT | YES | NULL | **[신규] 예상 작업 시간** |
+| **estimated_completion_date** | TIMESTAMP | YES | NULL | **[신규] 접수자가 설정한 예상 완료일** |
 | requested_at | TIMESTAMP | NO | now() | 요청 시간 |
+| intake_at | TIMESTAMP | YES | NULL | 접수 시간 |
 | due_date | TIMESTAMP | YES | NULL | 완료 목표 시간 (SLA 기준) |
+| expected_completion_date | TIMESTAMP | YES | NULL | 예상 완료일 |
+| actual_completion_date | TIMESTAMP | YES | NULL | 실제 완료일 |
 | completed_at | TIMESTAMP | YES | NULL | 완료 시간 |
+| confirmed_at | TIMESTAMP | YES | NULL | 확인 완료 시간 |
+| resolution_description | TEXT | YES | NULL | 처리 결과 설명 |
+| rejection_reason | TEXT | YES | NULL | 거부 사유 |
+| satisfaction_rating | INT | YES | NULL | 만족도 평가 (1-5) |
+| additional_feedback | TEXT | YES | NULL | 추가 피드백 |
+| attachment_count | INT | NO | 0 | 첨부파일 수 |
+| comment_count | INT | NO | 0 | 댓글 수 |
 | created_at | TIMESTAMP | NO | now() | 생성 시간 |
 | updated_at | TIMESTAMP | NO | now() | 수정 시간 |
 
@@ -568,6 +587,8 @@ SR(서비스 요청) 정보
 - `client_id` REFERENCES `clients(id)`
 - `requester_id` REFERENCES `users(id)`
 - `assignee_id` REFERENCES `users(id)` ON DELETE SET NULL
+- `service_category_id` REFERENCES `service_categories(id)`
+- **`intake_by_id` REFERENCES `users(id)` ON DELETE SET NULL** [신규]
 
 ---
 
@@ -729,6 +750,7 @@ model User {
   // SR Relations
   createdSRs           SR[]              @relation("SRRequester")
   assignedSRs          SR[]              @relation("SRAssignee")
+  intakedSRs           SR[]              @relation("SRIntakeBy")
   srActivities         SRActivity[]
   srComments           SRComment[]
   srStatusHistory      SRStatusHistory[] @relation("StatusChangeUser")
@@ -953,17 +975,28 @@ model SR {
   status                  SRStatus   @default(REQUESTED)
   priority                SRPriority @default(MEDIUM)
 
+  // ===== 요청자 입력 필드 =====
+  requestedPriority       SRPriority @default(MEDIUM) @map("requested_priority")
+  requestedCompletionDate DateTime?  @map("requested_completion_date")
+
   // FK 관계
   clientId                String  @map("client_id")
   requesterId             String  @map("requester_id")
   assigneeId              String? @map("assignee_id")
-  serviceCategoryId       String  @map("service_category_id") // 추가: 서비스 카테고리
+  serviceCategoryId       String  @map("service_category_id")
+
+  // ===== 접수자 분석 필드 =====
+  intakeById              String?     @map("intake_by_id")
+  actualPriority          SRPriority? @map("actual_priority")
+  intakeNotes             String?     @map("intake_notes") @db.Text
+  estimatedHours          Float?      @map("estimated_hours")
+  estimatedCompletionDate DateTime?   @map("estimated_completion_date")
 
   // 날짜 필드
   requestedAt             DateTime  @default(now()) @map("requested_at")
   intakeAt                DateTime? @map("intake_at")
   completedAt             DateTime? @map("completed_at")
-  confirmedAt             DateTime? @map("confirmed_at")         // 추가: 확인 완료 시간
+  confirmedAt             DateTime? @map("confirmed_at")
   dueDate                 DateTime? @map("due_date")
   expectedCompletionDate  DateTime? @map("expected_completion_date")
   actualCompletionDate    DateTime? @map("actual_completion_date")
@@ -972,8 +1005,8 @@ model SR {
   resolutionDescription   String? @map("resolution_description") @db.Text
   rejectionReason         String? @map("rejection_reason") @db.Text
 
-  // 만족도 (추가)
-  satisfactionRating      Int?    @map("satisfaction_rating") // 1~5
+  // 만족도
+  satisfactionRating      Int?    @map("satisfaction_rating")
   additionalFeedback      String? @map("additional_feedback") @db.Text
 
   // 카운터
@@ -987,6 +1020,7 @@ model SR {
   client          Client          @relation(fields: [clientId], references: [id])
   requester       User            @relation("SRRequester", fields: [requesterId], references: [id])
   assignee        User?           @relation("SRAssignee", fields: [assigneeId], references: [id])
+  intakeBy        User?           @relation("SRIntakeBy", fields: [intakeById], references: [id])
   serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
   activities      SRActivity[]
   comments        SRComment[]
@@ -999,6 +1033,7 @@ model SR {
   @@index([serviceCategoryId])
   @@index([srNumber])
   @@index([status, priority, createdAt])
+  @@index([intakeById])
   @@map("srs")
 }
 

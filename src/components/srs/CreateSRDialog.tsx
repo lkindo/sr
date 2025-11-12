@@ -50,9 +50,8 @@ export function CreateSRDialog({
   const [description, setDescription] = useState("");
   const [clientId, setClientId] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [priority, setPriority] = useState<string>("MEDIUM");
-  const [expectedCompletionDate, setExpectedCompletionDate] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [requestedPriority, setRequestedPriority] = useState<string>("MEDIUM");
+  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>(
@@ -162,30 +161,21 @@ export function CreateSRDialog({
       return;
     }
 
-    // 날짜 유효성 검증
-    if (expectedCompletionDate && dueDate) {
-      const expectedDate = new Date(expectedCompletionDate);
-      const dueDateValue = new Date(dueDate);
+    // 희망 완료일 유효성 검증 (과거 날짜 방지)
+    if (requestedCompletionDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const requestedDate = new Date(requestedCompletionDate);
 
-      if (dueDateValue < expectedDate) {
+      if (requestedDate < today) {
         toast({
           title: "오류",
-          description: "마감일은 예상 완료일과 같거나 이후여야 합니다.",
+          description: "희망 완료일은 오늘 이후여야 합니다.",
           variant: "destructive",
         });
         return;
       }
     }
-
-    // 과거 날짜 검증 (선택사항 - 필요시 주석 해제)
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0);
-    // if (dueDate && new Date(dueDate) < today) {
-    //   toast({
-    //     title: "경고",
-    //     description: "마감일이 과거 날짜입니다.",
-    //   });
-    // }
 
     setLoading(true);
 
@@ -195,9 +185,8 @@ export function CreateSRDialog({
       description,
       clientId,
       serviceCategoryId: categoryId,
-      priority,
-      expectedCompletionDate: expectedCompletionDate || undefined,
-      dueDate: dueDate || undefined,
+      requestedPriority,
+      requestedCompletionDate: requestedCompletionDate || undefined,
     };
     console.log(" [CreateSR] 요청 데이터:", requestBody);
 
@@ -245,9 +234,8 @@ export function CreateSRDialog({
       setDescription("");
       setClientId("");
       setCategoryId("");
-      setPriority("MEDIUM");
-      setExpectedCompletionDate("");
-      setDueDate("");
+      setRequestedPriority("MEDIUM");
+      setRequestedCompletionDate("");
       setFiles([]);
 
       onCreated();
@@ -269,9 +257,9 @@ export function CreateSRDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>새 SR 생성</DialogTitle>
+          <DialogTitle>새 SR 요청</DialogTitle>
           <DialogDescription>
-            서비스 요청(SR)을 생성합니다. 모든 필수 항목을 입력해주세요.
+            서비스 요청(SR)을 등록합니다. 제목, 설명, 고객사, 서비스 카테고리는 필수입니다.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -349,49 +337,39 @@ export function CreateSRDialog({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="priority">우선순위 *</Label>
-              <Select
-                value={priority}
-                onValueChange={setPriority}
-                disabled={loading}
-              >
-                <SelectTrigger id="priority">
-                  <SelectValue placeholder="우선순위 선택" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CRITICAL">긴급</SelectItem>
-                  <SelectItem value="HIGH">높음</SelectItem>
-                  <SelectItem value="MEDIUM">보통</SelectItem>
-                  <SelectItem value="LOW">낮음</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="expectedCompletionDate">
-                  예상 완료일
-                </Label>
-                <Input
-                  id="expectedCompletionDate"
-                  type="date"
-                  value={expectedCompletionDate}
-                  onChange={(e) =>
-                    setExpectedCompletionDate(e.target.value)
-                  }
+                <Label htmlFor="requestedPriority">희망 우선순위 *</Label>
+                <Select
+                  value={requestedPriority}
+                  onValueChange={setRequestedPriority}
                   disabled={loading}
-                />
+                >
+                  <SelectTrigger id="requestedPriority">
+                    <SelectValue placeholder="우선순위 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CRITICAL">긴급</SelectItem>
+                    <SelectItem value="HIGH">높음</SelectItem>
+                    <SelectItem value="MEDIUM">보통</SelectItem>
+                    <SelectItem value="LOW">낮음</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="dueDate">마감일</Label>
+                <Label htmlFor="requestedCompletionDate">
+                  희망 완료일 (선택)
+                </Label>
                 <Input
-                  id="dueDate"
+                  id="requestedCompletionDate"
                   type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  value={requestedCompletionDate}
+                  onChange={(e) =>
+                    setRequestedCompletionDate(e.target.value)
+                  }
                   disabled={loading}
+                  placeholder="언제까지 완료되길 원하시나요?"
                 />
               </div>
             </div>
@@ -417,7 +395,7 @@ export function CreateSRDialog({
               취소
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "생성 중..." : "생성"}
+              {loading ? "요청 중..." : "SR 요청하기"}
             </Button>
           </DialogFooter>
         </form>

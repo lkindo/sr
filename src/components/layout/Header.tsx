@@ -21,16 +21,22 @@ export async function Header() {
               Dashboard
             </Link>
             <Link
+              href="/my-requests"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              내 요청
+            </Link>
+            <Link
+              href="/srs/intake-queue"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              접수 대기
+            </Link>
+            <Link
               href="/srs"
               className="transition-colors hover:text-foreground/80 text-foreground/60"
             >
-              SR 목록
-            </Link>
-            <Link
-              href="/clients"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
-            >
-              고객사
+              전체 SR
             </Link>
           </nav>
         </div>

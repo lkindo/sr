@@ -29,6 +29,7 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get("isActive");
     const userType = searchParams.get("userType");
     const roleId = searchParams.get("roleId");
+    const role = searchParams.get("role"); // 역할 이름 필터링 (예: "ENGINEER,ADMIN")
 
     const where: any = {};
 
@@ -43,11 +44,25 @@ export async function GET(request: NextRequest) {
       where.isActive = isActive === "true";
     }
 
-    // 역할별 필터링
+    // 역할별 필터링 (roleId)
     if (roleId && roleId !== "all") {
       where.roles = {
         some: {
           roleId: roleId,
+        },
+      };
+    }
+
+    // 역할 이름으로 필터링 (role)
+    if (role) {
+      const roleNames = role.split(",");
+      where.roles = {
+        some: {
+          role: {
+            name: {
+              in: roleNames,
+            },
+          },
         },
       };
     }
@@ -94,7 +109,7 @@ export async function GET(request: NextRequest) {
       usersWithType = usersWithType.filter((user) => user.userType === userType);
     }
 
-    return NextResponse.json(usersWithType);
+    return NextResponse.json({ users: usersWithType });
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
