@@ -38,15 +38,16 @@
     --chart-5: 27 87% 67%;
     --radius: 0.25rem;
 
-    /* SR Management Design System Colors */
-    --sr-primary-dark: 232 28% 24%;
-    --sr-primary-darker: 234 35% 23%;
-    --sr-gray-medium: 234 11% 47%;
-    --sr-gray-light: 234 11% 71%;
-    --sr-bg-light: 234 17% 96%;
+    /* SR Management Design System Colors - Based on HTML Template */
+    --sr-primary-dark: 235 45% 23%; /* #2a3053 - Main sidebar color */
+    --sr-primary-darker: 233 47% 19%; /* #212642 - Sidebar submenu color */
+    --sr-sidebar-hover: 233 30% 29%; /* #34395b - Hover state */
+    --sr-gray-medium: 233 15% 60%; /* #9497a9 - Text muted */
+    --sr-gray-light: 233 15% 65%; /* #9092a0 - Submenu text */
+    --sr-bg-light: 232 45% 97%; /* #f5f6f9 - Light background */
     --sr-bg-lighter: 234 11% 93%;
-    --sr-border: 234 13% 85%;
-    --sr-accent-orange: 16 100% 50%;
+    --sr-border: 0 0% 88%; /* #e1e1e1 - Border light */
+    --sr-accent-orange: 16 100% 50%; /* #ff5000 - Accent color */
     --sr-accent-blue: 228 31% 42%;
   }
   .dark {
@@ -501,5 +502,192 @@
     .sr-icon-button {
       @apply w-8 h-8;
     }
+  }
+
+  /* HTML Template Inspired Styles */
+
+  /* Sidebar (LNB) Styles */
+  .sr-sidebar-bg {
+    @apply bg-[hsl(var(--sr-primary-dark))];
+  }
+
+  .sr-sidebar-item {
+    @apply text-[hsl(var(--sr-gray-medium))];
+    @apply hover:text-white hover:bg-[hsl(var(--sr-sidebar-hover))];
+    @apply transition-all duration-200;
+  }
+
+  .sr-sidebar-item.active {
+    @apply text-white bg-[hsl(var(--sr-sidebar-hover))];
+  }
+
+  .sr-sidebar-submenu {
+    @apply bg-[hsl(var(--sr-primary-darker))];
+  }
+
+  .sr-sidebar-submenu-item {
+    @apply text-[hsl(var(--sr-gray-light))];
+    @apply hover:text-white;
+    @apply transition-colors duration-200;
+  }
+
+  .sr-sidebar-submenu-item::before {
+    content: '';
+    @apply inline-block w-1 h-1 rounded-full;
+    @apply bg-gray-400 mr-3;
+    @apply opacity-0;
+  }
+
+  .sr-sidebar-submenu-item:hover::before {
+    @apply opacity-100;
+  }
+
+  /* Header with Accent Border */
+  .sr-header-accent {
+    @apply border-b-2 border-[hsl(var(--sr-accent-orange))];
+  }
+
+  /* Content Background */
+  .sr-content-bg {
+    @apply bg-[hsl(var(--sr-bg-light))];
+  }
+
+  /* Card with Template Shadow */
+  .sr-card-template {
+    @apply bg-white border border-gray-200/40;
+    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.05);
+  }
+
+  /* Button Styles from Template */
+  .sr-btn-template {
+    @apply inline-flex items-center justify-center;
+    @apply h-10 px-6 rounded;
+    @apply text-sm font-medium;
+    @apply bg-[hsl(var(--sr-bg-lighter))] text-gray-800;
+    @apply hover:bg-gray-300 active:bg-gray-400;
+    @apply transition-colors duration-200;
+  }
+
+  .sr-btn-template-primary {
+    @apply bg-[hsl(var(--sr-primary-dark))] text-white;
+    @apply hover:bg-[hsl(var(--sr-sidebar-hover))];
+    @apply active:bg-[hsl(var(--sr-primary-darker))];
+  }
+
+  .sr-btn-template-accent {
+    @apply bg-[hsl(var(--sr-accent-orange))] text-white;
+    @apply hover:opacity-90 active:opacity-80;
+  }
+
+  .sr-btn-template-small {
+    @apply h-8 px-4 text-xs;
+  }
+
+  .sr-btn-template-medium {
+    @apply h-8 px-4;
+  }
+
+  .sr-btn-template-big {
+    @apply h-12 px-8;
+  }
+
+  /* Badge Button Group from Template */
+  .sr-badge-group {
+    @apply inline-flex rounded overflow-hidden;
+  }
+
+  .sr-badge-item {
+    @apply bg-[hsl(var(--sr-bg-light))] h-10 px-3.5 leading-10;
+    @apply border-r border-gray-200;
+    @apply hover:bg-gray-200 active:bg-gray-300;
+    @apply transition-colors duration-200;
+    @apply first:border-l-0 last:border-r-0;
+  }
+
+  .sr-badge-item.active {
+    @apply bg-[hsl(var(--sr-primary-dark))] text-white;
+  }
+
+  /* Table from Template */
+  .sr-table-template {
+    @apply w-full;
+    @apply border-t-2 border-[hsl(var(--sr-primary-dark))];
+    @apply border-b border-[hsl(var(--sr-border))];
+  }
+
+  .sr-table-template th {
+    @apply bg-[hsl(var(--sr-bg-light))] h-12 px-6;
+    @apply text-left font-medium;
+    @apply border-r border-[hsl(var(--sr-border))];
+    @apply last:border-r-0;
+  }
+
+  .sr-table-template td {
+    @apply h-12 px-6;
+    @apply text-[hsl(var(--sr-gray-medium))];
+    @apply border-r border-[hsl(var(--sr-border))];
+    @apply last:border-r-0;
+  }
+
+  .sr-table-template tbody tr {
+    @apply border-b border-[hsl(var(--sr-border))];
+  }
+
+  /* Progress Bar from Template */
+  .sr-progress-bar-template {
+    @apply bg-[hsl(var(--sr-bg-light))] h-4 w-32 rounded-lg relative;
+  }
+
+  .sr-progress-fill {
+    @apply h-4 rounded-lg;
+  }
+
+  .sr-progress-yellow {
+    @apply bg-[#ffbd4c];
+  }
+
+  .sr-progress-red {
+    @apply bg-[#ff7e66];
+  }
+
+  .sr-progress-green {
+    @apply bg-[#66df6e];
+  }
+
+  .sr-progress-blue {
+    @apply bg-[#66c7ff];
+  }
+
+  /* Input from Template */
+  .sr-input-template {
+    @apply border border-gray-300 rounded h-10 px-3;
+    @apply focus:border-[hsl(var(--sr-primary-dark))] focus:outline-none;
+    @apply placeholder:text-gray-400;
+    @apply transition-colors duration-200;
+  }
+
+  .sr-input-template:hover {
+    @apply border-[hsl(var(--sr-primary-dark))];
+  }
+
+  /* Dropdown from Template */
+  .sr-dropdown-template {
+    @apply border border-gray-300 rounded h-10 px-5 pr-10;
+    @apply inline-flex items-center;
+    @apply text-[hsl(var(--sr-gray-medium))];
+    @apply hover:border-[hsl(var(--sr-primary-dark))];
+    @apply hover:text-[hsl(var(--sr-primary-dark))];
+    @apply transition-colors duration-200;
+  }
+
+  /* Menu Icons */
+  .sr-menu-icon {
+    @apply inline-block w-5 h-5;
+    @apply opacity-50;
+  }
+
+  .sr-sidebar-item:hover .sr-menu-icon,
+  .sr-sidebar-item.active .sr-menu-icon {
+    @apply opacity-100;
   }
 }

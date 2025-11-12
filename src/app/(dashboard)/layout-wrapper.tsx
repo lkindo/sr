@@ -10,10 +10,12 @@ export function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const isDashboard = pathname === "/dashboard";
 
   return (
-    <div className="flex">
+    <div className="flex min-h-[calc(100vh-104px)]">
       <Sidebar />
-      <main className={isDashboard ? "flex-1 p-6" : "flex-1 ml-64 p-6"}>
-        {children}
+      <main className={isDashboard ? "flex-1 p-8 sr-content-bg" : "flex-1 ml-64 p-8 sr-content-bg"}>
+        <div className="w-full max-w-[1280px] mx-auto">
+          {children}
+        </div>
       </main>
     </div>
   );

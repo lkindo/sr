@@ -1,0 +1,67 @@
+@charset "utf-8";
+
+.content_area{width: 100%; height: calc(100% - 104px); background-color: #f5f6f9}
+.contents{width: 1280px; margin: 0 auto;}
+h2{font-size: 24px; font-weight: bold; color: #252c52; padding-left: 44px;}
+h2.monitoring{background:url(../images/ic-monitoring_2.png) left center no-repeat; height: 104px; line-height: 104px}
+.rectangle{display: inline-block; vertical-align: middle; margin-left: 10px;}
+.rectangle > .tooltip_info{top: 0; left: 30px; width: 200px;}
+.contents_info{background-color: #fff; border: 1px solid rgba(42,48,83,0.1); padding: 0px 64px 0px 64px; box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.05);}
+h3{font-size: 20px; color: #252c52; line-height: 86px}
+
+.list_head{padding-top: 24px; padding-bottom: 26px}
+.list_head .title{font-weight: bold; color: #333333; font-size: 20px; display: inline-block}
+.list_head .title > span{font-size: 16px; font-weight: normal; padding-left: 4px}
+.list_head .search_area{display: inline-block}
+.list_head .total_num{float: right; color: #666; font-size: 14px; line-height: 40px}
+.list_head .total_num > b{color: #2a3053; padding: 0px 5px}
+.list_head .btn_area{display: inline-block; float: right}
+.list_head .btn_area .btn.fw{float: left; margin-right: 8px}
+.list_head .btn_area .day{display: inline-block}
+.list_head .btn_area .day ul li{float: left}
+.list table{border-bottom: 1px solid #e1e1e1;border-top:2px solid #2a3053;}
+.list table th{text-align: left; padding-left: 24px; height: 48px; position: relative; cursor: pointer; background-color: #f5f6f9;border-right: 1px solid #e1e1e1; font-family:'SFUIDisplay'; font-weight: 500}
+.list table th::after{content: ''; width: 16px; height: 16px; display: inline-block;background:url(../images/ic-tablesort.png) no-repeat; margin-left: 10px; position: absolute;
+    top: 17px;}
+.list table tr th:last-child::after, .list table tr td:last-child::after{content: none}
+.list table tr td{height: 48px; padding-left: 24px; border-right: 1px solid #e1e1e1; color: #6a6e86}
+.list table tr td.ic-search{padding-left: 0px; text-align: center}
+.list table tr th:last-child, .list table tr td:last-child{border-right: none}
+.ic-search > .btn{font-size: 0px; background:url(../images/ic-search.png) center center no-repeat; width: 40px; height: 40px; border-radius: 4px; padding: 0px; vertical-align: middle; display: inline-block}
+.ic-search > .btn:hover{background:url(../images/ic-search_on.png) center center no-repeat #dadce7;}
+.ic-search > .btn:active{background:url(../images/ic-search_on.png) center center no-repeat #b5b9d0;}
+.list table tr td .up{}
+.list table tr td .up .icon_up{border-top: 4px solid none;border-bottom: 7px solid #79f564;border-left: 5px solid transparent;border-right: 5px solid transparent; display: inline-block;margin-right: 5px;}
+
+.list table tr td .down{margin-left: 15px}
+.list table tr td .down .icon_down{border-top: 7px solid #ff7e66;border-bottom: 7px solid none;border-left: 5px solid transparent;border-right: 5px solid transparent; display: inline-block; margin-right: 5px;}
+
+.list table tr td .bar_bg{background-color: #f5f6f9; height: 16px; width: 132px; border-radius: 8px; position: relative}
+.list table tr td .bar_bg > em{font-size: 10px; color: #2a3053; position: absolute; left: calc(50% - 10px); font-style:normal}
+.list table tr td .bar_bg .bar{height: 16px; width: 132px; border-radius: 8px; display: inline-block}
+.yellow{background-color: #ffbd4c}
+.red{background-color: #ff7e66}
+.green{background-color: #66df6e}
+.blue{background-color: #66c7ff}
+
+.list_bottom{padding-top: 24px; padding-bottom: 56px}
+.dataTables_length{display: inline-block}
+.dataTables_length_info{width: 100px}
+.pageing{display: inline-block; float: right}
+.pageing .btn{width: 73px; height: 40px; line-height: 40px; padding: 0px; text-align: center}
+.pageing .btn.num{width: 40px; height: 40px; line-height: 40px; padding: 0px; text-align: center}
+
+.item_area{height: 74px; background-color: #f5f6f9; border-top: 2px solid #46508b; line-height: 74px; position: relative}
+.item_area .instance{display: inline-block; float: left; position: relative; margin-left:24px;}
+.item_area .instance a{padding-left: 12px}
+.item_area .instance_info{display: none; position: absolute; top: 62px; left: 24px; width: 400px}
+.item_area .instance_info .info{padding: 25px 20px}
+.item_area .instance_info .bottom{height: 56px; line-height: 56px; border-top: 1px solid #f5f6f9; padding-right: 16px; text-align: right;}
+.item_area .instance_more{display: inline-block; position: relative; margin-left:16px;}
+.item_area .instance_more a{padding-left: 12px}
+.item_area .instance_more_info{display: none; position: absolute; top: 62px; left: 294px; width: 400px}
+.item_area .instance_more_info .info{padding: 25px 20px}
+.item_area .instance_more_info .bottom{height: 56px; line-height: 56px; border-top: 1px solid #f5f6f9; padding-right: 16px; text-align: right;}
+
+.chart_area{margin-bottom: 84px}
+.chart_area .title{margin-top: 20px; color: #6a6e86; font-weight: bold; line-height: 40px}

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<title>SIP모니터링</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<link href="css/common.css" rel="stylesheet" type="text/css">
+<link href="css/content.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+<script type="text/javascript" src="js/ui.js" ></script>
+</head>
+<body>
+    <div class="wrap">
+        <div class="lnb_area">
+            <div id="lnb" class="lnb">
+                <h1><img src="images/ci.png" alt="smilegate ci"><span>인프라 플랫폼</span></h1>
+                <div class="memu_pro"><a href="#">프로젝트명</a></div>
+                <div class="menu_pro_info">
+                    <ul>
+                        <li>프로젝트_01</li>
+                        <li>프로젝트_02</li>
+                        <li>프로젝트_03</li>
+                        <li>프로젝트_04</li>
+                    </ul>
+                </div>
+                <ul>
+                <li><a href="#none" class="pm">Project Manager</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+
+                <li><a href="#none" class="mt">Monitoring</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+                <li><a href="#none" class="cm">Container Monitioring</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+                <li><a href="#none" class="at">Admin Tools</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+                </ul>
+            </div>
+        </div>  
+        <div class="content_wrap">
+            <div class="header">
+                <div class="menu_lnb"><a href="#" class="btn" onclick="menu_lnb()"><img src="images/ic-menu.png" alt="메뉴보기"></a></div>
+                <div class="header_info">
+                    <div class="man"><a href="">스토브님</a></div>
+                    <div class="logout"><a href="#" class="btn">logout</a></div>
+                </div>
+            </div>
+            <div class="content_area">
+                <div class="contents">
+                    <h2 class="monitoring">Monitoring
+                        <span class="rectangle tooltip">
+                            <img src="images/rectangle.png" alt="메뉴보기">
+                            <div class="tooltip_info">모니터링 할 수 있습니다.</div>
+                        </span>
+                    </h2>
+                    <div class="contents_info list">
+                        <h3>Intace List</h3>
+                        <div class="list_head">
+                            <div class="search_area">
+                                <label><input type="text" placeholder="search" class="search"></label>
+                            </div>
+                            <div class="total_num">Total<b>23</b>items</div>
+                        </div>
+                        <table width="100%" cellpadding="0" cellspacing="0" class="obj sort">
+                            <caption>Intace List</caption>
+                            <colgroup>
+                                <col width="13%" />
+                                <col width="13%" />                                
+                                <col width="13%" />
+                                <col width="180px" />
+                                <col width="180px" />
+                                <col width="*" />
+                                <col width="5%" />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th class="sort-alpha">IP</th>
+                                    <th class="sort-alpha">Host Name</th>
+                                    <th class="sort-alpha">Status</th>
+                                    <th class="sort-alpha">CPU</th>
+                                    <th class="sort-alpha">Memory</th>
+                                    <th class="sort-alpha">Network</th>
+                                    <th class="sort-alpha"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>10.100.12.13</td>
+                                    <td>ipdTest</td>
+                                    <td><a href="#">normal</a></td>
+                                    <td><div class="bar_bg"><em>68%</em><div class="bar yellow" style="width: 68%"></div></div></td>
+                                    <td><div class="bar_bg"><em>33%</em><div class="bar green" style="width: 33%"></div></div></td>
+                                    <td><span class="up"><em class="icon_up"></em>0.052 mbps</span> <span class="down"><em class="icon_down"></em>0.029 mbps</span></td>
+                                    <td class="ic-search"><a href="" class="btn ic-search">자세히보기</a></td>
+                                </tr>
+                                <tr>
+                                    <td>10.100.12.12</td>
+                                    <td>ipdTest</td>
+                                    <td><a href="#">normal</a></td>
+                                    <td><div class="bar_bg"><em>88%</em><div class="bar red" style="width: 88%"></div></div></td>
+                                    <td><div class="bar_bg"><em>24%</em><div class="bar blue" style="width: 24%"></div></div></td>
+                                    <td><span class="up"><em class="icon_up"></em>0.052 mbps</span> <span class="down"><em class="icon_down"></em>0.029 mbps</span></td>
+                                    <td class="ic-search"><a href="" class="btn">자세히보기</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div class="list_bottom">
+                            <div class="dropdown dataTables_length"><a href="">50</a></div>
+                            <div class="dropdown_info dataTables_length_info">
+                                <ul>
+                                    <li>10</li>
+                                    <li>20</li>
+                                    <li>30</li>
+                                    <li>40</li>
+                                </ul>
+                            </div>
+                            <div class="pageing">
+                                <span class="btn invisible">Previous</span>
+                                <span class="num btn invisible">1</span>
+                                <span class="num btn invisible">2</span>
+                                <span class="num btn invisible">3</span>
+                                <span class="num btn invisible">4</span>
+                                <span class="btn invisible">next</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

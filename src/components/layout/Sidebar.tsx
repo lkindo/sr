@@ -174,10 +174,11 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="fixed left-0 top-14 z-30 h-[calc(100vh-3.5rem)] w-64 border-r border-border bg-background overflow-y-auto">
-      <nav className="flex flex-col p-4 space-y-2">
-        <div className="px-3 py-2">
-          <h2 className="text-lg font-semibold">
+    <aside className="fixed left-0 top-[104px] z-30 h-[calc(100vh-104px)] w-64 sr-sidebar-bg text-white overflow-y-auto border-r border-[#3f4564]">
+      <nav className="flex flex-col pt-5">
+        {/* Menu Title */}
+        <div className="px-8 pb-5 border-b border-[#3f4564]">
+          <h2 className="text-lg font-medium text-white">
             {activeTopMenu === "/srs" && "SR 관리"}
             {activeTopMenu === "/clients" && "고객사 관리"}
             {activeTopMenu === "/users" && "사용자 관리"}
@@ -186,38 +187,42 @@ export function Sidebar() {
           </h2>
         </div>
 
-        {sections.map((section, idx) => (
-          <Collapsible key={idx} defaultOpen={getDefaultOpen(section)}>
-            <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
-              <span>{section.title}</span>
-              <ChevronRight className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-90" />
-            </CollapsibleTrigger>
-            <CollapsibleContent className="space-y-1 mt-1">
-              {section.items
-                .filter((item) => canAccessItem(item))
-                .map((item) => {
-                  const Icon = item.icon;
-                  const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+        {/* Menu Sections */}
+        <div className="mt-5">
+          {sections.map((section, idx) => (
+            <Collapsible key={idx} defaultOpen={getDefaultOpen(section)}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full h-[55px] px-8 text-sm font-medium sr-sidebar-item group">
+                <span>{section.title}</span>
+                <ChevronRight className="h-4 w-4 sr-chevron transition-transform duration-200 data-[state=open]:rotate-90" />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="sr-sidebar-submenu">
+                {section.items
+                  .filter((item) => canAccessItem(item))
+                  .map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ml-2",
-                        isActive
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      {Icon && <Icon className="h-4 w-4" />}
-                      {item.title}
-                    </Link>
-                  );
-                })}
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={cn(
+                          "flex items-center h-12 px-8 text-sm sr-sidebar-submenu-item relative",
+                          isActive && "text-white font-medium"
+                        )}
+                      >
+                        {isActive && (
+                          <span className="absolute left-[49px] w-1 h-1 rounded-full bg-gray-400" />
+                        )}
+                        {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
+                        {item.title}
+                      </Link>
+                    );
+                  })}
+              </CollapsibleContent>
+            </Collapsible>
+          ))}
+        </div>
       </nav>
     </aside>
   );

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<title>SIP모니터링</title>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<link href="css/common.css" rel="stylesheet" type="text/css">
+<link href="css/content.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+<script type="text/javascript" src="js/ui.js" ></script>
+</head>
+<body>
+    <div class="wrap">
+        <div class="lnb_area">
+            <div id="lnb" class="lnb">
+                <h1><img src="images/ci.png" alt="smilegate ci"><span>인프라 플랫폼</span></h1>
+                <div class="memu_pro"><a href="#">프로젝트명</a></div>
+                <div class="menu_pro_info">
+                    <ul>
+                        <li>프로젝트_01</li>
+                        <li>프로젝트_02</li>
+                        <li>프로젝트_03</li>
+                        <li>프로젝트_04</li>
+                    </ul>
+                </div>
+                <ul>
+                <li><a href="#none" class="pm">Project Manager</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+
+                <li><a href="#none" class="mt">Monitoring</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+                <li><a href="#none" class="cm">Container Monitioring</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+                <li><a href="#none" class="at">Admin Tools</a>
+                  <ul>
+                    <li><a href="#none">2Depth</a></li>
+                    <li><a href="#none">2Depth</a></li>
+                  </ul>
+                </li>
+                </ul>
+            </div>
+        </div>  
+        <div class="content_wrap">
+            <div class="header">
+                <div class="menu_lnb"><a href="#" class="btn" onclick="menu_lnb()"><img src="images/ic-menu.png" alt="메뉴보기"></a></div>
+                <div class="header_info">
+                    <div class="man"><a href="">스토브님</a></div>
+                    <div class="logout"><a href="#" class="btn">logout</a></div>
+                </div>
+            </div>
+            <div class="content_area">
+                <div class="contents">
+                    <h2 class="monitoring">Monitoring
+                        <span class="rectangle tooltip">
+                            <img src="images/rectangle.png" alt="메뉴보기">
+                            <div class="tooltip_info">모니터링 할 수 있습니다.</div>
+                        </span>
+                    </h2>
+                    <div class="contents_info list">
+                        <h3>Intace List</h3>
+                        <div class="list_head">
+                            <div class="title">
+                                Instance Detail:ipdTest<span>(10.100.12.13)</span>
+                            </div>
+                            <div class="btn_area">
+                                <span class="btn fw">항목 확장</span>
+                                <span class="btn fw">MIN / MAX</span>
+                                <span class="btn fw">실시간</span>
+                                <div class="day badge_btn pdl8">
+                                    <ul>
+                                        <li>1시간</li>
+                                        <li>12시간</li>
+                                        <li>1일</li>
+                                        <li>1주일</li>
+                                        <li>1달</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="item_area">
+                            <div class="instance dropdown_table"><a href="">인스턴스 비교</a></div>
+                            <div class="instance_info dropdown_table_info">
+                                <div class="info">
+                                    컨텐츠
+                                </div>
+                                <div class="bottom">
+                                    <span class="btn medium invisible">Accept</span>
+                                    <span class="btn medium invisible">Cancel</span>
+                                </div>
+                            </div>
+                            <div class="instance_more dropdown_table"><a href="">항목 더 보기</a></div>
+                            <div class="instance_more_info dropdown_table_info">
+                                <div class="info">
+                                    컨텐츠
+                                </div>
+                                <div class="bottom">
+                                    <span class="btn medium invisible">Accept</span>
+                                    <span class="btn medium invisible">Cancel</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chart_area">
+                            <div class="title">10.100.12.13 CPU Usage Avg 60</div>
+                            <div>그래프</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
