@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
         serviceCategoryId: validated.serviceCategoryId,
         requesterId: session.user.id,
         requestedPriority: validated.requestedPriority,
+        priority: validated.requestedPriority, // 초기 우선순위는 요청 우선순위와 동일
         requestedCompletionDate: validated.requestedCompletionDate
           ? new Date(validated.requestedCompletionDate)
           : undefined,

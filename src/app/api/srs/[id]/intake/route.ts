@@ -124,13 +124,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
       data: {
         status: "IN_PROGRESS",
         intakeAt: new Date(),
-        intakeById: session.user.id,
+        intakeBy: {
+          connect: { id: session.user.id }
+        },
         actualPriority: validated.actualPriority,
         estimatedHours: validated.estimatedHours,
         estimatedCompletionDate: new Date(validated.estimatedCompletionDate),
         dueDate: dueDate,
         intakeNotes: validated.intakeNotes || null,
-        assigneeId: validated.assigneeId,
+        assignee: {
+          connect: { id: validated.assigneeId }
+        },
       },
       include: {
         client: {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit } from "lucide-react";
+import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -108,6 +109,7 @@ type SortOrder = "asc" | "desc";
 
 export default function SRsPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [srs, setSrs] = useState<SR[]>([]);
   const [filteredSrs, setFilteredSrs] = useState<SR[]>([]);
   const [loading, setLoading] = useState(true);
@@ -417,6 +419,77 @@ export default function SRsPage() {
               </div>
             </div>
 
+            {/* 빠른 필터 버튼 */}
+            <div className="flex gap-2">
+              <Button
+                variant={statusFilter === "REQUESTED" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setStatusFilter("REQUESTED");
+                  setCurrentPage(1);
+                }}
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                접수 대기
+                {srs.filter(sr => sr.status === "REQUESTED").length > 0 && (
+                  <Badge className="ml-2 bg-orange-600" variant="secondary">
+                    {srs.filter(sr => sr.status === "REQUESTED").length}
+                  </Badge>
+                )}
+              </Button>
+
+              <Button
+                variant={assigneeFilter === session?.user?.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (session?.user?.id) {
+                    setAssigneeFilter(session.user.id);
+                    setCurrentPage(1);
+                  }
+                }}
+                disabled={!session?.user?.id}
+              >
+                <User className="mr-2 h-4 w-4" />
+                내 담당
+              </Button>
+
+              <Button
+                variant={priorityFilter === "CRITICAL" || priorityFilter === "HIGH" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (priorityFilter === "CRITICAL" || priorityFilter === "HIGH") {
+                    setPriorityFilter("all");
+                  } else {
+                    setPriorityFilter("CRITICAL");
+                  }
+                  setCurrentPage(1);
+                }}
+              >
+                <AlertCircle className="mr-2 h-4 w-4" />
+                긴급
+                {srs.filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length > 0 && (
+                  <Badge className="ml-2" variant="destructive">
+                    {srs.filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length}
+                  </Badge>
+                )}
+              </Button>
+
+              {(statusFilter !== "all" || priorityFilter !== "all" || assigneeFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setStatusFilter("all");
+                    setPriorityFilter("all");
+                    setAssigneeFilter("all");
+                    setCurrentPage(1);
+                  }}
+                >
+                  필터 초기화
+                </Button>
+              )}
+            </div>
+
             {showAdvancedFilters && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
                 <div className="space-y-2">
@@ -623,13 +696,23 @@ export default function SRsPage() {
                         {new Date(sr.createdAt).toLocaleDateString("ko-KR")}
                       </TableCell>
                       <TableCell>
-                        {sr.status === "IN_PROGRESS" && (
+                        {sr.status === "REQUESTED" ? (
+                          <Button
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/srs/${sr.id}/intake`);
+                            }}
+                          >
+                            접수
+                          </Button>
+                        ) : (
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/srs/${sr.id}/intake`);
+                              router.push(`/srs/${sr.id}`);
                             }}
                           >
                             <Edit className="h-4 w-4" />
