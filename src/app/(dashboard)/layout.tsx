@@ -1,7 +1,8 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { auth } from "@/auth";
-import { LayoutWrapper } from "./layout-wrapper";
+import MainContent from "./MainContent";
+import { convertSessionToPlainObject } from "@/lib/utils";
 
 export default async function DashboardLayout({
   children,
@@ -10,12 +11,13 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
 
+  // session.user 객체를 순수한 객체로 변환
+  const user = convertSessionToPlainObject(session);
+
   return (
     <div className="relative flex min-h-screen flex-col">
-      <Header user={session?.user} />
-      <div className="flex-1">
-        <LayoutWrapper>{children}</LayoutWrapper>
-      </div>
+      <Header user={user} />
+      <MainContent>{children}</MainContent>
       <Footer />
     </div>
   );

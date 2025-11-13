@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -44,30 +44,9 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-
-interface SR {
-  id: string;
-  srNumber: string;
-  title: string;
-  status: string;
-  priority: string;
-  dueDate?: string | null;
-  client: {
-    name: string;
-  };
-  requester: {
-    name: string;
-  };
-  assignedTo?: {
-    name: string;
-  } | null;
-  createdAt: string;
-  _count?: {
-    comments: number;
-    attachments: number;
-  };
-}
-
+import { useSRs, SR } from "@/hooks/useSR"; // useSRs 훅 임포트 및 SR 인터페이스 임포트
+import { useQueryClient } from "@tanstack/react-query"; // useQueryClient 훅 임포트
+import { TableSkeleton } from "@/components/loading/TableSkeleton";
 const statusLabels: Record<string, string> = {
   REQUESTED: "요청됨",
   INTAKE: "접수",
@@ -111,9 +90,6 @@ type SortOrder = "asc" | "desc";
 export default function SRsPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const [srs, setSrs] = useState<SR[]>([]);
-  const [filteredSrs, setFilteredSrs] = useState<SR[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -128,63 +104,27 @@ export default function SRsPage() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const { toast } = useToast();
+  const queryClient = useQueryClient(); // useQueryClient 훅 사용
+  const { data: srs, isLoading, isError, error } = useSRs();
 
   // 고유한 고객사와 담당자 목록 추출
-  const uniqueClients = Array.from(
-    new Set(srs.map((sr) => JSON.stringify({ id: sr.client.name, name: sr.client.name })))
-  ).map((str) => JSON.parse(str));
+  const uniqueClients = useMemo(() => {
+    const srsData: SR[] = srs || []; // srs를 SR[] 타입으로 명시적 캐스팅
+    return Array.from(
+      new Set(srsData.map((sr: SR) => JSON.stringify({ id: sr.client.name, name: sr.client.name })))
+    ).map((str) => JSON.parse(str));
+  }, [srs]);
 
-  const uniqueAssignees = Array.from(
-    new Set(
-      srs
-        .filter((sr) => sr.assignedTo)
-        .map((sr) => JSON.stringify({ id: sr.assignedTo!.name, name: sr.assignedTo!.name }))
-    )
-  ).map((str) => JSON.parse(str));
-
-  const fetchSRs = useCallback(async () => {
-    console.log("🔍 [Client] fetchSRs 시작");
-    setLoading(true);
-    try {
-      console.log("🔍 [Client] fetch /api/srs 호출 중...");
-      const response = await fetch("/api/srs");
-      console.log("🔍 [Client] 응답 받음:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error("❌ [Client] API 에러 응답:", errorData);
-        throw new Error(
-          errorData.error || 
-          errorData.details || 
-          `HTTP ${response.status}: ${response.statusText}`
-        );
-      }
-
-      const data = await response.json();
-      console.log("🔍 [Client] 데이터 받음:", { count: data.length });
-      setSrs(data);
-      setFilteredSrs(data);
-      console.log("✅ [Client] SR 목록 로드 성공!");
-    } catch (error) {
-      console.error("❌ [Client] fetchSRs 에러:", error);
-      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류";
-      toast({
-        title: "오류",
-        description: `SR 목록을 불러오는데 실패했습니다: ${errorMessage}`,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchSRs();
-  }, [fetchSRs]);
+  const uniqueAssignees = useMemo(() => {
+    const srsData: SR[] = srs || []; // srs를 SR[] 타입으로 명시적 캐스팅
+    return Array.from(
+      new Set(
+        srsData
+          .filter((sr: SR) => sr.assignedTo)
+          .map((sr: SR) => JSON.stringify({ id: sr.assignedTo!.name, name: sr.assignedTo!.name }))
+      )
+    ).map((str) => JSON.parse(str));
+  }, [srs]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -206,8 +146,8 @@ export default function SRsPage() {
     );
   };
 
-  useEffect(() => {
-    let filtered = srs;
+  const filteredSrs = useMemo(() => {
+    let filtered = srs || [];
 
     // 검색어 필터링
     if (searchQuery.trim()) {
@@ -260,7 +200,7 @@ export default function SRsPage() {
     }
 
     // 정렬
-    filtered.sort((a, b) => {
+    return [...filtered].sort((a, b) => {
       let aValue: any;
       let bValue: any;
 
@@ -302,16 +242,17 @@ export default function SRsPage() {
       if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
+  }, [srs, searchQuery, statusFilter, priorityFilter, clientFilter, assigneeFilter, dateFromFilter, dateToFilter, sortField, sortOrder]);
 
-    setFilteredSrs(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [statusFilter, priorityFilter, searchQuery, srs, sortField, sortOrder, clientFilter, assigneeFilter, dateFromFilter, dateToFilter]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, priorityFilter, clientFilter, assigneeFilter, dateFromFilter, dateToFilter]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredSrs.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedSrs = filteredSrs.slice(startIndex, endIndex);
+  const paginatedSrs = useMemo(() => filteredSrs.slice(startIndex, endIndex), [filteredSrs, startIndex, endIndex]);
 
   const getPageNumbers = () => {
     const pages: (number | string)[] = [];
@@ -343,14 +284,28 @@ export default function SRsPage() {
   };
 
   const handleSRCreated = () => {
-    fetchSRs();
+    queryClient.invalidateQueries({ queryKey: ["srs"] });
     setIsCreateDialogOpen(false);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">SR 관리</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              서비스 요청(SR)을 관리합니다.
+            </p>
+          </div>
+          <PermissionGuard resource="SR" action="CREATE">
+            <Button onClick={() => setIsCreateDialogOpen(true)} className="sr-btn-template-primary">
+              <Plus className="mr-2 h-4 w-4" />
+              등록
+            </Button>
+          </PermissionGuard>
+        </div>
+        <TableSkeleton columns={11} />
       </div>
     );
   }
@@ -397,9 +352,9 @@ export default function SRsPage() {
             >
               <Clock className="mr-2 h-4 w-4" />
               접수 대기
-              {srs.filter(sr => sr.status === "REQUESTED").length > 0 && (
+              {(srs || []).filter(sr => sr.status === "REQUESTED").length > 0 && (
                 <Badge className="ml-2 bg-orange-600" variant="secondary">
-                  {srs.filter(sr => sr.status === "REQUESTED").length}
+                  {(srs || []).filter(sr => sr.status === "REQUESTED").length}
                 </Badge>
               )}
             </Button>
@@ -441,9 +396,9 @@ export default function SRsPage() {
             >
               <AlertCircle className="mr-2 h-4 w-4" />
               긴급
-              {srs.filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length > 0 && (
+              {(srs || []).filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length > 0 && (
                 <Badge className="ml-2" variant="destructive">
-                  {srs.filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length}
+                  {(srs || []).filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length}
                 </Badge>
               )}
             </Button>
@@ -679,7 +634,7 @@ export default function SRsPage() {
               {filteredSrs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center py-8">
-                    {srs.length === 0
+                    {(srs || []).length === 0
                       ? "등록된 SR이 없습니다."
                       : "필터 조건에 맞는 SR이 없습니다."}
                   </TableCell>

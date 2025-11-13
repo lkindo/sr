@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Database, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,22 +15,86 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { SystemSettings } from "@/types/settings";
 
 export default function SystemSettingsPage() {
   const { toast } = useToast();
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // 시스템 설정 상태
-  const [siteName, setSiteName] = useState("SR Management System");
-  const [siteDescription, setSiteDescription] = useState("서비스 요청 관리 시스템");
-  const [adminEmail, setAdminEmail] = useState("admin@example.com");
+  const [siteName, setSiteName] = useState("");
+  const [siteDescription, setSiteDescription] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
 
-  const handleSave = () => {
-    // TODO: API 호출하여 시스템 설정 저장
-    toast({
-      title: "성공",
-      description: "시스템 설정이 저장되었습니다.",
-    });
+  // 시스템 설정 가져오기
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch("/api/settings/system");
+        if (!response.ok) {
+          throw new Error("Failed to fetch system settings");
+        }
+        const data = await response.json();
+        setSettings(data);
+        setSiteName(data.siteName || "");
+        setSiteDescription(data.siteDescription || "");
+        setAdminEmail(data.adminEmail || "");
+      } catch (error) {
+        toast({
+          title: "오류",
+          description: "시스템 설정을 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, [toast]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/api/settings/system", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          siteName,
+          siteDescription,
+          adminEmail,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save system settings");
+      }
+
+      toast({
+        title: "성공",
+        description: "시스템 설정이 저장되었습니다.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "오류",
+        description: error.message || "시스템 설정 저장에 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">로딩 중...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -206,7 +270,9 @@ export default function SystemSettingsPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={handleSave}>설정 저장</Button>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? "저장 중..." : "설정 저장"}
+        </Button>
       </div>
     </div>
   );

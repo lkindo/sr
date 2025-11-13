@@ -18,6 +18,8 @@ const srSchema = z.object({
   requestedCompletionDate: z.string().optional(),
 });
 
+import { getAllSrs, createSr } from "@/services/sr.service";
+
 // GET /api/srs - SR 목록 조회
 export async function GET(request: NextRequest) {
   console.log("🔍 [GET /api/srs] 요청 시작");
@@ -39,68 +41,21 @@ export async function GET(request: NextRequest) {
     const clientId = searchParams.get("clientId");
     const priority = searchParams.get("priority");
 
-    const where: any = {};
-
-    if (status) {
-      where.status = status;
-    }
-
-    if (clientId) {
-      where.clientId = clientId;
-    }
-
-    if (priority) {
-      where.priority = priority;
-    }
-
-    console.log("🔍 [GET /api/srs] Prisma 쿼리 실행 중...", { where });
-    const srs = await prisma.sR.findMany({
-      where,
-      include: {
-        client: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-        serviceCategory: true,
-        requester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            attachments: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    const srs = await getAllSrs({ status: status || undefined, clientId: clientId || undefined, priority: priority || undefined });
 
     console.log("🔍 [GET /api/srs] 쿼리 성공! SR 개수:", srs.length);
 
-    // Map assignee to assignedTo for frontend compatibility
-    const mappedSrs = srs.map((sr) => ({
+    // Date 객체를 문자열로 변환 (직렬화 문제 해결)
+    const serializableSrs = srs.map(sr => ({
       ...sr,
-      assignedTo: sr.assignee,
+      createdAt: sr.createdAt.toISOString(),
+      updatedAt: sr.updatedAt.toISOString(),
+      dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
+      requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
     }));
 
     console.log("🔍 [GET /api/srs] 200 응답 반환");
-    return NextResponse.json(mappedSrs);
+    return NextResponse.json(serializableSrs);
   } catch (error) {
     console.error("Error fetching SRs:", error);
     console.error("Error details:", error instanceof Error ? error.message : error);
@@ -147,91 +102,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     console.log("🔍 [POST /api/srs] 요청 바디:", body);
-    const validated = srSchema.parse(body);
-    console.log("🔍 [POST /api/srs] 유효성 검사 통과");
-
-    // Generate SR number (format: SR-YYYYMMDD-XXXX)
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-
-    // Get count of SRs created today
-    const todayStart = new Date(today.setHours(0, 0, 0, 0));
-    const todayEnd = new Date(today.setHours(23, 59, 59, 999));
-
-    const todayCount = await prisma.sR.count({
-      where: {
-        createdAt: {
-          gte: todayStart,
-          lte: todayEnd,
-        },
-      },
-    });
-
-    const srNumber = `SR-${dateStr}-${String(todayCount + 1).padStart(4, "0")}`;
-    console.log("🔍 [POST /api/srs] SR 번호 생성:", srNumber);
-
-    console.log("🔍 [POST /api/srs] SR 생성 중...", {
-      serviceCategoryId: validated.serviceCategoryId,
-      clientId: validated.clientId,
-      requesterId: session.user.id,
-    });
-    const sr = await prisma.sR.create({
-      data: {
-        srNumber,
-        title: validated.title,
-        description: validated.description,
-        clientId: validated.clientId,
-        serviceCategoryId: validated.serviceCategoryId,
-        requesterId: session.user.id,
-        requestedPriority: validated.requestedPriority,
-        priority: validated.requestedPriority, // 초기 우선순위는 요청 우선순위와 동일
-        requestedCompletionDate: validated.requestedCompletionDate
-          ? new Date(validated.requestedCompletionDate)
-          : undefined,
-        status: "REQUESTED",
-      },
-      include: {
-        client: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-        serviceCategory: true,
-        requester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        assignee: true,
-      },
-    });
+    
+    const sr = await createSr(body, session.user);
     console.log("🔍 [POST /api/srs] SR 생성 성공! ID:", sr.id);
-
-    // Create activity log
-    console.log("🔍 [POST /api/srs] Activity 로그 생성 중...");
-    await prisma.sRActivity.create({
-      data: {
-        srId: sr.id,
-        userId: session.user.id,
-        type: "CREATED",
-        description: "SR이 생성되었습니다.",
-      },
-    });
-
-    // Create status history
-    await prisma.sRStatusHistory.create({
-      data: {
-        srId: sr.id,
-        previousStatus: null,
-        currentStatus: "REQUESTED",
-        changedBy: session.user.id,
-        changeReason: "SR 생성",
-      },
-    });
 
     // Send email notification (non-blocking)
     // TODO: 임시로 주석 처리
@@ -254,7 +127,15 @@ export async function POST(request: NextRequest) {
     }
     */
 
-    return NextResponse.json(sr, { status: 201 });
+    const serializableSr = {
+      ...sr,
+      createdAt: sr.createdAt.toISOString(),
+      updatedAt: sr.updatedAt.toISOString(),
+      dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
+      requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
+    };
+
+    return NextResponse.json(serializableSr, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       const firstError = error.issues?.[0];
@@ -271,3 +152,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

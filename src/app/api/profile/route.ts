@@ -45,7 +45,12 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json(user);
+    const serializableUser = {
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+    return NextResponse.json(serializableUser);
   } catch (error) {
     console.error("Error fetching profile:", error);
     return NextResponse.json(
@@ -89,7 +94,12 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(user);
+    const serializableUser = {
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
+    return NextResponse.json(serializableUser);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

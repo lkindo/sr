@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History, AlertCircle } from "lucide-react";
 import Link from "next/link";
@@ -14,43 +14,8 @@ import { SRAttachments } from "@/components/srs/SRAttachments";
 import { EditSRDialog } from "@/components/srs/EditSRDialog";
 import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
 import { useToast } from "@/hooks/use-toast";
-
-interface SR {
-  id: string;
-  srNumber: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  requestedCompletionDate?: string;
-  dueDate?: string;
-  actualCompletionDate?: string;
-  client: {
-    id: string;
-    name: string;
-    code: string;
-  };
-  category?: {
-    id: string;
-    name: string;
-  };
-  requester: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  assignedTo?: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-  createdAt: string;
-  updatedAt: string;
-  _count?: {
-    comments: number;
-    attachments: number;
-  };
-}
+import { useSR } from "@/hooks/useSR"; // useSR 훅 임포트
+import { useQueryClient } from "@tanstack/react-query"; // useQueryClient 훅 임포트
 
 const statusLabels: Record<string, string> = {
   REQUESTED: "요청됨",
@@ -89,11 +54,18 @@ const priorityColors: Record<string, "default" | "secondary" | "destructive"> = 
 export default function SRDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [sr, setSr] = useState<SR | null>(null);
-  const [loading, setLoading] = useState(true);
+  const srId = params.id as string;
+  const { data: sr, isLoading, isError, error } = useSR(srId); // useSR 훅 사용
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient(); // useQueryClient 훅 사용
+
+  const handleSRUpdated = () => {
+    queryClient.invalidateQueries({ queryKey: ["sr", srId] });
+    setIsEditDialogOpen(false);
+  };
+
 
   // 통계 계산
   const calculateStatistics = () => {
@@ -148,54 +120,18 @@ export default function SRDetailPage() {
 
   const stats = calculateStatistics();
 
-  useEffect(() => {
-    const fetchSR = async () => {
-      try {
-        const response = await fetch(`/api/srs/${params.id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            toast({
-              title: "오류",
-              description: "SR을 찾을 수 없습니다.",
-              variant: "destructive",
-            });
-            router.push("/srs");
-            return;
-          }
-          throw new Error("Failed to fetch SR");
-        }
-        const data = await response.json();
-        setSr(data);
-      } catch (error) {
-        toast({
-          title: "오류",
-          description: "SR을 불러오는데 실패했습니다.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (params.id) {
-      fetchSR();
-    }
-  }, [params.id, toast, router]);
-
-  const handleSRUpdated = () => {
-    window.location.reload();
-    setIsEditDialogOpen(false);
-  };
-
-  const handleSRDeleted = () => {
+  // useSR 훅에서 에러 발생 시 처리
+  if (isError) {
     toast({
-      title: "성공",
-      description: "SR이 삭제되었습니다.",
+      title: "오류",
+      description: error?.message || "SR을 불러오는데 실패했습니다.",
+      variant: "destructive",
     });
     router.push("/srs");
-  };
+    return null; // 에러 발생 시 컴포넌트 렌더링 중단
+  }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="sr-loading">
         <div className="sr-loading-spinner"></div>
@@ -218,6 +154,14 @@ export default function SRDetailPage() {
       </div>
     );
   }
+
+  const handleSRDeleted = () => {
+    toast({
+      title: "성공",
+      description: "SR이 삭제되었습니다.",
+    });
+    router.push("/srs");
+  };
 
   return (
     <div className="space-y-6">
