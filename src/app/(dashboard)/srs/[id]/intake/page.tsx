@@ -12,13 +12,6 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Form,
   FormControl,
   FormDescription,
@@ -283,39 +276,44 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
-      {/* 헤더 */}
+      {/* 페이지 헤더 */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
             {isEditMode ? "SR 접수 정보 수정" : "SR 접수 처리"}
-          </h1>
-          <p className="text-muted-foreground">
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
             {isEditMode
               ? "접수된 SR의 정보를 수정하세요."
               : "SR을 검토하고 접수 정보를 입력하세요."}
           </p>
         </div>
         <Link href={isEditMode ? "/srs" : "/srs/intake-queue"}>
-          <Button variant="outline">
+          <Button className="sr-btn-template">
             {isEditMode ? "목록으로 돌아가기" : "대기 큐로 돌아가기"}
           </Button>
         </Link>
       </div>
 
       {/* Step 1: SR 정보 검토 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold">
+      <div className="sr-card-template bg-white">
+        {/* 카드 헤더 */}
+        <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[hsl(var(--sr-primary-dark))] text-white font-bold text-sm">
               1
             </div>
-            <CardTitle>SR 정보 검토</CardTitle>
+            <div>
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">SR 정보 검토</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                요청자가 등록한 SR 내용을 검토하세요
+              </p>
+            </div>
           </div>
-          <CardDescription>
-            요청자가 등록한 SR 내용을 검토하세요
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+
+        {/* 카드 내용 */}
+        <div className="px-6 py-5 space-y-4">
           {/* SR 번호 및 상태 */}
           <div className="flex items-center gap-4">
             <div>
@@ -416,23 +414,28 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Step 2: 접수 정보 입력 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold">
+      <div className="sr-card-template bg-white">
+        {/* 카드 헤더 */}
+        <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[hsl(var(--sr-primary-dark))] text-white font-bold text-sm">
               2
             </div>
-            <CardTitle>접수 정보 입력</CardTitle>
+            <div>
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">접수 정보 입력</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                실제 우선순위, 예상 작업시간, 담당자 등을 결정하세요
+              </p>
+            </div>
           </div>
-          <CardDescription>
-            실제 우선순위, 예상 작업시간, 담당자 등을 결정하세요
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        {/* 카드 내용 */}
+        <div className="px-6 py-5">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               {/* 실제 우선순위 */}
@@ -498,6 +501,7 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
                         type="number"
                         step="0.5"
                         placeholder="예: 8"
+                        className="sr-input-template"
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
@@ -612,7 +616,7 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
                     <FormControl>
                       <Textarea
                         placeholder="SR에 대한 분석 내용이나 특이사항을 기록하세요"
-                        className="min-h-[100px]"
+                        className="min-h-[100px] sr-input-template"
                         {...field}
                       />
                     </FormControl>
@@ -628,16 +632,15 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
               <div className="flex gap-4">
                 <Button
                   type="button"
-                  variant="outline"
                   onClick={() => router.push("/srs/intake-queue")}
-                  className="flex-1"
+                  className="flex-1 sr-btn-template"
                   disabled={submitting}
                 >
                   취소
                 </Button>
                 <Button
                   type="submit"
-                  className="flex-1"
+                  className="flex-1 sr-btn-template-primary"
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -655,8 +658,8 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
               </div>
             </form>
           </Form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

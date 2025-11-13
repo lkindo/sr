@@ -5,13 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -227,34 +220,33 @@ export default function SRDetailPage() {
   }
 
   return (
-    <div className="sr-content-area space-y-6 sr-fade-in">
+    <div className="space-y-6">
+      {/* 페이지 헤더 */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild className="sr-icon-button">
+          <Button variant="ghost" size="icon" asChild>
             <Link href="/srs">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+            <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
               {sr.srNumber}
-            </h1>
-            <p className="text-muted-foreground mt-1">{sr.title}</p>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">{sr.title}</p>
           </div>
         </div>
         <div className="flex gap-2">
           <Button
-            variant="outline"
             onClick={() => setIsEditDialogOpen(true)}
-            className="hover:bg-[hsl(var(--sr-accent-blue))] hover:text-white transition-colors"
+            className="sr-btn-template"
           >
             <Pencil className="mr-2 h-4 w-4" />
             수정
           </Button>
           <Button
-            variant="outline"
             onClick={() => setIsDeleteDialogOpen(true)}
-            className="hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            variant="destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             삭제
@@ -263,11 +255,14 @@ export default function SRDetailPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2 sr-card">
-          <CardHeader>
-            <CardTitle className="font-semibold">SR 상세 정보</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="md:col-span-2 sr-card-template bg-white">
+          {/* 카드 헤더 */}
+          <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">SR 상세 정보</h3>
+          </div>
+
+          {/* 카드 내용 */}
+          <div className="px-6 py-5 space-y-6">
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-2">
                 설명
@@ -412,14 +407,17 @@ export default function SRDetailPage() {
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card className="sr-card">
-          <CardHeader>
-            <CardTitle>통계</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="sr-card-template bg-white">
+          {/* 카드 헤더 */}
+          <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h3>
+          </div>
+
+          {/* 카드 내용 */}
+          <div className="px-6 py-5 space-y-4">
             {/* 기본 통계 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -540,8 +538,8 @@ export default function SRDetailPage() {
                 )}
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="comments" className="w-full">

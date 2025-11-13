@@ -5,13 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Trash2, Users, FileText, FolderTree } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -186,6 +179,7 @@ export default function ClientDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
@@ -194,21 +188,21 @@ export default function ClientDetailPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">
+            <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
               {client.name}
-            </h1>
-            <p className="text-muted-foreground">고객사 코드: {client.code}</p>
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">고객사 코드: {client.code}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
+          <Button onClick={() => setIsEditDialogOpen(true)} className="sr-btn-template">
             <Pencil className="mr-2 h-4 w-4" />
             수정
           </Button>
           <Button
-            variant="outline"
             onClick={() => setIsDeleteDialogOpen(true)}
             disabled={client.users.length > 0 || client.srs.length > 0}
+            variant="destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             삭제
@@ -217,11 +211,14 @@ export default function ClientDetailPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>기본 정보</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <div className="md:col-span-2 sr-card-template bg-white">
+          {/* 카드 헤더 */}
+          <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">기본 정보</h3>
+          </div>
+
+          {/* 카드 내용 */}
+          <div className="px-6 py-5 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">
@@ -320,14 +317,17 @@ export default function ClientDetailPage() {
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>통계</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="sr-card-template bg-white">
+          {/* 카드 헤더 */}
+          <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h3>
+          </div>
+
+          {/* 카드 내용 */}
+          <div className="px-6 py-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
@@ -357,8 +357,8 @@ export default function ClientDetailPage() {
                 {client.serviceCategories.length}
               </span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <Tabs defaultValue="categories" className="w-full">
@@ -375,14 +375,17 @@ export default function ClientDetailPage() {
         </TabsList>
 
         <TabsContent value="categories" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>서비스 카테고리</CardTitle>
-              <CardDescription>
+          <div className="sr-card-template bg-white">
+            {/* 카드 헤더 */}
+            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">서비스 카테고리</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 이 고객사에 등록된 서비스 카테고리 목록입니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+
+            {/* 카드 내용 */}
+            <div className="px-6 py-5">
               {client.serviceCategories.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">
                   등록된 서비스 카테고리가 없습니다.
@@ -430,19 +433,22 @@ export default function ClientDetailPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>사용자</CardTitle>
-              <CardDescription>
+          <div className="sr-card-template bg-white">
+            {/* 카드 헤더 */}
+            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 이 고객사에 속한 사용자 목록입니다.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+
+            {/* 카드 내용 */}
+            <div className="px-6 py-5">
               {client.users.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">
                   등록된 사용자가 없습니다.
@@ -467,19 +473,22 @@ export default function ClientDetailPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="srs" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>최근 SR</CardTitle>
-              <CardDescription>
+          <div className="sr-card-template bg-white">
+            {/* 카드 헤더 */}
+            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">최근 SR</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">
                 이 고객사의 최근 SR 목록입니다 (최대 10개).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </p>
+            </div>
+
+            {/* 카드 내용 */}
+            <div className="px-6 py-5">
               {client.srs.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">
                   등록된 SR이 없습니다.
@@ -530,8 +539,8 @@ export default function ClientDetailPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
