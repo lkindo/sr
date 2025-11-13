@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Save, Lock, User as UserIcon } from "lucide-react";
 import {
   Dialog,
@@ -67,7 +67,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     try {
       const response = await fetch("/api/profile");
       if (!response.ok) throw new Error("Failed to fetch profile");
@@ -84,14 +84,14 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     if (open) {
       setLoading(true);
       fetchProfile();
     }
-  }, [open]);
+  }, [open, fetchProfile]);
 
   const handleUpdateProfile = async () => {
     setSaving(true);

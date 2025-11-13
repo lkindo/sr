@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -142,8 +142,9 @@ export default function SRsPage() {
     )
   ).map((str) => JSON.parse(str));
 
-  const fetchSRs = async () => {
+  const fetchSRs = useCallback(async () => {
     console.log("🔍 [Client] fetchSRs 시작");
+    setLoading(true);
     try {
       console.log("🔍 [Client] fetch /api/srs 호출 중...");
       const response = await fetch("/api/srs");
@@ -179,11 +180,11 @@ export default function SRsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchSRs();
-  }, []);
+  }, [fetchSRs]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {

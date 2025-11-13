@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, UserCheck, UserX, Shield, Filter } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -111,9 +111,9 @@ export default function UsersPage() {
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
     try {
-      // 쿼리 파라미터 구성
       const params = new URLSearchParams();
       if (searchQuery) params.append("search", searchQuery);
       if (userTypeFilter !== "all") params.append("userType", userTypeFilter);
@@ -124,7 +124,7 @@ export default function UsersPage() {
       if (!response.ok) throw new Error("Failed to fetch users");
       const data = await response.json();
       setUsers(data);
-      setFilteredUsers(data);
+      setFilteredUsers(data); // Assuming the API does the filtering
     } catch (error) {
       toast({
         title: "오류",
@@ -134,27 +134,23 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const fetchRoles = async () => {
-    try {
-      const response = await fetch("/api/roles");
-      if (!response.ok) throw new Error("Failed to fetch roles");
-      const data = await response.json();
-      setRoles(data);
-    } catch (error) {
-      console.error("역할 목록 조회 실패:", error);
-    }
-  };
+  }, [searchQuery, userTypeFilter, roleFilter, statusFilter, toast]);
 
   useEffect(() => {
-    fetchUsers();
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch("/api/roles");
+        if (!response.ok) throw new Error("Failed to fetch roles");
+        const data = await response.json();
+        setRoles(data);
+      } catch (error) {
+        console.error("역할 목록 조회 실패:", error);
+      }
+    };
     fetchRoles();
-  }, []);
-
-  useEffect(() => {
     fetchUsers();
-  }, [searchQuery, userTypeFilter, roleFilter, statusFilter]);
+  }, [fetchUsers]);
+
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
     try {
@@ -172,7 +168,6 @@ export default function UsersPage() {
         title: "성공",
         description: `사용자가 ${!isActive ? "활성화" : "비활성화"}되었습니다.`,
       });
-
       fetchUsers();
     } catch (error) {
       toast({
@@ -192,8 +187,15 @@ export default function UsersPage() {
     setSelectedUser(null);
     setUserDialogOpen(true);
   };
+  
+  const onUserSaved = () => {
+    fetchUsers();
+    setUserDialogOpen(false);
+    setAssignRolesDialogOpen(false);
+  };
 
-  if (loading) {
+
+  if (loading && users.length === 0) { // 초기 로딩 시에만 전체 화면 로딩 표시
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-muted-foreground">로딩 중...</p>
@@ -304,7 +306,9 @@ export default function UsersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredUsers.length === 0 ? (
+              {loading && users.length === 0 ? (
+                 <TableRow><TableCell colSpan={7} className="text-center py-8">로딩 중...</TableCell></TableRow>
+              ) : filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     {searchQuery
@@ -406,14 +410,14 @@ export default function UsersPage() {
         open={userDialogOpen}
         onOpenChange={setUserDialogOpen}
         user={selectedUser}
-        onSaved={fetchUsers}
+        onSaved={onUserSaved}
       />
 
       <AssignRolesDialog
         open={assignRolesDialogOpen}
         onOpenChange={setAssignRolesDialogOpen}
         user={selectedUser}
-        onSaved={fetchUsers}
+        onSaved={onUserSaved}
       />
     </div>
   );

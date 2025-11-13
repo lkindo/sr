@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -54,7 +54,7 @@ export function SRActivities({ srId }: SRActivitiesProps) {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const fetchActivities = async () => {
+  const fetchActivities = useCallback(async () => {
     try {
       const response = await fetch(`/api/srs/${srId}/activities`);
       if (!response.ok) throw new Error("Failed to fetch activities");
@@ -69,11 +69,11 @@ export function SRActivities({ srId }: SRActivitiesProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [srId, toast]);
 
   useEffect(() => {
     fetchActivities();
-  }, [srId]);
+  }, [fetchActivities]);
 
   const getInitials = (name: string) => {
     return name

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,16 +52,7 @@ export function AssignRolesDialog({
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (open) {
-      fetchRoles();
-      if (user) {
-        setSelectedRoleIds(user.roles.map((ur) => ur.role.id));
-      }
-    }
-  }, [open, user]);
-
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch("/api/roles");
@@ -77,7 +68,16 @@ export function AssignRolesDialog({
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (open) {
+      fetchRoles();
+      if (user) {
+        setSelectedRoleIds(user.roles.map((ur) => ur.role.id));
+      }
+    }
+  }, [open, user, fetchRoles]);
 
   const handleToggleRole = (roleId: string) => {
     setSelectedRoleIds((prev) =>

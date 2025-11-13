@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,8 @@ export default function ClientsPage() {
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await fetch("/api/clients");
       if (!response.ok) throw new Error("Failed to fetch clients");
@@ -59,11 +60,11 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [fetchClients]);
 
   const handleCreateClient = () => {
     setSelectedClient(null);

@@ -17,17 +17,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
-
-  // Webpack 설정 (Prisma 최적화)
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push({
-        '@prisma/client': 'commonjs @prisma/client',
-        'prisma': 'commonjs prisma'
-      });
-    }
-    return config;
-  },
 };
 
 export default nextConfig;

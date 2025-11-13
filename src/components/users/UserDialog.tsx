@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -65,13 +65,7 @@ export function UserDialog({
 
   const isEditMode = !!user;
 
-  useEffect(() => {
-    if (open) {
-      fetchClients();
-    }
-  }, [open]);
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       const response = await fetch("/api/clients");
       if (!response.ok) throw new Error("Failed to fetch clients");
@@ -86,7 +80,13 @@ export function UserDialog({
     } finally {
       setLoadingClients(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (open) {
+      fetchClients();
+    }
+  }, [open, fetchClients]);
 
   const toggleClient = (clientId: string) => {
     setSelectedClientIds((prev) =>

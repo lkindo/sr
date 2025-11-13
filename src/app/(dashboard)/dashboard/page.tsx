@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -58,6 +58,7 @@ interface DashboardStats {
     };
     assignedTo?: {
       name: string;
+      id: string;
     } | null;
   }>;
   trend: Array<{
@@ -109,11 +110,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
       const response = await fetch("/api/dashboard/stats");
       if (!response.ok) throw new Error("Failed to fetch stats");
@@ -128,7 +125,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   if (loading) {
     return (

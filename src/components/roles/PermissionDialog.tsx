@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,23 +51,7 @@ export function PermissionDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (open) {
-      fetchPermissions();
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (role) {
-      setSelectedPermissions(
-        role.permissions.map((rp) => rp.permission.id)
-      );
-    } else {
-      setSelectedPermissions([]);
-    }
-  }, [role]);
-
-  const fetchPermissions = async () => {
+  const fetchPermissions = useCallback(async () => {
     try {
       const response = await fetch("/api/permissions");
       if (!response.ok) throw new Error("Failed to fetch permissions");
@@ -80,7 +64,23 @@ export function PermissionDialog({
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (open) {
+      fetchPermissions();
+    }
+  }, [open, fetchPermissions]);
+
+  useEffect(() => {
+    if (role) {
+      setSelectedPermissions(
+        role.permissions.map((rp) => rp.permission.id)
+      );
+    } else {
+      setSelectedPermissions([]);
+    }
+  }, [role]);
 
   const handleTogglePermission = (permissionId: string) => {
     setSelectedPermissions((prev) =>

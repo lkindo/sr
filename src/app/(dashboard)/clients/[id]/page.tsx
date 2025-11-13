@@ -114,42 +114,42 @@ export default function ClientDetailPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchClient = async () => {
-    try {
-      const response = await fetch(`/api/clients/${params.id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast({
-            title: "오류",
-            description: "고객사를 찾을 수 없습니다.",
-            variant: "destructive",
-          });
-          router.push("/clients");
-          return;
-        }
-        throw new Error("Failed to fetch client");
-      }
-      const data = await response.json();
-      setClient(data);
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "고객사 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchClient = async () => {
+      try {
+        const response = await fetch(`/api/clients/${params.id}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            toast({
+              title: "오류",
+              description: "고객사를 찾을 수 없습니다.",
+              variant: "destructive",
+            });
+            router.push("/clients");
+            return;
+          }
+          throw new Error("Failed to fetch client");
+        }
+        const data = await response.json();
+        setClient(data);
+      } catch (error) {
+        toast({
+          title: "오류",
+          description: "고객사 정보를 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (params.id) {
       fetchClient();
     }
-  }, [params.id]);
+  }, [params.id, toast, router]);
 
   const handleClientUpdated = () => {
-    fetchClient();
+    window.location.reload();
     setIsEditDialogOpen(false);
   };
 

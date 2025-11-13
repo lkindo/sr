@@ -148,42 +148,42 @@ export default function SRDetailPage() {
 
   const stats = calculateStatistics();
 
-  const fetchSR = async () => {
-    try {
-      const response = await fetch(`/api/srs/${params.id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast({
-            title: "오류",
-            description: "SR을 찾을 수 없습니다.",
-            variant: "destructive",
-          });
-          router.push("/srs");
-          return;
-        }
-        throw new Error("Failed to fetch SR");
-      }
-      const data = await response.json();
-      setSr(data);
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "SR을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchSR = async () => {
+      try {
+        const response = await fetch(`/api/srs/${params.id}`);
+        if (!response.ok) {
+          if (response.status === 404) {
+            toast({
+              title: "오류",
+              description: "SR을 찾을 수 없습니다.",
+              variant: "destructive",
+            });
+            router.push("/srs");
+            return;
+          }
+          throw new Error("Failed to fetch SR");
+        }
+        const data = await response.json();
+        setSr(data);
+      } catch (error) {
+        toast({
+          title: "오류",
+          description: "SR을 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (params.id) {
       fetchSR();
     }
-  }, [params.id]);
+  }, [params.id, toast, router]);
 
   const handleSRUpdated = () => {
-    fetchSR();
+    window.location.reload();
     setIsEditDialogOpen(false);
   };
 

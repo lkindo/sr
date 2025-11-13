@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useState } from "react";
 import { Upload, X, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,6 +22,25 @@ export function FileUpload({
 }: FileUploadProps) {
   const [dragActive, setDragActive] = useState(false);
 
+  const handleFiles = useCallback((files: File[]) => {
+    // Check max files
+    if (value.length + files.length > maxFiles) {
+      alert(`최대 ${maxFiles}개의 파일만 업로드할 수 있습니다.`);
+      return;
+    }
+
+    // Check file sizes
+    const oversizedFiles = files.filter(
+      (file) => file.size > maxSize * 1024 * 1024
+    );
+    if (oversizedFiles.length > 0) {
+      alert(`파일 크기는 ${maxSize}MB를 초과할 수 없습니다.`);
+      return;
+    }
+
+    onChange([...value, ...files]);
+  }, [onChange, value, maxFiles, maxSize]);
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -45,7 +62,7 @@ export function FileUpload({
       const files = Array.from(e.dataTransfer.files);
       handleFiles(files);
     },
-    [disabled, value, maxSize, maxFiles]
+    [disabled, handleFiles]
   );
 
   const handleChange = useCallback(
@@ -56,27 +73,8 @@ export function FileUpload({
       const files = e.target.files ? Array.from(e.target.files) : [];
       handleFiles(files);
     },
-    [disabled, value, maxSize, maxFiles]
+    [disabled, handleFiles]
   );
-
-  const handleFiles = (files: File[]) => {
-    // Check max files
-    if (value.length + files.length > maxFiles) {
-      alert(`최대 ${maxFiles}개의 파일만 업로드할 수 있습니다.`);
-      return;
-    }
-
-    // Check file sizes
-    const oversizedFiles = files.filter(
-      (file) => file.size > maxSize * 1024 * 1024
-    );
-    if (oversizedFiles.length > 0) {
-      alert(`파일 크기는 ${maxSize}MB를 초과할 수 없습니다.`);
-      return;
-    }
-
-    onChange([...value, ...files]);
-  };
 
   const removeFile = (index: number) => {
     const newFiles = value.filter((_, i) => i !== index);

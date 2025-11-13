@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,7 +55,8 @@ export default function RolesPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await fetch("/api/roles");
       if (!response.ok) throw new Error("Failed to fetch roles");
@@ -70,11 +71,11 @@ export default function RolesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchRoles();
-  }, []);
+  }, [fetchRoles]);
 
   const handleCreateRole = () => {
     setSelectedRole(null);

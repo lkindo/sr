@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,6 +84,37 @@ export function EditSRDialog({
   // SR 할당 권한 확인
   const canAssignSR = session?.user?.permissions?.includes("SR.ASSIGN") ?? false;
 
+  const fetchUsers = useCallback(async () => {
+    try {
+      // SR 처리 가능한 사용자만 조회 (SR 관련 모든 권한 보유)
+      const response = await fetch("/api/users/sr-handlers");
+      if (!response.ok) throw new Error("Failed to fetch SR handlers");
+      const data = await response.json();
+      setUsers(data);
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "SR 담당자 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const response = await fetch("/api/service-categories");
+      if (!response.ok) throw new Error("Failed to fetch categories");
+      const data = await response.json();
+      setCategories(data);
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "서비스 카테고리 목록을 불러오지 못했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   useEffect(() => {
     if (open && sr) {
       setTitle(sr.title);
@@ -107,38 +138,7 @@ export function EditSRDialog({
       fetchUsers();
       fetchCategories();
     }
-  }, [open, sr]);
-
-  const fetchUsers = async () => {
-    try {
-      // SR 처리 가능한 사용자만 조회 (SR 관련 모든 권한 보유)
-      const response = await fetch("/api/users/sr-handlers");
-      if (!response.ok) throw new Error("Failed to fetch SR handlers");
-      const data = await response.json();
-      setUsers(data);
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "SR 담당자 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch("/api/service-categories");
-      if (!response.ok) throw new Error("Failed to fetch categories");
-      const data = await response.json();
-      setCategories(data);
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "서비스 카테고리 목록을 불러오지 못했습니다.",
-        variant: "destructive",
-      });
-    }
-  };
+  }, [open, sr, fetchUsers, fetchCategories]);
 
   const uploadAttachments = async (srId: string, files: File[]) => {
     const formData = new FormData();

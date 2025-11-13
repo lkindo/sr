@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Clock, Filter, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -113,7 +113,7 @@ export default function MyRequestsPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchMyRequests = async () => {
+  const fetchMyRequests = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -135,11 +135,11 @@ export default function MyRequestsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, sortBy, toast]); // Add toast to dependencies as well
 
   useEffect(() => {
     fetchMyRequests();
-  }, [statusFilter, sortBy]);
+  }, [fetchMyRequests]);
 
   // 상태별 통계
   const stats = {
@@ -418,3 +418,4 @@ export default function MyRequestsPage() {
     </div>
   );
 }
+

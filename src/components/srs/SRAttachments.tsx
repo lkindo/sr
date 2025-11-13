@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Upload, Download, Trash2, FileIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,7 +31,7 @@ export function SRAttachments({ srId }: SRAttachmentsProps) {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
-  const fetchAttachments = async () => {
+  const fetchAttachments = useCallback(async () => {
     try {
       const response = await fetch(`/api/srs/${srId}`);
       if (!response.ok) throw new Error("Failed to fetch attachments");
@@ -46,11 +46,11 @@ export function SRAttachments({ srId }: SRAttachmentsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [srId, toast]);
 
   useEffect(() => {
     fetchAttachments();
-  }, [srId]);
+  }, [fetchAttachments]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;

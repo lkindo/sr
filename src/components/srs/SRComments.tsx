@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -36,7 +36,7 @@ export function SRComments({ srId }: SRCommentsProps) {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     try {
       const response = await fetch(`/api/srs/${srId}/comments`);
       if (!response.ok) throw new Error("Failed to fetch comments");
@@ -51,11 +51,11 @@ export function SRComments({ srId }: SRCommentsProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [srId, toast]);
 
   useEffect(() => {
     fetchComments();
-  }, [srId]);
+  }, [fetchComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

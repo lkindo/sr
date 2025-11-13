@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Pencil, Shield } from "lucide-react";
 import Link from "next/link";
@@ -102,7 +102,7 @@ export default function UserDetailPage() {
   const [isAssignRolesDialogOpen, setIsAssignRolesDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
       const response = await fetch(`/api/users/${params.id}`);
       if (!response.ok) {
@@ -128,13 +128,13 @@ export default function UserDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id, router, toast]);
 
   useEffect(() => {
     if (params.id) {
       fetchUser();
     }
-  }, [params.id]);
+  }, [params.id, fetchUser]);
 
   const handleUserUpdated = () => {
     fetchUser();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Clock, Filter, TrendingUp, User, Calendar } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,7 @@ export default function IntakeQueuePage() {
   const [sortBy, setSortBy] = useState<string>("priority");
   const { toast } = useToast();
 
-  const fetchIntakeQueue = async () => {
+  const fetchIntakeQueue = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -110,11 +110,11 @@ export default function IntakeQueuePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientFilter, categoryFilter, sortBy, toast]);
 
   useEffect(() => {
     fetchIntakeQueue();
-  }, [clientFilter, categoryFilter, sortBy]);
+  }, [fetchIntakeQueue]);
 
   // 고유 고객사 및 카테고리 목록
   const uniqueClients = Array.from(

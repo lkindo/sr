@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,14 +60,7 @@ export function CreateSRDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (open) {
-      fetchClients();
-      fetchCategories(); // 전체 서비스 카테고리 조회
-    }
-  }, [open]);
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       const response = await fetch("/api/clients");
       if (!response.ok) throw new Error("Failed to fetch clients");
@@ -80,9 +73,9 @@ export function CreateSRDialog({
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const response = await fetch("/api/service-categories");
       if (!response.ok) throw new Error("Failed to fetch categories");
@@ -95,7 +88,14 @@ export function CreateSRDialog({
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (open) {
+      fetchClients();
+      fetchCategories(); // 전체 서비스 카테고리 조회
+    }
+  }, [open, fetchClients, fetchCategories]);
 
   const uploadAttachments = async (srId: string, files: File[]) => {
     const formData = new FormData();
