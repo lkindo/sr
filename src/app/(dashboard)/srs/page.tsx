@@ -384,7 +384,12 @@ export default function SRsPage() {
               variant={statusFilter === "REQUESTED" ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                setStatusFilter("REQUESTED");
+                // 토글 기능: 이미 선택되어 있으면 해제, 아니면 선택
+                if (statusFilter === "REQUESTED") {
+                  setStatusFilter("all");
+                } else {
+                  setStatusFilter("REQUESTED");
+                }
                 setCurrentPage(1);
               }}
               className="sr-btn-template"
@@ -403,7 +408,12 @@ export default function SRsPage() {
               size="sm"
               onClick={() => {
                 if (session?.user?.id) {
-                  setAssigneeFilter(session.user.id);
+                  // 토글 기능: 이미 선택되어 있으면 해제, 아니면 선택
+                  if (assigneeFilter === session.user.id) {
+                    setAssigneeFilter("all");
+                  } else {
+                    setAssigneeFilter(session.user.id);
+                  }
                   setCurrentPage(1);
                 }
               }}
@@ -418,6 +428,7 @@ export default function SRsPage() {
               variant={priorityFilter === "CRITICAL" || priorityFilter === "HIGH" ? "default" : "outline"}
               size="sm"
               onClick={() => {
+                // 토글 기능: 이미 선택되어 있으면 해제, 아니면 선택
                 if (priorityFilter === "CRITICAL" || priorityFilter === "HIGH") {
                   setPriorityFilter("all");
                 } else {
