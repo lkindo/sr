@@ -3,6 +3,7 @@ import { ClientService } from "@/services/client.service";
 import { UserService } from "@/services/user.service";
 import { SRsDataTable } from "@/components/srs/SRsDataTable";
 import { Prisma } from "@prisma/client";
+import { getCachedClients, getCachedUsers } from "@/lib/cache";
 
 type Props = {
   params: Promise<{}>;
@@ -66,17 +67,17 @@ export default async function SRsPage({ searchParams }: Props) {
     [sortField]: sortOrder,
   };
 
-  // Fetch data in parallel
-  const [srData, clients, users] = await Promise.all([
-    srService.getAllSRs({
-      where,
-      orderBy,
-      skip: (page - 1) * itemsPerPage,
-      take: itemsPerPage,
-    }),
-    clientService.getAllClients(),
-    userService.getAllUsers() // Assuming a method to get all users exists
-  ]);
+  // Fetch SR data first
+  const srData = await srService.getAllSRs({
+    where,
+    orderBy,
+    skip: (page - 1) * itemsPerPage,
+    take: itemsPerPage,
+  });
+  
+  // Use cached data for clients and users to reduce database connections
+  const clients = await getCachedClients();
+  const users = await getCachedUsers();
 
   const totalCount = await srService.countSRs({ where });
 

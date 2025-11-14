@@ -22,7 +22,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: {
             email: credentials.email as string,
           },
-          include: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            password: true,
+            isActive: true,
             roles: {
               include: {
                 role: {
@@ -65,28 +71,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       // The 'user' object is only passed on the first sign-in.
       if (user) {
-        // Type assertion using 'any' to access extended properties
-        const userWithRoles = user as any;
-        
-        token.id = userWithRoles.id;
-        token.email = userWithRoles.email;
-        token.name = userWithRoles.name;
-        token.image = userWithRoles.image;
-
-        // Extract roles and permissions from the user object if they exist
-        if ('roles' in userWithRoles && Array.isArray(userWithRoles.roles)) {
-          token.roles = userWithRoles.roles.map((ur: any) => ur.role.name);
-
-          const permissionsSet = new Set<string>();
-          userWithRoles.roles.forEach((ur: any) => {
-            if (ur.role && ur.role.permissions && Array.isArray(ur.role.permissions)) {
-              ur.role.permissions.forEach((rp: any) => {
-                permissionsSet.add(`${rp.permission.resource}.${rp.permission.action}`);
-              });
-            }
-          });
-          token.permissions = Array.from(permissionsSet);
-        }
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.image = user.image;
       }
       return token;
     },
@@ -96,8 +84,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.image as string;
-        session.user.roles = token.roles as string[];
-        session.user.permissions = token.permissions as string[];
       }
       return session;
     },

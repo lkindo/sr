@@ -3,6 +3,12 @@ import { PrismaClient } from '@prisma/client'
 const prismaClientSingleton = () => {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    // 연결 풀 최적화 옵션
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL!,
+      },
+    },
   })
 }
 

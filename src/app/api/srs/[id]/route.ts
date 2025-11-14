@@ -61,8 +61,85 @@ export const GET = withAuthAndRateLimit(async (
 ) => {
   const { id } = await params;
 
-  const srRepository = new SRRepository();
-  const sr = await srRepository.findById(id);
+  // SR 정보를 필요한 필드만 선택하여 조회
+  const sr = await prisma.sR.findUnique({
+    where: { id },
+    include: {
+      client: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        }
+      },
+      requester: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        }
+      },
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        }
+      },
+      intakeBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        }
+      },
+      serviceCategory: true,
+      comments: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      },
+      activities: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      },
+      attachments: {
+        select: {
+          id: true,
+          fileName: true,
+          fileSize: true,
+          fileType: true,
+          fileUrl: true,
+          createdAt: true,
+        }
+      },
+      _count: {
+        select: {
+          comments: true,
+          attachments: true,
+        }
+      }
+    }
+  });
 
   if (!sr) {
     throw new NotFoundError("SR을 찾을 수 없습니다.");
@@ -78,15 +155,15 @@ export const GET = withAuthAndRateLimit(async (
     estimatedCompletionDate: sr.estimatedCompletionDate ? sr.estimatedCompletionDate.toISOString() : null,
     actualCompletionDate: sr.actualCompletionDate ? sr.actualCompletionDate.toISOString() : null,
     // 관련 객체들의 날짜 필드도 변환
-    comments: (sr as any).comments ? (sr as any).comments.map((comment: any) => ({
+    comments: sr.comments.map((comment) => ({
       ...comment,
       createdAt: comment.createdAt.toISOString(),
       updatedAt: comment.updatedAt.toISOString(),
-    })) : [],
-    activities: (sr as any).activities ? (sr as any).activities.map((activity: any) => ({
+    })),
+    activities: sr.activities.map((activity) => ({
       ...activity,
       createdAt: activity.createdAt.toISOString(),
-    })) : [],
+    })),
   };
 
   return NextResponse.json(serializableSr);

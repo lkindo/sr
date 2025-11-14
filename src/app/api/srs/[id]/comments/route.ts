@@ -63,7 +63,10 @@ export const POST = withAuthAndRateLimit(async (
   // Check if SR exists and get related data
   const sr = await prisma.sR.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      srNumber: true,
+      title: true,
       requester: {
         select: {
           id: true,

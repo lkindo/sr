@@ -12,19 +12,13 @@ export async function GET(request: NextRequest) {
   console.log("🔍 [GET /api/srs/my-requests] 요청 시작");
 
   try {
-    // 임시: admin 사용자 조회
-    const adminUser = await prisma.user.findFirst({
-      where: { email: "admin@example.com" }
-    });
-
-    if (!adminUser) {
+    const session = await auth();
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Admin user not found" },
-        { status: 500 }
+        { error: "Unauthorized" },
+        { status: 401 }
       );
     }
-
-    const session = { user: { id: adminUser.id, email: adminUser.email } } as any;
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status"); // 상태 필터 (all, REQUESTED, IN_PROGRESS, COMPLETED, etc.)
@@ -55,11 +49,25 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // SR 목록 조회
+    // 필요한 필드만 선택하여 SR 목록 조회
     const srs = await prisma.sR.findMany({
       where,
       orderBy,
-      include: {
+      select: {
+        id: true,
+        srNumber: true,
+        title: true,
+        description: true,
+        status: true,
+        requestedPriority: true,
+        actualPriority: true,
+        requestedCompletionDate: true,
+        estimatedCompletionDate: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+        intakeAt: true,
+        completedAt: true,
         client: {
           select: {
             id: true,
@@ -89,14 +97,52 @@ export async function GET(request: NextRequest) {
             email: true,
           }
         },
-        _count: {
-          select: {
-            comments: true,
-            attachments: true,
-          }
-        }
+        // 별도 쿼리로 처리할 count 정보
       }
     });
+
+    // 별도로 각 SR에 대한 카운트 정보 조회
+    const srIds = srs.map(sr => sr.id);
+    const counts = await prisma.sRComment.groupBy({
+      by: ['srId'],
+      where: {
+        srId: { in: srIds }
+      },
+      _count: {
+        _all: true
+      }
+    });
+    
+    const attachmentCounts = await prisma.sRAttachment.groupBy({
+      by: ['srId'],
+      where: {
+        srId: { in: srIds }
+      },
+      _count: {
+        _all: true
+      }
+    });
+    
+    // 카운트 정보 매핑
+    const commentCountsMap: Record<string, number> = {};
+    const attachmentCountsMap: Record<string, number> = {};
+    
+    counts.forEach(count => {
+      commentCountsMap[count.srId] = count._count._all;
+    });
+    
+    attachmentCounts.forEach(count => {
+      attachmentCountsMap[count.srId] = count._count._all;
+    });
+    
+    // 각 SR에 카운트 정보 추가
+    const srsWithCounts = srs.map(sr => ({
+      ...sr,
+      _count: {
+        comments: commentCountsMap[sr.id] || 0,
+        attachments: attachmentCountsMap[sr.id] || 0,
+      }
+    }));
 
     // 각 SR에 대해 추가 정보 계산
     const srsWithExtras = srs.map((sr) => {

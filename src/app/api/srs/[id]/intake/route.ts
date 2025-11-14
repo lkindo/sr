@@ -44,21 +44,31 @@ export const POST = withAuthAndRateLimit(async (
     throw error;
   }
 
-  // 2. SR 조회 및 상태 확인
-  const sr = await prisma.sR.findUnique({
-    where: { id },
-    include: {
-      serviceCategory: true,
-      client: true,
-      requester: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
+  // 2. SR 조회 및 상태 확인, 담당자 조회를 하나의 쿼리로 병합
+  const [sr, assignee] = await prisma.$transaction([
+    prisma.sR.findUnique({
+      where: { id },
+      include: {
+        serviceCategory: true,
+        client: true,
+        requester: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
         }
       }
-    }
-  });
+    }),
+    prisma.user.findUnique({
+      where: { id: validated.assigneeId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      }
+    })
+  ]);
 
   if (!sr) {
     throw new NotFoundError("SR을 찾을 수 없습니다");
@@ -67,16 +77,6 @@ export const POST = withAuthAndRateLimit(async (
   if (sr.status !== "REQUESTED") {
     throw new BadRequestError("이미 접수된 SR입니다");
   }
-
-  // 3. 담당자 조회
-  const assignee = await prisma.user.findUnique({
-    where: { id: validated.assigneeId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-    }
-  });
 
   if (!assignee) {
     throw new NotFoundError("담당자를 찾을 수 없습니다");
