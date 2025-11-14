@@ -1,21 +1,18 @@
 import { BaseRepository } from './base.repository';
-import { SRComment, Prisma } from '@prisma/client';
+import { SRAttachment, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, Prisma.SRCommentUncheckedCreateInput, Prisma.SRCommentUncheckedUpdateInput> {
+export class SRAttachmentRepository extends BaseRepositoryImpl<SRAttachment, string, Prisma.SRAttachmentUncheckedCreateInput, Prisma.SRAttachmentUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sRComment);
+    super(prisma.sRAttachment);
   }
 
-  async findDetailsById(id: string): Promise<SRComment | null> {
+  async findDetailsById(id: string): Promise<SRAttachment | null> {
     return this.model.findUnique({
       where: { id },
       include: {
         sr: true,
-        user: {
-          select: { id: true, name: true, image: true },
-        },
       },
     });
   }
@@ -23,11 +20,11 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
   async findAll(params?: {
     skip?: number;
     take?: number;
-    where?: Prisma.SRCommentWhereInput;
-    orderBy?: Prisma.SRCommentOrderByWithRelationInput;
-  }): Promise<SRComment[]> {
+    where?: Prisma.SRAttachmentWhereInput;
+    orderBy?: Prisma.SRAttachmentOrderByWithRelationInput;
+  }): Promise<SRAttachment[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
@@ -35,23 +32,20 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
       orderBy,
       include: {
         sr: true,
-        user: {
-          select: { id: true, name: true, image: true },
-        },
       },
     });
   }
 
-  // SRComment 관련 커스텀 메서드들
+  // SRAttachment 관련 커스텀 메서드들
   async findBySrId(srId: string, params?: {
     skip?: number;
     take?: number;
-    where?: Prisma.SRCommentWhereInput;
-    orderBy?: Prisma.SRCommentOrderByWithRelationInput;
-  }): Promise<{ data: SRComment[]; totalCount: number }> {
+    where?: Prisma.SRAttachmentWhereInput;
+    orderBy?: Prisma.SRAttachmentOrderByWithRelationInput;
+  }): Promise<{ data: SRAttachment[]; totalCount: number }> {
     const { skip, take, where = {}, orderBy = { createdAt: 'desc' } } = params || {};
-    
-    const whereWithSR: Prisma.SRCommentWhereInput = {
+
+    const whereWithSR: Prisma.SRAttachmentWhereInput = {
       ...where,
       srId,
     };
@@ -62,11 +56,6 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
         take,
         where: whereWithSR,
         orderBy,
-        include: {
-          user: {
-            select: { id: true, name: true, image: true },
-          },
-        },
       }),
       this.model.count({ where: whereWithSR }),
     ]);
@@ -77,25 +66,24 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
   async findByUserId(userId: string, params?: {
     skip?: number;
     take?: number;
-    where?: Prisma.SRCommentWhereInput;
-    orderBy?: Prisma.SRCommentOrderByWithRelationInput;
-  }): Promise<SRComment[]> {
+    where?: Prisma.SRAttachmentWhereInput;
+    orderBy?: Prisma.SRAttachmentOrderByWithRelationInput;
+  }): Promise<SRAttachment[]> {
     const { skip, take, where = {}, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
       where: {
         ...where,
-        userId,
+        sr: {
+          requesterId: userId
+        }
       },
       orderBy,
       include: {
         sr: {
           select: { id: true, srNumber: true, title: true },
-        },
-        user: {
-          select: { id: true, name: true, image: true },
         },
       },
     });

@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // 각 SR에 대해 추가 정보 계산
-    const srsWithExtras = srs.map((sr) => {
+    const srsWithExtras = srsWithCounts.map((sr) => {
       // 대기 시간 계산 (REQUESTED 상태인 경우)
       let waitingMinutes = 0;
       let waitingHours = 0;

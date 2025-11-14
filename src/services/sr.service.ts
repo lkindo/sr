@@ -3,6 +3,7 @@ import { z } from "zod";
 import { SRRepository } from "@/repositories/sr.repository";
 import { SRActivityRepository } from "@/repositories/sr-activity.repository";
 import { SRCommentRepository } from "@/repositories/sr-comment.repository";
+import { SRAttachmentRepository } from "@/repositories/sr-attachment.repository";
 import { ClientRepository } from "@/repositories/client.repository";
 import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
@@ -14,6 +15,7 @@ export class SRService {
   private srRepository: SRRepository;
   private srActivityRepository: SRActivityRepository;
   private srCommentRepository: SRCommentRepository;
+  private srAttachmentRepository: SRAttachmentRepository;
   private clientRepository: ClientRepository;
   private serviceCategoryRepository: ServiceCategoryRepository;
 
@@ -21,6 +23,7 @@ export class SRService {
     this.srRepository = new SRRepository();
     this.srActivityRepository = new SRActivityRepository();
     this.srCommentRepository = new SRCommentRepository();
+    this.srAttachmentRepository = new SRAttachmentRepository();
     this.clientRepository = new ClientRepository();
     this.serviceCategoryRepository = new ServiceCategoryRepository();
   }
@@ -150,7 +153,33 @@ export class SRService {
   }) {
     const { where, orderBy, skip, take } = params;
     const srs = await this.srRepository.findAll({ where, orderBy, skip, take });
-    return srs.map((sr) => ({ ...sr, assignedTo: sr.assignee || null }));
+    
+    // Count comments and attachments for each SR
+    const srIds = srs.map(sr => sr.id);
+    const counts = await this.srCommentRepository.countBySrs(srIds);
+    const attachmentCounts = await this.srAttachmentRepository.countBySrs(srIds);
+    
+    // Create maps for quick lookup
+    const commentCountsMap: Record<string, number> = {};
+    const attachmentCountsMap: Record<string, number> = {};
+    
+    counts.forEach(count => {
+      commentCountsMap[count.srId] = count._count._all;
+    });
+
+    attachmentCounts.forEach(count => {
+      attachmentCountsMap[count.srId] = count._count._all;
+    });
+    
+    // Add counts to each SR
+    return srs.map((sr) => ({ 
+      ...sr, 
+      assignedTo: sr.assignee || null,
+      _count: {
+        comments: commentCountsMap[sr.id] || 0,
+        attachments: attachmentCountsMap[sr.id] || 0,
+      }
+    }));
   }
 
   async countSRs(params: { where?: Prisma.SRWhereInput }) {

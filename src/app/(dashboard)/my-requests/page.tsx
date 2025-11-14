@@ -386,10 +386,10 @@ export default function MyRequestsPage() {
                   {/* 첨부파일 및 댓글 */}
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div className="flex gap-4 text-sm text-muted-foreground">
-                      {sr._count.attachments > 0 && (
+                      {sr._count?.attachments > 0 && (
                         <span>📎 첨부파일 {sr._count.attachments}개</span>
                       )}
-                      {sr._count.comments > 0 && (
+                      {sr._count?.comments > 0 && (
                         <span>💬 댓글 {sr._count.comments}개</span>
                       )}
                     </div>

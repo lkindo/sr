@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History, AlertCircle } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, MessageSquare, Paperclip, Clock, TrendingUp, History, AlertCircle, User } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -96,7 +96,7 @@ export default function SRDetailPage() {
     );
   }
 
-  // The rest of the component remains largely the same as the original client component
+  // Complete SR details component
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -105,42 +105,259 @@ export default function SRDetailPage() {
             <Link href="/srs"><ArrowLeft className="h-4 w-4" /></Link>
           </Button>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">{sr.srNumber}</h2>
-            <p className="text-sm text-muted-foreground mt-1">{sr.title}</p>
+            <div className="flex items-center gap-3">
+              <h2 className="text-3xl font-bold tracking-tight">{sr.srNumber}</h2>
+              <Badge variant={statusColors[sr.status]}>
+                {statusLabels[sr.status]}
+              </Badge>
+              <Badge variant={priorityColors[sr.requestedPriority]}>
+                {priorityLabels[sr.requestedPriority]}
+              </Badge>
+            </div>
+            <p className="text-2xl font-semibold mt-2">{sr.title}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setIsEditDialogOpen(true)}><Pencil className="mr-2 h-4 w-4" /> 수정</Button>
-          <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive"><Trash2 className="mr-2 h-4 w-4" /> 삭제</Button>
+          <Button onClick={() => setIsEditDialogOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" /> 수정
+          </Button>
+          <Button 
+            onClick={() => setIsDeleteDialogOpen(true)} 
+            variant="destructive"
+          >
+            <Trash2 className="mr-2 h-4 w-4" /> 삭제
+          </Button>
         </div>
       </div>
 
-      {/* The rest of the JSX for details, stats, and tabs */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Details Card */}
-        <div className="md:col-span-2 p-6 bg-white rounded-lg shadow">
-            <p>{sr.description}</p>
-            {/* ... more details */}
+        <div className="md:col-span-2 space-y-6">
+          <div className="p-6 bg-white rounded-lg shadow border">
+            <h3 className="text-lg font-semibold mb-4">상세 정보</h3>
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground">요청 내용</h4>
+                <p className="mt-1 text-foreground whitespace-pre-line">{sr.description}</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">고객사</h4>
+                  <p className="mt-1">{sr.client?.name || 'N/A'}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">서비스 카테고리</h4>
+                  <p className="mt-1">{sr.serviceCategory?.categoryName || 'N/A'}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">요청자</h4>
+                  <p className="mt-1">{sr.requester?.name || 'N/A'}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">담당자</h4>
+                  <p className="mt-1">{sr.assignee?.name || '미지정'}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">요청 우선순위</h4>
+                  <p className="mt-1">{priorityLabels[sr.requestedPriority]}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">실제 우선순위</h4>
+                  <p className="mt-1">{sr.actualPriority ? priorityLabels[sr.actualPriority] : 'N/A'}</p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">요청 완료일</h4>
+                  <p className="mt-1">
+                    {sr.requestedCompletionDate 
+                      ? new Date(sr.requestedCompletionDate).toLocaleDateString('ko-KR') 
+                      : 'N/A'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">예상 완료일</h4>
+                  <p className="mt-1">
+                    {sr.estimatedCompletionDate 
+                      ? new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR') 
+                      : 'N/A'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">완료 일자</h4>
+                  <p className="mt-1">
+                    {sr.completedAt 
+                      ? new Date(sr.completedAt).toLocaleDateString('ko-KR') 
+                      : 'N/A'}
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">SLA 마감일</h4>
+                  <p className="mt-1">
+                    {sr.dueDate 
+                      ? new Date(sr.dueDate).toLocaleDateString('ko-KR') 
+                      : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Resolution Details if available */}
+          {sr.resolutionDescription && (
+            <div className="p-6 bg-white rounded-lg shadow border">
+              <h3 className="text-lg font-semibold mb-4">해결 내용</h3>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-muted-foreground">해결 설명</h4>
+                  <p className="mt-1 whitespace-pre-line">{sr.resolutionDescription}</p>
+                </div>
+                
+                {sr.satisfactionRating && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground">만족도</h4>
+                      <p className="mt-1">{sr.satisfactionRating}/5</p>
+                    </div>
+                    
+                    {sr.additionalFeedback && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground">추가 피드백</h4>
+                        <p className="mt-1 whitespace-pre-line">{sr.additionalFeedback}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        {/* Stats Card */}
-        <div className="p-6 bg-white rounded-lg shadow">
-            {/* ... stats */}
+        
+        {/* Stats and Additional Info Card */}
+        <div className="space-y-6">
+          <div className="p-6 bg-white rounded-lg shadow border">
+            <h3 className="text-lg font-semibold mb-4">요약 정보</h3>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">요청일: {new Date(sr.createdAt).toLocaleDateString('ko-KR')}</span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">수정일: {new Date(sr.updatedAt).toLocaleDateString('ko-KR')}</span>
+              </div>
+              
+              {sr.intakeAt && (
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">접수일: {new Date(sr.intakeAt).toLocaleDateString('ko-KR')}</span>
+                </div>
+              )}
+              
+              {sr.intakeBy && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">접수자: {sr.intakeBy.name}</span>
+                </div>
+              )}
+              
+              <Separator className="my-2" />
+              
+              <div className="text-center">
+                <p className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">
+                  {sr._count?.comments || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">댓글 수</p>
+              </div>
+              
+              <div className="text-center">
+                <p className="text-2xl font-bold text-[hsl(var(--sr-primary-dark)))]">
+                  {sr._count?.attachments || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">첨부파일 수</p>
+              </div>
+              
+              <Separator className="my-2" />
+              
+              <div className="text-center">
+                <p className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
+                  {sr.estimatedHours || 'N/A'}
+                </p>
+                <p className="text-sm text-muted-foreground">예상 소요 시간</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Status History if available */}
+          {sr.statusHistory && sr.statusHistory.length > 0 && (
+            <div className="p-6 bg-white rounded-lg shadow border">
+              <h3 className="text-lg font-semibold mb-4">상태 변경 이력</h3>
+              <div className="space-y-3 max-h-60 overflow-y-auto">
+                {sr.statusHistory.map((history: any) => (
+                  <div key={history.id} className="flex justify-between text-sm">
+                    <div>
+                      <Badge variant={statusColors[history.currentStatus]}>
+                        {statusLabels[history.currentStatus]}
+                      </Badge>
+                    </div>
+                    <div className="text-muted-foreground">
+                      {new Date(history.changedAt).toLocaleDateString('ko-KR')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <Tabs defaultValue="comments" className="w-full">
         <TabsList>
-          <TabsTrigger value="comments">댓글 ({sr._count?.comments || 0})</TabsTrigger>
-          <TabsTrigger value="attachments">첨부파일 ({sr._count?.attachments || 0})</TabsTrigger>
-          <TabsTrigger value="activities">활동 이력</TabsTrigger>
+          <TabsTrigger value="comments" className="flex items-center gap-2">
+            <MessageSquare className="h-4 w-4" />
+            댓글 ({sr._count?.comments || 0})
+          </TabsTrigger>
+          <TabsTrigger value="attachments" className="flex items-center gap-2">
+            <Paperclip className="h-4 w-4" />
+            첨부파일 ({sr._count?.attachments || 0})
+          </TabsTrigger>
+          <TabsTrigger value="activities" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            활동 이력
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="comments" className="mt-6"><SRComments srId={sr.id} /></TabsContent>
-        <TabsContent value="attachments" className="mt-6"><SRAttachments srId={sr.id} /></TabsContent>
-        <TabsContent value="activities" className="mt-6"><SRActivities srId={sr.id} /></TabsContent>
+        <TabsContent value="comments" className="mt-6">
+          <SRComments srId={sr.id} />
+        </TabsContent>
+        <TabsContent value="attachments" className="mt-6">
+          <SRAttachments srId={sr.id} />
+        </TabsContent>
+        <TabsContent value="activities" className="mt-6">
+          <SRActivities srId={sr.id} />
+        </TabsContent>
       </Tabs>
 
-      <EditSRDialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} sr={sr} onUpdated={handleSRUpdated} />
-      <DeleteSRDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} sr={sr} onDeleted={handleSRDeleted} />
+      <EditSRDialog 
+        open={isEditDialogOpen} 
+        onOpenChange={setIsEditDialogOpen} 
+        sr={sr} 
+        onUpdated={handleSRUpdated} 
+      />
+      <DeleteSRDialog 
+        open={isDeleteDialogOpen} 
+        onOpenChange={setIsDeleteDialogOpen} 
+        sr={sr} 
+        onDeleted={handleSRDeleted} 
+      />
     </div>
   );
 }

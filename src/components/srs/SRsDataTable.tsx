@@ -130,7 +130,7 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
           <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))] mb-4">SR 목록</h3>
           
           {/* Filters and Search */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -138,12 +138,12 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10 sr-input-template"
+                className="pl-10 sr-input-template w-full"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-2">
               <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}>
-                <SelectTrigger className="sr-input-template w-[150px]">
+                <SelectTrigger className="sr-input-template w-full sm:w-[150px]">
                   <SelectValue placeholder="상태 필터" />
                 </SelectTrigger>
                 <SelectContent>
@@ -158,21 +158,22 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Responsive Table - Show Table on larger screens, Cards on smaller screens */}
+        <div className="hidden md:block overflow-x-auto">
           <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("srNumber")}>SR 번호{getSortIcon("srNumber")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("title")}>제목{getSortIcon("title")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("client")}>고객사{getSortIcon("client")}</Button></TableHead>
-                <TableHead>요청자</TableHead>
-                <TableHead>담당자</TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("priority")}>우선순위{getSortIcon("priority")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("status")}>상태{getSortIcon("status")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("dueDate")}>마감일{getSortIcon("dueDate")}</Button></TableHead>
-                <TableHead>댓글/첨부</TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("createdAt")}>생성일{getSortIcon("createdAt")}</Button></TableHead>
-                <TableHead>작업</TableHead>
+                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("srNumber")}>SR 번호{getSortIcon("srNumber")}</Button></TableHead>
+                <TableHead className="min-w-[150px]"><Button variant="ghost" onClick={() => handleSort("title")}>제목{getSortIcon("title")}</Button></TableHead>
+                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("client")}>고객사{getSortIcon("client")}</Button></TableHead>
+                <TableHead className="w-[100px]">요청자</TableHead>
+                <TableHead className="w-[100px]">담당자</TableHead>
+                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("priority")}>우선순위{getSortIcon("priority")}</Button></TableHead>
+                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("status")}>상태{getSortIcon("status")}</Button></TableHead>
+                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("dueDate")}>마감일{getSortIcon("dueDate")}</Button></TableHead>
+                <TableHead className="w-[80px]">댓글/첨부</TableHead>
+                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("createdAt")}>생성일{getSortIcon("createdAt")}</Button></TableHead>
+                <TableHead className="w-[80px]">작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -182,7 +183,7 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
                   return (
                     <TableRow key={sr.id} className="cursor-pointer" onClick={() => router.push(`/srs/${sr.id}`)}>
                       <TableCell className="font-medium text-primary hover:underline"><Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link></TableCell>
-                      <TableCell>{sr.title}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={sr.title}>{sr.title}</TableCell>
                       <TableCell>{sr.client.name}</TableCell>
                       <TableCell>{sr.requester.name}</TableCell>
                       <TableCell>{sr.assignee?.name || "-"}</TableCell>
@@ -204,6 +205,74 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4 p-4">
+          {srs && srs.length > 0 ? (
+            srs.map((sr) => {
+              const dueDateStatus = getDueDateStatus(sr.dueDate);
+              return (
+                <div 
+                  key={sr.id} 
+                  className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                  onClick={() => router.push(`/srs/${sr.id}`)}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Link href={`/srs/${sr.id}`} className="font-medium text-primary hover:underline">
+                          {sr.srNumber}
+                        </Link>
+                        <Badge variant={statusColors[sr.status]} className="flex-shrink-0">
+                          {statusLabels[sr.status]}
+                        </Badge>
+                        <Badge variant={priorityColors[sr.priority]} className="flex-shrink-0">
+                          {priorityLabels[sr.priority]}
+                        </Badge>
+                      </div>
+                      <h4 className="font-semibold mt-1 truncate">{sr.title}</h4>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <div className="flex">
+                          <span className="text-muted-foreground w-20">고객사</span>
+                          <span>{sr.client.name}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="text-muted-foreground w-20">요청자</span>
+                          <span>{sr.requester.name}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="text-muted-foreground w-20">담당자</span>
+                          <span>{sr.assignee?.name || "-"}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="text-muted-foreground w-20">마감일</span>
+                          <span>{dueDateStatus ? <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge> : '-'}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="text-muted-foreground w-20">등록일</span>
+                          <span>{new Date(sr.createdAt).toLocaleDateString("ko-KR")}</span>
+                        </div>
+                        <div className="flex">
+                          <span className="text-muted-foreground w-20">댓글/첨부</span>
+                          <span>{sr._count?.comments || 0} / {sr._count?.attachments || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}`); }}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">데이터가 없습니다.</div>
+          )}
         </div>
 
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
