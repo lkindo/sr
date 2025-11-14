@@ -1,8 +1,8 @@
 "use server";
 
 import { hash } from "bcryptjs";
+import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { UserService } from "@/services/user.service";
 
 const registerSchema = z.object({
   name: z.string().min(2, "이름은 최소 2자 이상이어야 합니다."),
@@ -20,11 +20,11 @@ export async function registerUser(formData: FormData) {
 
     const validated = registerSchema.parse(data);
 
-    // UserService 인스턴스 생성
-    const userService = new UserService();
-
     // Check if user already exists
-    const existingUser = await userService.getUserByEmail(validated.email);
+    const existingUser = await prisma.user.findUnique({
+      where: { email: validated.email },
+    });
+
     if (existingUser) {
       return {
         success: false,
@@ -35,11 +35,13 @@ export async function registerUser(formData: FormData) {
     // Hash password
     const hashedPassword = await hash(validated.password, 12);
 
-    // Create user using UserService
-    await userService.createUser({
-      name: validated.name,
-      email: validated.email,
-      password: hashedPassword,
+    // Create user
+    await prisma.user.create({
+      data: {
+        name: validated.name,
+        email: validated.email,
+        password: hashedPassword,
+      },
     });
 
     return {

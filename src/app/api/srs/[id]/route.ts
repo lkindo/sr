@@ -48,7 +48,8 @@ type RouteContext = {
   }>;
 };
 
-import { getSrById, deleteSr } from "@/services/sr.service";
+import { deleteSr } from "@/services/sr.service";
+import { SRRepository } from "@/repositories/sr.repository";
 
 // GET /api/srs/[id] - SR 상세 조회
 export async function GET(request: NextRequest, context: RouteContext) {
@@ -63,7 +64,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
     */
 
-    const sr = await getSrById(id);
+    const srRepository = new SRRepository();
+    const sr = await srRepository.findById(id);
 
     if (!sr) {
       return NextResponse.json(
@@ -72,6 +74,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       );
     }
 
+    // 날짜 객체를 문자열로 변환 (JSON 직렬화를 위해)
     const serializableSr = {
       ...sr,
       createdAt: sr.createdAt.toISOString(),
@@ -80,17 +83,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
       requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
       estimatedCompletionDate: sr.estimatedCompletionDate ? sr.estimatedCompletionDate.toISOString() : null,
       actualCompletionDate: sr.actualCompletionDate ? sr.actualCompletionDate.toISOString() : null,
-      // 관련 객체들의 날짜 필드도 변환해야 할 수 있습니다.
-      // 예: sr.comments, sr.activities 등
-      comments: sr.comments.map(comment => ({
+      // 관련 객체들의 날짜 필드도 변환
+      comments: (sr as any).comments ? (sr as any).comments.map((comment: any) => ({
         ...comment,
         createdAt: comment.createdAt.toISOString(),
         updatedAt: comment.updatedAt.toISOString(),
-      })),
-      activities: sr.activities.map(activity => ({
+      })) : [],
+      activities: (sr as any).activities ? (sr as any).activities.map((activity: any) => ({
         ...activity,
         createdAt: activity.createdAt.toISOString(),
-      })),
+      })) : [],
     };
 
     return NextResponse.json(serializableSr);

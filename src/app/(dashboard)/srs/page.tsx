@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -44,9 +44,10 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { useSRs, SR } from "@/hooks/useSR"; // useSRs 훅 임포트 및 SR 인터페이스 임포트
+import { useSRs, SR, UseSRsOptions } from "@/hooks/useSR"; // useSRs 훅 임포트 및 SR 인터페이스 임포트
 import { useQueryClient } from "@tanstack/react-query"; // useQueryClient 훅 임포트
 import { TableSkeleton } from "@/components/loading/TableSkeleton";
+
 const statusLabels: Record<string, string> = {
   REQUESTED: "요청됨",
   INTAKE: "접수",
@@ -105,26 +106,29 @@ export default function SRsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
   const { toast } = useToast();
   const queryClient = useQueryClient(); // useQueryClient 훅 사용
-  const { data: srs, isLoading, isError, error } = useSRs();
 
-  // 고유한 고객사와 담당자 목록 추출
-  const uniqueClients = useMemo(() => {
-    const srsData: SR[] = srs || []; // srs를 SR[] 타입으로 명시적 캐스팅
-    return Array.from(
-      new Set(srsData.map((sr: SR) => JSON.stringify({ id: sr.client.name, name: sr.client.name })))
-    ).map((str) => JSON.parse(str));
-  }, [srs]);
+  // 훅에 필터, 정렬, 페이징 옵션 전달
+  const options: UseSRsOptions = {
+    filters: {
+      status: statusFilter === "all" ? undefined : statusFilter,
+      priority: priorityFilter === "all" ? undefined : priorityFilter,
+      clientId: clientFilter === "all" ? undefined : clientFilter,
+      assigneeId: assigneeFilter === "all" ? undefined : assigneeFilter === "unassigned" ? "unassigned" : assigneeFilter,
+      searchQuery: searchQuery || undefined,
+      dateFrom: dateFromFilter || undefined,
+      dateTo: dateToFilter || undefined,
+    },
+    sort: {
+      field: sortField,
+      order: sortOrder
+    },
+    pagination: {
+      page: currentPage,
+      itemsPerPage: itemsPerPage
+    }
+  };
 
-  const uniqueAssignees = useMemo(() => {
-    const srsData: SR[] = srs || []; // srs를 SR[] 타입으로 명시적 캐스팅
-    return Array.from(
-      new Set(
-        srsData
-          .filter((sr: SR) => sr.assignedTo)
-          .map((sr: SR) => JSON.stringify({ id: sr.assignedTo!.name, name: sr.assignedTo!.name }))
-      )
-    ).map((str) => JSON.parse(str));
-  }, [srs]);
+  const { data: srs, isLoading, isError, error, paginationInfo } = useSRs(options);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -144,143 +148,6 @@ export default function SRsPage() {
     ) : (
       <ArrowDown className="ml-2 h-4 w-4" />
     );
-  };
-
-  const filteredSrs = useMemo(() => {
-    let filtered = srs || [];
-
-    // 검색어 필터링
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (sr) =>
-          sr.srNumber.toLowerCase().includes(query) ||
-          sr.title.toLowerCase().includes(query) ||
-          sr.client.name.toLowerCase().includes(query) ||
-          sr.requester.name.toLowerCase().includes(query) ||
-          (sr.assignedTo?.name || "").toLowerCase().includes(query)
-      );
-    }
-
-    // 상태 필터링
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((sr) => sr.status === statusFilter);
-    }
-
-    // 우선순위 필터링
-    if (priorityFilter !== "all") {
-      filtered = filtered.filter((sr) => sr.priority === priorityFilter);
-    }
-
-    // 고객사 필터링
-    if (clientFilter !== "all") {
-      filtered = filtered.filter((sr) => sr.client.name === clientFilter);
-    }
-
-    // 담당자 필터링
-    if (assigneeFilter !== "all") {
-      if (assigneeFilter === "unassigned") {
-        filtered = filtered.filter((sr) => !sr.assignedTo);
-      } else {
-        filtered = filtered.filter((sr) => sr.assignedTo?.name === assigneeFilter);
-      }
-    }
-
-    // 생성일 범위 필터링
-    if (dateFromFilter) {
-      const fromDate = new Date(dateFromFilter);
-      fromDate.setHours(0, 0, 0, 0);
-      filtered = filtered.filter((sr) => new Date(sr.createdAt) >= fromDate);
-    }
-
-    if (dateToFilter) {
-      const toDate = new Date(dateToFilter);
-      toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((sr) => new Date(sr.createdAt) <= toDate);
-    }
-
-    // 정렬
-    return [...filtered].sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-
-      switch (sortField) {
-        case "srNumber":
-          aValue = a.srNumber;
-          bValue = b.srNumber;
-          break;
-        case "title":
-          aValue = a.title.toLowerCase();
-          bValue = b.title.toLowerCase();
-          break;
-        case "client":
-          aValue = a.client.name.toLowerCase();
-          bValue = b.client.name.toLowerCase();
-          break;
-        case "priority":
-          const priorityOrder = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
-          aValue = priorityOrder[a.priority as keyof typeof priorityOrder];
-          bValue = priorityOrder[b.priority as keyof typeof priorityOrder];
-          break;
-        case "status":
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case "createdAt":
-          aValue = new Date(a.createdAt).getTime();
-          bValue = new Date(b.createdAt).getTime();
-          break;
-        case "dueDate":
-          aValue = a.dueDate ? new Date(a.dueDate).getTime() : 0;
-          bValue = b.dueDate ? new Date(b.dueDate).getTime() : 0;
-          break;
-        default:
-          return 0;
-      }
-
-      if (aValue < bValue) return sortOrder === "asc" ? -1 : 1;
-      if (aValue > bValue) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-  }, [srs, searchQuery, statusFilter, priorityFilter, clientFilter, assigneeFilter, dateFromFilter, dateToFilter, sortField, sortOrder]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, statusFilter, priorityFilter, clientFilter, assigneeFilter, dateFromFilter, dateToFilter]);
-
-  // Pagination calculations
-  const totalPages = Math.ceil(filteredSrs.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedSrs = useMemo(() => filteredSrs.slice(startIndex, endIndex), [filteredSrs, startIndex, endIndex]);
-
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const maxVisiblePages = 7;
-
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentPage <= 4) {
-        for (let i = 1; i <= 5; i++) pages.push(i);
-        pages.push("ellipsis");
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 3) {
-        pages.push(1);
-        pages.push("ellipsis");
-        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push("ellipsis");
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-        pages.push("ellipsis");
-        pages.push(totalPages);
-      }
-    }
-
-    return pages;
   };
 
   const handleSRCreated = () => {
@@ -341,39 +208,28 @@ export default function SRsPage() {
               size="sm"
               onClick={() => {
                 // 토글 기능: 이미 선택되어 있으면 해제, 아니면 선택
-                if (statusFilter === "REQUESTED") {
-                  setStatusFilter("all");
-                } else {
-                  setStatusFilter("REQUESTED");
-                }
-                setCurrentPage(1);
+                setStatusFilter(prev => prev === "REQUESTED" ? "all" : "REQUESTED");
               }}
               className="sr-btn-template"
             >
               <Clock className="mr-2 h-4 w-4" />
               접수 대기
-              {(srs || []).filter(sr => sr.status === "REQUESTED").length > 0 && (
+              {paginationInfo.totalCount > 0 && (
                 <Badge className="ml-2 bg-orange-600" variant="secondary">
-                  {(srs || []).filter(sr => sr.status === "REQUESTED").length}
+                  {paginationInfo.totalCount}
                 </Badge>
               )}
             </Button>
 
             <Button
-              variant={assigneeFilter === session?.user?.id ? "default" : "outline"}
+              variant={assigneeFilter === session?.user?.name ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                if (session?.user?.id) {
+                if (session?.user?.name) {
                   // 토글 기능: 이미 선택되어 있으면 해제, 아니면 선택
-                  if (assigneeFilter === session.user.id) {
-                    setAssigneeFilter("all");
-                  } else {
-                    setAssigneeFilter(session.user.id);
-                  }
-                  setCurrentPage(1);
+                  setAssigneeFilter(prev => prev === session.user.name ? "all" : session.user.name || "all");
                 }
               }}
-              disabled={!session?.user?.id}
               className="sr-btn-template"
             >
               <User className="mr-2 h-4 w-4" />
@@ -384,21 +240,16 @@ export default function SRsPage() {
               variant={priorityFilter === "CRITICAL" || priorityFilter === "HIGH" ? "default" : "outline"}
               size="sm"
               onClick={() => {
-                // 토글 기능: 이미 선택되어 있으면 해제, 아니면 선택
-                if (priorityFilter === "CRITICAL" || priorityFilter === "HIGH") {
-                  setPriorityFilter("all");
-                } else {
-                  setPriorityFilter("CRITICAL");
-                }
-                setCurrentPage(1);
+                // 토글 기능: 이미 선택되어 있으면 해제, 아니면 CRITICAL 선택
+                setPriorityFilter(prev => (prev === "CRITICAL" || prev === "HIGH") ? "all" : "CRITICAL");
               }}
               className="sr-btn-template"
             >
               <AlertCircle className="mr-2 h-4 w-4" />
               긴급
-              {(srs || []).filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length > 0 && (
+              {paginationInfo.totalCount > 0 && (
                 <Badge className="ml-2" variant="destructive">
-                  {(srs || []).filter(sr => sr.priority === "CRITICAL" || sr.priority === "HIGH").length}
+                  {paginationInfo.totalCount}
                 </Badge>
               )}
             </Button>
@@ -481,11 +332,6 @@ export default function SRsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">모든 고객사</SelectItem>
-                    {uniqueClients.map((client) => (
-                      <SelectItem key={client.id} value={client.name}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -499,11 +345,6 @@ export default function SRsPage() {
                   <SelectContent>
                     <SelectItem value="all">모든 담당자</SelectItem>
                     <SelectItem value="unassigned">미배정</SelectItem>
-                    {uniqueAssignees.map((assignee) => (
-                      <SelectItem key={assignee.id} value={assignee.name}>
-                        {assignee.name}
-                      </SelectItem>
-                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -544,7 +385,7 @@ export default function SRsPage() {
               />
             </div>
             <div className="text-sm text-muted-foreground ml-4">
-              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{filteredSrs.length}</span> items
+              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{paginationInfo.totalCount}</span> items
             </div>
           </div>
         </div>
@@ -631,16 +472,16 @@ export default function SRsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSrs.length === 0 ? (
+              {srs && srs.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center py-8">
-                    {(srs || []).length === 0
+                    {paginationInfo.totalCount === 0
                       ? "등록된 SR이 없습니다."
                       : "필터 조건에 맞는 SR이 없습니다."}
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedSrs.map((sr) => {
+                srs?.map((sr) => {
                   const dueDateStatus = getDueDateStatus(sr.dueDate);
                   return (
                     <TableRow key={sr.id} className="cursor-pointer hover:bg-muted/50">
@@ -747,7 +588,7 @@ export default function SRsPage() {
           </div>
 
           {/* 페이지네이션 */}
-          {totalPages > 1 && (
+          {paginationInfo.totalPages > 1 && (
             <Pagination>
               <PaginationContent>
                 <PaginationItem>
@@ -755,13 +596,55 @@ export default function SRsPage() {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      if (currentPage > 1) setCurrentPage(currentPage - 1);
+                      if (paginationInfo.hasPrevPage) setCurrentPage(prev => prev - 1);
                     }}
-                    className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    className={!paginationInfo.hasPrevPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
 
-                {getPageNumbers().map((page, index) => (
+                {Array.from({ length: Math.min(paginationInfo.totalPages, 7) }, (_, i) => {
+                  let pageNum: number | string;
+                  const totalPages = paginationInfo.totalPages;
+                  const currentPage = paginationInfo.currentPage;
+                  
+                  if (totalPages <= 7) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 4) {
+                    if (i < 5) {
+                      pageNum = i + 1;
+                    } else if (i === 5) {
+                      pageNum = 'ellipsis';
+                    } else {
+                      pageNum = totalPages;
+                    }
+                  } else if (currentPage >= totalPages - 3) {
+                    if (i === 0) {
+                      pageNum = 1;
+                    } else if (i === 1) {
+                      pageNum = 'ellipsis';
+                    } else {
+                      pageNum = totalPages - 4 + i;
+                    }
+                  } else {
+                    if (i === 0) {
+                      pageNum = 1;
+                    } else if (i === 1) {
+                      pageNum = 'ellipsis';
+                    } else if (i === 2) {
+                      pageNum = currentPage - 1;
+                    } else if (i === 3) {
+                      pageNum = currentPage;
+                    } else if (i === 4) {
+                      pageNum = currentPage + 1;
+                    } else if (i === 5) {
+                      pageNum = 'ellipsis';
+                    } else {
+                      pageNum = totalPages;
+                    }
+                  }
+                  
+                  return pageNum;
+                }).map((page, index) => (
                   <PaginationItem key={index}>
                     {page === "ellipsis" ? (
                       <PaginationEllipsis />
@@ -772,7 +655,7 @@ export default function SRsPage() {
                           e.preventDefault();
                           setCurrentPage(page as number);
                         }}
-                        isActive={currentPage === page}
+                        isActive={paginationInfo.currentPage === page}
                         className="cursor-pointer"
                       >
                         {page}
@@ -786,9 +669,9 @@ export default function SRsPage() {
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+                      if (paginationInfo.hasNextPage) setCurrentPage(prev => prev + 1);
                     }}
-                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    className={!paginationInfo.hasNextPage ? "pointer-events-none opacity-50" : "cursor-pointer"}
                   />
                 </PaginationItem>
               </PaginationContent>
