@@ -4,29 +4,7 @@ import { z } from "zod";
 import { ClientService } from "@/services/client.service";
 import { auth } from "@/auth";
 import { PermissionService } from "@/services/permission.service";
-
-const createClientSchema = z.object({
-  code: z.string().min(2, "고객사 코드는 최소 2자 이상이어야 합니다."),
-  name: z.string().min(1, "고객사 이름을 입력해주세요."),
-  industry: z.string().optional(),
-  contactPerson: z.string().optional(),
-  contactEmail: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
-  contactPhone: z.string().optional(),
-  address: z.string().optional(),
-  contractStartDate: z.string().optional(),
-  contractEndDate: z.string().optional(),
-});
-
-const updateClientSchema = z.object({
-  name: z.string().min(1, "고객사 이름을 입력해주세요.").optional(),
-  industry: z.string().optional(),
-  contactPerson: z.string().optional(),
-  contactEmail: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
-  contactPhone: z.string().optional(),
-  address: z.string().optional(),
-  contractStartDate: z.string().optional(),
-  contractEndDate: z.string().optional(),
-});
+import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
 
 export async function createClientAction(formData: FormData) {
   try {
@@ -42,7 +20,7 @@ export async function createClientAction(formData: FormData) {
       contractEndDate: formData.get("contractEndDate") as string | undefined,
     };
 
-    const validated = createClientSchema.parse(data);
+    const validated = clientCreateSchema.parse(data);
 
     // 인증 및 권한 확인
     const session = await auth();
@@ -96,7 +74,7 @@ export async function updateClientAction(id: string, formData: FormData) {
       contractEndDate: formData.get("contractEndDate") as string | undefined,
     };
 
-    const validated = updateClientSchema.parse(data);
+    const validated = clientUpdateSchema.parse(data);
 
     // 인증 및 권한 확인
     const session = await auth();
@@ -196,5 +174,16 @@ export async function getClientAction(id: string) {
       success: false,
       error: error instanceof Error ? error.message : "고객사 정보 조회 중 오류가 발생했습니다.",
     };
+  }
+}
+
+export async function getClientsForSelection() {
+  try {
+    // No auth check needed for a simple selection list
+    const clientService = new ClientService();
+    const clients = await clientService.getAllClients();
+    return { success: true, data: clients };
+  } catch (error) {
+    return { success: false, error: "고객사 목록을 불러오는데 실패했습니다." };
   }
 }

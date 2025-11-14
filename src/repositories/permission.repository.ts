@@ -1,10 +1,15 @@
 import { BaseRepository } from './base.repository';
 import { Permission, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class PermissionRepository implements BaseRepository<Permission, string, Prisma.PermissionUncheckedCreateInput, Prisma.PermissionUncheckedUpdateInput> {
-  async findById(id: string): Promise<Permission | null> {
-    return prisma.permission.findUnique({
+export class PermissionRepository extends BaseRepositoryImpl<Permission, string, Prisma.PermissionUncheckedCreateInput, Prisma.PermissionUncheckedUpdateInput> {
+  constructor() {
+    super(prisma.permission);
+  }
+
+  async findDetailsById(id: string): Promise<Permission | null> {
+    return this.model.findUnique({
       where: { id },
       include: {
         roles: {
@@ -24,7 +29,7 @@ export class PermissionRepository implements BaseRepository<Permission, string, 
   }): Promise<Permission[]> {
     const { skip, take, where, orderBy } = params || {};
     
-    return prisma.permission.findMany({
+    return this.model.findMany({
       skip,
       take,
       where,
@@ -32,28 +37,9 @@ export class PermissionRepository implements BaseRepository<Permission, string, 
     });
   }
 
-  async create(data: Prisma.PermissionUncheckedCreateInput): Promise<Permission> {
-    return prisma.permission.create({
-      data,
-    });
-  }
-
-  async update(id: string, data: Prisma.PermissionUncheckedUpdateInput): Promise<Permission> {
-    return prisma.permission.update({
-      where: { id },
-      data,
-    });
-  }
-
-  async delete(id: string): Promise<Permission> {
-    return prisma.permission.delete({
-      where: { id },
-    });
-  }
-
   // Permission 관련 커스텀 메서드들
   async findByResourceAndAction(resource: string, action: string): Promise<Permission | null> {
-    return prisma.permission.findUnique({
+    return this.model.findUnique({
       where: {
         resource_action: {
           resource,
@@ -64,7 +50,7 @@ export class PermissionRepository implements BaseRepository<Permission, string, 
   }
 
   async findByRoleId(roleId: string): Promise<Permission[]> {
-    return prisma.permission.findMany({
+    return this.model.findMany({
       where: {
         roles: {
           some: {
@@ -76,7 +62,7 @@ export class PermissionRepository implements BaseRepository<Permission, string, 
   }
 
   async findByResource(resource: string): Promise<Permission[]> {
-    return prisma.permission.findMany({
+    return this.model.findMany({
       where: { resource },
     });
   }

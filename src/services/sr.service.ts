@@ -5,55 +5,10 @@ import { SRActivityRepository } from "@/repositories/sr-activity.repository";
 import { SRCommentRepository } from "@/repositories/sr-comment.repository";
 import { ClientRepository } from "@/repositories/client.repository";
 import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
-
-// 입력 스키마 정의
-const srUpdateSchema = z.object({
-  title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다.").optional(),
-  description: z
-    .string()
-    .min(10, "설명은 최소 10자 이상이어야 합니다.")
-    .optional(),
-  serviceCategoryId: z.string().optional().nullable(),
-  priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  status: z
-    .enum([
-      "REQUESTED",
-      "INTAKE",
-      "IN_PROGRESS",
-      "ON_HOLD",
-      "COMPLETED",
-      "CONFIRMED",
-      "REJECTED",
-    ])
-    .optional(),
-  assignedToId: z.string().optional().nullable(),
-  expectedCompletionDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  actualCompletionDate: z.string().optional().nullable(),
-  resolutionDescription: z.string().optional().nullable(),
-  rejectionReason: z.string().optional().nullable(),
-  satisfactionRating: z.number().min(1).max(5).optional().nullable(),
-  additionalFeedback: z.string().optional().nullable(),
-  // 접수 처리 관련 필드 추가
-  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  estimatedHours: z.number().positive("예상 작업 시간은 0보다 커야 합니다").optional(),
-  estimatedCompletionDate: z.string().optional(),
-  intakeNotes: z.string().optional(),
-  assigneeId: z.string().min(1, "담당자를 선택해주세요").optional(),
-  changeReason: z.string().optional(),
-});
-
-const srSchema = z.object({
-  title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다."),
-  description: z.string().min(10, "설명은 최소 10자 이상이어야 합니다."),
-  clientId: z.string().min(1, "고객사를 선택해주세요."),
-  serviceCategoryId: z.string().min(1, "서비스 카테고리를 선택해주세요."),
-  requestedPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
-  requestedCompletionDate: z.string().optional(),
-});
+import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
-type SrCreateData = z.infer<typeof srSchema>;
+type SrCreateData = z.infer<typeof srCreateSchema>;
 
 export class SRService {
   private srRepository: SRRepository;
@@ -71,7 +26,7 @@ export class SRService {
   }
 
   async createSR(data: SrCreateData, sessionUser: { id: string; email: string }) {
-    const validated = srSchema.parse(data);
+    const validated = srCreateSchema.parse(data);
 
     const today = new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");

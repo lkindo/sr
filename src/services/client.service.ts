@@ -2,29 +2,7 @@ import { z } from "zod";
 import { ClientRepository } from "@/repositories/client.repository";
 import { UserRepository } from "@/repositories/user.repository";
 import { UserService } from "./user.service";
-
-const clientCreateSchema = z.object({
-  code: z.string().min(2, "고객사 코드는 최소 2자 이상이어야 합니다."),
-  name: z.string().min(1, "고객사 이름을 입력해주세요."),
-  industry: z.string().optional(),
-  contactPerson: z.string().optional(),
-  contactEmail: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
-  contactPhone: z.string().optional(),
-  address: z.string().optional(),
-  contractStartDate: z.string().optional(),
-  contractEndDate: z.string().optional(),
-});
-
-const clientUpdateSchema = z.object({
-  name: z.string().min(1, "고객사 이름을 입력해주세요.").optional(),
-  industry: z.string().optional(),
-  contactPerson: z.string().optional(),
-  contactEmail: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
-  contactPhone: z.string().optional(),
-  address: z.string().optional(),
-  contractStartDate: z.string().optional(),
-  contractEndDate: z.string().optional(),
-});
+import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
 type ClientUpdateData = z.infer<typeof clientUpdateSchema>;

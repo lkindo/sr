@@ -1,10 +1,15 @@
 import { BaseRepository } from './base.repository';
 import { User, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class UserRepository implements BaseRepository<User, string, Prisma.UserUncheckedCreateInput, Prisma.UserUncheckedUpdateInput> {
-  async findById(id: string): Promise<User | null> {
-    return prisma.user.findUnique({
+export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.UserUncheckedCreateInput, Prisma.UserUncheckedUpdateInput> {
+  constructor() {
+    super(prisma.user);
+  }
+
+  async findDetailsById(id: string): Promise<User | null> {
+    return this.model.findUnique({
       where: { id },
       include: {
         roles: {
@@ -29,6 +34,50 @@ export class UserRepository implements BaseRepository<User, string, Prisma.UserU
     });
   }
 
+  async findAllDetails(): Promise<(User & {
+    roles: {
+      role: {
+        id: string;
+        name: string;
+        description?: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        permissions: {
+          permission: {
+            id: string;
+            resource: string;
+            action: string;
+            description?: string | null;
+          };
+        }[];
+      };
+    }[];
+  })[]> {
+    return this.model.findMany({
+      include: {
+        roles: {
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      where: {
+        isActive: true, // Only active users
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+  }
+
   async findAll(params?: {
     skip?: number;
     take?: number;
@@ -37,7 +86,7 @@ export class UserRepository implements BaseRepository<User, string, Prisma.UserU
   }): Promise<User[]> {
     const { skip, take, where, orderBy } = params || {};
     
-    return prisma.user.findMany({
+    return this.model.findMany({
       skip,
       take,
       where,
@@ -45,28 +94,9 @@ export class UserRepository implements BaseRepository<User, string, Prisma.UserU
     });
   }
 
-  async create(data: Prisma.UserUncheckedCreateInput): Promise<User> {
-    return prisma.user.create({
-      data,
-    });
-  }
-
-  async update(id: string, data: Prisma.UserUncheckedUpdateInput): Promise<User> {
-    return prisma.user.update({
-      where: { id },
-      data,
-    });
-  }
-
-  async delete(id: string): Promise<User> {
-    return prisma.user.delete({
-      where: { id },
-    });
-  }
-
   // User 관련 커스텀 메서드들
   async findByEmail(email: string): Promise<User | null> {
-    return prisma.user.findUnique({
+    return this.model.findUnique({
       where: { email },
       include: {
         roles: {
@@ -92,7 +122,7 @@ export class UserRepository implements BaseRepository<User, string, Prisma.UserU
   }
 
   async findByClientId(clientId: string): Promise<User[]> {
-    return prisma.user.findMany({
+    return this.model.findMany({
       where: {
         clients: {
           some: {
@@ -104,7 +134,7 @@ export class UserRepository implements BaseRepository<User, string, Prisma.UserU
   }
 
   async updatePassword(userId: string, hashedPassword: string): Promise<User> {
-    return prisma.user.update({
+    return this.model.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
@@ -115,21 +145,21 @@ export class UserRepository implements BaseRepository<User, string, Prisma.UserU
     email?: string;
     image?: string;
   }): Promise<User> {
-    return prisma.user.update({
+    return this.model.update({
       where: { id: userId },
       data: profileData,
     });
   }
 
   async activateUser(userId: string): Promise<User> {
-    return prisma.user.update({
+    return this.model.update({
       where: { id: userId },
       data: { isActive: true },
     });
   }
 
   async deactivateUser(userId: string): Promise<User> {
-    return prisma.user.update({
+    return this.model.update({
       where: { id: userId },
       data: { isActive: false },
     });

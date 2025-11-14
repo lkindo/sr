@@ -1,10 +1,15 @@
 import { BaseRepository } from './base.repository';
 import { SR, Prisma, SRStatus, SRPriority } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheckedCreateInput, Prisma.SRUncheckedUpdateInput> {
-  async findById(id: string) {
-    return prisma.sR.findUnique({
+export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUncheckedCreateInput, Prisma.SRUncheckedUpdateInput> {
+  constructor() {
+    super(prisma.sR);
+  }
+
+  async findDetailsById(id: string) {
+    return this.model.findUnique({
       where: { id },
       include: {
         client: true,
@@ -62,7 +67,7 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
   })[]> {
     const { skip, take, where, orderBy } = params || {};
     
-    return prisma.sR.findMany({
+    return this.model.findMany({
       skip,
       take,
       where,
@@ -76,7 +81,7 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
   }
 
   async create(data: Prisma.SRUncheckedCreateInput): Promise<SR> {
-    return prisma.sR.create({
+    return this.model.create({
       data: {
         ...data,
         activities: data.activities || {
@@ -96,7 +101,7 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
   }
 
   async update(id: string, data: Prisma.SRUncheckedUpdateInput): Promise<SR> {
-    return prisma.sR.update({
+    return this.model.update({
       where: { id },
       data,
       include: {
@@ -107,15 +112,9 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
     });
   }
 
-  async delete(id: string): Promise<SR> {
-    return prisma.sR.delete({
-      where: { id },
-    });
-  }
-
   // SR 관련 커스텀 메서드들
   async findBySrNumber(srNumber: string): Promise<SR | null> {
-    return prisma.sR.findUnique({
+    return this.model.findUnique({
       where: { srNumber },
       include: {
         client: true,
@@ -139,7 +138,7 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
     };
 
     const [data, totalCount] = await Promise.all([
-      prisma.sR.findMany({
+      this.model.findMany({
         skip,
         take,
         where: whereWithClient,
@@ -150,7 +149,7 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
           assignee: { select: { id: true, name: true, email: true } },
         },
       }),
-      prisma.sR.count({ where: whereWithClient }),
+      this.model.count({ where: whereWithClient }),
     ]);
 
     return { data, totalCount };
@@ -161,7 +160,7 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
     if (clientId) where.clientId = clientId;
     if (status) where.status = status;
 
-    return prisma.sR.count({ where });
+    return this.model.count({ where });
   }
 
   async countByPriority(clientId?: string, priority?: SRPriority): Promise<number> {
@@ -169,10 +168,10 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
     if (clientId) where.clientId = clientId;
     if (priority) where.priority = priority;
 
-    return prisma.sR.count({ where });
+    return this.model.count({ where });
   }
 
   async count(where: Prisma.SRWhereInput = {}): Promise<number> {
-    return prisma.sR.count({ where });
+    return this.model.count({ where });
   }
 }

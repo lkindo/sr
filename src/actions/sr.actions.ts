@@ -3,46 +3,10 @@
 import { z } from "zod";
 import { SRService } from "@/services/sr.service";
 import { auth } from "@/auth";
+import { PermissionService } from "@/services/permission.service"; // Import PermissionService
+import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 
-const createSRSchema = z.object({
-  title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다."),
-  description: z.string().min(10, "설명은 최소 10자 이상이어야 합니다."),
-  clientId: z.string().min(1, "고객사를 선택해주세요."),
-  serviceCategoryId: z.string().min(1, "서비스 카테고리를 선택해주세요."),
-  requestedPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
-  requestedCompletionDate: z.string().optional(),
-});
-
-const updateSRSchema = z.object({
-  title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다.").optional(),
-  description: z.string().min(10, "설명은 최소 10자 이상이어야 합니다.").optional(),
-  serviceCategoryId: z.string().optional().nullable(),
-  priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  status: z.enum([
-    "REQUESTED",
-    "INTAKE",
-    "IN_PROGRESS",
-    "ON_HOLD",
-    "COMPLETED",
-    "CONFIRMED",
-    "REJECTED",
-  ]).optional(),
-  assignedToId: z.string().optional().nullable(),
-  expectedCompletionDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  actualCompletionDate: z.string().optional().nullable(),
-  resolutionDescription: z.string().optional().nullable(),
-  rejectionReason: z.string().optional().nullable(),
-  satisfactionRating: z.number().min(1).max(5).optional().nullable(),
-  additionalFeedback: z.string().optional().nullable(),
-  // 접수 처리 관련 필드
-  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  estimatedHours: z.number().positive("예상 작업 시간은 0보다 커야 합니다").optional(),
-  estimatedCompletionDate: z.string().optional(),
-  intakeNotes: z.string().optional(),
-  assigneeId: z.string().min(1, "담당자를 선택해주세요").optional(),
-  changeReason: z.string().optional(),
-});
+const permissionService = new PermissionService(); // Instantiate PermissionService once
 
 export async function createSRAction(formData: FormData) {
   try {
@@ -55,7 +19,7 @@ export async function createSRAction(formData: FormData) {
       requestedCompletionDate: formData.get("requestedCompletionDate") as string | undefined,
     };
 
-    const validated = createSRSchema.parse(data);
+    const validated = srCreateSchema.parse(data);
 
     // 인증 확인
     const session = await auth();
@@ -65,6 +29,7 @@ export async function createSRAction(formData: FormData) {
         error: "인증되지 않은 사용자입니다.",
       };
     }
+    await permissionService.requirePermission(session.user.id, 'sr:create'); // Permission check
 
     // SRService 인스턴스 생성
     const srService = new SRService();
@@ -138,7 +103,7 @@ export async function updateSRAction(id: string, formData: FormData) {
       }
     }
 
-    const validated = updateSRSchema.parse(processedData);
+    const validated = srUpdateSchema.parse(processedData);
 
     // 인증 확인
     const session = await auth();
@@ -148,6 +113,7 @@ export async function updateSRAction(id: string, formData: FormData) {
         error: "인증되지 않은 사용자입니다.",
       };
     }
+    await permissionService.requirePermission(session.user.id, 'sr:update'); // Permission check
 
     // SRService 인스턴스 생성
     const srService = new SRService();
@@ -195,6 +161,7 @@ export async function deleteSRAction(id: string) {
         error: "인증되지 않은 사용자입니다.",
       };
     }
+    await permissionService.requirePermission(session.user.id, 'sr:delete'); // Permission check
 
     // SRService 인스턴스 생성
     const srService = new SRService();

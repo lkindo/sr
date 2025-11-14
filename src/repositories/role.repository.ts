@@ -1,9 +1,14 @@
 import { BaseRepository } from './base.repository';
 import { Role, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class RoleRepository implements BaseRepository<Role, string, Prisma.RoleUncheckedCreateInput, Prisma.RoleUncheckedUpdateInput> {
-  async findById(id: string): Promise<Role | null> {
+export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.RoleUncheckedCreateInput, Prisma.RoleUncheckedUpdateInput> {
+  constructor() {
+    super(prisma.role);
+  }
+
+  async findDetailsById(id: string): Promise<Role | null> {
     return prisma.role.findUnique({
       where: { id },
       include: {
@@ -29,30 +34,11 @@ export class RoleRepository implements BaseRepository<Role, string, Prisma.RoleU
   }): Promise<Role[]> {
     const { skip, take, where, orderBy } = params || {};
     
-    return prisma.role.findMany({
+    return this.model.findMany({
       skip,
       take,
       where,
       orderBy,
-    });
-  }
-
-  async create(data: Prisma.RoleUncheckedCreateInput): Promise<Role> {
-    return prisma.role.create({
-      data,
-    });
-  }
-
-  async update(id: string, data: Prisma.RoleUncheckedUpdateInput): Promise<Role> {
-    return prisma.role.update({
-      where: { id },
-      data,
-    });
-  }
-
-  async delete(id: string): Promise<Role> {
-    return prisma.role.delete({
-      where: { id },
     });
   }
 

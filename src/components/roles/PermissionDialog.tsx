@@ -14,6 +14,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { getAllPermissionsAction } from "@/actions/permission.actions";
+import { updateRolePermissionsAction } from "@/actions/role.actions";
 
 interface Permission {
   id: string;
@@ -51,12 +53,15 @@ export function PermissionDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+
   const fetchPermissions = useCallback(async () => {
     try {
-      const response = await fetch("/api/permissions");
-      if (!response.ok) throw new Error("Failed to fetch permissions");
-      const data = await response.json();
-      setAllPermissions(data);
+      const result = await getAllPermissionsAction();
+      if (result.success) {
+        setAllPermissions(result.data as Permission[]);
+      } else {
+        throw new Error(result.error || "권한 목록을 불러오는데 실패했습니다.");
+      }
     } catch (error) {
       toast({
         title: "오류",
@@ -90,26 +95,17 @@ export function PermissionDialog({
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!role) return;
 
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/roles/${role.id}/permissions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          permissionIds: selectedPermissions,
-        }),
-      });
+      const result = await updateRolePermissionsAction(role.id, selectedPermissions);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update permissions");
+      if (!result.success) {
+        throw new Error(result.error || "권한 업데이트에 실패했습니다.");
       }
 
       toast({

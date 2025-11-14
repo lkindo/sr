@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { createRoleAction, updateRoleAction } from "@/actions/role.actions";
 
 interface Role {
   id: string;
@@ -48,28 +49,27 @@ export function RoleDialog({
     }
   }, [role, open]);
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    const formData = new FormData();
+    formData.append("name", name);
+    if (description) {
+      formData.append("description", description);
+    }
+
     try {
-      const url = role ? `/api/roles/${role.id}` : "/api/roles";
-      const method = role ? "PATCH" : "POST";
+      let result;
+      if (role) {
+        result = await updateRoleAction(role.id, formData);
+      } else {
+        result = await createRoleAction(formData);
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          description: description || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to save role");
+      if (!result.success) {
+        throw new Error(result.error || "역할 저장에 실패했습니다.");
       }
 
       toast({

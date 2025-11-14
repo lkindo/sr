@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { deleteClientAction } from "@/actions/client.actions";
 
 interface Client {
   id: string;
@@ -34,19 +35,17 @@ export function DeleteClientDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+
   const handleDelete = async () => {
     if (!client) return;
 
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/clients/${client.id}`, {
-        method: "DELETE",
-      });
+      const result = await deleteClientAction(client.id);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete client");
+      if (!result.success) {
+        throw new Error(result.error || "고객사 삭제에 실패했습니다.");
       }
 
       toast({

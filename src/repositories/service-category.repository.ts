@@ -1,10 +1,15 @@
 import { BaseRepository } from './base.repository';
 import { ServiceCategory, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class ServiceCategoryRepository implements BaseRepository<ServiceCategory, string, Prisma.ServiceCategoryUncheckedCreateInput, Prisma.ServiceCategoryUncheckedUpdateInput> {
-  async findById(id: string): Promise<ServiceCategory | null> {
-    return prisma.serviceCategory.findUnique({
+export class ServiceCategoryRepository extends BaseRepositoryImpl<ServiceCategory, string, Prisma.ServiceCategoryUncheckedCreateInput, Prisma.ServiceCategoryUncheckedUpdateInput> {
+  constructor() {
+    super(prisma.serviceCategory);
+  }
+
+  async findDetailsById(id: string): Promise<ServiceCategory | null> {
+    return this.model.findUnique({
       where: { id },
       include: {
         client: true,
@@ -27,7 +32,7 @@ export class ServiceCategoryRepository implements BaseRepository<ServiceCategory
   }): Promise<ServiceCategory[]> {
     const { skip, take, where, orderBy } = params || {};
     
-    return prisma.serviceCategory.findMany({
+    return this.model.findMany({
       skip,
       take,
       where,
@@ -44,34 +49,15 @@ export class ServiceCategoryRepository implements BaseRepository<ServiceCategory
     });
   }
 
-  async create(data: Prisma.ServiceCategoryUncheckedCreateInput): Promise<ServiceCategory> {
-    return prisma.serviceCategory.create({
-      data,
-    });
-  }
-
-  async update(id: string, data: Prisma.ServiceCategoryUncheckedUpdateInput): Promise<ServiceCategory> {
-    return prisma.serviceCategory.update({
-      where: { id },
-      data,
-    });
-  }
-
-  async delete(id: string): Promise<ServiceCategory> {
-    return prisma.serviceCategory.delete({
-      where: { id },
-    });
-  }
-
   // ServiceCategory 관련 커스텀 메서드들
   async findByClientId(clientId: string): Promise<ServiceCategory[]> {
-    return prisma.serviceCategory.findMany({
+    return this.model.findMany({
       where: { clientId },
     });
   }
 
   async findByHandlerId(handlerId: string): Promise<ServiceCategory[]> {
-    return prisma.serviceCategory.findMany({
+    return this.model.findMany({
       where: { 
         OR: [
           { handlerId },

@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { deleteRoleAction } from "@/actions/role.actions";
 
 interface Role {
   id: string;
@@ -33,19 +34,17 @@ export function DeleteRoleDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+
   const handleDelete = async () => {
     if (!role) return;
 
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/roles/${role.id}`, {
-        method: "DELETE",
-      });
+      const result = await deleteRoleAction(role.id);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete role");
+      if (!result.success) {
+        throw new Error(result.error || "역할 삭제에 실패했습니다.");
       }
 
       toast({

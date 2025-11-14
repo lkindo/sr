@@ -1,22 +1,21 @@
-import { User } from "@prisma/client";
-import { z } from "zod";
 import { UserRepository } from "@/repositories/user.repository";
+import { RoleRepository } from "@/repositories/role.repository";
 import { ClientRepository } from "@/repositories/client.repository";
-
-const userUpdateSchema = z.object({
-  name: z.string().min(1, "이름을 입력해주세요.").optional(),
-  email: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
-  image: z.string().url("유효한 이미지 URL을 입력해주세요.").optional(),
-});
+import { PermissionService } from "./permission.service";
+import { hash } from "bcryptjs";
+import { userUpdateSchema } from "@/lib/schemas";
+import { z } from "zod";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
 export class UserService {
   private userRepository: UserRepository;
+  private roleRepository: RoleRepository;
   private clientRepository: ClientRepository;
 
   constructor() {
     this.userRepository = new UserRepository();
+    this.roleRepository = new RoleRepository();
     this.clientRepository = new ClientRepository();
   }
 
@@ -88,5 +87,21 @@ export class UserService {
     }
 
     return user;
+  }
+
+  async getUsersWithSRHandlingPermission() {
+    const requiredPermissions = [
+      "SR.CREATE",
+      "SR.READ",
+      "SR.UPDATE",
+      "SR.DELETE",
+      "SR.ASSIGN",
+      "SR.STATUS_CHANGE",
+      "COMMENT.CREATE",
+      "COMMENT.READ",
+      "COMMENT.UPDATE",
+    ];
+    const permissionService = new PermissionService();
+    return permissionService.getUsersWithPermissions(requiredPermissions);
   }
 }

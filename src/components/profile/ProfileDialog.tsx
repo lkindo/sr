@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getProfileAction, updateUserAction, changePasswordAction } from "@/actions/user.actions";
 
 interface Role {
   role: {
@@ -69,12 +70,18 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
   const fetchProfile = useCallback(async () => {
     try {
-      const response = await fetch("/api/profile");
-      if (!response.ok) throw new Error("Failed to fetch profile");
-      const data = await response.json();
-      setProfile(data);
-      setName(data.name);
-      setImage(data.image || "");
+      const result = await getProfileAction();
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "프로필 정보를 불러오는데 실패했습니다.");
+      }
+      setProfile({
+        ...result.data,
+        createdAt: result.data.createdAt instanceof Date ? result.data.createdAt.toISOString() : result.data.createdAt,
+        roles: ('roles' in result.data && Array.isArray(result.data.roles)) ? result.data.roles : [],
+        clients: ('clients' in result.data && Array.isArray(result.data.clients)) ? result.data.clients : [],
+      } as UserProfile);
+      setName(result.data.name);
+      setImage(result.data.image || "");
     } catch (error) {
       toast({
         title: "오류",
@@ -96,15 +103,14 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const handleUpdateProfile = async () => {
     setSaving(true);
     try {
-      const response = await fetch("/api/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, image }),
-      });
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("image", image);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update profile");
+      const result = await updateUserAction(formData);
+
+      if (!result.success) {
+        throw new Error(result.error || "프로필 업데이트에 실패했습니다.");
       }
 
       toast({
@@ -136,19 +142,15 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
     setChangingPassword(true);
     try {
-      const response = await fetch("/api/profile/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-          confirmPassword,
-        }),
-      });
+      const formData = new FormData();
+      formData.append("currentPassword", currentPassword);
+      formData.append("newPassword", newPassword);
+      formData.append("confirmPassword", confirmPassword);
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to change password");
+      const result = await changePasswordAction(formData);
+
+      if (!result.success) {
+        throw new Error(result.error || "비밀번호 변경에 실패했습니다.");
       }
 
       toast({

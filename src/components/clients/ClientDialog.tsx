@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { createClientAction, updateClientAction } from "@/actions/client.actions";
 
 interface Client {
   id: string;
@@ -89,36 +90,33 @@ export function ClientDialog({
     }
   }, [client, open]);
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    const formData = new FormData();
+    formData.append("code", code);
+    formData.append("name", name);
+    formData.append("industry", industry);
+    formData.append("contactPerson", contactPerson);
+    formData.append("contactEmail", contactEmail);
+    formData.append("contactPhone", contactPhone);
+    formData.append("address", address);
+    formData.append("contractStartDate", contractStartDate);
+    formData.append("contractEndDate", contractEndDate);
+    formData.append("isActive", String(isActive));
+
     try {
-      const url = client ? `/api/clients/${client.id}` : "/api/clients";
-      const method = client ? "PATCH" : "POST";
+      let result;
+      if (client) {
+        result = await updateClientAction(client.id, formData);
+      } else {
+        result = await createClientAction(formData);
+      }
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          code,
-          name,
-          industry: industry || undefined,
-          contactPerson: contactPerson || undefined,
-          contactEmail: contactEmail || undefined,
-          contactPhone: contactPhone || undefined,
-          address: address || undefined,
-          contractStartDate: contractStartDate || undefined,
-          contractEndDate: contractEndDate || undefined,
-          isActive,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to save client");
+      if (!result.success) {
+        throw new Error(result.error || "고객사 저장에 실패했습니다.");
       }
 
       toast({

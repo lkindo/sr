@@ -1,10 +1,15 @@
 import { BaseRepository } from './base.repository';
 import { SRActivity, Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { BaseRepositoryImpl } from './base.repository.impl';
 
-export class SRActivityRepository implements BaseRepository<SRActivity, string, Prisma.SRActivityUncheckedCreateInput, Prisma.SRActivityUncheckedUpdateInput> {
-  async findById(id: string): Promise<SRActivity | null> {
-    return prisma.sRActivity.findUnique({
+export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string, Prisma.SRActivityUncheckedCreateInput, Prisma.SRActivityUncheckedUpdateInput> {
+  constructor() {
+    super(prisma.sRActivity);
+  }
+
+  async findDetailsById(id: string): Promise<SRActivity | null> {
+    return this.model.findUnique({
       where: { id },
       include: {
         sr: true,
@@ -23,7 +28,7 @@ export class SRActivityRepository implements BaseRepository<SRActivity, string, 
   }): Promise<SRActivity[]> {
     const { skip, take, where, orderBy } = params || {};
     
-    return prisma.sRActivity.findMany({
+    return this.model.findMany({
       skip,
       take,
       where,
@@ -34,25 +39,6 @@ export class SRActivityRepository implements BaseRepository<SRActivity, string, 
           select: { id: true, name: true, image: true },
         },
       },
-    });
-  }
-
-  async create(data: Prisma.SRActivityUncheckedCreateInput): Promise<SRActivity> {
-    return prisma.sRActivity.create({
-      data,
-    });
-  }
-
-  async update(id: string, data: Prisma.SRActivityUncheckedUpdateInput): Promise<SRActivity> {
-    return prisma.sRActivity.update({
-      where: { id },
-      data,
-    });
-  }
-
-  async delete(id: string): Promise<SRActivity> {
-    return prisma.sRActivity.delete({
-      where: { id },
     });
   }
 
@@ -71,7 +57,7 @@ export class SRActivityRepository implements BaseRepository<SRActivity, string, 
     };
 
     const [data, totalCount] = await Promise.all([
-      prisma.sRActivity.findMany({
+      this.model.findMany({
         skip,
         take,
         where: whereWithSR,
@@ -82,14 +68,14 @@ export class SRActivityRepository implements BaseRepository<SRActivity, string, 
           },
         },
       }),
-      prisma.sRActivity.count({ where: whereWithSR }),
+      this.model.count({ where: whereWithSR }),
     ]);
 
     return { data, totalCount };
   }
 
   async createActivity(srId: string, userId: string, type: "CREATED"|"STATUS_CHANGED"|"PRIORITY_CHANGED"|"ASSIGNED"|"REASSIGNED"|"COMMENTED"|"ATTACHMENT_ADDED"|"ATTACHMENT_REMOVED"|"REOPENED"|"COMPLETED"|"REJECTED", description: string, metadata?: any): Promise<SRActivity> {
-    return prisma.sRActivity.create({
+    return this.model.create({
       data: {
         srId,
         userId,
