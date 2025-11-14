@@ -236,9 +236,28 @@ export async function getSRAction(id: string) {
       data: sr,
     };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "SR 조회 중 오류가 발생했습니다.",
-    };
-  }
-}
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "SR 조회 중 오류가 발생했습니다.",
+        };
+      }
+    }
+    
+    export async function getSRDetailsAction(id: string) {
+      try {
+        const srService = new SRService();
+        const sr = await srService.getSRById(id);
+    
+        if (!sr) {
+          return { success: false, error: "SR을 찾을 수 없습니다." };
+        }
+    
+        return { success: true, data: sr };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "SR 상세 정보 조회 중 오류가 발생했습니다.",
+        };
+      }
+    }
+    

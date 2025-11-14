@@ -32,6 +32,10 @@ export class UserService {
     return this.userRepository.findByClientId(clientId);
   }
 
+  async getAllUsers() {
+    return this.userRepository.findAll();
+  }
+
   async updateUser(id: string, data: UserUpdateData) {
     const validated = userUpdateSchema.parse(data);
     return this.userRepository.update(id, validated);

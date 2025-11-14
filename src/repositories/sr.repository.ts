@@ -171,4 +171,8 @@ export class SRRepository implements BaseRepository<SR, string, Prisma.SRUncheck
 
     return prisma.sR.count({ where });
   }
+
+  async count(where: Prisma.SRWhereInput = {}): Promise<number> {
+    return prisma.sR.count({ where });
+  }
 }

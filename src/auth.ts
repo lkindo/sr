@@ -63,47 +63,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // The 'user' object is only passed on the first sign-in.
       if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.image = user.image;
+        // Type assertion using 'any' to access extended properties
+        const userWithRoles = user as any;
+        
+        token.id = userWithRoles.id;
+        token.email = userWithRoles.email;
+        token.name = userWithRoles.name;
+        token.image = userWithRoles.image;
 
-        // 사용자 권한 정보 로드
-        const userWithPermissions = await prisma.user.findUnique({
-          where: { id: user.id },
-          include: {
-            roles: {
-              include: {
-                role: {
-                  include: {
-                    permissions: {
-                      include: {
-                        permission: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        });
+        // Extract roles and permissions from the user object if they exist
+        if ('roles' in userWithRoles && Array.isArray(userWithRoles.roles)) {
+          token.roles = userWithRoles.roles.map((ur: any) => ur.role.name);
 
-        if (userWithPermissions) {
-          // 역할 목록 추출
-          token.roles = userWithPermissions.roles.map((ur) => ur.role.name);
-
-          // 권한 목록 추출 (중복 제거)
           const permissionsSet = new Set<string>();
-          userWithPermissions.roles.forEach((ur) => {
-            ur.role.permissions.forEach((rp) => {
-              permissionsSet.add(`${rp.permission.resource}.${rp.permission.action}`);
-            });
+          userWithRoles.roles.forEach((ur: any) => {
+            if (ur.role && ur.role.permissions && Array.isArray(ur.role.permissions)) {
+              ur.role.permissions.forEach((rp: any) => {
+                permissionsSet.add(`${rp.permission.resource}.${rp.permission.action}`);
+              });
+            }
           });
           token.permissions = Array.from(permissionsSet);
-        } else {
-          token.roles = [];
-          token.permissions = [];
         }
       }
       return token;
