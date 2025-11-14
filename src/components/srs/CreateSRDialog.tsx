@@ -149,7 +149,7 @@ export function CreateSRDialog({
     try {
       const result = await createSRAction(formData);
 
-      if (!result.success || !result.data) {
+      if (!result.success) {
         throw new Error(result.error || "SR 생성에 실패했습니다.");
       }
 

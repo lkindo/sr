@@ -60,4 +60,38 @@ export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.Role
       },
     });
   }
+
+  // 참조 무결성 확인 메서드
+  async getRelatedDataCounts(roleId: string): Promise<{
+    usersCount: number;
+    permissionsCount: number;
+  }> {
+    const [usersCount, permissionsCount] = await Promise.all([
+      prisma.userRole.count({ where: { roleId } }),
+      prisma.rolePermission.count({ where: { roleId } }),
+    ]);
+
+    return { usersCount, permissionsCount };
+  }
+
+  // 역할 권한 관리 메서드
+  async updateRolePermissions(roleId: string, permissionIds: string[]): Promise<void> {
+    // 트랜잭션으로 원자적 처리
+    await prisma.$transaction(async (tx) => {
+      // 기존 권한 연결 모두 삭제
+      await tx.rolePermission.deleteMany({
+        where: { roleId },
+      });
+
+      // 새 권한 연결 생성
+      if (permissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissionIds.map(permissionId => ({
+            roleId,
+            permissionId,
+          })),
+        });
+      }
+    });
+  }
 }

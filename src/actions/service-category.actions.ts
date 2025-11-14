@@ -1,14 +1,15 @@
 "use server";
 
 import { ServiceCategoryService } from "@/services/service-category.service";
+import { Result, ok } from "@/lib/result";
+import { errorToResult } from "@/lib/errors";
 
-export async function getServiceCategoriesForSelection() {
+export async function getServiceCategoriesForSelection(): Promise<Result<any>> {
   try {
-    // No auth check needed for a simple selection list
     const serviceCategoryService = new ServiceCategoryService();
     const categories = await serviceCategoryService.getAll();
-    return { success: true, data: categories };
+    return ok(categories);
   } catch (error) {
-    return { success: false, error: "서비스 카테고리 목록을 불러오는데 실패했습니다." };
+    return errorToResult(error);
   }
 }

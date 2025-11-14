@@ -3,6 +3,7 @@ import { ClientRepository } from "@/repositories/client.repository";
 import { UserRepository } from "@/repositories/user.repository";
 import { UserService } from "./user.service";
 import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
+import { NotFoundError, DuplicateError, ReferentialIntegrityError } from "@/lib/errors";
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
 type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
@@ -36,11 +37,11 @@ export class ClientService {
 
   async createClient(data: ClientCreateData) {
     const validated = clientCreateSchema.parse(data);
-    
+
     // 코드 중복 확인
     const existingClient = await this.clientRepository.findByCode(validated.code);
     if (existingClient) {
-      throw new Error("이미 존재하는 고객사 코드입니다.");
+      throw new DuplicateError("고객사 코드", "code", validated.code);
     }
 
     return this.clientRepository.create({
@@ -59,11 +60,11 @@ export class ClientService {
 
   async updateClient(id: string, data: ClientUpdateData) {
     const validated = clientUpdateSchema.parse(data);
-    
+
     // 기존 고객사 정보 확인
     const existingClient = await this.clientRepository.findById(id);
     if (!existingClient) {
-      throw new Error("고객사를 찾을 수 없습니다.");
+      throw new NotFoundError("고객사", id);
     }
 
     return this.clientRepository.update(id, {
@@ -82,11 +83,40 @@ export class ClientService {
     // 고객사 삭제 전 관련 데이터 확인
     const client = await this.clientRepository.findById(id);
     if (!client) {
-      throw new Error("고객사를 찾을 수 없습니다.");
+      throw new NotFoundError("고객사", id);
     }
 
-    // TODO: 관련된 SR, 사용자 등이 있는지 확인하고 처리
-    // 현재 단계에서는 단순 삭제
+    // 참조 무결성 확인: 관련된 데이터가 있는지 체크
+    const relatedCounts = await this.clientRepository.getRelatedDataCounts(id);
+
+    const hasRelatedData =
+      relatedCounts.srsCount > 0 ||
+      relatedCounts.usersCount > 0 ||
+      relatedCounts.serviceCategoriesCount > 0 ||
+      relatedCounts.clientHandlersCount > 0;
+
+    if (hasRelatedData) {
+      const errorMessages: string[] = [];
+      if (relatedCounts.srsCount > 0) {
+        errorMessages.push(`${relatedCounts.srsCount}개의 SR`);
+      }
+      if (relatedCounts.usersCount > 0) {
+        errorMessages.push(`${relatedCounts.usersCount}개의 사용자 연결`);
+      }
+      if (relatedCounts.serviceCategoriesCount > 0) {
+        errorMessages.push(`${relatedCounts.serviceCategoriesCount}개의 서비스 카테고리`);
+      }
+      if (relatedCounts.clientHandlersCount > 0) {
+        errorMessages.push(`${relatedCounts.clientHandlersCount}개의 담당자 연결`);
+      }
+
+      throw new ReferentialIntegrityError(
+        `고객사를 삭제할 수 없습니다. 다음 관련 데이터가 존재합니다: ${errorMessages.join(', ')}. ` +
+        `먼저 관련 데이터를 삭제하거나 고객사를 비활성화하세요.`
+      );
+    }
+
+    // 관련 데이터가 없으면 삭제 진행
     return this.clientRepository.delete(id);
   }
 

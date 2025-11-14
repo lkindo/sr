@@ -2,9 +2,10 @@ import { UserRepository } from "@/repositories/user.repository";
 import { RoleRepository } from "@/repositories/role.repository";
 import { ClientRepository } from "@/repositories/client.repository";
 import { PermissionService } from "./permission.service";
-import { hash } from "bcryptjs";
+import { hash, compare } from "bcryptjs";
 import { userUpdateSchema } from "@/lib/schemas";
 import { z } from "zod";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
@@ -31,7 +32,16 @@ export class UserService {
     return this.userRepository.findByClientId(clientId);
   }
 
-  async getAllUsers() {
+  async getAllUsers(filters?: {
+    search?: string;
+    isActive?: string;
+    userType?: string;
+    roleId?: string;
+    role?: string;
+  }) {
+    if (filters && Object.keys(filters).length > 0) {
+      return this.userRepository.findAllWithFilters(filters);
+    }
     return this.userRepository.findAll();
   }
 
@@ -103,5 +113,27 @@ export class UserService {
     ];
     const permissionService = new PermissionService();
     return permissionService.getUsersWithPermissions(requiredPermissions);
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    // 사용자 조회
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundError("사용자", userId);
+    }
+
+    // 현재 비밀번호 확인
+    if (user.password) {
+      const isPasswordValid = await compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        throw new ValidationError("현재 비밀번호가 일치하지 않습니다.");
+      }
+    }
+
+    // 새 비밀번호 해시
+    const hashedPassword = await hash(newPassword, 10);
+
+    // 비밀번호 업데이트
+    return this.userRepository.updatePassword(userId, hashedPassword);
   }
 }

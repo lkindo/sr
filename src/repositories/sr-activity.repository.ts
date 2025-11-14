@@ -74,7 +74,7 @@ export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string,
     return { data, totalCount };
   }
 
-  async createActivity(srId: string, userId: string, type: "CREATED"|"STATUS_CHANGED"|"PRIORITY_CHANGED"|"ASSIGNED"|"REASSIGNED"|"COMMENTED"|"ATTACHMENT_ADDED"|"ATTACHMENT_REMOVED"|"REOPENED"|"COMPLETED"|"REJECTED", description: string, metadata?: any): Promise<SRActivity> {
+  async createActivity(srId: string, userId: string, type: "CREATED"|"STATUS_CHANGED"|"PRIORITY_CHANGED"|"ASSIGNED"|"REASSIGNED"|"COMMENTED"|"ATTACHMENT_ADDED"|"ATTACHMENT_REMOVED"|"REOPENED"|"COMPLETED"|"REJECTED", description: string, metadata?: Record<string, unknown>): Promise<SRActivity> {
     return this.model.create({
       data: {
         srId,

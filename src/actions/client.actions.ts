@@ -5,8 +5,10 @@ import { ClientService } from "@/services/client.service";
 import { auth } from "@/auth";
 import { PermissionService } from "@/services/permission.service";
 import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
+import { Result, fail, ok } from "@/lib/result";
+import { errorToResult, ServiceError, UnauthorizedError, ValidationError } from "@/lib/errors";
 
-export async function createClientAction(formData: FormData) {
+export async function createClientAction(formData: FormData): Promise<Result<any>> {
   try {
     const data = {
       code: formData.get("code") as string,
@@ -25,10 +27,7 @@ export async function createClientAction(formData: FormData) {
     // 인증 및 권한 확인
     const session = await auth();
     if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "인증되지 않은 사용자입니다.",
-      };
+      throw new UnauthorizedError();
     }
 
     // 권한 확인
@@ -41,23 +40,13 @@ export async function createClientAction(formData: FormData) {
     // 고객사 생성
     const client = await clientService.createClient(validated);
 
-    return {
-      success: true,
-      data: client,
-      message: "고객사가 성공적으로 생성되었습니다.",
-    };
+    return ok(client);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        error: error.issues?.[0].message || "입력값 검증에 실패했습니다.",
-      };
+      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
     }
 
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "고객사 생성 중 오류가 발생했습니다.",
-    };
+    return errorToResult(error);
   }
 }
 

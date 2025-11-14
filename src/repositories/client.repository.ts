@@ -83,4 +83,21 @@ export class ClientRepository extends BaseRepositoryImpl<Client, string, Prisma.
       data: { isActive: false },
     });
   }
+
+  // 참조 무결성 확인 메서드
+  async getRelatedDataCounts(clientId: string): Promise<{
+    srsCount: number;
+    usersCount: number;
+    serviceCategoriesCount: number;
+    clientHandlersCount: number;
+  }> {
+    const [srsCount, usersCount, serviceCategoriesCount, clientHandlersCount] = await Promise.all([
+      prisma.sR.count({ where: { clientId } }),
+      prisma.userClient.count({ where: { clientId } }),
+      prisma.serviceCategory.count({ where: { clientId } }),
+      prisma.clientHandler.count({ where: { clientId } }),
+    ]);
+
+    return { srsCount, usersCount, serviceCategoriesCount, clientHandlersCount };
+  }
 }

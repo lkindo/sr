@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
 
 const clientSchema = z.object({
   code: z.string().min(2).optional(),
@@ -22,16 +23,15 @@ type RouteContext = {
   }>;
 };
 
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// GET /api/clients/[id] - 고객사 상세 조회 (Rate Limit: 표준)
+export const GET = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
 
-    // 고객사 정보와 전체 서비스 카테고리를 병렬로 조회
-    const [client, allServiceCategories] = await Promise.all([
+  // 고객사 정보와 전체 서비스 카테고리를 병렬로 조회
+  const [client, allServiceCategories] = await Promise.all([
       prisma.client.findUnique({
         where: { id },
         include: {
@@ -96,44 +96,47 @@ export async function GET(request: NextRequest, context: RouteContext) {
         },
         orderBy: { categoryName: "asc" },
       }),
-    ]);
+  ]);
 
-    if (!client) {
-      return NextResponse.json({ error: "고객사를 찾을 수 없습니다." }, { status: 404 });
-    }
-
-    // ADMIN 역할을 가진 사용자 제외
-    const filteredUsers = client.users.filter((userClient) => {
-      const hasAdminRole = userClient.user.roles.some(
-        (userRole) => userRole.role.name === "ADMIN"
-      );
-      return !hasAdminRole;
-    });
-
-    // 고객사 정보에 전체 서비스 카테고리 추가 및 필터링된 사용자로 대체
-    const clientWithCategories = {
-      ...client,
-      users: filteredUsers,
-      serviceCategories: allServiceCategories,
-    };
-
-    return NextResponse.json(clientWithCategories);
-  } catch (error) {
-    console.error("Error fetching client:", error);
-    return NextResponse.json({ error: "오류가 발생했습니다." }, { status: 500 });
+  if (!client) {
+    throw new NotFoundError("고객사를 찾을 수 없습니다.");
   }
-}
 
-export async function PATCH(request: NextRequest, context: RouteContext) {
+  // ADMIN 역할을 가진 사용자 제외
+  const filteredUsers = client.users.filter((userClient) => {
+    const hasAdminRole = userClient.user.roles.some(
+      (userRole) => userRole.role.name === "ADMIN"
+    );
+    return !hasAdminRole;
+  });
+
+  // 고객사 정보에 전체 서비스 카테고리 추가 및 필터링된 사용자로 대체
+  const clientWithCategories = {
+    ...client,
+    users: filteredUsers,
+    serviceCategories: allServiceCategories,
+  };
+
+  return NextResponse.json(clientWithCategories);
+}, { preset: 'standard' }); // 1분당 100회
+
+// PATCH /api/clients/[id] - 고객사 수정 (Rate Limit: 엄격)
+export const PATCH = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
+  const body = await request.json();
+
+  let validated;
   try {
-    const { id } = await context.params;
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    validated = clientSchema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new ValidationError(error.issues[0].message);
     }
-
-    const body = await request.json();
-    const validated = clientSchema.parse(body);
+    throw error;
+  }
 
     const updateData: any = {};
     if (validated.code) updateData.code = validated.code;
@@ -148,12 +151,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     if (validated.contractStartDate !== undefined) {
       updateData.contractStartDate = validated.contractStartDate ? new Date(validated.contractStartDate) : null;
     }
-    if (validated.contractEndDate !== undefined) {
-      updateData.contractEndDate = validated.contractEndDate ? new Date(validated.contractEndDate) : null;
-    }
+  if (validated.contractEndDate !== undefined) {
+    updateData.contractEndDate = validated.contractEndDate ? new Date(validated.contractEndDate) : null;
+  }
 
-    // 고객사 업데이트와 전체 서비스 카테고리를 병렬로 조회
-    const [client, allServiceCategories] = await Promise.all([
+  // 고객사 업데이트와 전체 서비스 카테고리를 병렬로 조회
+  const [client, allServiceCategories] = await Promise.all([
       prisma.client.update({
         where: { id },
         data: updateData,
@@ -186,56 +189,45 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           },
         },
         orderBy: { categoryName: "asc" },
-      }),
-    ]);
+    }),
+  ]);
 
-    // 고객사 정보에 전체 서비스 카테고리 추가
-    const clientWithCategories = {
-      ...client,
-      serviceCategories: allServiceCategories,
-    };
+  // 고객사 정보에 전체 서비스 카테고리 추가
+  const clientWithCategories = {
+    ...client,
+    serviceCategories: allServiceCategories,
+  };
 
-    return NextResponse.json(clientWithCategories);
-  } catch (error) {
-    console.error("Error updating client:", error);
-    return NextResponse.json({ error: "오류가 발생했습니다." }, { status: 500 });
-  }
-}
+  return NextResponse.json(clientWithCategories);
+}, { preset: 'strict' }); // 1분당 5회 (민감한 작업)
 
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+// DELETE /api/clients/[id] - 고객사 삭제 (Rate Limit: 엄격)
+export const DELETE = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
 
-    const client = await prisma.client.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            users: true,
-            srs: true,
-          },
+  const client = await prisma.client.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: {
+          users: true,
+          srs: true,
         },
       },
-    });
+    },
+  });
 
-    if (!client) {
-      return NextResponse.json({ error: "고객사를 찾을 수 없습니다." }, { status: 404 });
-    }
-
-    if (client._count.users > 0 || client._count.srs > 0) {
-      return NextResponse.json({
-        error: "연결된 사용자 또는 SR이 있어 삭제할 수 없습니다.",
-      }, { status: 400 });
-    }
-
-    await prisma.client.delete({ where: { id } });
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Error deleting client:", error);
-    return NextResponse.json({ error: "오류가 발생했습니다." }, { status: 500 });
+  if (!client) {
+    throw new NotFoundError("고객사를 찾을 수 없습니다.");
   }
-}
+
+  if (client._count.users > 0 || client._count.srs > 0) {
+    throw new BadRequestError("연결된 사용자 또는 SR이 있어 삭제할 수 없습니다.");
+  }
+
+  await prisma.client.delete({ where: { id } });
+  return NextResponse.json({ success: true });
+}, { preset: 'strict' }); // 1분당 5회 (민감한 작업)

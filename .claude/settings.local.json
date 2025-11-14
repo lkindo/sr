@@ -62,7 +62,11 @@
       "Bash(tail:*)",
       "Bash(if not exist \"src\\app\\api\\srs\\[id]\" mkdir \"src\\app\\api\\srs\\[id]\")",
       "Bash(if exist .next rmdir /s /q .next)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(pnpm type-check:*)",
+      "Bash(pnpm tsc:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm test:coverage:*)"
     ],
     "deny": [],
     "ask": []

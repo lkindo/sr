@@ -4,6 +4,12 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 // import { sendSRStatusChangedEmail, sendSRAssignedEmail } from "@/lib/email"; // 임시 주석
 
+import { deleteSr } from "@/services/sr.service";
+import { SRRepository } from "@/repositories/sr.repository";
+
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
+
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
@@ -48,91 +54,106 @@ type RouteContext = {
   }>;
 };
 
-import { deleteSr } from "@/services/sr.service";
-import { SRRepository } from "@/repositories/sr.repository";
+// GET /api/srs/[id] - SR 상세 조회 (Rate Limit: 표준)
+export const GET = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
 
-// GET /api/srs/[id] - SR 상세 조회
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
+  const srRepository = new SRRepository();
+  const sr = await srRepository.findById(id);
 
-    // TODO: auth() 함수 임시 주석 처리
-    /*
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    */
-
-    const srRepository = new SRRepository();
-    const sr = await srRepository.findById(id);
-
-    if (!sr) {
-      return NextResponse.json(
-        { error: "SR을 찾을 수 없습니다." },
-        { status: 404 }
-      );
-    }
-
-    // 날짜 객체를 문자열로 변환 (JSON 직렬화를 위해)
-    const serializableSr = {
-      ...sr,
-      createdAt: sr.createdAt.toISOString(),
-      updatedAt: sr.updatedAt.toISOString(),
-      dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
-      requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
-      estimatedCompletionDate: sr.estimatedCompletionDate ? sr.estimatedCompletionDate.toISOString() : null,
-      actualCompletionDate: sr.actualCompletionDate ? sr.actualCompletionDate.toISOString() : null,
-      // 관련 객체들의 날짜 필드도 변환
-      comments: (sr as any).comments ? (sr as any).comments.map((comment: any) => ({
-        ...comment,
-        createdAt: comment.createdAt.toISOString(),
-        updatedAt: comment.updatedAt.toISOString(),
-      })) : [],
-      activities: (sr as any).activities ? (sr as any).activities.map((activity: any) => ({
-        ...activity,
-        createdAt: activity.createdAt.toISOString(),
-      })) : [],
-    };
-
-    return NextResponse.json(serializableSr);
-  } catch (error) {
-    console.error("Error fetching SR:", error);
-    return NextResponse.json(
-      { error: "SR 조회 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+  if (!sr) {
+    throw new NotFoundError("SR을 찾을 수 없습니다.");
   }
-}
 
-// DELETE /api/srs/[id] - SR 삭제
-export async function DELETE(request: NextRequest, context: RouteContext) {
+  // 날짜 객체를 문자열로 변환 (JSON 직렬화를 위해)
+  const serializableSr = {
+    ...sr,
+    createdAt: sr.createdAt.toISOString(),
+    updatedAt: sr.updatedAt.toISOString(),
+    dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
+    requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
+    estimatedCompletionDate: sr.estimatedCompletionDate ? sr.estimatedCompletionDate.toISOString() : null,
+    actualCompletionDate: sr.actualCompletionDate ? sr.actualCompletionDate.toISOString() : null,
+    // 관련 객체들의 날짜 필드도 변환
+    comments: (sr as any).comments ? (sr as any).comments.map((comment: any) => ({
+      ...comment,
+      createdAt: comment.createdAt.toISOString(),
+      updatedAt: comment.updatedAt.toISOString(),
+    })) : [],
+    activities: (sr as any).activities ? (sr as any).activities.map((activity: any) => ({
+      ...activity,
+      createdAt: activity.createdAt.toISOString(),
+    })) : [],
+  };
+
+  return NextResponse.json(serializableSr);
+}, { preset: 'standard' }); // 1분당 100회
+
+// PATCH /api/srs/[id] - SR 수정 (Rate Limit: 엄격)
+export const PATCH = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { session, params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
+  const body = await request.json();
+
+  let validated;
   try {
-    const { id } = await context.params;
-
-    // TODO: auth() 함수 임시 주석 처리
-    /*
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    validated = srUpdateSchema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new ValidationError(error.issues[0].message);
     }
-    */
+    throw error;
+  }
 
+  // SR 존재 확인
+  const existingSR = await prisma.sR.findUnique({
+    where: { id },
+  });
+
+  if (!existingSR) {
+    throw new NotFoundError("SR을 찾을 수 없습니다.");
+  }
+
+  // SR 업데이트 - undefined 값 제거
+  const updateData: any = { ...validated };
+  Object.keys(updateData).forEach(key => {
+    if (updateData[key] === undefined) {
+      delete updateData[key];
+    }
+  });
+
+  const updatedSR = await prisma.sR.update({
+    where: { id },
+    data: updateData,
+  });
+
+  return NextResponse.json(updatedSR);
+}, { preset: 'strict' }); // 1분당 5회 (민감한 작업)
+
+// DELETE /api/srs/[id] - SR 삭제 (Rate Limit: 엄격)
+export const DELETE = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
+
+  try {
     const result = await deleteSr(id);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof Error) {
-        if (error.message === "SR을 찾을 수 없습니다.") {
-            return NextResponse.json({ error: error.message }, { status: 404 });
-        }
-        if (error.message === "진행 중이거나 완료된 SR은 삭제할 수 없습니다.") {
-            return NextResponse.json({ error: error.message }, { status: 400 });
-        }
+      if (error.message === "SR을 찾을 수 없습니다.") {
+        throw new NotFoundError(error.message);
+      }
+      if (error.message === "진행 중이거나 완료된 SR은 삭제할 수 없습니다.") {
+        throw new BadRequestError(error.message);
+      }
     }
-    console.error("Error deleting SR:", error);
-    return NextResponse.json(
-      { error: "SR 삭제 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    throw error;
   }
-}
+}, { preset: 'strict' }); // 1분당 5회 (삭제는 민감한 작업)

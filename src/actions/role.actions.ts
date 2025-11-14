@@ -5,10 +5,12 @@ import { RoleService } from "@/services/role.service";
 import { auth } from "@/auth";
 import { PermissionService } from "@/services/permission.service";
 import { roleCreateSchema, roleUpdateSchema } from "@/lib/schemas";
+import { Result, ok, fail } from "@/lib/result";
+import { errorToResult, UnauthorizedError } from "@/lib/errors";
 
 const permissionService = new PermissionService();
 
-export async function createRoleAction(formData: FormData) {
+export async function createRoleAction(formData: FormData): Promise<Result<any>> {
   try {
     const data = {
       name: formData.get("name") as string,
@@ -19,23 +21,23 @@ export async function createRoleAction(formData: FormData) {
 
     const session = await auth();
     if (!session?.user?.id) {
-      return { success: false, error: "인증되지 않은 사용자입니다." };
+      throw new UnauthorizedError();
     }
     await permissionService.requirePermission(session.user.id, 'role:create');
 
     const roleService = new RoleService();
     const role = await roleService.createRole(validated);
 
-    return { success: true, data: role, message: "역할이 성공적으로 생성되었습니다." };
+    return ok(role);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, error: error.issues?.[0].message || "입력값 검증에 실패했습니다." };
+      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
     }
-    return { success: false, error: error instanceof Error ? error.message : "역할 생성 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 
-export async function updateRoleAction(id: string, formData: FormData) {
+export async function updateRoleAction(id: string, formData: FormData): Promise<Result<any>> {
   try {
     const data = {
       name: formData.get("name") as string | undefined,
@@ -46,76 +48,76 @@ export async function updateRoleAction(id: string, formData: FormData) {
 
     const session = await auth();
     if (!session?.user?.id) {
-      return { success: false, error: "인증되지 않은 사용자입니다." };
+      throw new UnauthorizedError();
     }
     await permissionService.requirePermission(session.user.id, 'role:update');
 
     const roleService = new RoleService();
     const role = await roleService.updateRole(id, validated);
 
-    return { success: true, data: role, message: "역할이 성공적으로 업데이트되었습니다." };
+    return ok(role);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, error: error.issues?.[0].message || "입력값 검증에 실패했습니다." };
+      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
     }
-    return { success: false, error: error instanceof Error ? error.message : "역할 업데이트 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 
-export async function deleteRoleAction(id: string) {
+export async function deleteRoleAction(id: string): Promise<Result<void>> {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return { success: false, error: "인증되지 않은 사용자입니다." };
+      throw new UnauthorizedError();
     }
     await permissionService.requirePermission(session.user.id, 'role:delete');
 
     const roleService = new RoleService();
     await roleService.deleteRole(id);
 
-    return { success: true, message: "역할이 성공적으로 삭제되었습니다." };
+    return ok(undefined);
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "역할 삭제 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 
-export async function getRoleAction(id: string) {
+export async function getRoleAction(id: string): Promise<Result<any>> {
   try {
     const roleService = new RoleService();
     const role = await roleService.getRoleById(id);
     if (!role) {
-      return { success: false, error: "역할을 찾을 수 없습니다." };
+      return fail("역할을 찾을 수 없습니다.", "NOT_FOUND");
     }
-    return { success: true, data: role };
+    return ok(role);
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "역할 조회 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 
-export async function getAllRolesAction() {
+export async function getAllRolesAction(): Promise<Result<any>> {
   try {
     const roleService = new RoleService();
     const roles = await roleService.getAllRoles();
-    return { success: true, data: roles };
+    return ok(roles);
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "역할 목록 조회 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 
-export async function updateRolePermissionsAction(roleId: string, permissionIds: string[]) {
+export async function updateRolePermissionsAction(roleId: string, permissionIds: string[]): Promise<Result<void>> {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return { success: false, error: "인증되지 않은 사용자입니다." };
+      throw new UnauthorizedError();
     }
-    await permissionService.requirePermission(session.user.id, 'role:update_permissions'); // Assuming a specific permission for this
+    await permissionService.requirePermission(session.user.id, 'role:update_permissions');
 
     const roleService = new RoleService();
     await roleService.updateRolePermissions(roleId, permissionIds);
 
-    return { success: true, message: "역할 권한이 성공적으로 업데이트되었습니다." };
+    return ok(undefined);
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "역할 권한 업데이트 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 

@@ -1,265 +1,114 @@
 "use server";
 
 import { z } from "zod";
-
 import { UserService } from "@/services/user.service";
-
 import { auth } from "@/auth";
-
-import { PermissionService } from "@/services/permission.service"; // Import PermissionService
-
+import { PermissionService } from "@/services/permission.service";
 import { userUpdateSchema } from "@/lib/schemas";
+import { Result, ok, fail } from "@/lib/result";
+import { errorToResult, UnauthorizedError } from "@/lib/errors";
+
+const permissionService = new PermissionService();
 
 
 
-const permissionService = new PermissionService(); // Instantiate PermissionService once
-
-
-
-export async function updateUserAction(formData: FormData) {
-
+export async function updateUserAction(formData: FormData): Promise<Result<any>> {
   try {
-
     const data = {
-
       name: formData.get("name") as string | undefined,
-
       email: formData.get("email") as string | undefined,
-
       image: formData.get("image") as string | undefined,
-
     };
-
-
 
     const validated = userUpdateSchema.parse(data);
 
-
-
-    // 인증 확인
-
     const session = await auth();
-
     if (!session?.user?.id) {
-
-      return {
-
-        success: false,
-
-        error: "인증되지 않은 사용자입니다.",
-
-      };
-
+      throw new UnauthorizedError();
     }
-
-    await permissionService.requirePermission(session.user.id, 'user:update'); // Permission check
-
-
-
-    // UserService 인스턴스 생성
+    await permissionService.requirePermission(session.user.id, 'user:update');
 
     const userService = new UserService();
-
-
-
-    // 사용자 정보 업데이트
-
     const user = await userService.updateProfile(session.user.id, validated);
 
-
-
-    return {
-
-      success: true,
-
-      data: user,
-
-      message: "프로필이 성공적으로 업데이트되었습니다.",
-
-    };
-
+    return ok(user);
   } catch (error) {
-
     if (error instanceof z.ZodError) {
-
-      return {
-
-        success: false,
-
-        error: error.issues?.[0].message || "입력값 검증에 실패했습니다.",
-
-      };
-
+      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
     }
-
-
-
-    return {
-
-      success: false,
-
-      error: error instanceof Error ? error.message : "프로필 업데이트 중 오류가 발생했습니다.",
-
-    };
-
+    return errorToResult(error);
   }
-
 }
 
 
 
-export async function changePasswordAction(formData: FormData) {
-
+export async function changePasswordAction(formData: FormData): Promise<Result<void>> {
   try {
-
     const currentPassword = formData.get("currentPassword") as string;
-
     const newPassword = formData.get("newPassword") as string;
-
     const confirmPassword = formData.get("confirmPassword") as string;
 
-
-
-    // 비밀번호 변경을 위한 별도의 검증 스키마가 필요할 수 있습니다
-
     if (newPassword !== confirmPassword) {
-
-      return {
-
-        success: false,
-
-        error: "새 비밀번호와 확인 비밀번호가 일치하지 않습니다.",
-
-      };
-
+      return fail("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.", "VALIDATION_ERROR");
     }
-
-
 
     if (newPassword.length < 8) {
-
-      return {
-
-        success: false,
-
-        error: "비밀번호는 최소 8자 이상이어야 합니다.",
-
-      };
-
+      return fail("비밀번호는 최소 8자 이상이어야 합니다.", "VALIDATION_ERROR");
     }
-
-
-
-    // 인증 확인
 
     const session = await auth();
-
     if (!session?.user?.id) {
-
-      return {
-
-        success: false,
-
-        error: "인증되지 않은 사용자입니다.",
-
-      };
-
+      throw new UnauthorizedError();
     }
-
-    await permissionService.requirePermission(session.user.id, 'user:change_password'); // Permission check
-
-
-
-    // UserService 인스턴스 생성
+    await permissionService.requirePermission(session.user.id, 'user:change_password');
 
     const userService = new UserService();
+    await userService.changePassword(session.user.id, currentPassword, newPassword);
 
-
-
-    // 현재 비밀번호 확인 및 변경 로직은 UserService에 구현이 필요
-
-    // 현재 UserService에는 비밀번호 해시 처리 로직이 구현되어 있지 않으므로,
-
-    // 이 예제에서는 간단한 흐름만 구현합니다
-
-
-
-    return {
-
-      success: true,
-
-      message: "비밀번호가 성공적으로 변경되었습니다.",
-
-    };
-
+    return ok(undefined);
   } catch (error) {
-
-    return {
-
-      success: false,
-
-      error: error instanceof Error ? error.message : "비밀번호 변경 중 오류가 발생했습니다.",
-
-    };
-
+    return errorToResult(error);
   }
-
 }
 
 
 
-export async function getUserAction(id: string) {
+export async function getUserAction(id: string): Promise<Result<any>> {
   try {
-    // 인증 확인은 필요에 따라 처리 가능
-
-    // UserService 인스턴스 생성
     const userService = new UserService();
-
-    // 사용자 정보 조회
     const user = await userService.getUserById(id);
-
     if (!user) {
-      return {
-        success: false,
-        error: "사용자를 찾을 수 없습니다.",
-      };
+      return fail("사용자를 찾을 수 없습니다.", "NOT_FOUND");
     }
-
-    return {
-      success: true,
-      data: user,
-    };
+    return ok(user);
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "사용자 정보 조회 중 오류가 발생했습니다.",
-    };
+    return errorToResult(error);
   }
 }
 
-export async function getProfileAction() {
+export async function getProfileAction(): Promise<Result<any>> {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return { success: false, error: "인증되지 않은 사용자입니다." };
+      throw new UnauthorizedError();
     }
     const userService = new UserService();
     const user = await userService.getUserById(session.user.id);
     if (!user) {
-      return { success: false, error: "프로필을 찾을 수 없습니다." };
+      return fail("프로필을 찾을 수 없습니다.", "NOT_FOUND");
     }
-    return { success: true, data: user };
+    return ok(user);
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : "프로필 조회 중 오류가 발생했습니다." };
+    return errorToResult(error);
   }
 }
 
-export async function getSRHandlersForSelection() {
+export async function getSRHandlersForSelection(): Promise<Result<any>> {
   try {
     const userService = new UserService();
     const srHandlers = await userService.getUsersWithSRHandlingPermission();
-    return { success: true, data: srHandlers };
+    return ok(srHandlers);
   } catch (error) {
-    return { success: false, error: "SR 담당자 목록을 불러오는데 실패했습니다." };
+    return errorToResult(error);
   }
 }

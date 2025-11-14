@@ -5,7 +5,7 @@ export class NextRequest extends Request {
 }
 
 export class NextResponse<T = any> extends Response {
-  static json(data: T, init?: ResponseInit) {
+  static json<T = any>(data: T, init?: ResponseInit): NextResponse<T> {
     return new Response(JSON.stringify(data), {
       ...init,
       headers: {

@@ -71,7 +71,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const fetchProfile = useCallback(async () => {
     try {
       const result = await getProfileAction();
-      if (!result.success || !result.data) {
+      if (!result.success) {
         throw new Error(result.error || "프로필 정보를 불러오는데 실패했습니다.");
       }
       setProfile({

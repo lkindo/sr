@@ -1,4 +1,4 @@
-import { User } from "@prisma/client";
+import { User, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { SRRepository } from "@/repositories/sr.repository";
 import { SRActivityRepository } from "@/repositories/sr-activity.repository";
@@ -76,7 +76,8 @@ export class SRService {
       },
     });
 
-    return sr;
+    // 관계 데이터를 포함하여 반환
+    return this.srRepository.findDetailsById(sr.id);
   }
 
   async updateSR(id: string, data: SrUpdateData, sessionUser: User) {
@@ -86,7 +87,7 @@ export class SRService {
       throw new Error("SR을 찾을 수 없습니다.");
     }
 
-    const updateData: any = { ...validated }; // Use validated data directly
+    const updateData: Record<string, unknown> = { ...validated };
 
     // Additional logic from original method
     if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
@@ -142,8 +143,8 @@ export class SRService {
   }
 
   async getAllSRs(params: {
-    where?: any;
-    orderBy?: any;
+    where?: Prisma.SRWhereInput;
+    orderBy?: Prisma.SROrderByWithRelationInput;
     skip?: number;
     take?: number;
   }) {
@@ -152,7 +153,7 @@ export class SRService {
     return srs.map((sr) => ({ ...sr, assignedTo: sr.assignee || null }));
   }
 
-  async countSRs(params: { where?: any }) {
+  async countSRs(params: { where?: Prisma.SRWhereInput }) {
     const { where } = params;
     return this.srRepository.count(where);
   }
@@ -180,15 +181,15 @@ export const getSrById = async (id: string) => {
 
 export const getAllSrs = async (filters: { status?: string; clientId?: string; priority?: string }) => {
   // Convert filters to the expected format for SRService.getAllSRs
-  const whereFilters: any = {};
-  if (filters.status) whereFilters.status = filters.status;
+  const whereFilters: Prisma.SRWhereInput = {};
+  if (filters.status) whereFilters.status = filters.status as Prisma.SRWhereInput['status'];
   if (filters.clientId) whereFilters.clientId = filters.clientId;
-  if (filters.priority) whereFilters.priority = filters.priority;
-  
+  if (filters.priority) whereFilters.priority = filters.priority as Prisma.SRWhereInput['priority'];
+
   return srServiceInstance.getAllSRs({ where: whereFilters });
 };
 
-export const createSr = async (data: any, sessionUser: any) => {
+export const createSr = async (data: SrCreateData, sessionUser: { id: string; email: string }) => {
   return srServiceInstance.createSR(data, sessionUser);
 };
 

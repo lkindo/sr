@@ -60,8 +60,13 @@ export default function RolesPage() {
     try {
       const response = await fetch("/api/roles");
       if (!response.ok) throw new Error("Failed to fetch roles");
-      const data = await response.json();
-      setRoles(data);
+      const data: Role[] = await response.json();
+      // 권한 데이터가 없는 경우 빈 배열로 초기화
+      const rolesWithPermissions = data.map((role) => ({
+        ...role,
+        permissions: role.permissions || [],
+      }));
+      setRoles(rolesWithPermissions);
     } catch (error) {
       toast({
         title: "오류",

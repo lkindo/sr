@@ -1,25 +1,19 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
-// GET /api/dashboard/stats - 대시보드 통계 조회
-export async function GET(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
 
-    // Get SR counts by status
-    const srByStatus = await prisma.sR.groupBy({
-      by: ["status"],
-      _count: {
-        id: true,
-      },
-    });
+// GET /api/dashboard/stats - 대시보드 통계 조회 (Rate Limit: 느슨함)
+export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
+  // Get SR counts by status
+  const srByStatus = await prisma.sR.groupBy({
+    by: ["status"],
+    _count: {
+      id: true,
+    },
+  });
 
     const statusCounts = srByStatus.reduce((acc, item) => {
       acc[item.status] = item._count.id;
@@ -140,24 +134,17 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      summary: {
-        total: totalSRs,
-        inProgress: inProgressSRs,
-        completed: completedSRs,
-        pending: pendingSRs,
-      },
-      byStatus: statusCounts,
-      byPriority: priorityCounts,
-      byClient: clientCounts,
-      recentSRs: recentSRs,
-      trend: trendData,
-    });
-  } catch (error) {
-    console.error("Error fetching dashboard stats:", error);
-    return NextResponse.json(
-      { error: "대시보드 통계를 불러오는 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({
+    summary: {
+      total: totalSRs,
+      inProgress: inProgressSRs,
+      completed: completedSRs,
+      pending: pendingSRs,
+    },
+    byStatus: statusCounts,
+    byPriority: priorityCounts,
+    byClient: clientCounts,
+    recentSRs: recentSRs,
+    trend: trendData,
+  });
+}, { preset: 'relaxed' }); // 1분당 300회 (대시보드는 자주 조회됨)

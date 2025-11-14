@@ -193,7 +193,7 @@ export function EditSRDialog({
     try {
       const result = await updateSRAction(sr.id, formData);
 
-      if (!result.success || !result.data) {
+      if (!result.success) {
         throw new Error(result.error || "SR 수정에 실패했습니다.");
       }
 

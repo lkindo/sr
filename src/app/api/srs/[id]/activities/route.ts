@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { NotFoundError } from "@/lib/errors";
 
 type RouteContext = {
   params: Promise<{
@@ -8,38 +10,32 @@ type RouteContext = {
   }>;
 };
 
-// GET /api/srs/[id]/activities - SR 활동 이력 조회
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
+// GET /api/srs/[id]/activities - SR 활동 이력 조회 (Rate Limit: 표준)
+export const GET = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
 
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const activities = await prisma.sRActivity.findMany({
-      where: { srId: id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
+  const activities = await prisma.sRActivity.findMany({
+    where: { srId: id },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
         },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
 
-    return NextResponse.json(activities);
-  } catch (error) {
-    console.error("Error fetching activities:", error);
-    return NextResponse.json(
-      { error: "활동 이력을 불러오는 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+  if (!activities) {
+    throw new NotFoundError("활동 이력을 찾을 수 없습니다.");
   }
-}
+
+  return NextResponse.json(activities);
+}, { preset: 'standard' }); // 1분당 100회

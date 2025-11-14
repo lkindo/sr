@@ -3,12 +3,14 @@
 import { z } from "zod";
 import { SRService } from "@/services/sr.service";
 import { auth } from "@/auth";
-import { PermissionService } from "@/services/permission.service"; // Import PermissionService
+import { PermissionService } from "@/services/permission.service";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
+import { Result, ok, fail } from "@/lib/result";
+import { errorToResult, UnauthorizedError } from "@/lib/errors";
 
-const permissionService = new PermissionService(); // Instantiate PermissionService once
+const permissionService = new PermissionService();
 
-export async function createSRAction(formData: FormData) {
+export async function createSRAction(formData: FormData): Promise<Result<any>> {
   try {
     const data = {
       title: formData.get("title") as string,
@@ -21,57 +23,39 @@ export async function createSRAction(formData: FormData) {
 
     const validated = srCreateSchema.parse(data);
 
-    // 인증 확인
     const session = await auth();
     if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "인증되지 않은 사용자입니다.",
-      };
+      throw new UnauthorizedError();
     }
-    await permissionService.requirePermission(session.user.id, 'sr:create'); // Permission check
+    await permissionService.requirePermission(session.user.id, 'sr:create');
 
-    // SRService 인스턴스 생성
     const srService = new SRService();
-
-    // SR 생성
     const sr = await srService.createSR(validated, session.user);
 
-    return {
-      success: true,
-      data: sr,
-      message: "SR이 성공적으로 생성되었습니다.",
-    };
+    return ok(sr);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        error: error.issues?.[0].message || "입력값 검증에 실패했습니다.",
-      };
+      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
     }
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "SR 생성 중 오류가 발생했습니다.",
-    };
+    return errorToResult(error);
   }
 }
 
-export async function updateSRAction(id: string, formData: FormData) {
+export async function updateSRAction(id: string, formData: FormData): Promise<Result<any>> {
   try {
     const data = {
       title: formData.get("title") as string | undefined,
       description: formData.get("description") as string | undefined,
       serviceCategoryId: formData.get("serviceCategoryId") as string | undefined,
       priority: formData.get("priority") as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | undefined,
-      status: formData.get("status") as 
+      status: formData.get("status") as
         | "REQUESTED"
-        | "INTAKE" 
+        | "INTAKE"
         | "IN_PROGRESS"
         | "ON_HOLD"
         | "COMPLETED"
         | "CONFIRMED"
-        | "REJECTED" 
+        | "REJECTED"
         | undefined,
       assignedToId: formData.get("assignedToId") as string | null | undefined,
       expectedCompletionDate: formData.get("expectedCompletionDate") as string | null | undefined,
@@ -81,7 +65,6 @@ export async function updateSRAction(id: string, formData: FormData) {
       rejectionReason: formData.get("rejectionReason") as string | null | undefined,
       satisfactionRating: formData.get("satisfactionRating") as string | undefined,
       additionalFeedback: formData.get("additionalFeedback") as string | undefined,
-      // 접수 처리 관련 필드
       actualPriority: formData.get("actualPriority") as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | undefined,
       estimatedHours: formData.get("estimatedHours") as string | undefined,
       estimatedCompletionDate: formData.get("estimatedCompletionDate") as string | undefined,
@@ -91,7 +74,7 @@ export async function updateSRAction(id: string, formData: FormData) {
     };
 
     // 빈 문자열을 null로 변환
-    const processedData: any = {};
+    const processedData: Record<string, string | number | null | undefined> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value === "") {
         processedData[key] = null;
@@ -105,20 +88,13 @@ export async function updateSRAction(id: string, formData: FormData) {
 
     const validated = srUpdateSchema.parse(processedData);
 
-    // 인증 확인
     const session = await auth();
     if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "인증되지 않은 사용자입니다.",
-      };
+      throw new UnauthorizedError();
     }
-    await permissionService.requirePermission(session.user.id, 'sr:update'); // Permission check
+    await permissionService.requirePermission(session.user.id, 'sr:update');
 
-    // SRService 인스턴스 생성
     const srService = new SRService();
-
-    // 필요한 사용자 정보만 추출
     const userForService = {
       id: session.user.id,
       email: session.user.email,
@@ -128,103 +104,61 @@ export async function updateSRAction(id: string, formData: FormData) {
       permissions: session.user.permissions || [],
     };
 
-    // SR 업데이트
     const sr = await srService.updateSR(id, validated, userForService as any);
 
-    return {
-      success: true,
-      data: sr,
-      message: "SR이 성공적으로 업데이트되었습니다.",
-    };
+    return ok(sr);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return {
-        success: false,
-        error: error.issues?.[0].message || "입력값 검증에 실패했습니다.",
-      };
+      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
     }
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "SR 업데이트 중 오류가 발생했습니다.",
-    };
+    return errorToResult(error);
   }
 }
 
-export async function deleteSRAction(id: string) {
+export async function deleteSRAction(id: string): Promise<Result<void>> {
   try {
-    // 인증 확인
     const session = await auth();
     if (!session?.user?.id) {
-      return {
-        success: false,
-        error: "인증되지 않은 사용자입니다.",
-      };
+      throw new UnauthorizedError();
     }
-    await permissionService.requirePermission(session.user.id, 'sr:delete'); // Permission check
+    await permissionService.requirePermission(session.user.id, 'sr:delete');
 
-    // SRService 인스턴스 생성
     const srService = new SRService();
-
-    // SR 삭제
     await srService.deleteSR(id);
 
-    return {
-      success: true,
-      message: "SR이 성공적으로 삭제되었습니다.",
-    };
+    return ok(undefined);
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "SR 삭제 중 오류가 발생했습니다.",
-    };
+    return errorToResult(error);
   }
 }
 
-export async function getSRAction(id: string) {
+export async function getSRAction(id: string): Promise<Result<any>> {
   try {
-    // 인증 확인은 필요에 따라 처리 가능
-
-    // SRService 인스턴스 생성
     const srService = new SRService();
-
-    // SR 조회
     const sr = await srService.getSRById(id);
 
     if (!sr) {
-      return {
-        success: false,
-        error: "SR을 찾을 수 없습니다.",
-      };
+      return fail("SR을 찾을 수 없습니다.", "NOT_FOUND");
     }
 
-    return {
-      success: true,
-      data: sr,
-    };
+    return ok(sr);
   } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "SR 조회 중 오류가 발생했습니다.",
-        };
-      }
+    return errorToResult(error);
+  }
+}
+
+export async function getSRDetailsAction(id: string): Promise<Result<any>> {
+  try {
+    const srService = new SRService();
+    const sr = await srService.getSRById(id);
+
+    if (!sr) {
+      return fail("SR을 찾을 수 없습니다.", "NOT_FOUND");
     }
-    
-    export async function getSRDetailsAction(id: string) {
-      try {
-        const srService = new SRService();
-        const sr = await srService.getSRById(id);
-    
-        if (!sr) {
-          return { success: false, error: "SR을 찾을 수 없습니다." };
-        }
-    
-        return { success: true, data: sr };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : "SR 상세 정보 조회 중 오류가 발생했습니다.",
-        };
-      }
-    }
+
+    return ok(sr);
+  } catch (error) {
+    return errorToResult(error);
+  }
+}
     

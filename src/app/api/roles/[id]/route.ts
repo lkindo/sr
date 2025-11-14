@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
 
 const roleUpdateSchema = z.object({
   name: z.string().min(2, "역할 이름은 최소 2자 이상이어야 합니다.").optional(),
   description: z.string().optional(),
-});
-
-const permissionAssignSchema = z.object({
-  permissionIds: z.array(z.string()),
 });
 
 type RouteContext = {
@@ -18,170 +16,126 @@ type RouteContext = {
   }>;
 };
 
-// GET /api/roles/[id] - 특정 역할 조회
-export async function GET(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
+// GET /api/roles/[id] - 특정 역할 조회 (Rate Limit: 표준)
+export const GET = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
 
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const role = await prisma.role.findUnique({
-      where: { id },
-      include: {
-        permissions: {
-          include: {
-            permission: true,
-          },
+  const role = await prisma.role.findUnique({
+    where: { id },
+    include: {
+      permissions: {
+        include: {
+          permission: true,
         },
-        users: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
+      },
+      users: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
             },
           },
         },
       },
-    });
+    },
+  });
 
-    if (!role) {
-      return NextResponse.json(
-        { error: "역할을 찾을 수 없습니다." },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(role);
-  } catch (error) {
-    console.error("Error fetching role:", error);
-    return NextResponse.json(
-      { error: "역할 조회 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+  if (!role) {
+    throw new NotFoundError("역할을 찾을 수 없습니다.");
   }
-}
 
-// PATCH /api/roles/[id] - 역할 수정
-export async function PATCH(request: NextRequest, context: RouteContext) {
+  return NextResponse.json(role);
+}, { preset: 'standard' }); // 1분당 100회
+
+// PATCH /api/roles/[id] - 역할 수정 (Rate Limit: 엄격)
+export const PATCH = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
+  
+  const body = await request.json();
+  let validated;
   try {
-    const { id } = await context.params;
-
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const validated = roleUpdateSchema.parse(body);
-
-    // Check if role exists
-    const existingRole = await prisma.role.findUnique({
-      where: { id },
-    });
-
-    if (!existingRole) {
-      return NextResponse.json(
-        { error: "역할을 찾을 수 없습니다." },
-        { status: 404 }
-      );
-    }
-
-    // If name is being changed, check for duplicates
-    if (validated.name && validated.name !== existingRole.name) {
-      const duplicateRole = await prisma.role.findUnique({
-        where: { name: validated.name },
-      });
-
-      if (duplicateRole) {
-        return NextResponse.json(
-          { error: "이미 존재하는 역할 이름입니다." },
-          { status: 400 }
-        );
-      }
-    }
-
-    const role = await prisma.role.update({
-      where: { id },
-      data: validated,
-      include: {
-        permissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json(role);
+    validated = roleUpdateSchema.parse(body);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.issues?.[0].message },
-        { status: 400 }
-      );
+      throw new ValidationError(error.issues[0].message);
     }
-
-    console.error("Error updating role:", error);
-    return NextResponse.json(
-      { error: "역할 수정 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    throw error;
   }
-}
 
-// DELETE /api/roles/[id] - 역할 삭제
-export async function DELETE(request: NextRequest, context: RouteContext) {
-  try {
-    const { id } = await context.params;
+  // Check if role exists
+  const existingRole = await prisma.role.findUnique({
+    where: { id },
+  });
 
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!existingRole) {
+    throw new NotFoundError("역할을 찾을 수 없습니다.");
+  }
+
+  // If name is being changed, check for duplicates
+  if (validated.name && validated.name !== existingRole.name) {
+    const duplicateRole = await prisma.role.findUnique({
+      where: { name: validated.name },
+    });
+
+    if (duplicateRole) {
+      throw new BadRequestError("이미 존재하는 역할 이름입니다.");
     }
+  }
 
-    // Check if role exists
-    const existingRole = await prisma.role.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            users: true,
-          },
+  const role = await prisma.role.update({
+    where: { id },
+    data: validated,
+    include: {
+      permissions: {
+        include: {
+          permission: true,
         },
       },
-    });
+    },
+  });
 
-    if (!existingRole) {
-      return NextResponse.json(
-        { error: "역할을 찾을 수 없습니다." },
-        { status: 404 }
-      );
-    }
+  return NextResponse.json(role);
+}, { preset: 'strict' }); // 1분당 5회 (민감한 작업)
 
-    // Check if role is assigned to any users
-    if (existingRole._count.users > 0) {
-      return NextResponse.json(
-        { error: "사용자가 할당된 역할은 삭제할 수 없습니다." },
-        { status: 400 }
-      );
-    }
+// DELETE /api/roles/[id] - 역할 삭제 (Rate Limit: 엄격)
+export const DELETE = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
 
-    await prisma.role.delete({
-      where: { id },
-    });
+  // Check if role exists
+  const existingRole = await prisma.role.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: {
+          users: true,
+        },
+      },
+    },
+  });
 
-    return NextResponse.json({ message: "역할이 삭제되었습니다." });
-  } catch (error) {
-    console.error("Error deleting role:", error);
-    return NextResponse.json(
-      { error: "역할 삭제 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+  if (!existingRole) {
+    throw new NotFoundError("역할을 찾을 수 없습니다.");
   }
-}
+
+  // Check if role is assigned to any users
+  if (existingRole._count.users > 0) {
+    throw new BadRequestError("사용자가 할당된 역할은 삭제할 수 없습니다.");
+  }
+
+  await prisma.role.delete({
+    where: { id },
+  });
+
+  return NextResponse.json({ message: "역할이 삭제되었습니다." });
+}, { preset: 'strict' }); // 1분당 5회 (민감한 작업)

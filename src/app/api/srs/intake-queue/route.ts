@@ -1,24 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-// GET /api/srs/intake-queue - 접수 대기 목록 조회
-export async function GET(request: NextRequest) {
+// GET /api/srs/intake-queue - 접수 대기 목록 조회 (Rate Limit: 표준)
+export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
   console.log("🔍 [GET /api/srs/intake-queue] 요청 시작");
 
-  try {
-    // TODO: auth() 활성화
-    // const session = await auth();
-    // if (!session) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
-
-    const { searchParams } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
     const clientId = searchParams.get("clientId");
     const serviceCategoryId = searchParams.get("serviceCategoryId");
     const sortBy = searchParams.get("sortBy") || "waitingTime"; // waitingTime, priority, requestedCompletionDate
@@ -152,22 +145,11 @@ export async function GET(request: NextRequest) {
         sortedSrs.sort((a, b) => b.priorityScore - a.priorityScore);
     }
 
-    console.log(`✅ 접수 대기 SR ${sortedSrs.length}건 조회 완료`);
+  console.log(`✅ 접수 대기 SR ${sortedSrs.length}건 조회 완료`);
 
-    return NextResponse.json({
-      srs: sortedSrs,
-      total: sortedSrs.length,
-      timestamp: now.toISOString(),
-    });
-
-  } catch (error) {
-    console.error("❌ [GET /api/srs/intake-queue] 오류:", error);
-    return NextResponse.json(
-      {
-        error: "접수 대기 목록 조회 중 오류가 발생했습니다",
-        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.message : String(error)) : undefined
-      },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({
+    srs: sortedSrs,
+    total: sortedSrs.length,
+    timestamp: now.toISOString(),
+  });
+}, { preset: 'standard' }); // 1분당 100회

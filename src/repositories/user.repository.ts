@@ -164,4 +164,95 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
       data: { isActive: false },
     });
   }
+
+  async findAllWithFilters(filters?: {
+    search?: string;
+    isActive?: string;
+    userType?: string;
+    roleId?: string;
+    role?: string;
+  }): Promise<any[]> {
+    const where: Prisma.UserWhereInput = {};
+
+    // 검색어 필터
+    if (filters?.search) {
+      where.OR = [
+        { name: { contains: filters.search } },
+        { email: { contains: filters.search } },
+      ];
+    }
+
+    // 활성화 상태 필터
+    if (filters?.isActive !== null && filters?.isActive !== undefined && filters.isActive !== "") {
+      where.isActive = filters.isActive === "true";
+    }
+
+    // 역할 ID 필터
+    if (filters?.roleId && filters.roleId !== "all") {
+      where.roles = {
+        some: {
+          roleId: filters.roleId,
+        },
+      };
+    }
+
+    // 역할 이름 필터
+    if (filters?.role) {
+      const roleNames = filters.role.split(",");
+      where.roles = {
+        some: {
+          role: {
+            name: {
+              in: roleNames,
+            },
+          },
+        },
+      };
+    }
+
+    const users = await this.model.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        roles: {
+          include: {
+            role: true,
+          },
+        },
+        clients: {
+          include: {
+            client: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // 사용자 유형 결정 (클라이언트가 있으면 CLIENT, 없으면 ENGINEER)
+    type UserWithType = typeof users[number] & { userType: "CLIENT" | "ENGINEER" };
+    let usersWithType: UserWithType[] = users.map((user: typeof users[number]): UserWithType => ({
+      ...user,
+      userType: user.clients.length > 0 ? ("CLIENT" as const) : ("ENGINEER" as const),
+    }));
+
+    // 유형별 필터링
+    if (filters?.userType && filters.userType !== "all") {
+      usersWithType = usersWithType.filter((user) => user.userType === filters.userType);
+    }
+
+    return usersWithType;
+  }
 }

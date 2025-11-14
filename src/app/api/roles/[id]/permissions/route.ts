@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 
 const permissionAssignSchema = z.object({
   permissionIds: z.array(z.string()),
@@ -13,71 +15,59 @@ type RouteContext = {
   }>;
 };
 
-// POST /api/roles/[id]/permissions - 역할에 권한 할당
-export async function POST(request: NextRequest, context: RouteContext) {
+// POST /api/roles/[id]/permissions - 역할에 권한 할당 (Rate Limit: 엄격)
+export const POST = withAuthAndRateLimit(async (
+  request: NextRequest,
+  { params }: { session: any; params: RouteContext["params"] }
+) => {
+  const { id } = await params;
+
+  const body = await request.json();
+  let validated;
   try {
-    const { id } = await context.params;
-
-    const session = await auth();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const body = await request.json();
-    const validated = permissionAssignSchema.parse(body);
-
-    // Check if role exists
-    const role = await prisma.role.findUnique({
-      where: { id },
-    });
-
-    if (!role) {
-      return NextResponse.json(
-        { error: "역할을 찾을 수 없습니다." },
-        { status: 404 }
-      );
-    }
-
-    // Delete existing permissions
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: id },
-    });
-
-    // Add new permissions
-    if (validated.permissionIds.length > 0) {
-      await prisma.rolePermission.createMany({
-        data: validated.permissionIds.map((permissionId) => ({
-          roleId: id,
-          permissionId,
-        })),
-      });
-    }
-
-    // Fetch updated role with permissions
-    const updatedRole = await prisma.role.findUnique({
-      where: { id },
-      include: {
-        permissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json(updatedRole);
+    validated = permissionAssignSchema.parse(body);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: error.issues?.[0].message },
-        { status: 400 }
-      );
+      throw new ValidationError(error.issues[0].message);
     }
-
-    console.error("Error assigning permissions:", error);
-    return NextResponse.json(
-      { error: "권한 할당 중 오류가 발생했습니다." },
-      { status: 500 }
-    );
+    throw error;
   }
-}
+
+  // Check if role exists
+  const role = await prisma.role.findUnique({
+    where: { id },
+  });
+
+  if (!role) {
+    throw new NotFoundError("역할을 찾을 수 없습니다.");
+  }
+
+  // Delete existing permissions
+  await prisma.rolePermission.deleteMany({
+    where: { roleId: id },
+  });
+
+  // Add new permissions
+  if (validated.permissionIds.length > 0) {
+    await prisma.rolePermission.createMany({
+      data: validated.permissionIds.map((permissionId) => ({
+        roleId: id,
+        permissionId,
+      })),
+    });
+  }
+
+  // Fetch updated role with permissions
+  const updatedRole = await prisma.role.findUnique({
+    where: { id },
+    include: {
+      permissions: {
+        include: {
+          permission: true,
+        },
+      },
+    },
+  });
+
+  return NextResponse.json(updatedRole);
+}, { preset: 'strict' }); // 1분당 5회 (민감한 작업)
