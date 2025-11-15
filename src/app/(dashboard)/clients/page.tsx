@@ -86,29 +86,23 @@ export default function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">고객사 관리</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            고객사 정보를 관리합니다.
-          </p>
-        </div>
-        <Button onClick={handleCreateClient} className="sr-btn-template-primary">
-          <Plus className="mr-2 h-4 w-4" />
-          등록
-        </Button>
-      </div>
-
       {/* 메인 컨텐츠 카드 */}
       <div className="sr-card-template bg-white">
         {/* 리스트 헤더 */}
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">고객사 목록</h3>
-            <div className="text-sm text-muted-foreground">
-              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{clients.length}</span> items
-            </div>
+            <Button onClick={handleCreateClient} className="sr-btn-template-primary">
+              <Plus className="mr-2 h-4 w-4" />
+              등록
+            </Button>
+          </div>
+        </div>
+
+        {/* Total Count - 테이블 바로 위 */}
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
+          <div className="text-sm text-muted-foreground">
+            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{clients.length}</span> items
           </div>
         </div>
 
@@ -137,7 +131,7 @@ export default function ClientsPage() {
               ) : (
                 clients.map((client) => (
                   <TableRow key={client.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell className="font-medium">{client.code}</TableCell>
+                    <TableCell className="font-medium text-center">{client.code}</TableCell>
                     <TableCell>
                       <Link
                         href={`/clients/${client.id}`}
@@ -146,20 +140,20 @@ export default function ClientsPage() {
                         {client.name}
                       </Link>
                     </TableCell>
-                    <TableCell>{client.industry || "-"}</TableCell>
-                    <TableCell>{client.contactPerson || "-"}</TableCell>
+                    <TableCell className="text-center">{client.industry || "-"}</TableCell>
+                    <TableCell className="text-center">{client.contactPerson || "-"}</TableCell>
                     <TableCell>{client.contactEmail || "-"}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge variant="secondary">
                         {client._count?.users || 0}명
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge variant="secondary">
                         {client._count?.srs || 0}건
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge
                         variant={client.isActive ? "default" : "secondary"}
                       >

@@ -18,27 +18,27 @@ export function cn(...inputs: ClassValue[]) {
  * @param obj - 변환할 객체
  * @returns 순수한 JavaScript 객체
  */
-export function toPlainObject(obj: any): any {
+export function toPlainObject<T>(obj: T): T extends Date ? string : T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : T {
   if (obj === null || typeof obj !== "object") {
-    return obj;
+    return obj as T extends Date ? string : T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : T;
   }
 
   if (obj instanceof Date) {
-    return obj.toISOString();
+    return obj.toISOString() as T extends Date ? string : never;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(toPlainObject);
+    return obj.map(toPlainObject) as T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : never;
   }
 
-  const plainObj: any = {};
+  const plainObj: Record<string, unknown> = {};
   for (const key in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      plainObj[key] = toPlainObject(obj[key]);
+      plainObj[key] = toPlainObject((obj as Record<string, unknown>)[key]);
     }
   }
 
-  return plainObj;
+  return plainObj as T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : never;
 }
 
 /**
@@ -47,7 +47,7 @@ export function toPlainObject(obj: any): any {
  * @param session - NextAuth 세션 객체
  * @returns 클라이언트로 전달 가능한 순수 객체
  */
-export function convertSessionToPlainObject(session: any) {
+export function convertSessionToPlainObject(session: { user?: { id?: string; name?: string | null; email?: string | null; image?: string | null; roles?: string[]; permissions?: string[] } } | null) {
   if (!session?.user) {
     return undefined;
   }

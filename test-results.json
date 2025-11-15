@@ -1,0 +1,13 @@
+﻿node.exe : npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of np
+m.
+위치 줄:1 문자:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\sanle\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...version of npm.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm warn Unknown project config "store-dir". This will stop working in the next major version of npm.
+
+> sr-management@0.1.0 test
+> vitest --run --reporter=json
+

@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { UserNav } from "./UserNav";
 import { cn } from "@/lib/utils";
+import type { AuthenticatedUser } from "@/types/session";
 
 interface HeaderProps {
-  user?: any;
+  user?: AuthenticatedUser;
 }
 
 export function Header({ user }: HeaderProps) {

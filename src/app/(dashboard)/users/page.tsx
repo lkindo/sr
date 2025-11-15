@@ -32,6 +32,8 @@ import { useToast } from "@/hooks/use-toast";
 import { AssignRolesDialog } from "@/components/users/AssignRolesDialog";
 import { UserDialog } from "@/components/users/UserDialog";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useSession } from "next-auth/react";
 
 interface User {
   id: string;
@@ -110,6 +112,8 @@ export default function UsersPage() {
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { hasRole, hasAnyRole } = usePermissions();
+  const { data: session, update } = useSession();
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -161,18 +165,37 @@ export default function UsersPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update user");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || "사용자 상태 변경에 실패했습니다.";
+        throw new Error(errorMessage);
       }
+
+      const updatedUser = await response.json();
+
+      // 즉시 로컬 상태 업데이트
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === userId ? { ...user, isActive: updatedUser.isActive ?? !isActive } : user
+        )
+      );
+      setFilteredUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === userId ? { ...user, isActive: updatedUser.isActive ?? !isActive } : user
+        )
+      );
 
       toast({
         title: "성공",
         description: `사용자가 ${!isActive ? "활성화" : "비활성화"}되었습니다.`,
       });
+      
+      // 백그라운드에서 최신 데이터 가져오기
       fetchUsers();
     } catch (error) {
+      console.error("사용자 상태 변경 오류:", error);
       toast({
         title: "오류",
-        description: "사용자 상태 변경에 실패했습니다.",
+        description: error instanceof Error ? error.message : "사용자 상태 변경에 실패했습니다.",
         variant: "destructive",
       });
     }
@@ -205,27 +228,19 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">사용자 관리</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            시스템 사용자를 관리합니다.
-          </p>
-        </div>
-        <PermissionGuard roles={["ADMIN"]}>
-          <Button onClick={handleCreateUser} className="sr-btn-template-primary">
-            <Plus className="mr-2 h-4 w-4" />
-            등록
-          </Button>
-        </PermissionGuard>
-      </div>
-
       {/* 메인 컨텐츠 카드 */}
       <div className="sr-card-template bg-white">
         {/* 리스트 헤더 */}
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-          <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))] mb-4">사용자 목록</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자 목록</h3>
+            <PermissionGuard roles={["ADMIN"]}>
+              <Button onClick={handleCreateUser} className="sr-btn-template-primary">
+                <Plus className="mr-2 h-4 w-4" />
+                등록
+              </Button>
+            </PermissionGuard>
+          </div>
 
           {/* 검색 및 필터 영역 */}
           <div className="flex flex-col gap-4 md:flex-row md:items-end mb-4">
@@ -236,6 +251,11 @@ export default function UsersPage() {
                 placeholder="이름 또는 이메일로 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    fetchUsers();
+                  }
+                }}
                 className="pl-10 sr-input-template"
               />
             </div>
@@ -243,7 +263,10 @@ export default function UsersPage() {
             {/* 필터들 */}
             <div className="flex gap-2 flex-wrap md:flex-nowrap">
               {/* 유형 필터 */}
-              <Select value={userTypeFilter} onValueChange={setUserTypeFilter}>
+              <Select value={userTypeFilter} onValueChange={(value) => {
+                setUserTypeFilter(value);
+                setTimeout(() => fetchUsers(), 0);
+              }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="유형 전체" />
                 </SelectTrigger>
@@ -255,7 +278,10 @@ export default function UsersPage() {
               </Select>
 
               {/* 역할 필터 */}
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <Select value={roleFilter} onValueChange={(value) => {
+                setRoleFilter(value);
+                setTimeout(() => fetchUsers(), 0);
+              }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="역할 전체" />
                 </SelectTrigger>
@@ -270,7 +296,10 @@ export default function UsersPage() {
               </Select>
 
               {/* 상태 필터 */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value);
+                setTimeout(() => fetchUsers(), 0);
+              }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="상태 전체" />
                 </SelectTrigger>
@@ -283,11 +312,12 @@ export default function UsersPage() {
             </div>
           </div>
 
-          {/* Total 카운트 */}
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{filteredUsers.length}</span> items
-            </div>
+        </div>
+
+        {/* Total Count - 테이블 바로 위 */}
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
+          <div className="text-sm text-muted-foreground">
+            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{filteredUsers.length}</span> items
           </div>
         </div>
 
@@ -302,7 +332,7 @@ export default function UsersPage() {
                 <TableHead>역할</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead>가입일</TableHead>
-                <TableHead className="text-right">작업</TableHead>
+                <TableHead>작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -319,7 +349,7 @@ export default function UsersPage() {
               ) : (
                 filteredUsers.map((user) => (
                   <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell className="font-medium">
+                    <TableCell className="font-medium text-center">
                       <Link
                         href={`/users/${user.id}`}
                         className="text-primary hover:underline"
@@ -328,7 +358,7 @@ export default function UsersPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       {(() => {
                         const typeLabel = getUserTypeLabel(user);
                         return (
@@ -338,8 +368,8 @@ export default function UsersPage() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1 flex-wrap">
+                    <TableCell className="text-center">
+                      <div className="flex gap-1 flex-wrap justify-center">
                         {user.roles.length === 0 ? (
                           <Badge variant="outline">역할 없음</Badge>
                         ) : (
@@ -351,51 +381,81 @@ export default function UsersPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <Badge
                         variant={user.isActive ? "default" : "secondary"}
                       >
                         {user.isActive ? "활성" : "비활성"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {new Date(user.createdAt).toLocaleDateString("ko-KR")}
+                    <TableCell className="text-center">
+                      {new Date(user.createdAt).toLocaleDateString("ko-KR", { 
+                        year: 'numeric', 
+                        month: '2-digit', 
+                        day: '2-digit' 
+                      }).replace(/\./g, '. ').trim()}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <PermissionGuard roles={["ADMIN"]}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAssignRoles(user)}
-                            className="sr-btn-template"
-                          >
-                            <Shield className="mr-2 h-4 w-4" />
-                            역할 관리
-                          </Button>
-                        </PermissionGuard>
-                        <PermissionGuard roles={["ADMIN", "MANAGER"]}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              handleToggleActive(user.id, user.isActive)
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            // 세션 업데이트 시도
+                            await update();
+                            const currentRoles = session?.user?.roles || [];
+                            const isAdmin = currentRoles.includes("ADMIN");
+                            
+                            if (!isAdmin) {
+                              toast({
+                                title: "권한 없음",
+                                description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
+                                variant: "destructive",
+                              });
+                              return;
                             }
-                            className="sr-btn-template"
-                          >
-                            {user.isActive ? (
-                              <>
-                                <UserX className="mr-2 h-4 w-4" />
-                                비활성화
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="mr-2 h-4 w-4" />
-                                활성화
-                              </>
-                            )}
-                          </Button>
-                        </PermissionGuard>
+                            handleAssignRoles(user);
+                          }}
+                          className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
+                        >
+                          <Shield className="mr-1 h-4 w-4" />
+                          역할 관리
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            // 세션 업데이트 시도
+                            await update();
+                            const currentRoles = session?.user?.roles || [];
+                            const hasPermission = currentRoles.includes("ADMIN") || currentRoles.includes("MANAGER");
+                            
+                            if (!hasPermission) {
+                              toast({
+                                title: "권한 없음",
+                                description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            handleToggleActive(user.id, user.isActive);
+                          }}
+                          className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
+                        >
+                          {user.isActive ? (
+                            <>
+                              <UserX className="mr-1 h-4 w-4" />
+                              비활성화
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="mr-1 h-4 w-4" />
+                              활성화
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>

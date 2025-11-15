@@ -2,40 +2,38 @@
 
 import { z } from "zod";
 import { UserService } from "@/services/user.service";
-import { auth } from "@/auth";
-import { PermissionService } from "@/services/permission.service";
 import { userUpdateSchema } from "@/lib/schemas";
 import { Result, ok, fail } from "@/lib/result";
 import { errorToResult, UnauthorizedError } from "@/lib/errors";
+import { getFormDataValue } from "@/lib/form-data-parser";
+import { authenticateAndAuthorize, validateWithSchema, getAuthenticatedSession } from "@/lib/action-helpers";
+import type { User, Role, Permission } from "@prisma/client";
 
-const permissionService = new PermissionService();
 
 
-
-export async function updateUserAction(formData: FormData): Promise<Result<any>> {
+export async function updateUserAction(
+  formData: FormData
+): Promise<Result<User>> {
   try {
     const data = {
-      name: formData.get("name") as string | undefined,
-      email: formData.get("email") as string | undefined,
-      image: formData.get("image") as string | undefined,
+      name: getFormDataValue(formData, "name") || undefined,
+      email: getFormDataValue(formData, "email") || undefined,
+      image: getFormDataValue(formData, "image") || undefined,
     };
 
-    const validated = userUpdateSchema.parse(data);
-
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new UnauthorizedError();
+    const validationResult = validateWithSchema(data, userUpdateSchema);
+    if (!validationResult.success) {
+      return validationResult;
     }
-    await permissionService.requirePermission(session.user.id, 'user:update');
+    const validated = validationResult.data;
+
+    const session = await authenticateAndAuthorize('user:update');
 
     const userService = new UserService();
     const user = await userService.updateProfile(session.user.id, validated);
 
     return ok(user);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return fail(error.issues?.[0].message || "입력값 검증에 실패했습니다.", "VALIDATION_ERROR");
-    }
     return errorToResult(error);
   }
 }
@@ -44,9 +42,9 @@ export async function updateUserAction(formData: FormData): Promise<Result<any>>
 
 export async function changePasswordAction(formData: FormData): Promise<Result<void>> {
   try {
-    const currentPassword = formData.get("currentPassword") as string;
-    const newPassword = formData.get("newPassword") as string;
-    const confirmPassword = formData.get("confirmPassword") as string;
+    const currentPassword = getFormDataValue(formData, "currentPassword") || "";
+    const newPassword = getFormDataValue(formData, "newPassword") || "";
+    const confirmPassword = getFormDataValue(formData, "confirmPassword") || "";
 
     if (newPassword !== confirmPassword) {
       return fail("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.", "VALIDATION_ERROR");
@@ -56,11 +54,7 @@ export async function changePasswordAction(formData: FormData): Promise<Result<v
       return fail("비밀번호는 최소 8자 이상이어야 합니다.", "VALIDATION_ERROR");
     }
 
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new UnauthorizedError();
-    }
-    await permissionService.requirePermission(session.user.id, 'user:change_password');
+    const session = await authenticateAndAuthorize('user:change_password');
 
     const userService = new UserService();
     await userService.changePassword(session.user.id, currentPassword, newPassword);
@@ -73,7 +67,9 @@ export async function changePasswordAction(formData: FormData): Promise<Result<v
 
 
 
-export async function getUserAction(id: string): Promise<Result<any>> {
+type UserWithDetails = NonNullable<Awaited<ReturnType<UserService['getUserById']>>>;
+
+export async function getUserAction(id: string): Promise<Result<UserWithDetails>> {
   try {
     const userService = new UserService();
     const user = await userService.getUserById(id);
@@ -86,12 +82,9 @@ export async function getUserAction(id: string): Promise<Result<any>> {
   }
 }
 
-export async function getProfileAction(): Promise<Result<any>> {
+export async function getProfileAction(): Promise<Result<UserWithDetails>> {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new UnauthorizedError();
-    }
+    const session = await getAuthenticatedSession();
     const userService = new UserService();
     const user = await userService.getUserById(session.user.id);
     if (!user) {
@@ -103,7 +96,7 @@ export async function getProfileAction(): Promise<Result<any>> {
   }
 }
 
-export async function getSRHandlersForSelection(): Promise<Result<any>> {
+export async function getSRHandlersForSelection(): Promise<Result<Array<{ id: string; name: string; email: string }>>> {
   try {
     const userService = new UserService();
     const srHandlers = await userService.getUsersWithSRHandlingPermission();

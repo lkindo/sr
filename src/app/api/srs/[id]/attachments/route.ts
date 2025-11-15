@@ -4,8 +4,9 @@ import prisma from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
-import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError, ValidationError, BadRequestError } from "@/lib/errors";
+import { RouteContext } from "@/lib/api-helpers";
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';
@@ -13,7 +14,7 @@ export const runtime = 'nodejs';
 // POST /api/srs/[id]/attachments - Upload attachments (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(async (
   req: NextRequest,
-  { session, params }: { session: any; params: Promise<{ id: string }> }
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id: srId } = await params;
 
@@ -86,7 +87,7 @@ export const POST = withAuthAndRateLimit(async (
 // GET /api/srs/[id]/attachments - Get all attachments for an SR (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   req: NextRequest,
-  { params }: { session: any; params: Promise<{ id: string }> }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id: srId } = await params;
 

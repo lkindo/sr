@@ -119,10 +119,11 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       });
 
       fetchProfile();
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "프로필 업데이트에 실패했습니다.";
       toast({
         title: "오류",
-        description: error.message || "프로필 업데이트에 실패했습니다.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -162,10 +163,11 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "비밀번호 변경에 실패했습니다.";
       toast({
         title: "오류",
-        description: error.message || "비밀번호 변경에 실패했습니다.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

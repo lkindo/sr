@@ -31,7 +31,19 @@ export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.Role
     take?: number;
     where?: Prisma.RoleWhereInput;
     orderBy?: Prisma.RoleOrderByWithRelationInput;
-  }): Promise<Role[]> {
+  }): Promise<(Role & {
+    permissions: Array<{
+      permission: {
+        id: string;
+        resource: string;
+        action: string;
+        description: string | null;
+      };
+    }>;
+    _count: {
+      users: number;
+    };
+  })[]> {
     const { skip, take, where, orderBy } = params || {};
     
     return this.model.findMany({
@@ -39,6 +51,18 @@ export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.Role
       take,
       where,
       orderBy,
+      include: {
+        permissions: {
+          include: {
+            permission: true,
+          },
+        },
+        _count: {
+          select: {
+            users: true,
+          },
+        },
+      },
     });
   }
 

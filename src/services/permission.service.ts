@@ -1,6 +1,7 @@
 import { User, Role, Permission } from "@prisma/client";
 import { UserRepository } from "@/repositories/user.repository";
-import { PermissionRepository } from "@/repositories/permission.repository"; // Import PermissionRepository
+import { PermissionRepository } from "@/repositories/permission.repository";
+import { getCachedData, CacheKeys, invalidateCache } from "@/lib/redis-cache";
 
 type UserWithPermissions = User & {
   roles: {
@@ -13,21 +14,30 @@ type UserWithPermissions = User & {
 };
 
 export class PermissionService {
-  private userRepository: UserRepository;
-  private permissionRepository: PermissionRepository; // Instantiate PermissionRepository
-
-  constructor() {
-    this.userRepository = new UserRepository();
-    this.permissionRepository = new PermissionRepository(); // Instantiate PermissionRepository
-  }
+  constructor(
+    private userRepository: UserRepository = new UserRepository(),
+    private permissionRepository: PermissionRepository = new PermissionRepository()
+  ) {}
 
   private async getFullUser(userId: string): Promise<UserWithPermissions | null> {
-    // This single call fetches everything we need.
-    return this.userRepository.findDetailsById(userId) as Promise<UserWithPermissions | null>;
+    // 캐시된 사용자 정보 조회 또는 생성
+    return getCachedData(
+      `user:full:${userId}`,
+      async () => {
+        return this.userRepository.findDetailsById(userId) as Promise<UserWithPermissions | null>;
+      },
+      600 // 10분 캐시 (권한 정보는 자주 변경되지 않음)
+    );
   }
 
   async getAllPermissions(): Promise<Permission[]> {
-    return this.permissionRepository.findAll();
+    return getCachedData(
+      CacheKeys.userPermissions("all"),
+      async () => {
+        return this.permissionRepository.findAll();
+      },
+      1800 // 30분 캐시 (권한 목록은 거의 변경되지 않음)
+    );
   }
 
   async checkPermission(userId: string, requiredPermission: string): Promise<boolean> {
@@ -67,24 +77,36 @@ export class PermissionService {
   }
 
   async getUserPermissions(userId: string): Promise<Permission[]> {
-    const user = await this.getFullUser(userId);
-    if (!user) return [];
+    return getCachedData(
+      CacheKeys.userPermissions(userId),
+      async () => {
+        const user = await this.getFullUser(userId);
+        if (!user) return [];
 
-    const permissionsSet = new Map<string, Permission>();
-    user.roles.forEach(ur => {
-      ur.role.permissions.forEach(rp => {
-        permissionsSet.set(rp.permission.id, rp.permission);
-      });
-    });
+        const permissionsSet = new Map<string, Permission>();
+        user.roles.forEach(ur => {
+          ur.role.permissions.forEach(rp => {
+            permissionsSet.set(rp.permission.id, rp.permission);
+          });
+        });
 
-    return Array.from(permissionsSet.values());
+        return Array.from(permissionsSet.values());
+      },
+      600 // 10분 캐시
+    );
   }
 
   async getUserRoles(userId: string): Promise<Role[]> {
-    const user = await this.getFullUser(userId);
-    if (!user) return [];
+    return getCachedData(
+      CacheKeys.userRoles(userId),
+      async () => {
+        const user = await this.getFullUser(userId);
+        if (!user) return [];
 
-    return user.roles.map(ur => ur.role);
+        return user.roles.map(ur => ur.role);
+      },
+      600 // 10분 캐시
+    );
   }
 
   async requirePermission(userId: string, action: string): Promise<void> {

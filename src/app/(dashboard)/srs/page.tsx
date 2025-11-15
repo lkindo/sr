@@ -35,8 +35,8 @@ export default async function SRsPage({ searchParams }: Props) {
   const userService = new UserService();
 
   const where: Prisma.SRWhereInput = {};
-  if (status && status !== "all") where.status = status as any;
-  if (priority && priority !== "all") where.priority = priority as any;
+  if (status && status !== "all") where.status = status as Prisma.SRStatus;
+  if (priority && priority !== "all") where.priority = priority as Prisma.SRPriority;
   if (clientId && clientId !== "all") where.clientId = clientId;
   if (assigneeId && assigneeId !== "all") {
     where.assigneeId = assigneeId === "unassigned" ? null : assigneeId;
@@ -63,9 +63,26 @@ export default async function SRsPage({ searchParams }: Props) {
     ];
   }
 
-  const orderBy: Prisma.SROrderByWithRelationInput = {
-    [sortField]: sortOrder,
+  // 관계형 필드 정렬 처리
+  const getOrderBy = (): Prisma.SROrderByWithRelationInput => {
+    const order = sortOrder === "asc" ? "asc" : "desc";
+    
+    // 관계형 필드인 경우 중첩 객체 형식 사용
+    if (sortField === "client") {
+      return { client: { name: order } };
+    }
+    if (sortField === "requester") {
+      return { requester: { name: order } };
+    }
+    if (sortField === "assignee") {
+      return { assignee: { name: order } };
+    }
+    
+    // 일반 필드는 직접 정렬
+    return { [sortField]: order } as Prisma.SROrderByWithRelationInput;
   };
+
+  const orderBy = getOrderBy();
 
   // Fetch SR data first
   const srData = await srService.getAllSRs({

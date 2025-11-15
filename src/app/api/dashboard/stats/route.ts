@@ -1,14 +1,19 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { getCachedData, CacheKeys } from "@/lib/redis-cache";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
 // GET /api/dashboard/stats - 대시보드 통계 조회 (Rate Limit: 느슨함)
 export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
-  // Get SR counts by status
-  const srByStatus = await prisma.sR.groupBy({
+  // 캐시된 통계 데이터 조회 또는 생성
+  const stats = await getCachedData(
+    CacheKeys.dashboardStats(),
+    async () => {
+      // Get SR counts by status
+      const srByStatus = await prisma.sR.groupBy({
     by: ["status"],
     _count: {
       id: true,
@@ -122,29 +127,34 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
       return acc;
     }, {} as Record<string, number>);
 
-    // Fill in missing dates
-    const trendData = [];
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split("T")[0];
-      trendData.push({
-        date: dateStr,
-        count: trendByDate[dateStr] || 0,
-      });
-    }
+      // Fill in missing dates
+      const trendData = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split("T")[0];
+        trendData.push({
+          date: dateStr,
+          count: trendByDate[dateStr] || 0,
+        });
+      }
 
-  return NextResponse.json({
-    summary: {
-      total: totalSRs,
-      inProgress: inProgressSRs,
-      completed: completedSRs,
-      pending: pendingSRs,
+      return {
+        summary: {
+          total: totalSRs,
+          inProgress: inProgressSRs,
+          completed: completedSRs,
+          pending: pendingSRs,
+        },
+        byStatus: statusCounts,
+        byPriority: priorityCounts,
+        byClient: clientCounts,
+        recentSRs: recentSRs,
+        trend: trendData,
+      };
     },
-    byStatus: statusCounts,
-    byPriority: priorityCounts,
-    byClient: clientCounts,
-    recentSRs: recentSRs,
-    trend: trendData,
-  });
+    300 // 5분 캐시
+  );
+
+  return NextResponse.json(stats);
 }, { preset: 'relaxed' }); // 1분당 300회 (대시보드는 자주 조회됨)

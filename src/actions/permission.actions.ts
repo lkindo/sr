@@ -1,16 +1,14 @@
 "use server";
 
 import { PermissionService } from "@/services/permission.service";
-import { auth } from "@/auth";
 import { Result, ok } from "@/lib/result";
-import { errorToResult, UnauthorizedError } from "@/lib/errors";
+import { errorToResult } from "@/lib/errors";
+import { getAuthenticatedSession } from "@/lib/action-helpers";
+import type { Permission } from "@prisma/client";
 
-export async function getAllPermissionsAction(): Promise<Result<any>> {
+export async function getAllPermissionsAction(): Promise<Result<Permission[]>> {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new UnauthorizedError();
-    }
+    await getAuthenticatedSession();
 
     const permissionService = new PermissionService();
     const permissions = await permissionService.getAllPermissions();

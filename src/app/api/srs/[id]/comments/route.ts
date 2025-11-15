@@ -2,24 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { sendCommentNotificationEmail } from "@/lib/email";
+import { RouteContext } from "@/lib/api-helpers";
 
 const commentSchema = z.object({
   content: z.string().min(1, "댓글 내용을 입력해주세요."),
 });
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
-
 // GET /api/srs/[id]/comments - SR 댓글 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
@@ -45,7 +40,7 @@ export const GET = withAuthAndRateLimit(async (
 // POST /api/srs/[id]/comments - 새 댓글 추가 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(async (
   request: NextRequest,
-  { session, params }: { session: any; params: RouteContext["params"] }
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 

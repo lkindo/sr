@@ -77,10 +77,11 @@ export default function SystemSettingsPage() {
         title: "성공",
         description: "시스템 설정이 저장되었습니다.",
       });
-    } catch (error: any) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "시스템 설정 저장에 실패했습니다.";
       toast({
         title: "오류",
-        description: error.message || "시스템 설정 저장에 실패했습니다.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

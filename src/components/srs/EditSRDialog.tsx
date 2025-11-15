@@ -23,9 +23,18 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { FileUpload } from "@/components/ui/file-upload";
+import { getClientsForSelection } from "@/actions/client.actions";
 import { getSRHandlersForSelection } from "@/actions/user.actions";
 import { getServiceCategoriesForSelection } from "@/actions/service-category.actions";
 import { updateSRAction } from "@/actions/sr.actions";
+import { getProfileAction } from "@/actions/user.actions";
+import { usePermissions } from "@/hooks/use-permissions";
+
+interface Client {
+  id: string;
+  code: string;
+  name: string;
+}
 
 interface SR {
   id: string;
@@ -33,6 +42,14 @@ interface SR {
   description: string;
   status: string;
   priority: string;
+  requestedPriority?: string;
+  clientId?: string;
+  client?: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  requestedCompletionDate?: string;
   expectedCompletionDate?: string;
   dueDate?: string;
   assignedTo?: {
@@ -70,24 +87,59 @@ export function EditSRDialog({
 }: EditSRDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState("");
-  const [priority, setPriority] = useState("");
+  const [clientId, setClientId] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [assignedToId, setAssignedToId] = useState("");
+  const [requestedPriority, setRequestedPriority] = useState<string>("MEDIUM");
+  const [priority, setPriority] = useState("");
+  const [status, setStatus] = useState("");
+  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
   const [expectedCompletionDate, setExpectedCompletionDate] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [assignedToId, setAssignedToId] = useState("");
   const [changeReason, setChangeReason] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { data: session } = useSession();
+  const { hasAnyRole } = usePermissions();
+
+  // CLIENT_ADMIN, CLIENT_USER인지 확인
+  const isClientUser = hasAnyRole(["CLIENT_ADMIN", "CLIENT_USER"]);
+  const canSelectClient = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
 
   // SR 할당 권한 확인
   const canAssignSR = session?.user?.permissions?.includes("SR.ASSIGN") ?? false;
 
-
+  const fetchClients = useCallback(async () => {
+    // CLIENT_ADMIN, CLIENT_USER인 경우 자신의 고객사만 가져오기
+    if (isClientUser) {
+      const profileResult = await getProfileAction();
+      if (profileResult.success && profileResult.data) {
+        const userClients = profileResult.data.clients || [];
+        if (userClients.length > 0) {
+          const userClient = userClients[0].client;
+          setClients([{
+            id: userClient.id,
+            code: userClient.code,
+            name: userClient.name,
+          }]);
+          // 고객사는 수정 불가이므로 현재 SR의 고객사 사용
+          if (sr.clientId) {
+            setClientId(sr.clientId);
+          }
+        }
+      }
+    } else {
+      // ADMIN, MANAGER, ENGINEER인 경우 모든 고객사 가져오기
+      const result = await getClientsForSelection();
+      if (result.success) {
+        setClients(result.data as Client[]);
+      }
+    }
+  }, [isClientUser, sr.clientId]);
 
   const fetchUsers = useCallback(async () => {
     const result = await getSRHandlersForSelection();
@@ -104,8 +156,8 @@ export function EditSRDialog({
 
   const fetchCategories = useCallback(async () => {
     const result = await getServiceCategoriesForSelection();
-    if (result.success) {
-      setCategories(result.data as ServiceCategory[]);
+    if (result.success && result.data) {
+      setCategories(result.data.map((cat) => ({ id: cat.id, categoryName: cat.categoryName })));
     } else {
       toast({
         title: "오류",
@@ -119,10 +171,17 @@ export function EditSRDialog({
     if (open && sr) {
       setTitle(sr.title);
       setDescription(sr.description);
-      setStatus(sr.status);
-      setPriority(sr.priority);
+      setClientId(sr.clientId || sr.client?.id || "");
       setCategoryId(sr.category?.id || "");
+      setRequestedPriority(sr.requestedPriority || sr.priority || "MEDIUM");
+      setPriority(sr.priority);
+      setStatus(sr.status);
       setAssignedToId(sr.assignedTo?.id || "");
+      setRequestedCompletionDate(
+        sr.requestedCompletionDate
+          ? new Date(sr.requestedCompletionDate).toISOString().split("T")[0]
+          : ""
+      );
       setExpectedCompletionDate(
         sr.expectedCompletionDate
           ? new Date(sr.expectedCompletionDate).toISOString().split("T")[0]
@@ -135,10 +194,11 @@ export function EditSRDialog({
       );
       setChangeReason("");
       setFiles([]);
+      fetchClients();
       fetchUsers();
       fetchCategories();
     }
-  }, [open, sr, fetchUsers, fetchCategories]);
+  }, [open, sr, fetchClients, fetchUsers, fetchCategories]);
 
   const uploadAttachments = async (srId: string, files: File[]) => {
     const formData = new FormData();
@@ -165,15 +225,35 @@ export function EditSRDialog({
     }
   };
 
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ... (form validation logic remains the same)
-    if (title.length < 5) { /* ... */ return; }
-    if (description.length < 10) { /* ... */ return; }
-    if (status !== sr.status && !changeReason.trim()) { /* ... */ return; }
-    if (expectedCompletionDate && dueDate) { /* ... */ }
+    if (title.length < 5) {
+      toast({
+        title: "오류",
+        description: "제목은 최소 5자 이상이어야 합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (description.length < 10) {
+      toast({
+        title: "오류",
+        description: "설명은 최소 10자 이상이어야 합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (status !== sr.status && !changeReason.trim()) {
+      toast({
+        title: "오류",
+        description: "상태 변경 시 변경 사유를 입력해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
 
@@ -181,11 +261,20 @@ export function EditSRDialog({
     formData.append("title", title);
     formData.append("description", description);
     formData.append("status", status);
-    formData.append("priority", priority);
+    // priority가 빈 문자열이 아닐 때만 추가
+    if (priority && priority.trim() !== "") {
+      formData.append("priority", priority);
+    }
     formData.append("serviceCategoryId", categoryId || "");
     formData.append("assignedToId", assignedToId || "");
     formData.append("expectedCompletionDate", expectedCompletionDate || "");
     formData.append("dueDate", dueDate || "");
+    if (requestedPriority && requestedPriority.trim() !== "") {
+      formData.append("requestedPriority", requestedPriority);
+    }
+    if (requestedCompletionDate) {
+      formData.append("requestedCompletionDate", requestedCompletionDate);
+    }
     if (changeReason) {
       formData.append("changeReason", changeReason);
     }
@@ -226,7 +315,7 @@ export function EditSRDialog({
         <DialogHeader>
           <DialogTitle>SR 수정</DialogTitle>
           <DialogDescription>
-            SR 정보를 수정합니다. 상태 변경 시 변경 사유를 입력해주세요.
+            SR 정보를 수정합니다. 제목, 설명, 고객사, 서비스 카테고리는 필수입니다.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -237,7 +326,7 @@ export function EditSRDialog({
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="SR 제목"
+                placeholder="SR 제목을 입력하세요 (최소 5자)"
                 required
                 disabled={loading}
               />
@@ -249,37 +338,101 @@ export function EditSRDialog({
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="SR 상세 내용"
+                placeholder="SR 상세 내용을 입력하세요 (최소 10자)"
                 required
                 disabled={loading}
                 rows={5}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="category">서비스 카테고리 *</Label>
-              <Select
-                value={categoryId}
-                onValueChange={setCategoryId}
-                disabled={loading || categories.length === 0}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue
-                    placeholder={
-                      categories.length === 0
-                        ? "카테고리가 없습니다"
-                        : "카테고리를 선택"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.categoryName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="client">고객사 *</Label>
+                <Select
+                  value={clientId}
+                  onValueChange={setClientId}
+                  disabled={loading || !canSelectClient}
+                >
+                  <SelectTrigger id="client">
+                    <SelectValue placeholder="고객사를 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} ({client.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!canSelectClient && (
+                  <p className="text-xs text-muted-foreground">
+                    고객사는 수정할 수 없습니다.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">서비스 카테고리 *</Label>
+                <Select
+                  value={categoryId}
+                  onValueChange={setCategoryId}
+                  disabled={loading || categories.length === 0}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue
+                      placeholder={
+                        categories.length === 0
+                          ? "카테고리가 없습니다"
+                          : "카테고리를 선택"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.categoryName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="requestedPriority">희망 우선순위 *</Label>
+                <Select
+                  value={requestedPriority}
+                  onValueChange={setRequestedPriority}
+                  disabled={loading}
+                >
+                  <SelectTrigger id="requestedPriority">
+                    <SelectValue placeholder="우선순위 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CRITICAL">긴급</SelectItem>
+                    <SelectItem value="HIGH">높음</SelectItem>
+                    <SelectItem value="MEDIUM">보통</SelectItem>
+                    <SelectItem value="LOW">낮음</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="requestedCompletionDate">
+                  희망 완료일 (선택)
+                </Label>
+                <Input
+                  id="requestedCompletionDate"
+                  type="date"
+                  value={requestedCompletionDate}
+                  onChange={(e) =>
+                    setRequestedCompletionDate(e.target.value)
+                  }
+                  disabled={loading}
+                  placeholder="언제까지 완료되길 원하시나요?"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -393,7 +546,7 @@ export function EditSRDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>첨부파일 추가 (선택사항)</Label>
+              <Label>첨부파일 (선택사항)</Label>
               <FileUpload
                 value={files}
                 onChange={setFiles}

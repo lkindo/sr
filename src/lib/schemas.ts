@@ -55,6 +55,7 @@ export const userUpdateSchema = z.object({
   name: z.string().min(1, "이름을 입력해주세요.").optional(),
   email: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
   image: z.string().url("유효한 이미지 URL을 입력해주세요.").optional(),
+  isActive: z.boolean().optional(),
 });
 
 // Role Schemas
@@ -64,3 +65,21 @@ export const roleCreateSchema = z.object({
 });
 
 export const roleUpdateSchema = roleCreateSchema.partial();
+
+// SR Intake Schema - 접수 처리 전용
+export const intakeSchema = z.object({
+  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]),
+  estimatedHours: z.number().positive("예상 작업 시간은 0보다 커야 합니다"),
+  estimatedCompletionDate: z.string(),
+  intakeNotes: z.string().optional(),
+  assigneeId: z.string().min(1, "담당자를 선택해주세요"),
+});
+
+// SR Intake Update Schema - 접수 정보 수정 전용
+export const intakeUpdateSchema = z.object({
+  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
+  estimatedHours: z.number().positive("예상 작업 시간은 0보다 커야 합니다").max(1000, "예상 작업 시간은 1000시간을 초과할 수 없습니다").optional(),
+  estimatedCompletionDate: z.string().optional(),
+  intakeNotes: z.string().optional().nullable(),
+  assigneeId: z.string().min(1, "담당자를 선택해주세요").optional(),
+});

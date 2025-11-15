@@ -8,16 +8,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { handleApiError } from './api-error-handler';
 import { UnauthorizedError } from './errors';
-import type { Session } from 'next-auth';
+import type { AuthenticatedSession } from '@/types/session';
 
 /**
  * 인증된 사용자 정보를 포함하는 컨텍스트
  */
 export interface AuthenticatedContext<P = Promise<Record<string, string>>> {
   /**
-   * NextAuth 세션
+   * NextAuth 세션 (인증 보장)
    */
-  session: Session;
+  session: AuthenticatedSession;
 
   /**
    * Route params (동적 라우트의 경우)
@@ -44,19 +44,36 @@ export function withAuth<T extends NextRequest = NextRequest, P = Promise<Record
     try {
       // 인증 확인
       const session = await auth();
-      if (!session) {
+      if (!session || !session.user?.id) {
         throw new UnauthorizedError();
       }
 
+      // 타입 안전한 세션으로 변환
+      const authenticatedSession: AuthenticatedSession = {
+        ...session,
+        user: {
+          id: session.user.id,
+          email: session.user.email || '',
+          name: session.user.name,
+          image: session.user.image,
+          roles: session.user.roles || [],
+          permissions: session.user.permissions || [],
+        },
+      };
+
       // 인증된 핸들러 실행
       const context: AuthenticatedContext<P> = {
-        session,
+        session: authenticatedSession,
         params: routeContext.params,
       };
 
       return await handler(request, context);
     } catch (error) {
-      return handleApiError(error);
+      return handleApiError(error, {
+        userId: session?.user?.id,
+        path: request.url,
+        method: request.method,
+      });
     }
   };
 }

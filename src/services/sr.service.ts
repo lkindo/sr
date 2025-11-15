@@ -1,4 +1,4 @@
-import { User, Prisma } from "@prisma/client";
+import { User, Prisma, SR } from "@prisma/client";
 import { z } from "zod";
 import { SRRepository } from "@/repositories/sr.repository";
 import { SRActivityRepository } from "@/repositories/sr-activity.repository";
@@ -7,28 +7,34 @@ import { SRAttachmentRepository } from "@/repositories/sr-attachment.repository"
 import { ClientRepository } from "@/repositories/client.repository";
 import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
+import { AuthenticatedUser } from "@/types/session";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
 
 export class SRService {
-  private srRepository: SRRepository;
-  private srActivityRepository: SRActivityRepository;
-  private srCommentRepository: SRCommentRepository;
-  private srAttachmentRepository: SRAttachmentRepository;
-  private clientRepository: ClientRepository;
-  private serviceCategoryRepository: ServiceCategoryRepository;
+  constructor(
+    private srRepository: SRRepository = new SRRepository(),
+    private srActivityRepository: SRActivityRepository = new SRActivityRepository(),
+    private srCommentRepository: SRCommentRepository = new SRCommentRepository(),
+    private srAttachmentRepository: SRAttachmentRepository = new SRAttachmentRepository(),
+    private clientRepository: ClientRepository = new ClientRepository(),
+    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository()
+  ) {}
 
-  constructor() {
-    this.srRepository = new SRRepository();
-    this.srActivityRepository = new SRActivityRepository();
-    this.srCommentRepository = new SRCommentRepository();
-    this.srAttachmentRepository = new SRAttachmentRepository();
-    this.clientRepository = new ClientRepository();
-    this.serviceCategoryRepository = new ServiceCategoryRepository();
-  }
-
-  async createSR(data: SrCreateData, sessionUser: { id: string; email: string }) {
+  async createSR(
+    data: SrCreateData,
+    sessionUser: AuthenticatedUser
+  ): Promise<SR & {
+    client: { id: string; code: string; name: string };
+    requester: { id: string; name: string; email: string };
+    assignee: { id: string; name: string; email: string } | null;
+    serviceCategory: { id: string; categoryName: string };
+    comments: unknown[];
+    activities: unknown[];
+    attachments: unknown[];
+    _count: { comments: number; attachments: number };
+  }> {
     const validated = srCreateSchema.parse(data);
 
     const today = new Date();
@@ -83,14 +89,98 @@ export class SRService {
     return this.srRepository.findDetailsById(sr.id);
   }
 
-  async updateSR(id: string, data: SrUpdateData, sessionUser: User) {
-    const validated = srUpdateSchema.parse(data);
-    const existingSR = await this.srRepository.findById(id);
-    if (!existingSR) {
-      throw new Error("SR을 찾을 수 없습니다.");
+  async updateSR(
+    id: string,
+    data: SrUpdateData,
+    sessionUser: AuthenticatedUser
+  ): Promise<SR & {
+    client?: { id: string; code: string; name: string };
+    requester?: { id: string; name: string; email: string };
+    assignee?: { id: string; name: string; email: string } | null;
+    serviceCategory?: { id: string; categoryName: string };
+  }> {
+    // Prisma 업데이트 데이터 준비 (undefined 제거 및 필드 매핑)
+    const updateData: Prisma.SRUncheckedUpdateInput = {};
+    
+    try {
+      const validated = srUpdateSchema.parse(data);
+      const existingSR = await this.srRepository.findById(id);
+      if (!existingSR) {
+        throw new Error("SR을 찾을 수 없습니다.");
+      }
+
+    // 기본 필드 처리
+    if (validated.title !== undefined) {
+      updateData.title = validated.title;
+    }
+    if (validated.description !== undefined) {
+      updateData.description = validated.description;
+    }
+    if (validated.priority !== undefined) {
+      updateData.priority = validated.priority;
+    }
+    if (validated.status !== undefined) {
+      updateData.status = validated.status;
+    }
+    if (validated.actualPriority !== undefined) {
+      updateData.actualPriority = validated.actualPriority;
+    }
+    if (validated.estimatedHours !== undefined) {
+      updateData.estimatedHours = typeof validated.estimatedHours === 'string' 
+        ? parseFloat(validated.estimatedHours) 
+        : validated.estimatedHours;
+    }
+    if (validated.intakeNotes !== undefined) {
+      updateData.intakeNotes = validated.intakeNotes || null;
+    }
+    if (validated.resolutionDescription !== undefined) {
+      updateData.resolutionDescription = validated.resolutionDescription || null;
+    }
+    if (validated.rejectionReason !== undefined) {
+      updateData.rejectionReason = validated.rejectionReason || null;
+    }
+    if (validated.satisfactionRating !== undefined) {
+      updateData.satisfactionRating = validated.satisfactionRating || null;
+    }
+    if (validated.additionalFeedback !== undefined) {
+      updateData.additionalFeedback = validated.additionalFeedback || null;
     }
 
-    const updateData: Record<string, unknown> = { ...validated };
+    // 날짜 필드 처리
+    if (validated.expectedCompletionDate !== undefined) {
+      updateData.expectedCompletionDate = validated.expectedCompletionDate 
+        ? new Date(validated.expectedCompletionDate) 
+        : null;
+    }
+    if (validated.dueDate !== undefined) {
+      updateData.dueDate = validated.dueDate 
+        ? new Date(validated.dueDate) 
+        : null;
+    }
+    if (validated.actualCompletionDate !== undefined) {
+      updateData.actualCompletionDate = validated.actualCompletionDate 
+        ? new Date(validated.actualCompletionDate) 
+        : null;
+    }
+    if (validated.estimatedCompletionDate !== undefined) {
+      updateData.estimatedCompletionDate = validated.estimatedCompletionDate 
+        ? new Date(validated.estimatedCompletionDate) 
+        : null;
+    }
+
+    // 관계형 필드 처리
+    if (validated.serviceCategoryId !== undefined) {
+      if (validated.serviceCategoryId) {
+        updateData.serviceCategoryId = validated.serviceCategoryId;
+      }
+      // null인 경우 업데이트하지 않음 (필수 필드이므로)
+    }
+
+    // 담당자 필드 처리 (assignedToId → assigneeId 매핑)
+    const assigneeId = validated.assigneeId || validated.assignedToId;
+    if (assigneeId !== undefined) {
+      updateData.assigneeId = assigneeId || null;
+    }
 
     // Additional logic from original method
     if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
@@ -128,21 +218,65 @@ export class SRService {
       }
     }
     
-    const newAssigneeId = validated.assigneeId || validated.assignedToId;
-    if (newAssigneeId !== undefined && newAssigneeId !== existingSR.assigneeId) {
+    if (assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
       await this.srActivityRepository.create({
         srId: id,
         userId: sessionUser.id,
         type: "ASSIGNED",
-        description: newAssigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
+        description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
       });
     }
 
+    // updateData가 비어있으면 업데이트할 것이 없음
+    if (Object.keys(updateData).length === 0) {
+      return existingSR;
+    }
+
     return this.srRepository.update(id, updateData);
+    } catch (error) {
+      const { logger } = await import("@/lib/logger");
+      logger.error("SR 업데이트 서비스 오류", error instanceof Error ? error : undefined, {
+        srId: id,
+        updateData: Object.keys(updateData),
+      });
+      throw error;
+    }
   }
 
-  async getSRById(id: string) {
+  async getSRById(id: string): Promise<SR | null> {
     return this.srRepository.findById(id);
+  }
+
+  async getSRDetailsById(id: string): Promise<(SR & {
+    client: { id: string; code: string; name: string };
+    requester: { id: string; name: string; email: string };
+    assignee: { id: string; name: string; email: string } | null;
+    serviceCategory: { id: string; categoryName: string };
+    comments: Array<{
+      id: string;
+      content: string;
+      createdAt: Date;
+      updatedAt: Date;
+      user: { id: string; name: string; email: string };
+    }>;
+    activities: Array<{
+      id: string;
+      type: string;
+      description: string;
+      createdAt: Date;
+      user: { id: string; name: string; email: string };
+    }>;
+    attachments: Array<{
+      id: string;
+      fileName: string;
+      fileSize: number;
+      fileType: string;
+      fileUrl: string;
+      createdAt: Date;
+    }>;
+    _count: { comments: number; attachments: number };
+  }) | null> {
+    return this.srRepository.findDetailsById(id);
   }
 
   async getAllSRs(params: {
@@ -162,12 +296,12 @@ export class SRService {
     // Create maps for quick lookup
     const commentCountsMap: Record<string, number> = {};
     const attachmentCountsMap: Record<string, number> = {};
-    
-    counts.forEach(count => {
+
+    counts.forEach((count) => {
       commentCountsMap[count.srId] = count._count._all;
     });
 
-    attachmentCounts.forEach(count => {
+    attachmentCounts.forEach((count) => {
       attachmentCountsMap[count.srId] = count._count._all;
     });
     
@@ -218,7 +352,7 @@ export const getAllSrs = async (filters: { status?: string; clientId?: string; p
   return srServiceInstance.getAllSRs({ where: whereFilters });
 };
 
-export const createSr = async (data: SrCreateData, sessionUser: { id: string; email: string }) => {
+export const createSr = async (data: SrCreateData, sessionUser: AuthenticatedUser) => {
   return srServiceInstance.createSR(data, sessionUser);
 };
 

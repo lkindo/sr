@@ -3,6 +3,7 @@ import { Footer } from "@/components/layout/Footer";
 import { auth } from "@/auth";
 import MainContent from "./MainContent";
 import { convertSessionToPlainObject } from "@/lib/utils";
+import type { AuthenticatedUser } from "@/types/session";
 
 export default async function DashboardLayout({
   children,
@@ -12,7 +13,7 @@ export default async function DashboardLayout({
   const session = await auth();
 
   // session.user 객체를 순수한 객체로 변환
-  const user = convertSessionToPlainObject(session);
+  const user = convertSessionToPlainObject(session) as AuthenticatedUser | undefined;
 
   return (
     <div className="relative flex min-h-screen flex-col">

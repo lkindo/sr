@@ -171,7 +171,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     userType?: string;
     roleId?: string;
     role?: string;
-  }): Promise<any[]> {
+  }): Promise<User[]> {
     const where: Prisma.UserWhereInput = {};
 
     // 검색어 필터

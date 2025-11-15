@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ClientRepository } from "@/repositories/client.repository";
 import { UserRepository } from "@/repositories/user.repository";
+import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { UserService } from "./user.service";
 import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
 import { NotFoundError, DuplicateError, ReferentialIntegrityError } from "@/lib/errors";
@@ -9,18 +10,19 @@ type ClientCreateData = z.infer<typeof clientCreateSchema>;
 type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
 
 export class ClientService {
-  private clientRepository: ClientRepository;
-  private userRepository: UserRepository;
-  private userService: UserService;
-
-  constructor() {
-    this.clientRepository = new ClientRepository();
-    this.userRepository = new UserRepository();
-    this.userService = new UserService();
-  }
+  constructor(
+    private clientRepository: ClientRepository = new ClientRepository(),
+    private userRepository: UserRepository = new UserRepository(),
+    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository(),
+    private userService: UserService = new UserService()
+  ) {}
 
   async getClientById(id: string) {
     return this.clientRepository.findById(id);
+  }
+
+  async getClientDetailsById(id: string) {
+    return this.clientRepository.findDetailsById(id);
   }
 
   async getClientByCode(code: string) {
@@ -130,5 +132,34 @@ export class ClientService {
 
   async getClientsByUserId(userId: string) {
     return this.clientRepository.findByUserId(userId);
+  }
+
+  async getClientWithDetailsAndCategories(id: string) {
+    const client = await this.clientRepository.findDetailsById(id);
+    if (!client) {
+      return null;
+    }
+
+    // 모든 활성화된 서비스 카테고리 조회
+    const serviceCategories = await this.serviceCategoryRepository.findAll({
+      where: { isActive: true },
+      orderBy: { categoryName: "asc" },
+    });
+
+    // ADMIN 역할을 가진 사용자 제외
+    type ClientWithUsers = NonNullable<Awaited<ReturnType<ClientRepository['findDetailsById']>>>;
+    const clientWithUsers = client as ClientWithUsers;
+    const filteredUsers = clientWithUsers.users?.filter((userClient) => {
+      const hasAdminRole = userClient.user?.roles?.some(
+        (userRole) => userRole.role?.name === "ADMIN"
+      );
+      return !hasAdminRole;
+    }) || [];
+
+    return {
+      ...client,
+      users: filteredUsers,
+      serviceCategories,
+    };
   }
 }

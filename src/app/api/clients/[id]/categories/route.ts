@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError, ValidationError, BadRequestError } from "@/lib/errors";
+import { RouteContext } from "@/lib/api-helpers";
 
 const categorySchema = z.object({
   categoryName: z
@@ -19,16 +20,10 @@ const categorySchema = z.object({
   backupHandlerId: z.string().optional(),
 });
 
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
-
 // GET /api/clients/[id]/categories - 고객사의 서비스 카테고리 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
@@ -70,7 +65,7 @@ export const GET = withAuthAndRateLimit(async (
 // POST /api/clients/[id]/categories - 서비스 카테고리 생성 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 

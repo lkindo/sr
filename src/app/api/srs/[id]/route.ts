@@ -1,145 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
 import { z } from "zod";
-// import { sendSRStatusChangedEmail, sendSRAssignedEmail } from "@/lib/email"; // 임시 주석
-
-import { deleteSr } from "@/services/sr.service";
-import { SRRepository } from "@/repositories/sr.repository";
-
-import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
-import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
+import { SRService } from "@/services/sr.service";
+import { srUpdateSchema } from "@/lib/schemas";
+import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
+import { NotFoundError } from "@/lib/errors";
+import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
+import { Prisma } from "@prisma/client";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
-const srUpdateSchema = z.object({
-  title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다.").optional(),
-  description: z
-    .string()
-    .min(10, "설명은 최소 10자 이상이어야 합니다.")
-    .optional(),
-  serviceCategoryId: z.string().optional().nullable(),
-  priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  status: z
-    .enum([
-      "REQUESTED",
-      "INTAKE",
-      "IN_PROGRESS",
-      "ON_HOLD",
-      "COMPLETED",
-      "CONFIRMED",
-      "REJECTED",
-    ])
-    .optional(),
-  assignedToId: z.string().optional().nullable(),
-  expectedCompletionDate: z.string().optional().nullable(),
-  dueDate: z.string().optional().nullable(),
-  actualCompletionDate: z.string().optional().nullable(),
-  resolutionDescription: z.string().optional().nullable(),
-  rejectionReason: z.string().optional().nullable(),
-  satisfactionRating: z.number().min(1).max(5).optional().nullable(),
-  additionalFeedback: z.string().optional().nullable(),
-  // 접수 처리 관련 필드 추가
-  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
-  estimatedHours: z.number().positive("예상 작업 시간은 0보다 커야 합니다").optional(),
-  estimatedCompletionDate: z.string().optional(),
-  intakeNotes: z.string().optional(),
-  assigneeId: z.string().min(1, "담당자를 선택해주세요").optional(),
-});
-
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
-
 // GET /api/srs/[id] - SR 상세 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
-  // SR 정보를 필요한 필드만 선택하여 조회
-  const sr = await prisma.sR.findUnique({
-    where: { id },
-    include: {
-      client: {
-        select: {
-          id: true,
-          code: true,
-          name: true,
-        }
-      },
-      requester: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        }
-      },
-      assignee: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        }
-      },
-      intakeBy: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        }
-      },
-      serviceCategory: true,
-      comments: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      },
-      activities: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      },
-      attachments: {
-        select: {
-          id: true,
-          fileName: true,
-          fileSize: true,
-          fileType: true,
-          fileUrl: true,
-          createdAt: true,
-        }
-      },
-      _count: {
-        select: {
-          comments: true,
-          attachments: true,
-        }
-      }
-    }
-  });
+  // Service 레이어를 통해 SR 조회
+  const srService = new SRService();
+  const sr = await srService.getSRDetailsById(id);
 
   if (!sr) {
     throw new NotFoundError("SR을 찾을 수 없습니다.");
@@ -155,15 +35,15 @@ export const GET = withAuthAndRateLimit(async (
     estimatedCompletionDate: sr.estimatedCompletionDate ? sr.estimatedCompletionDate.toISOString() : null,
     actualCompletionDate: sr.actualCompletionDate ? sr.actualCompletionDate.toISOString() : null,
     // 관련 객체들의 날짜 필드도 변환
-    comments: sr.comments.map((comment) => ({
+    comments: sr.comments?.map((comment) => ({
       ...comment,
       createdAt: comment.createdAt.toISOString(),
       updatedAt: comment.updatedAt.toISOString(),
-    })),
-    activities: sr.activities.map((activity) => ({
+    })) || [],
+    activities: sr.activities?.map((activity) => ({
       ...activity,
       createdAt: activity.createdAt.toISOString(),
-    })),
+    })) || [],
   };
 
   return NextResponse.json(serializableSr);
@@ -172,42 +52,14 @@ export const GET = withAuthAndRateLimit(async (
 // PATCH /api/srs/[id] - SR 수정 (Rate Limit: 엄격)
 export const PATCH = withAuthAndRateLimit(async (
   request: NextRequest,
-  { session, params }: { session: any; params: RouteContext["params"] }
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
-  const body = await request.json();
+  const validated = await validateRequestBody(request, srUpdateSchema);
 
-  let validated;
-  try {
-    validated = srUpdateSchema.parse(body);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new ValidationError(error.issues[0].message);
-    }
-    throw error;
-  }
-
-  // SR 존재 확인
-  const existingSR = await prisma.sR.findUnique({
-    where: { id },
-  });
-
-  if (!existingSR) {
-    throw new NotFoundError("SR을 찾을 수 없습니다.");
-  }
-
-  // SR 업데이트 - undefined 값 제거
-  const updateData: any = { ...validated };
-  Object.keys(updateData).forEach(key => {
-    if (updateData[key] === undefined) {
-      delete updateData[key];
-    }
-  });
-
-  const updatedSR = await prisma.sR.update({
-    where: { id },
-    data: updateData,
-  });
+  // Service 레이어를 통해 SR 수정
+  const srService = new SRService();
+  const updatedSR = await srService.updateSR(id, validated, session.user);
 
   return NextResponse.json(updatedSR);
 }, { preset: 'strict' }); // 1분당 5회 (민감한 작업)
@@ -215,22 +67,13 @@ export const PATCH = withAuthAndRateLimit(async (
 // DELETE /api/srs/[id] - SR 삭제 (Rate Limit: 엄격)
 export const DELETE = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
-  try {
-    const result = await deleteSr(id);
-    return NextResponse.json(result);
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message === "SR을 찾을 수 없습니다.") {
-        throw new NotFoundError(error.message);
-      }
-      if (error.message === "진행 중이거나 완료된 SR은 삭제할 수 없습니다.") {
-        throw new BadRequestError(error.message);
-      }
-    }
-    throw error;
-  }
+  // Service 레이어를 통해 SR 삭제
+  const srService = new SRService();
+  const result = await srService.deleteSR(id);
+  
+  return NextResponse.json(result);
 }, { preset: 'strict' }); // 1분당 5회 (삭제는 민감한 작업)

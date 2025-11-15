@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { Prisma } from "@prisma/client";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -17,7 +18,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
     const sortBy = searchParams.get("sortBy") || "waitingTime"; // waitingTime, priority, requestedCompletionDate
 
     // WHERE 조건
-    const where: any = {
+    const where: Prisma.SRWhereInput = {
       status: "REQUESTED", // 접수 대기 중인 SR만
     };
 

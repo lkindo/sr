@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -25,17 +26,17 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get("sortBy") || "createdAt"; // 정렬 기준 (createdAt, updatedAt, status)
 
     // 조회 조건 구성
-    const where: any = {
+    const where: Prisma.SRWhereInput = {
       requesterId: session.user.id, // 내가 요청한 SR만
     };
 
     // 상태 필터링
     if (status && status !== "all") {
-      where.status = status;
+      where.status = status as Prisma.SRStatus;
     }
 
     // 정렬 조건 구성
-    let orderBy: any = {};
+    let orderBy: Prisma.SROrderByWithRelationInput;
     switch (sortBy) {
       case "updatedAt":
         orderBy = { updatedAt: "desc" };

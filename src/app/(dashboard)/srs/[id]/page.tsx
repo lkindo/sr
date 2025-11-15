@@ -15,7 +15,8 @@ import { EditSRDialog } from "@/components/srs/EditSRDialog";
 import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
 import { useToast } from "@/hooks/use-toast";
 import { getSRDetailsAction } from "@/actions/sr.actions";
-import { TableSkeleton } from "@/components/loading/TableSkeleton"; // Or a more specific skeleton
+import { TableSkeleton } from "@/components/loading/TableSkeleton";
+import { usePermissions } from "@/hooks/use-permissions";
 
 const statusLabels: Record<string, string> = {
   REQUESTED: "요청됨", INTAKE: "접수", IN_PROGRESS: "진행중", ON_HOLD: "대기",
@@ -35,13 +36,66 @@ export default function SRDetailPage() {
   const router = useRouter();
   const srId = params.id as string;
   
-  const [sr, setSr] = useState<any>(null);
+  // SR 상세 정보 타입 정의
+  type SRDetails = {
+    id: string;
+    srNumber: string;
+    title: string;
+    description: string;
+    status: string;
+    priority: string;
+    requestedPriority: string;
+    actualPriority: string | null;
+    requestedCompletionDate: Date | null;
+    estimatedCompletionDate: Date | null;
+    dueDate: Date | null;
+    estimatedHours: number | null;
+    intakeNotes: string | null;
+    satisfactionRating: number | null;
+    client: { id: string; code: string; name: string };
+    requester: { id: string; name: string; email: string };
+    assignee: { id: string; name: string; email: string } | null;
+    serviceCategory: { id: string; categoryName: string };
+    comments: Array<{
+      id: string;
+      content: string;
+      createdAt: Date;
+      updatedAt: Date;
+      user: { id: string; name: string; email: string };
+    }>;
+    activities: Array<{
+      id: string;
+      type: string;
+      description: string;
+      createdAt: Date;
+      user: { id: string; name: string; email: string };
+    }>;
+    attachments: Array<{
+      id: string;
+      fileName: string;
+      fileSize: number;
+      fileType: string;
+      fileUrl: string;
+      createdAt: Date;
+    }>;
+    statusHistory: Array<{
+      id: string;
+      currentStatus: string;
+      previousStatus: string | null;
+      changedAt: Date;
+      user: { id: string; name: string; image: string | null };
+    }>;
+    _count: { comments: number; attachments: number };
+  };
+  
+  const [sr, setSr] = useState<SRDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { hasAnyRole } = usePermissions();
 
   useEffect(() => {
     if (srId) {
@@ -118,6 +172,15 @@ export default function SRDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          {/* 접수 정보 수정 버튼 (IN_PROGRESS 상태이고 MANAGER/ADMIN 권한일 때만) */}
+          {sr.status === "IN_PROGRESS" && hasAnyRole(["MANAGER", "ADMIN"]) && (
+            <Button 
+              variant="outline"
+              onClick={() => router.push(`/srs/${srId}/intake`)}
+            >
+              <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
+            </Button>
+          )}
           <Button onClick={() => setIsEditDialogOpen(true)}>
             <Pencil className="mr-2 h-4 w-4" /> 수정
           </Button>
@@ -130,10 +193,10 @@ export default function SRDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
         {/* Details Card */}
-        <div className="md:col-span-2 space-y-6">
-          <div className="p-6 bg-white rounded-lg shadow border">
+        <div className="md:col-span-2 space-y-6 flex flex-col">
+          <div className="p-6 bg-white rounded-lg shadow border flex-1">
             <h3 className="text-lg font-semibold mb-4">상세 정보</h3>
             <div className="space-y-4">
               <div>
@@ -242,8 +305,8 @@ export default function SRDetailPage() {
         </div>
         
         {/* Stats and Additional Info Card */}
-        <div className="space-y-6">
-          <div className="p-6 bg-white rounded-lg shadow border">
+        <div className="space-y-6 flex flex-col">
+          <div className="p-6 bg-white rounded-lg shadow border flex-1">
             <h3 className="text-lg font-semibold mb-4">요약 정보</h3>
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -302,7 +365,7 @@ export default function SRDetailPage() {
             <div className="p-6 bg-white rounded-lg shadow border">
               <h3 className="text-lg font-semibold mb-4">상태 변경 이력</h3>
               <div className="space-y-3 max-h-60 overflow-y-auto">
-                {sr.statusHistory.map((history: any) => (
+                {sr.statusHistory.map((history) => (
                   <div key={history.id} className="flex justify-between text-sm">
                     <div>
                       <Badge variant={statusColors[history.currentStatus]}>

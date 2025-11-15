@@ -23,10 +23,12 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 
+import type { LucideIcon } from "lucide-react";
+
 interface SubMenuItem {
   title: string;
   href: string;
-  icon?: any;
+  icon?: LucideIcon;
   permission?: { resource: string; action: string };
   role?: string;
   roles?: string[];

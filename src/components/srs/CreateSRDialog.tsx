@@ -26,6 +26,8 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { getClientsForSelection } from "@/actions/client.actions";
 import { getServiceCategoriesForSelection } from "@/actions/service-category.actions";
 import { createSRAction } from "@/actions/sr.actions";
+import { getProfileAction } from "@/actions/user.actions";
+import { usePermissions } from "@/hooks/use-permissions";
 
 interface Client {
   id: string;
@@ -62,26 +64,62 @@ export function CreateSRDialog({
   );
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { data: session } = useSession();
+  const { hasAnyRole } = usePermissions();
 
-
+  // CLIENT_ADMIN, CLIENT_USER인지 확인
+  const isClientUser = hasAnyRole(["CLIENT_ADMIN", "CLIENT_USER"]);
+  const canSelectClient = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
 
   const fetchClients = useCallback(async () => {
-    const result = await getClientsForSelection();
-    if (result.success) {
-      setClients(result.data as Client[]);
+    // CLIENT_ADMIN, CLIENT_USER인 경우 자신의 고객사만 가져오기
+    if (isClientUser) {
+      const profileResult = await getProfileAction();
+      if (profileResult.success && profileResult.data) {
+        const userClients = profileResult.data.clients || [];
+        if (userClients.length > 0) {
+          // 첫 번째 고객사 사용 (일반적으로 사용자는 하나의 고객사에만 속함)
+          const userClient = userClients[0].client;
+          setClients([{
+            id: userClient.id,
+            code: userClient.code,
+            name: userClient.name,
+          }]);
+          // 자동으로 고객사 설정
+          setClientId(userClient.id);
+        } else {
+          toast({
+            title: "오류",
+            description: "고객사 정보를 찾을 수 없습니다.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "오류",
+          description: "사용자 정보를 불러오지 못했습니다.",
+          variant: "destructive",
+        });
+      }
     } else {
-      toast({
-        title: "오류",
-        description: "고객사 목록을 불러오지 못했습니다.",
-        variant: "destructive",
-      });
+      // ADMIN, MANAGER, ENGINEER인 경우 모든 고객사 가져오기
+      const result = await getClientsForSelection();
+      if (result.success) {
+        setClients(result.data as Client[]);
+      } else {
+        toast({
+          title: "오류",
+          description: "고객사 목록을 불러오지 못했습니다.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [toast]);
+  }, [toast, isClientUser]);
 
   const fetchCategories = useCallback(async () => {
     const result = await getServiceCategoriesForSelection();
     if (result.success && result.data) {
-      setCategories(result.data.map((cat: any) => ({ id: cat.id, name: cat.categoryName })));
+      setCategories(result.data.map((cat) => ({ id: cat.id, name: cat.categoryName })));
     } else {
       toast({
         title: "오류",
@@ -97,6 +135,19 @@ export function CreateSRDialog({
       fetchCategories(); // 전체 서비스 카테고리 조회
     }
   }, [open, fetchClients, fetchCategories]);
+
+  // 다이얼로그가 열릴 때마다 폼 초기화
+  useEffect(() => {
+    if (open) {
+      setTitle("");
+      setDescription("");
+      setClientId("");
+      setCategoryId("");
+      setRequestedPriority("MEDIUM");
+      setRequestedCompletionDate("");
+      setFiles([]);
+    }
+  }, [open]);
 
   const uploadAttachments = async (srId: string, files: File[]) => {
     const formData = new FormData();
@@ -232,7 +283,7 @@ export function CreateSRDialog({
                 <Select
                   value={clientId}
                   onValueChange={setClientId}
-                  disabled={loading}
+                  disabled={loading || !canSelectClient}
                 >
                   <SelectTrigger id="client">
                     <SelectValue placeholder="고객사를 선택" />
@@ -245,6 +296,11 @@ export function CreateSRDialog({
                     ))}
                   </SelectContent>
                 </Select>
+                {!canSelectClient && (
+                  <p className="text-xs text-muted-foreground">
+                    고객사는 자동으로 설정됩니다.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

@@ -7,10 +7,10 @@ import { NextResponse } from "next/server";
 export interface ApiError {
   error: string;
   code?: string;
-  details?: any;
+  details?: unknown;
 }
 
-export interface ApiSuccess<T = any> {
+export interface ApiSuccess<T = unknown> {
   data: T;
   message?: string;
   meta?: {
@@ -43,7 +43,7 @@ export function errorResponse(
   error: string,
   status: number = 500,
   code?: string,
-  details?: any
+  details?: unknown
 ): NextResponse {
   const response: ApiError = {
     error,
@@ -57,7 +57,7 @@ export function errorResponse(
 /**
  * 유효성 검사 에러 응답
  */
-export function validationErrorResponse(errors: any): NextResponse {
+export function validationErrorResponse(errors: unknown): NextResponse {
   return errorResponse("유효성 검사 실패", 400, "VALIDATION_ERROR", errors);
 }
 
@@ -97,7 +97,7 @@ export function notFoundResponse(
  */
 export function serverErrorResponse(
   message: string = "서버 오류가 발생했습니다.",
-  error?: any
+  error?: unknown
 ): NextResponse {
   console.error("Server error:", error);
   return errorResponse(message, 500, "SERVER_ERROR");

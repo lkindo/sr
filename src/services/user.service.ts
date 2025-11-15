@@ -2,33 +2,31 @@ import { UserRepository } from "@/repositories/user.repository";
 import { RoleRepository } from "@/repositories/role.repository";
 import { ClientRepository } from "@/repositories/client.repository";
 import { PermissionService } from "./permission.service";
+import { invalidateCachePattern } from "@/lib/redis-cache";
 import { hash, compare } from "bcryptjs";
 import { userUpdateSchema } from "@/lib/schemas";
 import { z } from "zod";
 import { NotFoundError, ValidationError } from "@/lib/errors";
+import type { User, Role, Permission } from "@prisma/client";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
 export class UserService {
-  private userRepository: UserRepository;
-  private roleRepository: RoleRepository;
-  private clientRepository: ClientRepository;
-
-  constructor() {
-    this.userRepository = new UserRepository();
-    this.roleRepository = new RoleRepository();
-    this.clientRepository = new ClientRepository();
-  }
+  constructor(
+    private userRepository: UserRepository = new UserRepository(),
+    private roleRepository: RoleRepository = new RoleRepository(),
+    private clientRepository: ClientRepository = new ClientRepository()
+  ) {}
 
   async getUserById(id: string) {
-    return this.userRepository.findById(id);
+    return this.userRepository.findDetailsById(id);
   }
 
   async getUserByEmail(email: string) {
     return this.userRepository.findByEmail(email);
   }
 
-  async getUserByClientId(clientId: string) {
+  async getUserByClientId(clientId: string): Promise<User[]> {
     return this.userRepository.findByClientId(clientId);
   }
 
@@ -38,19 +36,19 @@ export class UserService {
     userType?: string;
     roleId?: string;
     role?: string;
-  }) {
+  }): Promise<User[]> {
     if (filters && Object.keys(filters).length > 0) {
       return this.userRepository.findAllWithFilters(filters);
     }
     return this.userRepository.findAll();
   }
 
-  async updateUser(id: string, data: UserUpdateData) {
+  async updateUser(id: string, data: UserUpdateData): Promise<User> {
     const validated = userUpdateSchema.parse(data);
     return this.userRepository.update(id, validated);
   }
 
-  async updatePassword(userId: string, hashedPassword: string) {
+  async updatePassword(userId: string, hashedPassword: string): Promise<User> {
     return this.userRepository.updatePassword(userId, hashedPassword);
   }
 
@@ -58,16 +56,24 @@ export class UserService {
     name?: string;
     email?: string;
     image?: string;
-  }) {
+  }): Promise<User> {
     return this.userRepository.updateProfile(userId, profileData);
   }
 
-  async activateUser(userId: string) {
-    return this.userRepository.activateUser(userId);
+  async activateUser(userId: string): Promise<User> {
+    const user = await this.userRepository.activateUser(userId);
+    // 캐시 무효화
+    await invalidateCachePattern(`user:*:${userId}`);
+    await invalidateCachePattern("user:list*");
+    return user;
   }
 
-  async deactivateUser(userId: string) {
-    return this.userRepository.deactivateUser(userId);
+  async deactivateUser(userId: string): Promise<User> {
+    const user = await this.userRepository.deactivateUser(userId);
+    // 캐시 무효화
+    await invalidateCachePattern(`user:*:${userId}`);
+    await invalidateCachePattern("user:list*");
+    return user;
   }
 
   async createUser(userData: {
@@ -75,7 +81,7 @@ export class UserService {
     name: string;
     password: string;
     clientId?: string;
-  }) {
+  }): Promise<User> {
     const hashedPassword = userData.password; // 실제로는 해시 처리가 필요합니다
     const user = await this.userRepository.create({
       email: userData.email,
@@ -99,7 +105,9 @@ export class UserService {
     return user;
   }
 
-  async getUsersWithSRHandlingPermission() {
+  async getUsersWithSRHandlingPermission(
+    permissionService: PermissionService = new PermissionService()
+  ): Promise<Array<{ id: string; name: string; email: string }>> {
     const requiredPermissions = [
       "SR.CREATE",
       "SR.READ",
@@ -111,11 +119,10 @@ export class UserService {
       "COMMENT.READ",
       "COMMENT.UPDATE",
     ];
-    const permissionService = new PermissionService();
     return permissionService.getUsersWithPermissions(requiredPermissions);
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<User> {
     // 사용자 조회
     const user = await this.userRepository.findById(userId);
     if (!user) {

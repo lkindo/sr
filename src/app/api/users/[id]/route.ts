@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UserService } from "@/services/user.service";
-import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
-import { BusinessRuleError, NotFoundError, ValidationError } from "@/lib/errors";
+import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
+import { BusinessRuleError, NotFoundError } from "@/lib/errors";
 import { z } from "zod";
 import { userUpdateSchema } from "@/lib/schemas";
-
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
+import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
 
 // GET /api/users/[id] - 사용자 상세 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
@@ -31,20 +26,10 @@ export const GET = withAuthAndRateLimit(async (
 // PATCH /api/users/[id] - 사용자 수정 (Rate Limit: 엄격)
 export const PATCH = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
-  const body = await request.json();
-
-  let validated;
-  try {
-    validated = userUpdateSchema.parse(body);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new ValidationError(error.issues[0].message);
-    }
-    throw error;
-  }
+  const validated = await validateRequestBody(request, userUpdateSchema);
 
   const userService = new UserService();
   const user = await userService.updateUser(id, validated);
@@ -55,7 +40,7 @@ export const PATCH = withAuthAndRateLimit(async (
 // DELETE /api/users/[id] - 사용자 삭제 (비활성화) (Rate Limit: 엄격)
 export const DELETE = withAuthAndRateLimit(async (
   request: NextRequest,
-  { session, params }: { session: any; params: RouteContext["params"] }
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 

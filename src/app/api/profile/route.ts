@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
 
@@ -74,7 +75,7 @@ export const PATCH = withAuthAndRateLimit(async (request: NextRequest, { session
     throw error;
   }
 
-  const updateData: any = {};
+  const updateData: Prisma.UserUncheckedUpdateInput = {};
   if (validated.name !== undefined) updateData.name = validated.name;
   if (validated.image !== undefined) updateData.image = validated.image || null;
 

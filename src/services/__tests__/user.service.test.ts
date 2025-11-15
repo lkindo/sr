@@ -14,6 +14,7 @@ vi.mock('bcryptjs', () => ({
 // Mock repositories
 vi.mock('@/repositories/user.repository', () => {
   const mockFindById = vi.fn();
+  const mockFindDetailsById = vi.fn();
   const mockFindAll = vi.fn();
   const mockFindAllWithFilters = vi.fn();
   const mockCreate = vi.fn();
@@ -22,6 +23,7 @@ vi.mock('@/repositories/user.repository', () => {
 
   class MockUserRepository {
     findById = mockFindById;
+    findDetailsById = mockFindDetailsById;
     findAll = mockFindAll;
     findAllWithFilters = mockFindAllWithFilters;
     create = mockCreate;
@@ -67,16 +69,16 @@ describe('UserService', () => {
         updatedAt: new Date(),
       };
 
-      mockUserRepo.findById.mockResolvedValue(user);
+      mockUserRepo.findDetailsById.mockResolvedValue(user);
 
       const result = await userService.getUserById('1');
 
       expect(result).toEqual(user);
-      expect(mockUserRepo.findById).toHaveBeenCalledWith('1');
+      expect(mockUserRepo.findDetailsById).toHaveBeenCalledWith('1');
     });
 
     it('존재하지 않는 사용자 ID면 null을 반환해야 함', async () => {
-      mockUserRepo.findById.mockResolvedValue(null);
+      mockUserRepo.findDetailsById.mockResolvedValue(null);
 
       const result = await userService.getUserById('999');
 

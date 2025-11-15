@@ -51,6 +51,12 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
           },
           orderBy: { changedAt: 'desc' },
         },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+          },
+        },
       },
     });
   }

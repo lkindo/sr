@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { deleteAttachmentBlob } from "@/lib/storage";
-import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
-
-type RouteContext = {
-  params: Promise<{
-    id: string;
-  }>;
-};
+import { RouteContext } from "@/lib/api-helpers";
 
 // GET /api/attachments/[id] - 첨부파일 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: { session: any; params: RouteContext["params"] }
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
@@ -31,7 +26,7 @@ export const GET = withAuthAndRateLimit(async (
 // DELETE /api/attachments/[id] - 첨부파일 삭제 (Rate Limit: 엄격)
 export const DELETE = withAuthAndRateLimit(async (
   request: NextRequest,
-  { session, params }: { session: any; params: RouteContext["params"] }
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 

@@ -613,11 +613,12 @@
     @apply w-full;
     @apply border-t-2 border-[hsl(var(--sr-primary-dark))];
     @apply border-b border-[hsl(var(--sr-border))];
+    table-layout: auto;
   }
 
   .sr-table-template th {
     @apply bg-[hsl(var(--sr-bg-light))] h-12 px-6;
-    @apply text-left font-medium;
+    @apply font-medium text-center;
     @apply border-r border-[hsl(var(--sr-border))];
     @apply last:border-r-0;
   }

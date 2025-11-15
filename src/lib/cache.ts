@@ -1,11 +1,12 @@
 import { unstable_cache as cache } from 'next/cache';
 import prisma from './prisma';
+import type { Prisma } from '@prisma/client';
 
 // SR 목록 캐싱
 export const getCachedSRs = cache(
   async (params: { 
-    where?: any; 
-    orderBy?: any; 
+    where?: Prisma.SRWhereInput; 
+    orderBy?: Prisma.SROrderByWithRelationInput; 
     skip?: number; 
     take?: number;
   }) => {

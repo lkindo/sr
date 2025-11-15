@@ -4,7 +4,8 @@ import { useState, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle } from "lucide-react";
+import { usePermissions } from "@/hooks/use-permissions";
+import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import { CreateSRDialog } from "@/components/srs/CreateSRDialog";
 import { getDueDateStatus } from "@/lib/date-utils";
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { useQueryClient } from "@tanstack/react-query";
+import { SRService } from "@/services/sr.service";
 
 // These types and constants can be moved to a shared file if needed
 const statusLabels: Record<string, string> = {
@@ -34,13 +36,37 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
 type SortField = "srNumber" | "title" | "client" | "priority" | "status" | "createdAt" | "dueDate";
 type SortOrder = "asc" | "desc";
 
+// SR 타입 정의
+type SRListItem = Awaited<ReturnType<SRService['getAllSRs']>>[number];
+type ClientListItem = { id: string; code: string; name: string };
+type UserListItem = { id: string; name: string; email: string };
+type PaginationInfo = {
+  currentPage: number;
+  itemsPerPage: number;
+  totalCount: number;
+  totalPages: number;
+  hasPrevPage: boolean;
+  hasNextPage: boolean;
+};
+
 // This component now receives data fetched from the server as props
-export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any[], paginationInfo: any, clients: any[], users: any[] }) {
+export function SRsDataTable({ 
+  srs, 
+  paginationInfo, 
+  clients, 
+  users 
+}: { 
+  srs: SRListItem[]; 
+  paginationInfo: PaginationInfo; 
+  clients: ClientListItem[]; 
+  users: UserListItem[] 
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
   const queryClient = useQueryClient();
+  const { hasAnyRole } = usePermissions();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -113,49 +139,224 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
     setIsCreateDialogOpen(false);
   };
 
+  // Calculate filter counts
+  const waitingCount = useMemo(() => {
+    return srs.filter(sr => sr.status === 'REQUESTED').length;
+  }, [srs]);
+
+  const myAssignedCount = useMemo(() => {
+    if (!session?.user?.id) return 0;
+    return srs.filter(sr => sr.assigneeId === session.user.id).length;
+  }, [srs, session]);
+
+  const urgentCount = useMemo(() => {
+    return srs.filter(sr => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;
+  }, [srs]);
+
+  const activeQuickFilter = useMemo(() => {
+    if (filters.status === 'REQUESTED') return 'waiting';
+    if (filters.assigneeId === session?.user?.id) return 'myAssigned';
+    if (filters.priority === 'CRITICAL' || filters.priority === 'HIGH') return 'urgent';
+    return null;
+  }, [filters, session]);
+
+  const handleQuickFilter = (filterType: 'waiting' | 'myAssigned' | 'urgent' | null) => {
+    if (filterType === 'waiting') {
+      handleFilterChange('status', 'REQUESTED');
+    } else if (filterType === 'myAssigned') {
+      if (session?.user?.id) {
+        handleFilterChange('assigneeId', session.user.id);
+      }
+    } else if (filterType === 'urgent') {
+      handleFilterChange('priority', 'CRITICAL');
+    } else {
+      resetFilters();
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">SR 관리</h2>
-          <p className="text-sm text-muted-foreground mt-1">서비스 요청(SR)을 관리합니다.</p>
-        </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)} className="sr-btn-template-primary">
-          <Plus className="mr-2 h-4 w-4" /> 등록
-        </Button>
-      </div>
-
       <div className="sr-card-template bg-white">
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-          <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))] mb-4">SR 목록</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">SR 목록</h3>
+            <Button onClick={() => setIsCreateDialogOpen(true)} className="sr-btn-template-primary">
+              <Plus className="mr-2 h-4 w-4" /> 등록
+            </Button>
+          </div>
           
-          {/* Filters and Search */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1 max-w-md">
+          {/* Quick Filter Buttons and Advanced Filter Button */}
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')}
+                className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                  activeQuickFilter === 'waiting'
+                    ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                    : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+                <span>접수 대기</span>
+                {waitingCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                    {waitingCount}
+                  </Badge>
+                )}
+              </button>
+              <button
+                onClick={() => handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')}
+                className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                  activeQuickFilter === 'myAssigned'
+                    ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                    : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                }`}
+              >
+                <User className="h-4 w-4" />
+                <span>내 담당</span>
+              </button>
+              <button
+                onClick={() => handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')}
+                className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                  activeQuickFilter === 'urgent'
+                    ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                    : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                }`}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                <span>긴급</span>
+                {urgentCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                    {urgentCount}
+                  </Badge>
+                )}
+              </button>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              className="sr-input-template"
+            >
+              <Filter className="mr-2 h-4 w-4" />
+              고급 필터
+            </Button>
+          </div>
+
+          {/* Advanced Filters (Collapsible) */}
+          {showAdvancedFilters && (
+            <div className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))]">
+              {/* First Row: Status, Priority, Client, Assignee */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <Label className="text-sm mb-2 block">상태</Label>
+                  <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}>
+                    <SelectTrigger className="sr-input-template w-full">
+                      <SelectValue placeholder="모든 상태" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">모든 상태</SelectItem>
+                      {Object.entries(statusLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm mb-2 block">우선순위</Label>
+                  <Select value={filters.priority} onValueChange={(v) => handleFilterChange('priority', v)}>
+                    <SelectTrigger className="sr-input-template w-full">
+                      <SelectValue placeholder="모든 우선순위" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">모든 우선순위</SelectItem>
+                      {Object.entries(priorityLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm mb-2 block">고객사</Label>
+                  <Select value={filters.clientId} onValueChange={(v) => handleFilterChange('clientId', v)}>
+                    <SelectTrigger className="sr-input-template w-full">
+                      <SelectValue placeholder="모든 고객사" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">모든 고객사</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm mb-2 block">담당자</Label>
+                  <Select value={filters.assigneeId} onValueChange={(v) => handleFilterChange('assigneeId', v)}>
+                    <SelectTrigger className="sr-input-template w-full">
+                      <SelectValue placeholder="모든 담당자" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">모든 담당자</SelectItem>
+                      <SelectItem value="unassigned">미배정</SelectItem>
+                      {users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {/* Second Row: Date Range */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <Label className="text-sm mb-2 block">생성일 시작</Label>
+                  <Input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
+                    className="sr-input-template w-full"
+                    placeholder="년-월-일"
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm mb-2 block">생성일 종료</Label>
+                  <Input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => handleFilterChange('dateTo', e.target.value)}
+                    className="sr-input-template w-full"
+                    placeholder="년-월-일"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  필터 초기화
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Search Bar and Total Count */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="SR 번호, 제목 등으로 검색..."
+                placeholder="SR 번호, 제목, 고객사, 요청자, 담당자로 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="pl-10 sr-input-template w-full"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}>
-                <SelectTrigger className="sr-input-template w-full sm:w-[150px]">
-                  <SelectValue placeholder="상태 필터" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">모든 상태</SelectItem>
-                  {Object.entries(statusLabels).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" onClick={resetFilters}>필터 초기화</Button>
-            </div>
           </div>
+        </div>
+
+        {/* Total Count - 테이블 바로 위 */}
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
+          <span className="text-sm text-[hsl(var(--sr-gray-medium))] whitespace-nowrap">
+            Total {paginationInfo.totalCount} items
+          </span>
         </div>
 
         {/* Responsive Table - Show Table on larger screens, Cards on smaller screens */}
@@ -163,17 +364,17 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
           <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("srNumber")}>SR 번호{getSortIcon("srNumber")}</Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => handleSort("srNumber")}>SR 번호{getSortIcon("srNumber")}</Button></TableHead>
                 <TableHead className="min-w-[150px]"><Button variant="ghost" onClick={() => handleSort("title")}>제목{getSortIcon("title")}</Button></TableHead>
-                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("client")}>고객사{getSortIcon("client")}</Button></TableHead>
-                <TableHead className="w-[100px]">요청자</TableHead>
-                <TableHead className="w-[100px]">담당자</TableHead>
-                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("priority")}>우선순위{getSortIcon("priority")}</Button></TableHead>
-                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("status")}>상태{getSortIcon("status")}</Button></TableHead>
-                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("dueDate")}>마감일{getSortIcon("dueDate")}</Button></TableHead>
-                <TableHead className="w-[80px]">댓글/첨부</TableHead>
-                <TableHead className="w-[100px]"><Button variant="ghost" onClick={() => handleSort("createdAt")}>생성일{getSortIcon("createdAt")}</Button></TableHead>
-                <TableHead className="w-[80px]">작업</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => handleSort("client")}>고객사{getSortIcon("client")}</Button></TableHead>
+                <TableHead>요청자</TableHead>
+                <TableHead>담당자</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => handleSort("priority")}>우선순위{getSortIcon("priority")}</Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => handleSort("status")}>상태{getSortIcon("status")}</Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => handleSort("dueDate")}>마감일{getSortIcon("dueDate")}</Button></TableHead>
+                <TableHead>댓글/첨부</TableHead>
+                <TableHead><Button variant="ghost" onClick={() => handleSort("createdAt")}>생성일{getSortIcon("createdAt")}</Button></TableHead>
+                <TableHead>작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -182,20 +383,72 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
                   const dueDateStatus = getDueDateStatus(sr.dueDate);
                   return (
                     <TableRow key={sr.id} className="cursor-pointer" onClick={() => router.push(`/srs/${sr.id}`)}>
-                      <TableCell className="font-medium text-primary hover:underline"><Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link></TableCell>
+                      <TableCell className="font-medium text-primary hover:underline text-center"><Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link></TableCell>
                       <TableCell className="max-w-[200px] truncate" title={sr.title}>{sr.title}</TableCell>
                       <TableCell>{sr.client.name}</TableCell>
-                      <TableCell>{sr.requester.name}</TableCell>
-                      <TableCell>{sr.assignee?.name || "-"}</TableCell>
-                      <TableCell><Badge variant={priorityColors[sr.priority]}>{priorityLabels[sr.priority]}</Badge></TableCell>
-                      <TableCell><Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge></TableCell>
-                      <TableCell>{dueDateStatus ? <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge> : '-'}</TableCell>
-                      <TableCell>{sr._count?.comments || 0} / {sr._count?.attachments || 0}</TableCell>
-                      <TableCell>{new Date(sr.createdAt).toLocaleDateString("ko-KR")}</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}`); }}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="text-center">{sr.requester.name}</TableCell>
+                      <TableCell className="text-center">{sr.assignee?.name || "-"}</TableCell>
+                      <TableCell className="text-center"><Badge variant={priorityColors[sr.priority]}>{priorityLabels[sr.priority]}</Badge></TableCell>
+                      <TableCell className="text-center"><Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge></TableCell>
+                      <TableCell className="text-center">{dueDateStatus ? <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge> : '-'}</TableCell>
+                      <TableCell className="text-center">{sr._count?.comments || 0} / {sr._count?.attachments || 0}</TableCell>
+                      <TableCell className="text-center">
+                        {new Date(sr.createdAt).toLocaleDateString("ko-KR", { 
+                          year: 'numeric', 
+                          month: '2-digit', 
+                          day: '2-digit' 
+                        }).replace(/\./g, '. ').trim()}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {sr.status === 'REQUESTED' ? (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              router.push(`/srs/${sr.id}/intake`); 
+                            }}
+                          >
+                            접수
+                          </Button>
+                        ) : sr.status === 'IN_PROGRESS' && hasAnyRole(["MANAGER", "ADMIN"]) ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                router.push(`/srs/${sr.id}/intake`); 
+                              }}
+                              title="접수 정보 수정"
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                router.push(`/srs/${sr.id}`); 
+                              }}
+                              title="상세 보기"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              router.push(`/srs/${sr.id}`); 
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -259,13 +512,24 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
                         </div>
                       </div>
                     </div>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}`); }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
+                    {sr.status === 'REQUESTED' ? (
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
+                        onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}/intake`); }}
+                      >
+                        접수
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}`); }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
@@ -278,36 +542,17 @@ export function SRsDataTable({ srs, paginationInfo, clients, users }: { srs: any
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {ITEMS_PER_PAGE_OPTIONS.map((option) => (
                   <SelectItem key={option} value={String(option)}>{option}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <span className="text-sm text-muted-foreground">items per page</span>
+            <span className="text-sm text-[hsl(var(--sr-gray-medium))]">items per page</span>
           </div>
-
-          {paginationInfo && paginationInfo.totalPages > 1 && (
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); if (paginationInfo.hasPrevPage) handlePagination(paginationInfo.currentPage - 1); }} className={!paginationInfo.hasPrevPage ? "pointer-events-none opacity-50" : ""} />
-                </PaginationItem>
-                {/* Simplified pagination logic for brevity */}
-                {[...Array(paginationInfo.totalPages)].map((_, i) => (
-                  <PaginationItem key={i}>
-                    <PaginationLink href="#" onClick={(e) => { e.preventDefault(); handlePagination(i + 1); }} isActive={paginationInfo.currentPage === i + 1}>
-                      {i + 1}
-                    </PaginationLink>
-                  </PaginationItem>
-                ))}
-                <PaginationItem>
-                  <PaginationNext href="#" onClick={(e) => { e.preventDefault(); if (paginationInfo.hasNextPage) handlePagination(paginationInfo.currentPage + 1); }} className={!paginationInfo.hasNextPage ? "pointer-events-none opacity-50" : ""} />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
         </div>
       </div>
 

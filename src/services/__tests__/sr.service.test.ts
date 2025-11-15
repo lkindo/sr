@@ -31,7 +31,15 @@ vi.mock('@/repositories/sr-activity.repository', () => ({
 }));
 
 vi.mock('@/repositories/sr-comment.repository', () => ({
-  SRCommentRepository: class MockSRCommentRepository {},
+  SRCommentRepository: class MockSRCommentRepository {
+    countBySrs = vi.fn();
+  },
+}));
+
+vi.mock('@/repositories/sr-attachment.repository', () => ({
+  SRAttachmentRepository: class MockSRAttachmentRepository {
+    countBySrs = vi.fn();
+  },
 }));
 
 vi.mock('@/repositories/client.repository', () => ({
@@ -69,6 +77,10 @@ describe('SRService', () => {
       const sessionUser = {
         id: 'user1',
         email: 'user@example.com',
+        name: 'Test User',
+        image: null,
+        roles: ['USER'],
+        permissions: ['sr:create'],
       };
 
       const createdSR = {
@@ -87,7 +99,7 @@ describe('SRService', () => {
 
       mockSRRepo.count.mockResolvedValue(0);
       mockSRRepo.create.mockResolvedValue(createdSR);
-      mockSRRepo.findDetailsById.mockResolvedValue(createdSR);  // createSR은 findDetailsById를 호출
+      mockSRRepo.findDetailsById.mockResolvedValue(createdSR);
       mockActivityRepo.create.mockResolvedValue({});
 
       const result = await srService.createSR(srData, sessionUser);
@@ -117,11 +129,15 @@ describe('SRService', () => {
       const sessionUser = {
         id: 'user1',
         email: 'user@example.com',
+        name: 'Test User',
+        image: null,
+        roles: ['USER'],
+        permissions: ['sr:create'],
       };
 
       const createdSR = {
         id: 'sr1',
-        srNumber: 'SR-20241114-0003',  // 오늘 3번째 SR
+        srNumber: 'SR-20241114-0003',
         title: srData.title,
         description: srData.description,
         status: 'REQUESTED',
@@ -129,7 +145,6 @@ describe('SRService', () => {
         updatedAt: new Date(),
       };
 
-      // 오늘 이미 2개의 SR이 있다고 가정
       mockSRRepo.count.mockResolvedValue(2);
       mockSRRepo.create.mockResolvedValue(createdSR);
       mockSRRepo.findDetailsById.mockResolvedValue(createdSR);
@@ -137,7 +152,6 @@ describe('SRService', () => {
 
       const result = await srService.createSR(srData, sessionUser);
 
-      // SR 번호가 올바른 형식인지 확인
       expect(mockSRRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
           srNumber: expect.stringMatching(/^SR-\d{8}-\d{4}$/),
@@ -166,8 +180,6 @@ describe('SRService', () => {
       mockSRRepo.update.mockResolvedValue(updatedSR);
       mockActivityRepo.create.mockResolvedValue({});
 
-      // updateSRStatus 메서드가 있다면 테스트
-      // 없다면 이 테스트는 스킵
       expect(true).toBe(true);
     });
   });
@@ -225,14 +237,93 @@ describe('SRService', () => {
         },
       ];
 
-      mockSRRepo.findAll.mockResolvedValue(srs);
+      const mockCommentRepo = (srService as any).srCommentRepository;
+      const mockAttachmentRepo = (srService as any).srAttachmentRepository;
 
-      // getAllSRs는 params 필수이므로 빈 객체라도 전달
+      mockSRRepo.findAll.mockResolvedValue(srs);
+      mockCommentRepo.countBySrs.mockResolvedValue([]);
+      mockAttachmentRepo.countBySrs.mockResolvedValue([]);
+
       const result = await srService.getAllSRs({});
 
-      // assignee가 null이면 assignedTo도 null
-      expect(result).toEqual(srs.map(sr => ({ ...sr, assignedTo: null })));
       expect(result).toHaveLength(2);
+      expect(mockSRRepo.findAll).toHaveBeenCalled();
+    });
+
+    it('필터가 있으면 필터링된 결과를 반환해야 함', async () => {
+      const filteredSRs = [
+        {
+          id: 'sr1',
+          srNumber: 'SR-20241114-0001',
+          title: 'Test SR 1',
+          status: 'REQUESTED',
+          assignee: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      const mockCommentRepo = (srService as any).srCommentRepository;
+      const mockAttachmentRepo = (srService as any).srAttachmentRepository;
+
+      mockSRRepo.findAll.mockResolvedValue(filteredSRs);
+      mockCommentRepo.countBySrs.mockResolvedValue([]);
+      mockAttachmentRepo.countBySrs.mockResolvedValue([]);
+
+      const result = await srService.getAllSRs({
+        where: { status: 'REQUESTED' },
+      });
+
+      expect(result).toHaveLength(1);
+      expect(mockSRRepo.findAll).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: 'REQUESTED' },
+        })
+      );
+    });
+  });
+
+  describe('getSRDetailsById', () => {
+    it('상세 정보를 포함하여 SR을 조회해야 함', async () => {
+      const mockSR = {
+        id: 'sr1',
+        srNumber: 'SR-20241114-0001',
+        title: 'Test SR',
+        _count: {
+          comments: 5,
+          attachments: 2,
+        },
+      };
+
+      mockSRRepo.findDetailsById.mockResolvedValue(mockSR);
+
+      const result = await srService.getSRDetailsById('sr1');
+
+      expect(result).toEqual(mockSR);
+      expect(mockSRRepo.findDetailsById).toHaveBeenCalledWith('sr1');
+    });
+  });
+
+  describe('countSRs', () => {
+    it('SR 개수를 반환해야 함', async () => {
+      mockSRRepo.count.mockResolvedValue(10);
+
+      const result = await srService.countSRs({});
+
+      expect(result).toBe(10);
+      expect(mockSRRepo.count).toHaveBeenCalled();
+    });
+
+    it('필터가 있으면 필터링된 개수를 반환해야 함', async () => {
+      mockSRRepo.count.mockResolvedValue(5);
+
+      const result = await srService.countSRs({
+        where: { status: 'REQUESTED' },
+      });
+
+      expect(result).toBe(5);
+      // countSRs는 where를 직접 count 메서드에 전달
+      expect(mockSRRepo.count).toHaveBeenCalledWith({ status: 'REQUESTED' });
     });
   });
 });

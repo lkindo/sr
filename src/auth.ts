@@ -68,14 +68,90 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       // The 'user' object is only passed on the first sign-in.
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
         token.image = user.image;
+        
+        // 사용자의 roles와 permissions를 조회하여 token에 추가
+        const userWithRoles = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: {
+            roles: {
+              include: {
+                role: {
+                  include: {
+                    permissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (userWithRoles) {
+          // roles 배열 생성
+          const roles = userWithRoles.roles.map((ur) => ur.role.name);
+          token.roles = roles;
+
+          // permissions 배열 생성 (중복 제거)
+          const permissionsSet = new Set<string>();
+          userWithRoles.roles.forEach((ur) => {
+            ur.role.permissions.forEach((rp) => {
+              const permission = `${rp.permission.resource}.${rp.permission.action}`;
+              permissionsSet.add(permission);
+            });
+          });
+          token.permissions = Array.from(permissionsSet);
+        } else {
+          token.roles = [];
+          token.permissions = [];
+        }
       }
+      
+      // 세션 업데이트 시 roles와 permissions를 다시 조회
+      if (trigger === "update") {
+        const userWithRoles = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          include: {
+            roles: {
+              include: {
+                role: {
+                  include: {
+                    permissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (userWithRoles) {
+          const roles = userWithRoles.roles.map((ur) => ur.role.name);
+          token.roles = roles;
+
+          const permissionsSet = new Set<string>();
+          userWithRoles.roles.forEach((ur) => {
+            ur.role.permissions.forEach((rp) => {
+              const permission = `${rp.permission.resource}.${rp.permission.action}`;
+              permissionsSet.add(permission);
+            });
+          });
+          token.permissions = Array.from(permissionsSet);
+        }
+      }
+      
       return token;
     },
     async session({ session, token }) {
@@ -84,6 +160,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.image as string;
+        session.user.roles = (token.roles as string[]) || [];
+        session.user.permissions = (token.permissions as string[]) || [];
       }
       return session;
     },

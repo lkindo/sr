@@ -1,0 +1,214 @@
+﻿node.exe : npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of np
+m.
+위치 줄:1 문자:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\sanle\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...version of npm.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm warn Unknown project config "store-dir". This will stop working in the next major version of npm.
+
+> sr-management@0.1.0 test
+> vitest --run --reporter=verbose
+
+
+[1m[46m RUN [49m[22m [36mv4.0.8 [39m[90mC:/Users/sanle/OneDrive/臾몄꽌/GitHub/sr[39m
+
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mcreateSR[2m > [22m?깃났?곸쑝濡?SR???앹꽦?댁빞 ??[32m 12[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mcreateSR[2m > [22mSR 踰덊샇瑜??ㅻ뒛 ?좎쭨? ?쒕쾲?쇰줈 ?앹꽦?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mupdateSRStatus[2m > [22m?곹깭 蹂寃????쒕룞 湲곕줉???앹꽦?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mgetSRById[2m > [22m?깃났?곸쑝濡?SR??議고쉶?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mgetSRById[2m > [22m議댁옱?섏? ?딅뒗 SR ID硫?null??諛섑솚?댁빞 ??[32m 0[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mgetAllSRs[2m > [22m紐⑤뱺 SR 紐⑸줉??議고쉶?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mgetAllSRs[2m > [22m?꾪꽣媛 ?덉쑝硫??꾪꽣留곷맂 寃곌낵瑜?諛섑솚?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mgetSRDetailsById[2m > [22m?곸꽭 ?뺣낫瑜??ы븿?섏뿬 SR??議고쉶?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mcountSRs[2m > [22mSR 媛쒖닔瑜?諛섑솚?댁빞 ??[32m 2[2mms[22m[39m
+ [31m횞[39m src/services/__tests__/sr.service.test.ts[2m > [22mSRService[2m > [22mcountSRs[2m > [22m?꾪꽣媛 ?덉쑝硫??꾪꽣留곷맂 媛쒖닔瑜?諛섑솚?댁빞 ??[32m 14[2mms[22m[39m
+[31m   ??expected "vi.fn()" to be called with arguments: [ ObjectContaining{?? ][90m
+
+Received: 
+
+[1m  1st vi.fn() call:
+
+[22m[2m  [[22m
+[32m-   ObjectContaining {[90m
+[32m-     "where": {[90m
+[31m+   {[90m
+[2m      "status": "REQUESTED",[22m
+[32m-     },[90m
+[2m    },[22m
+[2m  ][22m
+[31m[90m
+
+Number of calls: [1m1[22m
+[31m[39m
+ [32m??[39m src/services/__tests__/client.service.test.ts[2m > [22mClientService[2m > [22mgetClientById[2m > [22m怨좉컼?щ? 議고쉶?댁빞 ??[32m 7[2mms[22m[39m
+ [32m??[39m src/services/__tests__/client.service.test.ts[2m > [22mClientService[2m > [22mgetAllClients[2m > [22m紐⑤뱺 怨좉컼??紐⑸줉??諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [31m횞[39m src/services/__tests__/client.service.test.ts[2m > [22mClientService[2m > [22mcreateClient[2m > [22m?깃났?곸쑝濡?怨좉컼?щ? ?앹꽦?댁빞 ??[32m 12[2mms[22m[39m
+[31m   ??this.clientRepository.findByCode is not a function[39m
+ [32m??[39m src/services/__tests__/client.service.test.ts[2m > [22mClientService[2m > [22mupdateClient[2m > [22m?깃났?곸쑝濡?怨좉컼?щ? ?섏젙?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/services/__tests__/client.service.test.ts[2m > [22mClientService[2m > [22mdeleteClient[2m > [22m?깃났?곸쑝濡?怨좉컼?щ? ??젣?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/client.service.test.ts[2m > [22mClientService[2m > [22mdeleteClient[2m > [22m愿???곗씠?곌? ?덉쑝硫??먮윭瑜??섏졇????[32m 4[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Button.test.tsx[2m > [22mButton Component[2m > [22m踰꾪듉 ?띿뒪?몃? ?뚮뜑留곹빐????[32m 75[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Input.test.tsx[2m > [22mInput Component[2m > [22m?낅젰媛믪쓣 ?뚮뜑留곹빐????[32m 71[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Button.test.tsx[2m > [22mButton Component[2m > [22m?대┃ ?대깽?몃? 泥섎━?댁빞 ??[33m 356[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Button.test.tsx[2m > [22mButton Component[2m > [22mdisabled ?곹깭?????대┃?섏? ?딆븘????[32m 124[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Button.test.tsx[2m > [22mButton Component[2m > [22mvariant prop???곕씪 ?ㅽ??쇱씠 ?곸슜?섏뼱????[32m 9[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Input.test.tsx[2m > [22mInput Component[2m > [22m?ъ슜???낅젰??泥섎━?댁빞 ??[33m 664[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Input.test.tsx[2m > [22mInput Component[2m > [22mplaceholder瑜??쒖떆?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Input.test.tsx[2m > [22mInput Component[2m > [22mdisabled ?곹깭?????낅젰?????놁뼱????[32m 36[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Input.test.tsx[2m > [22mInput Component[2m > [22monChange ?대깽?몃? 泥섎━?댁빞 ??[32m 175[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22mRate limit ?댁뿉?쒕뒗 ?몃뱾?щ? ?ㅽ뻾?댁빞 ??[32m 40[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22mRate limit 珥덇낵 ??429 ?먮윭瑜?諛섑솚?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22mRate limit ?ㅻ뜑瑜??ы븿?댁빞 ??[32m 15[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22mRate limit 珥덇낵 ??Retry-After ?ㅻ뜑瑜??ы븿?댁빞 ??[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22m而ㅼ뒪? ???앹꽦湲곕? ?ъ슜?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22m而ㅼ뒪? Rate limit 珥덇낵 ?몃뱾?щ? ?ъ슜?댁빞 ??[32m 5[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mwithRateLimit[2m > [22mincludeHeaders false硫??ㅻ뜑瑜??ы븿?섏? ?딆븘????[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mrateLimit[2m > [22m?꾨━???대쫫?쇰줈 Rate limiter瑜??앹꽦?댁빞 ??[32m 4[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-rate-limit.test.ts[2m > [22mrateLimit[2m > [22m湲곕낯媛믪쑝濡?standard ?꾨━?뗭쓣 ?ъ슜?댁빞 ??[32m 3[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Badge.test.tsx[2m > [22mBadge Component[2m > [22m諛곗? ?띿뒪?몃? ?뚮뜑留곹빐????[32m 167[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Badge.test.tsx[2m > [22mBadge Component[2m > [22mvariant prop???곕씪 ?ㅽ??쇱씠 ?곸슜?섏뼱????[32m 20[2mms[22m[39m
+ [32m??[39m src/components/__tests__/Badge.test.tsx[2m > [22mBadge Component[2m > [22m?ㅼ뼇??variant瑜?吏?먰빐????[32m 36[2mms[22m[39m
+[90mstderr[2m | src/lib/__tests__/api-response.test.ts[2m > [22m[2mapi-response[2m > [22m[2mserverErrorRespon
+se[2m > [22m[2m?쒕쾭 ?먮윭 ?묐떟 ?앹꽦
+[22m[39mServer error: Error: test
+    at C:/Users/sanle/OneDrive/臾몄꽌/GitHub/sr/src/lib/__tests__/api-response.test.ts:160:60
+    at [90mfile:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm[24m/@vitest+run
+ner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:157:11
+    at [90mfile:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm[24m/@vitest+run
+ner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:753:26
+    at [90mfile:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm[24m/@vitest+run
+ner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:1636:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm
+[24m/@vitest+runner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:1602:10[90m)[39m
+    at runTest [90m(file:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm[24m/@v
+itest+runner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:1309:12[90m)[39m
+[90m    at processTicksAndRejections (node:internal/process/task_queues:105:5)[39m
+    at runSuite [90m(file:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm[24m/@
+vitest+runner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+    at runSuite [90m(file:///C:/Users/sanle/OneDrive/%EB%AC%B8%EC%84%9C/GitHub/sr/[39mnode_modules/[4m.pnpm[24m/@
+vitest+runner@4.0.8/node_modules/[4m@vitest[24m/runner/dist/index.js:1468:8[90m)[39m
+
+[90mstderr[2m | src/lib/__tests__/api-response.test.ts[2m > [22m[2mapi-response[2m > [22m[2mserverErrorRespon
+se[2m > [22m[2m湲곕낯 硫붿떆吏 ?ъ슜
+[22m[39mServer error: [90mundefined[39m
+
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22msuccessResponse[2m > [22m?깃났 ?묐떟???щ컮瑜닿쾶 ?앹꽦[32m 24[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22msuccessResponse[2m > [22m硫붿떆吏 ?놁씠 ?깃났 ?묐떟 ?앹꽦[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22msuccessResponse[2m > [22m?곹깭 肄붾뱶 而ㅼ뒪?곕쭏?댁쭠[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22merrorResponse[2m > [22m?먮윭 ?묐떟???щ컮瑜닿쾶 ?앹꽦[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22merrorResponse[2m > [22m湲곕낯 ?곹깭 肄붾뱶 500 ?ъ슜[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22merrorResponse[2m > [22mcode? details ?놁씠 ?먮윭 ?앹꽦[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mvalidationErrorResponse[2m > [22m?좏슚??寃利??먮윭瑜??щ컮瑜닿쾶 ?앹꽦[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22munauthorizedResponse[2m > [22m而ㅼ뒪? 硫붿떆吏濡?401 ?묐떟 ?앹꽦[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22munauthorizedResponse[2m > [22m湲곕낯 硫붿떆吏 ?ъ슜[32m 4[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mforbiddenResponse[2m > [22m而ㅼ뒪? 硫붿떆吏濡?403 ?묐떟 ?앹꽦[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mforbiddenResponse[2m > [22m湲곕낯 硫붿떆吏 ?ъ슜[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mnotFoundResponse[2m > [22m由ъ냼???대쫫怨??④퍡 404 ?묐떟 ?앹꽦[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mnotFoundResponse[2m > [22m湲곕낯 由ъ냼???대쫫 ?ъ슜[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mserverErrorResponse[2m > [22m?쒕쾭 ?먮윭 ?묐떟 ?앹꽦[32m 23[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mserverErrorResponse[2m > [22m湲곕낯 硫붿떆吏 ?ъ슜[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mpaginatedResponse[2m > [22m?섏씠吏?ㅼ씠???묐떟???щ컮瑜닿쾶 ?앹꽦[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mpaginatedResponse[2m > [22m留덉?留??섏씠吏 怨꾩궛[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-response.test.ts[2m > [22mapi-response[2m > [22mpaginatedResponse[2m > [22m泥??섏씠吏? 留덉?留??섏씠吏媛 媛숈쓣 ??[32m 1[2mms[22m[39m
+ [31m횞[39m src/__tests__/performance/benchmark.test.ts[2m > [22mPerformance Benchmarks[2m > [22mFormData ?뚯떛 ?깅뒫[2m > [22mFormData瑜?媛앹껜濡?蹂?섑븯???쒓컙 痢≪젙[32m 45[2mms[22m[39m
+[31m   ??expected 17.004099999999198 to be less than 10[39m
+ [32m??[39m src/__tests__/performance/benchmark.test.ts[2m > [22mPerformance Benchmarks[2m > [22m諛곗뿴 泥섎━ ?깅뒫[2m > [22m????곗씠???꾪꽣留??깅뒫[32m 19[2mms[22m[39m
+ [32m??[39m src/__tests__/performance/benchmark.test.ts[2m > [22mPerformance Benchmarks[2m > [22m諛곗뿴 泥섎━ ?깅뒫[2m > [22m????곗씠???뺣젹 ?깅뒫[32m 16[2mms[22m[39m
+ [32m??[39m src/__tests__/performance/benchmark.test.ts[2m > [22mPerformance Benchmarks[2m > [22m臾몄옄??泥섎━ ?깅뒫[2m > [22m???臾몄옄??議곗옉 ?깅뒫[32m 3[2mms[22m[39m
+ [32m??[39m src/__tests__/performance/benchmark.test.ts[2m > [22mPerformance Benchmarks[2m > [22m媛앹껜 議곗옉 ?깅뒫[2m > [22m???媛앹껜 蹂???깅뒫[32m 7[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mgetFormDataValue[2m > [22mFormData?먯꽌 臾몄옄??媛믪쓣 異붿텧?댁빞 ??[32m 9[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mgetFormDataValue[2m > [22m議댁옱?섏? ?딅뒗 ?ㅻ뒗 null??諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mgetFormDataValue[2m > [22mFile 媛앹껜??null??諛섑솚?댁빞 ??[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mgetFormDataValues[2m > [22m?щ윭 媛믪쓣 ??踰덉뿉 異붿텧?댁빞 ??[32m 4[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mformDataToObject[2m > [22mFormData瑜?媛앹껜濡?蹂?섑빐????[32m 3[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mformDataToObject[2m > [22mFile 媛앹껜???쒖쇅?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mnormalizeFormDataValue[2m > [22m鍮?臾몄옄?댁쓣 null濡?蹂?섑빐????(湲곕낯媛?[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mnormalizeFormDataValue[2m > [22m鍮?臾몄옄?댁쓣 undefined濡?蹂?섑빐????(?듭뀡)[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mnormalizeFormDataValue[2m > [22m?좏슚??媛믪? 洹몃?濡?諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/form-data-parser.test.ts[2m > [22mform-data-parser[2m > [22mparseFormData[2m > [22mFormData瑜?Zod ?ㅽ궎留덈줈 ?뚯떛?댁빞 ??[32m 15[2mms[22m[39m
+[90mstdout[2m | src/services/__tests__/role.service.test.ts[2m > [22m[2mRoleService[2m > [22m[2mdeleteRole[2m > [22m[2m沅뚰븳留??덇퀬 ?ъ슜?먭? ?놁쑝硫???젣 媛?ν빐????[22m[39m??븷 ??젣 ??3媛쒖쓽 沅뚰븳 ?곌껐???④퍡 ??젣?⑸땲??
+
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mcreateRole[2m > [22m?깃났?곸쑝濡???븷???앹꽦?댁빞 ??[32m 20[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mupdateRole[2m > [22m?깃났?곸쑝濡???븷???섏젙?댁빞 ??[32m 5[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mdeleteRole[2m > [22m愿???곗씠?곌? ?놁쑝硫??깃났?곸쑝濡???젣?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mdeleteRole[2m > [22m議댁옱?섏? ?딅뒗 ??븷????젣?섎젮?섎㈃ NotFoundError瑜??섏졇????[32m 5[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mdeleteRole[2m > [22m愿???ъ슜?먭? ?덉쑝硫?ReferentialIntegrityError瑜??섏졇????[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mdeleteRole[2m > [22m沅뚰븳留??덇퀬 ?ъ슜?먭? ?놁쑝硫???젣 媛?ν빐????[32m 6[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mgetRoleById[2m > [22m?깃났?곸쑝濡???븷??議고쉶?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mgetRoleById[2m > [22m議댁옱?섏? ?딅뒗 ??븷 ID硫?null??諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mgetAllRoles[2m > [22m紐⑤뱺 ??븷 紐⑸줉??諛섑솚?댁빞 ??[32m 3[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mgetAllRoles[2m > [22m??븷???놁쑝硫?鍮?諛곗뿴??諛섑솚?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/role.service.test.ts[2m > [22mRoleService[2m > [22mupdateRolePermissions[2m > [22m?깃났?곸쑝濡???븷 沅뚰븳???낅뜲?댄듃?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-helpers.test.ts[2m > [22mapi-helpers[2m > [22mvalidateRequestBody[2m > [22m?좏슚???붿껌 諛붾뵒瑜?寃利앺빐????[32m 27[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-helpers.test.ts[2m > [22mapi-helpers[2m > [22mvalidateRequestBody[2m > [22m?좏슚?섏? ?딆? ?붿껌 諛붾뵒??ValidationError瑜??섏졇????[32m 8[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/api-helpers.test.ts[2m > [22mapi-helpers[2m > [22mvalidateRequestBody[2m > [22mJSON ?뚯떛 ?ㅽ뙣 ???먮윭瑜??섏졇????[32m 7[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mcheck[2m > [22m泥??붿껌? ?덉슜?섏뼱????[32m 7[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mcheck[2m > [22m理쒕? ?붿껌 ?섍퉴吏???덉슜?섏뼱????[32m 4[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mcheck[2m > [22m理쒕? ?붿껌 ??珥덇낵 ??嫄곕??섏뼱????[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mcheck[2m > [22m?ㅻⅨ ?ㅻ뒗 ?낅┰?곸쑝濡??쒗븳?섏뼱????[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mcheck[2m > [22m?덈룄?곌? 留뚮즺?섎㈃ 由ъ뀑?섏뼱????[32m 7[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mreset[2m > [22m?뱀젙 ?ㅼ쓽 rate limit??由ъ뀑?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mMemoryRateLimiter[2m > [22mresetAll[2m > [22m紐⑤뱺 rate limit??由ъ뀑?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mRateLimitPresets[2m > [22mSTRICT ?꾨━?뗭? ?꾧꺽???쒗븳??媛?몄빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mRateLimitPresets[2m > [22mSTANDARD ?꾨━?뗭? ?쇰컲 ?쒗븳??媛?몄빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mRateLimitPresets[2m > [22mRELAXED ?꾨━?뗭? ?먯뒯???쒗븳??媛?몄빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mRateLimitPresets[2m > [22mFILE_UPLOAD ?꾨━?뗭? 湲??덈룄?곕? 媛?몄빞 ??[32m 0[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mgetClientIdentifier[2m > [22mX-Forwarded-For ?ㅻ뜑?먯꽌 IP瑜?異붿텧?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mgetClientIdentifier[2m > [22mX-Real-IP ?ㅻ뜑?먯꽌 IP瑜?異붿텧?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mgetClientIdentifier[2m > [22mX-Forwarded-For媛 ?곗꽑?쒖쐞媛 ?믪븘????[32m 1[2mms[22m[39m
+ [32m??[39m src/lib/__tests__/rate-limiter.test.ts[2m > [22mgetClientIdentifier[2m > [22m?ㅻ뜑媛 ?놁쑝硫?湲곕낯媛믪쓣 諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/repositories/__tests__/sr.repository.test.ts[2m > [22mSRRepository[2m > [22mfindDetailsById[2m > [22m?곸꽭 ?뺣낫瑜??ы븿?섏뿬 SR??議고쉶?댁빞 ??[32m 13[2mms[22m[39m
+ [32m??[39m src/repositories/__tests__/sr.repository.test.ts[2m > [22mSRRepository[2m > [22mfindDetailsById[2m > [22m議댁옱?섏? ?딅뒗 SR? null??諛섑솚?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/repositories/__tests__/sr.repository.test.ts[2m > [22mSRRepository[2m > [22mfindById[2m > [22m湲곕낯 ?뺣낫留??ы븿?섏뿬 SR??議고쉶?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/actions/__tests__/sr.actions.test.ts[2m > [22mSR Actions[2m > [22mcreateSRAction[2m > [22m?깃났?곸쑝濡?SR???앹꽦?댁빞 ??[32m 10[2mms[22m[39m
+ [32m??[39m src/actions/__tests__/sr.actions.test.ts[2m > [22mSR Actions[2m > [22mcreateSRAction[2m > [22m寃利??ㅽ뙣 ???먮윭瑜?諛섑솚?댁빞 ??[32m 2[2mms[22m[39m
+ [32m??[39m src/actions/__tests__/sr.actions.test.ts[2m > [22mSR Actions[2m > [22mupdateSRAction[2m > [22m?깃났?곸쑝濡?SR???섏젙?댁빞 ??[32m 5[2mms[22m[39m
+ [32m??[39m src/actions/__tests__/sr.actions.test.ts[2m > [22mSR Actions[2m > [22mdeleteSRAction[2m > [22m?깃났?곸쑝濡?SR????젣?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/actions/__tests__/sr.actions.test.ts[2m > [22mSR Actions[2m > [22mdeleteSRAction[2m > [22m沅뚰븳???놁쑝硫??먮윭瑜?諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mgetUserById[2m > [22m?깃났?곸쑝濡??ъ슜?먮? 議고쉶?댁빞 ??[32m 8[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mgetUserById[2m > [22m議댁옱?섏? ?딅뒗 ?ъ슜??ID硫?null??諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mgetAllUsers[2m > [22m?꾪꽣 ?놁씠 紐⑤뱺 ?ъ슜?먮? 議고쉶?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mgetAllUsers[2m > [22m?꾪꽣媛 ?덉쑝硫?findAllWithFilters瑜??몄텧?댁빞 ??[32m 3[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mupdateUser[2m > [22m?깃났?곸쑝濡??ъ슜?먮? ?섏젙?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mchangePassword[2m > [22m?꾩옱 鍮꾨?踰덊샇媛 留욎쑝硫?鍮꾨?踰덊샇瑜?蹂寃쏀빐????[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mchangePassword[2m > [22m議댁옱?섏? ?딅뒗 ?ъ슜?먮㈃ NotFoundError瑜??섏졇????[32m 3[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mchangePassword[2m > [22m?꾩옱 鍮꾨?踰덊샇媛 ?由щ㈃ ValidationError瑜??섏졇????[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mchangePassword[2m > [22m鍮꾨?踰덊샇媛 ?녿뒗 ?ъ슜??OAuth)硫??꾩옱 鍮꾨?踰덊샇 泥댄겕瑜?嫄대꼫?곗뼱????[32m 2[2mms[22m[39m
+ [32m??[39m src/services/__tests__/user.service.test.ts[2m > [22mUserService[2m > [22mgetUsersWithSRHandlingPermission[2m > [22mSR 泥섎━ 沅뚰븳???덈뒗 ?ъ슜??紐⑸줉??議고쉶?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/repositories/__tests__/user.repository.test.ts[2m > [22mUserRepository[2m > [22mfindById[2m > [22m?ъ슜?먮? 議고쉶?댁빞 ??[32m 8[2mms[22m[39m
+ [32m??[39m src/repositories/__tests__/user.repository.test.ts[2m > [22mUserRepository[2m > [22mfindById[2m > [22m議댁옱?섏? ?딅뒗 ?ъ슜?먮뒗 null??諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/repositories/__tests__/user.repository.test.ts[2m > [22mUserRepository[2m > [22mfindDetailsById[2m > [22m?곸꽭 ?뺣낫瑜??ы븿?섏뿬 ?ъ슜?먮? 議고쉶?댁빞 ??[32m 4[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mgetAllPermissions[2m > [22m紐⑤뱺 沅뚰븳??諛섑솚?댁빞 ??[32m 6[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mcheckPermission[2m > [22mADMIN ??븷? 紐⑤뱺 沅뚰븳??媛?몄빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mcheckPermission[2m > [22m沅뚰븳???덉쑝硫?true瑜?諛섑솚?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mcheckPermission[2m > [22m沅뚰븳???놁쑝硫?false瑜?諛섑솚?댁빞 ??[32m 0[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mcheckPermission[2m > [22m鍮꾪솢???ъ슜?먮뒗 false瑜?諛섑솚?댁빞 ??[32m 0[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mgetUserPermissions[2m > [22m?ъ슜?먯쓽 紐⑤뱺 沅뚰븳??諛섑솚?댁빞 ??[32m 3[2mms[22m[39m
+ [32m??[39m src/services/__tests__/permission.service.test.ts[2m > [22mPermissionService[2m > [22mgetUserPermissions[2m > [22m以묐났 沅뚰븳? ?쒓굅?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/__tests__/integration/sr-flow.test.ts[2m > [22mSR Flow Integration[2m > [22mSR ?앹꽦 ?뚮줈?곌? ?щ컮瑜닿쾶 ?숈옉?댁빞 ??[32m 4[2mms[22m[39m
+ [32m??[39m src/__tests__/integration/sr-flow.test.ts[2m > [22mSR Flow Integration[2m > [22mSR ?섏젙 ?뚮줈?곌? ?щ컮瑜닿쾶 ?숈옉?댁빞 ??[32m 1[2mms[22m[39m
+ [32m??[39m src/__tests__/integration/sr-flow.test.ts[2m > [22mSR Flow Integration[2m > [22m沅뚰븳 泥댄겕媛 ?щ컮瑜닿쾶 ?숈옉?댁빞 ??[32m 0[2mms[22m[39m
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 1 expired buckets
+
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 1 expired buckets
+
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 1 expired buckets
+
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 2 expired buckets
+
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 1 expired buckets
+
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 1 expired buckets
+
+[90mstdout[2m | Timeout._onTimeout (C:\Users\sanle\OneDrive\臾몄꽌\GitHub\sr\src\lib\rate-limiter.ts:157:17)
+[22m[39m[RateLimiter] Cleaned up 2 expired buckets
+
