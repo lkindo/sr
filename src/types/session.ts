@@ -33,3 +33,4 @@ export function isAuthenticatedSession(
   return session !== null && session.user !== undefined && session.user.id !== undefined;
 }
 
+

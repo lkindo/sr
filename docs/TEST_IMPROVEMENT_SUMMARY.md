@@ -176,3 +176,4 @@ npm run test:e2e:debug
 - [TEST_COVERAGE_REPORT.md](./TEST_COVERAGE_REPORT.md) - 테스트 커버리지 상세 리포트
 - [E2E_TEST_SCENARIOS.md](./E2E_TEST_SCENARIOS.md) - E2E 테스트 시나리오 상세 문서
 
+

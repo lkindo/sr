@@ -233,3 +233,4 @@ const newValues: {
 
 API Route에서 모든 `any` 타입을 제거하고, Prisma 타입과 `AuthenticatedContext`를 활용하여 타입 안정성을 크게 향상시켰습니다. 이를 통해 컴파일 타임 오류 감지, IDE 지원 개선, 유지보수성 향상을 달성했습니다.
 
+

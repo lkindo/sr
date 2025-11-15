@@ -164,3 +164,4 @@ npx playwright test e2e/10-sr-intake-flow.spec.ts
 - [ ] 성능 테스트 (로드 시간)
 - [ ] 접근성 테스트
 
+

@@ -200,3 +200,4 @@ async getUserPermissions(userId: string): Promise<Permission[]> {
 - 각 역할의 권한을 명확히 문서화
 - 권한 중복이 의도적인지 확인
 
+
