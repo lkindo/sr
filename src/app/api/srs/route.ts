@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { SRService, getAllSrs, createSr } from "@/services/sr.service";
 import { sendSRCreatedEmail } from "@/lib/email";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
+import { PermissionService } from "@/services/permission.service";
+import { ForbiddenError } from "@/lib/errors";
 import prisma from "@/lib/prisma";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -33,7 +35,16 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
 }, { preset: 'relaxed' }); // 1분당 300회 (읽기 전용, 자주 조회됨)
 
 // POST /api/srs - 새 SR 생성 (Rate Limit: 표준)
+// SR:CREATE 권한이 있는 사용자만 SR 등록 가능
 export const POST = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
+  // 권한 체크: SR:CREATE 권한 필요
+  const permissionService = new PermissionService();
+  const hasPermission = await permissionService.checkPermission(session.user.id, 'SR:CREATE');
+  
+  if (!hasPermission) {
+    throw new ForbiddenError("SR 등록 권한이 없습니다. SR:CREATE 권한이 필요합니다.");
+  }
+
   const body = await request.json();
   const sr = await createSr(body, session.user);
 

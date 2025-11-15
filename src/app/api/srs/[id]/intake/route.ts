@@ -14,11 +14,25 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // POST /api/srs/{id}/intake - SR 접수 처리 (Rate Limit: 엄격)
+// SR.INTAKE 권한이 있는 사용자만 접수 가능
 export const POST = withAuthAndRateLimit(async (
   request: NextRequest,
   { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
+
+  // 권한 체크: SR.INTAKE 권한 또는 ADMIN, MANAGER, ENGINEER 역할
+  const userRoles = session.user?.roles || [];
+  const hasIntakePermission = session.user?.permissions?.some((p: string) => 
+    p === "SR.INTAKE" || p === "sr:create"
+  ) ?? false;
+  const hasIntakeRole = userRoles.some((role: string) => 
+    ["ADMIN", "MANAGER", "ENGINEER"].includes(role)
+  );
+
+  if (!hasIntakePermission && !hasIntakeRole) {
+    throw new ForbiddenError("SR 접수 권한이 없습니다. SR.INTAKE 권한 또는 ADMIN/MANAGER/ENGINEER 역할이 필요합니다.");
+  }
 
   // 1. 요청 바디 검증
   const validated = await validateRequestBody(request, intakeSchema);
@@ -170,7 +184,11 @@ export const POST = withAuthAndRateLimit(async (
   });
 
   // 9. 담당자에게 메일 발송 (non-blocking)
-  if (process.env.RESEND_API_KEY && updatedSR.assignee?.email) {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn(`[SR Intake] RESEND_API_KEY가 설정되지 않아 담당자(${updatedSR.assignee?.email || '이메일 없음'})에게 메일을 발송할 수 없습니다.`);
+  } else if (!updatedSR.assignee?.email) {
+    console.warn(`[SR Intake] 담당자(${updatedSR.assignee?.name || '이름 없음'})의 이메일 주소가 없어 메일을 발송할 수 없습니다.`);
+  } else {
     const priorityLabels: Record<string, string> = {
       CRITICAL: "긴급",
       HIGH: "높음",
@@ -178,6 +196,17 @@ export const POST = withAuthAndRateLimit(async (
       LOW: "낮음",
     };
 
+    console.log(`[SR Intake] 담당자(${updatedSR.assignee?.email || 'N/A'})에게 SR 배정 메일 발송 시도: ${updatedSR.srNumber}`);
+    
+    if (!updatedSR.assignee) {
+      console.warn(`[SR Intake] 담당자가 없어 메일을 발송할 수 없습니다: ${updatedSR.srNumber}`);
+      return NextResponse.json({
+        success: true,
+        sr: updatedSR,
+        message: "SR 접수가 완료되었습니다.",
+      });
+    }
+    
     sendSRAssignedEmail({
       to: updatedSR.assignee.email,
       srId: updatedSR.id,
@@ -188,9 +217,17 @@ export const POST = withAuthAndRateLimit(async (
       clientName: updatedSR.client?.name || "",
       assignedToName: updatedSR.assignee.name,
       assignedByName: updatedSR.intakeBy?.name || session.user.name || "시스템",
-    }).catch((error) => {
-      console.error("Failed to send SR assigned email:", error);
-    });
+    })
+      .then((result) => {
+        if (result) {
+          console.log(`[SR Intake] SR 배정 메일 발송 성공: ${updatedSR.srNumber} → ${updatedSR.assignee?.email || 'N/A'}`, result);
+        } else {
+          console.warn(`[SR Intake] SR 배정 메일 발송 실패 (null 반환): ${updatedSR.srNumber} → ${updatedSR.assignee?.email || 'N/A'}`);
+        }
+      })
+      .catch((error) => {
+        console.error(`[SR Intake] SR 배정 메일 발송 실패: ${updatedSR.srNumber} → ${updatedSR.assignee?.email || 'N/A'}`, error);
+      });
   }
 
   return NextResponse.json({
@@ -514,27 +551,43 @@ export const PATCH = withAuthAndRateLimit(async (
     });
 
     // 새 담당자에게만 메일 발송 (담당자가 배정된 경우만)
-    if (validated.assigneeId && newAssignee && process.env.RESEND_API_KEY && newAssignee.email) {
-      const priorityLabels: Record<string, string> = {
-        CRITICAL: "긴급",
-        HIGH: "높음",
-        MEDIUM: "보통",
-        LOW: "낮음",
-      };
+    if (validated.assigneeId && newAssignee) {
+      if (!process.env.RESEND_API_KEY) {
+        console.warn(`[SR Intake Update] RESEND_API_KEY가 설정되지 않아 담당자(${newAssignee.email || '이메일 없음'})에게 메일을 발송할 수 없습니다.`);
+      } else if (!newAssignee.email) {
+        console.warn(`[SR Intake Update] 담당자(${newAssignee.name || '이름 없음'})의 이메일 주소가 없어 메일을 발송할 수 없습니다.`);
+      } else {
+        const priorityLabels: Record<string, string> = {
+          CRITICAL: "긴급",
+          HIGH: "높음",
+          MEDIUM: "보통",
+          LOW: "낮음",
+        };
 
-      sendSRAssignedEmail({
-        to: newAssignee.email,
-        srId: updatedSR.id,
-        srNumber: updatedSR.srNumber,
-        title: updatedSR.title,
-        description: updatedSR.description || "",
-        priority: priorityLabels[updatedSR.actualPriority || "MEDIUM"] || "보통",
-        clientName: updatedSR.client?.name || "",
-        assignedToName: newAssignee.name,
-        assignedByName: session.user.name || session.user.email || "시스템",
-      }).catch((error) => {
-        console.error("Failed to send SR assigned email:", error);
-      });
+        console.log(`[SR Intake Update] 담당자(${newAssignee.email})에게 SR 배정 메일 발송 시도: ${updatedSR.srNumber}`);
+        
+        sendSRAssignedEmail({
+          to: newAssignee.email,
+          srId: updatedSR.id,
+          srNumber: updatedSR.srNumber,
+          title: updatedSR.title,
+          description: updatedSR.description || "",
+          priority: priorityLabels[updatedSR.actualPriority || "MEDIUM"] || "보통",
+          clientName: updatedSR.client?.name || "",
+          assignedToName: newAssignee.name,
+          assignedByName: session.user.name || session.user.email || "시스템",
+        })
+          .then((result) => {
+            if (result) {
+              console.log(`[SR Intake Update] SR 배정 메일 발송 성공: ${updatedSR.srNumber} → ${newAssignee.email}`, result);
+            } else {
+              console.warn(`[SR Intake Update] SR 배정 메일 발송 실패 (null 반환): ${updatedSR.srNumber} → ${newAssignee.email}`);
+            }
+          })
+          .catch((error) => {
+            console.error(`[SR Intake Update] SR 배정 메일 발송 실패: ${updatedSR.srNumber} → ${newAssignee.email}`, error);
+          });
+      }
     }
   }
 

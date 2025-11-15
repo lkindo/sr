@@ -70,6 +70,14 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
     client: { id: string; name: string };
     requester: { id: string; name: string; email: string };
     assignee: { id: string; name: string; email: string } | null;
+    serviceCategory: {
+      id: string;
+      categoryName: string;
+      priority: string;
+      slaHours: number;
+      handlerId: string | null;
+      handler: { id: string; name: string } | null;
+    };
   })[]> {
     const { skip, take, where, orderBy } = params || {};
     
@@ -82,6 +90,21 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
         client: { select: { id: true, name: true } },
         requester: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true, email: true } },
+        serviceCategory: {
+          select: {
+            id: true,
+            categoryName: true,
+            priority: true,
+            slaHours: true,
+            handlerId: true,
+            handler: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     });
   }

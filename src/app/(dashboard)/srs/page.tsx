@@ -4,6 +4,8 @@ import { UserService } from "@/services/user.service";
 import { SRsDataTable } from "@/components/srs/SRsDataTable";
 import { Prisma } from "@prisma/client";
 import { getCachedClients, getCachedUsers } from "@/lib/cache";
+import { auth } from "@/auth";
+import prisma from "@/lib/prisma";
 
 type Props = {
   params: Promise<{}>;
@@ -30,14 +32,58 @@ export default async function SRsPage({ searchParams }: Props) {
   const dateFrom = getSearchParam(resolvedSearchParams.dateFrom);
   const dateTo = getSearchParam(resolvedSearchParams.dateTo);
 
+  // 세션 정보 가져오기
+  const session = await auth();
+  const userRoles = session?.user?.roles || [];
+
+  // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
+  const isAdminManagerEngineer = userRoles.some((role) => 
+    ["ADMIN", "MANAGER", "ENGINEER"].includes(role)
+  );
+
   const srService = new SRService();
   const clientService = new ClientService();
   const userService = new UserService();
 
   const where: Prisma.SRWhereInput = {};
+
+  // 고객사 사용자인 경우 해당 고객사의 SR만 조회
+  let userClientIds: string[] = [];
+  if (!isAdminManagerEngineer && session?.user?.id) {
+    const userClients = await prisma.userClient.findMany({
+      where: { userId: session.user.id },
+      select: { clientId: true },
+    });
+    
+    userClientIds = userClients.map((uc) => uc.clientId);
+  }
+  
   if (status && status !== "all") where.status = status as "REQUESTED" | "INTAKE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CONFIRMED" | "REJECTED";
   if (priority && priority !== "all") where.priority = priority as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
-  if (clientId && clientId !== "all") where.clientId = clientId;
+  
+  // clientId 필터 처리
+  if (clientId && clientId !== "all") {
+    if (!isAdminManagerEngineer) {
+      // 고객사 사용자인 경우, 요청한 clientId가 사용자의 고객사 목록에 있는지 확인
+      if (userClientIds.length > 0 && userClientIds.includes(clientId)) {
+        where.clientId = clientId;
+      } else {
+        // 권한이 없는 고객사 ID이거나 고객사가 없는 경우 빈 결과 반환
+        where.clientId = { in: [] };
+      }
+    } else {
+      // ADMIN, MANAGER, ENGINEER는 모든 고객사 조회 가능
+      where.clientId = clientId;
+    }
+  } else if (!isAdminManagerEngineer) {
+    // 고객사 사용자이고 clientId 필터가 없는 경우, 사용자가 속한 모든 고객사의 SR 조회
+    if (userClientIds.length > 0) {
+      where.clientId = { in: userClientIds };
+    } else {
+      // 고객사가 없는 경우 빈 결과 반환
+      where.clientId = { in: [] };
+    }
+  }
   if (assigneeId && assigneeId !== "all") {
     where.assigneeId = assigneeId === "unassigned" ? null : assigneeId;
   }
@@ -64,7 +110,7 @@ export default async function SRsPage({ searchParams }: Props) {
   }
 
   // 관계형 필드 정렬 처리
-  const getOrderBy = (): Prisma.SROrderByWithRelationInput => {
+  const getOrderBy = (): Prisma.SROrderByWithRelationInput | undefined => {
     const order = sortOrder === "asc" ? "asc" : "desc";
     
     // 관계형 필드인 경우 중첩 객체 형식 사용

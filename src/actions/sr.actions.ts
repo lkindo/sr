@@ -6,7 +6,7 @@ import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { Result, ok, fail } from "@/lib/result";
 import { errorToResult } from "@/lib/errors";
 import { getFormDataValue } from "@/lib/form-data-parser";
-import { authenticateAndAuthorize, validateWithSchema } from "@/lib/action-helpers";
+import { authenticateAndAuthorize, validateWithSchema, getAuthenticatedSession } from "@/lib/action-helpers";
 import type { SR } from "@prisma/client";
 
 export async function createSRAction(
@@ -33,7 +33,8 @@ export async function createSRAction(
     }
     const validated = validationResult.data;
 
-    const session = await authenticateAndAuthorize('sr:create');
+    // SR 등록 권한 체크: SR:CREATE 권한 필요
+    const session = await authenticateAndAuthorize('SR:CREATE');
 
     const srService = new SRService();
     const sr = await srService.createSR(validated, session.user);
@@ -111,7 +112,8 @@ export async function updateSRAction(
     }
     const validated = validationResult.data;
 
-    const session = await authenticateAndAuthorize('sr:update');
+    // SR 수정 권한 체크는 서비스 레이어에서 처리
+    const session = await getAuthenticatedSession();
 
     const srService = new SRService();
     const sr = await srService.updateSR(id, validated, session.user);
@@ -125,10 +127,11 @@ export async function updateSRAction(
 
 export async function deleteSRAction(id: string): Promise<Result<void>> {
   try {
-    await authenticateAndAuthorize('sr:delete');
+    // SR 삭제 권한 체크는 서비스 레이어에서 처리
+    const session = await getAuthenticatedSession();
 
     const srService = new SRService();
-    await srService.deleteSR(id);
+    await srService.deleteSR(id, session.user);
 
     return ok(undefined);
   } catch (error) {

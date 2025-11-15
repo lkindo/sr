@@ -50,6 +50,7 @@ export const GET = withAuthAndRateLimit(async (
 }, { preset: 'standard' }); // 1분당 100회
 
 // PATCH /api/srs/[id] - SR 수정 (Rate Limit: 엄격)
+// 권한 체크는 서비스 레이어에서 처리 (REQUESTED 상태: 요청자 또는 ADMIN, 기타: ADMIN만)
 export const PATCH = withAuthAndRateLimit(async (
   request: NextRequest,
   { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
@@ -57,7 +58,7 @@ export const PATCH = withAuthAndRateLimit(async (
   const { id } = await params;
   const validated = await validateRequestBody(request, srUpdateSchema);
 
-  // Service 레이어를 통해 SR 수정
+  // Service 레이어를 통해 SR 수정 (권한 체크 포함)
   const srService = new SRService();
   const updatedSR = await srService.updateSR(id, validated, session.user);
 
@@ -67,13 +68,13 @@ export const PATCH = withAuthAndRateLimit(async (
 // DELETE /api/srs/[id] - SR 삭제 (Rate Limit: 엄격)
 export const DELETE = withAuthAndRateLimit(async (
   request: NextRequest,
-  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
+  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 
   // Service 레이어를 통해 SR 삭제
   const srService = new SRService();
-  const result = await srService.deleteSR(id);
+  const result = await srService.deleteSR(id, session.user);
   
   return NextResponse.json(result);
 }, { preset: 'strict' }); // 1분당 5회 (삭제는 민감한 작업)

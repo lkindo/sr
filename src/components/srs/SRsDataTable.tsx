@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { usePermissions } from "@/hooks/use-permissions";
-import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Edit, Clock, User, AlertCircle, AlertTriangle } from "lucide-react";
+import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Clock, User, AlertCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -67,6 +67,9 @@ export function SRsDataTable({
   const { data: session } = useSession();
   const queryClient = useQueryClient();
   const { hasAnyRole } = usePermissions();
+
+  // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
+  const isClientUser = !hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -185,66 +188,68 @@ export function SRsDataTable({
             </Button>
           </div>
           
-          {/* Quick Filter Buttons and Advanced Filter Button */}
-          <div className="flex items-center justify-between gap-2 mb-4">
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')}
-                className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
-                  activeQuickFilter === 'waiting'
-                    ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                    : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-                <span>접수 대기</span>
-                {waitingCount > 0 && (
-                  <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                    {waitingCount}
-                  </Badge>
-                )}
-              </button>
-              <button
-                onClick={() => handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')}
-                className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
-                  activeQuickFilter === 'myAssigned'
-                    ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                    : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
-                }`}
-              >
-                <User className="h-4 w-4" />
-                <span>내 담당</span>
-              </button>
-              <button
-                onClick={() => handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')}
-                className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
-                  activeQuickFilter === 'urgent'
-                    ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                    : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
-                }`}
-              >
-                <AlertTriangle className="h-4 w-4" />
-                <span>긴급</span>
-                {urgentCount > 0 && (
-                  <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                    {urgentCount}
-                  </Badge>
-                )}
-              </button>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className="sr-input-template"
-            >
-              <Filter className="mr-2 h-4 w-4" />
-              고급 필터
-            </Button>
-          </div>
+          {/* Quick Filter Buttons and Advanced Filter Button - 고객사 사용자는 숨김 */}
+          {!isClientUser && (
+            <>
+              <div className="flex items-center justify-between gap-2 mb-4">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      activeQuickFilter === 'waiting'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                    }`}
+                  >
+                    <Clock className="h-4 w-4" />
+                    <span>접수 대기</span>
+                    {waitingCount > 0 && (
+                      <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                        {waitingCount}
+                      </Badge>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      activeQuickFilter === 'myAssigned'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                    }`}
+                  >
+                    <User className="h-4 w-4" />
+                    <span>내 담당</span>
+                  </button>
+                  <button
+                    onClick={() => handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      activeQuickFilter === 'urgent'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                    }`}
+                  >
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>긴급</span>
+                    {urgentCount > 0 && (
+                      <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                        {urgentCount}
+                      </Badge>
+                    )}
+                  </button>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="sr-input-template"
+                >
+                  <Filter className="mr-2 h-4 w-4" />
+                  고급 필터
+                </Button>
+              </div>
 
-          {/* Advanced Filters (Collapsible) */}
-          {showAdvancedFilters && (
+              {/* Advanced Filters (Collapsible) */}
+              {showAdvancedFilters && (
             <div className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))]">
               {/* First Row: Status, Priority, Client, Assignee */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -335,6 +340,8 @@ export function SRsDataTable({
                 </Button>
               </div>
             </div>
+              )}
+            </>
           )}
 
           {/* Search Bar and Total Count */}
@@ -381,6 +388,7 @@ export function SRsDataTable({
               {srs && srs.length > 0 ? (
                 srs.map((sr) => {
                   const dueDateStatus = getDueDateStatus(sr.dueDate ? new Date(sr.dueDate).toISOString() : null);
+                  
                   return (
                     <TableRow key={sr.id} className="cursor-pointer" onClick={() => router.push(`/srs/${sr.id}`)}>
                       <TableCell className="font-medium text-primary hover:underline text-center"><Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link></TableCell>
@@ -399,55 +407,40 @@ export function SRsDataTable({
                           day: '2-digit' 
                         }).replace(/\./g, '. ').trim()}
                       </TableCell>
-                      <TableCell className="text-center">
-                        {sr.status === 'REQUESTED' ? (
-                          <Button 
-                            variant="default" 
-                            size="sm" 
-                            className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              router.push(`/srs/${sr.id}/intake`); 
-                            }}
-                          >
-                            접수
-                          </Button>
-                        ) : sr.status === 'IN_PROGRESS' && hasAnyRole(["MANAGER", "ADMIN"]) ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                router.push(`/srs/${sr.id}/intake`); 
-                              }}
-                              title="접수 정보 수정"
-                            >
-                              <Clock className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={(e) => { 
-                                e.stopPropagation(); 
-                                router.push(`/srs/${sr.id}`); 
-                              }}
-                              title="상세 보기"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          </div>
+                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                        {/* ADMIN/MANAGER/ENGINEER만 접수 및 접수 수정 가능 */}
+                        {hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]) ? (
+                          <>
+                            {sr.status === 'REQUESTED' ? (
+                              <Button 
+                                variant="default" 
+                                size="sm" 
+                                className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  router.push(`/srs/${sr.id}/intake`); 
+                                }}
+                              >
+                                접수
+                              </Button>
+                            ) : sr.status === 'IN_PROGRESS' ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  router.push(`/srs/${sr.id}/intake`); 
+                                }}
+                                title="접수 정보 수정"
+                              >
+                                <Clock className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </>
                         ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={(e) => { 
-                              e.stopPropagation(); 
-                              router.push(`/srs/${sr.id}`); 
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <span className="text-muted-foreground text-sm">-</span>
                         )}
                       </TableCell>
                     </TableRow>
@@ -512,24 +505,31 @@ export function SRsDataTable({
                         </div>
                       </div>
                     </div>
-                    {sr.status === 'REQUESTED' ? (
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
-                        onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}/intake`); }}
-                      >
-                        접수
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}`); }}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    )}
+                    {/* ADMIN/MANAGER/ENGINEER만 접수 및 접수 수정 가능 */}
+                    {hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]) ? (
+                      <>
+                        {sr.status === 'REQUESTED' && (
+                          <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
+                            onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}/intake`); }}
+                          >
+                            접수
+                          </Button>
+                        )}
+                        {sr.status === 'IN_PROGRESS' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}/intake`); }}
+                            title="접수 정보 수정"
+                          >
+                            <Clock className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </>
+                    ) : null}
                   </div>
                 </div>
               );

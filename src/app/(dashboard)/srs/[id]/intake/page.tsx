@@ -43,9 +43,9 @@ export default function SRIntakePage({ params }: { params: Promise<{ id: string 
               : "SR을 검토하고 접수 정보를 입력하세요."}
           </p>
         </div>
-        <Link href={isEditMode ? "/srs" : "/srs/intake-queue"}>
+        <Link href="/srs">
           <Button className="sr-btn-template">
-            {isEditMode ? "목록으로 돌아가기" : "대기 큐로 돌아가기"}
+            목록으로 돌아가기
           </Button>
         </Link>
       </div>

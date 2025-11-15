@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   ClipboardList,
-  Inbox,
   ListChecks,
   Building2,
   Users,
@@ -43,27 +42,21 @@ interface MenuSection {
 const menuStructure: Record<string, MenuSection[]> = {
   "/dashboard": [],
   "/srs": [
-    {
-      title: "SR 관리",
-      items: [
         {
-          title: "내 요청 SR",
-          href: "/my-requests",
-          icon: ClipboardList,
+          title: "SR 관리",
+          items: [
+            {
+              title: "내 요청 SR",
+              href: "/my-requests",
+              icon: ClipboardList,
+            },
+            {
+              title: "SR 전체 목록",
+              href: "/srs",
+              icon: ListChecks,
+            },
+          ],
         },
-        {
-          title: "SR 접수 대기",
-          href: "/srs/intake-queue",
-          icon: Inbox,
-          permission: { resource: "SR", action: "INTAKE" },
-        },
-        {
-          title: "SR 전체 목록",
-          href: "/srs",
-          icon: ListChecks,
-        },
-      ],
-    },
   ],
   "/clients": [
     {
@@ -73,6 +66,7 @@ const menuStructure: Record<string, MenuSection[]> = {
           title: "고객사 목록",
           href: "/clients",
           icon: Building2,
+          roles: ["ADMIN", "MANAGER", "ENGINEER"],
         },
       ],
     },
@@ -85,6 +79,7 @@ const menuStructure: Record<string, MenuSection[]> = {
           title: "사용자 목록",
           href: "/users",
           icon: Users,
+          roles: ["ADMIN", "MANAGER", "ENGINEER"],
         },
       ],
     },
@@ -97,6 +92,7 @@ const menuStructure: Record<string, MenuSection[]> = {
           title: "역할 관리",
           href: "/roles",
           icon: Shield,
+          roles: ["ADMIN", "MANAGER", "ENGINEER"],
         },
       ],
     },
@@ -187,39 +183,44 @@ export function Sidebar() {
 
         {/* Menu Sections */}
         <div className="mt-5">
-          {sections.map((section, idx) => (
-            <Collapsible key={idx} defaultOpen={getDefaultOpen(section)}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full h-[55px] px-8 text-sm font-medium sr-sidebar-item group">
-                <span>{section.title}</span>
-                <ChevronRight className="h-4 w-4 sr-chevron transition-transform duration-200 data-[state=open]:rotate-90" />
-              </CollapsibleTrigger>
-              <CollapsibleContent className="sr-sidebar-submenu">
-                {section.items
-                  .filter((item) => canAccessItem(item))
-                  .map((item) => {
-                    const Icon = item.icon;
-                    const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+          {sections
+            .filter((section) => {
+              // 섹션 내에 접근 가능한 항목이 하나라도 있으면 섹션 표시
+              return section.items.some((item) => canAccessItem(item));
+            })
+            .map((section, idx) => (
+              <Collapsible key={idx} defaultOpen={getDefaultOpen(section)}>
+                <CollapsibleTrigger className="flex items-center justify-between w-full h-[55px] px-8 text-sm font-medium sr-sidebar-item group">
+                  <span>{section.title}</span>
+                  <ChevronRight className="h-4 w-4 sr-chevron transition-transform duration-200 data-[state=open]:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="sr-sidebar-submenu">
+                  {section.items
+                    .filter((item) => canAccessItem(item))
+                    .map((item) => {
+                      const Icon = item.icon;
+                      const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
 
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={cn(
-                          "flex items-center h-12 px-8 text-sm sr-sidebar-submenu-item relative",
-                          isActive && "text-white font-medium"
-                        )}
-                      >
-                        {isActive && (
-                          <span className="absolute left-[49px] w-1 h-1 rounded-full bg-gray-400" />
-                        )}
-                        {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
-                        {item.title}
-                      </Link>
-                    );
-                  })}
-              </CollapsibleContent>
-            </Collapsible>
-          ))}
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={cn(
+                            "flex items-center h-12 px-8 text-sm sr-sidebar-submenu-item relative",
+                            isActive && "text-white font-medium"
+                          )}
+                        >
+                          {isActive && (
+                            <span className="absolute left-[49px] w-1 h-1 rounded-full bg-gray-400" />
+                          )}
+                          {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
+                          {item.title}
+                        </Link>
+                      );
+                    })}
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
         </div>
       </nav>
     </aside>

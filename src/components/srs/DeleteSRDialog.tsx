@@ -45,8 +45,23 @@ export function DeleteSRDialog({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete SR");
+        let errorMessage = "SR 삭제에 실패했습니다.";
+        try {
+          const error = await response.json();
+          errorMessage = error.error || error.message || errorMessage;
+        } catch {
+          // JSON 파싱 실패 시 상태 코드 기반 메시지
+          if (response.status === 404) {
+            errorMessage = "SR을 찾을 수 없습니다.";
+          } else if (response.status === 403) {
+            errorMessage = "SR 삭제 권한이 없습니다.";
+          } else if (response.status === 401) {
+            errorMessage = "인증이 필요합니다.";
+          } else {
+            errorMessage = `SR 삭제에 실패했습니다. (${response.status})`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       toast({
@@ -55,7 +70,9 @@ export function DeleteSRDialog({
       });
 
       onDeleted();
+      onOpenChange(false);
     } catch (error) {
+      console.error("SR 삭제 오류:", error);
       toast({
         title: "오류",
         description:

@@ -5,6 +5,9 @@ import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
 import { RouteContext } from "@/lib/api-helpers";
 
+// Force Node.js runtime (Prisma doesn't work in Edge Runtime)
+export const runtime = 'nodejs';
+
 // GET /api/attachments/[id] - 첨부파일 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,

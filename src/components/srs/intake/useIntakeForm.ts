@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { getSRHandlersForSelection } from "@/actions/user.actions";
 import type { SRDetail, User } from "./types";
 
 // Intake 폼 스키마
@@ -80,11 +81,30 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
 
         setSr(srData);
 
-        // 사용자 목록 조회 (담당자 선택용)
-        const usersResponse = await fetch("/api/users?role=ENGINEER,ADMIN");
-        if (!usersResponse.ok) throw new Error("사용자 목록을 불러오는데 실패했습니다");
-        const usersData = await usersResponse.json();
-        setUsers(usersData.users || []);
+        // 사용자 목록 조회 (담당자 선택용) - SR 처리 권한이 있는 사용자만
+        try {
+          const usersResult = await getSRHandlersForSelection();
+          if (usersResult.success && usersResult.data) {
+            setUsers(usersResult.data);
+            console.log("로드된 사용자 목록:", usersResult.data.length, "명");
+          } else {
+            console.error("사용자 목록 조회 실패:", usersResult.success === false ? usersResult.error : "알 수 없는 오류");
+            setUsers([]);
+            toast({
+              title: "경고",
+              description: usersResult.success === false ? usersResult.error : "담당자 목록을 불러오는데 실패했습니다.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error("사용자 목록 조회 중 오류:", error);
+          setUsers([]);
+          toast({
+            title: "경고",
+            description: "담당자 목록을 불러오는데 실패했습니다. 페이지를 새로고침해주세요.",
+            variant: "destructive",
+          });
+        }
 
         // 수정 모드인 경우 기존 값 설정, 접수 모드인 경우 기본값 설정
         if (srData.status === "IN_PROGRESS") {
@@ -194,8 +214,8 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         description: isEditMode ? "SR이 성공적으로 수정되었습니다." : "SR이 성공적으로 접수되었습니다.",
       });
 
-      // 접수 대기 큐 또는 전체 목록으로 이동
-      router.push(isEditMode ? "/srs" : "/srs/intake-queue");
+      // SR 목록으로 이동
+      router.push("/srs");
       
       if (onSuccess) {
         onSuccess();

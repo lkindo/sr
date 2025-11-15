@@ -67,12 +67,12 @@ export function CreateSRDialog({
   const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
 
-  // CLIENT_ADMIN, CLIENT_USER인지 확인
-  const isClientUser = hasAnyRole(["CLIENT_ADMIN", "CLIENT_USER"]);
+  // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
+  const isClientUser = !hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
   const canSelectClient = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
 
   const fetchClients = useCallback(async () => {
-    // CLIENT_ADMIN, CLIENT_USER인 경우 자신의 고객사만 가져오기
+    // 고객사 사용자인 경우 자신의 고객사만 가져오기
     if (isClientUser) {
       const profileResult = await getProfileAction();
       if (profileResult.success && profileResult.data) {
@@ -129,6 +129,22 @@ export function CreateSRDialog({
     }
   }, [toast]);
 
+  // 다이얼로그가 열릴 때마다 폼 초기화 (고객사 제외)
+  useEffect(() => {
+    if (open) {
+      setTitle("");
+      setDescription("");
+      // 고객사 사용자가 아닌 경우에만 clientId 초기화
+      if (!isClientUser) {
+        setClientId("");
+      }
+      setCategoryId("");
+      setRequestedPriority("MEDIUM");
+      setRequestedCompletionDate("");
+      setFiles([]);
+    }
+  }, [open, isClientUser]);
+
   useEffect(() => {
     if (open) {
       fetchClients();
@@ -136,18 +152,12 @@ export function CreateSRDialog({
     }
   }, [open, fetchClients, fetchCategories]);
 
-  // 다이얼로그가 열릴 때마다 폼 초기화
+  // 고객사 사용자인 경우 고객사 자동 설정 (fetchClients 완료 후)
   useEffect(() => {
-    if (open) {
-      setTitle("");
-      setDescription("");
-      setClientId("");
-      setCategoryId("");
-      setRequestedPriority("MEDIUM");
-      setRequestedCompletionDate("");
-      setFiles([]);
+    if (open && isClientUser && clients.length > 0 && !clientId) {
+      setClientId(clients[0].id);
     }
-  }, [open]);
+  }, [open, isClientUser, clients, clientId]);
 
   const uploadAttachments = async (srId: string, files: File[]) => {
     const formData = new FormData();
@@ -229,8 +239,14 @@ export function CreateSRDialog({
       onCreated();
     } catch (error) {
       console.error(" [CreateSR] SR 생성 실패:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "SR 생성에 실패했습니다.";
+      let errorMessage = "SR 생성에 실패했습니다.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "object" && error !== null && "message" in error) {
+        errorMessage = String(error.message);
+      }
+      
       toast({
         title: "오류",
         description: errorMessage,

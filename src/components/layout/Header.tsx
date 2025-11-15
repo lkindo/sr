@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { UserNav } from "./UserNav";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { AuthenticatedUser } from "@/types/session";
 
 interface HeaderProps {
@@ -13,14 +14,15 @@ interface HeaderProps {
 
 export function Header({ user }: HeaderProps) {
   const pathname = usePathname();
+  const { hasAnyRole } = usePermissions();
 
   // 상단 메뉴 정의
   const topMenuItems = [
     { title: "Dashboard", href: "/dashboard" },
     { title: "SR 관리", href: "/srs" },
-    { title: "고객사 관리", href: "/clients" },
-    { title: "사용자 관리", href: "/users" },
-    { title: "권한 관리", href: "/roles" },
+    { title: "고객사 관리", href: "/clients", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
+    { title: "사용자 관리", href: "/users", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
+    { title: "권한 관리", href: "/roles", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
     { title: "설정", href: "/settings" },
   ];
 
@@ -55,20 +57,29 @@ export function Header({ user }: HeaderProps) {
         {/* 메뉴 및 사용자 정보 영역 */}
         <div className="flex-1 flex items-center justify-between px-8">
           <nav className="flex items-center gap-1">
-            {topMenuItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "px-4 py-2 rounded text-sm transition-colors font-medium",
-                  activeMenu === item.href
-                    ? "bg-[hsl(var(--sr-primary-dark))] text-white"
-                    : "text-[hsl(var(--sr-gray-medium))] hover:text-foreground hover:bg-accent"
-                )}
-              >
-                {item.title}
-              </Link>
-            ))}
+            {topMenuItems
+              .filter((item) => {
+                // roles가 정의된 경우 권한 체크
+                if (item.roles && item.roles.length > 0) {
+                  return hasAnyRole(item.roles);
+                }
+                // roles가 없으면 모든 사용자에게 표시
+                return true;
+              })
+              .map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "px-4 py-2 rounded text-sm transition-colors font-medium",
+                    activeMenu === item.href
+                      ? "bg-[hsl(var(--sr-primary-dark))] text-white"
+                      : "text-[hsl(var(--sr-gray-medium))] hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  {item.title}
+                </Link>
+              ))}
           </nav>
 
           <nav className="flex items-center gap-3">

@@ -169,7 +169,21 @@ export default function SRDetailPage() {
               <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
             </Button>
           )}
-          <Button onClick={() => setIsEditDialogOpen(true)}>
+          <Button 
+            onClick={() => {
+              // 관리자는 모든 상태에서 수정 가능
+              if (sr.status === "REQUESTED" || hasAnyRole(["ADMIN"])) {
+                setIsEditDialogOpen(true);
+              } else {
+                toast({
+                  title: "알림",
+                  description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
+                  variant: "default",
+                });
+              }
+            }}
+            disabled={sr.status !== "REQUESTED" && !hasAnyRole(["ADMIN"])}
+          >
             <Pencil className="mr-2 h-4 w-4" /> 수정
           </Button>
           <Button 
@@ -400,7 +414,10 @@ export default function SRDetailPage() {
       <EditSRDialog 
         open={isEditDialogOpen} 
         onOpenChange={setIsEditDialogOpen} 
-        sr={sr} 
+        sr={{
+          ...sr,
+          attachments: sr?.attachments || [],
+        }} 
         onUpdated={handleSRUpdated} 
       />
       <DeleteSRDialog 

@@ -86,7 +86,7 @@ export function IntakeFormCard({
                   <FormLabel>실제 우선순위 *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -215,7 +215,7 @@ export function IntakeFormCard({
                   <FormLabel>담당자 *</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -223,14 +223,20 @@ export function IntakeFormCard({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem key={user.id} value={user.id}>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            {user.name} ({user.email})
-                          </div>
+                      {users.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          담당자 목록을 불러오는 중...
                         </SelectItem>
-                      ))}
+                      ) : (
+                        users.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              {user.name} ({user.email})
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormDescription>
@@ -271,7 +277,7 @@ export function IntakeFormCard({
             <div className="flex gap-4">
               <Button
                 type="button"
-                onClick={() => router.push("/srs/intake-queue")}
+                onClick={() => router.push("/srs")}
                 className="flex-1 sr-btn-template"
                 disabled={submitting}
               >

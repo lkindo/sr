@@ -37,35 +37,72 @@ export class SRService {
   }> {
     const validated = srCreateSchema.parse(data);
 
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    // SR 번호 생성 (중복 방지를 위한 재시도 로직)
+    let sr: SR | null = null;
+    let attempts = 0;
+    const maxAttempts = 10;
 
-    const todayStart = new Date(today.setHours(0, 0, 0, 0));
-    const todayEnd = new Date(today.setHours(23, 59, 59, 999));
+    while (!sr && attempts < maxAttempts) {
+      attempts++;
+      
+      const today = new Date();
+      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
-    const todayCount = await this.srRepository.count({
-      createdAt: {
-        gte: todayStart,
-        lte: todayEnd,
-      },
-    });
+      // 오늘 날짜의 시작과 끝 시간 계산 (원본 today 객체 보존)
+      const todayStart = new Date(today);
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
 
-    const srNumber = `SR-${dateStr}-${String(todayCount + 1).padStart(4, "0")}`;
+      // 오늘 생성된 SR 개수 조회
+      const todayCount = await this.srRepository.count({
+        createdAt: {
+          gte: todayStart,
+          lte: todayEnd,
+        },
+      });
 
-    const sr = await this.srRepository.create({
-      srNumber,
-      title: validated.title,
-      description: validated.description,
-      clientId: validated.clientId,
-      serviceCategoryId: validated.serviceCategoryId,
-      requesterId: sessionUser.id,
-      requestedPriority: validated.requestedPriority,
-      priority: validated.requestedPriority,
-      requestedCompletionDate: validated.requestedCompletionDate
-        ? new Date(validated.requestedCompletionDate)
-        : undefined,
-      status: "REQUESTED",
-    });
+      // SR 번호 생성 (시도 횟수만큼 증가)
+      const sequenceNumber = todayCount + attempts;
+      const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, "0")}`;
+
+      try {
+        sr = await this.srRepository.create({
+          srNumber,
+          title: validated.title,
+          description: validated.description,
+          clientId: validated.clientId,
+          serviceCategoryId: validated.serviceCategoryId,
+          requesterId: sessionUser.id,
+          requestedPriority: validated.requestedPriority,
+          priority: validated.requestedPriority,
+          requestedCompletionDate: validated.requestedCompletionDate
+            ? new Date(validated.requestedCompletionDate)
+            : undefined,
+          status: "REQUESTED",
+        });
+      } catch (error) {
+        // 중복 키 에러인 경우 재시도
+        const isUniqueConstraintError = 
+          (error instanceof Error && error.message.includes("Unique constraint")) ||
+          (error && typeof error === "object" && "code" in error && error.code === "P2002");
+        
+        if (isUniqueConstraintError) {
+          if (attempts >= maxAttempts) {
+            throw new Error("SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+          }
+          // 짧은 지연 후 재시도 (동시성 문제 완화)
+          await new Promise(resolve => setTimeout(resolve, 50 * attempts));
+          continue;
+        }
+        // 다른 에러는 즉시 throw
+        throw error;
+      }
+    }
+
+    if (!sr) {
+      throw new Error("SR 생성에 실패했습니다.");
+    }
 
     await this.srActivityRepository.create({
       srId: sr.id,
@@ -107,6 +144,21 @@ export class SRService {
       const existingSR = await this.srRepository.findById(id);
       if (!existingSR) {
         throw new Error("SR을 찾을 수 없습니다.");
+      }
+
+      // 권한 체크: REQUESTED 상태인 경우 요청자 또는 ADMIN만 수정 가능
+      const isAdmin = sessionUser.roles?.includes("ADMIN") ?? false;
+      const isRequester = existingSR.requesterId === sessionUser.id;
+      
+      if (existingSR.status === "REQUESTED") {
+        if (!isAdmin && !isRequester) {
+          throw new Error("SR 수정 권한이 없습니다. 요청자 또는 관리자만 수정할 수 있습니다.");
+        }
+      } else {
+        // REQUESTED가 아닌 경우 ADMIN만 수정 가능
+        if (!isAdmin) {
+          throw new Error("SR 수정 권한이 없습니다. 관리자만 수정할 수 있습니다.");
+        }
       }
 
     // 기본 필드 처리
@@ -329,14 +381,31 @@ export class SRService {
     return this.srRepository.count(where);
   }
 
-  async deleteSR(id: string) {
+  async deleteSR(id: string, sessionUser?: AuthenticatedUser) {
+    if (!sessionUser) {
+      throw new Error("인증이 필요합니다.");
+    }
+
     const existingSR = await this.srRepository.findById(id);
     if (!existingSR) {
       throw new Error("SR을 찾을 수 없습니다.");
     }
-    if (!["REQUESTED", "REJECTED"].includes(existingSR.status)) {
-      throw new Error("진행 중이거나 완료된 SR은 삭제할 수 없습니다.");
+    
+    // 권한 체크: REQUESTED, REJECTED 상태인 경우 요청자 또는 ADMIN만 삭제 가능
+    const isAdmin = sessionUser.roles?.includes("ADMIN") ?? false;
+    const isRequester = existingSR.requesterId === sessionUser.id;
+    
+    if (["REQUESTED", "REJECTED"].includes(existingSR.status)) {
+      if (!isAdmin && !isRequester) {
+        throw new Error("SR 삭제 권한이 없습니다. 요청자 또는 관리자만 삭제할 수 있습니다.");
+      }
+    } else {
+      // 다른 상태는 ADMIN만 삭제 가능
+      if (!isAdmin) {
+        throw new Error("진행 중이거나 완료된 SR은 관리자만 삭제할 수 있습니다.");
+      }
     }
+    
     await this.srRepository.delete(id);
     return { message: "SR이 삭제되었습니다." };
   }

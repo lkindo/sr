@@ -57,10 +57,18 @@ export class PermissionService {
       return false; // Invalid permission format
     }
 
+    // 대소문자 구분 없이 비교 (권한은 대문자로 저장되어 있음)
+    const normalizedRequiredResource = requiredResource.toUpperCase();
+    const normalizedRequiredAction = requiredAction.toUpperCase();
+
     for (const role of userRoles) {
       for (const rolePermission of role.permissions) {
         const { resource, action } = rolePermission.permission;
-        if (resource === requiredResource && action === requiredAction) {
+        // 대소문자 구분 없이 비교
+        if (
+          resource.toUpperCase() === normalizedRequiredResource &&
+          action.toUpperCase() === normalizedRequiredAction
+        ) {
           return true;
         }
       }
@@ -112,7 +120,8 @@ export class PermissionService {
   async requirePermission(userId: string, action: string): Promise<void> {
     const hasPermission = await this.checkPermission(userId, action);
     if (!hasPermission) {
-      throw new Error(`권한이 없습니다: ${action}`);
+      const { ForbiddenError } = await import("@/lib/errors");
+      throw new ForbiddenError(`권한이 없습니다: ${action}`);
     }
   }
 
