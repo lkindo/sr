@@ -18,7 +18,7 @@ export function cn(...inputs: ClassValue[]) {
  * @param obj - 변환할 객체
  * @returns 순수한 JavaScript 객체
  */
-export function toPlainObject<T>(obj: T): T extends Date ? string : T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : T {
+export function toPlainObject<T>(obj: T): any {
   if (obj === null || typeof obj !== "object") {
     return obj as T extends Date ? string : T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : T;
   }

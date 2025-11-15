@@ -35,8 +35,8 @@ export default async function SRsPage({ searchParams }: Props) {
   const userService = new UserService();
 
   const where: Prisma.SRWhereInput = {};
-  if (status && status !== "all") where.status = status as Prisma.SRStatus;
-  if (priority && priority !== "all") where.priority = priority as Prisma.SRPriority;
+  if (status && status !== "all") where.status = status as "REQUESTED" | "INTAKE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CONFIRMED" | "REJECTED";
+  if (priority && priority !== "all") where.priority = priority as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
   if (clientId && clientId !== "all") where.clientId = clientId;
   if (assigneeId && assigneeId !== "all") {
     where.assigneeId = assigneeId === "unassigned" ? null : assigneeId;

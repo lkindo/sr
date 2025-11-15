@@ -15,6 +15,7 @@ import { EditSRDialog } from "@/components/srs/EditSRDialog";
 import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
 import { useToast } from "@/hooks/use-toast";
 import { getSRDetailsAction } from "@/actions/sr.actions";
+import type { SR } from "@prisma/client";
 import { TableSkeleton } from "@/components/loading/TableSkeleton";
 import { usePermissions } from "@/hooks/use-permissions";
 
@@ -37,24 +38,11 @@ export default function SRDetailPage() {
   const srId = params.id as string;
   
   // SR 상세 정보 타입 정의
-  type SRDetails = {
-    id: string;
-    srNumber: string;
-    title: string;
-    description: string;
-    status: string;
-    priority: string;
-    requestedPriority: string;
-    actualPriority: string | null;
-    requestedCompletionDate: Date | null;
-    estimatedCompletionDate: Date | null;
-    dueDate: Date | null;
-    estimatedHours: number | null;
-    intakeNotes: string | null;
-    satisfactionRating: number | null;
+  type SRDetails = SR & {
     client: { id: string; code: string; name: string };
     requester: { id: string; name: string; email: string };
     assignee: { id: string; name: string; email: string } | null;
+    intakeBy: { id: string; name: string; email: string; image: string | null } | null;
     serviceCategory: { id: string; categoryName: string };
     comments: Array<{
       id: string;

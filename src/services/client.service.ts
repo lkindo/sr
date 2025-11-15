@@ -147,7 +147,9 @@ export class ClientService {
     });
 
     // ADMIN 역할을 가진 사용자 제외
-    type ClientWithUsers = NonNullable<Awaited<ReturnType<ClientRepository['findDetailsById']>>>;
+    type ClientWithUsers = NonNullable<Awaited<ReturnType<ClientRepository['findDetailsById']>>> & {
+      users?: Array<{ user?: { roles?: Array<{ role?: { name?: string } }> } }>;
+    };
     const clientWithUsers = client as ClientWithUsers;
     const filteredUsers = clientWithUsers.users?.filter((userClient) => {
       const hasAdminRole = userClient.user?.roles?.some(

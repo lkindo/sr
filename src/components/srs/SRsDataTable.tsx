@@ -380,7 +380,7 @@ export function SRsDataTable({
             <TableBody>
               {srs && srs.length > 0 ? (
                 srs.map((sr) => {
-                  const dueDateStatus = getDueDateStatus(sr.dueDate);
+                  const dueDateStatus = getDueDateStatus(sr.dueDate ? new Date(sr.dueDate).toISOString() : null);
                   return (
                     <TableRow key={sr.id} className="cursor-pointer" onClick={() => router.push(`/srs/${sr.id}`)}>
                       <TableCell className="font-medium text-primary hover:underline text-center"><Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link></TableCell>
@@ -464,7 +464,7 @@ export function SRsDataTable({
         <div className="md:hidden space-y-4 p-4">
           {srs && srs.length > 0 ? (
             srs.map((sr) => {
-              const dueDateStatus = getDueDateStatus(sr.dueDate);
+              const dueDateStatus = getDueDateStatus(sr.dueDate ? new Date(sr.dueDate).toISOString() : null);
               return (
                 <div 
                   key={sr.id} 

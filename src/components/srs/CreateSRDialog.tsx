@@ -76,7 +76,7 @@ export function CreateSRDialog({
     if (isClientUser) {
       const profileResult = await getProfileAction();
       if (profileResult.success && profileResult.data) {
-        const userClients = profileResult.data.clients || [];
+        const userClients = (profileResult.data as { clients?: Array<{ client: { id: string; code: string; name: string } }> }).clients || [];
         if (userClients.length > 0) {
           // 첫 번째 고객사 사용 (일반적으로 사용자는 하나의 고객사에만 속함)
           const userClient = userClients[0].client;

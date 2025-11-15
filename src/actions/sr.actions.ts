@@ -155,6 +155,7 @@ export async function getSRDetailsAction(id: string): Promise<Result<SR & {
   client: { id: string; code: string; name: string };
   requester: { id: string; name: string; email: string };
   assignee: { id: string; name: string; email: string } | null;
+  intakeBy: { id: string; name: string; email: string; image: string | null } | null;
   serviceCategory: { id: string; categoryName: string };
   comments: Array<{
     id: string;
@@ -177,6 +178,13 @@ export async function getSRDetailsAction(id: string): Promise<Result<SR & {
     fileType: string;
     fileUrl: string;
     createdAt: Date;
+  }>;
+  statusHistory: Array<{
+    id: string;
+    currentStatus: string;
+    previousStatus: string | null;
+    changedAt: Date;
+    user: { id: string; name: string; image: string | null };
   }>;
   _count: { comments: number; attachments: number };
 }>> {

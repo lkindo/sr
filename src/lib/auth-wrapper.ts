@@ -69,6 +69,7 @@ export function withAuth<T extends NextRequest = NextRequest, P = Promise<Record
 
       return await handler(request, context);
     } catch (error) {
+      const session = await auth();
       return handleApiError(error, {
         userId: session?.user?.id,
         path: request.url,

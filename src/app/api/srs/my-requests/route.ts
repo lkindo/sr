@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     // 상태 필터링
     if (status && status !== "all") {
-      where.status = status as Prisma.SRStatus;
+      where.status = status as "REQUESTED" | "INTAKE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CONFIRMED" | "REJECTED";
     }
 
     // 정렬 조건 구성

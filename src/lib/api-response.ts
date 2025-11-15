@@ -47,8 +47,8 @@ export function errorResponse(
 ): NextResponse {
   const response: ApiError = {
     error,
-    ...(code && { code }),
-    ...(details && { details }),
+    ...(code ? { code } : {}),
+    ...(details ? { details } : {}),
   };
 
   return NextResponse.json(response, { status });

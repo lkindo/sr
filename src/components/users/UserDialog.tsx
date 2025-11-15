@@ -172,14 +172,15 @@ export function UserDialog({
     setLoading(true);
 
     try {
-      const payload: {
-        name?: string;
-        email?: string;
-        isActive?: boolean;
-        userType?: string;
-        roleIds?: string[];
-        clientIds?: string[];
-      } = {
+    const payload: {
+      name?: string;
+      email?: string;
+      password?: string;
+      isActive?: boolean;
+      userType?: string;
+      roleIds?: string[];
+      clientIds?: string[];
+    } = {
         name,
         email,
         isActive,

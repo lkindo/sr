@@ -33,8 +33,7 @@ function initializeRedis(): RedisClient | null {
 
   try {
     // 동적 require로 Redis 패키지 로드 (선택적)
-    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-    const RedisModule = require("@upstash/redis");
+    const RedisModule = require("@upstash/redis") as { Redis?: new (config: { url: string; token: string }) => RedisClient } | undefined;
     if (RedisModule?.Redis) {
       return new RedisModule.Redis({
         url: process.env.UPSTASH_REDIS_REST_URL,

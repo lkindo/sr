@@ -398,11 +398,7 @@ export const PATCH = withAuthAndRateLimit(async (
     updateData.intakeNotes = validated.intakeNotes || null;
   }
   if (validated.assigneeId !== undefined) {
-    if (validated.assigneeId) {
-      updateData.assignee = { connect: { id: validated.assigneeId } };
-    } else {
-      updateData.assignee = { disconnect: true };
-    }
+    updateData.assigneeId = validated.assigneeId || null;
   }
   if (dueDate && validated.actualPriority && validated.actualPriority !== sr.actualPriority) {
     updateData.dueDate = dueDate;
@@ -474,7 +470,7 @@ export const PATCH = withAuthAndRateLimit(async (
   if (isAssigneeChanged) {
     const newAssigneeName = validated.assigneeId ? (newAssignee?.name || "미배정") : "미배정";
     changes.push(`담당자: ${previousValues.assigneeName || "미배정"} → ${newAssigneeName}`);
-    newValues.assigneeId = validated.assigneeId || null;
+    newValues.assigneeId = validated.assigneeId || undefined;
     newValues.assigneeName = newAssignee?.name || null;
   }
 

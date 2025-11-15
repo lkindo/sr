@@ -251,6 +251,7 @@ export class SRService {
     client: { id: string; code: string; name: string };
     requester: { id: string; name: string; email: string };
     assignee: { id: string; name: string; email: string } | null;
+    intakeBy: { id: string; name: string; email: string; image: string | null } | null;
     serviceCategory: { id: string; categoryName: string };
     comments: Array<{
       id: string;
@@ -273,6 +274,13 @@ export class SRService {
       fileType: string;
       fileUrl: string;
       createdAt: Date;
+    }>;
+    statusHistory: Array<{
+      id: string;
+      currentStatus: string;
+      previousStatus: string | null;
+      changedAt: Date;
+      user: { id: string; name: string; image: string | null };
     }>;
     _count: { comments: number; attachments: number };
   }) | null> {
@@ -297,11 +305,11 @@ export class SRService {
     const commentCountsMap: Record<string, number> = {};
     const attachmentCountsMap: Record<string, number> = {};
 
-    counts.forEach((count) => {
+    counts.forEach((count: { srId: string; _count: { _all: number } }) => {
       commentCountsMap[count.srId] = count._count._all;
     });
 
-    attachmentCounts.forEach((count) => {
+    attachmentCounts.forEach((count: { srId: string; _count: { _all: number } }) => {
       attachmentCountsMap[count.srId] = count._count._all;
     });
     

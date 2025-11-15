@@ -42,16 +42,18 @@ interface SR {
   description: string;
   status: string;
   priority: string;
-  requestedPriority?: string;
+  requestedPriority?: string | null;
+  requestedCompletionDate?: Date | null | string;
+  estimatedCompletionDate?: Date | null | string;
+  dueDate?: Date | null | string;
+  completedAt?: Date | null;
+  expectedCompletionDate?: Date | null | string;
   clientId?: string;
   client?: {
     id: string;
     code: string;
     name: string;
   };
-  requestedCompletionDate?: string;
-  expectedCompletionDate?: string;
-  dueDate?: string;
   assignedTo?: {
     id: string;
   } | null;
@@ -118,7 +120,7 @@ export function EditSRDialog({
     if (isClientUser) {
       const profileResult = await getProfileAction();
       if (profileResult.success && profileResult.data) {
-        const userClients = profileResult.data.clients || [];
+        const userClients = (profileResult.data as { clients?: Array<{ client: { id: string; code: string; name: string } }> }).clients || [];
         if (userClients.length > 0) {
           const userClient = userClients[0].client;
           setClients([{
