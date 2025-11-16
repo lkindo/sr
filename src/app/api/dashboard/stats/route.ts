@@ -9,6 +9,8 @@ export const runtime = 'nodejs';
 
 // GET /api/dashboard/stats - 대시보드 통계 조회 (Rate Limit: 느슨함)
 export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
+  const url = new URL(request.url);
+  const noCache = url.searchParams.get('nocache') === '1';
   const userId = session.user.id;
   const userRoles = session.user.roles || [];
   const isAdminManagerEngineer = userRoles.some((role: string) => 
@@ -17,7 +19,9 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
   const isEngineer = userRoles.includes("ENGINEER");
   
   // 사용자별 캐시 키 생성 (역할별로 다른 데이터 표시)
-  const cacheKey = `${CacheKeys.dashboardStats()}:${userId}:${isAdminManagerEngineer ? 'admin' : 'client'}`;
+  const baseCacheKey = `${CacheKeys.dashboardStats()}:${userId}:${isAdminManagerEngineer ? 'admin' : 'client'}`;
+  // nocache=1 이면 캐시 미스 유도(새 키)로 실시간 계산 강제
+  const cacheKey = noCache ? `${baseCacheKey}:nocache:${Date.now()}` : baseCacheKey;
   
   // 캐시된 통계 데이터 조회 또는 생성
   const stats = await getCachedData(
@@ -63,7 +67,8 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
       });
 
       const priorityCounts = srByPriority.reduce((acc, item) => {
-        acc[item.priority] = item._count.id;
+        const key = item.priority ?? 'UNKNOWN';
+        acc[key] = item._count.id;
         return acc;
       }, {} as Record<string, number>);
 
@@ -347,6 +352,22 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
     },
     getDashboardTtlSeconds() // 캐시 TTL (env로 조정)
   );
+
+  // 개발환경 진단 로그
+  try {
+    if (process.env.NODE_ENV === 'development') {
+      const { logger } = await import('@/lib/logger');
+      logger.info('[Dashboard][Stats] response', {
+        userId,
+        roleScope: isAdminManagerEngineer ? 'admin' : 'client',
+        byStatusKeys: Object.keys(stats?.byStatus ?? {}).length,
+        byPriorityKeys: Object.keys(stats?.byPriority ?? {}).length,
+        noCache,
+      });
+    }
+  } catch {
+    // noop
+  }
 
   return NextResponse.json(stats);
 }, { preset: 'relaxed' }); // 1분당 300회 (대시보드는 자주 조회됨)
