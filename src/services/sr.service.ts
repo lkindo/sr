@@ -104,6 +104,7 @@ export class SRService {
       throw new Error("SR 생성에 실패했습니다.");
     }
 
+    // 초기 생성 Activity 로그 1회 생성
     await this.srActivityRepository.create({
       srId: sr.id,
       userId: sessionUser.id,

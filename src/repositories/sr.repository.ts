@@ -112,14 +112,7 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
   async create(data: Prisma.SRUncheckedCreateInput): Promise<SR> {
     return this.model.create({
       data: {
-        ...data,
-        activities: data.activities || {
-          create: {
-            type: 'CREATED',
-            description: 'SR이 생성되었습니다',
-            userId: data.requesterId,
-          },
-        },
+        ...data
       },
       include: {
         client: true,

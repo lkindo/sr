@@ -53,6 +53,8 @@ export function DeleteClientDialog({
         description: "고객사가 삭제되었습니다.",
       });
 
+      // 모달 즉시 닫고 → 후속 이동/갱신
+      onOpenChange(false);
       onDeleted();
     } catch (error) {
       toast({

@@ -52,6 +52,8 @@ export function DeleteRoleDialog({
         description: "역할이 삭제되었습니다.",
       });
 
+      // 모달 즉시 닫고 → 후속 갱신
+      onOpenChange(false);
       onDeleted();
     } catch (error) {
       toast({

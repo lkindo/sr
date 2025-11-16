@@ -33,6 +33,13 @@ interface User {
   name: string;
   email: string;
   isActive: boolean;
+  roles?: Array<{
+    role: {
+      id: string;
+      name: string;
+      description?: string | null;
+    };
+  }>;
   clients?: Array<{
     client: Client;
   }>;
@@ -57,7 +64,10 @@ export function UserDialog({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [userType, setUserType] = useState<"ENGINEER" | "CLIENT">("ENGINEER");
+  // SR 처리자(ENGINEER): 멀티 선택
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
+  // SR 요청자(CLIENT): 단일 선택(소속 고객사)
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingClients, setLoadingClients] = useState(true);
@@ -107,8 +117,18 @@ export function UserDialog({
 
         // 사용자 유형 및 고객사 설정
         const userClients = user.clients || [];
-        setUserType(userClients.length > 0 ? "CLIENT" : "ENGINEER");
-        setSelectedClientIds(userClients.map((uc) => uc.client.id));
+        const initialIds = userClients.map((uc) => uc.client.id);
+        // 역할 기반 사용자유형 판별 우선순위:
+        // SR 처리자: ENGINEER, MANAGER
+        // SR 요청자: CLIENT_ADMIN, CLIENT_USER
+        const roleNames = (user.roles || []).map((ur) => ur.role.name.toUpperCase());
+        const isEngineer = roleNames.includes("ENGINEER") || roleNames.includes("MANAGER");
+        const isClient = roleNames.includes("CLIENT_ADMIN") || roleNames.includes("CLIENT_USER");
+        const inferredType: "ENGINEER" | "CLIENT" =
+          isEngineer ? "ENGINEER" : isClient ? "CLIENT" : (initialIds.length > 0 ? "CLIENT" : "ENGINEER");
+        setUserType(inferredType);
+        setSelectedClientIds(initialIds);
+        setSelectedClientId(initialIds[0] ?? "");
       } else {
         setName("");
         setEmail("");
@@ -117,6 +137,7 @@ export function UserDialog({
         setIsActive(true);
         setUserType("ENGINEER");
         setSelectedClientIds([]);
+        setSelectedClientId("");
       }
     }
   }, [open, user]);
@@ -160,10 +181,10 @@ export function UserDialog({
       return;
     }
 
-    if (userType === "CLIENT" && selectedClientIds.length === 0) {
+    if (userType === "CLIENT" && !selectedClientId) {
       toast({
         title: "오류",
-        description: "SR 요청자는 최소 1개 이상의 고객사를 선택해야 합니다.",
+        description: "SR 요청자는 소속 고객사를 선택해야 합니다.",
         variant: "destructive",
       });
       return;
@@ -185,7 +206,9 @@ export function UserDialog({
         email,
         isActive,
         userType,
-        clientIds: userType === "CLIENT" ? selectedClientIds : [],
+        clientIds: userType === "CLIENT"
+          ? (selectedClientId ? [selectedClientId] : [])
+          : selectedClientIds,
       };
 
       if (password) {
@@ -274,7 +297,11 @@ export function UserDialog({
                 onValueChange={(value: "ENGINEER" | "CLIENT") => {
                   setUserType(value);
                   if (value === "ENGINEER") {
-                    setSelectedClientIds([]);
+                    setSelectedClientId("");
+                    // ENGINEER는 멀티선택 허용(초기화는 유지)
+                  } else {
+                    // CLIENT 전환 시 첫 고객사 기본 지정
+                    setSelectedClientId((prev) => prev || (selectedClientIds[0] ?? ""));
                   }
                 }}
                 disabled={loading}
@@ -291,33 +318,57 @@ export function UserDialog({
 
             {userType === "CLIENT" && (
               <div className="space-y-2">
-                <Label>할당 고객사 *</Label>
+                <Label>소속 고객사 *</Label>
                 {loadingClients ? (
                   <p className="text-sm text-muted-foreground">
                     고객사 목록 로딩 중...
                   </p>
                 ) : (
+                  <>
+                    {clients.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">등록된 고객사가 없습니다.</p>
+                    ) : (
+                      <Select
+                        value={selectedClientId}
+                        onValueChange={(val) => setSelectedClientId(val)}
+                        disabled={loading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="소속 고객사 선택" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name} ({client.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {userType === "ENGINEER" && (
+              <div className="space-y-2">
+                <Label>할당 고객사 (복수 선택 가능)</Label>
+                {loadingClients ? (
+                  <p className="text-sm text-muted-foreground">고객사 목록 로딩 중...</p>
+                ) : (
                   <div className="border rounded-md p-4 space-y-2 max-h-60 overflow-y-auto">
                     {clients.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        등록된 고객사가 없습니다.
-                      </p>
+                      <p className="text-sm text-muted-foreground">등록된 고객사가 없습니다.</p>
                     ) : (
                       clients.map((client) => (
-                        <div
-                          key={client.id}
-                          className="flex items-center space-x-2"
-                        >
+                        <div key={client.id} className="flex items-center space-x-2">
                           <Checkbox
-                            id={`client-${client.id}`}
+                            id={`eng-client-${client.id}`}
                             checked={selectedClientIds.includes(client.id)}
                             onCheckedChange={() => toggleClient(client.id)}
                             disabled={loading}
                           />
-                          <Label
-                            htmlFor={`client-${client.id}`}
-                            className="cursor-pointer font-normal"
-                          >
+                          <Label htmlFor={`eng-client-${client.id}`} className="cursor-pointer font-normal">
                             {client.name} ({client.code})
                           </Label>
                         </div>
@@ -326,13 +377,10 @@ export function UserDialog({
                   </div>
                 )}
                 {selectedClientIds.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedClientIds.length}개 고객사 선택됨
-                  </p>
+                  <p className="text-sm text-muted-foreground">{selectedClientIds.length}개 고객사 선택됨</p>
                 )}
               </div>
             )}
-
             <div className="space-y-2">
               <Label htmlFor="password">
                 {isEditMode ? "비밀번호 (변경 시에만 입력)" : "비밀번호 *"}
