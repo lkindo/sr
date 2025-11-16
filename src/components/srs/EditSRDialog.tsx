@@ -216,6 +216,8 @@ export function EditSRDialog({
   }, [open, srId]);
 
   const handleDeleteAttachment = async (attachmentId: string) => {
+    // TODO: 추후 모달 확인으로 대체
+    // eslint-disable-next-line no-alert
     if (!confirm("이 파일을 삭제하시겠습니까?")) return;
 
     try {

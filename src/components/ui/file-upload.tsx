@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Upload, X, File } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface FileUploadProps {
   onChange: (files: File[]) => void;
@@ -21,11 +22,12 @@ export function FileUpload({
   disabled = false,
 }: FileUploadProps) {
   const [dragActive, setDragActive] = useState(false);
+  const { toast } = useToast();
 
   const handleFiles = useCallback((files: File[]) => {
     // Check max files
     if (value.length + files.length > maxFiles) {
-      alert(`최대 ${maxFiles}개의 파일만 업로드할 수 있습니다.`);
+      toast({ title: "업로드 제한", description: `최대 ${maxFiles}개의 파일만 업로드할 수 있습니다.`, variant: "destructive" });
       return;
     }
 
@@ -34,12 +36,12 @@ export function FileUpload({
       (file) => file.size > maxSize * 1024 * 1024
     );
     if (oversizedFiles.length > 0) {
-      alert(`파일 크기는 ${maxSize}MB를 초과할 수 없습니다.`);
+      toast({ title: "파일 크기 초과", description: `파일 크기는 ${maxSize}MB를 초과할 수 없습니다.`, variant: "destructive" });
       return;
     }
 
     onChange([...value, ...files]);
-  }, [onChange, value, maxFiles, maxSize]);
+  }, [onChange, value, maxFiles, maxSize, toast]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();

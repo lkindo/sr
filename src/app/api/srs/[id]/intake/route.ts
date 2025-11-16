@@ -7,6 +7,8 @@ import { NotFoundError, BadRequestError, ForbiddenError } from "@/lib/errors";
 import { sendSRAssignedEmail } from "@/lib/email";
 import { intakeUpdateSchema, intakeSchema } from "@/lib/schemas";
 import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
+import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
+import { srDetailKey, SR_LIST_PREFIX, DASHBOARD_STATS_PREFIX, MY_REQUESTS_PREFIX } from "@/lib/cache-keys";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -138,6 +140,16 @@ export const POST = withAuthAndRateLimit(async (
       }
     }
   });
+
+  // 캐시 무효화: 상세/목록/대시보드/내요청
+  try {
+    await invalidateCache(srDetailKey(id));
+    await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
+    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
+    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+  } catch (e) {
+    console.warn('Cache invalidation failed after SR intake create:', e);
+  }
 
   // 6. Activity 로그 생성
   await prisma.sRActivity.create({
@@ -476,6 +488,16 @@ export const PATCH = withAuthAndRateLimit(async (
       }
     }
   });
+
+  // 캐시 무효화: 상세/목록/대시보드/내요청
+  try {
+    await invalidateCache(srDetailKey(id));
+    await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
+    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
+    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+  } catch (e) {
+    console.warn('Cache invalidation failed after SR intake update:', e);
+  }
 
   // 8. 변경 사항 추적 및 이력 생성
   const changes: string[] = [];

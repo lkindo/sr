@@ -1,0 +1,46 @@
+name: Prewarm Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "대상 BASE_URL (예: https://preview.example.com)"
+        required: true
+        type: string
+      session_cookie:
+        description: "세션 쿠키 (선택)"
+        required: false
+        type: string
+      warm_paths:
+        description: "워밍 경로(콤마 구분). 미지정 시 기본값 사용"
+        required: false
+        type: string
+
+jobs:
+  prewarm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Warm cache
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url }}
+          SESSION_COOKIE: ${{ github.event.inputs.session_cookie }}
+          WARM_PATHS: ${{ github.event.inputs.warm_paths }}
+        run: pnpm run warm:dashboard
+

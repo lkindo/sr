@@ -1,0 +1,17 @@
+title = "gitleaks config"
+
+[extend]
+path = ""
+
+[rules]
+# 기본 규칙 사용, 프로젝트 특성상 허용할 false positive만 추가 예외 처리
+
+[allowlist]
+description = "Common test fixtures and examples"
+paths = [
+  '''\.env\.example$''',
+  '''/tests?/''',
+  '''/e2e/''',
+  '''/docs?/'''
+]
+

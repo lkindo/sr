@@ -6,6 +6,8 @@ import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError, ValidationError } from "@/lib/errors";
 import { sendCommentNotificationEmail } from "@/lib/email";
 import { RouteContext } from "@/lib/api-helpers";
+import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
+import { srDetailKey, MY_REQUESTS_PREFIX } from "@/lib/cache-keys";
 
 const commentSchema = z.object({
   content: z.string().min(1, "댓글 내용을 입력해주세요."),
@@ -107,6 +109,14 @@ export const POST = withAuthAndRateLimit(async (
       description: "댓글이 추가되었습니다.",
     },
   });
+
+  // Invalidate caches: detail and my-requests (댓글 카운트 등 반영)
+  try {
+    await invalidateCache(srDetailKey(id));
+    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+  } catch (e) {
+    console.warn('Cache invalidation failed after comment create:', e);
+  }
 
   // Send email notifications to requester and assignee (non-blocking)
   if (process.env.RESEND_API_KEY) {

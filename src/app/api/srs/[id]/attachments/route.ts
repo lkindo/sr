@@ -17,6 +17,8 @@ export const POST = withAuthAndRateLimit(async (
   { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id: srId } = await params;
+  const { invalidateCache, invalidateCachePattern } = await import('@/lib/redis-cache')
+  const { srDetailKey, MY_REQUESTS_PREFIX } = await import('@/lib/cache-keys')
 
   // SR 존재 확인
   const sr = await prisma.sR.findUnique({
@@ -73,6 +75,14 @@ export const POST = withAuthAndRateLimit(async (
     });
 
     uploadedAttachments.push(attachment);
+  }
+
+  // Invalidate caches: detail and my-requests (첨부 카운트 등 반영)
+  try {
+    await invalidateCache(srDetailKey(srId));
+    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+  } catch (e) {
+    console.warn('Cache invalidation failed after attachments upload:', e);
   }
 
   return NextResponse.json(

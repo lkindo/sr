@@ -1,0 +1,77 @@
+﻿=== STACK DETECTION ===
+FOUND: package.json
+FOUND: pnpm-lock.yaml
+
+=== TOOL VERSIONS (if available) ===
+node -v
+v22.19.0
+
+
+pnpm -v
+10.14.0
+
+
+python --version
+Python 3.13.5
+
+
+pip --version
+pip 25.2 from C:\Users\sanle\AppData\Roaming\Python\Python313\site-packages\pip (python 3.13)
+
+
+
+java -version
+
+
+dotnet --info
+
+Host:
+  Version:      7.0.7
+  Architecture: x64
+  Commit:       5b20af47d9
+
+.NET SDKs installed:
+  No SDKs were found.
+
+.NET runtimes installed:
+  Microsoft.AspNetCore.App 7.0.7 [C:\Program Files\dotnet\shared\Microsoft.AspNetCore.App]
+  Microsoft.NETCore.App 6.0.30 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
+  Microsoft.NETCore.App 7.0.7 [C:\Program Files\dotnet\shared\Microsoft.NETCore.App]
+  Microsoft.WindowsDesktop.App 6.0.30 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
+  Microsoft.WindowsDesktop.App 7.0.7 [C:\Program Files\dotnet\shared\Microsoft.WindowsDesktop.App]
+
+Other architectures found:
+  None
+
+Environment variables:
+  Not set
+
+global.json file:
+  Not found
+
+Learn more:
+  https://aka.ms/dotnet/info
+
+Download .NET:
+  https://aka.ms/dotnet/download
+
+
+=== FILE EXTENSION COUNTS (top 15) ===
+.js: 223
+.ts: 179
+.json: 91
+.tsx: 87
+.md: 30
+.pack: 20
+.html: 7
+.txt: 5
+.sql: 4
+.meta: 4
+.css: 4
+.rsc: 4
+: 4
+.example: 2
+.old: 2
+
+=== TOTAL FILE COUNT ===
+685

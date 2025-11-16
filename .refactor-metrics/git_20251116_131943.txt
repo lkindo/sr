@@ -1,0 +1,2585 @@
+﻿=== GIT INFO ===
+dev
+## dev...origin/dev
+?? .refactor-metrics/
+?? collect-baseline.ps1
+--- LAST 10 COMMITS ---
+4139d3de8342dd91576b842f44446a557a5e4263 sr愿由ы봽濡쒖꽭??理쒖쟻??諛?沅뚰븳 蹂?湲곕뒫 ?뺤씤??460949fa9d8bd21514dc4c5b62f3c59d49965188 鍮뚮뱶?ㅻ쪟 ?닿껐寃?9f0d34670ec300ca35372ca9051476b8f0cd3e63 鍮뚮뱶?ㅻ쪟瑜?826e00df969d815047c9ded253786fc263180d6e 而ㅼ꽌 由щ퉴?⑸뵫
+31faafd39eb5061bc38bb13981359136a9cc3bd4 aa
+067e1f65bd535bc7e7f24f5ab9b89399b8626031 ?곗씠?곕쿋?댁뒪 ?곌껐? ?쒗븳 ?댁뒋 瑜??꾪븳 理쒖쟻??25050f57b7b9274c1cecccd6bd4e148e6ff80c53 ?대줈??由ы뙥?좊쭅
+c673bac4de36135e4b53fabc7d6bb6384d265de2 gemini 由ы뙥?좊쭅 蹂댁셿 2李?ed961451241610b2950c33254d326c436f361a03 gemini 由ы뙥?좊━ 蹂댁셿1李?804082f8ad785377060d6de109400c31dd66352e 由ы뙥?좊쭅2李?
+--- CHURN (30 days) ---
+commit 4139d3de8342dd91576b842f44446a557a5e4263
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 16 01:18:02 2025 +0900
+
+    sr愿由ы봽濡쒖꽭??理쒖쟻??諛?沅뚰븳 蹂?湲곕뒫 ?뺤씤??
+ src/actions/sr.actions.ts                     |  13 +-
+ src/app/(dashboard)/dashboard/page.tsx        | 480 ++++++++++++++++++++++----
+ src/app/(dashboard)/srs/[id]/intake/page.tsx  |   4 +-
+ src/app/(dashboard)/srs/[id]/page.tsx         |  21 +-
+ src/app/(dashboard)/srs/intake-queue/page.tsx | 349 -------------------
+ src/app/(dashboard)/srs/page.tsx              |  50 ++-
+ src/app/api/attachments/[id]/route.ts         |   3 +
+ src/app/api/dashboard/stats/route.ts          | 343 ++++++++++++++----
+ src/app/api/srs/[id]/intake/route.ts          | 103 ++++--
+ src/app/api/srs/[id]/route.ts                 |   7 +-
+ src/app/api/srs/intake-queue/route.ts         | 156 ---------
+ src/app/api/srs/route.ts                      |  11 +
+ src/components/layout/Header.tsx              |  45 ++-
+ src/components/layout/Sidebar.tsx             | 105 +++---
+ src/components/srs/CreateSRDialog.tsx         |  46 ++-
+ src/components/srs/DeleteSRDialog.tsx         |  21 +-
+ src/components/srs/EditSRDialog.tsx           | 361 ++++++++++---------
+ src/components/srs/SRsDataTable.tsx           | 252 +++++++-------
+ src/components/srs/intake/IntakeFormCard.tsx  |  26 +-
+ src/components/srs/intake/useIntakeForm.ts    |  34 +-
+ src/repositories/sr.repository.ts             |  23 ++
+ src/services/permission.service.ts            |  13 +-
+ src/services/sr.service.ts                    | 129 +++++--
+ 23 files changed, 1468 insertions(+), 1127 deletions(-)
+
+commit 460949fa9d8bd21514dc4c5b62f3c59d49965188
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 15 22:04:07 2025 +0900
+
+    鍮뚮뱶?ㅻ쪟 ?닿껐寃?
+ src/actions/sr.actions.ts                |  8 ++++++++
+ src/app/(dashboard)/srs/[id]/page.tsx    | 18 +++---------------
+ src/app/(dashboard)/srs/page.tsx         |  4 ++--
+ src/app/api/srs/[id]/intake/route.ts     |  8 ++------
+ src/app/api/srs/my-requests/route.ts     |  2 +-
+ src/components/srs/CreateSRDialog.tsx    |  2 +-
+ src/components/srs/EditSRDialog.tsx      | 12 +++++++-----
+ src/components/srs/SRsDataTable.tsx      |  4 ++--
+ src/components/users/UserDialog.tsx      | 17 +++++++++--------
+ src/lib/api-response.ts                  |  4 ++--
+ src/lib/auth-wrapper.ts                  |  1 +
+ src/lib/redis-cache.ts                   |  3 +--
+ src/lib/utils.ts                         |  2 +-
+ src/repositories/base.repository.impl.ts | 23 ++++++++---------------
+ src/services/client.service.ts           |  4 +++-
+ src/services/sr.service.ts               | 12 ++++++++++--
+ 16 files changed, 61 insertions(+), 63 deletions(-)
+
+commit 9f0d34670ec300ca35372ca9051476b8f0cd3e63
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 15 20:58:09 2025 +0900
+
+    鍮뚮뱶?ㅻ쪟瑜?
+ docs/ADD_INTAKE_UPDATED_ENUM.md                    |  1 +
+ docs/ANY_TYPE_REMOVAL_SUMMARY.md                   |  1 +
+ docs/API_ROUTE_TYPE_IMPROVEMENT.md                 |  1 +
+ docs/E2E_TEST_SCENARIOS.md                         |  1 +
+ docs/EMAIL_NOTIFICATION_PROCESS.md                 |  1 +
+ docs/MOBILE_UI_ANALYSIS.md                         |  1 +
+ docs/PERMISSION_DUPLICATION_HANDLING.md            |  1 +
+ docs/PHASE1_IMPROVEMENT_SUMMARY.md                 |  1 +
+ docs/PHASE2_IMPROVEMENT_SUMMARY.md                 |  1 +
+ docs/REFACTORING_EVALUATION.md                     |  1 +
+ docs/REFACTORING_EVALUATION_2025.md                |  1 +
+ docs/SR_INTAKE_UPDATE_STRATEGY.md                  |  1 +
+ docs/TEST_COVERAGE_REPORT.md                       |  1 +
+ docs/TEST_IMPROVEMENT_SUMMARY.md                   |  1 +
+ docs/UPSTASH_REDIS_SETUP.md                        |  1 +
+ e2e/06-sr-update.spec.ts                           |  1 +
+ e2e/07-sr-filter-search.spec.ts                    |  1 +
+ e2e/08-user-management.spec.ts                     |  1 +
+ e2e/09-client-management.spec.ts                   |  1 +
+ e2e/10-sr-intake-flow.spec.ts                      |  1 +
+ e2e/11-sr-comment-attachment.spec.ts               |  1 +
+ e2e/12-role-management.spec.ts                     |  1 +
+ e2e/13-sr-status-workflow.spec.ts                  |  1 +
+ e2e/14-dashboard-overview.spec.ts                  |  1 +
+ e2e/15-pagination-sorting.spec.ts                  |  1 +
+ e2e/16-user-profile-management.spec.ts             |  1 +
+ pnpm-lock.yaml                                     | 15 +++++++++++++++
+ src/__tests__/integration/sr-flow.test.ts          |  1 +
+ src/__tests__/performance/benchmark.test.ts        |  1 +
+ src/components/__tests__/Badge.test.tsx            |  1 +
+ src/components/__tests__/Button.test.tsx           |  1 +
+ src/components/__tests__/Input.test.tsx            |  1 +
+ src/components/srs/intake/IntakeFormCard.tsx       |  1 +
+ src/components/srs/intake/SRReviewCard.tsx         |  1 +
+ src/components/srs/intake/constants.ts             |  1 +
+ src/components/srs/intake/types.ts                 |  1 +
+ src/components/srs/intake/useIntakeForm.ts         |  1 +
+ src/lib/__tests__/api-helpers.test.ts              |  1 +
+ src/lib/action-helpers.ts                          |  1 +
+ src/lib/api-helpers.ts                             |  1 +
+ src/lib/form-data-parser.ts                        |  1 +
+ src/lib/logger.ts                                  |  1 +
+ src/repositories/__tests__/sr.repository.test.ts   |  1 +
+ src/repositories/__tests__/user.repository.test.ts |  1 +
+ src/types/session.ts                               |  1 +
+ 45 files changed, 59 insertions(+)
+
+commit 826e00df969d815047c9ded253786fc263180d6e
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 15 20:52:24 2025 +0900
+
+    而ㅼ꽌 由щ퉴?⑸뵫
+
+ docs/ADD_INTAKE_UPDATED_ENUM.md                    |  78 +++
+ docs/ANY_TYPE_REMOVAL_SUMMARY.md                   | 255 +++++++++
+ docs/API_ROUTE_TYPE_IMPROVEMENT.md                 | 235 ++++++++
+ docs/E2E_TEST_SCENARIOS.md                         | 166 ++++++
+ docs/EMAIL_NOTIFICATION_PROCESS.md                 | 251 ++++++++
+ docs/FAILED_TEST_ANALYSIS.md                       | 212 +++++++
+ docs/MOBILE_UI_ANALYSIS.md                         | 205 +++++++
+ docs/PERMISSION_DUPLICATION_HANDLING.md            | 202 +++++++
+ docs/PHASE1_IMPROVEMENT_SUMMARY.md                 | 188 ++++++
+ docs/PHASE2_IMPROVEMENT_SUMMARY.md                 | 257 +++++++++
+ docs/REFACTORING_EVALUATION.md                     | 549 ++++++++++++++++++
+ docs/REFACTORING_EVALUATION_2025.md                | 620 ++++++++++++++++++++
+ docs/SR_INTAKE_UPDATE_STRATEGY.md                  | 260 +++++++++
+ docs/TEST_COVERAGE_REPORT.md                       | 130 +++++
+ docs/TEST_IMPROVEMENT_SUMMARY.md                   | 178 ++++++
+ docs/UPSTASH_REDIS_SETUP.md                        | 209 +++++++
+ e2e/06-sr-update.spec.ts                           |  56 ++
+ e2e/07-sr-filter-search.spec.ts                    |  82 +++
+ e2e/08-user-management.spec.ts                     |  54 ++
+ e2e/09-client-management.spec.ts                   |  54 ++
+ e2e/10-sr-intake-flow.spec.ts                      |  87 +++
+ e2e/11-sr-comment-attachment.spec.ts               | 114 ++++
+ e2e/12-role-management.spec.ts                     |  69 +++
+ e2e/13-sr-status-workflow.spec.ts                  |  81 +++
+ e2e/14-dashboard-overview.spec.ts                  |  57 ++
+ e2e/15-pagination-sorting.spec.ts                  |  82 +++
+ e2e/16-user-profile-management.spec.ts             |  64 +++
+ env                                                |  24 +-
+ package.json                                       |   1 +
+ .../migrations/add_intake_updated_enum_value.sql   |  17 +
+ prisma/schema.prisma                               | 131 ++---
+ src/__tests__/integration/sr-flow.test.ts          |  58 ++
+ src/__tests__/performance/benchmark.test.ts        | 124 ++++
+ src/actions/__tests__/sr.actions.test.ts           | 179 ++++++
+ src/actions/client.actions.ts                      | 100 ++--
+ src/actions/permission.actions.ts                  |  12 +-
+ src/actions/role.actions.ts                        |  81 ++-
+ src/actions/service-category.actions.ts            |   5 +-
+ src/actions/sr.actions.ts                          | 174 +++---
+ src/actions/user.actions.ts                        |  57 +-
+ src/app/(dashboard)/MainContent.tsx                |   2 +-
+ src/app/(dashboard)/clients/page.tsx               |  42 +-
+ src/app/(dashboard)/layout.tsx                     |   3 +-
+ src/app/(dashboard)/roles/page.tsx                 |  40 +-
+ src/app/(dashboard)/settings/profile/page.tsx      |  10 +-
+ src/app/(dashboard)/settings/system/page.tsx       |   5 +-
+ src/app/(dashboard)/srs/[id]/intake/page.tsx       | 628 +--------------------
+ src/app/(dashboard)/srs/[id]/page.tsx              |  79 ++-
+ src/app/(dashboard)/srs/page.tsx                   |  25 +-
+ src/app/(dashboard)/users/page.tsx                 | 198 ++++---
+ src/app/api/attachments/[id]/route.ts              |  13 +-
+ src/app/api/clients/[id]/categories/route.ts       |  13 +-
+ src/app/api/clients/[id]/route.ts                  | 207 +------
+ src/app/api/dashboard/stats/route.ts               |  62 +-
+ src/app/api/profile/route.ts                       |   3 +-
+ src/app/api/roles/[id]/permissions/route.ts        |  11 +-
+ src/app/api/roles/[id]/route.ts                    | 114 +---
+ src/app/api/srs/[id]/activities/route.ts           |  11 +-
+ src/app/api/srs/[id]/attachments/route.ts          |   7 +-
+ src/app/api/srs/[id]/comments/route.ts             |  13 +-
+ src/app/api/srs/[id]/intake/route.ts               | 332 +++++++++--
+ src/app/api/srs/[id]/route.ts                      | 207 +------
+ src/app/api/srs/intake-queue/route.ts              |   3 +-
+ src/app/api/srs/my-requests/route.ts               |   7 +-
+ src/app/api/srs/route.ts                           |  53 +-
+ src/app/api/users/[id]/roles/route.ts              |  11 +-
+ src/app/api/users/[id]/route.ts                    |  29 +-
+ src/app/globals.css                                |   3 +-
+ src/auth.ts                                        |  80 ++-
+ src/components/__tests__/Badge.test.tsx            |  28 +
+ src/components/__tests__/Button.test.tsx           |  46 ++
+ src/components/__tests__/Input.test.tsx            |  46 ++
+ src/components/layout/Footer.tsx                   |   6 +-
+ src/components/layout/Header.tsx                   |   3 +-
+ src/components/layout/Sidebar.tsx                  |   4 +-
+ src/components/profile/ProfileDialog.tsx           |  10 +-
+ src/components/srs/CreateSRDialog.tsx              |  80 ++-
+ src/components/srs/EditSRDialog.tsx                | 241 ++++++--
+ src/components/srs/SRsDataTable.tsx                | 411 +++++++++++---
+ src/components/srs/intake/IntakeFormCard.tsx       | 304 ++++++++++
+ src/components/srs/intake/SRReviewCard.tsx         | 140 +++++
+ src/components/srs/intake/constants.ts             |  18 +
+ src/components/srs/intake/types.ts                 |  48 ++
+ src/components/srs/intake/useIntakeForm.ts         | 240 ++++++++
+ src/components/users/UserDialog.tsx                |   9 +-
+ src/lib/__tests__/action-helpers.test.ts           | 137 +++++
+ src/lib/__tests__/api-helpers.test.ts              |  46 ++
+ src/lib/__tests__/errors.test.ts                   |  70 +++
+ src/lib/__tests__/form-data-parser.test.ts         | 120 ++++
+ src/lib/__tests__/result.test.ts                   |  58 ++
+ src/lib/action-helpers.ts                          |  80 +++
+ src/lib/api-error-handler.ts                       |  20 +-
+ src/lib/api-helpers.ts                             |  35 ++
+ src/lib/api-response.ts                            |  10 +-
+ src/lib/auth-wrapper.ts                            |  29 +-
+ src/lib/cache.ts                                   |   5 +-
+ src/lib/form-data-parser.ts                        | 111 ++++
+ src/lib/logger.ts                                  | 194 +++++++
+ src/lib/redis-cache.ts                             | 260 +++++++++
+ src/lib/schemas.ts                                 |  19 +
+ src/lib/utils.ts                                   |  16 +-
+ src/repositories/__tests__/sr.repository.test.ts   |  87 +++
+ src/repositories/__tests__/user.repository.test.ts |  86 +++
+ src/repositories/base.repository.impl.ts           |  21 +-
+ src/repositories/role.repository.ts                |  26 +-
+ src/repositories/sr.repository.ts                  |   6 +
+ src/repositories/user.repository.ts                |   2 +-
+ src/services/__tests__/client.service.test.ts      | 443 ++++-----------
+ src/services/__tests__/permission.service.test.ts  | 225 ++++++++
+ src/services/__tests__/sr.service.test.ts          | 111 +++-
+ src/services/__tests__/user.service.test.ts        |   8 +-
+ src/services/client.service.ts                     |  49 +-
+ src/services/permission.service.ts                 |  72 ++-
+ src/services/role.service.ts                       |  41 +-
+ src/services/service-category.service.ts           |   8 +-
+ src/services/sr.service.ts                         | 196 ++++++-
+ src/services/user.service.ts                       |  53 +-
+ src/types/session.ts                               |  35 ++
+ supabase-init.sql                                  |   2 +-
+ test-complete.txt                                  | 129 +++++
+ test-final.txt                                     |  90 +++
+ test-results.json                                  |  13 +
+ test-results.txt                                   | 214 +++++++
+ test-summary.txt                                   | 100 ++++
+ 124 files changed, 10550 insertions(+), 2280 deletions(-)
+
+commit 31faafd39eb5061bc38bb13981359136a9cc3bd4
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 15 00:02:46 2025 +0900
+
+    aa
+
+ src/app/(dashboard)/my-requests/page.tsx     |   4 +-
+ src/app/(dashboard)/srs/[id]/page.tsx        | 259 ++++++++++++++++++++++++---
+ src/app/api/srs/my-requests/route.ts         |   2 +-
+ src/components/srs/SRsDataTable.tsx          | 103 +++++++++--
+ src/components/ui/table.tsx                  |   4 +-
+ src/repositories/sr-attachment.repository.ts | 103 +++++++++++
+ src/repositories/sr-comment.repository.ts    |  12 ++
+ src/services/sr.service.ts                   |  31 +++-
+ 8 files changed, 474 insertions(+), 44 deletions(-)
+
+commit 067e1f65bd535bc7e7f24f5ab9b89399b8626031
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 14 17:22:59 2025 +0900
+
+    ?곗씠?곕쿋?댁뒪 ?곌껐? ?쒗븳 ?댁뒋 瑜??꾪븳 理쒖쟻??
+ src/app/(dashboard)/srs/page.tsx       |  23 ++++---
+ src/app/api/auth/register/route.ts     |  87 ++++++++++++++++++++++++
+ src/app/api/srs/[id]/comments/route.ts |   5 +-
+ src/app/api/srs/[id]/intake/route.ts   |  46 ++++++-------
+ src/app/api/srs/[id]/route.ts          |  89 ++++++++++++++++++++++--
+ src/app/api/srs/my-requests/route.ts   |  82 ++++++++++++++++++-----
+ src/auth.ts                            |  36 +++-------
+ src/lib/cache.ts                       | 119 +++++++++++++++++++++++++++++++++
+ src/lib/prisma.ts                      |   6 ++
+ 9 files changed, 409 insertions(+), 84 deletions(-)
+
+commit 25050f57b7b9274c1cecccd6bd4e148e6ff80c53
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 14 15:44:06 2025 +0900
+
+    ?대줈??由ы뙥?좊쭅
+
+ .claude/settings.local.json                   |   6 +-
+ .env.example                                  |  17 +
+ package.json                                  |   4 +-
+ pnpm-lock.yaml                                | 135 +++++++
+ src/__tests__/mocks/next-server.ts            |   2 +-
+ src/__tests__/mocks/prisma.ts                 |  15 +
+ src/actions/client.actions.ts                 |  25 +-
+ src/actions/permission.actions.ts             |  12 +-
+ src/actions/role.actions.ts                   |  54 +--
+ src/actions/service-category.actions.ts       |   9 +-
+ src/actions/sr.actions.ts                     | 156 +++-----
+ src/actions/user.actions.ts                   | 211 ++---------
+ src/app/(dashboard)/roles/page.tsx            |   9 +-
+ src/app/api/attachments/[id]/route.ts         | 188 ++++------
+ src/app/api/attachments/route.ts              | 131 +++----
+ src/app/api/clients/[id]/categories/route.ts  | 193 +++++-----
+ src/app/api/clients/[id]/route.ts             | 184 +++++----
+ src/app/api/clients/route.ts                  | 167 +--------
+ src/app/api/dashboard/stats/route.ts          |  61 ++-
+ src/app/api/permissions/route.ts              |  32 +-
+ src/app/api/profile/password/route.ts         | 105 +++---
+ src/app/api/profile/route.ts                  | 178 ++++-----
+ src/app/api/roles/[id]/permissions/route.ts   | 104 +++---
+ src/app/api/roles/[id]/route.ts               | 248 +++++-------
+ src/app/api/roles/route.ts                    | 108 +-----
+ src/app/api/service-categories/route.ts       |  36 +-
+ src/app/api/settings/system/route.ts          | 109 ++----
+ src/app/api/srs/[id]/activities/route.ts      |  56 ++-
+ src/app/api/srs/[id]/attachments/route.ts     | 184 ++++-----
+ src/app/api/srs/[id]/comments/route.ts        | 241 ++++++------
+ src/app/api/srs/[id]/intake/route.ts          | 518 +++++++++++---------------
+ src/app/api/srs/[id]/route.ts                 | 163 ++++----
+ src/app/api/srs/intake-queue/route.ts         |  40 +-
+ src/app/api/srs/route.ts                      | 199 +++-------
+ src/app/api/users/[id]/roles/route.ts         | 114 +++---
+ src/app/api/users/[id]/route.ts               | 263 +++----------
+ src/app/api/users/route.ts                    | 220 ++---------
+ src/components/profile/ProfileDialog.tsx      |   2 +-
+ src/components/srs/CreateSRDialog.tsx         |   2 +-
+ src/components/srs/EditSRDialog.tsx           |   2 +-
+ src/lib/__tests__/api-rate-limit.test.ts      | 242 ++++++++++++
+ src/lib/__tests__/rate-limiter.test.ts        | 204 ++++++++++
+ src/lib/api-error-handler.ts                  |  53 +++
+ src/lib/api-rate-limit.ts                     | 208 +++++++++++
+ src/lib/auth-wrapper.ts                       | 115 ++++++
+ src/lib/errors.ts                             | 138 +++++++
+ src/lib/rate-limiter.ts                       | 242 ++++++++++++
+ src/lib/result.ts                             |  21 ++
+ src/repositories/client.repository.ts         |  17 +
+ src/repositories/role.repository.ts           |  34 ++
+ src/repositories/sr-activity.repository.ts    |   2 +-
+ src/repositories/user.repository.ts           |  91 +++++
+ src/services/__tests__/client.service.test.ts | 392 +++++++++++++++++++
+ src/services/__tests__/role.service.test.ts   | 257 +++++++++++++
+ src/services/__tests__/sr.service.test.ts     | 238 ++++++++++++
+ src/services/__tests__/user.service.test.ts   | 262 +++++++++++++
+ src/services/client.service.ts                |  44 ++-
+ src/services/role.service.ts                  |  45 ++-
+ src/services/sr.service.ts                    |  23 +-
+ src/services/user.service.ts                  |  36 +-
+ 60 files changed, 4340 insertions(+), 2827 deletions(-)
+
+commit c673bac4de36135e4b53fabc7d6bb6384d265de2
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 14 11:31:45 2025 +0900
+
+    gemini 由ы뙥?좊쭅 蹂댁셿 2李?
+ src/actions/client.actions.ts                   |  41 +++----
+ src/actions/permission.actions.ts               |  21 ++++
+ src/actions/role.actions.ts                     | 121 ++++++++++++++++++++
+ src/actions/service-category.actions.ts         |  14 +++
+ src/actions/sr.actions.ts                       |  49 ++------
+ src/actions/user.actions.ts                     | 145 ++++++++++++++++++++++--
+ src/components/clients/ClientDialog.tsx         |  46 ++++----
+ src/components/clients/DeleteClientDialog.tsx   |  11 +-
+ src/components/layout/Sidebar.tsx               |   6 +-
+ src/components/profile/ProfileDialog.tsx        |  54 ++++-----
+ src/components/roles/DeleteRoleDialog.tsx       |  11 +-
+ src/components/roles/PermissionDialog.tsx       |  30 +++--
+ src/components/roles/RoleDialog.tsx             |  32 +++---
+ src/components/srs/CreateSRDialog.tsx           | 127 ++++++---------------
+ src/components/srs/EditSRDialog.tsx             | 108 ++++++------------
+ src/lib/schemas.ts                              |  66 +++++++++++
+ src/repositories/base.repository.impl.ts        |  37 ++++++
+ src/repositories/client.repository.ts           |  48 +++-----
+ src/repositories/permission.repository.ts       |  38 ++-----
+ src/repositories/role.repository.ts             |  30 ++---
+ src/repositories/service-category.repository.ts |  36 ++----
+ src/repositories/sr-activity.repository.ts      |  38 ++-----
+ src/repositories/sr-comment.repository.ts       |  38 ++-----
+ src/repositories/sr.repository.ts               |  35 +++---
+ src/repositories/user.repository.ts             |  88 +++++++++-----
+ src/services/client.service.ts                  |  24 +---
+ src/services/permission.service.ts              | 108 +++++++++++++-----
+ src/services/role.service.ts                    |  60 ++++++++++
+ src/services/service-category.service.ts        |  13 +++
+ src/services/sr.service.ts                      |  51 +--------
+ src/services/user.service.ts                    |  31 +++--
+ 31 files changed, 899 insertions(+), 658 deletions(-)
+
+commit ed961451241610b2950c33254d326c436f361a03
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 14 10:12:21 2025 +0900
+
+    gemini 由ы뙥?좊━ 蹂댁셿1李?
+ .genkit/traces_idx/genkit.metadata     |   2 +-
+ next.config.ts                         |   6 +
+ src/actions/sr.actions.ts              |  31 +-
+ src/app/(auth)/register/actions.ts.bak |  64 ---
+ src/app/(dashboard)/srs/[id]/page.tsx  | 521 +++-------------------
+ src/app/(dashboard)/srs/loading.tsx    |  17 +
+ src/app/(dashboard)/srs/page.tsx       | 762 ++++-----------------------------
+ src/auth.ts                            |  52 +--
+ src/components/srs/SRsDataTable.tsx    | 248 +++++++++++
+ src/hooks/useSR.ts                     | 236 ----------
+ src/hooks/useSR.ts.bak                 |  66 ---
+ src/repositories/sr.repository.ts      |   4 +
+ src/services/sr.service.ts             | 268 ++----------
+ src/services/sr.service.ts.bak         | 535 -----------------------
+ src/services/user.service.ts           |   4 +
+ 15 files changed, 515 insertions(+), 2301 deletions(-)
+
+commit 804082f8ad785377060d6de109400c31dd66352e
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 14 09:05:05 2025 +0900
+
+    由ы뙥?좊쭅2李?
+ src/actions/client.actions.ts                   | 200 ++++++
+ src/actions/sr.actions.ts                       | 244 +++++++
+ src/actions/user.actions.ts                     | 134 ++++
+ src/app/(auth)/register/actions.ts              |  22 +-
+ src/app/(auth)/register/actions.ts.bak          |  64 ++
+ src/app/(dashboard)/srs/page.tsx                | 295 +++------
+ src/app/api/srs/[id]/route.ts                   |  18 +-
+ src/hooks/useSR.ts                              | 180 +++++-
+ src/hooks/useSR.ts.bak                          |  66 ++
+ src/repositories/base.repository.ts             |   7 +
+ src/repositories/client.repository.ts           | 106 ++++
+ src/repositories/permission.repository.ts       |  83 +++
+ src/repositories/role.repository.ts             |  77 +++
+ src/repositories/service-category.repository.ts |  83 +++
+ src/repositories/sr-activity.repository.ts      | 102 +++
+ src/repositories/sr-comment.repository.ts       | 117 ++++
+ src/repositories/sr.repository.ts               | 174 +++++
+ src/repositories/user.repository.ts             | 137 ++++
+ src/services/client.service.ts                  | 126 ++++
+ src/services/permission.service.ts              |  80 +++
+ src/services/sr.service.ts                      | 803 +++++++++++-------------
+ src/services/sr.service.ts.bak                  | 535 ++++++++++++++++
+ src/services/user.service.ts                    |  88 +++
+ 23 files changed, 3060 insertions(+), 681 deletions(-)
+
+commit 9c5a53f2b7cc62394a6363c447d5519af6fcb1ed
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 14:12:33 2025 +0900
+
+    由ы뙥?좊쭅 1李?
+ .gitignore                                         |    1 +
+ SR_CREATE_FIX.md                                   |  322 --
+ SR_FORM_ENHANCEMENT.md                             |  386 --
+ SYSTEMATIC_DIAGNOSIS.md                            |  420 --
+ add-runtime-to-apis.ps1                            |   83 -
+ docs/backup_20251107/DB.md                         | 1469 ------
+ docs/backup_20251107/LLD.md                        | 3314 --------------
+ docs/backup_20251107/SR_Management_System_PRD.md   | 2008 --------
+ docs/backup_20251107/TRD.md                        | 4772 -------------------
+ docs/backup_20251107/TRD_before_optimization.md    | 4786 --------------------
+ html/css/common.css                                |  137 -
+ html/css/content.css                               |   67 -
+ html/mo_d_01.html                                  |  126 -
+ html/mo_s_01.html                                  |  149 -
+ package.json                                       |    1 +
+ pnpm-lock.yaml                                     |   18 +
+ restart-dev-server.ps1                             |   24 -
+ .../{layout-wrapper.tsx => MainContent.tsx}        |   12 +-
+ src/app/(dashboard)/layout.tsx                     |   12 +-
+ src/app/(dashboard)/settings/system/page.tsx       |   90 +-
+ src/app/(dashboard)/srs/[id]/page.tsx              |  112 +-
+ src/app/(dashboard)/srs/page.tsx                   |  153 +-
+ src/app/api/profile/route.ts                       |   14 +-
+ src/app/api/settings/system/route.ts               |   77 +
+ src/app/api/srs/[id]/route.ts                      |  443 +-
+ src/app/api/srs/route.ts                           |  162 +-
+ src/app/layout.tsx                                 |    8 +-
+ src/components/providers/ClientLayout.tsx          |   24 +
+ src/hooks/useSR.ts                                 |   66 +
+ src/lib/utils.ts                                   |   63 +-
+ src/services/sr.service.ts                         |  535 +++
+ src/types/settings.ts                              |   13 +
+ 32 files changed, 1038 insertions(+), 18829 deletions(-)
+
+commit 7f525055ca20fca2639247655c99ab2017fe4282
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 10:26:29 2025 +0900
+
+    鍮뚮뱶寃쎄퀬 ?닿껐
+
+ next.config.ts                                | 11 -----
+ src/app/(dashboard)/clients/[id]/page.tsx     | 56 ++++++++++++-------------
+ src/app/(dashboard)/clients/page.tsx          |  9 ++--
+ src/app/(dashboard)/dashboard/page.tsx        | 15 +++----
+ src/app/(dashboard)/my-requests/page.tsx      |  9 ++--
+ src/app/(dashboard)/roles/page.tsx            |  9 ++--
+ src/app/(dashboard)/settings/profile/page.tsx |  8 ++--
+ src/app/(dashboard)/srs/[id]/page.tsx         | 56 ++++++++++++-------------
+ src/app/(dashboard)/srs/intake-queue/page.tsx |  8 ++--
+ src/app/(dashboard)/srs/page.tsx              |  9 ++--
+ src/app/(dashboard)/users/[id]/page.tsx       |  8 ++--
+ src/app/(dashboard)/users/page.tsx            | 56 +++++++++++++------------
+ src/components/profile/ProfileDialog.tsx      |  8 ++--
+ src/components/roles/PermissionDialog.tsx     | 34 +++++++--------
+ src/components/srs/CreateSRDialog.tsx         | 24 +++++------
+ src/components/srs/EditSRDialog.tsx           | 60 +++++++++++++--------------
+ src/components/srs/SRActivities.tsx           |  8 ++--
+ src/components/srs/SRAttachments.tsx          |  8 ++--
+ src/components/srs/SRComments.tsx             |  8 ++--
+ src/components/ui/file-upload.tsx             | 44 ++++++++++----------
+ src/components/users/AssignRolesDialog.tsx    | 24 +++++------
+ src/components/users/UserDialog.tsx           | 18 ++++----
+ 22 files changed, 243 insertions(+), 247 deletions(-)
+
+commit e6ab8a1f8ca45edd81a06f645776ff981cbc87c3
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 09:31:54 2025 +0900
+
+    硫붾돱遺꾨━
+
+ .gitignore | 1 +
+ 1 file changed, 1 insertion(+)
+
+commit 601a680484723389e1c9366b9e7e2ff8a53aa3bb
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 09:29:43 2025 +0900
+
+    style: Footer ??묎텒 臾멸뎄 ?ㅻⅨ履??뺣젹
+    
+    - justify-center瑜?justify-end濡?蹂寃?    - md:text-right 異붽??섏뿬 ?곗뒪?ы넲?먯꽌 ?ㅻⅨ履??뺣젹
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/components/layout/Footer.tsx | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit 5dd00e7b0ab1eb29d141ed99eb6b8eb63a18c3d2
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 09:28:40 2025 +0900
+
+    style: Footer ??묎텒 臾멸뎄 媛?대뜲 ?뺣젹
+    
+    - justify-between??justify-center濡?蹂寃?    - md:text-left ?쒓굅?섏뿬 紐⑤뱺 ?붾㈃ ?ш린?먯꽌 媛?대뜲 ?뺣젹
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/components/layout/Footer.tsx | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+commit 987552349921b6e12f9b15dc07db82965c621ea2
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 09:16:47 2025 +0900
+
+    feat: ?낅젰/?섏젙/?곸꽭 ?섏씠吏 ?붿옄???쒖뒪???곸슜
+    
+    - SR ?곸꽭 ?섏씠吏 HTML ?쒗뵆由??ㅽ????곸슜:
+      * Card 而댄룷?뚰듃瑜?.sr-card-template div濡?蹂寃?      * ?쇨????ㅻ뜑 ?ㅽ???(px-6 py-5, border-b)
+      * ?섏씠吏 ?쒕ぉ text-[hsl(var(--sr-primary-dark))] ?곸슜
+      * 踰꾪듉 .sr-btn-template ?대옒???곸슜
+    
+    - SR ?묒닔/?섏젙 ???섏씠吏 ?ㅽ???媛쒖꽑:
+      * 2?④퀎 移대뱶 ?덉씠?꾩썐 ?쒗뵆由??곸슜
+      * ?④퀎蹂??ㅻ뜑 (1, 2 踰덊샇 諛곗?) ?붿옄???듭씪
+      * Input ?꾨뱶 .sr-input-template ?곸슜
+      * ?쒖텧/痍⑥냼 踰꾪듉 ?쒗뵆由??대옒???곸슜
+    
+    - 怨좉컼???곸꽭 ?섏씠吏 ?붿옄??媛쒖꽑:
+      * 湲곕낯 ?뺣낫 諛??듦퀎 移대뱶 ?쒗뵆由??곸슜
+      * ??而⑦뀗痢???紐⑤뱺 移대뱶 ?ㅽ????듭씪
+      * ?쒕퉬??移댄뀒怨좊━, ?ъ슜?? SR 紐⑸줉 移대뱶 媛쒖꽑
+    
+    - 紐⑸줉 ?섏씠吏? ?쇨????붿옄???몄뼱 援ы쁽:
+      * 紐⑤뱺 ?섏씠吏???숈씪???ㅻ뜑 ?⑦꽩
+      * 移대뱶 ?ㅻ뜑/?댁슜 ?덉씠?꾩썐 ?듭씪
+      * ?됱긽 諛?媛꾧꺽 ?쇨????좎?
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/clients/[id]/page.tsx    | 117 ++++++++++++++-------------
+ src/app/(dashboard)/srs/[id]/intake/page.tsx |  83 ++++++++++---------
+ src/app/(dashboard)/srs/[id]/page.tsx        |  60 +++++++-------
+ 3 files changed, 135 insertions(+), 125 deletions(-)
+
+commit 5048e9574f383442da463ebf8367cceb21c3b7c7
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 09:06:02 2025 +0900
+
+    fix: NEXTAUTH_SECRET ?앹꽦 媛?대뱶 異붽?
+    
+    - .env.example??NEXTAUTH_SECRET ?앹꽦 諛⑸쾿 異붽?
+    - openssl ?먮뒗 Node.js瑜??ъ슜???덉쟾???쒕뜡 臾몄옄???앹꽦 媛?대뱶
+    - NextAuth ClientFetchError 諛⑹?瑜??꾪븳 ?꾩닔 ?ㅼ젙
+    
+    臾몄젣 ?닿껐:
+    - ClientFetchError: Unexpected token '<' ?ㅻ쪟 ?섏젙
+    - ?쏀븳 ?쒗겕由???"sr management")瑜??덉쟾???쒕뜡 臾몄옄?대줈 ?泥?    - 媛쒕컻 ?섍꼍?먯꽌 NextAuth ?몄쬆 ?뺤긽 ?묐룞 ?뺤씤
+    
+    蹂댁븞 媛쒖꽑:
+    - 32諛붿씠??base64 ?몄퐫?⑸맂 ?쒕뜡 臾몄옄???ъ슜
+    - .env ?뚯씪? .gitignore???ы븿?섏뼱 ?덉뼱 ?덉쟾
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .env.example | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+commit be1bcf21f14e846e94a9d2c9e3af45fbeaffe621
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 09:01:29 2025 +0900
+
+    fix: SR 紐⑸줉 鍮좊Ⅸ ?꾪꽣 ?좉? 湲곕뒫 ?섏젙
+    
+    - ?묒닔 ?湲??꾪꽣 ?좉? 湲곕뒫 異붽? (?대┃ ???좏깮/?댁젣)
+    - ???대떦 ?꾪꽣 ?좉? 湲곕뒫 異붽? (?대┃ ???좏깮/?댁젣)
+    - 湲닿툒 ?꾪꽣??湲곗〈怨??숈씪?섍쾶 ?좉? 湲곕뒫 ?좎?
+    - 紐⑤뱺 鍮좊Ⅸ ?꾪꽣 踰꾪듉???쇨??섍쾶 ?좉? 諛⑹떇?쇰줈 ?숈옉
+    
+    ?섏젙 ?? ?묒닔 ?湲? ???대떦 踰꾪듉? ??踰??대┃?섎㈃ ?댁젣 遺덇???    ?섏젙 ?? 紐⑤뱺 鍮좊Ⅸ ?꾪꽣 踰꾪듉???대┃ ???좉??섏뼱 UX 媛쒖꽑
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/srs/page.tsx | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+commit b598900e844382441fcbcebeb6f0329bd8b2f49c
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 08:51:49 2025 +0900
+
+    feat: 怨좉컼???ъ슜??沅뚰븳 愿由??섏씠吏 HTML ?쒗뵆由??붿옄???곸슜
+    
+    - 怨좉컼??愿由? ?ъ슜??愿由? 沅뚰븳 愿由??섏씠吏???숈씪???붿옄???쒖뒪???곸슜
+    - Card 而댄룷?뚰듃 ?쒓굅?섍퀬 sr-card-template ?대옒?ㅻ줈 吏곸젒 援ъ꽦
+    - ?섏씠吏 ?ㅻ뜑 ?ㅽ????듭씪 (h2 ?쒓렇, sr-primary-dark ?됱긽)
+    - Total items 移댁슫???쒖떆 媛쒖꽑
+    - ?뚯씠釉붿뿉 sr-table-template ?대옒???곸슜
+    - 紐⑤뱺 踰꾪듉??sr-btn-template, sr-btn-template-primary ?대옒???곸슜
+    - ?ъ슜??愿由??섏씠吏 寃???꾪꽣 ?곸뿭??sr-input-template, sr-dropdown-template ?곸슜
+    - ?뚯씠釉??됱뿉 hover ?④낵 異붽? (hover:bg-muted/50)
+    - HTML ?쒗뵆由?湲곕컲 ?쇨????붿옄???몄뼱 ?꾩껜 ?곸슜 ?꾨즺
+    
+    愿由??섏씠吏 3醫??붿옄??理쒖쟻??
+    - 怨좉컼??愿由? 肄붾뱶, 怨좉컼?щ챸, ?곗뾽, ?대떦?? ?대찓?? ?ъ슜?? SR, ?곹깭
+    - ?ъ슜??愿由? ?대쫫, ?대찓?? ?좏삎, ??븷, ?곹깭, 媛?낆씪, ?묒뾽
+    - 沅뚰븳 愿由? ??븷 ?대쫫, ?ㅻ챸, 沅뚰븳 ?? ?ъ슜???? ?묒뾽
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/clients/page.tsx |  39 ++++++----
+ src/app/(dashboard)/roles/page.tsx   |  40 ++++++----
+ src/app/(dashboard)/users/page.tsx   | 147 ++++++++++++++++++-----------------
+ 3 files changed, 124 insertions(+), 102 deletions(-)
+
+commit 8852d8356bfea753314915977e5ae79f0cdb9979
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 08:44:39 2025 +0900
+
+    feat: HTML ?쒗뵆由?湲곕컲 SR 紐⑸줉 ?섏씠吏 ?붿옄??理쒖쟻??    
+    - mo_s_01.html ?뚯씠釉??붿옄?몄쓣 SR 紐⑸줉 ?섏씠吏???곸슜
+    - Card 而댄룷?뚰듃 ???吏곸젒 而⑦뀗痢??곸뿭 援ъ꽦?쇰줈 蹂寃?    - 寃???곸뿭怨?Total 移댁슫???쒖떆 ?ㅽ???媛쒖꽑
+    - ?섏씠吏????ぉ ???좏깮 ?쒕∼?ㅼ슫 異붽? (10, 20, 30, 50, 100)
+    - ?뚯씠釉붿뿉 .sr-table-template ?대옒???곸슜
+    - 鍮좊Ⅸ ?꾪꽣 踰꾪듉 ?덉씠?꾩썐 媛쒖꽑 (怨좉툒 ?꾪꽣, ?꾪꽣 珥덇린??踰꾪듉 ?곗륫 諛곗튂)
+    - 怨좉툒 ?꾪꽣 ?곸뿭 ?붿옄??理쒖쟻??(sr-bg-light 諛곌꼍, 洹몃━???덉씠?꾩썐)
+    - 紐⑤뱺 ?낅젰 ?붿냼??sr-input-template, sr-dropdown-template ?대옒???곸슜
+    - 踰꾪듉??sr-btn-template, sr-btn-template-primary ?대옒???곸슜
+    - 由ъ뒪???섎떒???섏씠吏?ㅼ씠?섍낵 ??ぉ ???좏깮???④퍡 諛곗튂
+    - HTML ?쒗뵆由우쓽 ?꾨줈?섏뀛?먰븳 ?붿옄???⑦꽩 ?꾩쟾 ?곸슜
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json      |   3 +-
+ src/app/(dashboard)/srs/page.tsx | 470 ++++++++++++++++++++++-----------------
+ 2 files changed, 264 insertions(+), 209 deletions(-)
+
+commit c20ea4a13b18798ce462444ebd06f8120e20b6f3
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 13 08:35:38 2025 +0900
+
+    feat: HTML ?쒗뵆由?湲곕컲 ?붿옄???쒖뒪???곸슜
+    
+    HTML ?대뜑???붿옄???쒗뵆由우쓣 李몄“?섏뿬 LNB(Sidebar) 諛?Header ?ㅽ???理쒖쟻??    
+    ## 二쇱슂 蹂寃쎌궗??    
+    ### ?붿옄???쒖뒪???됱긽 ?곸슜
+    - 硫붿씤 ?됱긽: #2a3053 (Sidebar 諛곌꼍)
+    - ?쒕툕硫붾돱 ?됱긽: #212642 (Submenu 諛곌꼍)
+    - ?몃쾭 ?됱긽: #34395b
+    - 媛뺤“ ?됱긽: #ff5000 (Header ?섎떒 ?뚮몢由?
+    - 諛곌꼍 ?됱긽: #f5f6f9 (Content ?곸뿭)
+    
+    ### Sidebar (LNB) ?붿옄??    - ?대몢??諛곌꼍???곸슜 (#2a3053)
+    - 硫붾돱 ??댄? ?곸뿭 異붽? (?곷떒 援щ텇??
+    - ?쒕툕硫붾돱 諛곌꼍??蹂寃?(#212642)
+    - ?몃쾭 ?④낵 媛쒖꽑 (?됱긽 蹂寃?+ ?꾩씠肄?opacity)
+    - ?쒖꽦 硫붾돱 ?쒖떆 媛쒖꽑 (?곗깋 ??留덉빱)
+    - ?믪씠 議곗젙 (?ㅻ뜑 ?믪씠 蹂寃쎌뿉 留욎땄)
+    
+    ### Header ?붿옄??    - ?믪씠 利앷?: 56px ??104px
+    - 濡쒓퀬 ?곸뿭 Sidebar? ?듭씪 (?대몢??諛곌꼍)
+    - ?쒕툕??댄? 異붽? ("?쒕퉬???붿껌 愿由?)
+    - ?ㅻ젋吏???섎떒 ?뚮몢由??곸슜 (#ff5000)
+    - 硫붾돱 ?꾩씠???ㅽ???媛쒖꽑
+    - 理쒖냼 ?덈퉬 ?ㅼ젙 (1280px)
+    
+    ### CSS ?ㅽ????대옒??異붽?
+    - sr-sidebar-bg: Sidebar 諛곌꼍??    - sr-sidebar-item: 硫붾돱 ?꾩씠???ㅽ???    - sr-sidebar-submenu: ?쒕툕硫붾돱 諛곌꼍
+    - sr-sidebar-submenu-item: ?쒕툕硫붾돱 ?꾩씠??    - sr-header-accent: Header 媛뺤“ ?뚮몢由?    - sr-content-bg: Content 諛곌꼍??    - sr-card-template: ?쒗뵆由?移대뱶 ?ㅽ???    - sr-btn-template-*: 踰꾪듉 ?ㅽ???蹂??    - sr-badge-group/item: 諛곗? 洹몃９ ?ㅽ???    - sr-table-template: ?뚯씠釉??ㅽ???    - sr-progress-*: 吏꾪뻾諛??됱긽 ?대옒??    - sr-input/dropdown-template: ?낅젰 ?붿냼 ?ㅽ???    
+    ### Layout 議곗젙
+    - Content ?곸뿭 理쒕? ?덈퉬: 1280px
+    - Content 諛곌꼍: 諛앹? ?뚯깋 (#f5f6f9)
+    - Padding 利앷?: 24px ??32px
+    - ?꾩껜 ?믪씠 怨꾩궛 議곗젙 (104px ?ㅻ뜑 諛섏쁺)
+    
+    ### HTML ?쒗뵆由??뚯씪 異붽?
+    - html/mo_d_01.html: Dashboard ?쒗뵆由?    - html/mo_s_01.html: Search/List ?쒗뵆由?    - html/css/common.css: 怨듯넻 ?ㅽ???    - html/css/content.css: Content ?ㅽ???    
+    ## 李멸퀬
+    HTML ?쒗뵆由우쓽 LNB ?붿옄?몄쓣 ?꾩쟾??援ы쁽?섏뿬
+    ?쇨????덇퀬 ?꾨Ц?곸씤 UI/UX ?쒓났
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ html/css/common.css                    | 137 ++++++++++++++++++++++
+ html/css/content.css                   |  67 +++++++++++
+ html/mo_d_01.html                      | 126 ++++++++++++++++++++
+ html/mo_s_01.html                      | 149 ++++++++++++++++++++++++
+ src/app/(dashboard)/layout-wrapper.tsx |   8 +-
+ src/app/globals.css                    | 204 +++++++++++++++++++++++++++++++--
+ src/components/layout/Header.tsx       |  31 ++---
+ src/components/layout/Sidebar.tsx      |  75 ++++++------
+ 8 files changed, 737 insertions(+), 60 deletions(-)
+
+commit 79362736e011d8db633affac84149144ac4b783b
+Author: lkindo <lkindo@gmail.com>
+Date:   Wed Nov 12 23:34:57 2025 +0900
+
+    feat: ???붿껌 SR ?섏씠吏 ?붿옄??理쒖쟻??    
+    - 濡쒕뵫 ?곹깭??sr-loading 諛?sr-loading-spinner ?곸슜
+    - 鍮??곹깭??sr-empty-state ?붿옄???쒖뒪???곸슜
+    - ?섏씠吏 濡쒕뱶 ??sr-fade-in ?좊땲硫붿씠??異붽?
+    - ?꾩껜 ?붿옄???쒖뒪?쒓낵???쇨???媛뺥솕
+    
+    蹂寃??ы빆:
+    - Loading state: 媛꾨떒???띿뒪?????ㅽ뵾??+ 硫붿떆吏
+    - Empty state: Card 湲곕컲 ??sr-empty-state 援ъ“?붾맂 ?붿옄??    - Page animation: fade-in ?④낵 異붽?
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/my-requests/page.tsx | 32 +++++++++++++++++---------------
+ 1 file changed, 17 insertions(+), 15 deletions(-)
+
+commit fda624ffdec70a0bca701a7fa8eff68272d7bc56
+Author: lkindo <lkindo@gmail.com>
+Date:   Wed Nov 12 23:28:12 2025 +0900
+
+    feat: 異붽? ?붿옄??理쒖쟻??- UX 媛쒖꽑 諛??쇨???媛뺥솕
+    
+    ?렓 5媛吏 異붽? ?붿옄??理쒖쟻??
+    
+    1截뤴깵 濡쒕뵫 諛??먮윭 ?곹깭 ?붿옄??媛쒖꽑:
+    - .sr-loading ?대옒?? 濡쒕뵫 而⑦뀒?대꼫 (flex, center, min-h-96)
+    - .sr-loading-spinner: ?뚯쟾 ?좊땲硫붿씠???ㅽ뵾??      * 8px 횞 8px, 4px border
+      * primary ?됱긽 gradient
+      * 1珥?linear 臾댄븳 ?뚯쟾
+    - .sr-empty-state: 鍮??곹깭 ?쒖떆 (以묒븰 ?뺣젹, py-16)
+      * .sr-empty-state-icon: 16px 횞 16px ?꾩씠肄?      * .sr-empty-state-title: ?쒕ぉ (lg, semibold)
+      * .sr-empty-state-description: ?ㅻ챸 (sm, max-w-md)
+    - .sr-error-state: ?먮윭 ?곹깭 (destructive ?뚮쭏)
+      * 諛곌꼍: destructive/5
+      * ?뚮몢由? destructive/20
+      * ?꾩슜 icon, title, message ?ㅽ???    
+    2截뤴깵 ?좊땲硫붿씠???④낵 異붽?:
+    - @keyframes fadeIn: ?섏씠?쒖씤 + ?꾩뿉???꾨옒濡?(10px)
+    - @keyframes slideIn: ?щ씪?대뱶??+ 醫뚯뿉???곕줈 (20px)
+    - @keyframes pulse: 源쒕묀???④낵 (opacity 1??.5)
+    - ?좏떥由ы떚 ?대옒??
+      * .sr-fade-in: 0.3s ease-out
+      * .sr-slide-in: 0.4s ease-out
+      * .sr-pulse: 2s infinite
+    
+    3截뤴깵 ???낅젰 ?붿냼 ?ㅽ????듭씪:
+    - .sr-input: ?쒖? input (h-10, focus ring ?④낵)
+      * hover ??border primary/50
+      * disabled ??opacity 50%
+    - .sr-input-error: ?먮윭 ?곹깭 (border destructive)
+    - .sr-textarea: ?띿뒪???곸뿭 (min-h-20, resize-y)
+    - .sr-select: ??됲듃 諛뺤뒪 (cursor pointer)
+    - .sr-label: ?쇰꺼 (text-sm, font-medium)
+    - .sr-label-required: ?꾩닔 ?쒖떆 (鍮④컙 蹂꾪몴 *)
+    - .sr-field-error: ?꾨뱶 ?먮윭 硫붿떆吏 (text-xs, destructive)
+    - .sr-field-hint: ?뚰듃 硫붿떆吏 (text-xs, muted)
+    
+    4截뤴깵 ?뚯씠釉??붿옄???쒖뒪???곸슜:
+    - SR 愿由??섏씠吏 Table??sr-table ?대옒??異붽?
+    - ?쇨????뚯씠釉??ㅽ????곸슜:
+      * thead: bg-muted, border-b-2 border-primary
+      * th/td: h-12, px-6
+      * tbody tr:hover: bg-muted/50
+    
+    5截뤴깵 SR ?곸꽭 ?섏씠吏 理쒖쟻??
+    - 濡쒕뵫 ?곹깭: sr-loading + spinner
+    - 鍮??곹깭: sr-empty-state (SR ?놁쓬)
+      * AlertCircle ?꾩씠肄?      * 紐낇솗??硫붿떆吏 + ?뚯븘媛湲?踰꾪듉
+    - ?섏씠吏 ?꾩껜??sr-fade-in ?좊땲硫붿씠??    - ?쒕ぉ??primary-dark ?됱긽
+    - ?섏젙 踰꾪듉: accent-blue hover ?④낵
+    - ??젣 踰꾪듉: destructive hover ?④낵
+    - 紐⑤뱺 Card??sr-card ?대옒??    
+    ?뮕 ?ъ슜??寃쏀뿕 媛쒖꽑:
+    - 濡쒕뵫 ?쇰뱶諛? ?ㅽ뵾?덈줈 紐낇솗??吏꾪뻾 ?곹깭 ?쒖떆
+    - 鍮??곹깭 ?덈궡: 移쒖젅??硫붿떆吏 + ?ㅼ쓬 ?≪뀡 ?쒖븞
+    - ?먮윭 泥섎━: ?쒓컖?곸쑝濡?援щ텇?섎뒗 ?먮윭 ?쒖떆
+    - 遺?쒕윭???꾪솚: fadeIn/slideIn ?좊땲硫붿씠??    - ?쇨????? 紐⑤뱺 ?낅젰 ?붿냼 ?듭씪???ㅽ???    
+    ?벀 鍮뚮뱶 寃곌낵:
+    ???꾨줈?뺤뀡 鍮뚮뱶 ?깃났
+    ??/srs/[id] ?섏씠吏 ?ш린: 9.49 kB
+    ??紐⑤뱺 ?좊땲硫붿씠??理쒖쟻??(hardware acceleration)
+    ?좑툘  ESLint 寃쎄퀬留?議댁옱 (湲곕뒫 臾닿?)
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/srs/[id]/page.tsx |  41 ++++++----
+ src/app/(dashboard)/srs/page.tsx      |   2 +-
+ src/app/globals.css                   | 136 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 164 insertions(+), 15 deletions(-)
+
+commit e99fe11e2ace39f946dc4d2eed3dbeaad30ef1a3
+Author: lkindo <lkindo@gmail.com>
+Date:   Wed Nov 12 23:16:40 2025 +0900
+
+    feat: ?꾩껜 ?붿옄???쒖뒪??理쒖쟻???꾨즺 - 紐⑤뱺 沅뚯옣?ы빆 ?곸슜
+    
+    ?렓 ?붿옄???쒖뒪???낃렇?덉씠??
+    
+    1截뤴깵 Dashboard ?섏씠吏 理쒖쟻??
+    - sr-content-area ?대옒?ㅻ줈 ?쇨????덉씠?꾩썐 ?곸슜
+    - Quick Access 移대뱶??醫뚯륫 accent border 異붽? (釉붾（/?ㅻ젋吏/洹몃┛)
+    - ?듦퀎 移대뱶 ?꾩씠肄??됱긽 理쒖쟻??(primary/accent-blue/green/accent-orange)
+    - 紐⑤뱺 移대뱶??sr-card ?대옒???곸슜 (?쇨???shadow ?④낵)
+    - 李⑦듃 ?됱긽???붿옄???쒖뒪??蹂?섎줈 蹂寃?    - 理쒓렐 SR ?쒕룞 ??ぉ??hover ?④낵 諛??됱긽 transition 異붽?
+    
+    2截뤴깵 My Requests ?섏씠吏 理쒖쟻??
+    - sr-list-head ?대옒?ㅻ줈 ?ㅻ뜑 ?덉씠?꾩썐 ?듭씪
+    - ?듦퀎 移대뱶 ?レ옄 ?됱긽 理쒖쟻??    - SR 移대뱶??醫뚯륫 accent-blue border 異붽?
+    - 留곹겕 hover ??accent-orange ?됱긽 transition
+    - 吏꾪뻾瑜??쒖떆 媛뺤“ (font-semibold + accent-blue)
+    - 踰꾪듉??primary-dark ?됱긽 ?곸슜
+    
+    3截뤴깵 ?꾩씠肄?理쒖쟻???쒖뒪??
+    - ?ш린 ?좏떥由ы떚 ?대옒??異붽? (sr-icon-sm/md/lg/xl)
+    - ?됱긽 ?좏떥由ы떚 ?대옒??異붽?:
+      * sr-icon-primary (primary-dark)
+      * sr-icon-accent-orange
+      * sr-icon-accent-blue
+      * sr-icon-success (green-600)
+      * sr-icon-warning (orange-600)
+      * sr-icon-error (red-600)
+      * sr-icon-muted
+    
+    4截뤴깵 諛섏쓳???붿옄??媛쒖꽑:
+    - ?쒕툝由?(max-width: 768px):
+      * content-area ?⑤뵫 異뺤냼 (px-2 py-4)
+      * list-head flex-col ?꾪솚
+      * header-nav-item ?ш린 異뺤냼 (text-xs)
+      * table ? ?⑤뵫 諛??고듃 異뺤냼
+    - 紐⑤컮??(max-width: 640px):
+      * filter-button ?ш린 異뺤냼 (h-8, text-xs)
+      * icon-button ?ш린 異뺤냼 (w-8 h-8)
+    
+    5截뤴깵 ?ㅽ겕 紐⑤뱶 吏???꾩꽦:
+    - 諛곌꼍?? ?대몢??釉붾（ ??(#2a3053 湲곕컲)
+    - 移대뱶: ?쎄컙 諛앹? 釉붾（ ??    - primary/secondary ?됱긽 諛섏쟾
+    - border/input ?됱긽 議곗젙
+    - SR ?붿옄???쒖뒪??蹂???ㅽ겕 紐⑤뱶 ?뺤쓽:
+      * primary-dark: 諛앹? ?뚯깋 (93%)
+      * accent-orange: 諛앷린 60%濡?利앷?
+      * accent-blue: 梨꾨룄 50%, 諛앷린 60%
+      * 紐⑤뱺 ?뚯깋 ??諛앷린 議곗젙
+    
+    ???붿옄??媛쒖꽑 ?④낵:
+    - 釉뚮옖???쇨??? 紐⑤뱺 ?섏씠吏???숈씪??accent ?됱긽 ?곸슜
+    - ?쒓컖??怨꾩링: border-l-4濡?移대뱶 以묒슂??媛뺤“
+    - ?ъ슜???쇰뱶諛? hover/transition ?④낵濡??명꽣?숈뀡 媛쒖꽑
+    - ?묎렐?? ?됱긽 ?鍮?媛쒖꽑 諛??ㅽ겕 紐⑤뱶 吏??    - 諛섏쓳?? 紐⑤컮???쒕툝由우뿉??理쒖쟻?붾맂 UX
+    
+    ?벀 鍮뚮뱶 寃곌낵:
+    ???꾨줈?뺤뀡 鍮뚮뱶 ?깃났
+    ??紐⑤뱺 ?섏씠吏 ?뺤긽 而댄뙆??    ??TypeScript ???泥댄겕 ?듦낵
+    ?좑툘  ESLint 寃쎄퀬留?議댁옱 (湲곕뒫 臾닿?)
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json              |   3 +-
+ src/app/(dashboard)/dashboard/page.tsx   | 115 ++++++++++++++++---------------
+ src/app/(dashboard)/my-requests/page.tsx |  51 +++++++-------
+ src/app/globals.css                      | 111 +++++++++++++++++++++++++----
+ 4 files changed, 187 insertions(+), 93 deletions(-)
+
+commit 354aebfbb725db71b4b4d74a5d4263a942376814
+Author: lkindo <lkindo@gmail.com>
+Date:   Wed Nov 12 22:59:33 2025 +0900
+
+    feat: SR 愿由??붿옄???쒖뒪??理쒖쟻??諛?Prisma 愿怨??섏젙
+    
+    ?붿옄???쒖뒪??媛쒖꽑:
+    - common.css 諛?content.css 李몄“?섏뿬 ?쇨????붿옄???곸슜
+    - 湲濡쒕쾶 CSS 蹂?섏뿉 SR Management ?됱긽 ?붾젅??異붽?
+      * Primary: #2a3053 (Dark Blue)
+      * Secondary: #ecedf3 (Light Gray)
+      * Accent: #ff5000 (Orange), #46508b (Blue)
+      * Border radius: 4px濡??듭씪
+    - ?ъ궗??媛?ν븳 而댄룷?뚰듃 ?ㅽ????대옒??異붽?:
+      * .sr-filter-button: ?꾪꽣 踰꾪듉 ?ㅽ???      * .sr-header-nav-item: ?ㅻ뜑 ?ㅻ퉬寃뚯씠???꾩씠??      * .sr-table: ?뚯씠釉??ㅽ???      * .sr-card: 移대뱶 ?ㅽ???      * .sr-status-badge, .sr-priority-badge: ?곹깭/?곗꽑?쒖쐞 諛곗?
+    
+    Header 而댄룷?뚰듃 理쒖쟻??
+    - ?ㅻ젋吏 accent 而щ윭 border ?곸슜 (2px)
+    - 濡쒓퀬 hover ?④낵 異붽? (orange transition)
+    - ?믪씠瑜?64px濡?利앷? (???섏? 媛?쒖꽦)
+    - ?⑤뵫 利앷? (px-6) 諛?shadow 異붽?
+    - sr-header-nav-item ?대옒???곸슜
+    
+    SR ?묒닔 API ?섏젙:
+    - Prisma 愿怨??꾨뱶 泥섎━ 諛⑹떇 ?섏젙
+    - intakeById ??intakeBy: { connect: { id } }
+    - assigneeId ??assignee: { connect: { id } }
+    - ????덉쟾???μ긽 諛?鍮뚮뱶 ?ㅻ쪟 ?닿껐
+    
+    SR ?앹꽦 API ?섏젙:
+    - 珥덇린 ?곗꽑?쒖쐞 ?ㅼ젙 濡쒖쭅 異붽?
+    - priority ?꾨뱶媛 requestedPriority? ?숈씪?섍쾶 ?ㅼ젙?섎룄濡??섏젙
+    
+    鍮뚮뱶 ?곹깭:
+    - 紐⑤뱺 ????ㅻ쪟 ?닿껐 ?꾨즺
+    - ESLint 寃쎄퀬留?議댁옱 (湲곕뒫???곹뼢 ?놁쓬)
+    - ?꾨줈?뺤뀡 鍮뚮뱶 ?깃났
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ common.css                           | 398 +++++++++++++++++++++++++++++++++++
+ content.css                          |  92 ++++++++
+ src/app/(dashboard)/srs/page.tsx     |  89 +++++++-
+ src/app/api/srs/[id]/intake/route.ts |   8 +-
+ src/app/api/srs/route.ts             |   1 +
+ src/app/globals.css                  | 226 +++++++++++++++++++-
+ src/components/layout/Header.tsx     |  24 +--
+ 7 files changed, 810 insertions(+), 28 deletions(-)
+
+commit 5766789cd4296f4ac9cd7af0c35a148b9347e965
+Author: lkindo <lkindo@gmail.com>
+Date:   Wed Nov 12 17:26:20 2025 +0900
+
+    fix: Next.js 15 ?명솚??諛?????ㅻ쪟 ?섏젙
+    
+    - Next.js 15 params Promise ???吏??(use hook ?ъ슜)
+    - SRActivityType enum ????ㅻ쪟 ?섏젙 (UPDATED ??COMMENTED)
+    - SRStatus enum ????ㅻ쪟 ?섏젙 (RESOLVED ??COMPLETED, CANCELLED ??REJECTED)
+    - Zod ?ㅽ궎留?????ㅻ쪟 ?섏젙 (required_error ??message)
+    - SR API route ????ㅻ쪟 ?섏젙 (assigneeId ?쒓굅)
+    - ?꾨줈???섏씠吏 ?듯빀 (湲곕낯 ?뺣낫 + 蹂댁븞 ??
+    
+    Phase: 鍮뚮뱶 ?ㅻ쪟 ?섏젙 ?꾨즺
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/layout-wrapper.tsx             |  20 ++
+ src/app/(dashboard)/layout.tsx                     |  14 +-
+ src/app/(dashboard)/settings/layout.tsx            | 192 -----------
+ .../(dashboard)/settings/notifications/page.tsx    | 204 +++++++++++
+ src/app/(dashboard)/settings/page.tsx              |  20 +-
+ src/app/(dashboard)/settings/profile/page.tsx      | 384 +++++++++++++++++++++
+ src/app/(dashboard)/settings/system/page.tsx       | 213 ++++++++++++
+ src/app/(dashboard)/srs/[id]/intake/page.tsx       |  20 +-
+ src/app/api/srs/[id]/route.ts                      |   2 +-
+ src/app/api/srs/my-requests/route.ts               |   5 +-
+ src/app/api/srs/route.ts                           |   8 +-
+ src/app/api/users/route.ts                         |   2 +-
+ src/components/layout/Header.tsx                   |  96 ++++--
+ src/components/layout/Sidebar.tsx                  | 266 +++++++++-----
+ src/components/layout/UserNav.tsx                  |  81 ++---
+ src/components/profile/ProfileDialog.tsx           |   2 +-
+ 16 files changed, 1126 insertions(+), 403 deletions(-)
+
+commit 5a6e814f670dd926a020aeee26c46cd17db40a55
+Author: lkindo <lkindo@gmail.com>
+Date:   Wed Nov 12 13:35:19 2025 +0900
+
+    feat: SR ?묒닔 ?뺣낫 ?섏젙 湲곕뒫 援ы쁽
+    
+    - SR ?묒닔 泥섎━ ?붾㈃???섏젙 紐⑤뱶 異붽?
+      * REQUESTED ?곹깭: ?묒닔 紐⑤뱶 (POST API)
+      * IN_PROGRESS ?곹깭: ?섏젙 紐⑤뱶 (PATCH API)
+      * 湲곗〈 ?묒닔 ?뺣낫 ?먮룞 濡쒕뱶
+      * ?숈쟻 UI ?띿뒪??(?쒕ぉ, 踰꾪듉)
+    
+    - SR ?섏젙 API ?붾뱶?ъ씤???뺤옣 (PATCH /api/srs/[id])
+      * ?묒닔 愿???꾨뱶 吏?? actualPriority, estimatedHours, estimatedCompletionDate, intakeNotes, assigneeId
+      * ?곗꽑?쒖쐞 蹂寃???留덇컧???먮룞 ?ш퀎??(SLA 湲곕컲)
+      * 蹂寃??대젰 Activity 濡쒓렇 ?앹꽦
+      * ?대떦??蹂寃???蹂꾨룄 濡쒓렇 諛??뚮┝ 以鍮?    
+    - SR ?꾩껜 紐⑸줉???섏젙 踰꾪듉 異붽?
+      * "?묒뾽" 而щ읆 異붽?
+      * IN_PROGRESS ?곹깭 SR?먮쭔 ?섏젙 ?꾩씠肄??쒖떆
+      * ?대┃ ???묒닔 ?붾㈃?쇰줈 ?대룞?섏뿬 ?섏젙
+    
+    - 硫붾돱 援ъ“ 媛쒖꽑
+      * Header 諛?Sidebar????硫붾돱 ??ぉ 異붽?
+      * "???붿껌 SR", "SR ?묒닔 ?湲?, "SR ?꾩껜 紐⑸줉" 遺꾨━
+      * ??븷 湲곕컲 ?묎렐 ?쒖뼱 ?곸슜
+    
+    - UI 而댄룷?뚰듃 異붽?
+      * shadcn/ui calendar, popover, progress 而댄룷?뚰듃
+      * date-fns ?⑦궎吏 異붽?
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json                      |   5 +-
+ docs/DB.md                                       |  51 +-
+ package.json                                     |   4 +
+ pnpm-lock.yaml                                   |  99 ++++
+ prisma/migrations/20250112_add_intake_fields.sql |  33 ++
+ prisma/schema.prisma                             |  22 +-
+ src/app/(dashboard)/dashboard/page.tsx           |  57 +-
+ src/app/(dashboard)/my-requests/page.tsx         | 415 ++++++++++++++
+ src/app/(dashboard)/srs/[id]/intake/page.tsx     | 660 +++++++++++++++++++++++
+ src/app/(dashboard)/srs/intake-queue/page.tsx    | 349 ++++++++++++
+ src/app/(dashboard)/srs/page.tsx                 |  21 +-
+ src/app/api/srs/[id]/intake/route.ts             | 343 ++++++++++++
+ src/app/api/srs/[id]/route.ts                    |  86 ++-
+ src/app/api/srs/intake-queue/route.ts            | 173 ++++++
+ src/app/api/srs/my-requests/route.ts             | 159 ++++++
+ src/app/api/srs/route.ts                         |  18 +-
+ src/app/api/users/route.ts                       |  19 +-
+ src/components/layout/Header.tsx                 |  14 +-
+ src/components/layout/Sidebar.tsx                |  16 +-
+ src/components/srs/CreateSRDialog.tsx            | 102 ++--
+ src/components/ui/calendar.tsx                   | 213 ++++++++
+ src/components/ui/popover.tsx                    |  33 ++
+ src/components/ui/progress.tsx                   |  28 +
+ 23 files changed, 2819 insertions(+), 101 deletions(-)
+
+commit af29858091a2c338f25d19c20b7767a006d06085
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 23:13:36 2025 +0900
+
+    SR愿由?怨좊룄??
+ .claude/settings.local.json               |   3 +-
+ .gitignore                                |   3 +
+ src/app/(dashboard)/srs/[id]/page.tsx     | 158 ++++++++-
+ src/app/(dashboard)/srs/page.tsx          | 545 +++++++++++++++++++++++++-----
+ src/app/api/srs/[id]/attachments/route.ts | 133 ++++++++
+ src/app/api/srs/[id]/route.ts             |  32 +-
+ src/app/api/srs/route.ts                  |   6 +-
+ src/components/srs/CreateSRDialog.tsx     | 165 ++++-----
+ src/components/srs/EditSRDialog.tsx       |  79 ++++-
+ src/components/ui/file-upload.tsx         | 166 +++++++++
+ src/components/ui/pagination.tsx          | 117 +++++++
+ src/lib/date-utils.ts                     |  97 ++++++
+ 12 files changed, 1315 insertions(+), 189 deletions(-)
+
+commit 37e51f4d064c565f16268e194f1e3cba15b3f763
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:29:35 2025 +0900
+
+    feat: SR ?섏젙 ?붾㈃???쒕퉬??移댄뀒怨좊━ ?좏깮 ??ぉ 異붽?
+    
+    - EditSRDialog???쒕퉬??移댄뀒怨좊━ ?좏깮 UI 異붽?
+    - ?쒕퉬??移댄뀒怨좊━ API ?곕룞 (fetchCategories)
+    - SR ?명꽣?섏씠?ㅼ뿉 category ?꾨뱶 異붽?
+    - SR ?섏젙 ??serviceCategoryId ?ы븿?섏뿬 ?꾩넚
+    - ?쒕ぉ/?ㅻ챸 ?ㅼ쓬??移댄뀒怨좊━ ?좏깮 諛곗튂
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/components/srs/EditSRDialog.tsx | 55 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+commit b1a05052224176d81de77b46d047cbc346c51a85
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:25:10 2025 +0900
+
+    feat: ?쒕퉬??移댄뀒怨좊━ 議고쉶 API ?붾뱶?ъ씤??異붽?
+    
+    - /api/service-categories GET ?붾뱶?ъ씤???앹꽦
+    - 紐⑤뱺 ?쒖꽦?붾맂 ?쒕퉬??移댄뀒怨좊━ 議고쉶
+    - SR ?앹꽦 ???꾩뿭 ?쒕퉬??移댄뀒怨좊━ ?ъ슜
+    - ?몄쬆 ?뺤씤 諛??ㅻ쪟 泥섎━ ?ы븿
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/api/service-categories/route.ts | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+commit a309b82331775eddc2f7921435b48167e8576078
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:19:12 2025 +0900
+
+    fix: SR ?깅줉 ?붾㈃ ?쒕퉬??移댄뀒怨좊━ ?꾩껜 紐⑸줉 ?쒖떆
+    
+    **臾몄젣**
+    - SR ?앹꽦 ??怨좉컼???좏깮 ???쒕퉬??移댄뀒怨좊━ 議고쉶 API ?몄텧
+    - `/api/clients/${clientId}/categories` ?붾뱶?ъ씤?멸? 議댁옱?섏? ?딆쓬
+    - ?쒕퉬??移댄뀒怨좊━媛 ?꾩껜 怨듯넻?쇰줈 蹂寃쎈릺?덉쑝??SR ?앹꽦 ?붾㈃? ?낅뜲?댄듃 ????    
+    **?닿껐**
+    - ?꾩껜 ?쒕퉬??移댄뀒怨좊━ 議고쉶 API濡?蹂寃? `/api/service-categories`
+    - 怨좉컼???좏깮怨?臾닿??섍쾶 紐⑤뱺 ?쒖꽦 ?쒕퉬??移댄뀒怨좊━ ?쒖떆
+    - 怨좉컼?щ퀎 移댄뀒怨좊━ ?섏〈???쒓굅
+    
+    **蹂寃??댁슜**
+    - CreateSRDialog 而댄룷?뚰듃:
+      * fetchCategories()瑜?怨좉컼??ID ?뚮씪誘명꽣 ?놁씠 ?몄텧
+      * useEffect?먯꽌 clientId ?섏〈???쒓굅
+      * ?ㅼ씠?쇰줈洹??대┫ ???꾩껜 移댄뀒怨좊━ ??踰덈쭔 議고쉶
+      * ?쒕퉬??移댄뀒怨좊━ ?좏깮 鍮꾪솢?깊솕 議곌굔 ?섏젙
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/components/srs/CreateSRDialog.tsx | 24 ++++++------------------
+ 1 file changed, 6 insertions(+), 18 deletions(-)
+
+commit e383c9077850372c2ae1104f04818ecf011f5d4e
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:15:39 2025 +0900
+
+    feat: 怨좉컼??紐⑸줉 ?ъ슜???섏뿉??ADMIN ?ъ슜???쒖쇅
+    
+    **蹂寃??ы빆**
+    - 怨좉컼??紐⑸줉 API?먯꽌 ADMIN ??븷 ?ъ슜?먮? ?쒖쇅???ㅼ젣 ?ъ슜????諛섑솚
+    - ?ъ슜??議고쉶 ????븷 ?뺣낫 ?ы븿?섎룄濡??섏젙
+    - _count.users瑜?ADMIN ?쒖쇅 ?꾪꽣留곷맂 媛믪쑝濡?怨꾩궛
+    
+    **援ы쁽 ?댁슜**
+    - GET /api/clients:
+      * ?ъ슜??議고쉶 ??roles ?뺣낫 異붽?濡?議고쉶
+      * ADMIN ??븷??媛吏??ъ슜???꾪꽣留?      * ?꾪꽣留곷맂 ?ъ슜???섎? _count.users??諛섏쁺
+      * 湲곗〈 ?꾨뱶?ㅼ? 紐⑤몢 ?좎??섏뿬 ?명솚??蹂댁옣
+    
+    **?섏젙 ??*: Prisma _count瑜?洹몃?濡??ъ슜 (ADMIN ?ы븿)
+    **?섏젙 ??*: ADMIN???쒖쇅???ㅼ젣 怨좉컼???뚯냽 ?ъ슜????諛섑솚
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/api/clients/route.ts | 50 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 48 insertions(+), 2 deletions(-)
+
+commit ed7a8481bc01ae6b524fee784a5fef38e6526996
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:13:17 2025 +0900
+
+    feat: 怨좉컼???ъ슜??紐⑸줉?먯꽌 ADMIN ??븷 ?ъ슜???쒖쇅
+    
+    **蹂寃??ы빆**
+    - 怨좉컼???곸꽭 API?먯꽌 ADMIN ??븷??媛吏??ъ슜???쒖쇅
+    - ?ъ슜??議고쉶 ????븷 ?뺣낫 ?ы븿?섎룄濡??섏젙
+    - ?묐떟 ?곗씠?곗뿉??ADMIN ?ъ슜???꾪꽣留??곸슜
+    
+    **援ы쁽 ?댁슜**
+    - GET /api/clients/[id]:
+      * ?ъ슜??議고쉶 ??roles ?뺣낫 異붽?濡?議고쉶
+      * ADMIN ??븷??媛吏??ъ슜???꾪꽣留?      * ?꾪꽣留곷맂 ?ъ슜??紐⑸줉 諛섑솚
+    
+    **鍮꾩쫰?덉뒪 濡쒖쭅**
+    - ADMIN ?ъ슜?먮뒗 ?쒖뒪??愿由ъ옄濡쒖꽌 ?뱀젙 怨좉컼?ъ뿉 ?뚯냽?섏? ?딆쓬
+    - 怨좉컼??愿由??붾㈃?먯꽌 ADMIN ?ъ슜?먮? ?쒖떆?섏? ?딆쓬
+    - SR ?붿껌?먯? 紐낇솗??援щ텇
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/api/clients/[id]/route.ts | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
+
+commit 2c312626354f7a5670f25083c1f39df387e4d67d
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:06:03 2025 +0900
+
+    feat: 愿由??섏씠吏 異붽? 踰꾪듉 ?띿뒪???듭씪
+    
+    **踰꾪듉 ?띿뒪??"?깅줉"?쇰줈 ?듭씪**
+    - SR 愿由? "??SR ?앹꽦" ??"?깅줉"
+    - 怨좉컼??愿由? "??怨좉컼??異붽?" ??"?깅줉"
+    - ?ъ슜??愿由? "???ъ슜??異붽?" ??"?깅줉"
+    - ??븷 愿由? "????븷 異붽?" ??"?깅줉"
+    
+    **?쇨???媛쒖꽑**
+    - 紐⑤뱺 愿由??섏씠吏?먯꽌 ?숈씪??踰꾪듉 ?띿뒪???ъ슜
+    - 媛꾧껐?섍퀬 紐낇솗???ъ슜??寃쏀뿕 ?쒓났
+    - Plus ?꾩씠肄섍낵 ?④퍡 吏곴??곸씤 ?깅줉 湲곕뒫 ?쒗쁽
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/clients/page.tsx | 2 +-
+ src/app/(dashboard)/roles/page.tsx   | 2 +-
+ src/app/(dashboard)/srs/page.tsx     | 2 +-
+ src/app/(dashboard)/users/page.tsx   | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+commit f0bfdf40ddfc43d10387b731ddbf6708a27275e1
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 15:02:41 2025 +0900
+
+    feat: ?ъ슜???깅줉/?섏젙 ?붾㈃ ?좏삎 ?쒖떆 媛쒖꽑
+    
+    **蹂寃??ы빆**
+    - UserDialog 而댄룷?뚰듃???ъ슜???좏삎 ?좏깮 ?듭뀡 ?띿뒪??蹂寃?      * "SR ?대떦 ?붿??덉뼱" ??"SR 泥섎━??
+      * "怨좉컼???ъ슜?? ??"SR ?붿껌??
+    - ?좏슚??寃??硫붿떆吏 ?낅뜲?댄듃
+      * "怨좉컼???ъ슜?먮뒗..." ??"SR ?붿껌?먮뒗..."
+    
+    **?쇨???媛쒖꽑**
+    - ?ъ슜??紐⑸줉 ?섏씠吏? ?숈씪???⑹뼱 ?ъ슜
+    - ?꾩껜 ?쒖뒪?쒖뿉???듭씪???ъ슜???좏삎 ?쒗쁽
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/components/users/UserDialog.tsx | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+commit 005904dba019a74379a33c5dfc689071272397e8
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 14:59:30 2025 +0900
+
+    feat: ?ъ슜???좏삎 遺꾨쪟 ?쒖뒪??媛쒖꽑
+    
+    **?ъ슜???좏삎 ?먮룞 遺꾨쪟 濡쒖쭅 援ы쁽**
+    - 湲곗〈: "?붿??덉뼱" / "怨좉컼?? 2媛吏 ?좏삎
+    - ?좉퇋: "?쒖뒪??愿由ъ옄" / "SR 泥섎━?? / "SR ?붿껌?? 3媛吏 ?좏삎
+    
+    **遺꾨쪟 湲곗?**
+    1. ?쒖뒪??愿由ъ옄: ADMIN ??븷??媛吏??ъ슜??    2. SR 泥섎━?? 怨좉컼?ъ뿉 ?뚯냽?섏? ?딆? ?붿??덉뼱
+    3. SR ?붿껌?? 怨좉컼?ъ뿉 ?뚯냽???ъ슜??(CLIENT ????먮뒗 怨좉컼??諛곗젙)
+    
+    **?좏삎蹂?諛곗? ?됱긽**
+    - ?쒖뒪??愿由ъ옄: destructive (鍮④컯)
+    - SR 泥섎━?? default (?뚮옉)
+    - SR ?붿껌?? outline (?뚯깋)
+    
+    **?섏젙???뚯씪**
+    - src/app/(dashboard)/users/page.tsx
+      * getUserTypeLabel() ?⑥닔 異붽?: ?ъ슜???좏삎 ?먮룞 ?먮퀎
+      * getUserTypeBadgeVariant() ?⑥닔 異붽?: ?좏삎蹂?諛곗? ?됱긽
+      * ?꾪꽣 ?듭뀡 ?띿뒪??蹂寃? "?붿??덉뼱" ??"SR 泥섎━??, "怨좉컼?? ??"SR ?붿껌??
+      * ?뚯씠釉붿뿉 ?좏삎 ?먮퀎 濡쒖쭅 ?곸슜
+    
+    - src/app/(dashboard)/users/[id]/page.tsx
+      * getUserTypeLabel() ?⑥닔 異붽?
+      * getUserTypeBadgeVariant() ?⑥닔 異붽?
+      * ?ъ슜???곸꽭 ?섏씠吏???좏삎 ?쒖떆 濡쒖쭅 ?곸슜
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/users/[id]/page.tsx | 39 ++++++++++++++++++----
+ src/app/(dashboard)/users/page.tsx      | 57 ++++++++++++++++++++++++++-------
+ 2 files changed, 79 insertions(+), 17 deletions(-)
+
+commit 549c452c38af73e146bf4ca5f838092818b78501
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 14:45:09 2025 +0900
+
+    feat: ?꾨줈??愿由?諛??쒕퉬??移댄뀒怨좊━ ?꾩뿭??援ы쁽
+    
+    **?쒕퉬??移댄뀒怨좊━ ?꾩뿭??*
+    - ServiceCategory瑜?怨좉컼?щ퀎???꾨땶 ?꾩껜 怨좉컼?ъ뿉??怨듯넻?쇰줈 ?ъ슜?섎룄濡?蹂寃?    - Prisma ?ㅽ궎留? clientId瑜?optional濡?蹂寃?(String -> String?)
+    - API ?섏젙:
+      * GET/PATCH /api/clients/[id]: 紐⑤뱺 ?쒖꽦 ?쒕퉬??移댄뀒怨좊━ 諛섑솚
+      * GET/POST /api/clients: serviceCategories include ?쒓굅
+    
+    **?꾨줈??愿由?湲곕뒫**
+    - ProfileDialog 而댄룷?뚰듃 ?앹꽦 (?앹뾽 ?뺥깭)
+      * 湲곕낯 ?뺣낫 ?? ?대쫫, ?꾨줈???대?吏 ?섏젙
+      * 蹂댁븞 ?? 鍮꾨?踰덊샇 蹂寃?      * ?ъ슜????븷 諛??뚯냽 怨좉컼???쒖떆
+    - API ?붾뱶?ъ씤??異붽?:
+      * GET/PATCH /api/profile: ?꾨줈??議고쉶 諛??섏젙
+      * POST /api/profile/password: 鍮꾨?踰덊샇 蹂寃?(bcrypt 寃利?
+    - UserNav 而댄룷?뚰듃: ?꾨줈???ㅼ씠?쇰줈洹??몃━嫄곕줈 蹂寃?    
+    **?ㅼ젙 硫붾돱 ?ш뎄??*
+    - 3?④퀎 Collapsible ?꾨쾭嫄?硫붾돱 援ъ“
+    - 硫붾돱 移댄뀒怨좊━:
+      * 媛쒖씤 ?ㅼ젙: ?꾨줈?? ?뚮┝ ?ㅼ젙
+      * ?쇰컲 ?ㅼ젙: ??븷 諛?沅뚰븳, ?쒕퉬??移댄뀒怨좊━, ?ъ슜??愿由? 怨좉컼??愿由? ?쒖뒪???ㅼ젙
+    - 紐⑤컮???곗뒪?ы넲 諛섏쓳???덉씠?꾩썐
+    - ?곗륫 而⑦뀗痢??곸뿭 鍮꾩썙??(?ν썑 湲곕뒫 援ы쁽 ?덉젙)
+    - 湲곗〈 /settings/profile ?섏씠吏 ??젣 (?ㅼ씠?쇰줈洹몃줈 ?泥?
+    
+    **UI 而댄룷?뚰듃 異붽?**
+    - Collapsible: ?묒쓣 ???덈뒗 硫붾돱 ?뱀뀡
+    - Sheet: 紐⑤컮???ъ씠?쒕컮
+    - Dialog ?묎렐??媛쒖꽑: DialogTitle 異붽?
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ package.json                                       |   1 +
+ pnpm-lock.yaml                                     |  32 ++++
+ src/app/(dashboard)/settings/layout.tsx            | 192 +++++++++++++++++++++
+ src/app/(dashboard)/settings/page.tsx              |  19 ++
+ src/components/layout/UserNav.tsx                  |  85 +++++----
+ .../profile/ProfileDialog.tsx}                     | 114 ++++++------
+ src/components/ui/collapsible.tsx                  |  11 ++
+ src/components/ui/sheet.tsx                        | 140 +++++++++++++++
+ 8 files changed, 494 insertions(+), 100 deletions(-)
+
+commit a5f81392ca8e0b85a0e1d9a475cb7e66836fabbb
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 09:05:16 2025 +0900
+
+    feat: ?꾨줈??愿由?諛??쒕퉬??移댄뀒怨좊━ ?꾩뿭??援ы쁽
+    
+    - ServiceCategory 紐⑤뜽??怨좉컼?щ퀎?먯꽌 ?꾩뿭 愿由щ줈 蹂寃?      * clientId瑜?optional濡??섏젙?섏뿬 紐⑤뱺 怨좉컼?ш? ?숈씪 移댄뀒怨좊━ 怨듭쑀
+      * 怨좉컼???곸꽭/紐⑸줉 API ?섏젙?섏뿬 ?꾩껜 移댄뀒怨좊━ 議고쉶
+    
+    - ?ъ슜???꾪꽣留?湲곕뒫 異붽? (users ?섏씠吏)
+      * ?좏삎蹂??꾪꽣 (ENGINEER/CLIENT)
+      * ??븷蹂??꾪꽣
+      * ?곹깭蹂??꾪꽣 (?쒖꽦/鍮꾪솢??
+      * ?ㅼ떆媛?寃??諛??꾪꽣 ?곸슜
+    
+    - 怨좉컼??愿由?UI 媛쒖꽑
+      * 紐⑸줉?먯꽌 ?곸꽭蹂닿린/?섏젙/??젣 踰꾪듉 ?쒓굅
+      * 怨좉컼?щ챸 ?대┃?쇰줈 ?곸꽭 ?섏씠吏 ?대룞
+      * ?곸꽭 ?섏씠吏?먯꽌 ?섏젙/??젣 湲곕뒫 ?쒓났
+    
+    - ?꾨줈??愿由?湲곕뒫 援ы쁽
+      * ?꾨줈??議고쉶/?섏젙 API (GET/PATCH /api/profile)
+      * 鍮꾨?踰덊샇 蹂寃?API (POST /api/profile/password)
+      * ?꾨줈???섏씠吏 UI (/settings/profile)
+        - 湲곕낯 ?뺣낫 ?섏젙 (?대쫫, ?꾨줈???대?吏)
+        - 鍮꾨?踰덊샇 蹂寃?(?꾩옱 鍮꾨?踰덊샇 ?뺤씤)
+        - ??븷 諛??뚯냽 怨좉컼???뺣낫 ?쒖떆
+    
+    ?쨼 Generated with [Claude Code](https://claude.com/claude-code)
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json                   |   3 +-
+ prisma/schema.prisma                          |  10 +-
+ src/app/(dashboard)/clients/page.tsx          |  58 +---
+ src/app/(dashboard)/settings/profile/page.tsx | 400 ++++++++++++++++++++++++++
+ src/app/(dashboard)/users/page.tsx            | 131 +++++++--
+ src/app/api/clients/[id]/route.ts             | 274 +++++++++---------
+ src/app/api/clients/route.ts                  |   4 -
+ src/app/api/profile/password/route.ts         |  80 ++++++
+ src/app/api/profile/route.ts                  | 107 +++++++
+ src/app/api/users/route.ts                    |  20 +-
+ 10 files changed, 850 insertions(+), 237 deletions(-)
+
+commit f3b6767bb42f4850629f3e8f8a22edf00166fe3a
+Author: lkindo <lkindo@gmail.com>
+Date:   Tue Nov 11 00:28:23 2025 +0900
+
+    SR 諛??ъ슜?먭?由?
+ .claude/settings.local.json               |   3 +-
+ .genkit/traces_idx/genkit.metadata        |   2 +-
+ .npmrc                                    |  10 +-
+ package.json                              |   1 +
+ pnpm-lock.yaml                            |  31 ++
+ src/app/(dashboard)/clients/[id]/page.tsx | 553 ++++++++++++++++++++++++++++++
+ src/app/(dashboard)/clients/page.tsx      |  19 +-
+ src/app/(dashboard)/srs/[id]/page.tsx     |  61 ++--
+ src/app/(dashboard)/users/[id]/page.tsx   | 368 ++++++++++++++++++++
+ src/app/(dashboard)/users/page.tsx        |  51 ++-
+ src/app/api/srs/[id]/route.ts             |   7 +
+ src/app/api/users/[id]/route.ts           |  49 +++
+ src/app/api/users/route.ts                |  49 ++-
+ src/app/api/users/sr-handlers/route.ts    |  85 +++++
+ src/components/srs/CreateSRDialog.tsx     |  25 +-
+ src/components/srs/EditSRDialog.tsx       |  80 +++--
+ src/components/ui/switch.tsx              |  29 ++
+ src/components/users/UserDialog.tsx       | 387 +++++++++++++++++++++
+ 18 files changed, 1737 insertions(+), 73 deletions(-)
+
+commit 3f4bcab6749f3291c5ee7ae9060a585b89928486
+Author: lkindo <lkindo@gmail.com>
+Date:   Mon Nov 10 08:40:14 2025 +0900
+
+    ?섍꼍?ㅼ젙?뚯씪
+
+ env | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+
+commit edaf4336b0fa819bdbceb5e53176e95180bb6319
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 22:37:09 2025 +0900
+
+    sr ?섏젙湲곕뒫
+
+ .claude/settings.local.json         |   7 +-
+ QUICK_FIX_API_ERROR.md              | 109 --------
+ ROOT_CAUSE_ANALYSIS.md              | 321 ----------------------
+ ROOT_CAUSE_FOUND.md                 | 515 ------------------------------------
+ SETUP_COMPLETE.md                   | 282 --------------------
+ SETUP_GUIDE.md                      | 299 ---------------------
+ src/components/srs/EditSRDialog.tsx |   6 +-
+ 7 files changed, 9 insertions(+), 1530 deletions(-)
+
+commit f656bace175b55a6107c0956bc416b6868bfb6f1
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 21:34:06 2025 +0900
+
+    fix: SR ?곸꽭 API ?묐떟 ?뺤떇 ?섏젙
+    
+    臾몄젣:
+    - API媛 serviceCategory.categoryName 諛섑솚
+    - ?꾨줎?몄뿏?쒓? category.name 湲곕?
+    - SR ?곸꽭 ?붾㈃?먯꽌 ?ㅻ쪟 諛쒖깮
+    
+    ?닿껐:
+    - API ?묐떟 蹂??濡쒖쭅 異붽?
+    - category.name?쇰줈 留ㅽ븨
+    - assignedTo, _count ?꾨뱶???뺢퇋??    
+    ?댁젣 SR ?곸꽭 ?붾㈃???뺤긽 ?묐룞!
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/api/srs/[id]/route.ts | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+commit 8befb97fabf6392a39b1c6bb059b95b0bf553c11
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 20:30:59 2025 +0900
+
+    docs: .env.example 異붽?
+    
+    ?섍꼍 蹂???쒗뵆由??뚯씪 異붽?:
+    - ?곗씠?곕쿋?댁뒪 ?ㅼ젙 (Supabase)
+    - NextAuth ?ㅼ젙
+    - Vercel Blob, Redis, Resend ??    - ?좏깮???쒕퉬??(Sentry, Axiom, Mattermost)
+    
+    媛쒕컻?먭? ?쎄쾶 ?섍꼍 ?ㅼ젙?????덈룄濡?媛?대뱶 ?쒓났
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .env.example | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
+
+commit 56851d739a5895c61151c3d1b020f6c7cc58804c
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 19:04:40 2025 +0900
+
+    fix: Edge Runtime???꾪븳 auth ?ㅼ젙 遺꾨━
+    
+    洹쇰낯 ?닿껐梨?
+    - auth.config.ts ?앹꽦 (Edge Runtime ?명솚)
+    - auth.ts?먯꽌 Prisma 濡쒖쭅 遺꾨━
+    - middleware??auth.config留?import (Prisma ?놁쓬)
+    
+    援ъ“:
+    - auth.config.ts: Edge-safe, Prisma ?놁쓬
+    - auth.ts: Node.js only, Prisma ?ъ슜
+    - middleware.ts: auth.config ?ъ슜
+    
+    ?댁젣 Edge Function?먯꽌 Prisma 李몄“ ?꾩쟾 ?쒓굅!
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/auth.config.ts | 30 ++++++++++++++++++++++++++++++
+ src/auth.ts        | 10 ++--------
+ src/middleware.ts  | 26 +++-----------------------
+ 3 files changed, 35 insertions(+), 31 deletions(-)
+
+commit e0557c17c193b9ec5eea34762da50b28cd02f3b6
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:44:58 2025 +0900
+
+    fix: src/generated ?대뜑 ?쒓굅 諛?.gitignore ?낅뜲?댄듃
+    
+    Edge Runtime ?ㅻ쪟??洹쇰낯 ?먯씤 ?닿껐:
+    - src/generated/prisma ?대뜑 ?꾩쟾 ??젣
+    - .gitignore??/src/generated 異붽?
+    - Prisma??node_modules/@prisma/client留??ъ슜
+    
+    ?댁젣 Vercel 鍮뚮뱶 ??
+    - 而ㅼ뒪? 寃쎈줈 李몄“ ?놁쓬
+    - Edge Function?먯꽌 unsupported modules ?ㅻ쪟 ?닿껐
+    - 源⑤걮??鍮뚮뱶 ?섍꼍
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .gitignore | Bin 522 -> 413 bytes
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+
+commit d9101a785e14fb98187f1d89ae17d58be3181ce3
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:39:05 2025 +0900
+
+    fix: Edge Runtime ?명솚?깆쓣 ?꾪븳 middleware ?섏젙
+    
+    NextAuth middleware瑜?Edge Runtime ?명솚 踰꾩쟾?쇰줈 蹂寃?
+    - Prisma import ?쒓굅 (Edge Runtime 誘몄???
+    - JWT 湲곕컲 ?몄뀡 寃利앸쭔 ?ъ슜
+    - 濡쒓렇???뚯썝媛???섏씠吏 由щ떎?대젆??濡쒖쭅 異붽?
+    
+    Vercel 諛고룷 ?ㅻ쪟 ?닿껐:
+    - "referencing unsupported modules" ?먮윭 ?섏젙
+    - Edge Function?먯꽌 Prisma 李몄“ ?쒓굅
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/middleware.ts | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+commit 031174ec6aba81e51915ba1451480b344ba16295
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:32:25 2025 +0900
+
+    fix: Vercel outputDirectory 紐낆떆???ㅼ젙
+    
+    - routes-manifest.json 寃쎈줈 臾몄젣 ?닿껐
+    - outputDirectory瑜?.next濡?紐낆떆
+    - Vercel??src/.next媛 ?꾨땶 .next瑜?李몄“?섎룄濡??섏젙
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ vercel.json | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+commit b59c430bc1a1b74e8424535931f20af90379f8fa
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:29:39 2025 +0900
+
+    fix: Vercel 諛고룷瑜??꾪빐 standalone 異쒕젰 紐⑤뱶 ?쒓굅
+    
+    - output: 'standalone'? Docker/?먯껜 ?몄뒪?낆슜
+    - Vercel?먯꽌??湲곕낯 異쒕젰 紐⑤뱶 ?ъ슜 ?꾩슂
+    - routes-manifest.json ?ㅻ쪟 ?닿껐
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ next.config.ts | 3 ---
+ 1 file changed, 3 deletions(-)
+
+commit eadc6dfd7e3dd0ceba9aa01b409c04b70b7f1130
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:25:52 2025 +0900
+
+    fix: Vercel buildCommand 紐낆떆???ㅼ젙
+    
+    Vercel??vercel-build瑜?李얠? 紐삵븯??臾몄젣 ?닿껐:
+    - buildCommand瑜?'pnpm build'濡?紐낆떆???ㅼ젙
+    - framework 媛먯?留뚯쑝濡쒕뒗 遺議깊븳 寃쎌슦 ?鍮?    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ vercel.json | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+commit ffdd2b9826dee6205723fe34086a5a71184c191f
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:20:44 2025 +0900
+
+    鍮뚮뱶理쒖쥌
+
+ .claude/settings.local.json | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+commit a1b3b3ba6cc8f0328b4b93f8d0d92af1d82260e8
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 18:15:25 2025 +0900
+
+    fix: Vercel 諛고룷 洹쇰낯 臾몄젣 ?닿껐
+    
+    ??而ㅻ컠? Vercel 諛고룷 ?ㅽ뙣??3媛吏 洹쇰낯 ?먯씤???닿껐?⑸땲??
+    
+    ## 二쇱슂 蹂寃쎌궗??
+    
+    ### 1. Prisma 而ㅼ뒪? 異쒕젰 寃쎈줈 ?쒓굅
+    - prisma/schema.prisma: output ?ㅼ젙 ?쒓굅
+    - 湲곕낯 寃쎈줈(node_modules/@prisma/client) ?ъ슜?쇰줈 蹂寃?    - 紐⑤뱺 import瑜?@prisma/client濡??섏젙:
+      * src/lib/prisma.ts
+      * src/auth.ts
+      * prisma/seed.ts
+    
+    ### 2. vercel.json 理쒖냼??    - 遺덊븘?뷀븳 buildCommand, installCommand ?쒓굅
+    - Vercel ?먮룞 媛먯? 諛?理쒖쟻???쒖슜
+    - framework? regions留?紐낆떆
+    
+    ### 3. pnpm ?ㅼ젙 理쒖쟻??    - .npmrc 異붽?濡?pnpm 罹먯떛 理쒖쟻??    - 鍮뚮뱶 ?띾룄 ?μ긽
+    
+    ### 4. next.config.ts ?섏젙
+    - swcMinify ?쒓굅 (Next.js 15?먯꽌 deprecated)
+    - Prisma webpack externals ?좎?
+    
+    ### 5. 諛고룷 臾몄꽌 ?낅뜲?댄듃
+    - VERCEL_DEPLOYMENT.md: 洹쇰낯 ?먯씤 遺꾩꽍 諛??닿껐梨?異붽?
+    - ?몃윭釉붿뒋??媛?대뱶 媛뺥솕
+    
+    ## 湲곕? ?④낵:
+    ???덉젙?곸씤 Vercel 諛고룷
+    ??鍮뚮뱶 ?쒓컙 ?⑥텞 (罹먯떛 ?쒖슜)
+    ??Prisma ?대씪?댁뼵???먮룞 ?앹꽦
+    ???좎?蹂댁닔???μ긽
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .npmrc               |  10 ++
+ VERCEL_DEPLOYMENT.md | 332 ++++++++++++++++++++++++++++++---------------------
+ next.config.ts       |   3 -
+ prisma/schema.prisma |   3 +-
+ prisma/seed.ts       |   2 +-
+ src/auth.ts          |   2 +-
+ src/lib/prisma.ts    |   2 +-
+ vercel.json          |  10 +-
+ 8 files changed, 209 insertions(+), 155 deletions(-)
+
+commit d041a851938a719c2c36f29c50b384b77e5ff1e4
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 17:12:21 2025 +0900
+
+    fix: Vercel 諛고룷 理쒖쟻??諛?援ъ꽦 ?ㅼ젙
+    
+    - vercel.json 異붽? (鍮뚮뱶 紐낅졊, ?꾨젅?꾩썙?? 由ъ쟾 ?ㅼ젙)
+    - .vercelignore 異붽? (遺덊븘?뷀븳 ?뚯씪 ?쒖쇅濡?鍮뚮뱶 ?띾룄 ?μ긽)
+    - next.config.ts ?낅뜲?댄듃:
+      * standalone 異쒕젰 紐⑤뱶濡?Vercel 理쒖쟻??      * Prisma webpack externals ?ㅼ젙
+      * ?대?吏 理쒖쟻???ㅼ젙
+      * swcMinify ?쒖꽦??    - package.json??postinstall ?ㅽ겕由쏀듃 異붽? (Prisma ?먮룞 ?앹꽦)
+    - VERCEL_DEPLOYMENT.md 諛고룷 媛?대뱶 異붽?
+    
+    ??蹂寃쎌궗??쑝濡?Vercel 諛고룷 ??
+    - 鍮뚮뱶 ?쒓컙 ?⑥텞
+    - Prisma ?대씪?댁뼵???먮룞 ?앹꽦
+    - 踰덈뱾 ?ш린 理쒖쟻??    - ?쒓뎅 由ъ쟾(icn1) ?ъ슜?쇰줈 ?깅뒫 ?μ긽
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .vercelignore        |  49 +++++++++
+ VERCEL_DEPLOYMENT.md | 284 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ next.config.ts       |  34 +++++-
+ package.json         |   1 +
+ vercel.json          |  12 +++
+ 5 files changed, 379 insertions(+), 1 deletion(-)
+
+commit 137eea2e3e3cc61150de83e5ef9dc217f70f83a1
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 16:48:39 2025 +0900
+
+    諛고룷?ㅻ쪟 臾몄젣 臾댁떆??
+ pnpm-workspace.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+commit 099ed57de2bd2655f86b9e18929d66176673b4ff
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 16:21:37 2025 +0900
+
+    諛고룷?몃쪟?섏젙 node 踰꾩쟾 ?ㅼ슫??
+ package.json   |  2 +-
+ pnpm-lock.yaml | 12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+commit 6a11d969dd1b3ea7b952328d410a5fc2184464b7
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 15:52:09 2025 +0900
+
+    鍮뚮뱶?ㅻ쪟瑜?
+ package.json                                 |  1 +
+ pnpm-lock.yaml                               | 54 ++++++++++++++++++++++
+ src/app/api/attachments/[id]/route.ts        | 20 ++++++--
+ src/app/api/clients/[id]/categories/route.ts | 35 ++++++++------
+ src/app/api/clients/[id]/route.ts            | 53 ++++++++++++++--------
+ src/app/api/roles/[id]/permissions/route.ts  | 21 +++++----
+ src/app/api/roles/[id]/route.ts              | 37 ++++++++-------
+ src/app/api/srs/[id]/activities/route.ts     | 15 ++++--
+ src/app/api/srs/[id]/comments/route.ts       | 28 +++++++-----
+ src/app/api/srs/[id]/route.ts                | 68 ++++++++++++++++------------
+ src/app/api/users/[id]/roles/route.ts        | 21 +++++----
+ src/app/api/users/[id]/route.ts              | 39 ++++++++--------
+ src/lib/email.ts                             | 26 ++++++++++-
+ 13 files changed, 280 insertions(+), 138 deletions(-)
+
+commit b8e24e6211a5781c7b372d98089509c10c4c0609
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 14:47:03 2025 +0900
+
+    vecel 諛고룷?ㅻ쪟
+
+ package.json | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+commit 997871ca51880ff934aada1c598bf977601cb020
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 14:22:43 2025 +0900
+
+    vercel?섍꼍?ㅼ젙??
+ API_FIXES_SUMMARY.md                  | 396 --------------------------------
+ CACHE_CLEAR_GUIDE.md                  | 340 ----------------------------
+ CONSOLE_LOG_CHECK.md                  | 237 -------------------
+ DEBUG_INSTRUCTIONS.md                 | 373 ------------------------------
+ DEVELOPMENT_STATUS.md                 | 227 -------------------
+ E2E_COMPLETION_SUMMARY.md             | 231 -------------------
+ E2E_FINAL_RESULTS.md                  | 324 --------------------------
+ E2E_FINAL_STATUS.md                   | 259 ---------------------
+ E2E_SR_LIST_TEST_NOTES.md             | 184 ---------------
+ E2E_SUCCESS_REPORT.md                 | 290 ------------------------
+ E2E_TESTING_SUMMARY.md                |  63 ------
+ E2E_TEST_RESULTS.md                   | 289 ------------------------
+ EDGE_RUNTIME_FIX.md                   | 164 --------------
+ EDGE_RUNTIME_FIX_COMPLETE.md          | 305 -------------------------
+ FINAL_FIX.md                          | 385 -------------------------------
+ FINAL_STATUS.md                       | 333 ---------------------------
+ FINAL_TEST_GUIDE.md                   | 414 ----------------------------------
+ NEXT_STEPS.md                         | 294 ------------------------
+ PHASE6_TESTING_COMPLETE.md            | 248 --------------------
+ new-server-log.txt                    | Bin 763672 -> 0 bytes
+ prisma/schema.prisma                  |   1 +
+ src/app/api/attachments/[id]/route.ts |  20 +-
+ src/app/api/attachments/route.ts      |  26 +--
+ src/lib/storage.ts                    |  59 +++++
+ 24 files changed, 74 insertions(+), 5388 deletions(-)
+
+commit 6fd27d8aeb464b50ff1cc9b96dbc417192a94e24
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 02:38:12 2025 +0900
+
+    SR?묒뾽以묒쨷
+
+ API_FIXES_SUMMARY.md                         | 396 ++++++++++++++++++++
+ CACHE_CLEAR_GUIDE.md                         | 340 ++++++++++++++++++
+ CONSOLE_LOG_CHECK.md                         | 237 ++++++++++++
+ DEBUG_INSTRUCTIONS.md                        | 373 +++++++++++++++++++
+ EDGE_RUNTIME_FIX_COMPLETE.md                 | 305 ++++++++++++++++
+ FINAL_FIX.md                                 | 385 ++++++++++++++++++++
+ FINAL_TEST_GUIDE.md                          | 414 +++++++++++++++++++++
+ QUICK_FIX_API_ERROR.md                       | 109 ++++++
+ ROOT_CAUSE_ANALYSIS.md                       | 321 +++++++++++++++++
+ ROOT_CAUSE_FOUND.md                          | 515 +++++++++++++++++++++++++++
+ SR_CREATE_FIX.md                             | 322 +++++++++++++++++
+ SR_FORM_ENHANCEMENT.md                       | 386 ++++++++++++++++++++
+ SYSTEMATIC_DIAGNOSIS.md                      | 420 ++++++++++++++++++++++
+ TEST_VERIFICATION_GUIDE.md                   | 309 ++++++++++++++++
+ add-runtime-to-apis.ps1                      |  83 +++++
+ new-server-log.txt                           | Bin 0 -> 763672 bytes
+ prisma/seed.ts                               |  52 ++-
+ restart-dev-server.ps1                       |  24 ++
+ server-debug.log                             | Bin 0 -> 2919118 bytes
+ src/app/(dashboard)/srs/page.tsx             |  25 +-
+ src/app/api/attachments/route.ts             |   3 +
+ src/app/api/clients/[id]/categories/route.ts |   8 +-
+ src/app/api/clients/route.ts                 |   3 +
+ src/app/api/dashboard/stats/route.ts         |   5 +-
+ src/app/api/health/route.ts                  |   3 +
+ src/app/api/permissions/route.ts             |   5 +-
+ src/app/api/roles/route.ts                   |   3 +
+ src/app/api/srs/[id]/route.ts                |  31 +-
+ src/app/api/srs/route.ts                     |  96 ++++-
+ src/app/api/test/route.ts                    |  32 ++
+ src/app/api/users/route.ts                   |   3 +
+ src/components/srs/CreateSRDialog.tsx        | 145 +++++++-
+ 32 files changed, 5301 insertions(+), 52 deletions(-)
+
+commit 47346adf5719a746a376b400605f744f6abff130
+Author: lkindo <lkindo@gmail.com>
+Date:   Sun Nov 9 00:04:47 2025 +0900
+
+    mvp1-沅뚰븳愿由????꾩닔 湲곕뒫 誘명씉??
+ DEVELOPMENT_STATUS.md                        |  227 ++++
+ E2E_COMPLETION_SUMMARY.md                    |  231 ++++
+ E2E_FINAL_RESULTS.md                         |  324 ++++++
+ E2E_FINAL_STATUS.md                          |  259 +++++
+ E2E_SR_LIST_TEST_NOTES.md                    |  184 +++
+ E2E_SUCCESS_REPORT.md                        |  290 +++++
+ E2E_TESTING_SUMMARY.md                       |   63 +
+ E2E_TEST_RESULTS.md                          |  289 +++++
+ EDGE_RUNTIME_FIX.md                          |  164 +++
+ FINAL_STATUS.md                              |  333 ++++++
+ NEXT_STEPS.md                                |  294 +++++
+ PERMISSION_SYSTEM_GUIDE.md                   |  351 ++++++
+ PHASE6_TESTING_COMPLETE.md                   |  248 ++++
+ REMAINING_FEATURES_COMPLETED.md              |  345 ++++++
+ SETUP_COMPLETE.md                            |  282 +++++
+ SETUP_GUIDE.md                               |  299 +++++
+ START_SERVER.md                              |  231 ++++
+ SUPABASE_SETUP.md                            |  187 +++
+ e2e/01-basic.spec.ts                         |   61 +
+ e2e/02-auth.spec.ts                          |  113 ++
+ e2e/03-sr-list.spec.ts                       |   67 ++
+ e2e/04-sr-create.spec.ts                     |  104 ++
+ e2e/05-sr-detail.spec.ts                     |   73 ++
+ e2e/auth.setup.ts                            |   27 +
+ e2e/global-setup.ts                          |   46 +
+ package.json                                 |   19 +-
+ playwright-report/index.html                 |   85 ++
+ playwright.config.ts                         |   88 ++
+ playwright/.auth/user.json                   |   35 +
+ pnpm-lock.yaml                               | 1590 +++++++++++++++++++++++++-
+ prisma.config.ts                             |   16 -
+ prisma/dev.db                                |  Bin 380928 -> 12288 bytes
+ prisma/schema.prisma                         |    2 +-
+ prisma/seed.ts                               |  128 +++
+ src/__tests__/helpers/setup.ts               |   67 ++
+ src/__tests__/mocks/next-navigation.ts       |   18 +
+ src/__tests__/mocks/next-server.ts           |   19 +
+ src/app/(auth)/register/actions.ts           |    2 +-
+ src/app/(dashboard)/srs/[id]/page.tsx        |    7 +
+ src/app/(dashboard)/srs/page.tsx             |   11 +-
+ src/app/(dashboard)/users/page.tsx           |  266 +++++
+ src/app/api/attachments/[id]/route.ts        |  120 ++
+ src/app/api/attachments/route.ts             |  110 ++
+ src/app/api/clients/[id]/categories/route.ts |   74 +-
+ src/app/api/clients/[id]/route.ts            |    2 +-
+ src/app/api/clients/route.ts                 |    2 +-
+ src/app/api/dashboard/stats/route.ts         |    2 +-
+ src/app/api/roles/[id]/permissions/route.ts  |    2 +-
+ src/app/api/roles/[id]/route.ts              |    2 +-
+ src/app/api/roles/route.ts                   |    2 +-
+ src/app/api/srs/[id]/comments/route.ts       |   11 +-
+ src/app/api/srs/[id]/route.ts                |   41 +-
+ src/app/api/srs/route.ts                     |   19 +-
+ src/app/api/users/[id]/roles/route.ts        |   84 ++
+ src/app/api/users/[id]/route.ts              |  193 ++++
+ src/app/api/users/route.ts                   |  130 +++
+ src/app/layout.tsx                           |    7 +-
+ src/app/page.tsx                             |  408 ++++++-
+ src/auth.ts                                  |   40 +
+ src/components/auth/PermissionGuard.tsx      |   62 +
+ src/components/dashboard/SRStatusChart.tsx   |   79 ++
+ src/components/dashboard/SRTrendChart.tsx    |   70 ++
+ src/components/dashboard/StatsCard.tsx       |   50 +
+ src/components/layout/Sidebar.tsx            |   75 +-
+ src/components/layout/UserNav.tsx            |    5 +-
+ src/components/loading/CardSkeleton.tsx      |   20 +
+ src/components/loading/ChartSkeleton.tsx     |   18 +
+ src/components/loading/TableSkeleton.tsx     |   43 +
+ src/components/providers/SessionProvider.tsx |   13 +
+ src/components/srs/SRAttachments.tsx         |  233 ++++
+ src/components/ui/skeleton.tsx               |   17 +
+ src/components/users/AssignRolesDialog.tsx   |  192 ++++
+ src/hooks/use-permissions.ts                 |   49 +
+ src/lib/__tests__/api-response.test.ts       |  229 ++++
+ src/lib/api-response.ts                      |  130 +++
+ src/lib/email.ts                             |    6 +-
+ src/lib/permissions.ts                       |  203 ++++
+ src/lib/prisma.ts                            |    9 -
+ src/types/next-auth.d.ts                     |    6 +
+ test-results/.last-run.json                  |    4 +
+ vitest.config.ts                             |   41 +
+ vitest.setup.ts                              |   15 +
+ 82 files changed, 10107 insertions(+), 156 deletions(-)
+
+commit 4ed92349318201e28511f674851f0ed2796f3556
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 16:08:33 2025 +0900
+
+    Update .gitignore
+
+ .gitignore | Bin 517 -> 522 bytes
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+
+commit 501885de50d0df0c34cbe0538e3a5b3c4e40fffd
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 16:02:37 2025 +0900
+
+    supabase ?ㅼ젙
+
+ .claude/settings.local.json                        |   19 +-
+ .env.supabase.example                              |    6 +-
+ .gitignore                                         |  Bin 507 -> 517 bytes
+ docs/SUPABASE_SETUP_GUIDE.md                       |  193 +++-
+ package.json                                       |   11 +-
+ pnpm-lock.yaml                                     | 1115 ++++++++++----------
+ prisma.config.ts                                   |    5 +-
+ .../migrations/20251107123048_init/migration.sql   |  362 -------
+ .../migration.sql                                  |   40 -
+ prisma/migrations/migration_lock.toml              |    3 -
+ prisma/schema.prisma                               |    2 +-
+ src/app/api/health/route.ts                        |   37 +
+ src/emails/SRAssignedEmail.tsx                     |  131 +++
+ src/emails/SRCreatedEmail.tsx                      |  124 +++
+ src/emails/SRStatusChangedEmail.tsx                |  145 +++
+ src/lib/prisma.ts                                  |    9 +
+ supabase-init.sql                                  |  293 +++++
+ supabase-seed.sql                                  |  145 +++
+ 18 files changed, 1603 insertions(+), 1037 deletions(-)
+
+commit 9462730c54b92a5345b285383199ab213b212d61
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 01:34:08 2025 +0900
+
+    docs: Supabase ?곌껐 媛?대뱶 諛?PostgreSQL 留덉씠洹몃젅?댁뀡 以鍮?    
+    - Prisma ?ㅽ궎留덈? PostgreSQL濡?蹂寃?      * provider: sqlite ??postgresql
+      * directUrl 異붽? (留덉씠洹몃젅?댁뀡??
+    
+    - Supabase ?곌껐 媛?대뱶 ?앹꽦 (docs/SUPABASE_SETUP_GUIDE.md):
+      * ?꾨줈?앺듃 ?앹꽦 ?④퀎蹂??덈궡
+      * Connection String ?뺣낫 諛⑸쾿 (Pooling/Direct)
+      * ?섍꼍 蹂???ㅼ젙
+      * 留덉씠洹몃젅?댁뀡 ?ㅽ뻾 諛⑸쾿
+      * Seed ?곗씠???앹꽦
+      * ?곌껐 ?뚯뒪???덉감
+      * 臾몄젣 ?닿껐 (5媛吏 ?쇰컲?곸씤 臾몄젣? ?닿껐梨?
+      * 臾대즺 ?뚮옖 ?쒗븳?ы빆
+    
+    - .env.supabase.example ?뚯씪 異붽?:
+      * DATABASE_URL (Connection Pooling) ?덉젣
+      * DIRECT_URL (Direct Connection) ?덉젣
+      * ?곸꽭??二쇱꽍怨?Supabase ??쒕낫??李몄“ 諛⑸쾿
+    
+    Phase 5.1 ?꾨즺: Supabase ?곌껐 以鍮?    
+    ?ㅼ쓬 ?④퀎:
+    1. Supabase ?꾨줈?앺듃 ?앹꽦 (https://supabase.com)
+    2. Connection String ?뺣낫
+    3. .env ?뚯씪 ?낅뜲?댄듃
+    4. 留덉씠洹몃젅?댁뀡 ?ㅽ뻾: npx prisma migrate deploy
+    5. Seed ?ㅽ뻾: pnpm db:seed
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .env.supabase.example        |  59 ++++++++
+ docs/SUPABASE_SETUP_GUIDE.md | 321 +++++++++++++++++++++++++++++++++++++++++++
+ prisma/schema.prisma         |   5 +-
+ 3 files changed, 383 insertions(+), 2 deletions(-)
+
+commit 938c62e96455d2b531a974b1c77eb755bddd507e
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 01:20:08 2025 +0900
+
+    feat: ??쒕낫??諛??듦퀎 湲곕뒫 援ы쁽 ?꾨즺
+    
+    - ??쒕낫???듦퀎 API (GET /api/dashboard/stats):
+      * ?꾩껜 ?듦퀎 (珥?SR, 吏꾪뻾 以? ?꾨즺, ?湲?
+      * ?곹깭蹂?SR 吏묎퀎
+      * ?곗꽑?쒖쐞蹂?SR 吏묎퀎
+      * 怨좉컼?щ퀎 SR ??(?곸쐞 10媛?
+      * 理쒓렐 SR 紐⑸줉 (理쒓렐 10媛?
+      * SR ?앹꽦 異붿씠 (理쒓렐 30??
+      * ?좎쭨蹂??먮룞 吏묎퀎 諛?鍮??좎쭨 梨꾩슦湲?    
+    - ??쒕낫??UI 援ы쁽 (src/app/(dashboard)/dashboard/page.tsx):
+      * 4媛??듦퀎 移대뱶:
+        - 珥?SR (FileText ?꾩씠肄?
+        - 吏꾪뻾 以?(Clock ?꾩씠肄?
+        - ?꾨즺 (CheckCircle ?꾩씠肄?
+        - ?湲?以?(AlertCircle ?꾩씠肄?
+      * ?곹깭蹂?SR 遺꾪룷 (?뚯씠 李⑦듃)
+        - 7媛吏 ?곹깭蹂??됱긽 援щ텇
+        - ?쇱꽱???쒖떆
+      * ?곗꽑?쒖쐞蹂?SR 遺꾪룷 (?뚯씠 李⑦듃)
+        - 4媛吏 ?곗꽑?쒖쐞蹂??됱긽 援щ텇
+        - ?쇱꽱???쒖떆
+      * SR ?앹꽦 異붿씠 李⑦듃 (?쇱씤 李⑦듃)
+        - 理쒓렐 30???곗씠??        - ?좎쭨蹂?SR ???쒖떆
+        - ?쒓뎅???좎쭨 ?뺤떇
+      * 理쒓렐 SR ?쒕룞 紐⑸줉
+        - SR 踰덊샇, ?쒕ぉ ?대┃ ???곸꽭 ?섏씠吏 ?대룞
+        - 怨좉컼?? ?붿껌?? ?대떦???뺣낫
+        - ?곗꽑?쒖쐞 諛??곹깭 Badge
+      * 怨좉컼?щ퀎 SR ?듦퀎
+        - ?곸쐞 10媛?怨좉컼??        - SR ???쒖떆
+    
+    - 李⑦듃 ?쇱씠釉뚮윭由?(Recharts):
+      * 諛섏쓳??李⑦듃 (ResponsiveContainer)
+      * PieChart, LineChart 援ы쁽
+      * Tooltip 諛?Legend
+      * ?ъ슜???뺤쓽 ?됱긽
+    
+    - ?⑦궎吏 異붽?:
+      * recharts - 李⑦듃 ?쇱씠釉뚮윭由?    
+    Phase 4 ?꾨즺: ??쒕낫??諛??듦퀎 ?쒖뒪??    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json            |   4 +-
+ package.json                           |   1 +
+ pnpm-lock.yaml                         | 283 ++++++++++++++++++++++++
+ src/app/(dashboard)/dashboard/page.tsx | 383 +++++++++++++++++++++++++++++++--
+ src/app/api/dashboard/stats/route.ts   | 160 ++++++++++++++
+ 5 files changed, 808 insertions(+), 23 deletions(-)
+
+commit deb43195125348984783a98ff85671a0c7ade869
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 01:17:31 2025 +0900
+
+    feat: ?대찓???뚮┝ ?쒖뒪??援ы쁽 ?꾨즺
+    
+    - ?대찓???쒗뵆由?援ы쁽 (React Email):
+      * SRCreatedEmail - SR ?앹꽦 ?뚮┝
+        - SR 湲곕낯 ?뺣낫 ?쒖떆 (踰덊샇, ?쒕ぉ, ?곗꽑?쒖쐞)
+        - 怨좉컼??諛??붿껌???뺣낫
+        - ?곗꽑?쒖쐞蹂??됱긽 諛곗?
+      * SRStatusChangedEmail - SR ?곹깭 蹂寃??뚮┝
+        - ?댁쟾 ?곹깭 ??蹂寃쎈맂 ?곹깭 ?쒖떆
+        - 蹂寃??ъ쑀 諛?蹂寃쎌옄 ?뺣낫
+      * SRAssignedEmail - SR ?대떦??諛곗젙 ?뚮┝
+        - 諛곗젙???대떦???뺣낫
+        - SR ?곸꽭 ?뺣낫 諛??곗꽑?쒖쐞
+    
+    - ?대찓??諛쒖넚 ?쒕퉬??(src/lib/email.ts):
+      * Resend API ?듯빀
+      * sendSRCreatedEmail() - SR ?앹꽦 ???붿껌?먯뿉寃??뚮┝
+      * sendSRStatusChangedEmail() - ?곹깭 蹂寃????붿껌?먯뿉寃??뚮┝
+      * sendSRAssignedEmail() - ?대떦??諛곗젙 ???대떦?먯뿉寃??뚮┝
+      * sendCommentNotificationEmail() - ?볤? ?묒꽦 ??愿?⑥옄?먭쾶 ?뚮┝
+      * Non-blocking 諛⑹떇?쇰줈 ?대찓???꾩넚 (?ㅽ뙣 ??濡쒓렇留?湲곕줉)
+    
+    - ?뚮┝ ?몃━嫄??듯빀:
+      * SR ?앹꽦 ???먮룞 ?대찓??諛쒖넚 (src/app/api/srs/route.ts)
+      * SR ?곹깭 蹂寃????먮룞 ?대찓??諛쒖넚 (src/app/api/srs/[id]/route.ts)
+      * ?대떦??諛곗젙 ???먮룞 ?대찓??諛쒖넚 (src/app/api/srs/[id]/route.ts)
+      * ?볤? ?묒꽦 ???붿껌??諛??대떦?먯뿉寃??뚮┝ (src/app/api/srs/[id]/comments/route.ts)
+        - 以묐났 ?뚮┝ 諛⑹? (Set ?ъ슜)
+        - ?먯떊?먭쾶???뚮┝ 諛쒖넚 ?덊븿
+    
+    - ?섍꼍 蹂???ㅼ젙 (.env):
+      * RESEND_API_KEY - Resend API ??      * EMAIL_FROM - 諛쒖떊???대찓??      * NEXT_PUBLIC_APP_URL - ??URL (?대찓??留곹겕??
+    
+    - ?⑦궎吏 異붽?:
+      * react-email - ?대찓???쒗뵆由??쇱씠釉뚮윭由?      * @react-email/components - ?대찓??而댄룷?뚰듃
+      * resend - ?대찓??諛쒖넚 ?쒕퉬??    
+    Phase 3 ?꾨즺: ?뚮┝ ?쒖뒪??援ы쁽
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ emails/SRAssignedEmail.tsx             |  238 +++++++
+ emails/SRCreatedEmail.tsx              |  239 +++++++
+ emails/SRStatusChangedEmail.tsx        |  280 ++++++++
+ package.json                           |    3 +
+ pnpm-lock.yaml                         | 1168 ++++++++++++++++++++++++++++++++
+ src/app/api/srs/[id]/comments/route.ts |   46 +-
+ src/app/api/srs/[id]/route.ts          |   42 ++
+ src/app/api/srs/route.ts               |   19 +
+ src/lib/email.ts                       |  240 +++++++
+ 9 files changed, 2274 insertions(+), 1 deletion(-)
+
+commit 8d3b925ecacc4f16bd022f2b30d8a01656ac7155
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 01:10:31 2025 +0900
+
+    feat: SR ?곸꽭 ?섏씠吏 諛?愿??湲곕뒫 援ы쁽 ?꾨즺
+    
+    - SR ?곸꽭 ?섏씠吏 援ы쁽 (src/app/(dashboard)/srs/[id]/page.tsx):
+      * SR 湲곕낯 ?뺣낫 ?쒖떆 (?쒕ぉ, ?ㅻ챸, ?곹깭, ?곗꽑?쒖쐞)
+      * 怨좉컼?? 移댄뀒怨좊━, ?붿껌?? ?대떦???뺣낫
+      * ?앹꽦?? ?섏젙?? ?붿껌/?ㅼ젣 ?꾨즺 ?좎쭨
+      * ?볤? 諛?泥⑤??뚯씪 ?듦퀎
+      * ?섏젙/??젣 踰꾪듉
+      * ??UI: ?볤?, ?쒕룞 ?대젰
+    
+    - SR ?볤? 而댄룷?뚰듃 (SRComments):
+      * ?볤? 紐⑸줉 議고쉶 諛??쒖떆
+      * ???볤? ?묒꽦 ??      * ?ъ슜???꾨컮? 諛??대쫫 ?쒖떆
+      * ?묒꽦 ?쒓컙 ?쒖떆
+    
+    - SR ?쒕룞 ?대젰 而댄룷?뚰듃 (SRActivities):
+      * 紐⑤뱺 ?쒕룞 ?대젰 ?쒓컙???쒖떆
+      * ??꾨씪??UI (?몃줈 ?쇱씤)
+      * ?쒕룞 ??낅퀎 Badge (?앹꽦, ?섏젙, ?곹깭 蹂寃? ?대떦??吏?? ?볤?, 泥⑤??뚯씪)
+      * ?ъ슜???꾨컮? 諛??ㅻ챸
+    
+    - SR ?섏젙 Dialog (EditSRDialog):
+      * ?쒕ぉ, ?ㅻ챸, ?곹깭, ?곗꽑?쒖쐞 ?섏젙
+      * ?대떦??蹂寃?(?ъ슜??紐⑸줉 議고쉶)
+      * ?붿껌 ?꾨즺 ?좎쭨 蹂寃?      * ?곹깭 蹂寃???蹂寃??ъ쑀 ?꾩닔 ?낅젰
+      * ?낅젰 ?좏슚??寃利?    
+    - SR ??젣 Dialog (DeleteSRDialog):
+      * ??젣 ?뺤씤 硫붿떆吏
+      * 愿???곗씠????젣 寃쎄퀬 (?볤?, 泥⑤??뚯씪)
+    
+    - SR ?쒕룞 ?대젰 API (GET /api/srs/[id]/activities):
+      * ?쒕룞 ?대젰 議고쉶
+      * ?ъ슜???뺣낫 ?ы븿
+      * ?쒓컙???뺣젹
+    
+    - Tabs UI 而댄룷?뚰듃 異붽? (shadcn/ui)
+    
+    - ?⑦궎吏 ?낅뜲?댄듃:
+      * @radix-ui/react-tabs 異붽?
+    
+    Phase 2.3 ?꾨즺: SR ?곸꽭 ?섏씠吏 援ы쁽
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ package.json                             |   1 +
+ pnpm-lock.yaml                           |  32 +++
+ src/app/(dashboard)/srs/[id]/page.tsx    | 394 +++++++++++++++++++++++++++++++
+ src/app/api/srs/[id]/activities/route.ts |  40 ++++
+ src/components/srs/DeleteSRDialog.tsx    | 103 ++++++++
+ src/components/srs/EditSRDialog.tsx      | 317 +++++++++++++++++++++++++
+ src/components/srs/SRActivities.tsx      | 149 ++++++++++++
+ src/components/srs/SRComments.tsx        | 198 ++++++++++++++++
+ src/components/ui/tabs.tsx               |  55 +++++
+ 9 files changed, 1289 insertions(+)
+
+commit ccaabdb858b2731790a47ce07e3f719a59946416
+Author: lkindo <lkindo@gmail.com>
+Date:   Sat Nov 8 01:06:37 2025 +0900
+
+    feat: SR 愿由??쒖뒪??API 諛?UI 援ы쁽 ?꾨즺
+    
+    - SR 愿由?API 援ы쁽:
+      * POST/GET /api/srs - SR ?앹꽦 諛?紐⑸줉 議고쉶
+        - ?먮룞 SR 踰덊샇 ?앹꽦 (SR-YYYYMMDD-XXXX ?뺤떇)
+        - ?곗꽑?쒖쐞, 移댄뀒怨좊━, ?붿껌 ?꾨즺??吏??        - Activity 濡쒓렇 ?먮룞 ?앹꽦
+      * GET/PATCH/DELETE /api/srs/[id] - SR 議고쉶/?섏젙/??젣
+        - ?곹깭 蹂寃???SRStatusHistory ?먮룞 ?앹꽦
+        - ?대떦??蹂寃?異붿쟻
+        - Activity 濡쒓렇 ?먮룞 ?앹꽦
+      * GET/POST /api/srs/[id]/comments - ?볤? 議고쉶/異붽?
+        - ?볤? 異붽? ??Activity 濡쒓렇 ?먮룞 ?앹꽦
+    
+    - SR 紐⑸줉 ?섏씠吏 援ы쁽 (src/app/(dashboard)/srs/page.tsx):
+      * ?곹깭 諛??곗꽑?쒖쐞 ?꾪꽣留?      * SR 踰덊샇, ?쒕ぉ, 怨좉컼?? ?붿껌?? ?대떦?? ?곗꽑?쒖쐞, ?곹깭 ?쒖떆
+      * ?볤?/泥⑤??뚯씪 媛쒖닔 ?쒖떆
+      * SR 踰덊샇 ?대┃ ???곸꽭 ?섏씠吏 ?대룞
+      * Badge 而댄룷?뚰듃濡??곹깭/?곗꽑?쒖쐞 ?쒓컖??    
+    - CreateSRDialog 而댄룷?뚰듃 援ы쁽:
+      * ?쒕ぉ, ?ㅻ챸, 怨좉컼?? ?쒕퉬??移댄뀒怨좊━ ?낅젰
+      * ?곗꽑?쒖쐞 ?좏깮 (湲닿툒/?믪쓬/蹂댄넻/??쓬)
+      * ?붿껌 ?꾨즺 ?좎쭨 ?좏깮 (?좏깮?ы빆)
+      * 怨좉컼???좏깮 ???대떦 怨좉컼?ъ쓽 ?쒕퉬??移댄뀒怨좊━ ?먮룞 濡쒕뱶
+      * ?낅젰 ?좏슚??寃利?(?쒕ぉ 5???댁긽, ?ㅻ챸 10???댁긽)
+      * Toast ?뚮┝?쇰줈 ?깃났/?ㅽ뙣 ?쇰뱶諛?    
+    - Textarea UI 而댄룷?뚰듃 異붽? (shadcn/ui)
+    
+    Phase 2.1-2.2 ?꾨즺: SR API 諛?紐⑸줉 ?섏씠吏
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/srs/page.tsx       | 277 +++++++++++++++++++++++++++
+ src/app/api/srs/[id]/comments/route.ts | 115 +++++++++++
+ src/app/api/srs/[id]/route.ts          | 340 +++++++++++++++++++++++++++++++++
+ src/app/api/srs/route.ts               | 198 +++++++++++++++++++
+ src/components/srs/CreateSRDialog.tsx  | 312 ++++++++++++++++++++++++++++++
+ src/components/ui/textarea.tsx         |  22 +++
+ 6 files changed, 1264 insertions(+)
+
+commit 859b40a03f6e56d0bbe0203fd0d23c2399479283
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 21:51:35 2025 +0900
+
+    feat: 怨좉컼??愿由??쒖뒪??援ы쁽
+    
+    - 怨좉컼??愿由?API (src/app/api/clients)
+      * GET /api/clients - ?꾩껜 怨좉컼??紐⑸줉 議고쉶
+      * POST /api/clients - ??怨좉컼???앹꽦
+      * GET /api/clients/[id] - ?뱀젙 怨좉컼??議고쉶 (?곸꽭 ?뺣낫)
+      * PATCH /api/clients/[id] - 怨좉컼???뺣낫 ?섏젙
+      * DELETE /api/clients/[id] - 怨좉컼????젣 (?ъ슜??SR ?곌껐 ?뺤씤)
+      * GET /api/clients/[id]/categories - ?쒕퉬??移댄뀒怨좊━ 議고쉶
+      * POST /api/clients/[id]/categories - ?쒕퉬??移댄뀒怨좊━ 異붽?
+    
+    - 怨좉컼??紐⑸줉 ?섏씠吏 (src/app/(dashboard)/clients/page.tsx)
+      * 怨좉컼??紐⑸줉 ?뚯씠釉?      * 肄붾뱶, ?대쫫, ?곗뾽, ?대떦?? ?대찓?? ?ъ슜???? SR ?? ?쒖꽦 ?곹깭
+      * ?앹꽦, ?섏젙, ??젣 湲곕뒫
+      * ?ъ슜??SR???곌껐??怨좉컼?щ뒗 ??젣 遺덇?
+    
+    - 怨좉컼???ㅼ씠?쇰줈洹?(src/components/clients/ClientDialog.tsx)
+      * 怨좉컼???앹꽦/?섏젙 ??      * ?꾨뱶: 肄붾뱶, ?대쫫, ?곗뾽, ?대떦?? ?대찓?? ?꾪솕踰덊샇, 二쇱냼
+      * 怨꾩빟 ?쒖옉??醫낅즺?? ?쒖꽦 ?곹깭 泥댄겕諛뺤뒪
+      * 2??洹몃━???덉씠?꾩썐?쇰줈 怨듦컙 ?⑥쑉??諛곗튂
+      * ?ㅽ겕濡?媛?ν븳 ??붿긽??(理쒕? ?믪씠 90vh)
+    
+    - 怨좉컼????젣 ?ㅼ씠?쇰줈洹?(src/components/clients/DeleteClientDialog.tsx)
+      * 怨좉컼?щ챸怨?肄붾뱶 ?쒖떆濡??ㅼ닔 諛⑹?
+      * API ?곕룞 諛??먮윭 泥섎━
+    
+    - ?곗씠??寃利?      * Zod ?ㅽ궎留덈? ?듯븳 ?낅젰 寃利?      * 怨좉컼??肄붾뱶 以묐났 ?뺤씤
+      * ?대찓???뺤떇 寃利?      * ?좎쭨 ?꾨뱶 泥섎━ (ISO ?뺤떇)
+    
+    Phase 1.4-1.5 ?꾨즺: 怨좉컼??愿由??쒖뒪??    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ src/app/(dashboard)/clients/page.tsx          | 214 ++++++++++++++++++
+ src/app/api/clients/[id]/categories/route.ts  | 103 +++++++++
+ src/app/api/clients/[id]/route.ts             | 218 +++++++++++++++++++
+ src/app/api/clients/route.ts                  | 116 ++++++++++
+ src/components/clients/ClientDialog.tsx       | 298 ++++++++++++++++++++++++++
+ src/components/clients/DeleteClientDialog.tsx | 104 +++++++++
+ 6 files changed, 1053 insertions(+)
+
+commit b3ef809ee154b0934aed8ea1429ee8827816f2af
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 21:42:35 2025 +0900
+
+    feat: ??븷 愿由?UI ?섏씠吏 援ы쁽
+    
+    - ??븷 愿由??섏씠吏 (src/app/(dashboard)/roles/page.tsx)
+      * ??븷 紐⑸줉 ?뚯씠釉?(?대쫫, ?ㅻ챸, 沅뚰븳 ?? ?ъ슜????
+      * ??븷 ?앹꽦, ?섏젙, ??젣 湲곕뒫
+      * 沅뚰븳 愿由?湲곕뒫
+      * ?ъ슜?먭? ?좊떦????븷? ??젣 遺덇?
+    
+    - ??븷 ?ㅼ씠?쇰줈洹?而댄룷?뚰듃 (src/components/roles/RoleDialog.tsx)
+      * ??븷 ?앹꽦/?섏젙 ??      * ?대쫫, ?ㅻ챸 ?낅젰
+      * API ?곕룞 諛??먮윭 泥섎━
+    
+    - 沅뚰븳 愿由??ㅼ씠?쇰줈洹?(src/components/roles/PermissionDialog.tsx)
+      * 由ъ냼?ㅻ퀎 沅뚰븳 洹몃９??      * 泥댄겕諛뺤뒪濡?沅뚰븳 ?좏깮
+      * ??븷??沅뚰븳 ?쇨큵 ?좊떦
+      * ?ㅽ겕濡?媛?ν븳 ??붿긽??(理쒕? ?믪씠 80vh)
+    
+    - ??븷 ??젣 ?ㅼ씠?쇰줈洹?(src/components/roles/DeleteRoleDialog.tsx)
+      * ??젣 ?뺤씤 ?ㅼ씠?쇰줈洹?      * ??븷紐??쒖떆濡??ㅼ닔 諛⑹?
+    
+    - UI 而댄룷?뚰듃 異붽?
+      * Checkbox (shadcn/ui)
+      * Toast & Toaster (shadcn/ui)
+      * use-toast hook
+    
+    - ?덉씠?꾩썐 ?낅뜲?댄듃
+      * 猷⑦듃 ?덉씠?꾩썐??Toaster 異붽? (?뚮┝ ?쒖떆)
+      * Sidebar??"??븷 愿由? 硫붾돱 異붽? (Shield ?꾩씠肄?
+      * 誘몃뱾?⑥뼱??/roles 寃쎈줈 蹂댄샇 異붽?
+    
+    Phase 1.3 ?꾨즺: ??븷 愿由?UI
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ package.json                              |   2 +
+ pnpm-lock.yaml                            |  68 +++++++++
+ src/app/(dashboard)/roles/page.tsx        | 229 ++++++++++++++++++++++++++++++
+ src/app/layout.tsx                        |   2 +
+ src/components/layout/Sidebar.tsx         |   6 +
+ src/components/roles/DeleteRoleDialog.tsx | 100 +++++++++++++
+ src/components/roles/PermissionDialog.tsx | 213 +++++++++++++++++++++++++++
+ src/components/roles/RoleDialog.tsx       | 147 +++++++++++++++++++
+ src/components/ui/checkbox.tsx            |  30 ++++
+ src/components/ui/toast.tsx               | 129 +++++++++++++++++
+ src/components/ui/toaster.tsx             |  35 +++++
+ src/hooks/use-toast.ts                    | 194 +++++++++++++++++++++++++
+ src/middleware.ts                         |   1 +
+ 13 files changed, 1156 insertions(+)
+
+commit ea36d20c749e872e967771ad43971dee0b25f9f5
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 21:33:19 2025 +0900
+
+    feat: RBAC ?쒖뒪??API 諛??쒕뱶 ?곗씠??援ы쁽
+    
+    - ?곗씠?곕쿋?댁뒪 ?ㅽ궎留??ш뎄??      * Permission 紐⑤뜽???낅┰?곸쑝濡?遺꾨━
+      * RolePermission 以묎컙 ?뚯씠釉??앹꽦
+      * SQLite ?명솚?깆쓣 ?꾪빐 @db.Text, @db.Date ?쒓굅
+      * 2媛쒖쓽 留덉씠洹몃젅?댁뀡 ?곸슜 (init, restructure_permissions)
+    
+    - ??븷(Role) 愿由?API 援ы쁽
+      * GET /api/roles - 紐⑤뱺 ??븷 議고쉶
+      * POST /api/roles - ????븷 ?앹꽦
+      * GET /api/roles/[id] - ?뱀젙 ??븷 議고쉶
+      * PATCH /api/roles/[id] - ??븷 ?섏젙
+      * DELETE /api/roles/[id] - ??븷 ??젣 (?ъ슜???좊떦 ?뺤씤)
+      * POST /api/roles/[id]/permissions - ??븷??沅뚰븳 ?좊떦
+    
+    - 沅뚰븳(Permission) 愿由?API 援ы쁽
+      * GET /api/permissions - 紐⑤뱺 沅뚰븳 議고쉶
+    
+    - ?쒕뱶 ?곗씠???앹꽦 (prisma/seed.ts)
+      * 31媛쒖쓽 沅뚰븳 ?뺤쓽 (SR, CLIENT, USER, ROLE, COMMENT, ATTACHMENT, NOTIFICATION, DASHBOARD)
+      * 5媛쒖쓽 ??븷 ?앹꽦 (ADMIN, MANAGER, ENGINEER, CLIENT_ADMIN, CLIENT_USER)
+      * ??븷蹂?沅뚰븳 ?먮룞 ?좊떦
+        - ADMIN: 紐⑤뱺 沅뚰븳 (31媛?
+        - MANAGER: SR 愿由? 怨좉컼???ъ슜??愿由?(22媛?
+        - ENGINEER: SR 泥섎━, ?볤?/泥⑤??뚯씪 愿由?(13媛?
+        - CLIENT_ADMIN: ?먯궗 SR 愿由?(19媛?
+        - CLIENT_USER: SR ?앹꽦 諛?議고쉶 (7媛?
+    
+    - 媛쒕컻 ?섍꼍 ?ㅼ젙
+      * SQLite 媛쒕컻 ?곗씠?곕쿋?댁뒪 ?ㅼ젙 (dev.db)
+      * tsx 異붽??섏뿬 TypeScript ?쒕뱶 ?ㅽ겕由쏀듃 ?ㅽ뻾
+      * package.json??db:seed ?ㅽ겕由쏀듃 異붽?
+    
+    Phase 1.1-1.2 ?꾨즺: RBAC API 諛??쒕뱶 ?곗씠??    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json                        |   6 +-
+ package.json                                       |   4 +-
+ pnpm-lock.yaml                                     | 314 +++++++++++++++++-
+ prisma/dev.db                                      | Bin 0 -> 380928 bytes
+ .../migrations/20251107123048_init/migration.sql   | 362 +++++++++++++++++++++
+ .../migration.sql                                  |  40 +++
+ prisma/migrations/migration_lock.toml              |   3 +
+ prisma/schema.prisma                               |  71 ++--
+ prisma/seed.ts                                     | 273 ++++++++++++++++
+ src/app/api/permissions/route.ts                   |  27 ++
+ src/app/api/roles/[id]/permissions/route.ts        |  78 +++++
+ src/app/api/roles/[id]/route.ts                    | 184 +++++++++++
+ src/app/api/roles/route.ts                         |  99 ++++++
+ 13 files changed, 1415 insertions(+), 46 deletions(-)
+
+commit 04a6c2fb23b8543fd755dba71ca560f8e9169e6c
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 21:21:14 2025 +0900
+
+    feat: NextAuth.js ?몄쬆 ?쒖뒪???꾩꽦
+    
+    - NextAuth.js v5 ?ㅼ젙 ?꾨즺 (src/auth.ts)
+      * Credentials Provider 援ы쁽
+      * JWT ?몄뀡 ?꾨왂 ?ъ슜
+      * Prisma? ?곕룞???ъ슜???몄쬆
+      * bcryptjs 鍮꾨?踰덊샇 寃利?    
+    - ?몄쬆 誘몃뱾?⑥뼱 ?ㅼ젙 (src/middleware.ts)
+      * Dashboard, SR, Clients, Users, Settings 寃쎈줈 蹂댄샇
+      * 誘몄씤利??ъ슜???먮룞 由щ떎?대젆??    
+    - ?몄쬆 API ?쇱슦??(src/app/api/auth/[...nextauth]/route.ts)
+      * GET, POST ?몃뱾??援ы쁽
+    
+    - 濡쒓렇???섏씠吏 (src/app/(auth)/login/page.tsx)
+      * ?대찓??鍮꾨?踰덊샇 ??      * ?먮윭 ?몃뱾留?      * ?뚯썝媛??留곹겕
+    
+    - ?뚯썝媛???섏씠吏 諛??쒕쾭 ?≪뀡
+      * src/app/(auth)/register/page.tsx
+      * src/app/(auth)/register/actions.ts
+      * Zod ?ㅽ궎留?寃利?      * bcryptjs 鍮꾨?踰덊샇 ?댁떛 (salt rounds: 12)
+      * 以묐났 ?대찓??泥댄겕
+    
+    - Auth Layout (src/app/(auth)/layout.tsx)
+      * 以묒븰 ?뺣젹 移대뱶 ?덉씠?꾩썐
+    
+    - Header 而댄룷?뚰듃 ?낅뜲?댄듃
+      * ?몄뀡 湲곕컲 議곌굔遺 ?뚮뜑留?      * UserNav ?듯빀
+    
+    - UserNav 而댄룷?뚰듃 異붽? (src/components/layout/UserNav.tsx)
+      * ?ъ슜???꾨컮? ?쒕∼?ㅼ슫
+      * ?ㅼ젙, ?꾨줈?? 濡쒓렇?꾩썐 硫붾돱
+      * Avatar, DropdownMenu UI 而댄룷?뚰듃 ?ъ슜
+    
+    - TypeScript ????뺤쓽 (src/types/next-auth.d.ts)
+      * NextAuth User, Session, JWT ?명꽣?섏씠???뺤옣
+    
+    - ?섏〈??異붽?
+      * next-auth@5.0.0-beta.30
+      * bcryptjs@3.0.3
+      * zod (??寃利앹슜)
+    
+    Phase 0.5 ?꾨즺: ?몄쬆 ?쒖뒪??湲곗큹
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json             |   7 +-
+ package.json                            |   5 +
+ pnpm-lock.yaml                          | 281 +++++++++++++++++++++++++++++++-
+ src/app/(auth)/layout.tsx               |  13 ++
+ src/app/(auth)/login/page.tsx           | 111 +++++++++++++
+ src/app/(auth)/register/actions.ts      |  64 ++++++++
+ src/app/(auth)/register/page.tsx        | 125 ++++++++++++++
+ src/app/api/auth/[...nextauth]/route.ts |   3 +
+ src/auth.ts                             |  89 ++++++++++
+ src/components/layout/Header.tsx        |  25 ++-
+ src/components/layout/UserNav.tsx       |  77 +++++++++
+ src/components/ui/avatar.tsx            |  50 ++++++
+ src/components/ui/dropdown-menu.tsx     | 201 +++++++++++++++++++++++
+ src/middleware.ts                       |  11 ++
+ src/types/next-auth.d.ts                |  28 ++++
+ 15 files changed, 1074 insertions(+), 16 deletions(-)
+
+commit 3585cba53bd4469658a04fe9690218a01fde217a
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 21:11:17 2025 +0900
+
+    feat: Shadcn/ui 諛??덉씠?꾩썐 而댄룷?뚰듃 援ы쁽 ?꾨즺
+    
+    - Shadcn/ui 珥덇린??諛??ㅼ젙
+    - 湲곕낯 UI 而댄룷?뚰듃 異붽?:
+      * Button, Input, Label, Card, Select
+      * Form, Table, Dialog, Badge, Separator
+    - ?덉씠?꾩썐 而댄룷?뚰듃 援ы쁽:
+      * Header (?ㅻ퉬寃뚯씠?? 濡쒓렇???뚯썝媛??踰꾪듉)
+      * Sidebar (硫붾돱 ?꾩씠?? ?꾩옱 寃쎈줈 ?섏씠?쇱씠??
+      * Footer (踰꾩쟾 ?뺣낫)
+    - Dashboard ?쇱슦??洹몃９ ?앹꽦
+    - Dashboard ?섏씠吏 援ы쁽 (?듦퀎 移대뱶 ?덉씠?꾩썐)
+    - lucide-react ?꾩씠肄?異붽?
+    - Tailwind CSS ?ㅽ겕紐⑤뱶 吏??    
+    Phase 0.4 ?꾨즺: UI ?꾨젅?꾩썙???ㅼ젙
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json            |   5 +-
+ components.json                        |  22 +
+ package.json                           |  15 +-
+ pnpm-lock.yaml                         | 858 +++++++++++++++++++++++++++++++++
+ src/app/(dashboard)/dashboard/page.tsx |  78 +++
+ src/app/(dashboard)/layout.tsx         |  22 +
+ src/app/globals.css                    |  79 ++-
+ src/components/layout/Footer.tsx       |  14 +
+ src/components/layout/Header.tsx       |  46 ++
+ src/components/layout/Sidebar.tsx      |  71 +++
+ src/components/ui/badge.tsx            |  36 ++
+ src/components/ui/button.tsx           |  57 +++
+ src/components/ui/card.tsx             |  76 +++
+ src/components/ui/dialog.tsx           | 122 +++++
+ src/components/ui/form.tsx             | 178 +++++++
+ src/components/ui/input.tsx            |  22 +
+ src/components/ui/label.tsx            |  26 +
+ src/components/ui/select.tsx           | 159 ++++++
+ src/components/ui/separator.tsx        |  31 ++
+ src/components/ui/table.tsx            | 120 +++++
+ src/lib/utils.ts                       |   6 +
+ tailwind.config.ts                     |  60 ++-
+ 22 files changed, 2079 insertions(+), 24 deletions(-)
+
+commit 70bd31d429ad4e38680209778247855e990fee32
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 21:05:50 2025 +0900
+
+    feat: Prisma 諛??곗씠?곕쿋?댁뒪 ?ㅽ궎留??ㅼ젙 ?꾨즺
+    
+    - Prisma ?ㅼ튂 諛?珥덇린??    - PostgreSQL ?곌껐 ?ㅼ젙 (Supabase 以鍮?
+    - ?꾩껜 ?곗씠?곕쿋?댁뒪 ?ㅽ궎留??뺤쓽:
+      * User, Account, Session (NextAuth ?몄쬆)
+      * Role, UserRole, Permission (RBAC)
+      * Client, UserClient, ServiceCategory (怨좉컼??愿由?
+      * SR, SRActivity, SRComment, SRAttachment (SR 愿由?
+      * Notification, SRStatusHistory (?뚮┝ 諛??대젰)
+    - Prisma Client ?앹꽦 (src/generated/prisma)
+    - Prisma Singleton ?⑦꽩 援ы쁽 (src/lib/prisma.ts)
+    - dotenv ?ㅼ젙 (?섍꼍 蹂??濡쒕뱶)
+    - .env ?뚯씪 ?앹꽦 (?꾩떆 ?ㅼ젙)
+    
+    Phase 0.2 ?꾨즺: ?곗씠?곕쿋?댁뒪 ?ㅼ젙
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json |   6 +-
+ .gitignore                  |   2 +
+ package.json                |   3 +
+ pnpm-lock.yaml              | 288 ++++++++++++++++++++++++++++++
+ prisma.config.ts            |  13 ++
+ prisma/schema.prisma        | 419 ++++++++++++++++++++++++++++++++++++++++++++
+ src/lib/prisma.ts           |  17 ++
+ 7 files changed, 747 insertions(+), 1 deletion(-)
+
+commit 14c9457cc56f82ef1ed78b2d3cdb9be847c6b780
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 20:58:12 2025 +0900
+
+    feat: Next.js ?꾨줈?앺듃 珥덇린??諛?湲곕낯 ?ㅼ젙 ?꾨즺
+    
+    - Next.js 15 + React 19 + TypeScript ?ㅼ젙
+    - Tailwind CSS ?ㅼ젙
+    - ESLint ?ㅼ젙
+    - 湲곕낯 ?붾젆?좊━ 援ъ“ ?앹꽦 (src/app, src/components, src/lib)
+    - README.md 諛??섍꼍 蹂???쒗뵆由?異붽?
+    - 媛쒕컻 ?쒕쾭 ?ㅽ뻾 ?뺤씤 ?꾨즺 (http://localhost:3000)
+    
+    Phase 0.1 ?꾨즺: 濡쒖뺄 媛쒕컻 ?섍꼍 援ъ텞
+    
+    ?쨼 Generated with Claude Code
+    
+    Co-Authored-By: Claude <noreply@anthropic.com>
+
+ .claude/settings.local.json    |   19 +
+ .eslintrc.json                 |    3 +
+ .gitignore                     |   44 +
+ README.md                      |   93 +
+ wbs.md => docs/planning/wbs.md |    0
+ docs/planning/wbs_optimized.md |  952 ++++++++++
+ next.config.ts                 |    7 +
+ package.json                   |   27 +
+ pnpm-lock.yaml                 | 3899 ++++++++++++++++++++++++++++++++++++++++
+ postcss.config.mjs             |    8 +
+ src/app/globals.css            |   27 +
+ src/app/layout.tsx             |   21 +
+ src/app/page.tsx               |   31 +
+ tailwind.config.ts             |   18 +
+ tsconfig.json                  |   40 +
+ 15 files changed, 5189 insertions(+)
+
+commit b3d003423c6fbe5a5209ea92e762eaf6b07702d2
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 17:39:16 2025 +0900
+
+    wbs蹂댁셿
+
+ wbs.md | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
+
+commit 5a46ad49c53848e6ac13c982307882460ca7ce39
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 17:13:44 2025 +0900
+
+    WBS源뚯? ?꾨즺
+
+ .genkit/traces_idx/genkit.metadata                 |    1 +
+ docs/DB.md                                         | 1491 ++++++
+ docs/LLD.md                                        | 3865 ++++++++++++++++
+ docs/SR_Management_System_PRD.md                   | 1242 +++++
+ docs/TRD.md                                        | 1414 ++++++
+ DB.md => docs/backup_20251107/DB.md                |  171 +-
+ LLD.md => docs/backup_20251107/LLD.md              |  795 ++--
+ .../backup_20251107/SR_Management_System_PRD.md    |  881 ++--
+ TRD.md => docs/backup_20251107/TRD.md              | 1301 ++++--
+ docs/backup_20251107/TRD_before_optimization.md    | 4786 ++++++++++++++++++++
+ wbs.md                                             |   79 +
+ 11 files changed, 14735 insertions(+), 1291 deletions(-)
+
+commit de30e0c6c624833625aa8a937bac839eb6d09218
+Author: lkindo <lkindo@gmail.com>
+Date:   Fri Nov 7 00:49:31 2025 +0900
+
+    臾몄꽌 ?낅뜲?댄듃
+
+ DB.md  | 35 +++++++++++++++++++++++++----------
+ TRD.md | 23 ++++++++++++++++-------
+ 2 files changed, 41 insertions(+), 17 deletions(-)
+
+commit 8f9092d4b1cdd16112e9ed486af6013b56e32d8d
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 6 23:24:28 2025 +0900
+
+    ?ㅺ퀎臾몄꽌
+
+ DB.md                       | 1349 ++++++++++++++
+ LLD.md                      | 3579 +++++++++++++++++++++++++++++++++++
+ SR_Management_System_PRD.md | 1743 ++++++++++++++++++
+ TRD.md                      | 4302 +++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 10973 insertions(+)
+
+commit c65d5884574bb9914a9d643f42cd0ccc5071ec8e
+Author: lkindo <lkindo@gmail.com>
+Date:   Thu Nov 6 22:05:41 2025 +0900
+
+    Initial commit
+
+ .gitattributes | 2 ++
+ 1 file changed, 2 insertions(+)

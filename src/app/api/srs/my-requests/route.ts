@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { withCache, isCacheAvailable } from "@/lib/cache";
+import { myRequestsKey } from "@/lib/cache-keys";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -50,57 +52,108 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // 필요한 필드만 선택하여 SR 목록 조회
-    const srs = await prisma.sR.findMany({
-      where,
-      orderBy,
-      select: {
-        id: true,
-        srNumber: true,
-        title: true,
-        description: true,
-        status: true,
-        requestedPriority: true,
-        actualPriority: true,
-        requestedCompletionDate: true,
-        estimatedCompletionDate: true,
-        dueDate: true,
-        createdAt: true,
-        updatedAt: true,
-        intakeAt: true,
-        completedAt: true,
-        client: {
+    const cacheKey = myRequestsKey(session.user.id, status, sortBy);
+    const srs = await (isCacheAvailable()
+      ? withCache(cacheKey, async () => {
+          return await prisma.sR.findMany({
+            where,
+            orderBy,
+            select: {
+              id: true,
+              srNumber: true,
+              title: true,
+              description: true,
+              status: true,
+              requestedPriority: true,
+              actualPriority: true,
+              requestedCompletionDate: true,
+              estimatedCompletionDate: true,
+              dueDate: true,
+              createdAt: true,
+              updatedAt: true,
+              intakeAt: true,
+              completedAt: true,
+              client: {
+                select: {
+                  id: true,
+                  code: true,
+                  name: true,
+                }
+              },
+              serviceCategory: {
+                select: {
+                  id: true,
+                  categoryName: true,
+                  slaHours: true,
+                  priority: true,
+                }
+              },
+              assignee: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                }
+              },
+              intakeBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                }
+              },
+            }
+          })
+        }, { ttlSeconds: 60, namespace: 'sr' })
+      : prisma.sR.findMany({
+          where,
+          orderBy,
           select: {
             id: true,
-            code: true,
-            name: true,
+            srNumber: true,
+            title: true,
+            description: true,
+            status: true,
+            requestedPriority: true,
+            actualPriority: true,
+            requestedCompletionDate: true,
+            estimatedCompletionDate: true,
+            dueDate: true,
+            createdAt: true,
+            updatedAt: true,
+            intakeAt: true,
+            completedAt: true,
+            client: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              }
+            },
+            serviceCategory: {
+              select: {
+                id: true,
+                categoryName: true,
+                slaHours: true,
+                priority: true,
+              }
+            },
+            assignee: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            },
+            intakeBy: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              }
+            },
           }
-        },
-        serviceCategory: {
-          select: {
-            id: true,
-            categoryName: true,
-            slaHours: true,
-            priority: true,
-          }
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        },
-        intakeBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          }
-        },
-        // 별도 쿼리로 처리할 count 정보
-      }
-    });
+        }));
 
     // 별도로 각 SR에 대한 카운트 정보 조회
     const srIds = srs.map(sr => sr.id);

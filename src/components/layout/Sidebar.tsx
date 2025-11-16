@@ -13,6 +13,7 @@ import {
   Bell,
   Settings as SettingsIcon,
   ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useState } from "react";
@@ -21,8 +22,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-
-import type { LucideIcon } from "lucide-react";
 
 interface SubMenuItem {
   title: string;

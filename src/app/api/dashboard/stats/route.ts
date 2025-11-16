@@ -2,6 +2,7 @@
 import prisma from "@/lib/prisma";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 import { getCachedData, CacheKeys } from "@/lib/redis-cache";
+import { getDashboardTtlSeconds } from "@/lib/cache-config";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -344,7 +345,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
         trend: trendData,
       };
     },
-    300 // 5분 캐시
+    getDashboardTtlSeconds() // 캐시 TTL (env로 조정)
   );
 
   return NextResponse.json(stats);

@@ -1,3 +1,99 @@
+import { Redis } from '@upstash/redis'
+import { logger } from '@/lib/logger'
+
+type CacheOptions = {
+	ttlSeconds?: number
+	namespace?: string
+}
+
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
+
+let redis: Redis | null = null
+const metrics = {
+	hit: 0,
+	miss: 0,
+	set: 0,
+	invalidate: 0,
+}
+if (redisUrl && redisToken) {
+	redis = new Redis({
+		url: redisUrl,
+		token: redisToken,
+	})
+}
+
+function buildKey(key: string, namespace?: string) {
+	return namespace ? `${namespace}:${key}` : key
+}
+
+export async function cacheGet<T>(key: string, options?: CacheOptions): Promise<T | null> {
+	if (!redis) return null
+	const k = buildKey(key, options?.namespace)
+	const v = await redis.get<T>(k)
+	if (v === null) {
+		metrics.miss++
+		return null
+	}
+	metrics.hit++
+	return v
+}
+
+export async function cacheSet<T>(
+	key: string,
+	value: T,
+	options?: CacheOptions
+): Promise<void> {
+	if (!redis) return
+	const k = buildKey(key, options?.namespace)
+	const ttl = options?.ttlSeconds
+	if (ttl && ttl > 0) {
+		await redis.set(k, value, { ex: ttl })
+	} else {
+		await redis.set(k, value)
+	}
+	metrics.set++
+}
+
+export async function withCache<T>(
+	key: string,
+	compute: () => Promise<T>,
+	options?: CacheOptions
+): Promise<T> {
+	const hit = await cacheGet<T>(key, options)
+	if (hit !== null) return hit
+	const value = await compute()
+	await cacheSet(key, value, options)
+	return value
+}
+
+export function isCacheAvailable(): boolean {
+	return !!redis
+}
+
+export function getCacheMetrics() {
+	return { ...metrics }
+}
+
+// Development-only periodic metrics logger
+if (process.env.NODE_ENV === 'development') {
+	const intervalMs =
+		Number(process.env.CACHE_METRICS_LOG_INTERVAL_MS ?? 60000)
+
+	// Avoid multiple intervals in hot-reload by using globalThis flag
+	const g = globalThis as any
+	if (!g.__sr_cache_metrics_logger_started__) {
+		try {
+			setInterval(() => {
+				try {
+					const m = getCacheMetrics()
+					logger.info(`[Cache][Metrics] hit=${m.hit} miss=${m.miss} set=${m.set} invalidate=${m.invalidate}`)
+				} catch {}
+			}, Math.max(5000, intervalMs))
+			g.__sr_cache_metrics_logger_started__ = true
+		} catch {}
+	}
+}
 import { unstable_cache as cache } from 'next/cache';
 import prisma from './prisma';
 import type { Prisma } from '@prisma/client';

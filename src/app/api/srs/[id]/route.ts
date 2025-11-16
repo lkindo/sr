@@ -6,6 +6,10 @@ import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
 import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
 import { Prisma } from "@prisma/client";
+import { withCache, isCacheAvailable } from "@/lib/cache";
+import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
+import { srDetailKey, SR_LIST_PREFIX, DASHBOARD_STATS_PREFIX, MY_REQUESTS_PREFIX, srListPatternForClient, srListPatternForStatus, srListPatternForPriority } from "@/lib/cache-keys";
+import { getSrsDetailTtlSeconds, shouldWideInvalidate } from "@/lib/cache-config";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -19,7 +23,10 @@ export const GET = withAuthAndRateLimit(async (
 
   // Service 레이어를 통해 SR 조회
   const srService = new SRService();
-  const sr = await srService.getSRDetailsById(id);
+  const cacheKey = srDetailKey(id);
+  const sr = await (isCacheAvailable()
+    ? withCache(cacheKey, async () => await srService.getSRDetailsById(id), { ttlSeconds: getSrsDetailTtlSeconds(), namespace: 'sr' })
+    : srService.getSRDetailsById(id));
 
   if (!sr) {
     throw new NotFoundError("SR을 찾을 수 없습니다.");
@@ -62,6 +69,21 @@ export const PATCH = withAuthAndRateLimit(async (
   const srService = new SRService();
   const updatedSR = await srService.updateSR(id, validated, session.user);
 
+  // 캐시 무효화: 상세/목록/대시보드/내요청
+  try {
+    const wide = shouldWideInvalidate()
+    await invalidateCache(srDetailKey(id));
+    // updatedSR에 client가 포함된 경우, 해당 client 기반으로 목록을 선별 무효화
+    if (!wide && (updatedSR as any).client?.id) await invalidateCachePattern(srListPatternForClient((updatedSR as any).client.id));
+    if (!wide && (updatedSR as any).status) await invalidateCachePattern(srListPatternForStatus((updatedSR as any).status));
+    if (!wide && (updatedSR as any).priority) await invalidateCachePattern(srListPatternForPriority((updatedSR as any).priority));
+    if (wide || !(updatedSR as any).client?.id) await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
+    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
+    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+  } catch (e) {
+    console.warn('Cache invalidation failed after SR patch:', e);
+  }
+
   return NextResponse.json(updatedSR);
 }, { preset: 'strict' }); // 1분당 5회 (민감한 작업)
 
@@ -76,5 +98,15 @@ export const DELETE = withAuthAndRateLimit(async (
   const srService = new SRService();
   const result = await srService.deleteSR(id, session.user);
   
+  // 캐시 무효화: 상세/목록/대시보드/내요청
+  try {
+    await invalidateCache(srDetailKey(id));
+    await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
+    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
+    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+  } catch (e) {
+    console.warn('Cache invalidation failed after SR delete:', e);
+  }
+
   return NextResponse.json(result);
 }, { preset: 'strict' }); // 1분당 5회 (삭제는 민감한 작업)
