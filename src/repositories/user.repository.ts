@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.UserUncheckedCreateInput, Prisma.UserUncheckedUpdateInput> {
   constructor() {
-    super(prisma.user);
+    super(prisma.user as any);
   }
 
   async findDetailsById(id: string): Promise<User | null> {
@@ -85,7 +85,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     orderBy?: Prisma.UserOrderByWithRelationInput;
   }): Promise<User[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
@@ -210,7 +210,10 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
       };
     }
 
-    const users = await this.model.findMany({
+    const users = await this.model.findMany<User & {
+      roles: { role: import("@prisma/client").Role }[];
+      clients: { client: { id: string; name: string; code: string } }[];
+    }>({
       where,
       select: {
         id: true,

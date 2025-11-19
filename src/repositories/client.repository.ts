@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class ClientRepository extends BaseRepositoryImpl<Client, string, Prisma.ClientUncheckedCreateInput, Prisma.ClientUncheckedUpdateInput> {
   constructor() {
-    super(prisma.client);
+    super(prisma.client as any);
   }
 
   async findDetailsById(id: string): Promise<Client | null> {
@@ -36,7 +36,7 @@ export class ClientRepository extends BaseRepositoryImpl<Client, string, Prisma.
     orderBy?: Prisma.ClientOrderByWithRelationInput;
   }): Promise<Client[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,

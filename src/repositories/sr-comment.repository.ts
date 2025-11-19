@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, Prisma.SRCommentUncheckedCreateInput, Prisma.SRCommentUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sRComment);
+    super(prisma.sRComment as any);
   }
 
   async findDetailsById(id: string): Promise<SRComment | null> {
@@ -27,7 +27,7 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
     orderBy?: Prisma.SRCommentOrderByWithRelationInput;
   }): Promise<SRComment[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
@@ -50,7 +50,7 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
     orderBy?: Prisma.SRCommentOrderByWithRelationInput;
   }): Promise<{ data: SRComment[]; totalCount: number }> {
     const { skip, take, where = {}, orderBy = { createdAt: 'desc' } } = params || {};
-    
+
     const whereWithSR: Prisma.SRCommentWhereInput = {
       ...where,
       srId,
@@ -81,7 +81,7 @@ export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, P
     orderBy?: Prisma.SRCommentOrderByWithRelationInput;
   }): Promise<SRComment[]> {
     const { skip, take, where = {}, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,

@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.RoleUncheckedCreateInput, Prisma.RoleUncheckedUpdateInput> {
   constructor() {
-    super(prisma.role);
+    super(prisma.role as any);
   }
 
   async findDetailsById(id: string): Promise<Role | null> {
@@ -45,7 +45,7 @@ export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.Role
     };
   })[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,

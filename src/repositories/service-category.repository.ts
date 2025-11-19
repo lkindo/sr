@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class ServiceCategoryRepository extends BaseRepositoryImpl<ServiceCategory, string, Prisma.ServiceCategoryUncheckedCreateInput, Prisma.ServiceCategoryUncheckedUpdateInput> {
   constructor() {
-    super(prisma.serviceCategory);
+    super(prisma.serviceCategory as any);
   }
 
   async findDetailsById(id: string): Promise<ServiceCategory | null> {
@@ -31,7 +31,7 @@ export class ServiceCategoryRepository extends BaseRepositoryImpl<ServiceCategor
     orderBy?: Prisma.ServiceCategoryOrderByWithRelationInput;
   }): Promise<ServiceCategory[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
@@ -58,7 +58,7 @@ export class ServiceCategoryRepository extends BaseRepositoryImpl<ServiceCategor
 
   async findByHandlerId(handlerId: string): Promise<ServiceCategory[]> {
     return this.model.findMany({
-      where: { 
+      where: {
         OR: [
           { handlerId },
           { backupHandlerId: handlerId },

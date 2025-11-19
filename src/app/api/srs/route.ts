@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SRService, getAllSrs, createSr } from "@/services/sr.service";
+import { SRService } from "@/services/sr.service";
+import { SRStatus, SRPriority } from "@prisma/client";
 import { sendSRCreatedEmail } from "@/lib/email";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 import { PermissionService } from "@/services/permission.service";
@@ -19,16 +20,18 @@ export const revalidate = 0;
 export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
   const filters = {
-    status: searchParams.get("status") || undefined,
+    status: (searchParams.get("status") as SRStatus) || undefined,
     clientId: searchParams.get("clientId") || undefined,
-    priority: searchParams.get("priority") || undefined,
+    priority: (searchParams.get("priority") as SRPriority) || undefined,
   };
+
+  const srService = new SRService();
 
   // 캐시 키: 필터 조합 기반 (읽기 전용, 짧은 TTL)
   const cacheKey = srListKey(filters);
   const srs = isCacheAvailable()
-    ? await withCache(cacheKey, async () => await getAllSrs(filters), { ttlSeconds: getSrsListTtlSeconds(), namespace: 'sr' })
-    : await getAllSrs(filters);
+    ? await withCache(cacheKey, async () => await srService.getAllSRs({ where: filters }), { ttlSeconds: getSrsListTtlSeconds(), namespace: 'sr' })
+    : await srService.getAllSRs({ where: filters });
 
   // Date 객체를 문자열로 변환 (직렬화 문제 해결)
   const serializableSrs = srs.map(sr => ({
@@ -48,13 +51,14 @@ export const POST = withAuthAndRateLimit(async (request: NextRequest, { session 
   // 권한 체크: SR:CREATE 권한 필요
   const permissionService = new PermissionService();
   const hasPermission = await permissionService.checkPermission(session.user.id, 'SR:CREATE');
-  
+
   if (!hasPermission) {
     throw new ForbiddenError("SR 등록 권한이 없습니다. SR:CREATE 권한이 필요합니다.");
   }
 
   const body = await request.json();
-  const sr = await createSr(body, session.user);
+  const srService = new SRService();
+  const sr = await srService.createSR(body, session.user);
 
   // Send email notification to MANAGER role users (non-blocking)
   if (process.env.RESEND_API_KEY) {

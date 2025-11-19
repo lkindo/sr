@@ -36,7 +36,7 @@ export default function SRDetailPage() {
   const params = useParams();
   const router = useRouter();
   const srId = params.id as string;
-  
+
   // SR 상세 정보 타입 정의
   type SRDetails = SR & {
     client: { id: string; code: string; name: string };
@@ -49,14 +49,14 @@ export default function SRDetailPage() {
       content: string;
       createdAt: Date;
       updatedAt: Date;
-      user: { id: string; name: string; email: string };
+      user: { id: string; name: string; image: string | null };
     }>;
     activities: Array<{
       id: string;
       type: string;
       description: string;
       createdAt: Date;
-      user: { id: string; name: string; email: string };
+      user: { id: string; name: string; image: string | null };
     }>;
     attachments: Array<{
       id: string;
@@ -75,7 +75,7 @@ export default function SRDetailPage() {
     }>;
     _count: { comments: number; attachments: number };
   };
-  
+
   const [sr, setSr] = useState<SRDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -162,14 +162,14 @@ export default function SRDetailPage() {
         <div className="flex gap-2">
           {/* 접수 정보 수정 버튼 (IN_PROGRESS 상태이고 MANAGER/ADMIN 권한일 때만) */}
           {sr.status === "IN_PROGRESS" && hasAnyRole(["MANAGER", "ADMIN"]) && (
-            <Button 
+            <Button
               variant="outline"
               onClick={() => router.push(`/srs/${srId}/intake`)}
             >
               <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
             </Button>
           )}
-          <Button 
+          <Button
             onClick={() => {
               // 관리자는 모든 상태에서 수정 가능
               if (sr.status === "REQUESTED" || hasAnyRole(["ADMIN"])) {
@@ -186,8 +186,8 @@ export default function SRDetailPage() {
           >
             <Pencil className="mr-2 h-4 w-4" /> 수정
           </Button>
-          <Button 
-            onClick={() => setIsDeleteDialogOpen(true)} 
+          <Button
+            onClick={() => setIsDeleteDialogOpen(true)}
             variant="destructive"
           >
             <Trash2 className="mr-2 h-4 w-4" /> 삭제
@@ -205,77 +205,77 @@ export default function SRDetailPage() {
                 <h4 className="text-sm font-medium text-muted-foreground">요청 내용</h4>
                 <p className="mt-1 text-foreground whitespace-pre-line">{sr.description}</p>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">고객사</h4>
                   <p className="mt-1">{sr.client?.name || 'N/A'}</p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">서비스 카테고리</h4>
                   <p className="mt-1">{sr.serviceCategory?.categoryName || 'N/A'}</p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">요청자</h4>
                   <p className="mt-1">{sr.requester?.name || 'N/A'}</p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">담당자</h4>
                   <p className="mt-1">{sr.assignee?.name || '미지정'}</p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">요청 우선순위</h4>
                   <p className="mt-1">{priorityLabels[sr.requestedPriority]}</p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">실제 우선순위</h4>
                   <p className="mt-1">{sr.actualPriority ? priorityLabels[sr.actualPriority] : 'N/A'}</p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">요청 완료일</h4>
                   <p className="mt-1">
-                    {sr.requestedCompletionDate 
-                      ? new Date(sr.requestedCompletionDate).toLocaleDateString('ko-KR') 
+                    {sr.requestedCompletionDate
+                      ? new Date(sr.requestedCompletionDate).toLocaleDateString('ko-KR')
                       : 'N/A'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">예상 완료일</h4>
                   <p className="mt-1">
-                    {sr.estimatedCompletionDate 
-                      ? new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR') 
+                    {sr.estimatedCompletionDate
+                      ? new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')
                       : 'N/A'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">완료 일자</h4>
                   <p className="mt-1">
-                    {sr.completedAt 
-                      ? new Date(sr.completedAt).toLocaleDateString('ko-KR') 
+                    {sr.completedAt
+                      ? new Date(sr.completedAt).toLocaleDateString('ko-KR')
                       : 'N/A'}
                   </p>
                 </div>
-                
+
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">SLA 마감일</h4>
                   <p className="mt-1">
-                    {sr.dueDate 
-                      ? new Date(sr.dueDate).toLocaleDateString('ko-KR') 
+                    {sr.dueDate
+                      ? new Date(sr.dueDate).toLocaleDateString('ko-KR')
                       : 'N/A'}
                   </p>
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* Resolution Details if available */}
           {sr.resolutionDescription && (
             <div className="p-6 bg-white rounded-lg shadow border">
@@ -285,14 +285,14 @@ export default function SRDetailPage() {
                   <h4 className="text-sm font-medium text-muted-foreground">해결 설명</h4>
                   <p className="mt-1 whitespace-pre-line">{sr.resolutionDescription}</p>
                 </div>
-                
+
                 {sr.satisfactionRating && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <h4 className="text-sm font-medium text-muted-foreground">만족도</h4>
                       <p className="mt-1">{sr.satisfactionRating}/5</p>
                     </div>
-                    
+
                     {sr.additionalFeedback && (
                       <div>
                         <h4 className="text-sm font-medium text-muted-foreground">추가 피드백</h4>
@@ -305,7 +305,7 @@ export default function SRDetailPage() {
             </div>
           )}
         </div>
-        
+
         {/* Stats and Additional Info Card */}
         <div className="space-y-6 flex flex-col">
           <div className="p-6 bg-white rounded-lg shadow border flex-1">
@@ -315,44 +315,44 @@ export default function SRDetailPage() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">요청일: {new Date(sr.createdAt).toLocaleDateString('ko-KR')}</span>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">수정일: {new Date(sr.updatedAt).toLocaleDateString('ko-KR')}</span>
               </div>
-              
+
               {sr.intakeAt && (
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">접수일: {new Date(sr.intakeAt).toLocaleDateString('ko-KR')}</span>
                 </div>
               )}
-              
+
               {sr.intakeBy && (
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">접수자: {sr.intakeBy.name}</span>
                 </div>
               )}
-              
+
               <Separator className="my-2" />
-              
+
               <div className="text-center">
                 <p className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">
                   {sr._count?.comments || 0}
                 </p>
                 <p className="text-sm text-muted-foreground">댓글 수</p>
               </div>
-              
+
               <div className="text-center">
                 <p className="text-2xl font-bold text-[hsl(var(--sr-primary-dark)))]">
                   {sr._count?.attachments || 0}
                 </p>
                 <p className="text-sm text-muted-foreground">첨부파일 수</p>
               </div>
-              
+
               <Separator className="my-2" />
-              
+
               <div className="text-center">
                 <p className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
                   {sr.estimatedHours || 'N/A'}
@@ -361,7 +361,7 @@ export default function SRDetailPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Status History if available */}
           {sr.statusHistory && sr.statusHistory.length > 0 && (
             <div className="p-6 bg-white rounded-lg shadow border">
@@ -411,20 +411,20 @@ export default function SRDetailPage() {
         </TabsContent>
       </Tabs>
 
-      <EditSRDialog 
-        open={isEditDialogOpen} 
-        onOpenChange={setIsEditDialogOpen} 
+      <EditSRDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
         sr={{
           ...sr,
           attachments: sr?.attachments || [],
-        }} 
-        onUpdated={handleSRUpdated} 
+        }}
+        onUpdated={handleSRUpdated}
       />
-      <DeleteSRDialog 
-        open={isDeleteDialogOpen} 
-        onOpenChange={setIsDeleteDialogOpen} 
-        sr={sr} 
-        onDeleted={handleSRDeleted} 
+      <DeleteSRDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        sr={sr}
+        onDeleted={handleSRDeleted}
       />
     </div>
   );

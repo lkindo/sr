@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createSRAction, updateSRAction, deleteSRAction } from '../sr.actions';
 import { SRService } from '@/services/sr.service';
 import { UnauthorizedError } from '@/lib/errors';
+import { getAuthenticatedSession } from '@/lib/action-helpers';
 
 // Mock dependencies
 const mockCreateSR = vi.fn();
@@ -21,6 +22,7 @@ vi.mock('@/services/sr.service', () => ({
 vi.mock('@/lib/action-helpers', () => ({
   authenticateAndAuthorize: (permission: string) => mockAuthenticateAndAuthorize(permission),
   validateWithSchema: (data: unknown, schema: any) => mockValidateWithSchema(data, schema),
+  getAuthenticatedSession: vi.fn(),
 }));
 
 vi.mock('@/lib/form-data-parser', () => ({
@@ -83,7 +85,7 @@ describe('SR Actions', () => {
       if (result.success) {
         expect(result.data).toEqual(mockSR);
       }
-      expect(mockAuthenticateAndAuthorize).toHaveBeenCalledWith('sr:create');
+      expect(mockAuthenticateAndAuthorize).toHaveBeenCalledWith('SR:CREATE');
       expect(mockCreateSR).toHaveBeenCalled();
     });
 
@@ -138,11 +140,12 @@ describe('SR Actions', () => {
         },
       });
       mockUpdateSR.mockResolvedValue(mockUpdatedSR);
+      vi.mocked(getAuthenticatedSession).mockResolvedValue(mockSession);
 
       const result = await updateSRAction('sr1', formData);
 
       expect(result.success).toBe(true);
-      expect(mockAuthenticateAndAuthorize).toHaveBeenCalledWith('sr:update');
+      // expect(mockAuthenticateAndAuthorize).toHaveBeenCalledWith('sr:update'); // Removed
       expect(mockUpdateSR).toHaveBeenCalledWith(
         'sr1',
         expect.any(Object),
@@ -156,19 +159,19 @@ describe('SR Actions', () => {
       mockAuthenticateAndAuthorize.mockResolvedValue({
         user: { id: 'user1' },
       });
+      vi.mocked(getAuthenticatedSession).mockResolvedValue({ user: { id: 'user1' } } as any);
       mockDeleteSR.mockResolvedValue(undefined);
 
       const result = await deleteSRAction('sr1');
 
       expect(result.success).toBe(true);
-      expect(mockAuthenticateAndAuthorize).toHaveBeenCalledWith('sr:delete');
-      expect(mockDeleteSR).toHaveBeenCalledWith('sr1');
+      // expect(mockAuthenticateAndAuthorize).toHaveBeenCalledWith('sr:delete'); // Removed
+      expect(mockDeleteSR).toHaveBeenCalledWith('sr1', expect.any(Object));
     });
 
     it('권한이 없으면 에러를 반환해야 함', async () => {
-      mockAuthenticateAndAuthorize.mockRejectedValue(
-        new UnauthorizedError()
-      );
+      mockDeleteSR.mockRejectedValue(new UnauthorizedError("권한이 없습니다"));
+      vi.mocked(getAuthenticatedSession).mockResolvedValue({ user: { id: 'user1' } } as any);
 
       const result = await deleteSRAction('sr1');
 

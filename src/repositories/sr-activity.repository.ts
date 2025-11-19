@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string, Prisma.SRActivityUncheckedCreateInput, Prisma.SRActivityUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sRActivity);
+    super(prisma.sRActivity as any);
   }
 
   async findDetailsById(id: string): Promise<SRActivity | null> {
@@ -27,7 +27,7 @@ export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string,
     orderBy?: Prisma.SRActivityOrderByWithRelationInput;
   }): Promise<SRActivity[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
@@ -50,7 +50,7 @@ export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string,
     orderBy?: Prisma.SRActivityOrderByWithRelationInput;
   }): Promise<{ data: SRActivity[]; totalCount: number }> {
     const { skip, take, where = {}, orderBy = { createdAt: 'desc' } } = params || {};
-    
+
     const whereWithSR: Prisma.SRActivityWhereInput = {
       ...where,
       srId,
@@ -74,14 +74,14 @@ export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string,
     return { data, totalCount };
   }
 
-  async createActivity(srId: string, userId: string, type: "CREATED"|"STATUS_CHANGED"|"PRIORITY_CHANGED"|"ASSIGNED"|"REASSIGNED"|"COMMENTED"|"ATTACHMENT_ADDED"|"ATTACHMENT_REMOVED"|"REOPENED"|"COMPLETED"|"REJECTED", description: string, metadata?: Record<string, unknown>): Promise<SRActivity> {
+  async createActivity(srId: string, userId: string, type: "CREATED" | "STATUS_CHANGED" | "PRIORITY_CHANGED" | "ASSIGNED" | "REASSIGNED" | "COMMENTED" | "ATTACHMENT_ADDED" | "ATTACHMENT_REMOVED" | "REOPENED" | "COMPLETED" | "REJECTED", description: string, metadata?: Record<string, unknown>): Promise<SRActivity> {
     return this.model.create({
       data: {
         srId,
         userId,
         type,
         description,
-        metadata: metadata || {},
+        metadata: (metadata as Prisma.InputJsonValue) || {},
       },
     });
   }

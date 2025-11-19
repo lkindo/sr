@@ -5,10 +5,21 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUncheckedCreateInput, Prisma.SRUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sR);
+    super(prisma.sR as any);
   }
 
-  async findDetailsById(id: string) {
+  async findDetailsById(id: string): Promise<(SR & {
+    client: import("@prisma/client").Client;
+    requester: { id: string; name: string; email: string; image: string | null };
+    assignee: { id: string; name: string; email: string; image: string | null } | null;
+    intakeBy: { id: string; name: string; email: string; image: string | null } | null;
+    serviceCategory: import("@prisma/client").ServiceCategory;
+    activities: (import("@prisma/client").SRActivity & { user: { id: string; name: string; image: string | null } })[];
+    comments: (import("@prisma/client").SRComment & { user: { id: string; name: string; image: string | null } })[];
+    attachments: import("@prisma/client").SRAttachment[];
+    statusHistory: (import("@prisma/client").SRStatusHistory & { user: { id: string; name: string; image: string | null } })[];
+    _count: { comments: number; attachments: number };
+  }) | null> {
     return this.model.findUnique({
       where: { id },
       include: {
@@ -78,9 +89,10 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
       handlerId: string | null;
       handler: { id: string; name: string } | null;
     };
+    _count: { comments: number; attachments: number };
   })[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,
@@ -103,6 +115,12 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
                 name: true,
               },
             },
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
           },
         },
       },
@@ -153,7 +171,7 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
     orderBy?: Prisma.SROrderByWithRelationInput;
   }): Promise<{ data: SR[]; totalCount: number }> {
     const { skip, take, where = {}, orderBy } = params || {};
-    
+
     const whereWithClient: Prisma.SRWhereInput = {
       ...where,
       clientId,

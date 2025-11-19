@@ -43,11 +43,24 @@ vi.mock('@/repositories/sr-attachment.repository', () => ({
 }));
 
 vi.mock('@/repositories/client.repository', () => ({
-  ClientRepository: class MockClientRepository {},
+  ClientRepository: class MockClientRepository { },
 }));
 
 vi.mock('@/repositories/service-category.repository', () => ({
-  ServiceCategoryRepository: class MockServiceCategoryRepository {},
+  ServiceCategoryRepository: class MockServiceCategoryRepository { },
+}));
+
+vi.mock('@/lib/policies/sr.policy', () => ({
+  SRPolicy: class MockSRPolicy {
+    canCreate = vi.fn().mockReturnValue(true);
+    canRead = vi.fn().mockReturnValue(true);
+    canUpdate = vi.fn().mockReturnValue(true);
+    canDelete = vi.fn().mockReturnValue(true);
+    ensureCanCreate = vi.fn();
+    ensureCanRead = vi.fn();
+    ensureCanUpdate = vi.fn();
+    ensureCanDelete = vi.fn();
+  },
 }));
 
 describe('SRService', () => {

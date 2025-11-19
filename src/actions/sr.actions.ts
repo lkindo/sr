@@ -165,14 +165,14 @@ export async function getSRDetailsAction(id: string): Promise<Result<SR & {
     content: string;
     createdAt: Date;
     updatedAt: Date;
-    user: { id: string; name: string; email: string };
+    user: { id: string; name: string; image: string | null };
   }>;
   activities: Array<{
     id: string;
     type: string;
     description: string;
     createdAt: Date;
-    user: { id: string; name: string; email: string };
+    user: { id: string; name: string; image: string | null };
   }>;
   attachments: Array<{
     id: string;
@@ -204,4 +204,3 @@ export async function getSRDetailsAction(id: string): Promise<Result<SR & {
     return errorToResult(error);
   }
 }
-    

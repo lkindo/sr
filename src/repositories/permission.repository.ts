@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class PermissionRepository extends BaseRepositoryImpl<Permission, string, Prisma.PermissionUncheckedCreateInput, Prisma.PermissionUncheckedUpdateInput> {
   constructor() {
-    super(prisma.permission);
+    super(prisma.permission as any);
   }
 
   async findDetailsById(id: string): Promise<Permission | null> {
@@ -28,7 +28,7 @@ export class PermissionRepository extends BaseRepositoryImpl<Permission, string,
     orderBy?: Prisma.PermissionOrderByWithRelationInput;
   }): Promise<Permission[]> {
     const { skip, take, where, orderBy } = params || {};
-    
+
     return this.model.findMany({
       skip,
       take,

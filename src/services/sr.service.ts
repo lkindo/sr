@@ -8,6 +8,7 @@ import { ClientRepository } from "@/repositories/client.repository";
 import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { AuthenticatedUser } from "@/types/session";
+import { SRPolicy } from "@/lib/policies/sr.policy";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -19,8 +20,9 @@ export class SRService {
     private srCommentRepository: SRCommentRepository = new SRCommentRepository(),
     private srAttachmentRepository: SRAttachmentRepository = new SRAttachmentRepository(),
     private clientRepository: ClientRepository = new ClientRepository(),
-    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository()
-  ) {}
+    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository(),
+    private srPolicy: SRPolicy = new SRPolicy()
+  ) { }
 
   async createSR(
     data: SrCreateData,
@@ -30,11 +32,12 @@ export class SRService {
     requester: { id: string; name: string; email: string };
     assignee: { id: string; name: string; email: string } | null;
     serviceCategory: { id: string; categoryName: string };
-    comments: unknown[];
-    activities: unknown[];
-    attachments: unknown[];
+    comments: (import("@prisma/client").SRComment & { user: { id: string; name: string; image: string | null } })[];
+    activities: (import("@prisma/client").SRActivity & { user: { id: string; name: string; image: string | null } })[];
+    attachments: import("@prisma/client").SRAttachment[];
     _count: { comments: number; attachments: number };
   }> {
+    this.srPolicy.ensureCanCreate(sessionUser);
     const validated = srCreateSchema.parse(data);
 
     // SR 번호 생성 (중복 방지를 위한 재시도 로직)
@@ -44,7 +47,7 @@ export class SRService {
 
     while (!sr && attempts < maxAttempts) {
       attempts++;
-      
+
       const today = new Date();
       const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
 
@@ -83,10 +86,10 @@ export class SRService {
         });
       } catch (error) {
         // 중복 키 에러인 경우 재시도
-        const isUniqueConstraintError = 
+        const isUniqueConstraintError =
           (error instanceof Error && error.message.includes("Unique constraint")) ||
           (error && typeof error === "object" && "code" in error && error.code === "P2002");
-        
+
         if (isUniqueConstraintError) {
           if (attempts >= maxAttempts) {
             throw new Error("SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
@@ -124,7 +127,11 @@ export class SRService {
     });
 
     // 관계 데이터를 포함하여 반환
-    return this.srRepository.findDetailsById(sr.id);
+    const result = await this.srRepository.findDetailsById(sr.id);
+    if (!result) {
+      throw new Error("SR 생성 후 조회에 실패했습니다.");
+    }
+    return result;
   }
 
   async updateSR(
@@ -139,7 +146,7 @@ export class SRService {
   }> {
     // Prisma 업데이트 데이터 준비 (undefined 제거 및 필드 매핑)
     const updateData: Prisma.SRUncheckedUpdateInput = {};
-    
+
     try {
       const validated = srUpdateSchema.parse(data);
       const existingSR = await this.srRepository.findById(id);
@@ -147,96 +154,84 @@ export class SRService {
         throw new Error("SR을 찾을 수 없습니다.");
       }
 
-      // 권한 체크: REQUESTED 상태인 경우 요청자 또는 ADMIN만 수정 가능
-      const isAdmin = sessionUser.roles?.includes("ADMIN") ?? false;
-      const isRequester = existingSR.requesterId === sessionUser.id;
-      
-      if (existingSR.status === "REQUESTED") {
-        if (!isAdmin && !isRequester) {
-          throw new Error("SR 수정 권한이 없습니다. 요청자 또는 관리자만 수정할 수 있습니다.");
-        }
-      } else {
-        // REQUESTED가 아닌 경우 ADMIN만 수정 가능
-        if (!isAdmin) {
-          throw new Error("SR 수정 권한이 없습니다. 관리자만 수정할 수 있습니다.");
-        }
+      // 권한 체크 (SRPolicy 사용)
+      this.srPolicy.ensureCanUpdate(sessionUser, existingSR);
+
+      // 기본 필드 처리
+      if (validated.title !== undefined) {
+        updateData.title = validated.title;
+      }
+      if (validated.description !== undefined) {
+        updateData.description = validated.description;
+      }
+      if (validated.priority !== undefined) {
+        updateData.priority = validated.priority;
+      }
+      if (validated.status !== undefined) {
+        updateData.status = validated.status;
+      }
+      if (validated.actualPriority !== undefined) {
+        updateData.actualPriority = validated.actualPriority;
+      }
+      if (validated.estimatedHours !== undefined) {
+        updateData.estimatedHours = typeof validated.estimatedHours === 'string'
+          ? parseFloat(validated.estimatedHours)
+          : validated.estimatedHours;
+      }
+      if (validated.intakeNotes !== undefined) {
+        updateData.intakeNotes = validated.intakeNotes || null;
+      }
+      if (validated.resolutionDescription !== undefined) {
+        updateData.resolutionDescription = validated.resolutionDescription || null;
+      }
+      if (validated.rejectionReason !== undefined) {
+        updateData.rejectionReason = validated.rejectionReason || null;
+      }
+      if (validated.satisfactionRating !== undefined) {
+        updateData.satisfactionRating = validated.satisfactionRating || null;
+      }
+      if (validated.additionalFeedback !== undefined) {
+        updateData.additionalFeedback = validated.additionalFeedback || null;
       }
 
-    // 기본 필드 처리
-    if (validated.title !== undefined) {
-      updateData.title = validated.title;
-    }
-    if (validated.description !== undefined) {
-      updateData.description = validated.description;
-    }
-    if (validated.priority !== undefined) {
-      updateData.priority = validated.priority;
-    }
-    if (validated.status !== undefined) {
-      updateData.status = validated.status;
-    }
-    if (validated.actualPriority !== undefined) {
-      updateData.actualPriority = validated.actualPriority;
-    }
-    if (validated.estimatedHours !== undefined) {
-      updateData.estimatedHours = typeof validated.estimatedHours === 'string' 
-        ? parseFloat(validated.estimatedHours) 
-        : validated.estimatedHours;
-    }
-    if (validated.intakeNotes !== undefined) {
-      updateData.intakeNotes = validated.intakeNotes || null;
-    }
-    if (validated.resolutionDescription !== undefined) {
-      updateData.resolutionDescription = validated.resolutionDescription || null;
-    }
-    if (validated.rejectionReason !== undefined) {
-      updateData.rejectionReason = validated.rejectionReason || null;
-    }
-    if (validated.satisfactionRating !== undefined) {
-      updateData.satisfactionRating = validated.satisfactionRating || null;
-    }
-    if (validated.additionalFeedback !== undefined) {
-      updateData.additionalFeedback = validated.additionalFeedback || null;
-    }
-
-    // 날짜 필드 처리
-    if (validated.expectedCompletionDate !== undefined) {
-      updateData.expectedCompletionDate = validated.expectedCompletionDate 
-        ? new Date(validated.expectedCompletionDate) 
-        : null;
-    }
-    if (validated.dueDate !== undefined) {
-      updateData.dueDate = validated.dueDate 
-        ? new Date(validated.dueDate) 
-        : null;
-    }
-    if (validated.actualCompletionDate !== undefined) {
-      updateData.actualCompletionDate = validated.actualCompletionDate 
-        ? new Date(validated.actualCompletionDate) 
-        : null;
-    }
-    if (validated.estimatedCompletionDate !== undefined) {
-      updateData.estimatedCompletionDate = validated.estimatedCompletionDate 
-        ? new Date(validated.estimatedCompletionDate) 
-        : null;
-    }
-
-    // 관계형 필드 처리
-    if (validated.serviceCategoryId !== undefined) {
-      if (validated.serviceCategoryId) {
-        updateData.serviceCategoryId = validated.serviceCategoryId;
+      // 날짜 필드 처리
+      if (validated.expectedCompletionDate !== undefined) {
+        updateData.expectedCompletionDate = validated.expectedCompletionDate
+          ? new Date(validated.expectedCompletionDate)
+          : null;
       }
-      // null인 경우 업데이트하지 않음 (필수 필드이므로)
-    }
+      if (validated.dueDate !== undefined) {
+        updateData.dueDate = validated.dueDate
+          ? new Date(validated.dueDate)
+          : null;
+      }
+      if (validated.actualCompletionDate !== undefined) {
+        updateData.actualCompletionDate = validated.actualCompletionDate
+          ? new Date(validated.actualCompletionDate)
+          : null;
+      }
+      if (validated.estimatedCompletionDate !== undefined) {
+        updateData.estimatedCompletionDate = validated.estimatedCompletionDate
+          ? new Date(validated.estimatedCompletionDate)
+          : null;
+      }
 
-    // 담당자 필드 처리 (assignedToId → assigneeId 매핑)
-    const assigneeId = validated.assigneeId || validated.assignedToId;
-    if (assigneeId !== undefined) {
-      updateData.assigneeId = assigneeId || null;
-    }
+      // 관계형 필드 처리
+      if (validated.serviceCategoryId !== undefined) {
+        if (validated.serviceCategoryId) {
+          updateData.serviceCategoryId = validated.serviceCategoryId;
+        }
+        // null인 경우 업데이트하지 않음 (필수 필드이므로)
+      }
 
-    // Additional logic from original method
-    if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
+      // 담당자 필드 처리 (assignedToId → assigneeId 매핑)
+      const assigneeId = validated.assigneeId || validated.assignedToId;
+      if (assigneeId !== undefined) {
+        updateData.assigneeId = assigneeId || null;
+      }
+
+      // Additional logic from original method
+      if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
         const serviceCategory = await this.serviceCategoryRepository.findById(
           existingSR.serviceCategoryId
         );
@@ -247,45 +242,45 @@ export class SRService {
           dueDate.setHours(dueDate.getHours() + adjustedHours);
           updateData.dueDate = dueDate;
         }
-    }
-    
-    if (validated.status && validated.status !== existingSR.status) {
-      await this.srRepository.update(existingSR.id, {
-        statusHistory: {
-          create: {
-            previousStatus: existingSR.status,
-            currentStatus: validated.status,
-            changedBy: sessionUser.id,
-            changeReason: validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
-          },
-        },
-      });
-      await this.srActivityRepository.create({
-        srId: id,
-        userId: sessionUser.id,
-        type: "STATUS_CHANGED",
-        description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
-      });
-      if (validated.status === "COMPLETED" && !updateData.actualCompletionDate) {
-        updateData.actualCompletionDate = new Date();
       }
-    }
-    
-    if (assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
-      await this.srActivityRepository.create({
-        srId: id,
-        userId: sessionUser.id,
-        type: "ASSIGNED",
-        description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
-      });
-    }
 
-    // updateData가 비어있으면 업데이트할 것이 없음
-    if (Object.keys(updateData).length === 0) {
-      return existingSR;
-    }
+      if (validated.status && validated.status !== existingSR.status) {
+        await this.srRepository.update(existingSR.id, {
+          statusHistory: {
+            create: {
+              previousStatus: existingSR.status,
+              currentStatus: validated.status,
+              changedBy: sessionUser.id,
+              changeReason: validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
+            },
+          },
+        });
+        await this.srActivityRepository.create({
+          srId: id,
+          userId: sessionUser.id,
+          type: "STATUS_CHANGED",
+          description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
+        });
+        if (validated.status === "COMPLETED" && !updateData.actualCompletionDate) {
+          updateData.actualCompletionDate = new Date();
+        }
+      }
 
-    return this.srRepository.update(id, updateData);
+      if (assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
+        await this.srActivityRepository.create({
+          srId: id,
+          userId: sessionUser.id,
+          type: "ASSIGNED",
+          description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
+        });
+      }
+
+      // updateData가 비어있으면 업데이트할 것이 없음
+      if (Object.keys(updateData).length === 0) {
+        return existingSR;
+      }
+
+      return this.srRepository.update(id, updateData);
     } catch (error) {
       const { logger } = await import("@/lib/logger");
       logger.error("SR 업데이트 서비스 오류", error instanceof Error ? error : undefined, {
@@ -311,14 +306,14 @@ export class SRService {
       content: string;
       createdAt: Date;
       updatedAt: Date;
-      user: { id: string; name: string; email: string };
+      user: { id: string; name: string; image: string | null };
     }>;
     activities: Array<{
       id: string;
       type: string;
       description: string;
       createdAt: Date;
-      user: { id: string; name: string; email: string };
+      user: { id: string; name: string; image: string | null };
     }>;
     attachments: Array<{
       id: string;
@@ -340,100 +335,41 @@ export class SRService {
     return this.srRepository.findDetailsById(id);
   }
 
-  async getAllSRs(params: {
-    where?: Prisma.SRWhereInput;
-    orderBy?: Prisma.SROrderByWithRelationInput;
+  async getAllSRs(params?: {
     skip?: number;
     take?: number;
-  }) {
-    const { where, orderBy, skip, take } = params;
-    const srs = await this.srRepository.findAll({ where, orderBy, skip, take });
-    
-    // Count comments and attachments for each SR
-    const srIds = srs.map(sr => sr.id);
-    const counts = await this.srCommentRepository.countBySrs(srIds);
-    const attachmentCounts = await this.srAttachmentRepository.countBySrs(srIds);
-    
-    // Create maps for quick lookup
-    const commentCountsMap: Record<string, number> = {};
-    const attachmentCountsMap: Record<string, number> = {};
-
-    counts.forEach((count: { srId: string; _count: { _all: number } }) => {
-      commentCountsMap[count.srId] = count._count._all;
-    });
-
-    attachmentCounts.forEach((count: { srId: string; _count: { _all: number } }) => {
-      attachmentCountsMap[count.srId] = count._count._all;
-    });
-    
-    // Add counts to each SR
-    return srs.map((sr) => ({ 
-      ...sr, 
-      assignedTo: sr.assignee || null,
-      _count: {
-        comments: commentCountsMap[sr.id] || 0,
-        attachments: attachmentCountsMap[sr.id] || 0,
-      }
-    }));
+    where?: Prisma.SRWhereInput;
+    orderBy?: Prisma.SROrderByWithRelationInput;
+  }): Promise<(SR & {
+    client: { id: string; name: string };
+    requester: { id: string; name: string; email: string };
+    assignee: { id: string; name: string; email: string } | null;
+    serviceCategory: {
+      id: string;
+      categoryName: string;
+      priority: string;
+      slaHours: number;
+      handlerId: string | null;
+      handler: { id: string; name: string } | null;
+    };
+    _count: { comments: number; attachments: number };
+  })[]> {
+    return this.srRepository.findAll(params);
   }
 
-  async countSRs(params: { where?: Prisma.SRWhereInput }) {
-    const { where } = params;
-    return this.srRepository.count(where);
+  async countSRs(params?: { where?: Prisma.SRWhereInput }): Promise<number> {
+    return this.srRepository.count(params?.where);
   }
 
-  async deleteSR(id: string, sessionUser?: AuthenticatedUser) {
-    if (!sessionUser) {
-      throw new Error("인증이 필요합니다.");
-    }
-
+  async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
     const existingSR = await this.srRepository.findById(id);
     if (!existingSR) {
       throw new Error("SR을 찾을 수 없습니다.");
     }
-    
-    // 권한 체크: REQUESTED, REJECTED 상태인 경우 요청자 또는 ADMIN만 삭제 가능
-    const isAdmin = sessionUser.roles?.includes("ADMIN") ?? false;
-    const isRequester = existingSR.requesterId === sessionUser.id;
-    
-    if (["REQUESTED", "REJECTED"].includes(existingSR.status)) {
-      if (!isAdmin && !isRequester) {
-        throw new Error("SR 삭제 권한이 없습니다. 요청자 또는 관리자만 삭제할 수 있습니다.");
-      }
-    } else {
-      // 다른 상태는 ADMIN만 삭제 가능
-      if (!isAdmin) {
-        throw new Error("진행 중이거나 완료된 SR은 관리자만 삭제할 수 있습니다.");
-      }
-    }
-    
+
+    // 권한 체크 (SRPolicy 사용)
+    this.srPolicy.ensureCanDelete(sessionUser, existingSR);
+
     await this.srRepository.delete(id);
-    return { message: "SR이 삭제되었습니다." };
   }
 }
-
-// 서비스 인스턴스 생성
-const srServiceInstance = new SRService();
-
-// 개별 함수 내보내기
-export const getSrById = async (id: string) => {
-  return srServiceInstance.getSRById(id);
-};
-
-export const getAllSrs = async (filters: { status?: string; clientId?: string; priority?: string }) => {
-  // Convert filters to the expected format for SRService.getAllSRs
-  const whereFilters: Prisma.SRWhereInput = {};
-  if (filters.status) whereFilters.status = filters.status as Prisma.SRWhereInput['status'];
-  if (filters.clientId) whereFilters.clientId = filters.clientId;
-  if (filters.priority) whereFilters.priority = filters.priority as Prisma.SRWhereInput['priority'];
-
-  return srServiceInstance.getAllSRs({ where: whereFilters });
-};
-
-export const createSr = async (data: SrCreateData, sessionUser: AuthenticatedUser) => {
-  return srServiceInstance.createSR(data, sessionUser);
-};
-
-export const deleteSr = async (id: string) => {
-  return srServiceInstance.deleteSR(id);
-};
