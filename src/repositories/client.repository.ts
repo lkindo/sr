@@ -1,11 +1,14 @@
 import { BaseRepository } from './base.repository';
-import { Client, Prisma } from '@prisma/client';
+import { Client, Prisma, PrismaClient } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class ClientRepository extends BaseRepositoryImpl<Client, string, Prisma.ClientUncheckedCreateInput, Prisma.ClientUncheckedUpdateInput> {
-  constructor() {
-    super(prisma.client as any);
+  constructor(
+    model: Prisma.ClientDelegate = prisma.client as any,
+    private prismaClient: PrismaClient = prisma as unknown as PrismaClient
+  ) {
+    super(model as any);
   }
 
   async findDetailsById(id: string): Promise<Client | null> {
@@ -92,10 +95,10 @@ export class ClientRepository extends BaseRepositoryImpl<Client, string, Prisma.
     clientHandlersCount: number;
   }> {
     const [srsCount, usersCount, serviceCategoriesCount, clientHandlersCount] = await Promise.all([
-      prisma.sR.count({ where: { clientId } }),
-      prisma.userClient.count({ where: { clientId } }),
-      prisma.serviceCategory.count({ where: { clientId } }),
-      prisma.clientHandler.count({ where: { clientId } }),
+      this.prismaClient.sR.count({ where: { clientId } }),
+      this.prismaClient.userClient.count({ where: { clientId } }),
+      this.prismaClient.serviceCategory.count({ where: { clientId } }),
+      this.prismaClient.clientHandler.count({ where: { clientId } }),
     ]);
 
     return { srsCount, usersCount, serviceCategoriesCount, clientHandlersCount };

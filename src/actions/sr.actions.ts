@@ -5,9 +5,10 @@ import { SRService } from "@/services/sr.service";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { Result, ok, fail } from "@/lib/result";
 import { errorToResult } from "@/lib/errors";
-import { getFormDataValue } from "@/lib/form-data-parser";
 import { authenticateAndAuthorize, validateWithSchema, getAuthenticatedSession } from "@/lib/action-helpers";
+import { PERMISSIONS } from "@/lib/permission-helpers";
 import type { SR } from "@prisma/client";
+import { buildSRCreateInput, buildSRUpdateInput } from "./sr-form.utils";
 
 export async function createSRAction(
   formData: FormData
@@ -18,23 +19,15 @@ export async function createSRAction(
   serviceCategory: { id: string; categoryName: string };
 }>> {
   try {
-    const data = {
-      title: getFormDataValue(formData, "title") || "",
-      description: getFormDataValue(formData, "description") || "",
-      clientId: getFormDataValue(formData, "clientId") || "",
-      serviceCategoryId: getFormDataValue(formData, "serviceCategoryId") || "",
-      requestedPriority: (getFormDataValue(formData, "requestedPriority") || "MEDIUM") as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW",
-      requestedCompletionDate: getFormDataValue(formData, "requestedCompletionDate") || undefined,
-    };
-
-    const validationResult = validateWithSchema(data, srCreateSchema);
+    const payload = buildSRCreateInput(formData);
+    const validationResult = validateWithSchema(payload, srCreateSchema);
     if (!validationResult.success) {
       return validationResult;
     }
     const validated = validationResult.data;
 
     // SR 등록 권한 체크: SR:CREATE 권한 필요
-    const session = await authenticateAndAuthorize('SR:CREATE');
+    const session = await authenticateAndAuthorize(PERMISSIONS.SR.CREATE);
 
     const srService = new SRService();
     const sr = await srService.createSR(validated, session.user);
@@ -55,57 +48,7 @@ export async function updateSRAction(
   serviceCategory?: { id: string; categoryName: string };
 }>> {
   try {
-    const data = {
-      title: getFormDataValue(formData, "title") || undefined,
-      description: getFormDataValue(formData, "description") || undefined,
-      serviceCategoryId: getFormDataValue(formData, "serviceCategoryId") || undefined,
-      priority: (getFormDataValue(formData, "priority") || undefined) as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | undefined,
-      status: (getFormDataValue(formData, "status") || undefined) as
-        | "REQUESTED"
-        | "INTAKE"
-        | "IN_PROGRESS"
-        | "ON_HOLD"
-        | "COMPLETED"
-        | "CONFIRMED"
-        | "REJECTED"
-        | undefined,
-      assignedToId: getFormDataValue(formData, "assignedToId"),
-      expectedCompletionDate: getFormDataValue(formData, "expectedCompletionDate"),
-      dueDate: getFormDataValue(formData, "dueDate"),
-      actualCompletionDate: getFormDataValue(formData, "actualCompletionDate"),
-      resolutionDescription: getFormDataValue(formData, "resolutionDescription"),
-      rejectionReason: getFormDataValue(formData, "rejectionReason"),
-      satisfactionRating: getFormDataValue(formData, "satisfactionRating") || undefined,
-      additionalFeedback: getFormDataValue(formData, "additionalFeedback") || undefined,
-      actualPriority: (getFormDataValue(formData, "actualPriority") || undefined) as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | undefined,
-      estimatedHours: getFormDataValue(formData, "estimatedHours") || undefined,
-      estimatedCompletionDate: getFormDataValue(formData, "estimatedCompletionDate") || undefined,
-      intakeNotes: getFormDataValue(formData, "intakeNotes") || undefined,
-      assigneeId: getFormDataValue(formData, "assigneeId") || undefined,
-      changeReason: getFormDataValue(formData, "changeReason") || undefined,
-    };
-
-    // 빈 문자열을 null 또는 undefined로 변환
-    const processedData: Record<string, string | number | null | undefined> = {};
-    for (const [key, value] of Object.entries(data)) {
-      if (value === "") {
-        // enum 필드(priority, status, actualPriority)는 undefined로 처리
-        if (key === "priority" || key === "status" || key === "actualPriority") {
-          processedData[key] = undefined;
-        } else {
-          processedData[key] = null;
-        }
-      } else if (key === "satisfactionRating" && value !== undefined) {
-        const rating = parseInt(value as string, 10);
-        processedData[key] = isNaN(rating) ? null : rating;
-      } else if (key === "estimatedHours" && value !== undefined && value !== "") {
-        const hours = parseFloat(value as string);
-        processedData[key] = isNaN(hours) ? undefined : hours;
-      } else {
-        processedData[key] = value;
-      }
-    }
-
+    const processedData = buildSRUpdateInput(formData);
     const validationResult = validateWithSchema(processedData, srUpdateSchema);
     if (!validationResult.success) {
       return validationResult;

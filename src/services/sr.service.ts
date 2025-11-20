@@ -368,8 +368,14 @@ export class SRService {
     }
 
     // 권한 체크 (SRPolicy 사용)
-    this.srPolicy.ensureCanDelete(sessionUser, existingSR);
+    this.srPolicy.ensureCanDelete(sessionUser);
 
     await this.srRepository.delete(id);
+    await this.srActivityRepository.create({
+      srId: id,
+      userId: sessionUser.id,
+      type: "STATUS_CHANGED",
+      description: "SR이 삭제되었습니다.",
+    });
   }
 }

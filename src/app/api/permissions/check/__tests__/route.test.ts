@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
-// Mock PermissionService first
-const mockCheckPermission = vi.fn();
+const permissionServiceMocks = vi.hoisted(() => {
+    const mockCheckPermission = vi.fn();
+    class PermissionServiceMock {
+        checkPermission = mockCheckPermission;
+    }
+    return { mockCheckPermission, PermissionServiceMock };
+});
+
+const { mockCheckPermission, PermissionServiceMock } = permissionServiceMocks;
+
 vi.mock('@/services/permission.service', () => ({
-    PermissionService: vi.fn().mockImplementation(() => ({
-        checkPermission: mockCheckPermission,
-    })),
+    PermissionService: PermissionServiceMock,
 }));
 
 // Mock auth-wrapper to return a simple handler

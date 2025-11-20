@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PermissionRepository } from '../permission.repository';
 
-// Mock prisma
-const mockFindUnique = vi.fn();
-const mockFindMany = vi.fn();
+const { mockFindUnique, mockFindMany } = vi.hoisted(() => ({
+    mockFindUnique: vi.fn(),
+    mockFindMany: vi.fn(),
+}));
 
 vi.mock('@/lib/prisma', () => ({
     default: {

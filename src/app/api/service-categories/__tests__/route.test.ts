@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// Mock ServiceCategoryService
-const mockGetAll = vi.fn();
+const { mockGetAll, ServiceCategoryServiceMock } = vi.hoisted(() => {
+    const mockGetAll = vi.fn();
+    class ServiceCategoryServiceMock {
+        getAll = mockGetAll;
+    }
+    return { mockGetAll, ServiceCategoryServiceMock };
+});
+
 vi.mock('@/services/service-category.service', () => ({
-    ServiceCategoryService: vi.fn().mockImplementation(() => ({
-        getAll: mockGetAll,
-    })),
+    ServiceCategoryService: ServiceCategoryServiceMock,
 }));
 
 // Mock auth-wrapper

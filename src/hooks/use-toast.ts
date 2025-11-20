@@ -59,7 +59,7 @@ interface State {
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 const addToRemoveQueue = (toastId: string) => {
-  if (toastTimeouts.has(toastId)) {
+  if (toastTimeouts.has(toastId) || !memoryState.toasts.length) {
     return
   }
 
@@ -72,6 +72,12 @@ const addToRemoveQueue = (toastId: string) => {
   }, TOAST_REMOVE_DELAY)
 
   toastTimeouts.set(toastId, timeout)
+}
+
+export function __resetToastsForTest() {
+  toastTimeouts.forEach((timeout) => clearTimeout(timeout))
+  toastTimeouts.clear()
+  memoryState = { toasts: [] }
 }
 
 export const reducer = (state: State, action: Action): State => {

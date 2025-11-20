@@ -4,8 +4,8 @@ import prisma from '@/lib/prisma';
 import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class ServiceCategoryRepository extends BaseRepositoryImpl<ServiceCategory, string, Prisma.ServiceCategoryUncheckedCreateInput, Prisma.ServiceCategoryUncheckedUpdateInput> {
-  constructor() {
-    super(prisma.serviceCategory as any);
+  constructor(model: Prisma.ServiceCategoryDelegate = prisma.serviceCategory as any) {
+    super(model as any);
   }
 
   async findDetailsById(id: string): Promise<ServiceCategory | null> {

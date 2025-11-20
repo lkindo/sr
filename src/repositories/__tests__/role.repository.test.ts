@@ -1,13 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RoleRepository } from '../role.repository';
 
-// Mock prisma
-const mockFindUnique = vi.fn();
-const mockFindMany = vi.fn();
-const mockCount = vi.fn();
-const mockTransaction = vi.fn();
-const mockDeleteMany = vi.fn();
-const mockCreateMany = vi.fn();
+const {
+    mockFindUnique,
+    mockFindMany,
+    mockCount,
+    mockTransaction,
+    mockDeleteMany,
+    mockCreateMany,
+} = vi.hoisted(() => ({
+    mockFindUnique: vi.fn(),
+    mockFindMany: vi.fn(),
+    mockCount: vi.fn(),
+    mockTransaction: vi.fn(),
+    mockDeleteMany: vi.fn(),
+    mockCreateMany: vi.fn(),
+}));
 
 vi.mock('@/lib/prisma', () => ({
     default: {

@@ -10,7 +10,8 @@ export class ServiceError extends Error {
   constructor(
     message: string,
     public code: string = "INTERNAL_ERROR",
-    public statusCode: number = 500
+    public statusCode: number = 500,
+    public details?: unknown
   ) {
     super(message);
     this.name = "ServiceError";
@@ -22,8 +23,8 @@ export class ServiceError extends Error {
  * 유효성 검증 실패 에러
  */
 export class ValidationError extends ServiceError {
-  constructor(message: string) {
-    super(message, "VALIDATION_ERROR", 400);
+  constructor(message: string, details?: unknown) {
+    super(message, "VALIDATION_ERROR", 400, details);
     this.name = "ValidationError";
     Object.setPrototypeOf(this, ValidationError.prototype);
   }
@@ -91,8 +92,8 @@ export class BusinessRuleError extends ServiceError {
  * 참조 무결성 위반 에러
  */
 export class ReferentialIntegrityError extends ServiceError {
-  constructor(message: string) {
-    super(message, "REFERENTIAL_INTEGRITY_VIOLATION", 409);
+  constructor(message: string, details?: unknown) {
+    super(message, "REFERENTIAL_INTEGRITY_VIOLATION", 409, details);
     this.name = "ReferentialIntegrityError";
     Object.setPrototypeOf(this, ReferentialIntegrityError.prototype);
   }
@@ -126,7 +127,7 @@ export function errorToResult<T>(error: unknown): { success: false; error: strin
     return {
       success: false,
       error: error.message,
-      code: "UNKNOWN_ERROR",
+      code: "INTERNAL_ERROR",
     };
   }
 

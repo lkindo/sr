@@ -467,13 +467,16 @@ describe('SRService', () => {
       mockSRRepo.delete.mockResolvedValue(sr);
       mockActivityRepo.create.mockResolvedValue({});
 
-      // Note: deleteSR 메서드가 실제로 존재하는지 확인 필요
-      if (typeof (srService as any).deleteSR === 'function') {
-        const result = await (srService as any).deleteSR('sr1', { id: 'user1' });
-        expect(result).toBeDefined();
-      } else {
-        expect(true).toBe(true); // 메서드가 없으면 테스트 통과
-      }
+      const result = await srService.deleteSR('sr1', { id: 'user1' } as any);
+      expect(result).toBeUndefined();
+      expect(mockSRRepo.delete).toHaveBeenCalledWith('sr1');
+      expect(mockActivityRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          srId: 'sr1',
+          userId: 'user1',
+          type: 'STATUS_CHANGED',
+        })
+      );
     });
   });
 });

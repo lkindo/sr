@@ -50,6 +50,18 @@ function initializeRedis(): RedisClient | null {
 // 런타임에만 초기화
 redisClient = initializeRedis();
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __SR_TEST_REDIS__: RedisClient | null | undefined
+}
+
+if (process.env.NODE_ENV === 'test' && typeof globalThis !== 'undefined') {
+  const testClient = (globalThis as typeof globalThis & { __SR_TEST_REDIS__?: RedisClient | null }).__SR_TEST_REDIS__
+  if (testClient) {
+    redisClient = testClient
+  }
+}
+
 /**
  * 캐시 키 생성 헬퍼
  */
@@ -174,6 +186,18 @@ export async function invalidateCaches(keys: string[]): Promise<void> {
   } catch (error) {
     console.warn(`캐시 무효화 실패:`, error);
   }
+}
+
+export async function invalidateCachePatterns(patterns: string[]): Promise<void> {
+  await Promise.all(patterns.map((pattern) => invalidateCachePattern(pattern)));
+}
+
+export function scheduleInvalidateCachePatterns(patterns: string[], delayMs = 0) {
+  setTimeout(() => {
+    invalidateCachePatterns(patterns).catch((error) => {
+      console.warn("Scheduled cache invalidation failed:", error);
+    });
+  }, Math.max(0, delayMs));
 }
 
 /**

@@ -5,6 +5,8 @@ import { NextRequest } from 'next/server';
 const mockGroupBy = vi.fn();
 const mockCount = vi.fn();
 const mockFindMany = vi.fn();
+const mockClientFindMany = vi.fn();
+const mockUserClientFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
     default: {
@@ -14,10 +16,10 @@ vi.mock('@/lib/prisma', () => ({
             findMany: mockFindMany,
         },
         client: {
-            findMany: vi.fn(),
+            findMany: mockClientFindMany,
         },
         userClient: {
-            findMany: vi.fn(),
+            findMany: mockUserClientFindMany,
         },
     },
 }));
@@ -53,17 +55,37 @@ vi.mock('@/lib/cache-config', () => ({
 describe('GET /api/dashboard/stats', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockClientFindMany.mockResolvedValue([]);
+        mockUserClientFindMany.mockResolvedValue([]);
+        mockGroupBy.mockResolvedValue([]);
+        mockCount.mockResolvedValue(0);
+        mockFindMany.mockResolvedValue([]);
     });
 
     it('대시보드 통계를 반환해야 함', async () => {
         // Arrange
-        mockGroupBy.mockResolvedValue([
-            { status: 'REQUESTED', _count: { id: 5 } },
-            { status: 'IN_PROGRESS', _count: { id: 3 } },
-        ]);
+        const trendDate = new Date('2024-01-01T00:00:00.000Z');
+        mockGroupBy
+            .mockResolvedValueOnce([
+                { status: 'REQUESTED', _count: { id: 5 } },
+                { status: 'IN_PROGRESS', _count: { id: 3 } },
+            ]) // srByStatus
+            .mockResolvedValueOnce([
+                { priority: 'HIGH', _count: { id: 4 } },
+                { priority: 'MEDIUM', _count: { id: 2 } },
+            ]) // srByPriority
+            .mockResolvedValueOnce([
+                { clientId: 'client-1', _count: { id: 7 } },
+            ]) // srByClient
+            .mockResolvedValueOnce([
+                { createdAt: trendDate, _count: { id: 1 } },
+            ]); // srTrend
 
         mockCount.mockResolvedValue(10);
         mockFindMany.mockResolvedValue([]);
+        mockClientFindMany.mockResolvedValue([
+            { id: 'client-1', name: 'Client A', code: 'CA' },
+        ]);
 
         const request = new Request('http://localhost/api/dashboard/stats') as NextRequest;
 

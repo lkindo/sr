@@ -95,7 +95,7 @@ if (process.env.NODE_ENV === 'development') {
 	}
 }
 import { unstable_cache as cache } from 'next/cache';
-import prisma from './prisma';
+import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
 // SR 목록 캐싱
