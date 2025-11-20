@@ -1,5 +1,8 @@
 import { Session } from "next-auth";
-import prisma from "@/lib/prisma";
+import { PermissionService } from "@/services/permission.service";
+
+// Singleton instance for permission service
+const permissionService = new PermissionService();
 
 /**
  * 사용자의 권한을 확인합니다.
@@ -14,40 +17,7 @@ export async function hasPermission(
   action: string
 ): Promise<boolean> {
   try {
-    const userWithPermissions = await prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        roles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!userWithPermissions) {
-      return false;
-    }
-
-    // 사용자의 모든 역할에서 권한 확인
-    for (const userRole of userWithPermissions.roles) {
-      for (const rolePermission of userRole.role.permissions) {
-        const permission = rolePermission.permission;
-        if (permission.resource === resource && permission.action === action) {
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return await permissionService.checkPermission(userId, `${resource}:${action}`);
   } catch (error) {
     console.error("Error checking permission:", error);
     return false;
@@ -117,16 +87,7 @@ export async function hasAllPermissions(
  */
 export async function hasRole(userId: string, roleName: string): Promise<boolean> {
   try {
-    const userRole = await prisma.userRole.findFirst({
-      where: {
-        userId,
-        role: {
-          name: roleName,
-        },
-      },
-    });
-
-    return !!userRole;
+    return await permissionService.checkRole(userId, roleName);
   } catch (error) {
     console.error("Error checking role:", error);
     return false;
@@ -139,49 +100,12 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
  * @returns 권한 배열
  */
 export async function getUserPermissions(userId: string) {
-  const userWithPermissions = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      roles: {
-        include: {
-          role: {
-            include: {
-              permissions: {
-                include: {
-                  permission: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!userWithPermissions) {
-    return [];
-  }
-
-  const permissions: Array<{ resource: string; action: string; description?: string }> = [];
-  const seen = new Set<string>();
-
-  for (const userRole of userWithPermissions.roles) {
-    for (const rolePermission of userRole.role.permissions) {
-      const permission = rolePermission.permission;
-      const key = `${permission.resource}.${permission.action}`;
-      
-      if (!seen.has(key)) {
-        seen.add(key);
-        permissions.push({
-          resource: permission.resource,
-          action: permission.action,
-          description: permission.description || undefined,
-        });
-      }
-    }
-  }
-
-  return permissions;
+  const permissions = await permissionService.getUserPermissions(userId);
+  return permissions.map(p => ({
+    resource: p.resource,
+    action: p.action,
+    description: p.description || undefined,
+  }));
 }
 
 /**
@@ -190,14 +114,7 @@ export async function getUserPermissions(userId: string) {
  * @returns 역할 배열
  */
 export async function getUserRoles(userId: string) {
-  const userRoles = await prisma.userRole.findMany({
-    where: { userId },
-    include: {
-      role: true,
-    },
-  });
-
-  return userRoles.map((ur) => ur.role);
+  return await permissionService.getUserRoles(userId);
 }
 
 

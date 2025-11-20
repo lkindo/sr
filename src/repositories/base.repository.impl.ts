@@ -18,7 +18,7 @@ export interface PrismaDelegate<T, CreateInput, UpdateInput> {
 
 /**
  * A generic base repository implementation for common CRUD operations.
- * Uses a generic PrismaDelegate to ensure type safety.
+ * Accepts any Prisma model delegate.
  */
 export abstract class BaseRepositoryImpl<
   T,
@@ -26,7 +26,8 @@ export abstract class BaseRepositoryImpl<
   CreateInput = unknown,
   UpdateInput = unknown
 > implements BaseRepository<T, ID, CreateInput, UpdateInput> {
-  constructor(protected readonly model: PrismaDelegate<T, CreateInput, UpdateInput>) { }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(protected readonly model: any) { }
 
   async findById(id: ID): Promise<T | null> {
     return this.model.findUnique({ where: { id } });

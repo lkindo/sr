@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUncheckedCreateInput, Prisma.SRUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sR as any);
+    super(prisma.sR);
   }
 
   async findDetailsById(id: string): Promise<(SR & {

@@ -10,6 +10,7 @@ import { withCache, isCacheAvailable } from "@/lib/cache";
 import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
 import { srDetailKey, SR_LIST_PREFIX, DASHBOARD_STATS_PREFIX, MY_REQUESTS_PREFIX, srListPatternForClient, srListPatternForStatus, srListPatternForPriority } from "@/lib/cache-keys";
 import { getSrsDetailTtlSeconds, shouldWideInvalidate } from "@/lib/cache-config";
+import { serializeResponse } from "@/lib/serialization";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -33,27 +34,7 @@ export const GET = withAuthAndRateLimit(async (
   }
 
   // 날짜 객체를 문자열로 변환 (JSON 직렬화를 위해)
-  const serializableSr = {
-    ...sr,
-    createdAt: sr.createdAt.toISOString(),
-    updatedAt: sr.updatedAt.toISOString(),
-    dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
-    requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
-    estimatedCompletionDate: sr.estimatedCompletionDate ? sr.estimatedCompletionDate.toISOString() : null,
-    actualCompletionDate: sr.actualCompletionDate ? sr.actualCompletionDate.toISOString() : null,
-    // 관련 객체들의 날짜 필드도 변환
-    comments: sr.comments?.map((comment) => ({
-      ...comment,
-      createdAt: comment.createdAt.toISOString(),
-      updatedAt: comment.updatedAt.toISOString(),
-    })) || [],
-    activities: sr.activities?.map((activity) => ({
-      ...activity,
-      createdAt: activity.createdAt.toISOString(),
-    })) || [],
-  };
-
-  return NextResponse.json(serializableSr);
+  return NextResponse.json(serializeResponse(sr));
 }, { preset: 'standard' }); // 1분당 100회
 
 // PATCH /api/srs/[id] - SR 수정 (Rate Limit: 엄격)

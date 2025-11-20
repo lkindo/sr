@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRCommentRepository extends BaseRepositoryImpl<SRComment, string, Prisma.SRCommentUncheckedCreateInput, Prisma.SRCommentUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sRComment as any);
+    super(prisma.sRComment);
   }
 
   async findDetailsById(id: string): Promise<SRComment | null> {

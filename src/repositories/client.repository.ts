@@ -5,10 +5,10 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class ClientRepository extends BaseRepositoryImpl<Client, string, Prisma.ClientUncheckedCreateInput, Prisma.ClientUncheckedUpdateInput> {
   constructor(
-    model: Prisma.ClientDelegate = prisma.client as any,
+    model: Prisma.ClientDelegate = prisma.client,
     private prismaClient: PrismaClient = prisma as unknown as PrismaClient
   ) {
-    super(model as any);
+    super(model);
   }
 
   async findDetailsById(id: string): Promise<Client | null> {

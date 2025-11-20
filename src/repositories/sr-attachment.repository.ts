@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRAttachmentRepository extends BaseRepositoryImpl<SRAttachment, string, Prisma.SRAttachmentUncheckedCreateInput, Prisma.SRAttachmentUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sRAttachment as any);
+    super(prisma.sRAttachment);
   }
 
   async findDetailsById(id: string): Promise<SRAttachment | null> {

@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class PermissionRepository extends BaseRepositoryImpl<Permission, string, Prisma.PermissionUncheckedCreateInput, Prisma.PermissionUncheckedUpdateInput> {
   constructor() {
-    super(prisma.permission as any);
+    super(prisma.permission);
   }
 
   async findDetailsById(id: string): Promise<Permission | null> {

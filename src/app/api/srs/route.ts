@@ -8,6 +8,7 @@ import { ForbiddenError } from "@/lib/errors";
 import prisma from "@/lib/prisma";
 import { withCache, isCacheAvailable } from "@/lib/cache";
 import { invalidateCachePattern } from "@/lib/redis-cache";
+import { serializeResponse } from "@/lib/serialization";
 import { srListKey, DASHBOARD_STATS_PREFIX, srListPatternForClient, srListPatternForPriority } from "@/lib/cache-keys";
 import { getSrsListTtlSeconds, shouldWideInvalidate } from "@/lib/cache-config";
 
@@ -34,15 +35,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
     : await srService.getAllSRs({ where: filters });
 
   // Date 객체를 문자열로 변환 (직렬화 문제 해결)
-  const serializableSrs = srs.map(sr => ({
-    ...sr,
-    createdAt: sr.createdAt.toISOString(),
-    updatedAt: sr.updatedAt.toISOString(),
-    dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
-    requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
-  }));
-
-  return NextResponse.json(serializableSrs);
+  return NextResponse.json(serializeResponse(srs));
 }, { preset: 'relaxed' }); // 1분당 300회 (읽기 전용, 자주 조회됨)
 
 // POST /api/srs - 새 SR 생성 (Rate Limit: 표준)
@@ -103,14 +96,6 @@ export const POST = withAuthAndRateLimit(async (request: NextRequest, { session 
     });
   }
 
-  const serializableSr = {
-    ...sr,
-    createdAt: sr.createdAt.toISOString(),
-    updatedAt: sr.updatedAt.toISOString(),
-    dueDate: sr.dueDate ? sr.dueDate.toISOString() : null,
-    requestedCompletionDate: sr.requestedCompletionDate ? sr.requestedCompletionDate.toISOString() : null,
-  };
-
   // 캐시 무효화: 목록/대시보드 관련 키
   try {
     const wide = shouldWideInvalidate()
@@ -123,6 +108,6 @@ export const POST = withAuthAndRateLimit(async (request: NextRequest, { session 
     console.warn('Cache invalidation failed after SR create:', e);
   }
 
-  return NextResponse.json(serializableSr, { status: 201 });
+  return NextResponse.json(serializeResponse(sr), { status: 201 });
 }, { preset: 'standard' }); // 1분당 100회
 

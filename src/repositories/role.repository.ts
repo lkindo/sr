@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class RoleRepository extends BaseRepositoryImpl<Role, string, Prisma.RoleUncheckedCreateInput, Prisma.RoleUncheckedUpdateInput> {
   constructor() {
-    super(prisma.role as any);
+    super(prisma.role);
   }
 
   async findDetailsById(id: string): Promise<Role | null> {

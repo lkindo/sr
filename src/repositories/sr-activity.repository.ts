@@ -5,7 +5,7 @@ import { BaseRepositoryImpl } from './base.repository.impl';
 
 export class SRActivityRepository extends BaseRepositoryImpl<SRActivity, string, Prisma.SRActivityUncheckedCreateInput, Prisma.SRActivityUncheckedUpdateInput> {
   constructor() {
-    super(prisma.sRActivity as any);
+    super(prisma.sRActivity);
   }
 
   async findDetailsById(id: string): Promise<SRActivity | null> {

@@ -70,7 +70,9 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm update:*)",
       "Bash(set NEXT_FORCE_WEBPACK=1)",
-      "Bash(.env)"
+      "Bash(.env)",
+      "Bash(if not exist \"src\\services\\__tests__\" mkdir \"src\\services\\__tests__\")",
+      "Bash(if not exist \"src\\repositories\\__tests__\" mkdir \"src\\repositories\\__tests__\")"
     ],
     "deny": [],
     "ask": []

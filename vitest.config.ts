@@ -32,8 +32,6 @@ export default defineConfig({
         '**/mockData/',
         'tests/',
         'e2e/',
-        'src/repositories/**',
-        'src/services/**',
         'src/lib/redis-cache.ts',
         'src/lib/logger.ts',
         'src/lib/prisma.ts',
