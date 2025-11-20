@@ -1,10 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: {
-    // 빌드 시 ESLint 오류로 실패하지 않도록 설정 (CI에서는 별도로 lint 단계 수행)
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     // 경고: 프로덕션 빌드에서 타입스크립트 에러를 무시합니다.
     // 경고: 이 옵션은 타입 안정성을 해칠 수 있으므로 주의해서 사용해야 합니다.
