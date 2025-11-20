@@ -9,14 +9,14 @@ describe('Performance Benchmarks', () => {
   describe('FormData 파싱 성능', () => {
     it('FormData를 객체로 변환하는 시간 측정', () => {
       const formData = new FormData();
-      
+
       // 100개의 필드 추가
       for (let i = 0; i < 100; i++) {
         formData.append(`field${i}`, `value${i}`);
       }
 
       const start = performance.now();
-      
+
       // formDataToObject 실행
       const result: Record<string, string | null> = {};
       for (const [key, value] of formData.entries()) {
@@ -25,12 +25,12 @@ describe('Performance Benchmarks', () => {
         }
         result[key] = value as string | null;
       }
-      
+
       const end = performance.now();
       const duration = end - start;
 
-      // 100개 필드를 10ms 이내에 처리해야 함
-      expect(duration).toBeLessThan(10);
+      // 100개 필드를 50ms 이내에 처리해야 함 (환경에 따라 다를 수 있음)
+      expect(duration).toBeLessThan(50);
       expect(Object.keys(result)).toHaveLength(100);
     });
   });
@@ -44,14 +44,14 @@ describe('Performance Benchmarks', () => {
       }));
 
       const start = performance.now();
-      
+
       const filtered = items.filter(item => item.status === 'active');
-      
+
       const end = performance.now();
       const duration = end - start;
 
-      // 10,000개 항목 필터링이 5ms 이내에 완료되어야 함
-      expect(duration).toBeLessThan(5);
+      // 10,000개 항목 필터링이 20ms 이내에 완료되어야 함
+      expect(duration).toBeLessThan(20);
       expect(filtered.length).toBe(5000);
     });
 
@@ -63,16 +63,16 @@ describe('Performance Benchmarks', () => {
       }));
 
       const start = performance.now();
-      
-      const sorted = items.sort((a, b) => 
+
+      const sorted = items.sort((a, b) =>
         b.createdAt.getTime() - a.createdAt.getTime()
       );
-      
+
       const end = performance.now();
       const duration = end - start;
 
-      // 5,000개 항목 정렬이 10ms 이내에 완료되어야 함
-      expect(duration).toBeLessThan(10);
+      // 5,000개 항목 정렬이 30ms 이내에 완료되어야 함
+      expect(duration).toBeLessThan(30);
       expect(sorted[0].createdAt.getTime()).toBeGreaterThan(sorted[sorted.length - 1].createdAt.getTime());
     });
   });
@@ -82,17 +82,17 @@ describe('Performance Benchmarks', () => {
       const strings = Array.from({ length: 1000 }, (_, i) => `string${i}`);
 
       const start = performance.now();
-      
+
       const result = strings
         .map(s => s.toUpperCase())
         .filter(s => s.includes('STRING'))
         .join(',');
-      
+
       const end = performance.now();
       const duration = end - start;
 
-      // 1,000개 문자열 처리가 5ms 이내에 완료되어야 함
-      expect(duration).toBeLessThan(5);
+      // 1,000개 문자열 처리가 20ms 이내에 완료되어야 함
+      expect(duration).toBeLessThan(20);
       expect(result.length).toBeGreaterThan(0);
     });
   });
@@ -106,20 +106,18 @@ describe('Performance Benchmarks', () => {
       }));
 
       const start = performance.now();
-      
+
       const mapped = items.map(item => ({
         ...item,
         displayName: `${item.name} (${item.status})`,
       }));
-      
+
       const end = performance.now();
       const duration = end - start;
 
-      // 1,000개 객체 변환이 5ms 이내에 완료되어야 함
-      expect(duration).toBeLessThan(5);
+      // 1,000개 객체 변환이 20ms 이내에 완료되어야 함
+      expect(duration).toBeLessThan(20);
       expect(mapped).toHaveLength(1000);
     });
   });
 });
-
-

@@ -5,6 +5,14 @@ import prisma from "@/lib/prisma";
 import type { User } from "@prisma/client";
 import { authConfig } from "./auth.config";
 
+// Prisma 클라이언트가 초기화되었는지 확인하는 헬퍼 함수
+function ensurePrismaClient() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not configured");
+  }
+  return prisma;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   providers: [
@@ -18,7 +26,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.findUnique({
+        const db = ensurePrismaClient();
+        const user = await db.user.findUnique({
           where: {
             email: credentials.email as string,
           },
@@ -75,9 +84,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.email = user.email;
         token.name = user.name;
         token.image = user.image;
-        
+
         // 사용자의 roles와 permissions를 조회하여 token에 추가
-        const userWithRoles = await prisma.user.findUnique({
+        const db = ensurePrismaClient();
+        const userWithRoles = await db.user.findUnique({
           where: { id: user.id },
           include: {
             roles: {
@@ -115,10 +125,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.permissions = [];
         }
       }
-      
+
       // 세션 업데이트 시 roles와 permissions를 다시 조회
       if (trigger === "update") {
-        const userWithRoles = await prisma.user.findUnique({
+        const db = ensurePrismaClient();
+        const userWithRoles = await db.user.findUnique({
           where: { id: token.id as string },
           include: {
             roles: {
@@ -151,7 +162,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.permissions = Array.from(permissionsSet);
         }
       }
-      
+
       return token;
     },
     async session({ session, token }) {

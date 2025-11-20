@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 // GET /api/health - 데이터베이스 연결 상태 확인
 export async function GET() {

@@ -1,6 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 
 const prismaClientSingleton = () => {
+  // 빌드 타임에는 DATABASE_URL이 없을 수 있으므로 체크
+  if (!process.env.DATABASE_URL) {
+    console.warn('DATABASE_URL is not set, Prisma client will not be initialized');
+    return null;
+  }
+
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     // 연결 풀 최적화 옵션
@@ -18,12 +24,15 @@ declare const globalThis: {
 
 const prisma = globalThis.prismaGlobal ?? prismaClientSingleton()
 
-export default prisma
+// Fallback for build time - create a mock object
+const safePrisma = prisma ?? {} as PrismaClient;
+
+export default safePrisma
 
 if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = prisma
 
 // Slow query logger (development only)
-if (process.env.NODE_ENV === 'development') {
+if (process.env.NODE_ENV === 'development' && prisma) {
   const slowMs = Number(process.env.PRISMA_SLOW_MS ?? 200)
   const slowLogFile = process.env.PRISMA_SLOW_LOG_FILE
   let append: ((line: string) => void) | null = null
