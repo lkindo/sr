@@ -1,0 +1,236 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - link "SR Management 서비스 요청 관리" [ref=e6] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e7]: SR Management
+          - generic [ref=e8]: 서비스 요청 관리
+        - generic [ref=e9]:
+          - navigation [ref=e10]:
+            - link "Dashboard" [ref=e11] [cursor=pointer]:
+              - /url: /dashboard
+            - link "SR 관리" [ref=e12] [cursor=pointer]:
+              - /url: /srs
+            - link "고객사 관리" [ref=e13] [cursor=pointer]:
+              - /url: /clients
+            - link "사용자 관리" [ref=e14] [cursor=pointer]:
+              - /url: /users
+            - link "권한 관리" [ref=e15] [cursor=pointer]:
+              - /url: /roles
+            - link "설정" [ref=e16] [cursor=pointer]:
+              - /url: /settings
+          - navigation [ref=e17]:
+            - button "AU" [ref=e18] [cursor=pointer]:
+              - generic [ref=e20]: AU
+    - generic [ref=e21]:
+      - complementary [ref=e22]:
+        - navigation [ref=e23]:
+          - heading "SR 관리" [level=2] [ref=e25]
+          - generic [ref=e27]:
+            - button "SR 관리" [expanded] [ref=e28] [cursor=pointer]:
+              - generic [ref=e29]: SR 관리
+              - img [ref=e30]
+            - generic [ref=e32]:
+              - link "내 요청 SR" [ref=e33] [cursor=pointer]:
+                - /url: /my-requests
+                - img [ref=e34]
+                - text: 내 요청 SR
+              - link "SR 전체 목록" [ref=e37] [cursor=pointer]:
+                - /url: /srs
+                - img [ref=e39]
+                - text: SR 전체 목록
+      - main [ref=e42]:
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - generic [ref=e47]:
+              - heading "SR 목록" [level=3] [ref=e48]
+              - button "등록" [ref=e49] [cursor=pointer]:
+                - img
+                - text: 등록
+            - generic [ref=e50]:
+              - generic [ref=e51]:
+                - button "접수 대기 1" [ref=e52] [cursor=pointer]:
+                  - img [ref=e53]
+                  - generic [ref=e56]: 접수 대기
+                  - generic [ref=e57]: "1"
+                - button "내 담당" [ref=e58] [cursor=pointer]:
+                  - img [ref=e59]
+                  - generic [ref=e62]: 내 담당
+                - button "긴급 4" [ref=e63] [cursor=pointer]:
+                  - img [ref=e64]
+                  - generic [ref=e66]: 긴급
+                  - generic [ref=e67]: "4"
+              - button "고급 필터" [ref=e68] [cursor=pointer]:
+                - img
+                - text: 고급 필터
+            - generic [ref=e70]:
+              - img [ref=e71]
+              - textbox "SR 번호, 제목, 고객사, 요청자, 담당자로 검색..." [ref=e74]
+          - generic [ref=e76]: Total 6 items
+          - table [ref=e79]:
+            - rowgroup [ref=e80]:
+              - row "SR 번호 제목 고객사 요청자 담당자 우선순위 상태 마감일 댓글/첨부 생성일 작업" [ref=e81]:
+                - cell "SR 번호" [ref=e82]:
+                  - button "SR 번호" [ref=e83] [cursor=pointer]:
+                    - text: SR 번호
+                    - img
+                - cell "제목" [ref=e84]:
+                  - button "제목" [ref=e85] [cursor=pointer]:
+                    - text: 제목
+                    - img
+                - cell "고객사" [ref=e86]:
+                  - button "고객사" [ref=e87] [cursor=pointer]:
+                    - text: 고객사
+                    - img
+                - cell "요청자" [ref=e88]
+                - cell "담당자" [ref=e89]
+                - cell "우선순위" [ref=e90]:
+                  - button "우선순위" [ref=e91] [cursor=pointer]:
+                    - text: 우선순위
+                    - img
+                - cell "상태" [ref=e92]:
+                  - button "상태" [ref=e93] [cursor=pointer]:
+                    - text: 상태
+                    - img
+                - cell "마감일" [ref=e94]:
+                  - button "마감일" [ref=e95] [cursor=pointer]:
+                    - text: 마감일
+                    - img
+                - cell "댓글/첨부" [ref=e96]
+                - cell "생성일" [ref=e97]:
+                  - button "생성일" [ref=e98] [cursor=pointer]:
+                    - text: 생성일
+                    - img
+                - cell "작업" [ref=e99]
+            - rowgroup [ref=e100]:
+              - row "SR-20251120-0001 test3 테스트고객사C Admin User - 높음 요청됨 - 0 / 0 2025. 11. 20. 접수" [ref=e101] [cursor=pointer]:
+                - cell "SR-20251120-0001" [ref=e102]:
+                  - link "SR-20251120-0001" [ref=e103]:
+                    - /url: /srs/cmi7e96qo0001og3glfmdk5c2
+                - cell "test3" [ref=e104]
+                - cell "테스트고객사C" [ref=e105]
+                - cell "Admin User" [ref=e106]
+                - cell "-" [ref=e107]
+                - cell "높음" [ref=e108]:
+                  - generic [ref=e109]: 높음
+                - cell "요청됨" [ref=e110]:
+                  - generic [ref=e111]: 요청됨
+                - cell "-" [ref=e112]
+                - cell "0 / 0" [ref=e113]
+                - cell "2025. 11. 20." [ref=e114]
+                - cell "접수" [ref=e115]:
+                  - button "접수" [ref=e116]
+              - row "SR-20251115-0002 test3 테스트 고객사 A TEST1사용자 이경인 보통 진행중 2일 지연 0 / 0 2025. 11. 16." [ref=e117] [cursor=pointer]:
+                - cell "SR-20251115-0002" [ref=e118]:
+                  - link "SR-20251115-0002" [ref=e119]:
+                    - /url: /srs/cmi0g0e1n000dogzs0apt6zs1
+                - cell "test3" [ref=e120]
+                - cell "테스트 고객사 A" [ref=e121]
+                - cell "TEST1사용자" [ref=e122]
+                - cell "이경인" [ref=e123]
+                - cell "보통" [ref=e124]:
+                  - generic [ref=e125]: 보통
+                - cell "진행중" [ref=e126]:
+                  - generic [ref=e127]: 진행중
+                - cell "2일 지연" [ref=e128]:
+                  - generic [ref=e129]: 2일 지연
+                - cell "0 / 0" [ref=e130]
+                - cell "2025. 11. 16." [ref=e131]
+                - cell [ref=e132]:
+                  - button "접수 정보 수정" [ref=e133]:
+                    - img
+              - row "SR-20251115-0001 srtest2 테스트 고객사 A Admin User 이경인 높음 진행중 4일 지연 0 / 0 2025. 11. 15." [ref=e134] [cursor=pointer]:
+                - cell "SR-20251115-0001" [ref=e135]:
+                  - link "SR-20251115-0001" [ref=e136]:
+                    - /url: /srs/cmi0bd8xl0001og8sbkprbfrc
+                - cell "srtest2" [ref=e137]
+                - cell "테스트 고객사 A" [ref=e138]
+                - cell "Admin User" [ref=e139]
+                - cell "이경인" [ref=e140]
+                - cell "높음" [ref=e141]:
+                  - generic [ref=e142]: 높음
+                - cell "진행중" [ref=e143]:
+                  - generic [ref=e144]: 진행중
+                - cell "4일 지연" [ref=e145]:
+                  - generic [ref=e146]: 4일 지연
+                - cell "0 / 0" [ref=e147]
+                - cell "2025. 11. 15." [ref=e148]
+                - cell [ref=e149]:
+                  - button "접수 정보 수정" [ref=e150]:
+                    - img
+              - row "SR-20251112-0001 새로운 sr 요청 테스트 고객사 A Admin User 이경인 보통 진행중 8일 지연 1 / 1 2025. 11. 12." [ref=e151] [cursor=pointer]:
+                - cell "SR-20251112-0001" [ref=e152]:
+                  - link "SR-20251112-0001" [ref=e153]:
+                    - /url: /srs/cmhvh7why0001iz8oy63r0608
+                - cell "새로운 sr 요청" [ref=e154]
+                - cell "테스트 고객사 A" [ref=e155]
+                - cell "Admin User" [ref=e156]
+                - cell "이경인" [ref=e157]
+                - cell "보통" [ref=e158]:
+                  - generic [ref=e159]: 보통
+                - cell "진행중" [ref=e160]:
+                  - generic [ref=e161]: 진행중
+                - cell "8일 지연" [ref=e162]:
+                  - generic [ref=e163]: 8일 지연
+                - cell "1 / 1" [ref=e164]
+                - cell "2025. 11. 12." [ref=e165]
+                - cell [ref=e166]:
+                  - button "접수 정보 수정" [ref=e167]:
+                    - img
+              - row "SR-20251111-0002 SR테스트 테스트 고객사 A Admin User 이경인 높음 진행중 3일 지연 0 / 1 2025. 11. 11." [ref=e168] [cursor=pointer]:
+                - cell "SR-20251111-0002" [ref=e169]:
+                  - link "SR-20251111-0002" [ref=e170]:
+                    - /url: /srs/cmhumberi0001ognsfwdj01h0
+                - cell "SR테스트" [ref=e171]
+                - cell "테스트 고객사 A" [ref=e172]
+                - cell "Admin User" [ref=e173]
+                - cell "이경인" [ref=e174]
+                - cell "높음" [ref=e175]:
+                  - generic [ref=e176]: 높음
+                - cell "진행중" [ref=e177]:
+                  - generic [ref=e178]: 진행중
+                - cell "3일 지연" [ref=e179]:
+                  - generic [ref=e180]: 3일 지연
+                - cell "0 / 1" [ref=e181]
+                - cell "2025. 11. 11." [ref=e182]
+                - cell [ref=e183]:
+                  - button "접수 정보 수정" [ref=e184]:
+                    - img
+              - row "SR-20251111-0001 SR001-B 테스트 고객사 B Admin User 이경인 긴급 진행중 6일 지연 0 / 0 2025. 11. 11." [ref=e185] [cursor=pointer]:
+                - cell "SR-20251111-0001" [ref=e186]:
+                  - link "SR-20251111-0001" [ref=e187]:
+                    - /url: /srs/cmhukpvqx0001jp04hy128dtn
+                - cell "SR001-B" [ref=e188]
+                - cell "테스트 고객사 B" [ref=e189]
+                - cell "Admin User" [ref=e190]
+                - cell "이경인" [ref=e191]
+                - cell "긴급" [ref=e192]:
+                  - generic [ref=e193]: 긴급
+                - cell "진행중" [ref=e194]:
+                  - generic [ref=e195]: 진행중
+                - cell "6일 지연" [ref=e196]:
+                  - generic [ref=e197]: 6일 지연
+                - cell "0 / 0" [ref=e198]
+                - cell "2025. 11. 11." [ref=e199]
+                - cell [ref=e200]:
+                  - button "접수 정보 수정" [ref=e201]:
+                    - img
+          - generic [ref=e203]:
+            - combobox [ref=e204] [cursor=pointer]:
+              - generic: "20"
+              - img [ref=e205]
+            - generic [ref=e207]: items per page
+    - contentinfo [ref=e208]:
+      - generic [ref=e209]:
+        - paragraph [ref=e210]: © 2025 SR Management System. All rights reserved.
+        - generic [ref=e212]: v0.1.0
+  - region "Notifications (F8)":
+    - list
+  - button "Open Next.js Dev Tools" [ref=e218] [cursor=pointer]:
+    - img [ref=e219]
+  - alert [ref=e222]
+```

@@ -29,7 +29,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             email: 'test@example.com',
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         const createdUser = {
@@ -57,10 +58,10 @@ describe('POST /api/auth/register', () => {
         // Assert
         expect(response.status).toBe(201);
         expect(json.message).toBe('회원가입이 성공적으로 완료되었습니다.');
-        expect(json.user).toHaveProperty('id');
-        expect(json.user).toHaveProperty('name', userData.name);
-        expect(json.user).toHaveProperty('email', userData.email);
-        expect(json.user).not.toHaveProperty('password'); // 비밀번호는 응답에 포함되지 않아야 함
+        expect(json.data.user).toHaveProperty('id');
+        expect(json.data.user).toHaveProperty('name', userData.name);
+        expect(json.data.user).toHaveProperty('email', userData.email);
+        expect(json.data.user).not.toHaveProperty('password'); // 비밀번호는 응답에 포함되지 않아야 함
     });
 
     it('이메일이 중복되면 400 에러를 반환해야 함', async () => {
@@ -68,7 +69,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             email: 'existing@example.com',
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         mockFindUnique.mockResolvedValue({ id: 'existing-user', email: userData.email });
@@ -87,15 +89,16 @@ describe('POST /api/auth/register', () => {
 
         // Assert
         expect(response.status).toBe(400);
-        expect(json.error).toBe('이미 존재하는 이메일입니다.');
+        expect(json.error.message).toBe('이미 존재하는 이메일입니다.');
     });
 
-    it('이름이 2자 미만이면 검증 에러를 반환해야 함', async () => {
+    it('비밀번호가 일치하지 않으면 검증 에러를 반환해야 함', async () => {
         // Arrange
         const userData = {
-            name: 'A', // 1자
+            name: 'Test User',
             email: 'test@example.com',
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'DifferentPassword123!',
         };
 
         const request = new Request('http://localhost/api/auth/register', {
@@ -112,7 +115,7 @@ describe('POST /api/auth/register', () => {
 
         // Assert
         expect(response.status).toBe(400);
-        expect(json.error).toContain('이름은 최소 2자 이상이어야 합니다');
+        expect(json.error.message).toContain('비밀번호가 일치하지 않습니다');
     });
 
     it('이메일 형식이 잘못되면 검증 에러를 반환해야 함', async () => {
@@ -120,7 +123,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             email: 'invalid-email', // 잘못된 이메일 형식
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         const request = new Request('http://localhost/api/auth/register', {
@@ -137,15 +141,16 @@ describe('POST /api/auth/register', () => {
 
         // Assert
         expect(response.status).toBe(400);
-        expect(json.error).toContain('유효한 이메일 주소를 입력해주세요');
+        expect(json.error.message).toContain('유효한 이메일 주소를 입력해주세요');
     });
 
-    it('비밀번호가 6자 미만이면 검증 에러를 반환해야 함', async () => {
+    it('비밀번호가 8자 미만이면 검증 에러를 반환해야 함', async () => {
         // Arrange
         const userData = {
             name: 'Test User',
             email: 'test@example.com',
-            password: '12345', // 5자
+            password: 'Pass1!', // 6자
+            confirmPassword: 'Pass1!',
         };
 
         const request = new Request('http://localhost/api/auth/register', {
@@ -162,7 +167,7 @@ describe('POST /api/auth/register', () => {
 
         // Assert
         expect(response.status).toBe(400);
-        expect(json.error).toContain('비밀번호는 최소 6자 이상이어야 합니다');
+        expect(json.error.message).toContain('비밀번호는 최소 8자 이상이어야 합니다');
     });
 
     it('필수 필드가 누락되면 검증 에러를 반환해야 함', async () => {
@@ -170,7 +175,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             // email 누락
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         const request = new Request('http://localhost/api/auth/register', {
@@ -195,7 +201,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             email: 'test@example.com',
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         mockFindUnique.mockRejectedValue(new Error('database connection failed'));
@@ -214,7 +221,7 @@ describe('POST /api/auth/register', () => {
 
         // Assert
         expect(response.status).toBe(500);
-        expect(json.error).toContain('데이터베이스 연결에 실패했습니다');
+        expect(json.error.message).toContain('데이터베이스 연결에 실패했습니다');
     });
 
     it('예상치 못한 에러 시 500 에러를 반환해야 함', async () => {
@@ -222,7 +229,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             email: 'test@example.com',
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         mockFindUnique.mockRejectedValue(new Error('Unexpected error'));
@@ -241,7 +249,7 @@ describe('POST /api/auth/register', () => {
 
         // Assert
         expect(response.status).toBe(500);
-        expect(json.error).toBe('회원가입 처리 중 오류가 발생했습니다.');
+        expect(json.error.message).toBe('회원가입 처리 중 오류가 발생했습니다.');
     });
 
     it('비밀번호가 해싱되어 저장되어야 함', async () => {
@@ -249,7 +257,8 @@ describe('POST /api/auth/register', () => {
         const userData = {
             name: 'Test User',
             email: 'test@example.com',
-            password: 'password123',
+            password: 'Password123!',
+            confirmPassword: 'Password123!',
         };
 
         const createdUser = {

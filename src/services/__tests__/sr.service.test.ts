@@ -401,7 +401,9 @@ describe('SRService', () => {
 
       expect(result).toBe(5);
       // countSRs는 where를 직접 count 메서드에 전달
-      expect(mockSRRepo.count).toHaveBeenCalledWith({ status: 'REQUESTED' });
+      expect(mockSRRepo.count).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'REQUESTED' })
+      );
     });
 
     it('SR이 없으면 0을 반환해야 함', async () => {

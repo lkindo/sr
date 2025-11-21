@@ -569,6 +569,69 @@ API 요청 제한:
           },
         },
       },
+      '/api/auth/register': {
+        post: {
+          tags: ['Users'],
+          summary: '회원가입',
+          description: '새로운 사용자를 등록합니다.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['email', 'password', 'name', 'confirmPassword'],
+                  properties: {
+                    email: { type: 'string', format: 'email', example: 'user@example.com' },
+                    password: {
+                      type: 'string',
+                      format: 'password',
+                      minLength: 8,
+                      description: '최소 8자, 대소문자, 숫자, 특수문자 포함',
+                      example: 'Password123!'
+                    },
+                    confirmPassword: { type: 'string', format: 'password' },
+                    name: { type: 'string', example: '홍길동' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: '회원가입 성공',
+              content: {
+                'application/json': {
+                  schema: {
+                    allOf: [
+                      { $ref: '#/components/schemas/SuccessResponse' },
+                      {
+                        type: 'object',
+                        properties: {
+                          data: {
+                            type: 'object',
+                            properties: {
+                              user: { $ref: '#/components/schemas/User' },
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            '400': {
+              description: '입력값 검증 실패 (비밀번호 불일치, 중복 이메일 등)',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   };
 };

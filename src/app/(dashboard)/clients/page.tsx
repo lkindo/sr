@@ -49,8 +49,9 @@ export default function ClientsPage() {
     try {
       const response = await fetch("/api/clients");
       if (!response.ok) throw new Error("Failed to fetch clients");
-      const data = await response.json();
-      setClients(data);
+      const result = await response.json();
+      // 페이지네이션 응답에서 data 추출
+      setClients(result.data || result);
     } catch (error) {
       toast({
         title: "오류",

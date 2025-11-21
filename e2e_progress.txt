@@ -1,0 +1,10 @@
+START
+STEP 1: SR 목록 페이지 이동
+STEP 2: 새 SR 버튼 찾기
+STEP 3: 다이얼로그 확인
+STEP 4: 폼 필드 존재 확인
+STEP 5: 폼 입력
+STEP 6: 고객사 선택
+STEP 7: 서비스 카테고리 선택
+STEP 8: 제출
+STEP 9: 목록 새로고침 및 SR 확인

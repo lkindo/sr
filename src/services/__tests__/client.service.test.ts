@@ -41,7 +41,7 @@ describe('ClientService', () => {
     clientService = new ClientService();
     mockClientRepository = (clientService as any).clientRepository;
     mockServiceCategoryRepository = (clientService as any).serviceCategoryRepository;
-    
+
     // Mock 함수들을 실제 mock 함수로 설정
     mockClientRepository.findById = mockFindById;
     mockClientRepository.findDetailsById = mockFindDetailsById;
@@ -109,7 +109,7 @@ describe('ClientService', () => {
       const result = await clientService.createClient(clientData);
 
       expect(result).toEqual(mockCreatedClient);
-      expect(mockFindByCode).toHaveBeenCalledWith('CLI001');
+      expect(mockClientRepository.findByCode).toHaveBeenCalledWith('CLI001');
       expect(mockClientRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           code: 'CLI001',
