@@ -266,7 +266,7 @@ async function main() {
 
   // Create test users
   console.log("Creating test users...");
-  
+
   // Check if admin user already exists
   const existingAdmin = await prisma.user.findUnique({
     where: { email: "admin@example.com" },
@@ -304,11 +304,37 @@ async function main() {
   } else {
     adminUser = existingAdmin;
     console.log("Admin user already exists");
+
+    // 클라이언트 사용자 생성 (clientuser@example.com)
+    const clientEmail = 'clientuser@example.com';
+    const clientPassword = 'client123';
+    let clientUser = await prisma.user.findUnique({ where: { email: clientEmail } });
+    if (!clientUser) {
+      const bcrypt = require('bcryptjs');
+      const hashed = await bcrypt.hash(clientPassword, 10);
+      clientUser = await prisma.user.create({
+        data: {
+          email: clientEmail,
+          name: 'Client User',
+          password: hashed,
+        },
+      });
+      // CLIENT_USER 역할 부여
+      const clientRole = await prisma.role.findUnique({ where: { name: 'CLIENT_USER' } });
+      if (clientRole) {
+        await prisma.userRole.create({ data: { userId: clientUser.id, roleId: clientRole.id } });
+      }
+      // TEST001 클라이언트와 연결
+      const testClient = await prisma.client.findUnique({ where: { code: 'TEST001' } });
+      if (testClient) {
+        await prisma.userClient.create({ data: { clientId: testClient.id, userId: clientUser.id } });
+      }
+    }
   }
 
   // Create test clients
   console.log("Creating test clients...");
-  
+
   const existingClient = await prisma.client.findUnique({
     where: { code: "TEST001" },
   });
@@ -361,7 +387,7 @@ async function main() {
 
   // Create service categories for test clients (always check)
   console.log("Creating service categories...");
-  
+
   const existingCategories = await prisma.serviceCategory.count({
     where: {
       clientId: {

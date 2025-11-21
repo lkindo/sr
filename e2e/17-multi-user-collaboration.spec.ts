@@ -53,16 +53,37 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       const timestamp = Date.now();
       srTitle = `협업 테스트 SR ${timestamp}`;
 
-      await page.getByRole('textbox', { name: '제목' }).fill(srTitle);
-      await page.getByRole('textbox', { name: '설명' }).fill('다중 사용자 협업 시나리오 테스트입니다.');
+      await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
+      await page.getByRole('textbox', { name: '설명 *' }).fill('다중 사용자 협업 시나리오 테스트입니다.');
 
-      // 고객사 선택
-      await page.getByRole('combobox', { name: '고객사' }).click();
-      await page.getByRole('option').first().click();
+      // 고객사 선택 (disabled 가능성 있음, CLIENT는 자동 설정)
+      const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
+      const isClientDisabled = await clientCombobox.getAttribute('disabled');
+      if (!isClientDisabled) {
+        await clientCombobox.click();
+        const firstClientOption = page.getByRole('option').first();
+        await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+        await firstClientOption.click();
+        await page.waitForTimeout(300);
+      }
 
-      // 서비스 카테고리 선택
-      await page.getByRole('combobox', { name: '서비스 카테고리' }).click();
-      await page.getByRole('option').first().click();
+      // 서비스 카테고리 선택 - categories 로딩 완료 대기
+      const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('#category') as HTMLButtonElement;
+          return el && !el.disabled;
+        },
+        { timeout: 10000 }
+      );
+
+      // 키보드로 선택 (안정성 향상)
+      await categoryCombobox.click({ force: true });
+      await page.waitForTimeout(500); // 메뉴가 열릴 때까지 대기
+      const firstCategoryOption = page.getByRole('option').first();
+      await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
+      await firstCategoryOption.click();
+      await page.waitForTimeout(500); // 선택 반영 대기
 
       // SR 생성
       await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();

@@ -43,14 +43,42 @@ test.describe('알림 시스템 통합 테스트', () => {
       const timestamp = Date.now();
       srTitle = `알림 테스트 SR ${timestamp}`;
 
-      await page.getByRole('textbox', { name: '제목' }).fill(srTitle);
-      await page.getByRole('textbox', { name: '설명' }).fill('알림 시스템 테스트용 SR입니다.');
+      await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
+      await page.getByRole('textbox', { name: '설명 *' }).fill('알림 시스템 테스트용 SR입니다.');
 
-      await page.getByRole('combobox', { name: '고객사' }).click();
-      await page.getByRole('option').first().click();
+      // 고객사 선택 (CLIENT는 자동 설정)
+      const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
+      const isDisabled = await clientCombobox.getAttribute('disabled');
+      if (!isDisabled) {
+        await page.waitForFunction(
+          () => {
+            const el = document.querySelector('#client') as HTMLButtonElement;
+            return el && !el.disabled;
+          },
+          { timeout: 5000 }
+        );
+        await clientCombobox.click();
+        const firstClientOption = page.getByRole('option').first();
+        await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+        await firstClientOption.click();
+        await page.waitForTimeout(300);
+      }
 
-      await page.getByRole('combobox', { name: '서비스 카테고리' }).click();
-      await page.getByRole('option').first().click();
+      // 서비스 카테고리 선택 - categories 로딩 완료 대기
+      const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('#category') as HTMLButtonElement;
+          return el && !el.disabled;
+        },
+        { timeout: 10000 }
+      );
+      await categoryCombobox.click({ force: true });
+      await page.waitForTimeout(500);
+      const firstCategoryOption = page.getByRole('option').first();
+      await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
+      await firstCategoryOption.click();
+      await page.waitForTimeout(500);
 
       await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
       await page.waitForTimeout(2000);

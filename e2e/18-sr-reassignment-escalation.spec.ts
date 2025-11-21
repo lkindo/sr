@@ -43,16 +43,39 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       const timestamp = Date.now();
       srTitle = `재배정 테스트 SR ${timestamp}`;
 
-      await page.getByRole('textbox', { name: '제목' }).fill(srTitle);
-      await page.getByRole('textbox', { name: '설명' }).fill('담당자 재배정 및 우선순위 에스컬레이션 테스트');
+      await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
+      await page.getByRole('textbox', { name: '설명 *' }).fill('담당자 재배정 및 우선순위 에스컬레이션 테스트');
 
-      // 고객사 선택
-      await page.getByRole('combobox', { name: '고객사' }).click();
-      await page.getByRole('option').first().click();
+      // 고객사 선택 - Select가 enabled될 때까지 대기
+      const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('#client') as HTMLButtonElement;
+          return el && !el.disabled;
+        },
+        { timeout: 5000 }
+      );
+      await clientCombobox.click();
+      const firstClientOption = page.getByRole('option').first();
+      await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+      await firstClientOption.click();
+      await page.waitForTimeout(300);
 
-      // 서비스 카테고리 선택
-      await page.getByRole('combobox', { name: '서비스 카테고리' }).click();
-      await page.getByRole('option').first().click();
+      // 서비스 카테고리 선택 - categories 로딩 완료 대기
+      const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
+      await page.waitForFunction(
+        () => {
+          const el = document.querySelector('#category') as HTMLButtonElement;
+          return el && !el.disabled;
+        },
+        { timeout: 10000 }
+      );
+      await categoryCombobox.click({ force: true });
+      await page.waitForTimeout(500);
+      const firstCategoryOption = page.getByRole('option').first();
+      await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
+      await firstCategoryOption.click();
+      await page.waitForTimeout(500);
 
       // SR 생성
       await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();

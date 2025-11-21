@@ -26,23 +26,56 @@ test.describe('SR 워크플로우 통합', () => {
     await page.getByRole('button', { name: '등록' }).click();
     await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible();
 
-    await page.getByRole('textbox', { name: '제목' }).fill(srTitle);
-    await page.getByRole('textbox', { name: '설명' }).fill('통합 워크플로우 테스트');
+    await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
+    await page.getByRole('textbox', { name: '설명 *' }).fill('통합 워크플로우 테스트');
 
-    await page.getByRole('combobox', { name: '고객사' }).click();
-    await page.getByRole('option').first().click();
+    // 고객사 선택 - Select가 enabled될 때까지 대기
+    const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('#client') as HTMLButtonElement;
+        return el && !el.disabled;
+      },
+      { timeout: 5000 }
+    );
+    await clientCombobox.click();
+    const firstClientOption = page.getByRole('option').first();
+    await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+    await firstClientOption.click();
+    await page.waitForTimeout(300);
 
-    await page.getByRole('combobox', { name: '서비스 카테고리' }).click();
-    await page.getByRole('option').first().click();
+    // 서비스 카테고리 선택 - categories 로딩 완료 대기
+    const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
+    await page.waitForFunction(
+      () => {
+        const el = document.querySelector('#category') as HTMLButtonElement;
+        return el && !el.disabled;
+      },
+      { timeout: 10000 }
+    );
+    await categoryCombobox.click({ force: true });
+    await page.waitForTimeout(500);
+    const firstCategoryOption = page.getByRole('option').first();
+    await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
+    await firstCategoryOption.click();
+    await page.waitForTimeout(500);
 
     await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
-    await page.waitForTimeout(2000);
 
-    // 목록에서 SR 찾기
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    // SR 생성 성공 대기 (다이얼로그가 닫히거나 목록으로 리디렉션)
+    await page.waitForTimeout(3000);
+
+    // 목록에서 SR 찾기 (이미 목록 페이지에 있거나 이동)
+    const currentUrl = page.url();
+    if (!currentUrl.includes('/srs')) {
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    }
+
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(1000);
+
     const srRow = page.locator('tr', { hasText: srTitle }).first();
-    await expect(srRow).toBeVisible({ timeout: 10000 });
+    await expect(srRow).toBeVisible({ timeout: 15000 });
 
     // SR ID 추출
     await srRow.click();

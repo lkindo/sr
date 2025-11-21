@@ -6,22 +6,26 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
-  
+
   /* 병렬 테스트 실행 */
   fullyParallel: true,
-  
+
   /* CI에서 실패 시 재시도 */
   retries: process.env.CI ? 2 : 0,
-  
+
   /* 병렬 워커 수 (CI에서는 1개만) */
   workers: process.env.CI ? 1 : undefined,
-  
+
   /* 리포터 설정 */
-  reporter: 'html',
-  
+  outputDir: 'test-results',
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'test-results', open: 'never' }],
+  ],
+
   /* Global Setup - 로그인 상태 저장 */
   globalSetup: require.resolve('./e2e/global-setup'),
-  
+
   /* 모든 테스트에 공통 설정 */
   use: {
     /* Base URL */
@@ -52,7 +56,7 @@ export default defineConfig({
   /* 테스트 실행 전 개발 서버 시작 (선택사항) */
   // 수동으로 개발 서버를 실행하려면 아래를 주석 처리하세요
   webServer: process.env.SKIP_WEBSERVER ? undefined : {
-    command: 'pnpm dev',
+    command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
@@ -72,7 +76,7 @@ export default defineConfig({
       testMatch: /auth-multi-user\.setup\.ts/,
     },
 
-    // Chromium 테스트 - setup에 의존
+    // Chromium 테스트 - setup에 의존 (일반 기능 테스트)
     {
       name: 'chromium',
       use: {
@@ -80,6 +84,8 @@ export default defineConfig({
         storageState: './playwright/.auth/user.json',
       },
       dependencies: ['setup'],
+      // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
+      testIgnore: ['**/17-*.spec.ts', '**/18-*.spec.ts', '**/19-*.spec.ts', '**/20-*.spec.ts'],
     },
 
     // Multi-user 테스트 - multi-user-setup에 의존 (고도화 테스트 17-20)

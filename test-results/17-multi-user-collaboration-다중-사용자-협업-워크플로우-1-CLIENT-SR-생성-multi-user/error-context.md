@@ -1,0 +1,417 @@
+# Page snapshot
+
+```yaml
+- generic:
+  - generic:
+    - banner:
+      - generic:
+        - generic:
+          - link:
+            - /url: /dashboard
+            - generic: SR Management
+            - generic: 서비스 요청 관리
+        - generic:
+          - navigation:
+            - link:
+              - /url: /dashboard
+              - text: Dashboard
+            - link:
+              - /url: /srs
+              - text: SR 관리
+            - link:
+              - /url: /settings
+              - text: 설정
+          - navigation:
+            - button:
+              - generic:
+                - generic: CU
+    - generic:
+      - complementary:
+        - navigation:
+          - generic:
+            - heading [level=2]: SR 관리
+          - generic:
+            - generic:
+              - button [expanded]:
+                - generic: SR 관리
+                - img
+              - generic:
+                - link:
+                  - /url: /my-requests
+                  - img
+                  - text: 내 요청 SR
+                - link:
+                  - /url: /srs
+                  - img
+                  - text: SR 전체 목록
+      - main:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - heading [level=3]: SR 목록
+                  - button:
+                    - img
+                    - text: 등록
+                - generic:
+                  - generic:
+                    - img
+                    - textbox:
+                      - /placeholder: SR 번호, 제목, 고객사, 요청자, 담당자로 검색...
+              - generic:
+                - generic: Total 14 items
+              - generic:
+                - generic:
+                  - table:
+                    - rowgroup:
+                      - row:
+                        - cell:
+                          - button:
+                            - text: SR 번호
+                            - img
+                        - cell:
+                          - button:
+                            - text: 제목
+                            - img
+                        - cell:
+                          - button:
+                            - text: 고객사
+                            - img
+                        - cell: 요청자
+                        - cell: 담당자
+                        - cell:
+                          - button:
+                            - text: 우선순위
+                            - img
+                        - cell:
+                          - button:
+                            - text: 상태
+                            - img
+                        - cell:
+                          - button:
+                            - text: 마감일
+                            - img
+                        - cell: 댓글/첨부
+                        - cell:
+                          - button:
+                            - text: 생성일
+                            - img
+                        - cell: 작업
+                    - rowgroup:
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8yolf20002ogy89qtiwk9z
+                            - text: SR-20251121-0010
+                        - cell: 통합 테스트 SR 1763735661968
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 1 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8mri90001pizykulsiombg
+                            - text: SR-20251121-0009
+                        - cell: SR Permissions 1763715652380
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: Admin User
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 오늘 마감
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8mrhzh001jizyk9dhw73gg
+                            - text: SR-20251121-0008
+                        - cell: SR Permissions 1763715651644
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8mfmtl001dizyken866etc
+                            - text: SR-20251121-0007
+                        - cell: SR Permissions 1763715098671
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8mfmms0017izyk0lljol1s
+                            - text: SR-20251121-0006
+                        - cell: SR Permissions 1763715098215
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8m4bpz000vizyk2em6u7ch
+                            - text: SR-20251121-0005
+                        - cell: E2E Intake SR 1763714571989
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: Admin User
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 오늘 마감
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8m1a5x000jizykvn7z7b4h
+                            - text: SR-20251121-0004
+                        - cell: E2E Intake SR 1763714430556
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: Admin User
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 오늘 마감
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8li8zq000dizyka6a6b3cj
+                            - text: SR-20251121-0003
+                        - cell: E2E Test SR 1763713543565
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8lgzqb0007izykmtzcf6x4
+                            - text: SR-20251121-0002
+                        - cell: E2E Test SR 1763713485051
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi8lfxz20001izyk1lgq1pab
+                            - text: SR-20251121-0001
+                        - cell: E2E Test SR 1763713435905
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: "-"
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 요청됨
+                        - cell: "-"
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 21.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi0g0e1n000dogzs0apt6zs1
+                            - text: SR-20251115-0002
+                        - cell: test3
+                        - cell: 테스트 고객사 A
+                        - cell: TEST1사용자
+                        - cell: 이경인
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 3일 지연
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 16.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmi0bd8xl0001og8sbkprbfrc
+                            - text: SR-20251115-0001
+                        - cell: srtest2
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: 이경인
+                        - cell:
+                          - generic: 높음
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 5일 지연
+                        - cell: 0 / 0
+                        - cell: 2025. 11. 15.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmhvh7why0001iz8oy63r0608
+                            - text: SR-20251112-0001
+                        - cell: 새로운 sr 요청
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: 이경인
+                        - cell:
+                          - generic: 보통
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 9일 지연
+                        - cell: 1 / 1
+                        - cell: 2025. 11. 12.
+                        - cell: "-"
+                      - row:
+                        - cell:
+                          - link:
+                            - /url: /srs/cmhumberi0001ognsfwdj01h0
+                            - text: SR-20251111-0002
+                        - cell: SR테스트
+                        - cell: 테스트 고객사 A
+                        - cell: Admin User
+                        - cell: 이경인
+                        - cell:
+                          - generic: 높음
+                        - cell:
+                          - generic: 진행중
+                        - cell:
+                          - generic: 4일 지연
+                        - cell: 0 / 1
+                        - cell: 2025. 11. 11.
+                        - cell: "-"
+              - generic:
+                - generic:
+                  - combobox:
+                    - generic: "20"
+                    - img
+                  - generic: items per page
+    - contentinfo:
+      - generic:
+        - paragraph: © 2025 SR Management System. All rights reserved.
+        - generic:
+          - generic: v0.1.0
+  - list
+  - button "Open Next.js Dev Tools" [ref=e6] [cursor=pointer]:
+    - img [ref=e7]
+  - alert
+  - dialog "새 SR 요청" [ref=e11]:
+    - generic [ref=e12]:
+      - heading "새 SR 요청" [level=2] [ref=e13]
+      - paragraph [ref=e14]: 서비스 요청(SR)을 등록합니다. 제목, 설명, 고객사, 서비스 카테고리는 필수입니다.
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - text: 제목 *
+          - textbox "제목 *" [ref=e18]:
+            - /placeholder: SR 제목을 입력하세요 (최소 5자)
+            - text: 협업 테스트 SR 1763743200065
+        - generic [ref=e19]:
+          - text: 설명 *
+          - textbox "설명 *" [active] [ref=e20]:
+            - /placeholder: SR 상세 내용을 입력하세요 (최소 10자)
+            - text: 다중 사용자 협업 시나리오 테스트입니다.
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - text: 고객사 *
+            - combobox "고객사 *" [disabled] [ref=e23]:
+              - generic: 테스트 고객사 A (TEST001)
+              - img [ref=e24]
+            - combobox [disabled] [ref=e26]
+            - paragraph [ref=e27]: 고객사는 자동으로 설정됩니다.
+          - generic [ref=e28]:
+            - text: 서비스 카테고리 *
+            - combobox "서비스 카테고리 *" [ref=e29] [cursor=pointer]:
+              - generic: 카테고리를 선택
+              - img [ref=e30]
+            - combobox [ref=e32]
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - text: 희망 우선순위 *
+            - combobox "희망 우선순위 *" [ref=e35] [cursor=pointer]:
+              - generic: 보통
+              - img [ref=e36]
+            - combobox [ref=e38]
+          - generic [ref=e39]:
+            - text: 희망 완료일 (선택)
+            - textbox "희망 완료일 (선택)" [ref=e40]:
+              - /placeholder: 언제까지 완료되길 원하시나요?
+        - generic [ref=e41]:
+          - text: 첨부파일 (선택사항)
+          - generic [ref=e43] [cursor=pointer]:
+            - button "Choose File" [ref=e44]
+            - generic [ref=e45]:
+              - img [ref=e46]
+              - generic [ref=e49]: 클릭하거나 파일을 드래그하여 업로드
+              - generic [ref=e50]: 최대 5개, 파일당 10MB 이하
+      - generic [ref=e51]:
+        - button "취소" [ref=e52] [cursor=pointer]
+        - button "SR 요청하기" [ref=e53] [cursor=pointer]
+    - button "Close" [ref=e54] [cursor=pointer]:
+      - img [ref=e55]
+      - generic [ref=e58]: Close
+```

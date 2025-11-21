@@ -53,7 +53,22 @@ for (const user of users) {
     // 로그인 성공 대기 (dashboard 또는 srs 페이지로 리디렉션)
     await page.waitForURL(/\/(dashboard|srs)/, { timeout: 30000 });
 
-    console.log(`✅ ${user.name} 로그인 성공!`);
+    console.log(`✅ ${user.name} 로그인 성공!!`);
+
+    // 주요 페이지 워밍업 (manager만)
+    if (user.name === 'manager') {
+      console.log(`🔥 ${user.name} 페이지 워밍업 중...`);
+      const warmupPages = ['/dashboard'];
+      for (const pagePath of warmupPages) {
+        try {
+          await page.goto(pagePath, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          await page.waitForTimeout(500);
+          console.log(`  ✓ ${pagePath} 워밍업 완료`);
+        } catch (err) {
+          console.log(`  ⚠ ${pagePath} 워밍업 실패 (무시)`);
+        }
+      }
+    }
 
     // 인증 상태 저장
     await page.context().storageState({ path: user.authFile });
