@@ -10,15 +10,15 @@ export async function GET() {
   try {
     // SR 처리에 필요한 권한 목록
     const requiredPermissions = [
-      "SR.CREATE",
-      "SR.READ",
-      "SR.UPDATE",
-      "SR.DELETE",
-      "SR.ASSIGN",
-      "SR.STATUS_CHANGE",
-      "COMMENT.CREATE",
-      "COMMENT.READ",
-      "COMMENT.UPDATE",
+      "SR:CREATE",
+      "SR:READ",
+      "SR:UPDATE",
+      "SR:DELETE",
+      "SR:ASSIGN",
+      "SR:STATUS_CHANGE",
+      "COMMENT:CREATE",
+      "COMMENT:READ",
+      "COMMENT:UPDATE",
     ];
 
     // 모든 활성 사용자 조회 (권한 포함)

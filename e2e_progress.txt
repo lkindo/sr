@@ -8,3 +8,5 @@ STEP 6: 고객사 선택
 STEP 7: 서비스 카테고리 선택
 STEP 8: 제출
 STEP 9: 목록 새로고침 및 SR 확인
+STEP 10: 상세 페이지 이동
+DONE

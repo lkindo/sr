@@ -25,9 +25,10 @@ export const POST = withAuthAndRateLimit(async (
 
   // 권한 체크: SR.INTAKE 권한 또는 ADMIN, MANAGER, ENGINEER 역할
   const userRoles = session.user?.roles || [];
-  const hasIntakePermission = session.user?.permissions?.some((p: string) => 
-    p === "SR.INTAKE" || p === "sr:create"
-  ) ?? false;
+  const hasIntakePermission = session.user?.permissions?.some((p: string) => {
+    const normalized = p.toUpperCase();
+    return normalized === "SR:INTAKE" || normalized === "SR:CREATE";
+  }) ?? false;
   const hasIntakeRole = userRoles.some((role: string) => 
     ["ADMIN", "MANAGER", "ENGINEER"].includes(role)
   );

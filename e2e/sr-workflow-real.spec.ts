@@ -56,13 +56,15 @@ test.describe('SR 전체 워크플로우', () => {
 
         log('STEP 6: 고객사 선택');
         await page.getByRole('combobox', { name: '고객사' }).click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option').first().click({ force: true });
+        await page
+            .getByRole('option', { name: /테스트 고객사 A/i })
+            .click();
 
         log('STEP 7: 서비스 카테고리 선택');
         await page.getByRole('combobox', { name: '서비스 카테고리' }).click();
-        await page.waitForSelector('[role="option"]', { state: 'visible', timeout: 5000 });
-        await page.getByRole('option').first().click({ force: true });
+        await page
+            .getByRole('option', { name: /기술 지원/i })
+            .click();
 
         log('STEP 8: 제출');
         await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
@@ -71,14 +73,14 @@ test.describe('SR 전체 워크플로우', () => {
         log('STEP 9: 목록 새로고침 및 SR 확인');
         await page.goto('/srs');
         await page.waitForLoadState('networkidle');
-        const srLink = page.locator(`text="${srTitle}"`);
-        await expect(srLink).toBeVisible({ timeout: 10000 });
+        const srListCell = page.getByRole('cell', { name: srTitle }).first();
+        await expect(srListCell).toBeVisible({ timeout: 10000 });
 
         log('STEP 10: 상세 페이지 이동');
-        await srLink.click();
+        await srListCell.click();
         await expect(page).toHaveURL(/\/srs\/[a-zA-Z0-9-]+/);
         await expect(
-            page.locator('h1, h2').filter({ hasText: srTitle })
+            page.locator('p').filter({ hasText: srTitle }).first()
         ).toBeVisible({ timeout: 5000 });
 
         log('DONE');

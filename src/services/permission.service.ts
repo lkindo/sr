@@ -193,7 +193,7 @@ export class PermissionService {
       user.roles.forEach((userRole) => {
         userRole.role.permissions.forEach((rolePermission) => {
           userPermissions.add(
-            `${rolePermission.permission.resource}.${rolePermission.permission.action}`
+            `${rolePermission.permission.resource}:${rolePermission.permission.action}`
           );
         });
       });

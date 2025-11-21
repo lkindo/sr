@@ -115,7 +115,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const permissionsSet = new Set<string>();
           userWithRoles.roles.forEach((ur) => {
             ur.role.permissions.forEach((rp) => {
-              const permission = `${rp.permission.resource}.${rp.permission.action}`;
+              const permission = `${rp.permission.resource}:${rp.permission.action}`;
               permissionsSet.add(permission);
             });
           });
@@ -155,7 +155,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           const permissionsSet = new Set<string>();
           userWithRoles.roles.forEach((ur) => {
             ur.role.permissions.forEach((rp) => {
-              const permission = `${rp.permission.resource}.${rp.permission.action}`;
+              const permission = `${rp.permission.resource}:${rp.permission.action}`;
               permissionsSet.add(permission);
             });
           });

@@ -109,15 +109,15 @@ export class UserService {
     permissionService: PermissionService = new PermissionService()
   ): Promise<Array<{ id: string; name: string; email: string }>> {
     const requiredPermissions = [
-      "SR.CREATE",
-      "SR.READ",
-      "SR.UPDATE",
-      "SR.DELETE",
-      "SR.ASSIGN",
-      "SR.STATUS_CHANGE",
-      "COMMENT.CREATE",
-      "COMMENT.READ",
-      "COMMENT.UPDATE",
+      "SR:CREATE",
+      "SR:READ",
+      "SR:UPDATE",
+      "SR:DELETE",
+      "SR:ASSIGN",
+      "SR:STATUS_CHANGE",
+      "COMMENT:CREATE",
+      "COMMENT:READ",
+      "COMMENT:UPDATE",
     ];
     return permissionService.getUsersWithPermissions(requiredPermissions);
   }
