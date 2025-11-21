@@ -9,6 +9,15 @@ import { NotFoundError, DuplicateError, ReferentialIntegrityError } from "@/lib/
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
 type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
 
+/**
+ * 고객사 서비스
+ *
+ * 고객사 관리 및 관련 비즈니스 로직을 처리합니다.
+ * - 고객사 CRUD
+ * - 고객사-사용자 연결 관리
+ * - 서비스 카테고리 연동
+ * - 고객사 담당자(Handler) 관리
+ */
 export class ClientService {
   constructor(
     private clientRepository: ClientRepository = new ClientRepository(),
@@ -17,26 +26,88 @@ export class ClientService {
     private userService: UserService = new UserService()
   ) {}
 
+  /**
+   * 고객사 ID로 조회
+   *
+   * @param id - 고객사 ID
+   * @returns 고객사 정보 또는 null
+   */
   async getClientById(id: string) {
     return this.clientRepository.findById(id);
   }
 
+  /**
+   * 고객사 상세 정보 조회 (담당자, 사용자 포함)
+   *
+   * @param id - 고객사 ID
+   * @returns 고객사 상세 정보 또는 null
+   */
   async getClientDetailsById(id: string) {
     return this.clientRepository.findDetailsById(id);
   }
 
+  /**
+   * 고객사 코드로 조회
+   *
+   * @param code - 고객사 코드
+   * @returns 고객사 정보 또는 null
+   */
   async getClientByCode(code: string) {
     return this.clientRepository.findByCode(code);
   }
 
+  /**
+   * 고객사명으로 조회
+   *
+   * @param name - 고객사명
+   * @returns 고객사 정보 또는 null
+   */
   async getClientByName(name: string) {
     return this.clientRepository.findByName(name);
   }
 
+  /**
+   * 전체 고객사 목록 조회
+   *
+   * @returns 고객사 목록
+   */
   async getAllClients() {
     return this.clientRepository.findAll();
   }
 
+  /**
+   * 고객사를 생성합니다.
+   *
+   * 프로세스:
+   * 1. 고객사 코드 중복 확인
+   * 2. 고객사 생성
+   *
+   * @param data - 고객사 생성 데이터
+   * @param data.code - 고객사 코드 (고유값, 2자 이상)
+   * @param data.name - 고객사명 (1자 이상)
+   * @param data.industry - 산업 분류 (선택)
+   * @param data.contactPerson - 담당자 (선택)
+   * @param data.contactEmail - 담당자 이메일 (선택)
+   * @param data.contactPhone - 담당자 연락처 (선택)
+   * @param data.address - 주소 (선택)
+   * @param data.contractStartDate - 계약 시작일 (선택)
+   * @param data.contractEndDate - 계약 종료일 (선택)
+   *
+   * @returns 생성된 고객사
+   *
+   * @throws {ValidationError} 입력 데이터 검증 실패
+   * @throws {DuplicateError} 고객사 코드 중복
+   *
+   * @example
+   * ```typescript
+   * const client = await clientService.createClient({
+   *   code: 'ABC',
+   *   name: 'ABC 주식회사',
+   *   industry: 'IT',
+   *   contactEmail: 'contact@abc.com',
+   * });
+   * ```
+   */
   async createClient(data: ClientCreateData) {
     const validated = clientCreateSchema.parse(data);
 

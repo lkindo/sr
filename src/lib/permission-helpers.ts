@@ -8,6 +8,26 @@ export const PERMISSIONS = {
     UPDATE_SELF: "SR:UPDATE_SELF",
     DELETE: "SR:DELETE",
   },
+  CLIENT: {
+    CREATE: "CLIENT:CREATE",
+    READ: "CLIENT:READ",
+    UPDATE: "CLIENT:UPDATE",
+    DELETE: "CLIENT:DELETE",
+  },
+  USER: {
+    CREATE: "USER:CREATE",
+    READ: "USER:READ",
+    UPDATE: "USER:UPDATE",
+    UPDATE_SELF: "USER:UPDATE_SELF",
+    DELETE: "USER:DELETE",
+  },
+  ROLE: {
+    CREATE: "ROLE:CREATE",
+    READ: "ROLE:READ",
+    UPDATE: "ROLE:UPDATE",
+    DELETE: "ROLE:DELETE",
+    ASSIGN: "ROLE:ASSIGN",
+  },
 } as const
 
 export function hasPermissionFlag(user: AuthenticatedUser, permission: string) {

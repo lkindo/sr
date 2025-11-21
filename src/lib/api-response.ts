@@ -127,4 +127,19 @@ export function paginatedResponse<T>(
   return NextResponse.json(response);
 }
 
+/**
+ * API 응답 유틸리티 객체
+ * api-factory.ts에서 사용
+ */
+export const apiResponse = {
+  success: successResponse,
+  error: errorResponse,
+  validation: validationErrorResponse,
+  unauthorized: unauthorizedResponse,
+  forbidden: forbiddenResponse,
+  notFound: notFoundResponse,
+  serverError: serverErrorResponse,
+  paginated: paginatedResponse,
+};
+
 

@@ -93,13 +93,6 @@ class Logger {
     if (this.isProduction) {
       // 프로덕션: JSON 형식으로 출력 (로그 수집 도구에서 파싱 가능)
       console.log(JSON.stringify(entry));
-      
-      // TODO: Sentry 등 에러 트래킹 서비스 연동
-      // if (entry.level === 'error' && entry.error) {
-      //   Sentry.captureException(entry.error, {
-      //     extra: entry.context,
-      //   });
-      // }
     } else {
       // 개발 환경: 가독성 좋은 형식으로 출력
       const prefix = `[${entry.level.toUpperCase()}]`;

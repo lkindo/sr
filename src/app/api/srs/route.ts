@@ -11,6 +11,7 @@ import { invalidateCachePattern } from "@/lib/redis-cache";
 import { serializeResponse } from "@/lib/serialization";
 import { srListKey, DASHBOARD_STATS_PREFIX, srListPatternForClient, srListPatternForPriority } from "@/lib/cache-keys";
 import { getSrsListTtlSeconds, shouldWideInvalidate } from "@/lib/cache-config";
+import { usePagination } from "@/lib/pagination";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -18,24 +19,45 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // GET /api/srs - SR 목록 조회 (Rate Limit: 느슨함 - 자주 조회되는 API)
+// 페이지네이션 지원: ?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc
 export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
+
+  // 필터 파라미터
   const filters = {
     status: (searchParams.get("status") as SRStatus) || undefined,
     clientId: searchParams.get("clientId") || undefined,
     priority: (searchParams.get("priority") as SRPriority) || undefined,
   };
 
+  // 페이지네이션 파라미터
+  const { skip, take, orderBy, createResponse } = usePagination(request);
+
   const srService = new SRService();
 
-  // 캐시 키: 필터 조합 기반 (읽기 전용, 짧은 TTL)
+  // 캐시 키: 필터 기반 (페이지네이션은 캐시 키에서 제외)
   const cacheKey = srListKey(filters);
-  const srs = isCacheAvailable()
-    ? await withCache(cacheKey, async () => await srService.getAllSRs({ where: filters }), { ttlSeconds: getSrsListTtlSeconds(), namespace: 'sr' })
-    : await srService.getAllSRs({ where: filters });
+
+  const fetchData = async () => {
+    const [srs, totalCount] = await Promise.all([
+      srService.getAllSRs({
+        where: filters,
+        skip,
+        take,
+        orderBy: orderBy as any,
+      }),
+      prisma.sR.count({ where: filters }),
+    ]);
+
+    return createResponse(srs, totalCount);
+  };
+
+  const result = isCacheAvailable()
+    ? await withCache(cacheKey, fetchData, { ttlSeconds: getSrsListTtlSeconds(), namespace: 'sr' })
+    : await fetchData();
 
   // Date 객체를 문자열로 변환 (직렬화 문제 해결)
-  return NextResponse.json(serializeResponse(srs));
+  return NextResponse.json(serializeResponse(result));
 }, { preset: 'relaxed' }); // 1분당 300회 (읽기 전용, 자주 조회됨)
 
 // POST /api/srs - 새 SR 생성 (Rate Limit: 표준)

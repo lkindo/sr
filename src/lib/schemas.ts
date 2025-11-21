@@ -1,5 +1,63 @@
 import { z } from "zod";
 
+/**
+ * 비밀번호 복잡도 검증 스키마
+ *
+ * 보안 요구사항:
+ * - 최소 8자 이상
+ * - 대문자 1개 이상 포함 (A-Z)
+ * - 소문자 1개 이상 포함 (a-z)
+ * - 숫자 1개 이상 포함 (0-9)
+ * - 특수문자 1개 이상 포함 (!@#$%^&*()_+-=[]{}|;:,.<>?)
+ */
+export const passwordSchema = z
+  .string()
+  .min(8, "비밀번호는 최소 8자 이상이어야 합니다.")
+  .max(100, "비밀번호는 100자를 초과할 수 없습니다.")
+  .regex(/[A-Z]/, "비밀번호는 대문자를 최소 1개 이상 포함해야 합니다.")
+  .regex(/[a-z]/, "비밀번호는 소문자를 최소 1개 이상 포함해야 합니다.")
+  .regex(/[0-9]/, "비밀번호는 숫자를 최소 1개 이상 포함해야 합니다.")
+  .regex(
+    /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/,
+    "비밀번호는 특수문자를 최소 1개 이상 포함해야 합니다."
+  );
+
+/**
+ * 회원가입 스키마
+ */
+export const registerSchema = z.object({
+  name: z.string().min(1, "이름을 입력해주세요.").max(100, "이름은 100자를 초과할 수 없습니다."),
+  email: z.string().email("유효한 이메일 주소를 입력해주세요."),
+  password: passwordSchema,
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "비밀번호가 일치하지 않습니다.",
+  path: ["confirmPassword"],
+});
+
+/**
+ * 로그인 스키마
+ */
+export const loginSchema = z.object({
+  email: z.string().email("유효한 이메일 주소를 입력해주세요."),
+  password: z.string().min(1, "비밀번호를 입력해주세요."),
+});
+
+/**
+ * 비밀번호 변경 스키마
+ */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "현재 비밀번호를 입력해주세요."),
+  newPassword: passwordSchema,
+  confirmNewPassword: z.string(),
+}).refine((data) => data.newPassword === data.confirmNewPassword, {
+  message: "새 비밀번호가 일치하지 않습니다.",
+  path: ["confirmNewPassword"],
+}).refine((data) => data.currentPassword !== data.newPassword, {
+  message: "새 비밀번호는 현재 비밀번호와 달라야 합니다.",
+  path: ["newPassword"],
+});
+
 // Client Schemas
 export const clientCreateSchema = z.object({
   code: z.string().min(2, "고객사 코드는 최소 2자 이상이어야 합니다."),

@@ -13,6 +13,15 @@ import { SRPolicy } from "@/lib/policies/sr.policy";
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
 
+/**
+ * SR (Service Request) 서비스
+ *
+ * SR의 생명주기 관리 및 비즈니스 로직을 처리합니다.
+ * - SR 생성, 조회, 수정, 삭제
+ * - SR 접수 처리 (Intake)
+ * - 활동 로그 자동 기록
+ * - 권한 정책 적용
+ */
 export class SRService {
   constructor(
     private srRepository: SRRepository = new SRRepository(),
@@ -24,6 +33,42 @@ export class SRService {
     private srPolicy: SRPolicy = new SRPolicy()
   ) { }
 
+  /**
+   * SR을 생성합니다.
+   *
+   * 프로세스:
+   * 1. 권한 검증 (SR:CREATE 또는 SR:CREATE_SELF)
+   * 2. SR 번호 자동 생성 (형식: SR-YYYYMMDD-0001)
+   * 3. 중복 방지를 위한 재시도 로직 (최대 10회)
+   * 4. SR 생성 활동 로그 기록
+   * 5. MANAGER 역할 사용자에게 이메일 알림 발송 (비동기)
+   *
+   * @param data - SR 생성 데이터
+   * @param data.title - SR 제목 (5자 이상)
+   * @param data.description - SR 상세 설명 (10자 이상)
+   * @param data.clientId - 고객사 ID
+   * @param data.serviceCategoryId - 서비스 카테고리 ID
+   * @param data.requestedPriority - 요청 우선순위 (CRITICAL, HIGH, MEDIUM, LOW)
+   * @param data.requestedCompletionDate - 요청 완료 희망일 (선택)
+   * @param sessionUser - 요청 생성자 (세션 사용자)
+   *
+   * @returns 생성된 SR (고객사, 요청자, 서비스 카테고리 포함)
+   *
+   * @throws {ValidationError} 입력 데이터 검증 실패
+   * @throws {ForbiddenError} SR 생성 권한 없음
+   * @throws {Error} SR 번호 생성 실패 (재시도 10회 초과)
+   *
+   * @example
+   * ```typescript
+   * const sr = await srService.createSR({
+   *   title: '로그인 오류 수정 요청',
+   *   description: '로그인 시 500 에러 발생',
+   *   clientId: 'client-123',
+   *   serviceCategoryId: 'cat-456',
+   *   requestedPriority: 'HIGH',
+   * }, sessionUser);
+   * ```
+   */
   async createSR(
     data: SrCreateData,
     sessionUser: AuthenticatedUser
