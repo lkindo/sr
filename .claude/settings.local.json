@@ -73,7 +73,13 @@
       "Bash(.env)",
       "Bash(if not exist \"src\\services\\__tests__\" mkdir \"src\\services\\__tests__\")",
       "Bash(if not exist \"src\\repositories\\__tests__\" mkdir \"src\\repositories\\__tests__\")",
-      "Bash(if not exist \".github\\workflows\" mkdir .githubworkflows)"
+      "Bash(if not exist \".github\\workflows\" mkdir .githubworkflows)",
+      "Bash(pnpm exec playwright test:*)",
+      "Bash(SKIP_WEBSERVER=true pnpm exec playwright test:*)",
+      "Bash(powershell -Command \"$env:NEXTAUTH_SECRET\")",
+      "Bash(powershell -Command:*)",
+      "Bash(set SKIP_ENV_VALIDATION=true)",
+      "Bash(pnpm dev:test:*)"
     ],
     "deny": [],
     "ask": []

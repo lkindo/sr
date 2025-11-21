@@ -18,8 +18,6 @@ test.describe('인증 플로우', () => {
     await page.fill('#name', 'E2E Test User')
     await page.fill('#email', testEmail)
     await page.fill('#password', testPassword)
-    // 비밀번호 확인 필드 입력 (필수)
-    await page.fill('#confirmPassword', testPassword)
 
     // 제출
     await page.click('button[type="submit"]')

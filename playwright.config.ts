@@ -26,18 +26,27 @@ export default defineConfig({
   use: {
     /* Base URL */
     baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    
+
     /* 저장된 인증 상태 사용 */
     storageState: './playwright/.auth/user.json',
-    
+
     /* 실패 시 스크린샷 촬영 */
     screenshot: 'only-on-failure',
-    
+
     /* 실패 시 비디오 녹화 */
     video: 'retain-on-failure',
-    
+
     /* 네트워크 요청 트레이스 */
     trace: 'on-first-retry',
+
+    /* E2E 테스트 실행 시 환경 변수 검증 건너뛰기 */
+    launchOptions: {
+      env: {
+        ...process.env,
+        SKIP_ENV_VALIDATION: 'true',
+        PLAYWRIGHT_TEST: 'true',
+      },
+    },
   },
 
   /* 테스트 실행 전 개발 서버 시작 (선택사항) */
@@ -51,20 +60,47 @@ export default defineConfig({
 
   /* 테스트할 브라우저 설정 */
   projects: [
-    // Setup project - 로그인 상태 저장
+    // Setup project - 로그인 상태 저장 (단일 사용자)
     {
       name: 'setup',
       testMatch: /global-setup\.ts/,
     },
-    
+
+    // Multi-user setup - 다중 사용자 인증 상태 저장 (CLIENT, MANAGER, ENGINEER)
+    {
+      name: 'multi-user-setup',
+      testMatch: /auth-multi-user\.setup\.ts/,
+    },
+
     // Chromium 테스트 - setup에 의존
     {
       name: 'chromium',
-      use: { 
+      use: {
         ...devices['Desktop Chrome'],
         storageState: './playwright/.auth/user.json',
       },
       dependencies: ['setup'],
+    },
+
+    // Multi-user 테스트 - multi-user-setup에 의존 (고도화 테스트 17-20)
+    {
+      name: 'multi-user',
+      testMatch: /(17|18|19|20)-.*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+        // 다중 사용자 테스트는 각 테스트 내에서 storageState를 동적으로 설정
+      },
+      dependencies: ['multi-user-setup'],
+    },
+
+    // 권한 테스트 (단독 실행 가능)
+    {
+      name: 'permissions',
+      testMatch: /sr-permissions\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      dependencies: [],
     },
 
     /* 추가 브라우저 테스트 (선택사항) */

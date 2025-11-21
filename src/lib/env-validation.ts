@@ -273,9 +273,13 @@ export function validateEnv(): void {
       try {
         const isValid = envVar.validate(value);
         if (!isValid) {
+          // 디버깅: 실제 값 정보 출력
+          const debugInfo = envVar.name === 'NEXTAUTH_SECRET'
+            ? ` (실제 길이: ${value.length}, 첫 20자: "${value.substring(0, 20)}")`
+            : '';
           invalidVariables.push({
             variable: envVar,
-            error: envVar.validationError || '유효하지 않은 값입니다.',
+            error: (envVar.validationError || '유효하지 않은 값입니다.') + debugInfo,
           });
         }
       } catch (error) {

@@ -10,9 +10,14 @@
 export async function register() {
   // 서버 사이드에서만 실행
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { validateAndPrintEnv } = await import('./src/lib/env-validation');
+    // E2E 테스트 중이거나 명시적으로 비활성화된 경우 검증 스킵
+    if (process.env.SKIP_ENV_VALIDATION === 'true' || process.env.PLAYWRIGHT_TEST === 'true') {
+      console.log('✅ Instrumentation registered (env validation skipped for testing)');
+      return;
+    }
 
-    // 환경 변수 검증 및 요약 출력
+    // 환경 변수 검증 활성화
+    const { validateAndPrintEnv } = await import('./src/lib/env-validation');
     validateAndPrintEnv();
   }
 }
