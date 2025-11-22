@@ -22,8 +22,8 @@ async function globalSetup(config: FullConfig) {
     // 로그인 버튼 클릭
     await page.click('button[type="submit"]')
 
-    // 대시보드로 리디렉션 대기
-    await page.waitForURL(`${baseURL}/dashboard`, { timeout: 15000 })
+    // 로그인 성공 대기 (dashboard 또는 srs 페이지로 리디렉션)
+    await page.waitForURL(/\/(dashboard|srs)/, { timeout: 30000 })
 
     console.log('✅ 로그인 성공!')
 

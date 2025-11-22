@@ -23,20 +23,13 @@ test.describe('인증 플로우', () => {
     await page.click('button[type="submit"]')
 
     // 제출 후 잠시 대기
-    await page.waitForTimeout(2000)
+    await page.waitForTimeout(3000)
 
-    // 성공 메시지 또는 로그인 페이지로 이동 확인 (유연하게)
-    const successMessageVisible = await page.locator('text=/회원가입.*완료|성공/').isVisible().catch(() => false)
-    const redirectedToLogin = await page.url().includes('/login')
-
-    // 둘 중 하나라도 성공하면 통과
-    expect(successMessageVisible || redirectedToLogin).toBeTruthy()
-
-    // 로그인 페이지로 리디렉션되었다면 확인
-    if (!redirectedToLogin) {
-      await page.waitForURL('/login', { timeout: 15000 })
-    }
+    // 로그인 페이지로 리디렉션 확인 (회원가입 성공)
+    await page.waitForURL('/login', { timeout: 15000 })
     await expect(page).toHaveURL('/login')
+
+    console.log(`✅ 회원가입 성공: ${testEmail}`)
   })
 
   test('로그인 플로우 - 잘못된 자격 증명', async ({ page }) => {

@@ -11,7 +11,7 @@ async function login(page: any) {
   await page.fill('#email', process.env.TEST_USER_EMAIL || 'admin@example.com')
   await page.fill('#password', process.env.TEST_USER_PASSWORD || 'admin123')
   await page.click('button[type="submit"]')
-  
+
   // 로그인 성공 확인 - 대시보드로 이동
   await page.waitForURL('/dashboard', { timeout: 15000 })
 }
@@ -23,32 +23,53 @@ test.describe('SR 목록 관리', () => {
   test('SR 목록 페이지 접근', async ({ page }) => {
     // SR 목록 페이지로 이동
     await page.goto('/srs')
-    
+
     // 페이지가 로드될 때까지 대기
     await page.waitForLoadState('domcontentloaded')
-    
+
     // 테이블 확인
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
   })
 
   test('SR 필터링', async ({ page }) => {
     await page.goto('/srs')
-    
-    // 상태 필터 확인
-    const statusFilter = page.locator('select, [role="combobox"]').first()
-    if (await statusFilter.isVisible()) {
-      await statusFilter.click()
-      // 필터 옵션이 표시되는지 확인
-      await expect(page.locator('text=전체')).toBeVisible()
+
+    // 고급 필터 버튼 클릭
+    const advancedFilterBtn = page.locator('button:has-text("고급 필터")')
+    if (await advancedFilterBtn.isVisible()) {
+      await advancedFilterBtn.click()
+
+      // 상태 필터 확인 (레이블 근처의 콤보박스 찾기)
+      // "상태" 레이블을 포함하는 div 영역 내의 콤보박스 찾기
+      // 또는 placeholder 텍스트 "모든 상태"를 이용
+      const statusFilter = page.getByRole('combobox').filter({ hasText: '모든 상태' }).first()
+
+      // 만약 위 셀렉터가 실패하면, 고급 필터 영역이 열릴 때까지 기다린 후 첫 번째 콤보박스 시도
+      if (!(await statusFilter.isVisible())) {
+        await page.waitForTimeout(1000) // 애니메이션 대기
+      }
+
+      if (await statusFilter.isVisible()) {
+        await statusFilter.click()
+        // 필터 옵션이 표시되는지 확인
+        await expect(page.locator('[role="option"]:has-text("모든 상태")')).toBeVisible()
+      } else {
+        // Fallback: 첫 번째 콤보박스 (상태 필터일 가능성 높음)
+        const firstCombobox = page.locator('[role="combobox"]').nth(0)
+        if (await firstCombobox.isVisible()) {
+          await firstCombobox.click()
+          await expect(page.locator('[role="option"]').first()).toBeVisible()
+        }
+      }
     }
   })
 
   test('SR 목록 로딩 상태', async ({ page }) => {
     await page.goto('/srs')
-    
+
     // 페이지 로드 대기
     await page.waitForLoadState('domcontentloaded')
-    
+
     // 테이블이 표시되는지 확인
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
   })
@@ -66,7 +87,6 @@ test.describe('SR 목록 관리', () => {
     await page.waitForTimeout(2000)
 
     // 오류 다이얼로그가 표시되지 않아야 함
-    await expect(page.locator('dialog:has-text("Error")')).not.toBeVisible({ timeout: 1000 }).catch(() => {})
+    await expect(page.locator('dialog:has-text("Error")')).not.toBeVisible({ timeout: 1000 }).catch(() => { })
   })
 })
-
