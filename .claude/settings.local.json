@@ -79,7 +79,10 @@
       "Bash(powershell -Command \"$env:NEXTAUTH_SECRET\")",
       "Bash(powershell -Command:*)",
       "Bash(set SKIP_ENV_VALIDATION=true)",
-      "Bash(pnpm dev:test:*)"
+      "Bash(pnpm dev:test:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(if exist \"src\\domain\" rmdir /s /q \"src\\domain\")"
     ],
     "deny": [],
     "ask": []

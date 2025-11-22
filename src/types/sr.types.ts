@@ -11,7 +11,13 @@ export type SRDetails = SR & {
   requester: { id: string; name: string; email: string };
   assignee: { id: string; name: string; email: string } | null;
   intakeBy: { id: string; name: string; email: string; image: string | null } | null;
-  serviceCategory: { id: string; categoryName: string };
+  serviceCategory: {
+    id: string;
+    categoryName: string;
+    slaHours: number;
+    handlerId?: string | null;
+    handler?: { id: string; name: string } | null;
+  };
   comments: Array<{
     id: string;
     content: string;
@@ -52,7 +58,13 @@ export type SRCreateResult = SR & {
   client: { id: string; code: string; name: string };
   requester: { id: string; name: string; email: string };
   assignee: { id: string; name: string; email: string } | null;
-  serviceCategory: { id: string; categoryName: string };
+  serviceCategory: {
+    id: string;
+    categoryName: string;
+    slaHours: number;
+    handlerId?: string | null;
+    handler?: { id: string; name: string } | null;
+  };
   comments: (import("@prisma/client").SRComment & { user: { id: string; name: string; image: string | null } })[];
   activities: (import("@prisma/client").SRActivity & { user: { id: string; name: string; image: string | null } })[];
   attachments: import("@prisma/client").SRAttachment[];
@@ -66,7 +78,13 @@ export type SRUpdateResult = SR & {
   client?: { id: string; code: string; name: string };
   requester?: { id: string; name: string; email: string };
   assignee?: { id: string; name: string; email: string } | null;
-  serviceCategory?: { id: string; categoryName: string };
+  serviceCategory?: {
+    id: string;
+    categoryName: string;
+    slaHours: number;
+    handlerId?: string | null;
+    handler?: { id: string; name: string } | null;
+  };
 };
 
 /**

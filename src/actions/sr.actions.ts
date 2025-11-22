@@ -54,7 +54,6 @@ export async function updateSRAction(
 
     return ok(sr);
   } catch (error) {
-    console.error("SR 수정 오류:", error);
     return errorToResult(error);
   }
 }

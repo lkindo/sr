@@ -35,12 +35,13 @@ import {
 import { cn } from "@/lib/utils";
 import { priorityLabels } from "./constants";
 import type { IntakeFormValues } from "./useIntakeForm";
-import type { SRDetail, User as UserType } from "./types";
+import type { SRDetails } from "@/types/sr.types";
+import type { User as UserType } from "./types";
 
 interface IntakeFormCardProps {
   form: UseFormReturn<IntakeFormValues>;
   onSubmit: (values: IntakeFormValues) => Promise<void>;
-  sr: SRDetail;
+  sr: SRDetails;
   users: UserType[];
   isEditMode: boolean;
   submitting: boolean;

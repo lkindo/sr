@@ -9,7 +9,8 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { getSRHandlersForSelection } from "@/actions/user.actions";
-import type { SRDetail, User } from "./types";
+import type { SRDetails } from "@/types/sr.types";
+import type { User } from "./types";
 
 // Intake 폼 스키마
 export const intakeFormSchema = z.object({
@@ -35,7 +36,7 @@ interface UseIntakeFormOptions {
 }
 
 export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
-  const [sr, setSr] = useState<SRDetail | null>(null);
+  const [sr, setSr] = useState<SRDetails | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);

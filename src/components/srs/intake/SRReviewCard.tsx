@@ -7,10 +7,10 @@ import { ko } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { priorityLabels, priorityColors } from "./constants";
-import type { SRDetail } from "./types";
+import type { SRDetails } from "@/types/sr.types";
 
 interface SRReviewCardProps {
-  sr: SRDetail;
+  sr: SRDetails;
 }
 
 export function SRReviewCard({ sr }: SRReviewCardProps) {
