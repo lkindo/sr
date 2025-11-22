@@ -30,6 +30,8 @@ import { getSRDetailsAction } from "@/actions/sr.actions";
 import type { SR } from "@prisma/client";
 import { TableSkeleton } from "@/components/loading/TableSkeleton";
 import { usePermissions } from "@/hooks/use-permissions";
+import type { SRDetails } from "@/types/sr.types";
+import { useSRDetails, useDeleteSR } from "@/hooks/use-sr";
 
 const statusLabels: Record<string, string> = {
   REQUESTED: "요청됨",
@@ -70,49 +72,6 @@ export default function SRDetailPage() {
   const router = useRouter();
   const srId = params.id as string;
 
-  // Detailed SR type including nested relations
-  type SRDetails = SR & {
-    client: { id: string; code: string; name: string };
-    requester: { id: string; name: string; email: string };
-    assignee: { id: string; name: string; email: string } | null;
-    intakeBy: { id: string; name: string; email: string; image: string | null } | null;
-    serviceCategory: { id: string; categoryName: string };
-    comments: Array<{
-      id: string;
-      content: string;
-      createdAt: Date;
-      updatedAt: Date;
-      user: { id: string; name: string; image: string | null };
-    }>;
-    activities: Array<{
-      id: string;
-      type: string;
-      description: string;
-      createdAt: Date;
-      user: { id: string; name: string; image: string | null };
-    }>;
-    attachments: Array<{
-      id: string;
-      fileName: string;
-      fileSize: number;
-      fileType: string;
-      fileUrl: string;
-      createdAt: Date;
-    }>;
-    statusHistory: Array<{
-      id: string;
-      currentStatus: string;
-      previousStatus: string | null;
-      changedAt: Date;
-      changeReason: string | null;
-      user: { id: string; name: string; image: string | null };
-    }>;
-    _count: { comments: number; attachments: number };
-  };
-
-  const [sr, setSr] = useState<SRDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -120,36 +79,20 @@ export default function SRDetailPage() {
   const { hasAnyRole, roles } = usePermissions();
   const { data: session } = useSession();
 
-  useEffect(() => {
-    if (!srId) return;
-    const fetchSr = async () => {
-      setIsLoading(true);
-      const result = await getSRDetailsAction(srId);
-      if (result.success) {
-        setSr(result.data);
-        setError(null);
-      } else {
-        setError(result.error || "알 수 없는 오류가 발생했습니다.");
-        toast({
-          title: "오류",
-          description: result.error || "알 수 없는 오류가 발생했습니다.",
-          variant: "destructive",
-        });
-      }
-      setIsLoading(false);
-    };
-    fetchSr();
-  }, [srId, toast]);
+  // React Query를 사용한 SR 상세 조회
+  const { data: sr, isLoading, error, refetch } = useSRDetails(srId);
 
-  const handleSRUpdated = async () => {
-    const result = await getSRDetailsAction(srId);
-    if (result.success) setSr(result.data);
+  // SR 삭제 mutation
+  const deleteMutation = useDeleteSR();
+
+  const handleSRUpdated = () => {
     setIsEditDialogOpen(false);
+    // React Query가 자동으로 최신 데이터를 가져옴
   };
 
   const handleSRDeleted = () => {
-    toast({ title: "성공", description: "SR이 삭제되었습니다." });
-    router.push("/srs");
+    deleteMutation.mutate(srId);
+    setIsDeleteDialogOpen(false);
   };
 
   if (isLoading) {
@@ -162,11 +105,16 @@ export default function SRDetailPage() {
         <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
         <h2 className="mt-4 text-xl font-semibold">SR을 불러올 수 없습니다</h2>
         <p className="mt-2 text-muted-foreground">
-          {error || "요청한 SR을 찾을 수 없거나 오류가 발생했습니다."}
+          {error instanceof Error ? error.message : "요청한 SR을 찾을 수 없거나 오류가 발생했습니다."}
         </p>
-        <Button asChild className="mt-6">
-          <Link href="/srs">목록으로 돌아가기</Link>
-        </Button>
+        <div className="mt-6 flex gap-3 justify-center">
+          <Button onClick={() => refetch()} variant="outline">
+            다시 시도
+          </Button>
+          <Button asChild>
+            <Link href="/srs">목록으로 돌아가기</Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -217,7 +165,7 @@ export default function SRDetailPage() {
                 });
               }
             }}
-            disabled={sr.status !== "REQUESTED" && !hasAnyRole(["ADMIN"]))
+            disabled={sr.status !== "REQUESTED" && !hasAnyRole(["ADMIN"])}
           >
             <Pencil className="mr-2 h-4 w-4" /> 수정
           </Button>

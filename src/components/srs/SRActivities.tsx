@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -10,19 +10,9 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-
-interface Activity {
-  id: string;
-  type: string;
-  description: string;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useSRActivitiesInfinite } from "@/hooks/use-sr-infinite";
 
 interface SRActivitiesProps {
   srId: string;
@@ -50,30 +40,28 @@ const activityTypeColors: Record<
 };
 
 export function SRActivities({ srId }: SRActivitiesProps) {
-  const [activities, setActivities] = useState<Activity[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
+    useSRActivitiesInfinite(srId);
 
-  const fetchActivities = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/srs/${srId}/activities`);
-      if (!response.ok) throw new Error("Failed to fetch activities");
-      const data = await response.json();
-      setActivities(data);
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "활동 이력을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [srId, toast]);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
+  // Intersection Observer로 자동 로딩
   useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const getInitials = (name: string) => {
     return name
@@ -84,11 +72,28 @@ export function SRActivities({ srId }: SRActivitiesProps) {
       .slice(0, 2);
   };
 
-  if (loading) {
+  const allActivities = data?.pages.flatMap((page) => page.activities) || [];
+  const totalCount = allActivities.length;
+
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">로딩 중...</p>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-destructive py-8">
+            활동 이력을 불러오는데 실패했습니다.
+          </p>
         </CardContent>
       </Card>
     );
@@ -97,51 +102,66 @@ export function SRActivities({ srId }: SRActivitiesProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>활동 이력 ({activities.length})</CardTitle>
+        <CardTitle>활동 이력 ({totalCount})</CardTitle>
         <CardDescription>
           이 SR의 모든 활동 이력을 시간순으로 확인할 수 있습니다.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {activities.length === 0 ? (
+        {allActivities.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             활동 이력이 없습니다.
           </p>
         ) : (
-          <div className="relative space-y-4">
-            <div className="absolute left-5 top-0 h-full w-px bg-border" />
-            {activities.map((activity, index) => (
-              <div key={activity.id} className="relative flex gap-4">
-                <Avatar className="relative z-10">
-                  <AvatarImage src="" alt={activity.user.name} />
-                  <AvatarFallback>
-                    {getInitials(activity.user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 space-y-1 pt-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">
-                      {activity.user.name}
-                    </span>
-                    <Badge
-                      variant={
-                        activityTypeColors[activity.type] || "secondary"
-                      }
-                      className="text-xs"
-                    >
-                      {activityTypeLabels[activity.type] || activity.type}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(activity.createdAt).toLocaleString("ko-KR")}
-                    </span>
+          <>
+            <div className="relative space-y-4">
+              <div className="absolute left-5 top-0 h-full w-px bg-border" />
+              {allActivities.map((activity) => (
+                <div key={activity.id} className="relative flex gap-4">
+                  <Avatar className="relative z-10">
+                    <AvatarImage src={activity.user.image || ""} alt={activity.user.name} />
+                    <AvatarFallback>
+                      {getInitials(activity.user.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-1 pt-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {activity.user.name}
+                      </span>
+                      <Badge
+                        variant={
+                          activityTypeColors[activity.type] || "secondary"
+                        }
+                        className="text-xs"
+                      >
+                        {activityTypeLabels[activity.type] || activity.type}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(activity.createdAt).toLocaleString("ko-KR")}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {activity.description}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {activity.description}
-                  </p>
                 </div>
+              ))}
+            </div>
+
+            {/* 무한 스크롤 트리거 */}
+            {hasNextPage && (
+              <div ref={loadMoreRef} className="mt-4 flex justify-center">
+                {isFetchingNextPage ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <Button onClick={() => fetchNextPage()} variant="outline" size="sm">
+                    더 보기
+                  </Button>
+                )}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

@@ -9,6 +9,8 @@ import { ServiceCategoryRepository } from "@/repositories/service-category.repos
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { AuthenticatedUser } from "@/types/session";
 import { SRPolicy } from "@/lib/policies/sr.policy";
+import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from "@/types/sr.types";
+import prisma from "@/lib/prisma";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -39,16 +41,7 @@ export class SRService {
   async createSR(
     data: SrCreateData,
     sessionUser: AuthenticatedUser
-  ): Promise<SR & {
-    client: { id: string; code: string; name: string };
-    requester: { id: string; name: string; email: string };
-    assignee: { id: string; name: string; email: string } | null;
-    serviceCategory: { id: string; categoryName: string };
-    comments: (import("@prisma/client").SRComment & { user: { id: string; name: string; image: string | null } })[];
-    activities: (import("@prisma/client").SRActivity & { user: { id: string; name: string; image: string | null } })[];
-    attachments: import("@prisma/client").SRAttachment[];
-    _count: { comments: number; attachments: number };
-  }> {
+  ): Promise<SRCreateResult> {
     this.srPolicy.ensureCanCreate(sessionUser);
     const validated = srCreateSchema.parse(data);
 
@@ -136,19 +129,15 @@ export class SRService {
     id: string,
     data: SrUpdateData,
     sessionUser: AuthenticatedUser
-  ): Promise<SR & {
-    client?: { id: string; code: string; name: string };
-    requester?: { id: string; name: string; email: string };
-    assignee?: { id: string; name: string; email: string } | null;
-    serviceCategory?: { id: string; categoryName: string };
-  }> {
-    const updateData: Prisma.SRUncheckedUpdateInput = {};
+  ): Promise<SRUpdateResult> {
     try {
       const validated = srUpdateSchema.parse(data);
       const existingSR = await this.srRepository.findById(id);
       if (!existingSR) throw new Error("SR을 찾을 수 없습니다.");
 
       this.srPolicy.ensureCanUpdate(sessionUser, existingSR);
+
+      const updateData: Prisma.SRUncheckedUpdateInput = {};
 
       // basic fields
       if (validated.title !== undefined) updateData.title = validated.title;
@@ -196,46 +185,71 @@ export class SRService {
         }
       }
 
-      // status change handling
-      if (validated.status && validated.status !== existingSR.status) {
-        await this.srRepository.update(existingSR.id, {
-          statusHistory: {
-            create: {
-              previousStatus: existingSR.status,
-              currentStatus: validated.status,
-              changedBy: sessionUser.id,
-              changeReason: validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
-            },
+      // 상태 변경 처리: statusHistory를 updateData에 포함
+      const statusChanged = validated.status && validated.status !== existingSR.status;
+      if (statusChanged) {
+        updateData.statusHistory = {
+          create: {
+            previousStatus: existingSR.status,
+            currentStatus: validated.status!,
+            changedBy: sessionUser.id,
+            changeReason: validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
           },
-        });
-        await this.srActivityRepository.create({
-          srId: id,
-          userId: sessionUser.id,
-          type: "STATUS_CHANGED",
-          description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
-        });
+        };
         if (validated.status === "COMPLETED" && !updateData.actualCompletionDate) {
           updateData.actualCompletionDate = new Date();
         }
       }
 
-      // assignee change activity
-      if (assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
-        await this.srActivityRepository.create({
-          srId: id,
-          userId: sessionUser.id,
-          type: "ASSIGNED",
-          description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
-        });
-      }
+      const assigneeChanged = assigneeId !== undefined && assigneeId !== existingSR.assigneeId;
 
-      if (Object.keys(updateData).length === 0) return existingSR;
-      return this.srRepository.update(id, updateData);
+      // 트랜잭션으로 업데이트 및 활동 로그 생성
+      return await prisma.$transaction(async (tx) => {
+        // 1. SR 업데이트 (statusHistory 포함)
+        let updatedSR = existingSR;
+        if (Object.keys(updateData).length > 0) {
+          updatedSR = await tx.sR.update({
+            where: { id },
+            data: updateData,
+            include: {
+              client: { select: { id: true, code: true, name: true } },
+              requester: { select: { id: true, name: true, email: true } },
+              assignee: { select: { id: true, name: true, email: true } },
+              serviceCategory: { select: { id: true, categoryName: true } },
+            },
+          });
+        }
+
+        // 2. 상태 변경 활동 로그
+        if (statusChanged) {
+          await tx.sRActivity.create({
+            data: {
+              srId: id,
+              userId: sessionUser.id,
+              type: "STATUS_CHANGED",
+              description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
+            },
+          });
+        }
+
+        // 3. 담당자 변경 활동 로그
+        if (assigneeChanged) {
+          await tx.sRActivity.create({
+            data: {
+              srId: id,
+              userId: sessionUser.id,
+              type: "ASSIGNED",
+              description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
+            },
+          });
+        }
+
+        return updatedSR;
+      });
     } catch (error) {
       const { logger } = await import("@/lib/logger");
       logger.error("SR 업데이트 서비스 오류", error instanceof Error ? error : undefined, {
         srId: id,
-        updateData: Object.keys(updateData),
       });
       throw error;
     }
@@ -245,44 +259,7 @@ export class SRService {
     return this.srRepository.findById(id);
   }
 
-  async getSRDetailsById(id: string): Promise<(SR & {
-    client: { id: string; code: string; name: string };
-    requester: { id: string; name: string; email: string };
-    assignee: { id: string; name: string; email: string } | null;
-    intakeBy: { id: string; name: string; email: string; image: string | null } | null;
-    serviceCategory: { id: string; categoryName: string };
-    comments: Array<{
-      id: string;
-      content: string;
-      createdAt: Date;
-      updatedAt: Date;
-      user: { id: string; name: string; image: string | null };
-    }>;
-    activities: Array<{
-      id: string;
-      type: string;
-      description: string;
-      createdAt: Date;
-      user: { id: string; name: string; image: string | null };
-    }>;
-    attachments: Array<{
-      id: string;
-      fileName: string;
-      fileSize: number;
-      fileType: string;
-      fileUrl: string;
-      createdAt: Date;
-    }>;
-    statusHistory: Array<{
-      id: string;
-      currentStatus: string;
-      previousStatus: string | null;
-      changedAt: Date;
-      changeReason: string | null;
-      user: { id: string; name: string; image: string | null };
-    }>;
-    _count: { comments: number; attachments: number };
-  }) | null> {
+  async getSRDetailsById(id: string): Promise<SRDetails | null> {
     return this.srRepository.findDetailsById(id);
   }
 
@@ -291,20 +268,7 @@ export class SRService {
     take?: number;
     where?: Prisma.SRWhereInput;
     orderBy?: Prisma.SROrderByWithRelationInput;
-  }): Promise<(SR & {
-    client: { id: string; name: string };
-    requester: { id: string; name: string; email: string };
-    assignee: { id: string; name: string; email: string } | null;
-    serviceCategory: {
-      id: string;
-      categoryName: string;
-      priority: string;
-      slaHours: number;
-      handlerId: string | null;
-      handler: { id: string; name: string } | null;
-    };
-    _count: { comments: number; attachments: number };
-  })[]> {
+  }): Promise<SRListItem[]> {
     return this.srRepository.findAll(params);
   }
 
@@ -316,12 +280,17 @@ export class SRService {
     const existingSR = await this.srRepository.findById(id);
     if (!existingSR) throw new Error("SR을 찾을 수 없습니다.");
     this.srPolicy.ensureCanDelete(sessionUser);
-    await this.srRepository.delete(id);
-    await this.srActivityRepository.create({
-      srId: id,
-      userId: sessionUser.id,
-      type: "STATUS_CHANGED",
-      description: "SR이 삭제되었습니다.",
+
+    // 트랜잭션으로 관련 데이터와 함께 삭제
+    await prisma.$transaction(async (tx) => {
+      // 1. 관련 데이터 삭제 (Cascade가 설정되어 있지 않은 경우를 위해)
+      await tx.sRActivity.deleteMany({ where: { srId: id } });
+      await tx.sRComment.deleteMany({ where: { srId: id } });
+      await tx.sRAttachment.deleteMany({ where: { srId: id } });
+      await tx.sRStatusHistory.deleteMany({ where: { srId: id } });
+
+      // 2. SR 삭제
+      await tx.sR.delete({ where: { id } });
     });
   }
 }

@@ -8,7 +8,13 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
     super(prisma.sR);
   }
 
-  async findDetailsById(id: string): Promise<(SR & {
+  async findDetailsById(
+    id: string,
+    options?: {
+      activitiesLimit?: number;
+      commentsLimit?: number;
+    }
+  ): Promise<(SR & {
     client: import("@prisma/client").Client;
     requester: { id: string; name: string; email: string; image: string | null };
     assignee: { id: string; name: string; email: string; image: string | null } | null;
@@ -20,6 +26,8 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
     statusHistory: (import("@prisma/client").SRStatusHistory & { user: { id: string; name: string; image: string | null } })[];
     _count: { comments: number; attachments: number };
   }) | null> {
+    const { activitiesLimit = 20, commentsLimit = 20 } = options || {};
+
     return this.model.findUnique({
       where: { id },
       include: {
@@ -41,7 +49,7 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
             },
           },
           orderBy: { createdAt: 'desc' },
-          take: 50,
+          take: activitiesLimit,
         },
         comments: {
           include: {
@@ -50,6 +58,7 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
             },
           },
           orderBy: { createdAt: 'desc' },
+          take: commentsLimit,
         },
         attachments: {
           orderBy: { createdAt: 'desc' },

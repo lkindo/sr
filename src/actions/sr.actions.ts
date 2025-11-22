@@ -9,15 +9,11 @@ import { authenticateAndAuthorize, validateWithSchema, getAuthenticatedSession }
 import { PERMISSIONS } from "@/lib/permission-helpers";
 import type { SR } from "@prisma/client";
 import { buildSRCreateInput, buildSRUpdateInput } from "./sr-form.utils";
+import { SRCreateResult, SRUpdateResult, SRDetails } from "@/types/sr.types";
 
 export async function createSRAction(
   formData: FormData
-): Promise<Result<SR & {
-  client: { id: string; code: string; name: string };
-  requester: { id: string; name: string; email: string };
-  assignee: { id: string; name: string; email: string } | null;
-  serviceCategory: { id: string; categoryName: string };
-}>> {
+): Promise<Result<SRCreateResult>> {
   try {
     const payload = buildSRCreateInput(formData);
     const validationResult = validateWithSchema(payload, srCreateSchema);
@@ -41,12 +37,7 @@ export async function createSRAction(
 export async function updateSRAction(
   id: string,
   formData: FormData
-): Promise<Result<SR & {
-  client?: { id: string; code: string; name: string };
-  requester?: { id: string; name: string; email: string };
-  assignee?: { id: string; name: string; email: string } | null;
-  serviceCategory?: { id: string; categoryName: string };
-}>> {
+): Promise<Result<SRUpdateResult>> {
   try {
     const processedData = buildSRUpdateInput(formData);
     const validationResult = validateWithSchema(processedData, srUpdateSchema);
@@ -97,43 +88,7 @@ export async function getSRAction(id: string): Promise<Result<SR>> {
   }
 }
 
-export async function getSRDetailsAction(id: string): Promise<Result<SR & {
-  client: { id: string; code: string; name: string };
-  requester: { id: string; name: string; email: string };
-  assignee: { id: string; name: string; email: string } | null;
-  intakeBy: { id: string; name: string; email: string; image: string | null } | null;
-  serviceCategory: { id: string; categoryName: string };
-  comments: Array<{
-    id: string;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
-    user: { id: string; name: string; image: string | null };
-  }>;
-  activities: Array<{
-    id: string;
-    type: string;
-    description: string;
-    createdAt: Date;
-    user: { id: string; name: string; image: string | null };
-  }>;
-  attachments: Array<{
-    id: string;
-    fileName: string;
-    fileSize: number;
-    fileType: string;
-    fileUrl: string;
-    createdAt: Date;
-  }>;
-  statusHistory: Array<{
-    id: string;
-    currentStatus: string;
-    previousStatus: string | null;
-    changedAt: Date;
-    user: { id: string; name: string; image: string | null };
-  }>;
-  _count: { comments: number; attachments: number };
-}>> {
+export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>> {
   try {
     const srService = new SRService();
     const sr = await srService.getSRDetailsById(id);
@@ -143,6 +98,94 @@ export async function getSRDetailsAction(id: string): Promise<Result<SR & {
     }
 
     return ok(sr);
+  } catch (error) {
+    return errorToResult(error);
+  }
+}
+
+export async function getSRActivitiesAction(
+  srId: string,
+  options?: { cursor?: string; limit?: number }
+): Promise<Result<{
+  activities: Array<{
+    id: string;
+    type: string;
+    description: string;
+    createdAt: Date;
+    user: { id: string; name: string; image: string | null };
+  }>;
+  nextCursor: string | null;
+}>> {
+  try {
+    const prisma = (await import("@/lib/prisma")).default;
+
+    const limit = options?.limit || 20;
+    const cursor = options?.cursor;
+
+    const activities = await prisma.sRActivity.findMany({
+      where: { srId },
+      take: limit + 1,
+      ...(cursor && {
+        skip: 1,
+        cursor: { id: cursor },
+      }),
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: { id: true, name: true, image: true },
+        },
+      },
+    });
+
+    const hasMore = activities.length > limit;
+    const items = hasMore ? activities.slice(0, limit) : activities;
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    return ok({ activities: items, nextCursor });
+  } catch (error) {
+    return errorToResult(error);
+  }
+}
+
+export async function getSRCommentsAction(
+  srId: string,
+  options?: { cursor?: string; limit?: number }
+): Promise<Result<{
+  comments: Array<{
+    id: string;
+    content: string;
+    createdAt: Date;
+    updatedAt: Date;
+    user: { id: string; name: string; image: string | null };
+  }>;
+  nextCursor: string | null;
+}>> {
+  try {
+    const prisma = (await import("@/lib/prisma")).default;
+
+    const limit = options?.limit || 20;
+    const cursor = options?.cursor;
+
+    const comments = await prisma.sRComment.findMany({
+      where: { srId },
+      take: limit + 1,
+      ...(cursor && {
+        skip: 1,
+        cursor: { id: cursor },
+      }),
+      orderBy: { createdAt: "desc" },
+      include: {
+        user: {
+          select: { id: true, name: true, image: true },
+        },
+      },
+    });
+
+    const hasMore = comments.length > limit;
+    const items = hasMore ? comments.slice(0, limit) : comments;
+    const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+    return ok({ comments: items, nextCursor });
   } catch (error) {
     return errorToResult(error);
   }

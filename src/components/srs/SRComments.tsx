@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Send } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -13,49 +13,41 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-
-interface Comment {
-  id: string;
-  content: string;
-  createdAt: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
+import { useSRCommentsInfinite } from "@/hooks/use-sr-infinite";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface SRCommentsProps {
   srId: string;
 }
 
 export function SRComments({ srId }: SRCommentsProps) {
-  const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  const fetchComments = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/srs/${srId}/comments`);
-      if (!response.ok) throw new Error("Failed to fetch comments");
-      const data = await response.json();
-      setComments(data);
-    } catch (error) {
-      toast({
-        title: "오류",
-        description: "댓글을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [srId, toast]);
+  // React Query 무한 스크롤
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
+    useSRCommentsInfinite(srId);
 
+  // Intersection Observer로 자동 로딩
   useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          fetchNextPage();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +85,9 @@ export function SRComments({ srId }: SRCommentsProps) {
       });
 
       setNewComment("");
-      fetchComments();
+
+      // React Query 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ["sr", srId, "comments"] });
     } catch (error) {
       toast({
         title: "오류",
@@ -117,11 +111,28 @@ export function SRComments({ srId }: SRCommentsProps) {
       .slice(0, 2);
   };
 
-  if (loading) {
+  const allComments = data?.pages.flatMap((page) => page.comments) || [];
+  const totalCount = allComments.length;
+
+  if (isLoading) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-muted-foreground">로딩 중...</p>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-center text-destructive py-8">
+            댓글을 불러오는데 실패했습니다.
+          </p>
         </CardContent>
       </Card>
     );
@@ -154,42 +165,57 @@ export function SRComments({ srId }: SRCommentsProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>댓글 ({comments.length})</CardTitle>
+          <CardTitle>댓글 ({totalCount})</CardTitle>
           <CardDescription>
             이 SR에 달린 모든 댓글을 확인할 수 있습니다.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {comments.length === 0 ? (
+          {allComments.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
               아직 댓글이 없습니다.
             </p>
           ) : (
-            <div className="space-y-4">
-              {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-4">
-                  <Avatar>
-                    <AvatarImage src="" alt={comment.user.name} />
-                    <AvatarFallback>
-                      {getInitials(comment.user.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {comment.user.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(comment.createdAt).toLocaleString("ko-KR")}
-                      </span>
-                    </div>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {comment.content}
-                    </p>
+            <>
+              <div className="space-y-4">
+                {allComments.map((comment) => (
+                  <div key={comment.id} className="flex gap-4">
+                    <Avatar>
+                      <AvatarImage src={comment.user.image || ""} alt={comment.user.name} />
+                      <AvatarFallback>
+                        {getInitials(comment.user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {comment.user.name}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(comment.createdAt).toLocaleString("ko-KR")}
+                        </span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap">
+                        {comment.content}
+                      </p>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* 무한 스크롤 트리거 */}
+            {hasNextPage && (
+              <div ref={loadMoreRef} className="mt-4 flex justify-center">
+                {isFetchingNextPage ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                ) : (
+                  <Button onClick={() => fetchNextPage()} variant="outline" size="sm">
+                    더 보기
+                  </Button>
+                )}
+              </div>
+            )}
+          </>
           )}
         </CardContent>
       </Card>
