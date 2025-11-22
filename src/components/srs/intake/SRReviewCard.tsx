@@ -6,8 +6,15 @@ import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { priorityLabels, priorityColors } from "./constants";
+import { priorityLabels } from "@/lib/constants/sr";
 import type { SRDetails } from "@/types/sr.types";
+
+const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
+  CRITICAL: "destructive",
+  HIGH: "destructive",
+  MEDIUM: "default",
+  LOW: "secondary",
+};
 
 interface SRReviewCardProps {
   sr: SRDetails;

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { statusLabels, priorityLabels } from "@/lib/constants/sr";
 import {
   Card,
   CardContent,
@@ -118,23 +119,6 @@ interface DashboardStats {
     count: number;
   }>;
 }
-
-const statusLabels: Record<string, string> = {
-  REQUESTED: "요청됨",
-  INTAKE: "접수",
-  IN_PROGRESS: "진행중",
-  ON_HOLD: "대기",
-  COMPLETED: "완료",
-  CONFIRMED: "확인완료",
-  REJECTED: "거부",
-};
-
-const priorityLabels: Record<string, string> = {
-  CRITICAL: "긴급",
-  HIGH: "높음",
-  MEDIUM: "보통",
-  LOW: "낮음",
-};
 
 const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
   REQUESTED: "secondary",

@@ -33,10 +33,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { priorityLabels } from "./constants";
+import { priorityLabels } from "@/lib/constants/sr";
 import type { IntakeFormValues } from "./useIntakeForm";
 import type { SRDetails } from "@/types/sr.types";
-import type { User as UserType } from "./types";
+
+interface UserType {
+  id: string;
+  name: string;
+  email: string;
+}
 
 interface IntakeFormCardProps {
   form: UseFormReturn<IntakeFormValues>;

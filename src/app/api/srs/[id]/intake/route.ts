@@ -91,14 +91,22 @@ export const POST = withAuthAndRateLimit(async (
   const dueDate = new Date();
   dueDate.setHours(dueDate.getHours() + adjustedHours);
 
-  // 5. SR 업데이트 (REQUESTED → IN_PROGRESS)
+  // 5. SR 업데이트 (REQUESTED → INTAKE) 및 상태 이력 생성
   const updatedSR = await prisma.sR.update({
     where: { id },
     data: {
-      status: "IN_PROGRESS",
+      status: "INTAKE",
       intakeAt: new Date(),
       intakeBy: {
         connect: { id: session.user.id }
+      },
+      statusHistory: {
+        create: {
+          previousStatus: "REQUESTED",
+          currentStatus: "INTAKE",
+          changedBy: session.user.id,
+          changeReason: "SR 접수 처리",
+        }
       },
       actualPriority: validated.actualPriority,
       estimatedHours: validated.estimatedHours,
@@ -161,7 +169,7 @@ export const POST = withAuthAndRateLimit(async (
       description: `SR이 접수되었습니다 (담당자: ${assignee.name})`,
       metadata: {
         previousStatus: "REQUESTED",
-        currentStatus: "IN_PROGRESS",
+        currentStatus: "INTAKE",
         actualPriority: validated.actualPriority,
         estimatedHours: validated.estimatedHours,
         estimatedCompletionDate: validated.estimatedCompletionDate,
@@ -385,8 +393,8 @@ export const PATCH = withAuthAndRateLimit(async (
     throw new NotFoundError("SR을 찾을 수 없습니다");
   }
 
-  if (sr.status !== "IN_PROGRESS") {
-    throw new BadRequestError("진행 중인 SR만 접수 정보를 수정할 수 있습니다");
+  if (sr.status !== "INTAKE" && sr.status !== "IN_PROGRESS") {
+    throw new BadRequestError("접수되었거나 진행 중인 SR만 접수 정보를 수정할 수 있습니다");
   }
 
   // 4. 변경 전 값 저장 (이력 추적용)

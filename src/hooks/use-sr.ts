@@ -110,9 +110,6 @@ export function useDeleteSR() {
       // 이전 데이터 백업
       const previousSR = queryClient.getQueryData<SRDetails>(["sr", srId]);
 
-      // Optimistic Update: 즉시 캐시에서 제거
-      queryClient.removeQueries({ queryKey: ["sr", srId] });
-
       return { previousSR, srId };
     },
     onError: (error, srId, context) => {
@@ -126,16 +123,24 @@ export function useDeleteSR() {
         variant: "destructive",
       });
     },
-    onSuccess: () => {
+    onSuccess: (srId) => {
+      // 1. 즉시 페이지 이동 (추가 쿼리 방지)
+      router.push("/srs");
+
+      // 2. 페이지 이동 후 비동기로 캐시 정리 (타이머 사용)
+      setTimeout(() => {
+        // 삭제된 SR 관련 모든 쿼리 제거
+        queryClient.removeQueries({ queryKey: ["sr", srId] });
+
+        // SR 목록 쿼리 무효화 (목록 갱신)
+        queryClient.invalidateQueries({ queryKey: ["srs"] });
+      }, 0);
+
+      // 3. 토스트 표시
       toast({
         title: "성공",
         description: "SR이 삭제되었습니다.",
       });
-      router.push("/srs");
-    },
-    onSettled: () => {
-      // SR 목록 쿼리 무효화
-      queryClient.invalidateQueries({ queryKey: ["srs"] });
     },
   });
 }

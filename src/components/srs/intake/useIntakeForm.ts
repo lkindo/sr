@@ -10,7 +10,12 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { getSRHandlersForSelection } from "@/actions/user.actions";
 import type { SRDetails } from "@/types/sr.types";
-import type { User } from "./types";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
 
 // Intake 폼 스키마
 export const intakeFormSchema = z.object({
@@ -67,10 +72,10 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         // 상태에 따라 모드 결정
         if (srData.status === "REQUESTED") {
           setIsEditMode(false); // 접수 모드
-        } else if (srData.status === "IN_PROGRESS") {
+        } else if (srData.status === "INTAKE" || srData.status === "IN_PROGRESS") {
           setIsEditMode(true); // 수정 모드
         } else {
-          // REQUESTED나 IN_PROGRESS가 아닌 경우 목록으로 리다이렉트
+          // 수정 불가능한 상태 (ON_HOLD, COMPLETED, CONFIRMED, REJECTED)
           toast({
             title: "알림",
             description: "이 SR은 수정할 수 없습니다. SR 목록으로 이동합니다.",
@@ -108,7 +113,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         }
 
         // 수정 모드인 경우 기존 값 설정, 접수 모드인 경우 기본값 설정
-        if (srData.status === "IN_PROGRESS") {
+        if (srData.status === "INTAKE" || srData.status === "IN_PROGRESS") {
           // 수정 모드: 기존 접수 정보 로드
           form.setValue("actualPriority", srData.actualPriority || "MEDIUM");
           form.setValue("estimatedHours", srData.estimatedHours || srData.serviceCategory.slaHours);
@@ -150,14 +155,9 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
 
   // 접수/수정 처리
   const onSubmit = async (values: IntakeFormValues) => {
-    setSubmitting(true);
-    
-    // 수정 모드: PATCH /api/srs/[id]/intake 사용
-    // 접수 모드: POST /api/srs/[id]/intake 사용
+    // 변수를 상위 스코프로 이동
     const url = `/api/srs/${srId}/intake`;
     const method = isEditMode ? "PATCH" : "POST";
-
-    // 수정 모드와 접수 모드 모두 동일한 형식으로 전송 (서버에서 변경 여부 확인)
     const requestBody = {
       actualPriority: values.actualPriority,
       estimatedHours: values.estimatedHours,
@@ -167,6 +167,8 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
     };
 
     try {
+      setSubmitting(true);
+
       console.log("Submitting intake:", { url, method, requestBody, isEditMode });
 
       const response = await fetch(url, {
@@ -185,7 +187,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
           // 응답 본문을 텍스트로 먼저 읽기
           const responseText = await response.text();
           console.error("Error response text:", responseText);
-          
+
           if (responseText) {
             try {
               const errorData = JSON.parse(responseText);
@@ -207,21 +209,23 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-      console.log("Success response:", data);
-
-      toast({
-        title: "성공",
-        description: isEditMode ? "SR이 성공적으로 수정되었습니다." : "SR이 성공적으로 접수되었습니다.",
-      });
-
-      // SR 목록으로 이동
-      router.push("/srs");
-      
-      if (onSuccess) {
-        onSuccess();
+      let data;
+      try {
+        data = await response.json();
+        console.log("Success response:", data);
+      } catch (jsonError) {
+        console.warn("Failed to parse JSON response, but request was successful:", jsonError);
       }
-    } catch (error) {
+
+      console.log("Request successful, navigating to /srs...");
+
+      // 즉시 페이지 이동 - window.location.href 사용 (가장 확실한 방법)
+      // 페이지 이동이 시작되면 토스트는 자동으로 사라지므로 토스트 표시 생략
+      window.location.href = "/srs";
+
+      // 성공 시에는 submitting을 false로 설정하지 않음 (페이지 이동 중이므로)
+      // 페이지가 이동되면서 컴포넌트가 언마운트되므로 상태 업데이트 불필요
+    } catch (error: any) {
       console.error("Error submitting intake:", error);
       console.error("Error details:", {
         message: error instanceof Error ? error.message : String(error),
@@ -231,19 +235,20 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         requestBody,
         isEditMode,
       });
-      
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : typeof error === 'string' 
-        ? error 
+
+      const errorMessage = error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+        ? error
         : "접수 처리 중 오류가 발생했습니다.";
-      
+
       toast({
         title: "오류",
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
+
+      // 에러 발생 시에만 submitting을 false로 설정
       setSubmitting(false);
     }
   };

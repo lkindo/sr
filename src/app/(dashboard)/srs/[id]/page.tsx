@@ -25,6 +25,7 @@ import { SRAttachments } from "@/components/srs/SRAttachments";
 import { EditSRDialog } from "@/components/srs/EditSRDialog";
 import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
 import { SRStatusActions } from "@/components/srs/SRStatusActions";
+import { IntakeInfoCard } from "@/components/srs/IntakeInfoCard";
 import { useToast } from "@/hooks/use-toast";
 import { getSRDetailsAction } from "@/actions/sr.actions";
 import type { SR } from "@prisma/client";
@@ -32,23 +33,10 @@ import { TableSkeleton } from "@/components/loading/TableSkeleton";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { SRDetails } from "@/types/sr.types";
 import { useSRDetails, useDeleteSR } from "@/hooks/use-sr";
-
-const statusLabels: Record<string, string> = {
-  REQUESTED: "요청됨",
-  INTAKE: "접수",
-  IN_PROGRESS: "진행중",
-  ON_HOLD: "대기",
-  COMPLETED: "완료",
-  CONFIRMED: "확인완료",
-  REJECTED: "거부",
-};
-
-const priorityLabels: Record<string, string> = {
-  CRITICAL: "긴급",
-  HIGH: "높음",
-  MEDIUM: "보통",
-  LOW: "낮음",
-};
+import {
+  statusLabels,
+  priorityLabels,
+} from "@/lib/constants/sr";
 
 const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
   REQUESTED: "secondary",
@@ -138,7 +126,7 @@ export default function SRDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {sr.status === "IN_PROGRESS" && hasAnyRole(["MANAGER", "ADMIN"]) && (
+          {(sr.status === "INTAKE" || sr.status === "IN_PROGRESS") && hasAnyRole(["MANAGER", "ADMIN"]) && (
             <Button variant="outline" onClick={() => router.push(`/srs/${srId}/intake`)}>
               <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
             </Button>
@@ -233,6 +221,9 @@ export default function SRDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Intake Info Card */}
+          <IntakeInfoCard sr={sr} />
 
           {/* Status History */}
           {sr.statusHistory && sr.statusHistory.length > 0 && (
