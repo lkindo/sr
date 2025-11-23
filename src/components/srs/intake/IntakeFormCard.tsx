@@ -302,7 +302,7 @@ export function IntakeFormCard({
                 ) : (
                   <>
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    {isEditMode ? "수정 완료" : "SR 접수하기"}
+                    {isEditMode ? "저장" : "저장"}
                   </>
                 )}
               </Button>

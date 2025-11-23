@@ -86,7 +86,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.waitForTimeout(500); // 선택 반영 대기
 
       // SR 생성
-      await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
+      await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(2000);
 
       // 목록에서 생성된 SR 확인
@@ -157,7 +157,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.getByLabel(/접수 메모/i).fill('엔지니어에게 배정하였습니다. 빠른 처리 부탁드립니다.');
 
       // 접수 완료
-      await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+      await page.getByRole('button', { name: /저장/i }).click();
       await page.waitForTimeout(2000);
 
       // 상세 페이지로 복귀

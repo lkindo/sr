@@ -78,7 +78,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       await page.waitForTimeout(500);
 
       // SR 생성
-      await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
+      await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(2000);
 
       // 목록에서 생성된 SR 찾기
@@ -125,7 +125,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         await page.getByLabel(/접수 메모/i).fill('초기 담당자로 Engineer A 배정');
 
         // 접수 완료
-        await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+        await page.getByRole('button', { name: /저장/i }).click();
         await page.waitForTimeout(2000);
 
         console.log(`✅ SR 접수 완료 - Engineer A 배정, 우선순위: LOW`);
@@ -189,7 +189,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         }
 
         // 저장
-        await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+        await page.getByRole('button', { name: /저장/i }).click();
         await page.waitForTimeout(2000);
 
         console.log(`✅ 담당자 재배정 완료: Engineer A → Engineer B`);
@@ -226,7 +226,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         }
 
         // 저장
-        await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+        await page.getByRole('button', { name: /저장/i }).click();
         await page.waitForTimeout(2000);
 
         console.log(`✅ 우선순위 상향 조정 완료: LOW → HIGH`);
@@ -279,7 +279,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         }
 
         // 저장
-        await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+        await page.getByRole('button', { name: /저장/i }).click();
         await page.waitForTimeout(2000);
 
         console.log(`✅ 긴급 에스컬레이션 완료: HIGH → CRITICAL`);

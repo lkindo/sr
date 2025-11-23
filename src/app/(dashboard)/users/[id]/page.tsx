@@ -14,14 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { UserDialog } from "@/components/users/UserDialog";
 import { AssignRolesDialog } from "@/components/users/AssignRolesDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -67,26 +60,26 @@ const getUserTypeLabel = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
   const hasAdminRole = user.roles.some((ur) => ur.role.name === "ADMIN");
   if (hasAdminRole) {
-    return "시스템 관리자";
+    return "시스템 운영팀";
   }
 
   // 2. 고객사에 소속되어 있으면 SR 요청자
   if (user.clients.length > 0) {
-    return "SR 요청자";
+    return "고객사 담당자";
   }
 
   // 3. 고객사에 소속되지 않았으면 SR 처리자 (엔지니어)
-  return "SR 처리자";
+  return "기술 지원팀";
 };
 
 // 유형별 배지 색상 결정
 const getUserTypeBadgeVariant = (typeLabel: string) => {
   switch (typeLabel) {
-    case "시스템 관리자":
+    case "시스템 운영팀":
       return "destructive" as const;
-    case "SR 처리자":
+    case "기술 지원팀":
       return "default" as const;
-    case "SR 요청자":
+    case "고객사 담당자":
       return "outline" as const;
     default:
       return "secondary" as const;
@@ -342,36 +335,43 @@ export default function UserDetailPage() {
           <Separator />
 
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+            <h3 className="text-sm font-medium text-muted-foreground mb-4">
               권한 목록 ({allPermissions.size}개)
             </h3>
             {allPermissions.size === 0 ? (
               <p className="text-sm text-muted-foreground">할당된 권한이 없습니다.</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>리소스</TableHead>
-                    <TableHead>액션</TableHead>
-                    <TableHead>설명</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Array.from(allPermissions.values()).map((permission) => (
-                    <TableRow key={permission.id}>
-                      <TableCell className="font-medium">
-                        <Badge variant="outline">{permission.resource}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge>{permission.action}</Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {permission.description || "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Array.from(
+                  Array.from(allPermissions.values()).reduce((acc, curr) => {
+                    if (!acc.has(curr.resource)) {
+                      acc.set(curr.resource, []);
+                    }
+                    acc.get(curr.resource)?.push(curr);
+                    return acc;
+                  }, new Map<string, Permission["permission"][]>())
+                ).map(([resource, permissions]) => (
+                  <Card key={resource} className="shadow-sm">
+                    <CardHeader className="pb-2 bg-slate-50/50 border-b px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-3.5 w-3.5 text-slate-500" />
+                        <CardTitle className="text-sm font-bold capitalize text-slate-700">
+                          {resource}
+                        </CardTitle>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-3 pb-3 px-4">
+                      <div className="flex flex-wrap gap-2">
+                        {permissions.map((p) => (
+                          <Badge key={p.id} variant="outline" className="bg-white hover:bg-slate-50 font-normal text-slate-600 border-slate-200">
+                            {p.action}
+                          </Badge>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </div>
         </CardContent>

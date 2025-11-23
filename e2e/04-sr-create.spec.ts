@@ -50,7 +50,7 @@ test.describe('SR 생성', () => {
     // 우선순위는 이미 MEDIUM이 기본값이므로 변경하지 않음
 
     // 제출
-    const submitButton = page.locator('button[type="submit"]').filter({ hasText: 'SR 요청하기' })
+    const submitButton = page.locator('button[type="submit"]').filter({ hasText: '저장' })
     await submitButton.click()
 
     // 다이얼로그가 닫힐 때까지 대기 (성공 시 닫힘)
@@ -69,7 +69,7 @@ test.describe('SR 생성', () => {
     await page.click('button:has-text("등록")')
 
     // 빈 폼으로 제출 시도
-    await page.click('button[type="submit"]:has-text("SR 요청하기")')
+    await page.click('button[type="submit"]:has-text("저장")')
 
     // 유효성 검증 메시지 확인
     await expect(page.locator('text=필수')).toBeVisible()

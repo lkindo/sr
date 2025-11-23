@@ -240,13 +240,13 @@ export function CreateSRDialog({
     } catch (error) {
       console.error(" [CreateSR] SR 생성 실패:", error);
       let errorMessage = "SR 생성에 실패했습니다.";
-      
+
       if (error instanceof Error) {
         errorMessage = error.message;
       } else if (typeof error === "object" && error !== null && "message" in error) {
         errorMessage = String(error.message);
       }
-      
+
       toast({
         title: "오류",
         description: errorMessage,
@@ -404,7 +404,7 @@ export function CreateSRDialog({
               취소
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "요청 중..." : "SR 요청하기"}
+              {loading ? "요청 중..." : "저장"}
             </Button>
           </DialogFooter>
         </form>

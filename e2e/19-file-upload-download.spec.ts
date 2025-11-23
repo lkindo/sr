@@ -145,7 +145,7 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       }
 
       // SR 생성
-      await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
+      await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(2000);
 
       // 목록에서 생성된 SR 찾기
@@ -228,7 +228,7 @@ test.describe('파일 업로드/다운로드 플로우', () => {
         await assigneeSelect.click();
         await managerPage.getByRole('option', { name: /Engineer|엔지니어/i }).first().click();
 
-        await managerPage.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+        await managerPage.getByRole('button', { name: /저장/i }).click();
         await managerPage.waitForTimeout(2000);
 
         console.log(`✅ MANAGER가 SR 접수 완료`);

@@ -68,17 +68,17 @@ const getUserTypeLabel = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
   const hasAdminRole = user.roles.some((ur) => ur.role.name === "ADMIN");
   if (hasAdminRole) {
-    return "시스템 관리자";
+    return "시스템 운영팀";
   }
 
   // 2. 엔지니어 타입이면 SR 처리자
   if (user.userType === "ENGINEER") {
-    return "SR 처리자";
+    return "기술 지원팀";
   }
 
   // 3. 고객사 타입이거나 고객사에 소속되어 있으면 SR 요청자
   if (user.userType === "CLIENT" || user.clients.length > 0) {
-    return "SR 요청자";
+    return "고객사 담당자";
   }
 
   // 기본값
@@ -88,11 +88,11 @@ const getUserTypeLabel = (user: User): string => {
 // 유형별 배지 색상 결정
 const getUserTypeBadgeVariant = (typeLabel: string) => {
   switch (typeLabel) {
-    case "시스템 관리자":
+    case "시스템 운영팀":
       return "destructive" as const;
-    case "SR 처리자":
+    case "기술 지원팀":
       return "default" as const;
-    case "SR 요청자":
+    case "고객사 담당자":
       return "outline" as const;
     default:
       return "secondary" as const;
@@ -188,7 +188,7 @@ export default function UsersPage() {
         title: "성공",
         description: `사용자가 ${!isActive ? "활성화" : "비활성화"}되었습니다.`,
       });
-      
+
       // 백그라운드에서 최신 데이터 가져오기
       fetchUsers();
     } catch (error) {
@@ -210,7 +210,7 @@ export default function UsersPage() {
     setSelectedUser(null);
     setUserDialogOpen(true);
   };
-  
+
   const onUserSaved = () => {
     fetchUsers();
     setUserDialogOpen(false);
@@ -272,8 +272,8 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">유형 전체</SelectItem>
-                  <SelectItem value="ENGINEER">SR 처리자</SelectItem>
-                  <SelectItem value="CLIENT">SR 요청자</SelectItem>
+                  <SelectItem value="ENGINEER">기술 지원팀</SelectItem>
+                  <SelectItem value="CLIENT">고객사 담당자</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -337,7 +337,7 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
               {loading && users.length === 0 ? (
-                 <TableRow><TableCell colSpan={7} className="text-center py-8">로딩 중...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center py-8">로딩 중...</TableCell></TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
@@ -389,10 +389,10 @@ export default function UsersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      {new Date(user.createdAt).toLocaleDateString("ko-KR", { 
-                        year: 'numeric', 
-                        month: '2-digit', 
-                        day: '2-digit' 
+                      {new Date(user.createdAt).toLocaleDateString("ko-KR", {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
                       }).replace(/\./g, '. ').trim()}
                     </TableCell>
                     <TableCell className="text-center">
@@ -406,7 +406,7 @@ export default function UsersPage() {
                             await update();
                             const currentRoles = session?.user?.roles || [];
                             const isAdmin = currentRoles.includes("ADMIN");
-                            
+
                             if (!isAdmin) {
                               toast({
                                 title: "권한 없음",
@@ -431,7 +431,7 @@ export default function UsersPage() {
                             await update();
                             const currentRoles = session?.user?.roles || [];
                             const hasPermission = currentRoles.includes("ADMIN") || currentRoles.includes("MANAGER");
-                            
+
                             if (!hasPermission) {
                               toast({
                                 title: "권한 없음",

@@ -80,7 +80,7 @@ test.describe('알림 시스템 통합 테스트', () => {
       await firstCategoryOption.click();
       await page.waitForTimeout(500);
 
-      await page.getByRole('button', { name: /SR 요청하기|생성|Create/i }).click();
+      await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(2000);
 
       await page.goto('/srs');
@@ -131,7 +131,7 @@ test.describe('알림 시스템 통합 테스트', () => {
 
         await page.getByLabel(/접수 메모/i).fill('엔지니어에게 배정하였습니다.');
 
-        await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+        await page.getByRole('button', { name: /저장/i }).click();
         await page.waitForTimeout(2000);
 
         console.log(`✅ MANAGER가 SR 접수 및 ENGINEER 배정 완료 (알림 발송 예정)`);

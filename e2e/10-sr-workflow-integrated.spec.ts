@@ -58,7 +58,7 @@ test.describe('SR 워크플로우 통합', () => {
     // 선택 확인
     await expect(categoryCombobox).toContainText(categoryName, { timeout: 5000 });
 
-    const createButton = page.getByRole('button', { name: /SR 요청하기|생성|Create/i });
+    const createButton = page.getByRole('button', { name: /저장|생성|Create/i });
     await expect(createButton).toBeEnabled();
     await createButton.click({ force: true });
 
@@ -121,7 +121,7 @@ test.describe('SR 워크플로우 통합', () => {
 
     await page.getByLabel(/접수 메모/i).fill('통합 테스트 접수');
 
-    await page.getByRole('button', { name: /SR 접수하기|수정 완료/i }).click();
+    await page.getByRole('button', { name: /저장/i }).click();
 
     // 접수 완료 대기
     await page.waitForTimeout(2000);
