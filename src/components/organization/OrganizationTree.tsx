@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Building2, Users, ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Building2, Users, ChevronDown, ChevronRight, Plus, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -10,12 +11,15 @@ import { UserCardContextMenu } from "./UserCardContextMenu";
 import {
     DndContext,
     DragEndEvent,
+    DragStartEvent,
+    DragOverEvent,
     PointerSensor,
     useSensor,
     useSensors,
     closestCenter,
     useDraggable,
     useDroppable,
+    DragOverlay,
 } from "@dnd-kit/core";
 
 export interface User {
@@ -51,6 +55,8 @@ interface OrganizationTreeProps {
     onToggleClientStatus?: (clientId: string) => Promise<void>;
     onToggleUserStatus?: (userId: string) => Promise<void>;
     onDragEnd?: (event: DragEndEvent) => void;
+    onDragStart?: (event: DragStartEvent) => void;
+    onDragOver?: (event: DragOverEvent) => void;
     searchQuery: string;
 }
 
@@ -78,11 +84,9 @@ function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: 
     return (
         <div
             ref={setNodeRef}
-            {...listeners}
-            {...attributes}
             className={cn(
                 "relative",
-                isDragging && "opacity-50"
+                isDragging && "opacity-30"
             )}
         >
             {/* 수평 연결선 */}
@@ -98,6 +102,15 @@ function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: 
                     href={user.id ? `/users/${user.id}` : "#"}
                     className="flex items-center gap-3 p-3 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
                 >
+                    {/* 드래그 핸들 */}
+                    <div
+                        {...listeners}
+                        {...attributes}
+                        className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+                    </div>
                     <div className="p-2 rounded-full bg-muted group-hover:bg-background shrink-0">
                         <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
                     </div>
@@ -145,10 +158,13 @@ function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: 
 
 // 드롭 가능한 고객사 헤더 컴포넌트
 function DroppableClientHeader({ client, isExpanded, onToggleClient, onAddUser, onToggleClientStatus, searchQuery, userCount }: any) {
-    const { setNodeRef, isOver } = useDroppable({
+    const { setNodeRef, isOver, active } = useDroppable({
         id: `client-${client.id}`,
         data: { clientId: client.id, client },
     });
+
+    const isDraggingUser = active?.id?.toString().startsWith('user-');
+    const isValidDrop = isOver && isDraggingUser;
 
     return (
         <ClientCardContextMenu
@@ -164,7 +180,8 @@ function DroppableClientHeader({ client, isExpanded, onToggleClient, onAddUser, 
                     isExpanded
                         ? "bg-gradient-to-r from-primary/5 to-transparent border-l-primary"
                         : "hover:bg-muted/20 border-l-transparent hover:border-l-primary/30",
-                    isOver && "bg-primary/10 border-l-primary"
+                    isValidDrop && "bg-primary/15 border-l-primary shadow-md ring-2 ring-primary/20",
+                    isOver && !isValidDrop && "bg-muted/30"
                 )}
                 onClick={() => onToggleClient(client.id)}
             >
@@ -246,6 +263,8 @@ export function OrganizationTree({
     onToggleClientStatus,
     onToggleUserStatus,
     onDragEnd,
+    onDragStart,
+    onDragOver,
     searchQuery,
 }: OrganizationTreeProps) {
     // DnD Sensors
@@ -256,6 +275,50 @@ export function OrganizationTree({
             },
         })
     );
+
+    // 드래그 중인 사용자 상태
+    const [activeUser, setActiveUser] = useState<User | null>(null);
+
+    const handleDragStart = (event: DragStartEvent) => {
+        const { active } = event;
+        const user = active.data.current?.user as User | undefined;
+        if (user) {
+            setActiveUser(user);
+        }
+        onDragStart?.(event);
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        setActiveUser(null);
+        onDragEnd?.(event);
+    };
+
+    // 드래그 프리뷰 컴포넌트
+    const renderDragPreview = () => {
+        if (!activeUser) return null;
+
+        return (
+            <div className="flex items-center gap-3 p-3 rounded-md border bg-white shadow-lg ring-2 ring-primary/20 opacity-95">
+                <div className="p-2 rounded-full bg-primary/10 shrink-0">
+                    <Users className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{activeUser.name || "이름 없음"}</p>
+                        <Badge
+                            variant={activeUser.isActive ? "default" : "secondary"}
+                            className="text-[10px] h-5 px-1.5"
+                        >
+                            {activeUser.isActive ? "활성" : "비활성"}
+                        </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                        {activeUser.email || "-"}
+                    </p>
+                </div>
+            </div>
+        );
+    };
 
     if (clients.length === 0) {
         return (
@@ -272,7 +335,9 @@ export function OrganizationTree({
         <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
-            onDragEnd={onDragEnd}
+            onDragStart={handleDragStart}
+            onDragOver={onDragOver}
+            onDragEnd={handleDragEnd}
         >
             <div className="space-y-2">
                 {clients.map((client) => {
@@ -333,6 +398,9 @@ export function OrganizationTree({
                     );
                 })}
             </div>
+            <DragOverlay>
+                {renderDragPreview()}
+            </DragOverlay>
         </DndContext>
     );
 }

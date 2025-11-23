@@ -10,7 +10,7 @@ import { ClientDialog } from "@/components/clients/ClientDialog";
 import { UserDialog } from "@/components/users/UserDialog";
 import { OrganizationTree, type Client, type User } from "@/components/organization/OrganizationTree";
 import { UserReassignDialog } from "@/components/organization/UserReassignDialog";
-import type { DragEndEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent, DragOverEvent } from "@dnd-kit/core";
 
 export default function OrganizationPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -24,6 +24,7 @@ export default function OrganizationPage() {
 
   // 드래그 앤 드롭 관련 상태
   const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
+  const [isReassigning, setIsReassigning] = useState(false);
   const [reassignData, setReassignData] = useState<{
     userId: string;
     userName: string;
@@ -175,9 +176,18 @@ export default function OrganizationPage() {
   };
 
   // 드래그 앤 드롭 핸들러
+  const handleDragStart = (event: DragStartEvent) => {
+    // 드래그 시작 시 추가 처리 (필요시)
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    // 드래그 오버 시 추가 처리 (필요시)
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
+    // 드롭 영역이 없거나 유효하지 않으면 무시
     if (!over || !active) return;
 
     const userId = active.data.current?.userId as string;
@@ -185,14 +195,31 @@ export default function OrganizationPage() {
     const user = active.data.current?.user;
     const targetClientId = over.data.current?.clientId as string;
 
+    // 드래그한 항목이 사용자가 아니면 무시
+    if (!userId || !user) return;
+
     // 같은 고객사로 드롭하면 무시
-    if (sourceClientId === targetClientId) return;
+    if (sourceClientId === targetClientId) {
+      toast({
+        title: "알림",
+        description: "같은 고객사로는 이동할 수 없습니다.",
+        variant: "default",
+      });
+      return;
+    }
 
     // 고객사 정보 찾기
     const sourceClient = clients.find(c => c.id === sourceClientId);
     const targetClient = clients.find(c => c.id === targetClientId);
 
-    if (!sourceClient || !targetClient || !user) return;
+    if (!sourceClient || !targetClient) {
+      toast({
+        title: "오류",
+        description: "고객사 정보를 찾을 수 없습니다.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // 확인 모달 열기
     setReassignData({
@@ -210,6 +237,7 @@ export default function OrganizationPage() {
   const handleConfirmReassign = async () => {
     if (!reassignData) return;
 
+    setIsReassigning(true);
     try {
       const response = await fetch(`/api/users/${reassignData.userId}/client`, {
         method: 'PATCH',
@@ -217,36 +245,47 @@ export default function OrganizationPage() {
         body: JSON.stringify({ clientId: reassignData.targetClientId }),
       });
 
-      if (!response.ok) throw new Error('Failed to reassign user');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reassign user');
+      }
 
-      //  데이터 새로고침
+      // 데이터 새로고침
       await fetchClients();
 
       // 양쪽 고객사의 사용자 목록 새로고침
-      for (const clientId of [reassignData.sourceClientId, reassignData.targetClientId]) {
-        if (expandedClients.has(clientId)) {
-          const response = await fetch(`/api/clients/${clientId}`);
-          if (response.ok) {
-            const data = await response.json();
-            setClientUsers(prev => ({
-              ...prev,
-              [clientId]: data.users || [],
-            }));
+      const refreshPromises = [reassignData.sourceClientId, reassignData.targetClientId]
+        .filter(clientId => expandedClients.has(clientId))
+        .map(async (clientId) => {
+          try {
+            const response = await fetch(`/api/clients/${clientId}`);
+            if (response.ok) {
+              const data = await response.json();
+              setClientUsers(prev => ({
+                ...prev,
+                [clientId]: data.users || [],
+              }));
+            }
+          } catch (error) {
+            console.error(`Failed to refresh users for client ${clientId}:`, error);
           }
-        }
-      }
+        });
+
+      await Promise.all(refreshPromises);
 
       toast({
         title: "성공",
         description: `${reassignData.userName}이(가) ${reassignData.targetClientName}(으)로 이동되었습니다.`,
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "소속 변경 중 오류가 발생했습니다.";
       toast({
         title: "오류",
-        description: "소속 변경 중 오류가 발생했습니다.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
+      setIsReassigning(false);
       setIsReassignDialogOpen(false);
       setReassignData(null);
     }
@@ -393,6 +432,8 @@ export default function OrganizationPage() {
             onAddUser={handleAddUser}
             onToggleClientStatus={handleToggleClientStatus}
             onToggleUserStatus={handleToggleUserStatus}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             searchQuery={debouncedSearchQuery}
           />
@@ -417,11 +458,19 @@ export default function OrganizationPage() {
       {reassignData && (
         <UserReassignDialog
           open={isReassignDialogOpen}
-          onOpenChange={setIsReassignDialogOpen}
+          onOpenChange={(open) => {
+            if (!isReassigning) {
+              setIsReassignDialogOpen(open);
+              if (!open) {
+                setReassignData(null);
+              }
+            }
+          }}
           userName={reassignData.userName}
           sourceClientName={reassignData.sourceClientName}
           targetClientName={reassignData.targetClientName}
           onConfirm={handleConfirmReassign}
+          isLoading={isReassigning}
         />
       )}
     </div>

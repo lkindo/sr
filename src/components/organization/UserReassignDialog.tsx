@@ -18,6 +18,7 @@ interface UserReassignDialogProps {
     sourceClientName: string;
     targetClientName: string;
     onConfirm: () => void;
+    isLoading?: boolean;
 }
 
 export function UserReassignDialog({
@@ -27,6 +28,7 @@ export function UserReassignDialog({
     sourceClientName,
     targetClientName,
     onConfirm,
+    isLoading = false,
 }: UserReassignDialogProps) {
     return (
         <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -50,8 +52,17 @@ export function UserReassignDialog({
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel>취소</AlertDialogCancel>
-                    <AlertDialogAction onClick={onConfirm}>확인</AlertDialogAction>
+                    <AlertDialogCancel disabled={isLoading}>취소</AlertDialogCancel>
+                    <AlertDialogAction onClick={onConfirm} disabled={isLoading}>
+                        {isLoading ? (
+                            <span className="flex items-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                처리 중...
+                            </span>
+                        ) : (
+                            "확인"
+                        )}
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
