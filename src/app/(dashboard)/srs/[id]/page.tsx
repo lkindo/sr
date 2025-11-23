@@ -26,6 +26,7 @@ import { EditSRDialog } from "@/components/srs/EditSRDialog";
 import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
 import { SRStatusActions } from "@/components/srs/SRStatusActions";
 import { IntakeInfoCard } from "@/components/srs/IntakeInfoCard";
+import { SRStatusTimeline } from "@/components/srs/SRStatusTimeline";
 import { useToast } from "@/hooks/use-toast";
 import { getSRDetailsAction } from "@/actions/sr.actions";
 import type { SR } from "@prisma/client";
@@ -225,26 +226,12 @@ export default function SRDetailPage() {
           {/* Intake Info Card */}
           <IntakeInfoCard sr={sr} />
 
-          {/* Status History */}
+          {/* Status History Timeline */}
           {sr.statusHistory && sr.statusHistory.length > 0 && (
-            <div className="p-6 bg-white rounded-lg shadow border">
-              <h3 className="text-lg font-semibold mb-4">상태 변경 이력</h3>
-              <div className="space-y-3 max-h-60 overflow-y-auto">
-                {sr.statusHistory.map((history) => (
-                  <div key={history.id} className="flex justify-between text-sm">
-                    <div>
-                      <Badge variant={statusColors[history.currentStatus]}>{statusLabels[history.currentStatus]}</Badge>
-                    </div>
-                    <div className="text-muted-foreground text-right">
-                      {history.changeReason && (
-                        <p className="text-xs mb-1 text-gray-600">{history.changeReason}</p>
-                      )}
-                      <p>{new Date(history.changedAt).toLocaleDateString("ko-KR")}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <SRStatusTimeline
+              statusHistory={sr.statusHistory}
+              currentStatus={sr.status}
+            />
           )}
         </div>
 
@@ -275,7 +262,7 @@ export default function SRDetailPage() {
         </div>
       </div>
 
-      {/* Dialogs */ }
+      {/* Dialogs */}
       <EditSRDialog
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SRService } from '../sr.service';
+import prisma from '@/lib/prisma';
 
 // Mock all repositories
 vi.mock('@/repositories/sr.repository', () => {
@@ -62,6 +63,27 @@ vi.mock('@/lib/policies/sr.policy', () => ({
     ensureCanRead = vi.fn();
     ensureCanUpdate = vi.fn();
     ensureCanDelete = vi.fn();
+  },
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock('@/lib/prisma', () => ({
+  default: {
+    $transaction: vi.fn((callback) => callback({
+      sR: { update: vi.fn(), delete: vi.fn() },
+      sRActivity: { create: vi.fn(), deleteMany: vi.fn() },
+      sRComment: { deleteMany: vi.fn() },
+      sRAttachment: { deleteMany: vi.fn() },
+      sRStatusHistory: { deleteMany: vi.fn() },
+    })),
   },
 }));
 
@@ -213,30 +235,6 @@ describe('SRService', () => {
 
       expect(result).toBeDefined();
       expect(result.id).toBe('sr1');
-    });
-  });
-
-  describe('updateSRStatus', () => {
-    it('상태 변경 시 활동 기록을 생성해야 함', async () => {
-      const sr = {
-        id: 'sr1',
-        srNumber: 'SR-20241114-0001',
-        title: 'Test SR',
-        status: 'REQUESTED',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      const updatedSR = {
-        ...sr,
-        status: 'IN_PROGRESS',
-      };
-
-      mockSRRepo.findById.mockResolvedValue(sr);
-      mockSRRepo.update.mockResolvedValue(updatedSR);
-      mockActivityRepo.create.mockResolvedValue({});
-
-      expect(true).toBe(true);
     });
   });
 
@@ -400,7 +398,6 @@ describe('SRService', () => {
       });
 
       expect(result).toBe(5);
-      // countSRs는 where를 직접 count 메서드에 전달
       expect(mockSRRepo.count).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'REQUESTED' })
       );
@@ -416,41 +413,90 @@ describe('SRService', () => {
   });
 
   describe('updateSR', () => {
-    it('SR 업데이트 시 활동 기록을 생성해야 함', async () => {
-      const existingSR = {
-        id: 'sr1',
-        srNumber: 'SR-20241114-0001',
-        title: 'Original Title',
-        description: 'Original Description',
-        status: 'REQUESTED',
-        priority: 'MEDIUM',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
+    const sessionUser = {
+      id: 'user1',
+      email: 'user@example.com',
+      name: 'Test User',
+      image: null,
+      roles: ['USER'],
+      permissions: ['sr:update'],
+    };
 
-      const updateData = {
-        title: 'Updated Title',
-        description: 'Updated Description',
-      };
+    const existingSR = {
+      id: 'sr1',
+      srNumber: 'SR-20241114-0001',
+      title: 'Original Title',
+      description: 'Original Description',
+      status: 'REQUESTED',
+      priority: 'MEDIUM',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      assigneeId: null,
+      intakeById: null,
+      resolutionDescription: null,
+      rejectionReason: null,
+    };
+
+    it('유효하지 않은 상태 변경 시 에러를 던져야 함 (REQUESTED -> COMPLETED)', async () => {
+      mockSRRepo.findById.mockResolvedValue(existingSR);
+
+      await expect(srService.updateSR('sr1', { status: 'COMPLETED' }, sessionUser))
+        .rejects.toThrow('유효하지 않은 상태 변경입니다');
+    });
+
+    it('INTAKE 상태로 변경 시 접수자가 없으면 현재 사용자로 지정해야 함', async () => {
+      mockSRRepo.findById.mockResolvedValue(existingSR);
 
       const updatedSR = {
         ...existingSR,
-        ...updateData,
-        updatedAt: new Date(),
+        status: 'INTAKE',
+        intakeById: sessionUser.id,
+        intakeAt: new Date(),
+        client: { id: 'client1', code: 'C001', name: 'Test Client' },
+        requester: { id: 'user1', name: 'Test User', email: 'user@example.com' },
+        assignee: null,
+        serviceCategory: { id: 'cat1', categoryName: 'Test Category' },
       };
 
-      mockSRRepo.findById.mockResolvedValue(existingSR);
-      mockSRRepo.update.mockResolvedValue(updatedSR);
-      mockActivityRepo.create.mockResolvedValue({});
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => {
+        return callback({
+          sR: {
+            update: vi.fn().mockResolvedValue(updatedSR)
+          },
+          sRActivity: {
+            create: vi.fn().mockResolvedValue({})
+          },
+        });
+      });
 
-      // Note: updateSR 메서드가 실제로 존재하는지 확인 필요
-      // 존재하지 않으면 이 테스트는 스킵
-      if (typeof (srService as any).updateSR === 'function') {
-        const result = await (srService as any).updateSR('sr1', updateData, { id: 'user1' });
-        expect(result).toBeDefined();
-      } else {
-        expect(true).toBe(true); // 메서드가 없으면 테스트 통과
-      }
+      const result = await srService.updateSR('sr1', { status: 'INTAKE' }, sessionUser);
+
+      expect(result.status).toBe('INTAKE');
+      expect(result.intakeById).toBe(sessionUser.id);
+      expect(result.intakeAt).toBeDefined();
+    });
+
+    it('IN_PROGRESS 상태로 변경 시 담당자가 없으면 에러를 던져야 함', async () => {
+      const intakeSR = { ...existingSR, status: 'INTAKE', intakeById: 'user1' };
+      mockSRRepo.findById.mockResolvedValue(intakeSR);
+
+      await expect(srService.updateSR('sr1', { status: 'IN_PROGRESS' }, sessionUser))
+        .rejects.toThrow('진행 상태로 변경하려면 담당자가 지정되어야 합니다');
+    });
+
+    it('COMPLETED 상태로 변경 시 처리 내용이 없으면 에러를 던져야 함', async () => {
+      const progressSR = { ...existingSR, status: 'IN_PROGRESS', assigneeId: 'user1' };
+      mockSRRepo.findById.mockResolvedValue(progressSR);
+
+      await expect(srService.updateSR('sr1', { status: 'COMPLETED' }, sessionUser))
+        .rejects.toThrow('완료 상태로 변경하려면 처리 내용을 입력해야 합니다');
+    });
+
+    it('REJECTED 상태로 변경 시 반려 사유가 없으면 에러를 던져야 함', async () => {
+      mockSRRepo.findById.mockResolvedValue(existingSR);
+
+      await expect(srService.updateSR('sr1', { status: 'REJECTED' }, sessionUser))
+        .rejects.toThrow('반려 상태로 변경하려면 반려 사유를 입력해야 합니다');
     });
   });
 
@@ -469,16 +515,19 @@ describe('SRService', () => {
       mockSRRepo.delete.mockResolvedValue(sr);
       mockActivityRepo.create.mockResolvedValue({});
 
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        return callback({
+          sRActivity: { deleteMany: vi.fn() },
+          sRComment: { deleteMany: vi.fn() },
+          sRAttachment: { deleteMany: vi.fn() },
+          sRStatusHistory: { deleteMany: vi.fn() },
+          sR: { delete: mockSRRepo.delete },
+        } as any);
+      });
+
       const result = await srService.deleteSR('sr1', { id: 'user1' } as any);
       expect(result).toBeUndefined();
-      expect(mockSRRepo.delete).toHaveBeenCalledWith('sr1');
-      expect(mockActivityRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          srId: 'sr1',
-          userId: 'user1',
-          type: 'STATUS_CHANGED',
-        })
-      );
+      expect(mockSRRepo.delete).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'sr1' } }));
     });
   });
 });
