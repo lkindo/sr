@@ -50,17 +50,31 @@ export const PATCH = withAuthAndRateLimit(async (
   const srService = new SRService();
   const updatedSR = await srService.updateSR(id, validated, session.user);
 
-  // 캐시 무효화: 상세/목록/대시보드/내요청
+  // 캐시 무효화: 상세/목록/대시보드/내요청 (병렬 처리)
   try {
-    const wide = shouldWideInvalidate()
-    await invalidateCache(srDetailKey(id));
-    // updatedSR에 client가 포함된 경우, 해당 client 기반으로 목록을 선별 무효화
-    if (!wide && (updatedSR as any).client?.id) await invalidateCachePattern(srListPatternForClient((updatedSR as any).client.id));
-    if (!wide && (updatedSR as any).status) await invalidateCachePattern(srListPatternForStatus((updatedSR as any).status));
-    if (!wide && (updatedSR as any).priority) await invalidateCachePattern(srListPatternForPriority((updatedSR as any).priority));
-    if (wide || !(updatedSR as any).client?.id) await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
-    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
-    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+    const wide = shouldWideInvalidate();
+
+    const cacheInvalidations = [
+      invalidateCache(srDetailKey(id)),
+      invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`),
+      invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
+    ];
+
+    // wide 모드에 따라 추가 무효화
+    if (!wide && (updatedSR as any).client?.id) {
+      cacheInvalidations.push(invalidateCachePattern(srListPatternForClient((updatedSR as any).client.id)));
+    }
+    if (!wide && (updatedSR as any).status) {
+      cacheInvalidations.push(invalidateCachePattern(srListPatternForStatus((updatedSR as any).status)));
+    }
+    if (!wide && (updatedSR as any).priority) {
+      cacheInvalidations.push(invalidateCachePattern(srListPatternForPriority((updatedSR as any).priority)));
+    }
+    if (wide || !(updatedSR as any).client?.id) {
+      cacheInvalidations.push(invalidateCachePattern(`${SR_LIST_PREFIX}*`));
+    }
+
+    await Promise.all(cacheInvalidations);
   } catch (e) {
     console.warn('Cache invalidation failed after SR patch:', e);
   }
@@ -78,13 +92,15 @@ export const DELETE = withAuthAndRateLimit(async (
   // Service 레이어를 통해 SR 삭제
   const srService = new SRService();
   const result = await srService.deleteSR(id, session.user);
-  
-  // 캐시 무효화: 상세/목록/대시보드/내요청
+
+  // 캐시 무효화: 상세/목록/대시보드/내요청 (병렬 처리)
   try {
-    await invalidateCache(srDetailKey(id));
-    await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
-    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
-    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+    await Promise.all([
+      invalidateCache(srDetailKey(id)),
+      invalidateCachePattern(`${SR_LIST_PREFIX}*`),
+      invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`),
+      invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
+    ]);
   } catch (e) {
     console.warn('Cache invalidation failed after SR delete:', e);
   }

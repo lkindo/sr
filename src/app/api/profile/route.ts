@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
-import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
+import { NotFoundError, BadRequestError, ValidationError, UnauthorizedError } from "@/lib/errors";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2, "이름은 최소 2자 이상이어야 합니다.").optional(),
@@ -13,7 +13,7 @@ const updateProfileSchema = z.object({
 // GET /api/profile - 현재 사용자 프로필 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
   if (!session?.user?.email) {
-    throw new BadRequestError("이메일 정보가 없습니다.");
+    throw new UnauthorizedError("유효하지 않은 세션입니다. 다시 로그인해주세요.");
   }
 
   const user = await prisma.user.findUnique({
@@ -46,7 +46,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
   });
 
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError("사용자");
   }
 
   const serializableUser = {
@@ -60,7 +60,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
 // PATCH /api/profile - 프로필 업데이트 (Rate Limit: 엄격)
 export const PATCH = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
   if (!session?.user?.email) {
-    throw new BadRequestError("이메일 정보가 없습니다.");
+    throw new UnauthorizedError("유효하지 않은 세션입니다. 다시 로그인해주세요.");
   }
 
   const body = await request.json();

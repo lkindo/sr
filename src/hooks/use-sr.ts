@@ -124,23 +124,21 @@ export function useDeleteSR() {
       });
     },
     onSuccess: (srId) => {
-      // 1. 즉시 페이지 이동 (추가 쿼리 방지)
-      router.push("/srs");
+      // 1. 쿼리 즉시 제거 (refetch 방지)
+      queryClient.setQueryData(["sr", srId], null);
+      queryClient.removeQueries({ queryKey: ["sr", srId], exact: true });
 
-      // 2. 페이지 이동 후 비동기로 캐시 정리 (타이머 사용)
-      setTimeout(() => {
-        // 삭제된 SR 관련 모든 쿼리 제거
-        queryClient.removeQueries({ queryKey: ["sr", srId] });
-
-        // SR 목록 쿼리 무효화 (목록 갱신)
-        queryClient.invalidateQueries({ queryKey: ["srs"] });
-      }, 0);
+      // 2. 목록 무효화 (목록 갱신)
+      queryClient.invalidateQueries({ queryKey: ["srs"] });
 
       // 3. 토스트 표시
       toast({
         title: "성공",
         description: "SR이 삭제되었습니다.",
       });
+
+      // 4. 캐시 정리 완료 후 페이지 이동
+      router.push("/srs");
     },
   });
 }

@@ -29,7 +29,7 @@ export const POST = withAuthAndRateLimit(async (
     const normalized = p.toUpperCase();
     return normalized === "SR:INTAKE" || normalized === "SR:CREATE";
   }) ?? false;
-  const hasIntakeRole = userRoles.some((role: string) => 
+  const hasIntakeRole = userRoles.some((role: string) =>
     ["ADMIN", "MANAGER", "ENGINEER"].includes(role)
   );
 
@@ -67,7 +67,7 @@ export const POST = withAuthAndRateLimit(async (
   ]);
 
   if (!sr) {
-    throw new NotFoundError("SR을 찾을 수 없습니다");
+    throw new NotFoundError("SR");
   }
 
   if (sr.status !== "REQUESTED") {
@@ -75,7 +75,7 @@ export const POST = withAuthAndRateLimit(async (
   }
 
   if (!assignee) {
-    throw new NotFoundError("담당자를 찾을 수 없습니다");
+    throw new NotFoundError("담당자");
   }
 
   // 4. SLA 기반 마감일 자동 계산
@@ -150,12 +150,14 @@ export const POST = withAuthAndRateLimit(async (
     }
   });
 
-  // 캐시 무효화: 상세/목록/대시보드/내요청
+  // 캐시 무효화 (병렬 처리)
   try {
-    await invalidateCache(srDetailKey(id));
-    await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
-    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
-    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+    await Promise.all([
+      invalidateCache(srDetailKey(id)),
+      invalidateCachePattern(`${SR_LIST_PREFIX}*`),
+      invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`),
+      invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
+    ]);
   } catch (e) {
     console.warn('Cache invalidation failed after SR intake create:', e);
   }
@@ -218,7 +220,7 @@ export const POST = withAuthAndRateLimit(async (
     };
 
     console.log(`[SR Intake] 담당자(${updatedSR.assignee?.email || 'N/A'})에게 SR 배정 메일 발송 시도: ${updatedSR.srNumber}`);
-    
+
     if (!updatedSR.assignee) {
       console.warn(`[SR Intake] 담당자가 없어 메일을 발송할 수 없습니다: ${updatedSR.srNumber}`);
       return NextResponse.json({
@@ -227,7 +229,7 @@ export const POST = withAuthAndRateLimit(async (
         message: "SR 접수가 완료되었습니다.",
       });
     }
-    
+
     sendSRAssignedEmail({
       to: updatedSR.assignee.email,
       srId: updatedSR.id,
@@ -337,7 +339,7 @@ export const GET = withAuthAndRateLimit(async (
   });
 
   if (!sr) {
-    throw new NotFoundError("SR을 찾을 수 없습니다");
+    throw new NotFoundError("SR");
   }
 
   return NextResponse.json(sr);
@@ -352,7 +354,7 @@ export const PATCH = withAuthAndRateLimit(async (
 
   // 1. 권한 확인: MANAGER 또는 ADMIN만 접수 정보 수정 가능
   const userRoles = session.user?.roles || [];
-  const hasPermission = userRoles.some((role: string) => 
+  const hasPermission = userRoles.some((role: string) =>
     role === "ADMIN" || role === "MANAGER"
   );
 
@@ -364,12 +366,12 @@ export const PATCH = withAuthAndRateLimit(async (
   const validated = await validateRequestBody(request, intakeUpdateSchema);
 
   // 최소 하나의 필드는 수정되어야 함 (undefined가 아닌 값이 있어야 함)
-  const hasAnyField = validated.actualPriority !== undefined || 
-                      validated.estimatedHours !== undefined || 
-                      validated.estimatedCompletionDate !== undefined || 
-                      validated.intakeNotes !== undefined || 
-                      validated.assigneeId !== undefined;
-  
+  const hasAnyField = validated.actualPriority !== undefined ||
+    validated.estimatedHours !== undefined ||
+    validated.estimatedCompletionDate !== undefined ||
+    validated.intakeNotes !== undefined ||
+    validated.assigneeId !== undefined;
+
   if (!hasAnyField) {
     throw new BadRequestError("수정할 정보를 최소 하나 이상 입력해주세요.");
   }
@@ -390,7 +392,7 @@ export const PATCH = withAuthAndRateLimit(async (
   });
 
   if (!sr) {
-    throw new NotFoundError("SR을 찾을 수 없습니다");
+    throw new NotFoundError("SR");
   }
 
   if (sr.status !== "INTAKE" && sr.status !== "IN_PROGRESS") {
@@ -425,7 +427,7 @@ export const PATCH = withAuthAndRateLimit(async (
   // 6. 담당자 조회 (변경 시)
   let newAssignee = null;
   const isAssigneeChanged = validated.assigneeId !== undefined && validated.assigneeId !== sr.assigneeId;
-  
+
   if (isAssigneeChanged && validated.assigneeId) {
     newAssignee = await prisma.user.findUnique({
       where: { id: validated.assigneeId },
@@ -437,7 +439,7 @@ export const PATCH = withAuthAndRateLimit(async (
     });
 
     if (!newAssignee) {
-      throw new NotFoundError("담당자를 찾을 수 없습니다");
+      throw new NotFoundError("담당자");
     }
   }
 
@@ -498,12 +500,14 @@ export const PATCH = withAuthAndRateLimit(async (
     }
   });
 
-  // 캐시 무효화: 상세/목록/대시보드/내요청
+  // 캐시 무효화 (병렬 처리)
   try {
-    await invalidateCache(srDetailKey(id));
-    await invalidateCachePattern(`${SR_LIST_PREFIX}*`);
-    await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
-    await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
+    await Promise.all([
+      invalidateCache(srDetailKey(id)),
+      invalidateCachePattern(`${SR_LIST_PREFIX}*`),
+      invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`),
+      invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
+    ]);
   } catch (e) {
     console.warn('Cache invalidation failed after SR intake update:', e);
   }
@@ -569,7 +573,7 @@ export const PATCH = withAuthAndRateLimit(async (
         srId: id,
         userId: session.user.id,
         type: validated.assigneeId ? $Enums.SRActivityType.ASSIGNED : $Enums.SRActivityType.REASSIGNED,
-        description: validated.assigneeId 
+        description: validated.assigneeId
           ? `담당자가 변경되었습니다: ${previousValues.assigneeName || "미배정"} → ${newAssigneeName}`
           : `담당자가 해제되었습니다: ${previousValues.assigneeName || "미배정"}`,
         metadata: {
@@ -596,7 +600,7 @@ export const PATCH = withAuthAndRateLimit(async (
         };
 
         console.log(`[SR Intake Update] 담당자(${newAssignee.email})에게 SR 배정 메일 발송 시도: ${updatedSR.srNumber}`);
-        
+
         sendSRAssignedEmail({
           to: newAssignee.email,
           srId: updatedSR.id,

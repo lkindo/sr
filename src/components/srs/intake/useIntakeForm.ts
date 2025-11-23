@@ -219,9 +219,13 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
 
       console.log("Request successful, navigating to /srs...");
 
-      // 즉시 페이지 이동 - window.location.href 사용 (가장 확실한 방법)
-      // 페이지 이동이 시작되면 토스트는 자동으로 사라지므로 토스트 표시 생략
-      window.location.href = "/srs";
+      toast({
+        title: "성공",
+        description: isEditMode ? "접수 정보가 수정되었습니다." : "SR이 접수되었습니다.",
+      });
+
+      // SPA 방식으로 페이지 이동 (전체 reload 방지)
+      router.push("/srs");
 
       // 성공 시에는 submitting을 false로 설정하지 않음 (페이지 이동 중이므로)
       // 페이지가 이동되면서 컴포넌트가 언마운트되므로 상태 업데이트 불필요
@@ -239,8 +243,8 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
       const errorMessage = error instanceof Error
         ? error.message
         : typeof error === 'string'
-        ? error
-        : "접수 처리 중 오류가 발생했습니다.";
+          ? error
+          : "접수 처리 중 오류가 발생했습니다.";
 
       toast({
         title: "오류",

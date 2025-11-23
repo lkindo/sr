@@ -31,7 +31,7 @@ export const GET = withAuthAndRateLimit(async (
   const clientWithCategories = await clientService.getClientWithDetailsAndCategories(id);
 
   if (!clientWithCategories) {
-    throw new NotFoundError("고객사를 찾을 수 없습니다.");
+    throw new NotFoundError("고객사");
   }
 
   return NextResponse.json(clientWithCategories);
@@ -65,6 +65,6 @@ export const DELETE = withAuthAndRateLimit(async (
   // Service 레이어를 통해 고객사 삭제
   const clientService = new ClientService();
   await clientService.deleteClient(id);
-  
+
   return NextResponse.json({ success: true });
 }, { preset: 'strict' }); // 1분당 5회 (민감한 작업)

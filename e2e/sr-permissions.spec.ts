@@ -120,4 +120,62 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
       test.skip();
     }
   });
+
+  test('SR 삭제 버튼 권한 확인 (ADMIN)', async ({ page }) => {
+    await page.goto('/srs');
+    await page.waitForLoadState('networkidle');
+
+    const firstSRLink = page.locator('table tbody tr a').first();
+
+    if (await firstSRLink.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const href = await firstSRLink.getAttribute('href');
+      const srId = href?.split('/').pop() || '';
+
+      await page.goto(`/srs/${srId}`);
+      await page.waitForLoadState('networkidle');
+
+      // ADMIN은 삭제 버튼이 보여야 함
+      await expect(page.getByRole('button', { name: '삭제' })).toBeVisible();
+      console.log('✅ ADMIN 권한: 삭제 버튼 표시 확인 완료');
+    } else {
+      console.log('⚠️ SR이 없어 삭제 버튼 테스트를 건너뜁니다.');
+      test.skip();
+    }
+  });
+});
+
+test.describe('SR 권한 테스트 (ENGINEER)', () => {
+  // 엔지니어 권한으로 테스트 (파일이 없으면 실패할 수 있음 - setup 의존)
+  test.use({ storageState: './playwright/.auth/engineer.json' });
+
+  test('SR 삭제 버튼 미노출 확인', async ({ page }) => {
+    // 엔지니어 인증 파일 존재 여부 확인은 어렵지만, 실패 시 원인 파악 가능
+
+    await page.goto('/srs');
+    // 로그인 페이지로 리다이렉트되면 인증 실패 (파일 없음)
+    if (page.url().includes('/login')) {
+      console.log('⚠️ 엔지니어 인증 정보가 없어 테스트를 건너뜁니다.');
+      test.skip();
+      return;
+    }
+
+    await page.waitForLoadState('networkidle');
+
+    const firstSRLink = page.locator('table tbody tr a').first();
+
+    if (await firstSRLink.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const href = await firstSRLink.getAttribute('href');
+      const srId = href?.split('/').pop() || '';
+
+      await page.goto(`/srs/${srId}`);
+      await page.waitForLoadState('networkidle');
+
+      // ENGINEER는 삭제 버튼이 보이지 않아야 함
+      await expect(page.getByRole('button', { name: '삭제' })).not.toBeVisible();
+      console.log('✅ ENGINEER 권한: 삭제 버튼 미표시 확인 완료');
+    } else {
+      console.log('⚠️ SR이 없어 삭제 버튼 테스트를 건너뜁니다.');
+      test.skip();
+    }
+  });
 });

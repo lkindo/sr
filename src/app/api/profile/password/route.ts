@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
-import { NotFoundError, BadRequestError, ValidationError } from "@/lib/errors";
+import { NotFoundError, BadRequestError, ValidationError, UnauthorizedError } from "@/lib/errors";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "현재 비밀번호를 입력하세요."),
@@ -17,7 +17,7 @@ const changePasswordSchema = z.object({
 // POST /api/profile/password - 비밀번호 변경 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
   if (!session?.user?.email) {
-    throw new BadRequestError("이메일 정보가 없습니다.");
+    throw new UnauthorizedError("유효하지 않은 세션입니다. 다시 로그인해주세요.");
   }
 
   const body = await request.json();
@@ -42,7 +42,7 @@ export const POST = withAuthAndRateLimit(async (request: NextRequest, { session 
   });
 
   if (!user) {
-    throw new NotFoundError("User not found");
+    throw new NotFoundError("사용자");
   }
 
   // 현재 비밀번호 확인
@@ -52,7 +52,7 @@ export const POST = withAuthAndRateLimit(async (request: NextRequest, { session 
   );
 
   if (!isPasswordValid) {
-    throw new BadRequestError("현재 비밀번호가 올바르지 않습니다.");
+    throw new UnauthorizedError("현재 비밀번호가 올바르지 않습니다.");
   }
 
   // 새 비밀번호 해시화

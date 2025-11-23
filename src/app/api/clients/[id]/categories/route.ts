@@ -86,7 +86,7 @@ export const POST = withAuthAndRateLimit(async (
   });
 
   if (!client) {
-    throw new NotFoundError("고객사를 찾을 수 없습니다.");
+    throw new NotFoundError("고객사");
   }
 
   // 카테고리 생성

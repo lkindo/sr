@@ -158,9 +158,11 @@ export default function SRDetailPage() {
           >
             <Pencil className="mr-2 h-4 w-4" /> 수정
           </Button>
-          <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive">
-            <Trash2 className="mr-2 h-4 w-4" /> 삭제
-          </Button>
+          {hasAnyRole(["ADMIN", "MANAGER", "CLIENT_ADMIN"]) && (
+            <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive">
+              <Trash2 className="mr-2 h-4 w-4" /> 삭제
+            </Button>
+          )}
         </div>
       </div>
 

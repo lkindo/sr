@@ -265,7 +265,7 @@ export default function UsersPage() {
               {/* 유형 필터 */}
               <Select value={userTypeFilter} onValueChange={(value) => {
                 setUserTypeFilter(value);
-                setTimeout(() => fetchUsers(), 0);
+                // fetchUsers는 useEffect의 의존성 배열을 통해 자동 호출됨
               }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="유형 전체" />
@@ -280,7 +280,7 @@ export default function UsersPage() {
               {/* 역할 필터 */}
               <Select value={roleFilter} onValueChange={(value) => {
                 setRoleFilter(value);
-                setTimeout(() => fetchUsers(), 0);
+                // fetchUsers는 useEffect의 의존성 배열을 통해 자동 호출됨
               }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="역할 전체" />
@@ -298,7 +298,7 @@ export default function UsersPage() {
               {/* 상태 필터 */}
               <Select value={statusFilter} onValueChange={(value) => {
                 setStatusFilter(value);
-                setTimeout(() => fetchUsers(), 0);
+                // fetchUsers는 useEffect의 의존성 배열을 통해 자동 호출됨
               }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="상태 전체" />

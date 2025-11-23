@@ -31,7 +31,7 @@ export async function GET() {
         status: "unhealthy",
         database: {
           connected: false,
-          error: error instanceof Error ? error.message : "Unknown error",
+          error: error instanceof Error ? error.message : "알 수 없는 오류",
         },
         timestamp: new Date().toISOString(),
       },

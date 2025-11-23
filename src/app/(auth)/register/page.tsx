@@ -36,7 +36,7 @@ export default function RegisterPage() {
         setSuccess(result.message || "");
         setTimeout(() => {
           router.push("/login");
-        }, 2000);
+        }, 500); // 500ms 후 로그인 페이지로 이동
       } else {
         setError(result.error || "");
       }

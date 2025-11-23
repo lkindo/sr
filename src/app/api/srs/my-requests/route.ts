@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json(
-        { error: "Unauthorized" },
+        { error: "인증이 필요합니다" },
         { status: 401 }
       );
     }
@@ -55,57 +55,7 @@ export async function GET(request: NextRequest) {
     const cacheKey = myRequestsKey(session.user.id, status, sortBy);
     const srs = await (isCacheAvailable()
       ? withCache(cacheKey, async () => {
-          return await prisma.sR.findMany({
-            where,
-            orderBy,
-            select: {
-              id: true,
-              srNumber: true,
-              title: true,
-              description: true,
-              status: true,
-              requestedPriority: true,
-              actualPriority: true,
-              requestedCompletionDate: true,
-              estimatedCompletionDate: true,
-              dueDate: true,
-              createdAt: true,
-              updatedAt: true,
-              intakeAt: true,
-              completedAt: true,
-              client: {
-                select: {
-                  id: true,
-                  code: true,
-                  name: true,
-                }
-              },
-              serviceCategory: {
-                select: {
-                  id: true,
-                  categoryName: true,
-                  slaHours: true,
-                  priority: true,
-                }
-              },
-              assignee: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                }
-              },
-              intakeBy: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                }
-              },
-            }
-          })
-        }, { ttlSeconds: 60, namespace: 'sr' })
-      : prisma.sR.findMany({
+        return await prisma.sR.findMany({
           where,
           orderBy,
           select: {
@@ -153,7 +103,57 @@ export async function GET(request: NextRequest) {
               }
             },
           }
-        }));
+        })
+      }, { ttlSeconds: 60, namespace: 'sr' })
+      : prisma.sR.findMany({
+        where,
+        orderBy,
+        select: {
+          id: true,
+          srNumber: true,
+          title: true,
+          description: true,
+          status: true,
+          requestedPriority: true,
+          actualPriority: true,
+          requestedCompletionDate: true,
+          estimatedCompletionDate: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+          intakeAt: true,
+          completedAt: true,
+          client: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            }
+          },
+          serviceCategory: {
+            select: {
+              id: true,
+              categoryName: true,
+              slaHours: true,
+              priority: true,
+            }
+          },
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+          intakeBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            }
+          },
+        }
+      }));
 
     // 별도로 각 SR에 대한 카운트 정보 조회
     const srIds = srs.map(sr => sr.id);
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
         _all: true
       }
     });
-    
+
     const attachmentCounts = await prisma.sRAttachment.groupBy({
       by: ['srId'],
       where: {
@@ -176,19 +176,19 @@ export async function GET(request: NextRequest) {
         _all: true
       }
     });
-    
+
     // 카운트 정보 매핑
     const commentCountsMap: Record<string, number> = {};
     const attachmentCountsMap: Record<string, number> = {};
-    
+
     counts.forEach(count => {
       commentCountsMap[count.srId] = count._count._all;
     });
-    
+
     attachmentCounts.forEach(count => {
       attachmentCountsMap[count.srId] = count._count._all;
     });
-    
+
     // 각 SR에 카운트 정보 추가
     const srsWithCounts = srs.map(sr => ({
       ...sr,

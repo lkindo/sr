@@ -34,7 +34,7 @@ export const POST = withAuthAndRateLimit(async (
   });
 
   if (!user) {
-    throw new NotFoundError("사용자를 찾을 수 없습니다.");
+    throw new NotFoundError("사용자");
   }
 
   // Delete existing roles

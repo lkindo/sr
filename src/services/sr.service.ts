@@ -11,6 +11,7 @@ import { AuthenticatedUser } from "@/types/session";
 import { SRPolicy } from "@/lib/policies/sr.policy";
 import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from "@/types/sr.types";
 import prisma from "@/lib/prisma";
+import { NotFoundError } from "@/lib/errors";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -133,7 +134,7 @@ export class SRService {
     try {
       const validated = srUpdateSchema.parse(data);
       const existingSR = await this.srRepository.findById(id);
-      if (!existingSR) throw new Error("SR을 찾을 수 없습니다.");
+      if (!existingSR) throw new NotFoundError("SR을 찾을 수 없습니다.");
 
       this.srPolicy.ensureCanUpdate(sessionUser, existingSR);
 
@@ -278,7 +279,7 @@ export class SRService {
 
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
     const existingSR = await this.srRepository.findById(id);
-    if (!existingSR) throw new Error("SR을 찾을 수 없습니다.");
+    if (!existingSR) throw new NotFoundError("SR");
     this.srPolicy.ensureCanDelete(sessionUser);
 
     // 트랜잭션으로 관련 데이터와 함께 삭제
@@ -296,50 +297,50 @@ export class SRService {
   /**
  * SR 상태 변경 이력 조회 (페이징 지원)
  */
-async getStatusHistory(
-  srId: string,
-  options?: {
-    skip?: number;
-    take?: number;
-  }
-): Promise<{
-  items: Array<{
-    id: string;
-    previousStatus: string | null;
-    currentStatus: string;
-    changedAt: Date;
-    changeReason: string | null;
-    user: {
+  async getStatusHistory(
+    srId: string,
+    options?: {
+      skip?: number;
+      take?: number;
+    }
+  ): Promise<{
+    items: Array<{
       id: string;
-      name: string;
-      email: string;
-      image: string | null;
-    };
-  }>;
-  total: number;
-}> {
-  const { skip = 0, take = 20 } = options ||{};
-  const [items, total] = await Promise.all([
-    prisma.sRStatusHistory.findMany({
-      where: { srId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
+      previousStatus: string | null;
+      currentStatus: string;
+      changedAt: Date;
+      changeReason: string | null;
+      user: {
+        id: string;
+        name: string;
+        email: string;
+        image: string | null;
+      };
+    }>;
+    total: number;
+  }> {
+    const { skip = 0, take = 20 } = options || {};
+    const [items, total] = await Promise.all([
+      prisma.sRStatusHistory.findMany({
+        where: { srId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+            },
           },
         },
-      },
-      orderBy: { changedAt: "desc" },
-      skip,
-      take,
-    }),
-    prisma.sRStatusHistory.count({
-      where: { srId },
-    }),
-  ]);
-  return { items, total };
-}
+        orderBy: { changedAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.sRStatusHistory.count({
+        where: { srId },
+      }),
+    ]);
+    return { items, total };
+  }
 }
