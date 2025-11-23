@@ -16,7 +16,7 @@ export class UserService {
     private userRepository: UserRepository = new UserRepository(),
     private roleRepository: RoleRepository = new RoleRepository(),
     private clientRepository: ClientRepository = new ClientRepository()
-  ) {}
+  ) { }
 
   async getUserById(id: string) {
     return this.userRepository.findDetailsById(id);
@@ -37,23 +37,29 @@ export class UserService {
     roleId?: string;
     role?: string;
     clientId?: string;
-  }): Promise<User[]> {
+  }, params?: {
+    skip?: number;
+    take?: number;
+    orderBy?: any;
+  }): Promise<{ data: User[]; total: number }> {
     if (filters && Object.keys(filters).length > 0) {
-      return this.userRepository.findAllWithFilters(filters);
+      const [data, total] = await this.userRepository.findAllWithFilters(filters, params);
+      return { data, total };
     }
-    return this.userRepository.findAll();
+    const [data, total] = await this.userRepository.findAllPaginated(params);
+    return { data, total };
   }
 
   async updateUser(id: string, data: UserUpdateData): Promise<User> {
     const validated = userUpdateSchema.parse(data);
     const { clientIds, ...updateData } = validated;
-    
+
     const user = await this.userRepository.update(id, updateData);
-    
+
     if (clientIds) {
       await this.userRepository.updateClientAssociations(id, clientIds);
     }
-    
+
     return user;
   }
 
@@ -93,7 +99,7 @@ export class UserService {
     clientIds?: string[];
   }): Promise<User> {
     const hashedPassword = await hash(userData.password, 10);
-    
+
     const user = await this.userRepository.create({
       email: userData.email,
       name: userData.name,
@@ -104,7 +110,7 @@ export class UserService {
 
     // 클라이언트 연결 (clientIds 우선, 없으면 clientId 호환성 지원)
     const clientIds = userData.clientIds || (userData.clientId ? [userData.clientId] : []);
-    
+
     if (clientIds.length > 0) {
       await this.userRepository.updateClientAssociations(user.id, clientIds);
     }

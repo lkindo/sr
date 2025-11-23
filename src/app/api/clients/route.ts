@@ -9,13 +9,38 @@ export const runtime = 'nodejs';
 
 // GET /api/clients - 모든 고객사 조회 (Rate Limit: 표준)
 // 페이지네이션 지원: ?page=1&pageSize=20&sortBy=name&sortOrder=asc
+// GET /api/clients - 모든 고객사 조회 (Rate Limit: 표준)
+// 페이지네이션 지원: ?page=1&pageSize=20&sortBy=name&sortOrder=asc
 export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
+  const { searchParams } = new URL(request.url);
   const { skip, take, orderBy, createResponse } = usePagination(request);
+
+  const search = searchParams.get("search");
+  const industry = searchParams.get("industry");
+  const isActive = searchParams.get("isActive");
+
+  const where: any = {};
+
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { code: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  if (industry && industry !== "all") {
+    where.industry = industry;
+  }
+
+  if (isActive !== null && isActive !== undefined && isActive !== "all") {
+    where.isActive = isActive === "true";
+  }
 
   const [clients, totalCount] = await Promise.all([
     prisma.client.findMany({
       skip,
       take,
+      where,
       orderBy: orderBy as any,
       include: {
         _count: {
@@ -26,7 +51,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
         },
       },
     }),
-    prisma.client.count(),
+    prisma.client.count({ where }),
   ]);
 
   return NextResponse.json(createResponse(clients, totalCount));

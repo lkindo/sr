@@ -42,21 +42,21 @@ interface MenuSection {
 const menuStructure: Record<string, MenuSection[]> = {
   "/dashboard": [],
   "/srs": [
+    {
+      title: "SR 관리",
+      items: [
         {
-          title: "SR 관리",
-          items: [
-            {
-              title: "내 요청 SR",
-              href: "/my-requests",
-              icon: ClipboardList,
-            },
-            {
-              title: "SR 전체 목록",
-              href: "/srs",
-              icon: ListChecks,
-            },
-          ],
+          title: "내 요청 SR",
+          href: "/my-requests",
+          icon: ClipboardList,
         },
+        {
+          title: "SR 전체 목록",
+          href: "/srs",
+          icon: ListChecks,
+        },
+      ],
+    },
   ],
   "/organization": [
     {
@@ -83,32 +83,7 @@ const menuStructure: Record<string, MenuSection[]> = {
       ],
     },
   ],
-  "/clients": [
-    {
-      title: "고객사 관리",
-      items: [
-        {
-          title: "고객사 목록",
-          href: "/clients",
-          icon: Building2,
-          roles: ["ADMIN", "MANAGER", "ENGINEER"],
-        },
-      ],
-    },
-  ],
-  "/users": [
-    {
-      title: "사용자 관리",
-      items: [
-        {
-          title: "사용자 목록",
-          href: "/users",
-          icon: Users,
-          roles: ["ADMIN", "MANAGER", "ENGINEER"],
-        },
-      ],
-    },
-  ],
+
   "/roles": [
     {
       title: "권한 관리",
@@ -201,8 +176,7 @@ export function Sidebar() {
           <h2 className="text-lg font-medium text-white">
             {activeTopMenu === "/srs" && "SR 관리"}
             {activeTopMenu === "/organization" && "조직 관리"}
-            {activeTopMenu === "/clients" && "고객사 관리"}
-            {activeTopMenu === "/users" && "사용자 관리"}
+
             {activeTopMenu === "/roles" && "권한 관리"}
             {activeTopMenu === "/settings" && "설정"}
           </h2>

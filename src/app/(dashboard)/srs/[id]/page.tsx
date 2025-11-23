@@ -275,8 +275,10 @@ export default function SRDetailPage() {
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         sr={sr}
-        onDeleted={handleSRDeleted}
+        onDelete={async (srId) => {
+          await deleteMutation.mutateAsync(srId);
+        }}
       />
-    </div >
+    </div>
   );
 }

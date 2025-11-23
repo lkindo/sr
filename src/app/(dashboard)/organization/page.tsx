@@ -1,41 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Building2, Users, ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
+import { Building2, Users, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useDebounce } from "@/hooks/use-debounce";
 import { ClientDialog } from "@/components/clients/ClientDialog";
 import { UserDialog } from "@/components/users/UserDialog";
-
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  isActive: boolean;
-  roles: Array<{
-    role: {
-      name: string;
-    };
-  }>;
-}
-
-interface Client {
-  id: string;
-  code: string;
-  name: string;
-  industry?: string;
-  isActive: boolean;
-  users: Array<{
-    user: User;
-  }>;
-  _count?: {
-    users: number;
-    srs: number;
-  };
-}
+import { OrganizationTree, type Client, type User } from "@/components/organization/OrganizationTree";
+import { UserReassignDialog } from "@/components/organization/UserReassignDialog";
+import type { DragEndEvent } from "@dnd-kit/core";
 
 export default function OrganizationPage() {
   const [clients, setClients] = useState<Client[]>([]);
@@ -46,6 +21,18 @@ export default function OrganizationPage() {
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
+
+  // 드래그 앤 드롭 관련 상태
+  const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
+  const [reassignData, setReassignData] = useState<{
+    userId: string;
+    userName: string;
+    sourceClientId: string;
+    sourceClientName: string;
+    targetClientId: string;
+    targetClientName: string;
+  } | null>(null);
+
   const { toast } = useToast();
 
   useEffect(() => {
@@ -83,12 +70,6 @@ export default function OrganizationPage() {
           const response = await fetch(`/api/clients/${clientId}`);
           if (response.ok) {
             const data = await response.json();
-            // API returns users as UserClient objects ({ user: User }), we need to extract user objects
-            // But wait, the interface for User in this file matches what we want to display?
-            // The API returns { users: [{ user: { ... } }] }
-            // Let's store the whole structure or transform it.
-            // The render loop expects { user: User }.
-            // Let's store the array directly from data.users
             setClientUsers((prev) => ({
               ...prev,
               [clientId]: data.users || [],
@@ -97,9 +78,9 @@ export default function OrganizationPage() {
         } catch (error) {
           console.error("Failed to fetch client users:", error);
           toast({
-             title: "오류",
-             description: "사용자 정보를 불러오는데 실패했습니다.",
-             variant: "destructive",
+            title: "오류",
+            description: "사용자 정보를 불러오는데 실패했습니다.",
+            variant: "destructive",
           });
         }
       }
@@ -127,10 +108,191 @@ export default function OrganizationPage() {
     setSelectedClient(null);
   };
 
+  // 고객사 상태 변경 핸들러
+  const handleToggleClientStatus = async (clientId: string) => {
+    try {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return;
+
+      const response = await fetch(`/api/clients/${clientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !client.isActive }),
+      });
+
+      if (!response.ok) throw new Error('Failed to update client status');
+
+      await fetchClients();
+      toast({
+        title: "성공",
+        description: `${client.name}이(가) ${client.isActive ? "비활성화" : "활성화"}되었습니다.`,
+      });
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "상태 변경 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 사용자 상태 변경 핸들러
+  const handleToggleUserStatus = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: undefined }), // Toggle will be handled by API
+      });
+
+      if (!response.ok) throw new Error('Failed to update user status');
+
+      // Refresh all data
+      await fetchClients();
+      // Reload users for expanded clients
+      for (const clientId of Array.from(expandedClients)) {
+        const response = await fetch(`/api/clients/${clientId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setClientUsers((prev) => ({
+            ...prev,
+            [clientId]: data.users || [],
+          }));
+        }
+      }
+
+      toast({
+        title: "성공",
+        description: "사용자 상태가 변경되었습니다.",
+      });
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "상태 변경 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // 드래그 앤 드롭 핸들러
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (!over || !active) return;
+
+    const userId = active.data.current?.userId as string;
+    const sourceClientId = active.data.current?.sourceClientId as string;
+    const user = active.data.current?.user;
+    const targetClientId = over.data.current?.clientId as string;
+
+    // 같은 고객사로 드롭하면 무시
+    if (sourceClientId === targetClientId) return;
+
+    // 고객사 정보 찾기
+    const sourceClient = clients.find(c => c.id === sourceClientId);
+    const targetClient = clients.find(c => c.id === targetClientId);
+
+    if (!sourceClient || !targetClient || !user) return;
+
+    // 확인 모달 열기
+    setReassignData({
+      userId,
+      userName: user.name,
+      sourceClientId,
+      sourceClientName: sourceClient.name,
+      targetClientId,
+      targetClientName: targetClient.name,
+    });
+    setIsReassignDialogOpen(true);
+  };
+
+  // 소속 변경 확인
+  const handleConfirmReassign = async () => {
+    if (!reassignData) return;
+
+    try {
+      const response = await fetch(`/api/users/${reassignData.userId}/client`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: reassignData.targetClientId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to reassign user');
+
+      //  데이터 새로고침
+      await fetchClients();
+
+      // 양쪽 고객사의 사용자 목록 새로고침
+      for (const clientId of [reassignData.sourceClientId, reassignData.targetClientId]) {
+        if (expandedClients.has(clientId)) {
+          const response = await fetch(`/api/clients/${clientId}`);
+          if (response.ok) {
+            const data = await response.json();
+            setClientUsers(prev => ({
+              ...prev,
+              [clientId]: data.users || [],
+            }));
+          }
+        }
+      }
+
+      toast({
+        title: "성공",
+        description: `${reassignData.userName}이(가) ${reassignData.targetClientName}(으)로 이동되었습니다.`,
+      });
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "소속 변경 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsReassignDialogOpen(false);
+      setReassignData(null);
+    }
+  };
+
+  // Debounce search query
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  // 검색어가 있을 때 일치하는 고객사 또는 해당 고객사의 사용자가 일치하는 경우 자동 펼침
+  useEffect(() => {
+    if (debouncedSearchQuery) {
+      const matchingClientIds = new Set<string>();
+
+      clients.forEach((client) => {
+        // 고객사 이름이나 코드가 일치하면 펼침
+        const clientMatches =
+          client.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+          client.code.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+
+        if (clientMatches) {
+          matchingClientIds.add(client.id);
+        }
+
+        // 사용자 이름이나 이메일이 일치하면 해당 고객사 펼침
+        const users = clientUsers[client.id] || [];
+        const userMatches = users.some((uc: any) => {
+          const user = uc.user || uc;
+          return (
+            user.name?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+            user.email?.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+          );
+        });
+
+        if (userMatches) {
+          matchingClientIds.add(client.id);
+        }
+      });
+
+      setExpandedClients(matchingClientIds);
+    }
+  }, [debouncedSearchQuery, clients, clientUsers]);
+
   const filteredClients = clients.filter((client) =>
-    searchQuery
-      ? client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        client.code.toLowerCase().includes(searchQuery.toLowerCase())
+    debouncedSearchQuery
+      ? client.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      client.code.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
       : true
   );
 
@@ -222,140 +384,18 @@ export default function OrganizationPage() {
           </div>
         </div>
 
-        <div className="px-6 py-5 space-y-2">
-          {filteredClients.length === 0 ? (
-            <div className="text-center py-12">
-              <Building2 className="h-16 w-16 mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-muted-foreground">
-                {searchQuery ? "검색 결과가 없습니다." : "등록된 고객사가 없습니다."}
-              </p>
-            </div>
-          ) : (
-            filteredClients.map((client) => {
-              const isExpanded = expandedClients.has(client.id);
-              const userCount = client._count?.users || 0;
-
-              return (
-                <div key={client.id} className="border rounded-lg overflow-hidden">
-                  {/* 고객사 헤더 */}
-                  <div className="flex items-center gap-3 p-4 bg-muted/20 hover:bg-muted/30 transition-colors">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleClient(client.id)}
-                      className="h-8 w-8 p-0 shrink-0"
-                    >
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-
-                    <Building2 className="h-5 w-5 text-primary shrink-0" />
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/clients/${client.id}`}
-                          className="font-semibold text-[hsl(var(--sr-primary-dark))] hover:underline truncate"
-                        >
-                          {client.name}
-                        </Link>
-                        <Badge variant="outline" className="shrink-0">
-                          {client.code}
-                        </Badge>
-                        {client.industry && (
-                          <Badge variant="secondary" className="shrink-0">
-                            {client.industry}
-                          </Badge>
-                        )}
-                        <Badge
-                          variant={client.isActive ? "default" : "secondary"}
-                          className="shrink-0"
-                        >
-                          {client.isActive ? "활성" : "비활성"}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {userCount}명
-                      </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddUser(client.id)}
-                      >
-                        <Plus className="h-4 w-4 mr-1" />
-                        사용자 추가
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* 사용자 목록 */}
-                  {isExpanded && (
-                    <div className="p-4 bg-background space-y-2">
-                      {userCount === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          등록된 사용자가 없습니다.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {(clientUsers[client.id] || []).map((uc: any) => (
-                            <Link
-                              key={uc.user?.id || Math.random()} 
-                              href={uc.user?.id ? `/users/${uc.user.id}` : "#"}
-                              className="flex items-center gap-3 p-3 rounded-md border hover:bg-accent transition-colors"
-                            >
-                              <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {uc.user?.name || "이름 없음"}
-                                </p>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {uc.user?.email || "-"}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                {uc.user?.roles?.slice(0, 2).map((ur: any) => (
-                                  <Badge
-                                    key={ur.role.name}
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
-                                    {ur.role.name}
-                                  </Badge>
-                                ))}
-                                {uc.user?.roles?.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{uc.user.roles.length - 2}
-                                  </Badge>
-                                )}
-                                <Badge
-                                  variant={uc.user?.isActive ? "default" : "secondary"}
-                                  className="text-xs"
-                                >
-                                  {uc.user?.isActive ? "활성" : "비활성"}
-                                </Badge>
-                              </div>
-                            </Link>
-                          ))}
-                          {!clientUsers[client.id] && userCount > 0 && (
-                             <div className="text-center py-4 text-sm text-muted-foreground">
-                               사용자 정보 로딩 중...
-                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+        <div className="px-6 py-5">
+          <OrganizationTree
+            clients={filteredClients}
+            expandedClients={expandedClients}
+            clientUsers={clientUsers}
+            onToggleClient={toggleClient}
+            onAddUser={handleAddUser}
+            onToggleClientStatus={handleToggleClientStatus}
+            onToggleUserStatus={handleToggleUserStatus}
+            onDragEnd={handleDragEnd}
+            searchQuery={debouncedSearchQuery}
+          />
         </div>
       </div>
 
@@ -373,6 +413,17 @@ export default function OrganizationPage() {
         onSaved={handleUserSaved}
         defaultClientId={selectedClient || undefined}
       />
+
+      {reassignData && (
+        <UserReassignDialog
+          open={isReassignDialogOpen}
+          onOpenChange={setIsReassignDialogOpen}
+          userName={reassignData.userName}
+          sourceClientName={reassignData.sourceClientName}
+          targetClientName={reassignData.targetClientName}
+          onConfirm={handleConfirmReassign}
+        />
+      )}
     </div>
   );
 }

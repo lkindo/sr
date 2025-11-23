@@ -69,6 +69,13 @@ interface Client {
   code: string;
 }
 
+interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 // 사용자 유형 판별 함수
 const getUserTypeLabel = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
@@ -107,21 +114,29 @@ const getUserTypeBadgeVariant = (typeLabel: string) => {
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
-  const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [clientFilter, setClientFilter] = useState<string>("all");
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "grouped">("list");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const { toast} = useToast();
+
+  // Pagination & Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [pagination, setPagination] = useState<PaginationMeta>({
+    page: 1,
+    pageSize: 10,
+    total: 0,
+    totalPages: 0,
+  });
+
+  const { toast } = useToast();
   const { hasRole, hasAnyRole } = usePermissions();
   const { data: session, update } = useSession();
 
@@ -129,6 +144,8 @@ export default function UsersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      params.append("page", pagination.page.toString());
+      params.append("pageSize", pagination.pageSize.toString());
       if (searchQuery) params.append("search", searchQuery);
       if (userTypeFilter !== "all") params.append("userType", userTypeFilter);
       if (roleFilter !== "all") params.append("roleId", roleFilter);
@@ -137,9 +154,14 @@ export default function UsersPage() {
 
       const response = await fetch(`/api/users?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch users");
-      const data = await response.json();
-      setUsers(data);
-      setFilteredUsers(data); // Assuming the API does the filtering
+      const result = await response.json();
+
+      setUsers(result.data);
+      setPagination(prev => ({
+        ...prev,
+        total: result.meta.total,
+        totalPages: result.meta.totalPages,
+      }));
     } catch (error) {
       toast({
         title: "오류",
@@ -149,7 +171,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, userTypeFilter, roleFilter, statusFilter, clientFilter, toast]);
+  }, [pagination.page, pagination.pageSize, searchQuery, userTypeFilter, roleFilter, statusFilter, clientFilter, toast]);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -203,11 +225,6 @@ export default function UsersPage() {
           user.id === userId ? { ...user, isActive: updatedUser.isActive ?? !isActive } : user
         )
       );
-      setFilteredUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.id === userId ? { ...user, isActive: updatedUser.isActive ?? !isActive } : user
-        )
-      );
 
       toast({
         title: "성공",
@@ -242,13 +259,17 @@ export default function UsersPage() {
     setAssignRolesDialogOpen(false);
   };
 
+  const handlePageChange = (newPage: number) => {
+    setPagination(prev => ({ ...prev, page: newPage }));
+  };
+
   // 고객사별로 사용자 그룹핑
   const groupedUsers = useCallback(() => {
     const groups: Record<string, User[]> = {
       "고객사 없음": [],
     };
 
-    filteredUsers.forEach((user) => {
+    users.forEach((user) => {
       if (user.clients.length === 0) {
         groups["고객사 없음"].push(user);
       } else {
@@ -263,16 +284,8 @@ export default function UsersPage() {
     });
 
     return groups;
-  }, [filteredUsers]);
+  }, [users]);
 
-
-  if (loading && users.length === 0) { // 초기 로딩 시에만 전체 화면 로딩 표시
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -323,7 +336,7 @@ export default function UsersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    fetchUsers();
+                    setPagination(prev => ({ ...prev, page: 1 }));
                   }
                 }}
                 className="pl-10 sr-input-template"
@@ -336,6 +349,7 @@ export default function UsersPage() {
               <Select value={clientFilter} onValueChange={(value) => {
                 setClientFilter(value);
                 setClientSearchQuery("");
+                setPagination(prev => ({ ...prev, page: 1 }));
               }}>
                 <SelectTrigger className="w-[180px] sr-dropdown-template">
                   <SelectValue placeholder="고객사 전체" />
@@ -355,7 +369,7 @@ export default function UsersPage() {
                     .filter((client) =>
                       clientSearchQuery
                         ? client.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-                          client.code.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                        client.code.toLowerCase().includes(clientSearchQuery.toLowerCase())
                         : true
                     )
                     .map((client) => (
@@ -369,7 +383,7 @@ export default function UsersPage() {
               {/* 유형 필터 */}
               <Select value={userTypeFilter} onValueChange={(value) => {
                 setUserTypeFilter(value);
-                // fetchUsers는 useEffect의 의존성 배열을 통해 자동 호출됨
+                setPagination(prev => ({ ...prev, page: 1 }));
               }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="유형 전체" />
@@ -384,7 +398,7 @@ export default function UsersPage() {
               {/* 역할 필터 */}
               <Select value={roleFilter} onValueChange={(value) => {
                 setRoleFilter(value);
-                // fetchUsers는 useEffect의 의존성 배열을 통해 자동 호출됨
+                setPagination(prev => ({ ...prev, page: 1 }));
               }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="역할 전체" />
@@ -402,7 +416,7 @@ export default function UsersPage() {
               {/* 상태 필터 */}
               <Select value={statusFilter} onValueChange={(value) => {
                 setStatusFilter(value);
-                // fetchUsers는 useEffect의 의존성 배열을 통해 자동 호출됨
+                setPagination(prev => ({ ...prev, page: 1 }));
               }}>
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="상태 전체" />
@@ -421,7 +435,7 @@ export default function UsersPage() {
         {/* Total Count - 테이블 바로 위 */}
         <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
           <div className="text-sm text-muted-foreground">
-            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{filteredUsers.length}</span> items
+            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{pagination.total}</span> items
           </div>
         </div>
 
@@ -429,162 +443,167 @@ export default function UsersPage() {
         {viewMode === "list" ? (
           <div className="overflow-x-auto">
             <Table className="sr-table-template">
-            <TableHeader>
-              <TableRow>
-                <TableHead>이름</TableHead>
-                <TableHead>이메일</TableHead>
-                <TableHead>유형</TableHead>
-                <TableHead>고객사</TableHead>
-                <TableHead>역할</TableHead>
-                <TableHead>상태</TableHead>
-                <TableHead>가입일</TableHead>
-                <TableHead>작업</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading && users.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">로딩 중...</TableCell></TableRow>
-              ) : filteredUsers.length === 0 ? (
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    {searchQuery
-                      ? "검색 결과가 없습니다."
-                      : "등록된 사용자가 없습니다."}
-                  </TableCell>
+                  <TableHead>이름</TableHead>
+                  <TableHead>이메일</TableHead>
+                  <TableHead>유형</TableHead>
+                  <TableHead>고객사</TableHead>
+                  <TableHead>역할</TableHead>
+                  <TableHead>상태</TableHead>
+                  <TableHead>가입일</TableHead>
+                  <TableHead>작업</TableHead>
                 </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell className="font-medium text-center">
-                      <Link
-                        href={`/users/${user.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        {user.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell className="text-center">
-                      {(() => {
-                        const typeLabel = getUserTypeLabel(user);
-                        return (
-                          <Badge variant={getUserTypeBadgeVariant(typeLabel)}>
-                            {typeLabel}
-                          </Badge>
-                        );
-                      })()}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex gap-1 flex-wrap justify-center">
-                        {user.clients.length === 0 ? (
-                          <Badge variant="outline">-</Badge>
-                        ) : (
-                          user.clients.map((uc) => (
-                            <Link key={uc.client.id} href={`/clients/${uc.client.id}`}>
-                              <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                                {uc.client.name}
-                              </Badge>
-                            </Link>
-                          ))
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex gap-1 flex-wrap justify-center">
-                        {user.roles.length === 0 ? (
-                          <Badge variant="outline">역할 없음</Badge>
-                        ) : (
-                          user.roles.map((ur) => (
-                            <Badge key={ur.role.id} variant="secondary">
-                              {ur.role.name}
-                            </Badge>
-                          ))
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge
-                        variant={user.isActive ? "default" : "secondary"}
-                      >
-                        {user.isActive ? "활성" : "비활성"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {new Date(user.createdAt).toLocaleDateString("ko-KR", {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
-                      }).replace(/\./g, '. ').trim()}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            // 세션 업데이트 시도
-                            await update();
-                            const currentRoles = session?.user?.roles || [];
-                            const isAdmin = currentRoles.includes("ADMIN");
-
-                            if (!isAdmin) {
-                              toast({
-                                title: "권한 없음",
-                                description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
-                                variant: "destructive",
-                              });
-                              return;
-                            }
-                            handleAssignRoles(user);
-                          }}
-                          className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
-                        >
-                          <Shield className="mr-1 h-4 w-4" />
-                          역할 관리
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            // 세션 업데이트 시도
-                            await update();
-                            const currentRoles = session?.user?.roles || [];
-                            const hasPermission = currentRoles.includes("ADMIN") || currentRoles.includes("MANAGER");
-
-                            if (!hasPermission) {
-                              toast({
-                                title: "권한 없음",
-                                description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
-                                variant: "destructive",
-                              });
-                              return;
-                            }
-                            handleToggleActive(user.id, user.isActive);
-                          }}
-                          className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
-                        >
-                          {user.isActive ? (
-                            <>
-                              <UserX className="mr-1 h-4 w-4" />
-                              비활성화
-                            </>
-                          ) : (
-                            <>
-                              <UserCheck className="mr-1 h-4 w-4" />
-                              활성화
-                            </>
-                          )}
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={8} className="text-center py-8">
+                    <div className="flex justify-center items-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      <span className="text-muted-foreground">로딩 중...</span>
+                    </div>
+                  </TableCell></TableRow>
+                ) : users.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      {searchQuery
+                        ? "검색 결과가 없습니다."
+                        : "등록된 사용자가 없습니다."}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  users.map((user) => (
+                    <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableCell className="font-medium text-center">
+                        <Link
+                          href={`/users/${user.id}`}
+                          className="text-primary hover:underline"
+                        >
+                          {user.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell className="text-center">
+                        {(() => {
+                          const typeLabel = getUserTypeLabel(user);
+                          return (
+                            <Badge variant={getUserTypeBadgeVariant(typeLabel)}>
+                              {typeLabel}
+                            </Badge>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex gap-1 flex-wrap justify-center">
+                          {user.clients.length === 0 ? (
+                            <Badge variant="outline">-</Badge>
+                          ) : (
+                            user.clients.map((uc) => (
+                              <Link key={uc.client.id} href={`/clients/${uc.client.id}`}>
+                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+                                  {uc.client.name}
+                                </Badge>
+                              </Link>
+                            ))
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex gap-1 flex-wrap justify-center">
+                          {user.roles.length === 0 ? (
+                            <Badge variant="outline">역할 없음</Badge>
+                          ) : (
+                            user.roles.map((ur) => (
+                              <Badge key={ur.role.id} variant="secondary">
+                                {ur.role.name}
+                              </Badge>
+                            ))
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={user.isActive ? "default" : "secondary"}
+                        >
+                          {user.isActive ? "활성" : "비활성"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {new Date(user.createdAt).toLocaleDateString("ko-KR", {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit'
+                        }).replace(/\./g, '. ').trim()}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              // 세션 업데이트 시도
+                              await update();
+                              const currentRoles = session?.user?.roles || [];
+                              const isAdmin = currentRoles.includes("ADMIN");
+
+                              if (!isAdmin) {
+                                toast({
+                                  title: "권한 없음",
+                                  description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              handleAssignRoles(user);
+                            }}
+                            className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
+                          >
+                            <Shield className="mr-1 h-4 w-4" />
+                            역할 관리
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              // 세션 업데이트 시도
+                              await update();
+                              const currentRoles = session?.user?.roles || [];
+                              const hasPermission = currentRoles.includes("ADMIN") || currentRoles.includes("MANAGER");
+
+                              if (!hasPermission) {
+                                toast({
+                                  title: "권한 없음",
+                                  description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              handleToggleActive(user.id, user.isActive);
+                            }}
+                            className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
+                          >
+                            {user.isActive ? (
+                              <>
+                                <UserX className="mr-1 h-4 w-4" />
+                                비활성화
+                              </>
+                            ) : (
+                              <>
+                                <UserCheck className="mr-1 h-4 w-4" />
+                                활성화
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
           <div className="px-6 py-5 space-y-6">
             {Object.entries(groupedUsers()).map(([clientName, users]) => (
@@ -647,6 +666,33 @@ export default function UsersPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-center py-4 border-t border-[hsl(var(--sr-border))]">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page - 1)}
+                disabled={pagination.page === 1}
+              >
+                이전
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages}
+              >
+                다음
+              </Button>
+            </div>
           </div>
         )}
       </div>

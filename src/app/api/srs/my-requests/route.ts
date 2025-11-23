@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
-import { withCache, isCacheAvailable } from "@/lib/cache";
-import { myRequestsKey } from "@/lib/cache-keys";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -12,29 +10,32 @@ export const revalidate = 0;
 
 // GET /api/srs/my-requests - 내가 요청한 SR 목록 조회
 export async function GET(request: NextRequest) {
-  console.log("🔍 [GET /api/srs/my-requests] 요청 시작");
+  console.log("[DEBUG] [GET /api/srs/my-requests] 요청 시작");
 
   try {
     const session = await auth();
     if (!session?.user?.id) {
+      console.log("[DEBUG] No session found");
       return NextResponse.json(
         { error: "인증이 필요합니다" },
         { status: 401 }
       );
     }
 
+    console.log(`[DEBUG] User ID: ${session.user.id}`);
+
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status"); // 상태 필터 (all, REQUESTED, IN_PROGRESS, COMPLETED, etc.)
-    const sortBy = searchParams.get("sortBy") || "createdAt"; // 정렬 기준 (createdAt, updatedAt, status)
+    const status = searchParams.get("status");
+    const sortBy = searchParams.get("sortBy") || "createdAt";
 
     // 조회 조건 구성
     const where: Prisma.SRWhereInput = {
-      requesterId: session.user.id, // 내가 요청한 SR만
+      requesterId: session.user.id,
     };
 
     // 상태 필터링
     if (status && status !== "all") {
-      where.status = status as "REQUESTED" | "INTAKE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CONFIRMED" | "REJECTED";
+      where.status = status as any;
     }
 
     // 정렬 조건 구성
@@ -52,155 +53,68 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    const cacheKey = myRequestsKey(session.user.id, status, sortBy);
-    const srs = await (isCacheAvailable()
-      ? withCache(cacheKey, async () => {
-        return await prisma.sR.findMany({
-          where,
-          orderBy,
+    console.log(`[DEBUG] Querying database with where:`, where);
+
+    const srs = await prisma.sR.findMany({
+      where,
+      orderBy,
+      select: {
+        id: true,
+        srNumber: true,
+        title: true,
+        description: true,
+        status: true,
+        requestedPriority: true,
+        actualPriority: true,
+        requestedCompletionDate: true,
+        estimatedCompletionDate: true,
+        dueDate: true,
+        createdAt: true,
+        updatedAt: true,
+        intakeAt: true,
+        completedAt: true,
+        client: {
           select: {
             id: true,
-            srNumber: true,
-            title: true,
-            description: true,
-            status: true,
-            requestedPriority: true,
-            actualPriority: true,
-            requestedCompletionDate: true,
-            estimatedCompletionDate: true,
-            dueDate: true,
-            createdAt: true,
-            updatedAt: true,
-            intakeAt: true,
-            completedAt: true,
-            client: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-              }
-            },
-            serviceCategory: {
-              select: {
-                id: true,
-                categoryName: true,
-                slaHours: true,
-                priority: true,
-              }
-            },
-            assignee: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              }
-            },
-            intakeBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              }
-            },
+            code: true,
+            name: true,
           }
-        })
-      }, { ttlSeconds: 60, namespace: 'sr' })
-      : prisma.sR.findMany({
-        where,
-        orderBy,
-        select: {
-          id: true,
-          srNumber: true,
-          title: true,
-          description: true,
-          status: true,
-          requestedPriority: true,
-          actualPriority: true,
-          requestedCompletionDate: true,
-          estimatedCompletionDate: true,
-          dueDate: true,
-          createdAt: true,
-          updatedAt: true,
-          intakeAt: true,
-          completedAt: true,
-          client: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-            }
-          },
-          serviceCategory: {
-            select: {
-              id: true,
-              categoryName: true,
-              slaHours: true,
-              priority: true,
-            }
-          },
-          assignee: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            }
-          },
-          intakeBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            }
-          },
+        },
+        serviceCategory: {
+          select: {
+            id: true,
+            categoryName: true,
+            slaHours: true,
+            priority: true,
+          }
+        },
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
+        intakeBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          }
+        },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+          }
         }
-      }));
-
-    // 별도로 각 SR에 대한 카운트 정보 조회
-    const srIds = srs.map(sr => sr.id);
-    const counts = await prisma.sRComment.groupBy({
-      by: ['srId'],
-      where: {
-        srId: { in: srIds }
-      },
-      _count: {
-        _all: true
       }
     });
 
-    const attachmentCounts = await prisma.sRAttachment.groupBy({
-      by: ['srId'],
-      where: {
-        srId: { in: srIds }
-      },
-      _count: {
-        _all: true
-      }
-    });
-
-    // 카운트 정보 매핑
-    const commentCountsMap: Record<string, number> = {};
-    const attachmentCountsMap: Record<string, number> = {};
-
-    counts.forEach(count => {
-      commentCountsMap[count.srId] = count._count._all;
-    });
-
-    attachmentCounts.forEach(count => {
-      attachmentCountsMap[count.srId] = count._count._all;
-    });
-
-    // 각 SR에 카운트 정보 추가
-    const srsWithCounts = srs.map(sr => ({
-      ...sr,
-      _count: {
-        comments: commentCountsMap[sr.id] || 0,
-        attachments: attachmentCountsMap[sr.id] || 0,
-      }
-    }));
+    console.log(`[DEBUG] Retrieved ${srs.length} SRs from database`);
 
     // 각 SR에 대해 추가 정보 계산
-    const srsWithExtras = srsWithCounts.map((sr) => {
-      // 대기 시간 계산 (REQUESTED 상태인 경우)
+    const srsWithExtras = srs.map((sr) => {
       let waitingMinutes = 0;
       let waitingHours = 0;
       if (sr.status === "REQUESTED") {
@@ -210,11 +124,13 @@ export async function GET(request: NextRequest) {
         waitingHours = waitingMinutes / 60;
       }
 
-      // 진행률 계산 (간단한 예시)
       let progressPercentage = 0;
       switch (sr.status) {
         case "REQUESTED":
           progressPercentage = 10;
+          break;
+        case "INTAKE":
+          progressPercentage = 25;
           break;
         case "IN_PROGRESS":
           progressPercentage = 50;
@@ -226,6 +142,8 @@ export async function GET(request: NextRequest) {
         case "REJECTED":
           progressPercentage = 0;
           break;
+        default:
+          progressPercentage = 10;
       }
 
       return {
@@ -236,7 +154,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    console.log(`✅ [GET /api/srs/my-requests] ${srsWithExtras.length}개 SR 조회 완료`);
+    console.log(`[DEBUG] Returning ${srsWithExtras.length} SRs`);
 
     return NextResponse.json({
       srs: srsWithExtras,
@@ -244,7 +162,8 @@ export async function GET(request: NextRequest) {
     }, { status: 200 });
 
   } catch (error) {
-    console.error("❌ [GET /api/srs/my-requests] 오류:", error);
+    console.error("[ERROR] [GET /api/srs/my-requests] 오류:", error);
+    console.error("[ERROR] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
       {
         error: "요청 목록 조회 중 오류가 발생했습니다",

@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
 
 interface SR {
   id: string;
@@ -22,22 +21,30 @@ interface DeleteSRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sr: SR | null;
-  onDeleted: () => void;
+  onDelete: (srId: string) => Promise<void>;
 }
 
 export function DeleteSRDialog({
   open,
   onOpenChange,
   sr,
-  onDeleted,
+  onDelete,
 }: DeleteSRDialogProps) {
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
 
-  const handleDelete = () => {
-    // 실제 삭제 로직은 부모 컴포넌트(SRDetailPage)에서 useDeleteSR 훅을 통해 처리
-    onDeleted();
-    onOpenChange(false);
+  const handleDelete = async () => {
+    if (!sr) return;
+
+    setLoading(true);
+    try {
+      await onDelete(sr.id);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Failed to delete SR:", error);
+      // 에러 처리는 부모 컴포넌트나 훅에서 담당 (토스트 등)
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

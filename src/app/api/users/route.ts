@@ -5,9 +5,13 @@ import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
+import { usePagination } from "@/lib/pagination";
+
 // GET /api/users - 사용자 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url);
+  const { skip, take, orderBy, createResponse } = usePagination(request);
+
   const filters = {
     search: searchParams.get("search") || undefined,
     isActive: searchParams.get("isActive") || undefined,
@@ -18,9 +22,9 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
   };
 
   const userService = new UserService();
-  const users = await userService.getAllUsers(filters);
+  const { data, total } = await userService.getAllUsers(filters, { skip, take, orderBy });
 
-  return NextResponse.json(users);
+  return NextResponse.json(createResponse(data, total));
 }, { preset: 'standard' }); // 1분당 100회
 
 // POST /api/users - 새 사용자 생성 (Rate Limit: 엄격)

@@ -392,10 +392,10 @@ export function SRsDataTable({
           </div>
         </div>
 
-        {/* Total Count - 테이블 바로 위 */}
+        {/* 전체 개수 - 테이블 바로 위 */}
         <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
           <span className="text-sm text-[hsl(var(--sr-gray-medium))] whitespace-nowrap">
-            Total {paginationInfo.totalCount} items
+            전체 {paginationInfo.totalCount}건
           </span>
         </div>
 
@@ -584,7 +584,7 @@ export function SRsDataTable({
                 ))}
               </SelectContent>
             </Select>
-            <span className="text-sm text-[hsl(var(--sr-gray-medium))]">items per page</span>
+            <span className="text-sm text-[hsl(var(--sr-gray-medium))]">페이지당 항목 수</span>
           </div>
         </div>
       </div>
