@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, Users, FileText, FolderTree } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Users, FileText, FolderTree, UserMinus, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { ClientDialog } from "@/components/clients/ClientDialog";
 import { DeleteClientDialog } from "@/components/clients/DeleteClientDialog";
+import { UserDialog } from "@/components/users/UserDialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface ServiceCategory {
@@ -112,44 +113,45 @@ export default function ClientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchClient = async () => {
-      try {
-        const response = await fetch(`/api/clients/${params.id}`);
-        if (!response.ok) {
-          if (response.status === 404) {
-            toast({
-              title: "오류",
-              description: "고객사를 찾을 수 없습니다.",
-              variant: "destructive",
-            });
-            router.push("/clients");
-            return;
-          }
-          throw new Error("Failed to fetch client");
+  const fetchClient = async () => {
+    try {
+      const response = await fetch(`/api/clients/${params.id}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          toast({
+            title: "오류",
+            description: "고객사를 찾을 수 없습니다.",
+            variant: "destructive",
+          });
+          router.push("/clients");
+          return;
         }
-        const data = await response.json();
-        setClient(data);
-      } catch (error) {
-        toast({
-          title: "오류",
-          description: "고객사 정보를 불러오는데 실패했습니다.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+        throw new Error("Failed to fetch client");
       }
-    };
+      const data = await response.json();
+      setClient(data);
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "고객사 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (params.id) {
       fetchClient();
     }
   }, [params.id, toast, router]);
 
   const handleClientUpdated = () => {
-    window.location.reload();
+    fetchClient();
     setIsEditDialogOpen(false);
   };
 
@@ -159,6 +161,48 @@ export default function ClientDetailPage() {
       description: "고객사가 삭제되었습니다.",
     });
     router.push("/clients");
+  };
+
+  const handleUserSaved = () => {
+    fetchClient();
+    setIsUserDialogOpen(false);
+  };
+
+  const handleRemoveUser = async (userId: string) => {
+    if (!confirm("정말 이 사용자를 고객사에서 제외하시겠습니까?")) return;
+
+    try {
+      // 1. Get current user details to find other clients
+      const userRes = await fetch(`/api/users/${userId}`);
+      if (!userRes.ok) throw new Error("Failed to fetch user details");
+      const userData = await userRes.json();
+
+      // 2. Filter out this client
+      const currentClientIds = userData.clients?.map((uc: any) => uc.client.id) || [];
+      const newClientIds = currentClientIds.filter((id: string) => id !== client?.id);
+
+      // 3. Update user
+      const updateRes = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientIds: newClientIds }),
+      });
+
+      if (!updateRes.ok) throw new Error("Failed to unlink user");
+
+      toast({
+        title: "성공",
+        description: "사용자가 고객사에서 제외되었습니다.",
+      });
+      fetchClient();
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "오류",
+        description: "사용자 제외에 실패했습니다.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -440,11 +484,17 @@ export default function ClientDetailPage() {
         <TabsContent value="users" className="mt-6">
           <div className="sr-card-template bg-white">
             {/* 카드 헤더 */}
-            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                이 고객사에 속한 사용자 목록입니다.
-              </p>
+            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  이 고객사에 속한 사용자 목록입니다.
+                </p>
+              </div>
+              <Button onClick={() => setIsUserDialogOpen(true)} size="sm" className="sr-btn-template-primary">
+                <UserPlus className="mr-2 h-4 w-4" />
+                사용자 추가
+              </Button>
             </div>
 
             {/* 카드 내용 */}
@@ -459,6 +509,7 @@ export default function ClientDetailPage() {
                     <TableRow>
                       <TableHead>이름</TableHead>
                       <TableHead>이메일</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -468,6 +519,16 @@ export default function ClientDetailPage() {
                           {userClient.user.name}
                         </TableCell>
                         <TableCell>{userClient.user.email}</TableCell>
+                        <TableCell className="text-right">
+                           <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveUser(userClient.user.id)}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            >
+                              <UserMinus className="h-4 w-4" />
+                           </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -556,6 +617,14 @@ export default function ClientDetailPage() {
         onOpenChange={setIsDeleteDialogOpen}
         client={client}
         onDeleted={handleClientDeleted}
+      />
+
+      <UserDialog
+        open={isUserDialogOpen}
+        onOpenChange={setIsUserDialogOpen}
+        user={null}
+        onSaved={handleUserSaved}
+        defaultClientId={client?.id}
       />
     </div>
   );

@@ -251,9 +251,11 @@ export default function UserDetailPage() {
                   </h3>
                   <div className="flex gap-2 flex-wrap">
                     {user.clients.map((uc) => (
-                      <Badge key={uc.client.id} variant="outline">
-                        {uc.client.name} ({uc.client.code})
-                      </Badge>
+                      <Link key={uc.client.id} href={`/clients/${uc.client.id}`}>
+                        <Badge variant="outline" className="cursor-pointer hover:bg-secondary/50">
+                          {uc.client.name} ({uc.client.code})
+                        </Badge>
+                      </Link>
                     ))}
                   </div>
                 </div>

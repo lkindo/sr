@@ -114,6 +114,7 @@ export const userUpdateSchema = z.object({
   email: z.string().email("유효한 이메일 주소를 입력해주세요.").optional(),
   image: z.string().url("유효한 이미지 URL을 입력해주세요.").optional(),
   isActive: z.boolean().optional(),
+  clientIds: z.array(z.string()).optional(),
 });
 
 // Role Schemas

@@ -14,6 +14,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
     userType: searchParams.get("userType") || undefined,
     roleId: searchParams.get("roleId") || undefined,
     role: searchParams.get("role") || undefined,
+    clientId: searchParams.get("clientId") || undefined,
   };
 
   const userService = new UserService();

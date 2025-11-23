@@ -36,6 +36,7 @@ export class UserService {
     userType?: string;
     roleId?: string;
     role?: string;
+    clientId?: string;
   }): Promise<User[]> {
     if (filters && Object.keys(filters).length > 0) {
       return this.userRepository.findAllWithFilters(filters);
@@ -45,7 +46,15 @@ export class UserService {
 
   async updateUser(id: string, data: UserUpdateData): Promise<User> {
     const validated = userUpdateSchema.parse(data);
-    return this.userRepository.update(id, validated);
+    const { clientIds, ...updateData } = validated;
+    
+    const user = await this.userRepository.update(id, updateData);
+    
+    if (clientIds) {
+      await this.userRepository.updateClientAssociations(id, clientIds);
+    }
+    
+    return user;
   }
 
   async updatePassword(userId: string, hashedPassword: string): Promise<User> {
@@ -81,8 +90,10 @@ export class UserService {
     name: string;
     password: string;
     clientId?: string;
+    clientIds?: string[];
   }): Promise<User> {
-    const hashedPassword = userData.password; // 실제로는 해시 처리가 필요합니다
+    const hashedPassword = await hash(userData.password, 10);
+    
     const user = await this.userRepository.create({
       email: userData.email,
       name: userData.name,
@@ -91,15 +102,11 @@ export class UserService {
       isActive: true,
     });
 
-    // 클라이언트가 지정된 경우, 사용자-클라이언트 연결 생성
-    if (userData.clientId) {
-      await this.clientRepository.update(userData.clientId, {
-        users: {
-          create: {
-            userId: user.id,
-          },
-        },
-      });
+    // 클라이언트 연결 (clientIds 우선, 없으면 clientId 호환성 지원)
+    const clientIds = userData.clientIds || (userData.clientId ? [userData.clientId] : []);
+    
+    if (clientIds.length > 0) {
+      await this.userRepository.updateClientAssociations(user.id, clientIds);
     }
 
     return user;

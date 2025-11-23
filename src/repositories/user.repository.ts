@@ -171,6 +171,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     userType?: string;
     roleId?: string;
     role?: string;
+    clientId?: string;
   }): Promise<User[]> {
     const where: Prisma.UserWhereInput = {};
 
@@ -185,6 +186,15 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     // 활성화 상태 필터
     if (filters?.isActive !== null && filters?.isActive !== undefined && filters.isActive !== "") {
       where.isActive = filters.isActive === "true";
+    }
+
+    // 고객사 필터
+    if (filters?.clientId && filters.clientId !== "all") {
+      where.clients = {
+        some: {
+          clientId: filters.clientId,
+        },
+      };
     }
 
     // 역할 ID 필터
@@ -254,5 +264,19 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     }
 
     return usersWithType;
+  }
+
+  async updateClientAssociations(userId: string, clientIds: string[]): Promise<void> {
+    await this.model.update({
+      where: { id: userId },
+      data: {
+        clients: {
+          deleteMany: {},
+          create: clientIds.map((clientId) => ({
+            clientId,
+          })),
+        },
+      },
+    });
   }
 }

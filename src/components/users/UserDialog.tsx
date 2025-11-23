@@ -50,6 +50,7 @@ interface UserDialogProps {
   onOpenChange: (open: boolean) => void;
   user: User | null;
   onSaved: () => void;
+  defaultClientId?: string;
 }
 
 export function UserDialog({
@@ -57,6 +58,7 @@ export function UserDialog({
   onOpenChange,
   user,
   onSaved,
+  defaultClientId,
 }: UserDialogProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -151,12 +153,13 @@ export function UserDialog({
         setPassword("");
         setConfirmPassword("");
         setIsActive(true);
-        setUserType("ENGINEER");
-        setSelectedClientIds([]);
-        setSelectedClientId("");
+        // defaultClientId가 있으면 CLIENT 유형으로, 없으면 ENGINEER 유형으로
+        setUserType(defaultClientId ? "CLIENT" : "ENGINEER");
+        setSelectedClientIds(defaultClientId ? [defaultClientId] : []);
+        setSelectedClientId(defaultClientId || "");
       }
     }
-  }, [open, user]);
+  }, [open, user, defaultClientId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, UserCheck, UserX, Shield, Filter } from "lucide-react";
+import { Plus, Search, UserCheck, UserX, Shield, Filter, List, Grid } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,12 @@ interface Role {
   description?: string;
 }
 
+interface Client {
+  id: string;
+  name: string;
+  code: string;
+}
+
 // 사용자 유형 판별 함수
 const getUserTypeLabel = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
@@ -103,15 +109,19 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "grouped">("list");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
-  const { toast } = useToast();
+  const { toast} = useToast();
   const { hasRole, hasAnyRole } = usePermissions();
   const { data: session, update } = useSession();
 
@@ -123,6 +133,7 @@ export default function UsersPage() {
       if (userTypeFilter !== "all") params.append("userType", userTypeFilter);
       if (roleFilter !== "all") params.append("roleId", roleFilter);
       if (statusFilter !== "all") params.append("isActive", statusFilter);
+      if (clientFilter !== "all") params.append("clientId", clientFilter);
 
       const response = await fetch(`/api/users?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch users");
@@ -138,7 +149,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, userTypeFilter, roleFilter, statusFilter, toast]);
+  }, [searchQuery, userTypeFilter, roleFilter, statusFilter, clientFilter, toast]);
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -151,7 +162,21 @@ export default function UsersPage() {
         console.error("역할 목록 조회 실패:", error);
       }
     };
+
+    const fetchClients = async () => {
+      try {
+        const response = await fetch("/api/clients?pageSize=100");
+        if (!response.ok) throw new Error("Failed to fetch clients");
+        const result = await response.json();
+        const clientData = Array.isArray(result) ? result : (result.data || []);
+        setClients(clientData);
+      } catch (error) {
+        console.error("고객사 목록 조회 실패:", error);
+      }
+    };
+
     fetchRoles();
+    fetchClients();
     fetchUsers();
   }, [fetchUsers]);
 
@@ -217,6 +242,29 @@ export default function UsersPage() {
     setAssignRolesDialogOpen(false);
   };
 
+  // 고객사별로 사용자 그룹핑
+  const groupedUsers = useCallback(() => {
+    const groups: Record<string, User[]> = {
+      "고객사 없음": [],
+    };
+
+    filteredUsers.forEach((user) => {
+      if (user.clients.length === 0) {
+        groups["고객사 없음"].push(user);
+      } else {
+        user.clients.forEach((uc) => {
+          const clientName = uc.client.name;
+          if (!groups[clientName]) {
+            groups[clientName] = [];
+          }
+          groups[clientName].push(user);
+        });
+      }
+    });
+
+    return groups;
+  }, [filteredUsers]);
+
 
   if (loading && users.length === 0) { // 초기 로딩 시에만 전체 화면 로딩 표시
     return (
@@ -233,7 +281,29 @@ export default function UsersPage() {
         {/* 리스트 헤더 */}
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자 목록</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자 목록</h3>
+              <div className="flex items-center gap-1 border rounded-md p-1">
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="h-7 px-2"
+                >
+                  <List className="h-4 w-4 mr-1" />
+                  목록
+                </Button>
+                <Button
+                  variant={viewMode === "grouped" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grouped")}
+                  className="h-7 px-2"
+                >
+                  <Grid className="h-4 w-4 mr-1" />
+                  그룹
+                </Button>
+              </div>
+            </div>
             <PermissionGuard roles={["ADMIN"]}>
               <Button onClick={handleCreateUser} className="sr-btn-template-primary">
                 <Plus className="mr-2 h-4 w-4" />
@@ -262,6 +332,40 @@ export default function UsersPage() {
 
             {/* 필터들 */}
             <div className="flex gap-2 flex-wrap md:flex-nowrap">
+              {/* 고객사 필터 (검색 가능) */}
+              <Select value={clientFilter} onValueChange={(value) => {
+                setClientFilter(value);
+                setClientSearchQuery("");
+              }}>
+                <SelectTrigger className="w-[180px] sr-dropdown-template">
+                  <SelectValue placeholder="고객사 전체" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 pb-2">
+                    <Input
+                      placeholder="고객사 검색..."
+                      value={clientSearchQuery}
+                      onChange={(e) => setClientSearchQuery(e.target.value)}
+                      className="h-8"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <SelectItem value="all">고객사 전체</SelectItem>
+                  {clients
+                    .filter((client) =>
+                      clientSearchQuery
+                        ? client.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                          client.code.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                        : true
+                    )
+                    .map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name} ({client.code})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+
               {/* 유형 필터 */}
               <Select value={userTypeFilter} onValueChange={(value) => {
                 setUserTypeFilter(value);
@@ -322,13 +426,15 @@ export default function UsersPage() {
         </div>
 
         {/* 테이블 영역 */}
-        <div className="overflow-x-auto">
-          <Table className="sr-table-template">
+        {viewMode === "list" ? (
+          <div className="overflow-x-auto">
+            <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
                 <TableHead>이름</TableHead>
                 <TableHead>이메일</TableHead>
                 <TableHead>유형</TableHead>
+                <TableHead>고객사</TableHead>
                 <TableHead>역할</TableHead>
                 <TableHead>상태</TableHead>
                 <TableHead>가입일</TableHead>
@@ -337,10 +443,10 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
               {loading && users.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8">로딩 중...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">로딩 중...</TableCell></TableRow>
               ) : filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     {searchQuery
                       ? "검색 결과가 없습니다."
                       : "등록된 사용자가 없습니다."}
@@ -367,6 +473,21 @@ export default function UsersPage() {
                           </Badge>
                         );
                       })()}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex gap-1 flex-wrap justify-center">
+                        {user.clients.length === 0 ? (
+                          <Badge variant="outline">-</Badge>
+                        ) : (
+                          user.clients.map((uc) => (
+                            <Link key={uc.client.id} href={`/clients/${uc.client.id}`}>
+                              <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
+                                {uc.client.name}
+                              </Badge>
+                            </Link>
+                          ))
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex gap-1 flex-wrap justify-center">
@@ -464,6 +585,70 @@ export default function UsersPage() {
             </TableBody>
           </Table>
         </div>
+        ) : (
+          <div className="px-6 py-5 space-y-6">
+            {Object.entries(groupedUsers()).map(([clientName, users]) => (
+              <div key={clientName} className="space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b">
+                  <h4 className="text-lg font-semibold text-[hsl(var(--sr-primary-dark))]">
+                    {clientName}
+                  </h4>
+                  <Badge variant="outline" className="ml-auto">
+                    {users.length}명
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {users.map((user) => (
+                    <Link
+                      key={user.id}
+                      href={`/users/${user.id}`}
+                      className="group p-4 rounded-lg border bg-card hover:bg-accent transition-all duration-200"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate group-hover:text-primary">
+                            {user.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {user.email}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={user.isActive ? "default" : "secondary"}
+                          className="ml-2 shrink-0 text-xs"
+                        >
+                          {user.isActive ? "활성" : "비활성"}
+                        </Badge>
+                      </div>
+                      <div className="flex gap-1 flex-wrap mt-2">
+                        {user.roles.length === 0 ? (
+                          <Badge variant="outline" className="text-xs">
+                            역할 없음
+                          </Badge>
+                        ) : (
+                          user.roles.slice(0, 2).map((ur) => (
+                            <Badge
+                              key={ur.role.id}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {ur.role.name}
+                            </Badge>
+                          ))
+                        )}
+                        {user.roles.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{user.roles.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <UserDialog

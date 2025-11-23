@@ -20,8 +20,7 @@ export function Header({ user }: HeaderProps) {
   const topMenuItems = [
     { title: "Dashboard", href: "/dashboard" },
     { title: "SR 관리", href: "/srs" },
-    { title: "고객사 관리", href: "/clients", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
-    { title: "사용자 관리", href: "/users", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
+    { title: "조직 관리", href: "/organization", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
     { title: "권한 관리", href: "/roles", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
     { title: "설정", href: "/settings" },
   ];
@@ -29,8 +28,7 @@ export function Header({ user }: HeaderProps) {
   // 현재 활성 메뉴 판단
   const getActiveMenu = () => {
     if (pathname?.startsWith("/srs") || pathname?.startsWith("/my-requests")) return "/srs";
-    if (pathname?.startsWith("/clients")) return "/clients";
-    if (pathname?.startsWith("/users")) return "/users";
+    if (pathname?.startsWith("/organization") || pathname?.startsWith("/clients") || pathname?.startsWith("/users")) return "/organization";
     if (pathname?.startsWith("/roles")) return "/roles";
     if (pathname?.startsWith("/settings")) return "/settings";
     return "/dashboard";

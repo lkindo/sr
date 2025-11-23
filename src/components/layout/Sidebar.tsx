@@ -13,6 +13,7 @@ import {
   Bell,
   Settings as SettingsIcon,
   ChevronRight,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -56,6 +57,31 @@ const menuStructure: Record<string, MenuSection[]> = {
             },
           ],
         },
+  ],
+  "/organization": [
+    {
+      title: "조직 관리",
+      items: [
+        {
+          title: "조직 구조",
+          href: "/organization",
+          icon: Network,
+          roles: ["ADMIN", "MANAGER", "ENGINEER"],
+        },
+        {
+          title: "고객사 목록",
+          href: "/clients",
+          icon: Building2,
+          roles: ["ADMIN", "MANAGER", "ENGINEER"],
+        },
+        {
+          title: "사용자 목록",
+          href: "/users",
+          icon: Users,
+          roles: ["ADMIN", "MANAGER", "ENGINEER"],
+        },
+      ],
+    },
   ],
   "/clients": [
     {
@@ -133,8 +159,9 @@ export function Sidebar() {
   // 현재 활성 메뉴 판단
   const getActiveTopMenu = () => {
     if (pathname?.startsWith("/srs") || pathname?.startsWith("/my-requests")) return "/srs";
-    if (pathname?.startsWith("/clients")) return "/clients";
-    if (pathname?.startsWith("/users")) return "/users";
+    if (pathname?.startsWith("/organization")) return "/organization";
+    if (pathname?.startsWith("/clients")) return "/organization";
+    if (pathname?.startsWith("/users")) return "/organization";
     if (pathname?.startsWith("/roles")) return "/roles";
     if (pathname?.startsWith("/settings")) return "/settings";
     return "/dashboard";
@@ -173,6 +200,7 @@ export function Sidebar() {
         <div className="px-8 pb-5 border-b border-[#3f4564]">
           <h2 className="text-lg font-medium text-white">
             {activeTopMenu === "/srs" && "SR 관리"}
+            {activeTopMenu === "/organization" && "조직 관리"}
             {activeTopMenu === "/clients" && "고객사 관리"}
             {activeTopMenu === "/users" && "사용자 관리"}
             {activeTopMenu === "/roles" && "권한 관리"}
