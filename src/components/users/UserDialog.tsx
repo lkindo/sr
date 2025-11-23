@@ -77,11 +77,27 @@ export function UserDialog({
 
   const fetchClients = useCallback(async () => {
     try {
-      const response = await fetch("/api/clients");
+      const response = await fetch("/api/clients?pageSize=100"); // 충분한 수의 고객사를 가져오기 위해 pageSize 증가
       if (!response.ok) throw new Error("Failed to fetch clients");
-      const data = await response.json();
-      setClients(data);
+      const result = await response.json();
+      
+      // 페이지네이션 된 응답({ data: [], meta: {} })과 일반 배열 응답([]) 모두 처리
+      const clientData = Array.isArray(result) ? result : (Array.isArray(result.data) ? result.data : []);
+
+      if (Array.isArray(clientData)) {
+        setClients(clientData);
+      } else {
+        console.error("Unexpected API response format:", result);
+        setClients([]);
+        toast({
+          title: "데이터 오류",
+          description: "고객사 목록 형식이 올바르지 않습니다.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
+      console.error("Error fetching clients:", error);
+      setClients([]); 
       toast({
         title: "오류",
         description: "고객사 목록을 불러오는데 실패했습니다.",
@@ -337,7 +353,7 @@ export function UserDialog({
                           <SelectValue placeholder="소속 고객사 선택" />
                         </SelectTrigger>
                         <SelectContent>
-                          {clients.map((client) => (
+                          {(Array.isArray(clients) ? clients : []).map((client) => (
                             <SelectItem key={client.id} value={client.id}>
                               {client.name} ({client.code})
                             </SelectItem>
@@ -360,7 +376,7 @@ export function UserDialog({
                     {clients.length === 0 ? (
                       <p className="text-sm text-muted-foreground">등록된 고객사가 없습니다.</p>
                     ) : (
-                      clients.map((client) => (
+                      (Array.isArray(clients) ? clients : []).map((client) => (
                         <div key={client.id} className="flex items-center space-x-2">
                           <Checkbox
                             id={`eng-client-${client.id}`}

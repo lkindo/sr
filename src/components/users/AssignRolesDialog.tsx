@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,9 +11,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Shield, Loader2, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Role {
   id: string;
@@ -50,6 +51,7 @@ export function AssignRolesDialog({
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   const fetchRoles = useCallback(async () => {
@@ -76,6 +78,7 @@ export function AssignRolesDialog({
       if (user) {
         setSelectedRoleIds(user.roles.map((ur) => ur.role.id));
       }
+      setSearchQuery("");
     }
   }, [open, user, fetchRoles]);
 
@@ -122,57 +125,103 @@ export function AssignRolesDialog({
     }
   };
 
+  // 검색 필터링
+  const filteredRoles = useMemo(() => {
+    if (!searchQuery) return roles;
+    return roles.filter((role) =>
+      role.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [roles, searchQuery]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>역할 할당</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b shrink-0">
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <Shield className="w-5 h-5 text-primary" />
+            역할 할당
+          </DialogTitle>
           <DialogDescription>
-            {user?.name} ({user?.email})에게 역할을 할당합니다.
+            <span className="font-semibold text-foreground">{user?.name}</span>님에게 부여할 역할을 선택하세요.
           </DialogDescription>
         </DialogHeader>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        {/* 검색 영역 */}
+        <div className="px-6 py-3 bg-slate-50/50 border-b shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="역할 검색..."
+              className="pl-8 bg-white"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="space-y-4 py-4">
-            {roles.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                사용 가능한 역할이 없습니다.
-              </p>
-            ) : (
-              roles.map((role) => (
-                <div
-                  key={role.id}
-                  className="flex items-start space-x-3 space-y-0"
-                >
-                  <Checkbox
-                    id={`role-${role.id}`}
-                    checked={selectedRoleIds.includes(role.id)}
-                    onCheckedChange={() => handleToggleRole(role.id)}
-                  />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor={`role-${role.id}`}
-                      className="text-sm font-medium leading-none cursor-pointer"
-                    >
-                      {role.name}
-                    </Label>
-                    {role.description && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {role.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
+        </div>
 
-        <DialogFooter>
+        {/* 역할 리스트 (카드형) */}
+        <ScrollArea className="flex-1 p-6 bg-slate-50/30">
+          {loading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredRoles.map((role) => {
+                const isSelected = selectedRoleIds.includes(role.id);
+                return (
+                  <div
+                    key={role.id}
+                    onClick={() => handleToggleRole(role.id)}
+                    className={cn(
+                      "cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-white",
+                      isSelected
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "hover:border-primary/50"
+                    )}
+                  >
+                    {/* 선택 표시 아이콘 */}
+                    {isSelected && (
+                      <div className="absolute top-0 right-0 bg-primary text-white p-1 rounded-bl-lg shadow-sm">
+                        <Check className="w-3 h-3" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-1.5">
+                      <h4
+                        className={cn(
+                          "font-semibold flex items-center gap-2 transition-colors",
+                          isSelected ? "text-primary" : "text-foreground"
+                        )}
+                      >
+                        {role.name}
+                      </h4>
+                      {role.description ? (
+                        <p className="text-sm text-muted-foreground line-clamp-2 leading-snug">
+                          {role.description}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground/50 italic">
+                          설명 없음
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+              {filteredRoles.length === 0 && (
+                <div className="col-span-full text-center py-12 text-muted-foreground">
+                  검색 결과가 없습니다.
+                </div>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter className="px-6 py-4 border-t bg-white shrink-0">
+          <div className="flex-1 text-sm text-muted-foreground flex items-center">
+            {selectedRoleIds.length}개 역할 선택됨
+          </div>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

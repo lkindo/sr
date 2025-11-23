@@ -7,7 +7,7 @@
 		"import"
   ],
   "rules": {
-		"no-console": "off",
+		"no-console": "warn",
 		"no-alert": "warn",
 		"no-debugger": "error",
 		"no-duplicate-imports": "warn",
@@ -27,9 +27,27 @@
       }
     ],
 		"import/no-cycle": ["warn", { "maxDepth": 1 }],
-		"import/order": "off",
-		"import/named": "off",
-		"import/no-restricted-paths": "off",
-		"no-restricted-imports": "off"
+    "import/no-restricted-paths": [
+      "error",
+      {
+        "zones": [
+          {
+            "target": "./src/components",
+            "from": "./src/repositories",
+            "message": "Components should not import directly from Repositories. Use Actions or Hooks."
+          },
+          {
+            "target": "./src/lib",
+            "from": "./src/components",
+            "message": "Lib utilities should not depend on UI components."
+          },
+          {
+            "target": "./src/lib",
+            "from": "./src/app",
+            "message": "Lib utilities should not depend on App pages."
+          }
+        ]
+      }
+    ]
   }
 }

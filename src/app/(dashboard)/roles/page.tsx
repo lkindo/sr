@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { RoleDialog } from "@/components/roles/RoleDialog";
-import { PermissionDialog } from "@/components/roles/PermissionDialog";
+import { PermissionBoard } from "@/components/roles/PermissionBoard";
 import { DeleteRoleDialog } from "@/components/roles/DeleteRoleDialog";
 import { useToast } from "@/hooks/use-toast";
 
@@ -221,7 +221,7 @@ export default function RolesPage() {
         onSaved={handleRoleSaved}
       />
 
-      <PermissionDialog
+      <PermissionBoard
         open={isPermissionDialogOpen}
         onOpenChange={setIsPermissionDialogOpen}
         role={selectedRole}
