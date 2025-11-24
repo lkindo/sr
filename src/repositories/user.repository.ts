@@ -218,11 +218,19 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
 
     // 고객사 필터
     if (filters?.clientId && filters.clientId !== "all") {
-      where.clients = {
-        some: {
-          clientId: filters.clientId,
-        },
-      };
+      if (filters.clientId === "unassigned") {
+        // 미할당 사용자: 고객사가 없는 사용자
+        where.clients = {
+          none: {}
+        };
+      } else {
+        // 특정 고객사에 할당된 사용자
+        where.clients = {
+          some: {
+            clientId: filters.clientId,
+          },
+        };
+      }
     }
 
     // 역할 ID 필터

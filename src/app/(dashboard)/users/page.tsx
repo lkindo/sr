@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, UserCheck, UserX, Shield, Filter, List, Grid } from "lucide-react";
+import { Plus, Search, UserCheck, UserX, Shield, Filter, List, Grid, CheckSquare, Square, Building2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,8 @@ import { UserDialog } from "@/components/users/UserDialog";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSession } from "next-auth/react";
+import { ClientAssignDropdown } from "@/components/users/ClientAssignDropdown";
+import { ClientBadgeWithActions } from "@/components/users/ClientBadgeWithActions";
 
 interface User {
   id: string;
@@ -122,6 +124,9 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkAssignClientId, setBulkAssignClientId] = useState("");
 
   // Pagination & Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -263,6 +268,78 @@ export default function UsersPage() {
     setPagination(prev => ({ ...prev, page: newPage }));
   };
 
+  // 체크박스 토글
+  const handleToggleUser = (userId: string) => {
+    setSelectedUserIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
+  // 전체 선택/해제
+  const handleToggleAll = () => {
+    if (selectedUserIds.size === users.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(users.map((u) => u.id)));
+    }
+  };
+
+  // 벌크 할당
+  const handleBulkAssign = async () => {
+    if (!bulkAssignClientId || selectedUserIds.size === 0) return;
+
+    const selectedClient = clients.find((c) => c.id === bulkAssignClientId);
+    if (!selectedClient) return;
+
+    try {
+      const promises = Array.from(selectedUserIds).map((userId) =>
+        fetch(`/api/users/${userId}/client`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientId: bulkAssignClientId }),
+        })
+      );
+
+      const results = await Promise.allSettled(promises);
+      const successCount = results.filter((r) => r.status === "fulfilled").length;
+      const failCount = results.filter((r) => r.status === "rejected").length;
+
+      if (successCount > 0) {
+        toast({
+          title: "완료",
+          description: `${successCount}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${
+            failCount > 0 ? ` (${failCount}명 실패)` : ""
+          }`,
+        });
+      }
+
+      if (failCount > 0) {
+        toast({
+          title: "일부 실패",
+          description: `${failCount}명의 사용자 할당에 실패했습니다.`,
+          variant: "destructive",
+        });
+      }
+
+      fetchUsers();
+      setSelectedUserIds(new Set());
+      setShowBulkAssign(false);
+      setBulkAssignClientId("");
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "일괄 할당 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // 고객사별로 사용자 그룹핑
   const groupedUsers = useCallback(() => {
     const groups: Record<string, User[]> = {
@@ -365,6 +442,7 @@ export default function UsersPage() {
                     />
                   </div>
                   <SelectItem value="all">고객사 전체</SelectItem>
+                  <SelectItem value="unassigned">⚠️ 미할당</SelectItem>
                   {clients
                     .filter((client) =>
                       clientSearchQuery
@@ -432,8 +510,44 @@ export default function UsersPage() {
 
         </div>
 
-        {/* Total Count - 테이블 바로 위 */}
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
+        {/* Total Count & Bulk Actions - 테이블 바로 위 */}
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            {selectedUserIds.size > 0 && (
+              <>
+                <Badge variant="secondary" className="text-sm">
+                  {selectedUserIds.size}명 선택됨
+                </Badge>
+                {showBulkAssign ? (
+                  <div className="flex items-center gap-2">
+                    <Select value={bulkAssignClientId} onValueChange={setBulkAssignClientId}>
+                      <SelectTrigger className="w-[200px] h-8">
+                        <SelectValue placeholder="고객사 선택..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name} ({client.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={handleBulkAssign} disabled={!bulkAssignClientId}>
+                      할당
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setShowBulkAssign(false)}>
+                      취소
+                    </Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setShowBulkAssign(true)}>
+                    <Building2 className="mr-2 h-4 w-4" />
+                    일괄 할당
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
           <div className="text-sm text-muted-foreground">
             Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{pagination.total}</span> items
           </div>
@@ -445,6 +559,20 @@ export default function UsersPage() {
             <Table className="sr-table-template">
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleToggleAll}
+                      className="h-8 w-8 p-0"
+                    >
+                      {selectedUserIds.size === users.length && users.length > 0 ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TableHead>
                   <TableHead>이름</TableHead>
                   <TableHead>이메일</TableHead>
                   <TableHead>유형</TableHead>
@@ -457,7 +585,7 @@ export default function UsersPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8">
+                  <TableRow><TableCell colSpan={9} className="text-center py-8">
                     <div className="flex justify-center items-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                       <span className="text-muted-foreground">로딩 중...</span>
@@ -465,7 +593,7 @@ export default function UsersPage() {
                   </TableCell></TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={9} className="text-center py-8">
                       {searchQuery
                         ? "검색 결과가 없습니다."
                         : "등록된 사용자가 없습니다."}
@@ -474,6 +602,23 @@ export default function UsersPage() {
                 ) : (
                   users.map((user) => (
                     <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableCell className="text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleUser(user.id);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          {selectedUserIds.has(user.id) ? (
+                            <CheckSquare className="h-4 w-4 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
                       <TableCell className="font-medium text-center">
                         <Link
                           href={`/users/${user.id}`}
@@ -496,14 +641,22 @@ export default function UsersPage() {
                       <TableCell className="text-center">
                         <div className="flex gap-1 flex-wrap justify-center">
                           {user.clients.length === 0 ? (
-                            <Badge variant="outline">-</Badge>
+                            <ClientAssignDropdown
+                              userId={user.id}
+                              userName={user.name}
+                              clients={clients}
+                              onAssigned={fetchUsers}
+                            />
                           ) : (
                             user.clients.map((uc) => (
-                              <Link key={uc.client.id} href={`/clients/${uc.client.id}`}>
-                                <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80">
-                                  {uc.client.name}
-                                </Badge>
-                              </Link>
+                              <ClientBadgeWithActions
+                                key={uc.client.id}
+                                userId={user.id}
+                                userName={user.name}
+                                client={uc.client}
+                                allClients={clients}
+                                onChanged={fetchUsers}
+                              />
                             ))
                           )}
                         </div>
@@ -606,16 +759,31 @@ export default function UsersPage() {
           </div>
         ) : (
           <div className="px-6 py-5 space-y-6">
-            {Object.entries(groupedUsers()).map(([clientName, users]) => (
-              <div key={clientName} className="space-y-3">
-                <div className="flex items-center gap-2 pb-2 border-b">
-                  <h4 className="text-lg font-semibold text-[hsl(var(--sr-primary-dark))]">
-                    {clientName}
-                  </h4>
-                  <Badge variant="outline" className="ml-auto">
-                    {users.length}명
-                  </Badge>
-                </div>
+            {Object.entries(groupedUsers()).map(([clientName, users]) => {
+              const isUnassigned = clientName === "고객사 없음";
+              return (
+                <div
+                  key={clientName}
+                  className={cn(
+                    "space-y-3 p-4 rounded-lg border-2 transition-all",
+                    isUnassigned
+                      ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20"
+                      : "border-transparent"
+                  )}
+                >
+                  <div className="flex items-center gap-2 pb-2 border-b">
+                    {isUnassigned && (
+                      <Badge variant="destructive" className="shrink-0">
+                        ⚠️ 미할당
+                      </Badge>
+                    )}
+                    <h4 className="text-lg font-semibold text-[hsl(var(--sr-primary-dark))]">
+                      {clientName}
+                    </h4>
+                    <Badge variant="outline" className="ml-auto">
+                      {users.length}명
+                    </Badge>
+                  </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {users.map((user) => (
                     <Link
@@ -665,7 +833,8 @@ export default function UsersPage() {
                   ))}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
 

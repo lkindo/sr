@@ -33,6 +33,8 @@ export default function OrganizationPage() {
     targetClientId: string;
     targetClientName: string;
   } | null>(null);
+  const [ongoingSRs, setOngoingSRs] = useState<any[]>([]);
+  const [showWarning, setShowWarning] = useState(false);
 
   const { toast } = useToast();
 
@@ -234,7 +236,7 @@ export default function OrganizationPage() {
   };
 
   // 소속 변경 확인
-  const handleConfirmReassign = async () => {
+  const handleConfirmReassign = async (force: boolean = false) => {
     if (!reassignData) return;
 
     setIsReassigning(true);
@@ -242,14 +244,27 @@ export default function OrganizationPage() {
       const response = await fetch(`/api/users/${reassignData.userId}/client`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: reassignData.targetClientId }),
+        body: JSON.stringify({
+          clientId: reassignData.targetClientId,
+          force
+        }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to reassign user');
+        throw new Error(result.error || 'Failed to reassign user');
       }
 
+      // 경고가 있고 강제 이동이 아니면 경고 표시
+      if (result.warning && !force) {
+        setOngoingSRs(result.data.ongoingSRs || []);
+        setShowWarning(true);
+        setIsReassigning(false);
+        return;
+      }
+
+      // 성공 처리
       // 데이터 새로고침
       await fetchClients();
 
@@ -275,8 +290,14 @@ export default function OrganizationPage() {
 
       toast({
         title: "성공",
-        description: `${reassignData.userName}이(가) ${reassignData.targetClientName}(으)로 이동되었습니다.`,
+        description: `${reassignData.userName}이(가) ${reassignData.targetClientName}(으)로 이동되었습니다.${result.data?.ongoingSRsHandled > 0 ? ` (진행 중인 SR ${result.data.ongoingSRsHandled}건 유지됨)` : ''}`,
       });
+
+      // 다이얼로그 닫기 및 상태 초기화
+      setIsReassignDialogOpen(false);
+      setReassignData(null);
+      setOngoingSRs([]);
+      setShowWarning(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "소속 변경 중 오류가 발생했습니다.";
       toast({
@@ -286,8 +307,6 @@ export default function OrganizationPage() {
       });
     } finally {
       setIsReassigning(false);
-      setIsReassignDialogOpen(false);
-      setReassignData(null);
     }
   };
 
@@ -463,6 +482,8 @@ export default function OrganizationPage() {
               setIsReassignDialogOpen(open);
               if (!open) {
                 setReassignData(null);
+                setOngoingSRs([]);
+                setShowWarning(false);
               }
             }
           }}
@@ -471,6 +492,8 @@ export default function OrganizationPage() {
           targetClientName={reassignData.targetClientName}
           onConfirm={handleConfirmReassign}
           isLoading={isReassigning}
+          ongoingSRs={ongoingSRs}
+          showWarning={showWarning}
         />
       )}
     </div>
