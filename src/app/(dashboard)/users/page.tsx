@@ -36,6 +36,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useSession } from "next-auth/react";
 import { ClientAssignDropdown } from "@/components/users/ClientAssignDropdown";
 import { ClientBadgeWithActions } from "@/components/users/ClientBadgeWithActions";
+import { cn } from "@/lib/utils";
 
 interface User {
   id: string;
@@ -313,9 +314,8 @@ export default function UsersPage() {
       if (successCount > 0) {
         toast({
           title: "완료",
-          description: `${successCount}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${
-            failCount > 0 ? ` (${failCount}명 실패)` : ""
-          }`,
+          description: `${successCount}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${failCount > 0 ? ` (${failCount}명 실패)` : ""
+            }`,
         });
       }
 
@@ -483,6 +483,7 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">역할 전체</SelectItem>
+                  <SelectItem value="none">역할 없음</SelectItem>
                   {roles.map((role) => (
                     <SelectItem key={role.id} value={role.id}>
                       {role.name}
@@ -579,13 +580,13 @@ export default function UsersPage() {
                   <TableHead>고객사</TableHead>
                   <TableHead>역할</TableHead>
                   <TableHead>상태</TableHead>
-                  <TableHead>가입일</TableHead>
+
                   <TableHead>작업</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8">
+                  <TableRow><TableCell colSpan={8} className="text-center py-8">
                     <div className="flex justify-center items-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                       <span className="text-muted-foreground">로딩 중...</span>
@@ -593,7 +594,7 @@ export default function UsersPage() {
                   </TableCell></TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       {searchQuery
                         ? "검색 결과가 없습니다."
                         : "등록된 사용자가 없습니다."}
@@ -681,13 +682,7 @@ export default function UsersPage() {
                           {user.isActive ? "활성" : "비활성"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        {new Date(user.createdAt).toLocaleDateString("ko-KR", {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit'
-                        }).replace(/\./g, '. ').trim()}
-                      </TableCell>
+
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-2">
                           <Button
@@ -784,56 +779,56 @@ export default function UsersPage() {
                       {users.length}명
                     </Badge>
                   </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {users.map((user) => (
-                    <Link
-                      key={user.id}
-                      href={`/users/${user.id}`}
-                      className="group p-4 rounded-lg border bg-card hover:bg-accent transition-all duration-200"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold truncate group-hover:text-primary">
-                            {user.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {user.email}
-                          </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {users.map((user) => (
+                      <Link
+                        key={user.id}
+                        href={`/users/${user.id}`}
+                        className="group p-4 rounded-lg border bg-card hover:bg-accent transition-all duration-200"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate group-hover:text-primary">
+                              {user.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {user.email}
+                            </p>
+                          </div>
+                          <Badge
+                            variant={user.isActive ? "default" : "secondary"}
+                            className="ml-2 shrink-0 text-xs"
+                          >
+                            {user.isActive ? "활성" : "비활성"}
+                          </Badge>
                         </div>
-                        <Badge
-                          variant={user.isActive ? "default" : "secondary"}
-                          className="ml-2 shrink-0 text-xs"
-                        >
-                          {user.isActive ? "활성" : "비활성"}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-1 flex-wrap mt-2">
-                        {user.roles.length === 0 ? (
-                          <Badge variant="outline" className="text-xs">
-                            역할 없음
-                          </Badge>
-                        ) : (
-                          user.roles.slice(0, 2).map((ur) => (
-                            <Badge
-                              key={ur.role.id}
-                              variant="secondary"
-                              className="text-xs"
-                            >
-                              {ur.role.name}
+                        <div className="flex gap-1 flex-wrap mt-2">
+                          {user.roles.length === 0 ? (
+                            <Badge variant="outline" className="text-xs">
+                              역할 없음
                             </Badge>
-                          ))
-                        )}
-                        {user.roles.length > 2 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{user.roles.length - 2}
-                          </Badge>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
+                          ) : (
+                            user.roles.slice(0, 2).map((ur) => (
+                              <Badge
+                                key={ur.role.id}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {ur.role.name}
+                              </Badge>
+                            ))
+                          )}
+                          {user.roles.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{user.roles.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
+              );
             })}
           </div>
         )}

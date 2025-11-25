@@ -235,11 +235,17 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
 
     // 역할 ID 필터
     if (filters?.roleId && filters.roleId !== "all") {
-      where.roles = {
-        some: {
-          roleId: filters.roleId,
-        },
-      };
+      if (filters.roleId === "none") {
+        where.roles = {
+          none: {}
+        };
+      } else {
+        where.roles = {
+          some: {
+            roleId: filters.roleId,
+          },
+        };
+      }
     }
 
     // 역할 이름 필터
