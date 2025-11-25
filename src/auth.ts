@@ -103,6 +103,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 },
               },
             },
+            clients: {
+              select: {
+                clientId: true,
+              },
+            },
           },
         });
 
@@ -120,9 +125,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             });
           });
           token.permissions = Array.from(permissionsSet);
+
+          // clientIds 배열 생성
+          token.clientIds = userWithRoles.clients.map((uc) => uc.clientId);
         } else {
           token.roles = [];
           token.permissions = [];
+          token.clientIds = [];
         }
       }
 
@@ -145,6 +154,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 },
               },
             },
+            clients: {
+              select: {
+                clientId: true,
+              },
+            },
           },
         });
 
@@ -160,6 +174,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             });
           });
           token.permissions = Array.from(permissionsSet);
+
+          // clientIds 배열 생성
+          token.clientIds = userWithRoles.clients.map((uc) => uc.clientId);
         }
       }
 
@@ -173,6 +190,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.image = token.image as string;
         session.user.roles = (token.roles as string[]) || [];
         session.user.permissions = (token.permissions as string[]) || [];
+        session.user.clientIds = (token.clientIds as string[]) || [];
       }
       return session;
     },

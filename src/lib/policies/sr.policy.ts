@@ -10,8 +10,14 @@ export class SRPolicy {
 
   canRead(user: AuthenticatedUser, sr: SR): boolean {
     const isAdmin = user.roles.includes("ADMIN")
-    const isRequester = sr.requesterId === user.id && hasPermissionFlag(user, PERMISSIONS.SR.UPDATE_SELF)
     const canViewAll = hasPermissionFlag(user, PERMISSIONS.SR.READ)
+
+    // 요청자는 본인이 속한 고객사의 SR만 조회 가능
+    const belongsToClient = user.clientIds?.includes(sr.clientId) ?? false;
+    const isRequester = sr.requesterId === user.id &&
+      hasPermissionFlag(user, PERMISSIONS.SR.UPDATE_SELF) &&
+      belongsToClient;
+
     return isAdmin || canViewAll || isRequester
   }
 

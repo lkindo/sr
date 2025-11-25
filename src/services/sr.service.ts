@@ -138,6 +138,57 @@ export class SRService {
 
       this.srPolicy.ensureCanUpdate(sessionUser, existingSR);
 
+      // 상태 전환 검증
+      if (validated.status && validated.status !== existingSR.status) {
+        const { canTransition, getRequiredFields } = await import("@/lib/sr-state-machine");
+
+        if (!canTransition(existingSR.status as any, validated.status as any)) {
+          throw new Error(
+            `${existingSR.status}에서 ${validated.status}(으)로 직접 전환할 수 없습니다. ` +
+            `허용된 전환: REQUESTED→INTAKE/REJECTED, INTAKE→IN_PROGRESS/ON_HOLD/REJECTED, ` +
+            `IN_PROGRESS→COMPLETED/ON_HOLD, ON_HOLD→IN_PROGRESS/REJECTED, ` +
+            `COMPLETED→CONFIRMED/IN_PROGRESS, REJECTED→REQUESTED`
+          );
+        }
+
+        // 필수 필드 검증
+        const requiredFields = getRequiredFields(validated.status as any);
+        const missingFields: string[] = [];
+
+        for (const field of requiredFields) {
+          // validated에 있거나 existingSR에 있어야 함
+          if (field === 'assigneeId') {
+            if (!validated.assigneeId && !validated.assignedToId && !existingSR.assigneeId) {
+              missingFields.push('담당자(assigneeId)');
+            }
+          } else if (field === 'resolutionDescription') {
+            if (!validated.resolutionDescription && !existingSR.resolutionDescription) {
+              missingFields.push('해결 내용(resolutionDescription)');
+            }
+          } else if (field === 'rejectionReason') {
+            if (!validated.rejectionReason && !existingSR.rejectionReason) {
+              missingFields.push('거절 사유(rejectionReason)');
+            }
+          }
+        }
+
+        if (missingFields.length > 0) {
+          throw new Error(
+            `${validated.status} 상태로 전환하려면 다음 필드가 필요합니다: ${missingFields.join(', ')}`
+          );
+        }
+      }
+
+      // 완료/확정 상태에서 담당자 변경 차단
+      const assigneeId = validated.assigneeId || validated.assignedToId;
+      if ((existingSR.status === 'COMPLETED' || existingSR.status === 'CONFIRMED') &&
+          assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
+        throw new Error(
+          "완료되거나 확정된 SR의 담당자는 변경할 수 없습니다. " +
+          "변경이 필요한 경우 SR을 다시 열어주세요."
+        );
+      }
+
       const updateData: Prisma.SRUncheckedUpdateInput = {};
 
       // basic fields
