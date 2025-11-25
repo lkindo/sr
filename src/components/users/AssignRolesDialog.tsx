@@ -103,7 +103,28 @@ export function AssignRolesDialog({
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to assign roles");
+
+        // 시스템 운영팀 역할 + 고객사 할당 충돌 에러 처리
+        if (error.assignedClients && error.assignedClients.length > 0) {
+          const clientNames = error.assignedClients.map((c: any) => c.name).join(', ');
+          toast({
+            title: "역할 할당 제한",
+            description: (
+              <div className="space-y-2">
+                <p>{error.error}</p>
+                <p className="text-sm">
+                  <strong>할당된 고객사:</strong> {clientNames}
+                </p>
+                <p className="text-sm text-muted-foreground">{error.suggestion}</p>
+              </div>
+            ),
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else {
+          throw new Error(error.error || "Failed to assign roles");
+        }
+        return;
       }
 
       toast({

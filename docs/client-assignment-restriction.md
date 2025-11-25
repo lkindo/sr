@@ -185,7 +185,68 @@ const handleBulkAssign = async () => {
 };
 ```
 
-### 3. 데이터 정리 스크립트
+### 3. 역할 할당 API 검증 (양방향 보호)
+
+**파일:** [src/app/api/users/[id]/roles/route.ts](../src/app/api/users/[id]/roles/route.ts)
+
+역할 할당 순서에 따른 문제를 방지하기 위해 역할 할당 시 고객사 할당 상태를 검증합니다.
+
+#### 문제 시나리오
+1. **CLIENT → ADMIN**: 사용자가 고객사에 할당되어 있는데 ADMIN 역할을 받음
+2. **역할 없음 → ENGINEER**: 고객사 할당 후 ENGINEER 역할을 받음
+
+#### 해결 방법
+```typescript
+// 시스템 운영팀 역할(ADMIN, MANAGER, ENGINEER)을 할당하려는 경우
+// 기존 고객사 할당이 있으면 차단
+if (validated.roleIds.length > 0) {
+    const roles = await prisma.role.findMany({
+        where: { id: { in: validated.roleIds } },
+        select: { id: true, name: true }
+    });
+
+    const hasSystemTeamRole = roles.some(role =>
+        ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role.name)
+    );
+
+    if (hasSystemTeamRole && user.clients.length > 0) {
+        return NextResponse.json({
+            error: "시스템 운영팀 역할은 고객사가 할당된 사용자에게 부여할 수 없습니다",
+            details: `사용자는 현재 다음 고객사에 할당되어 있습니다: ${clientNames}`,
+            suggestion: "먼저 고객사 할당을 해제한 후 시스템 운영팀 역할을 부여하세요.",
+            assignedClients: [...]
+        }, { status: 400 });
+    }
+}
+```
+
+**UI 개선:** [src/components/users/AssignRolesDialog.tsx](../src/components/users/AssignRolesDialog.tsx)
+
+상세한 오류 메시지를 8초간 표시:
+- 할당된 고객사 목록
+- 해결 방법 제안
+
+```typescript
+if (error.assignedClients && error.assignedClients.length > 0) {
+    const clientNames = error.assignedClients.map((c: any) => c.name).join(', ');
+    toast({
+        title: "역할 할당 제한",
+        description: (
+            <div className="space-y-2">
+                <p>{error.error}</p>
+                <p className="text-sm">
+                    <strong>할당된 고객사:</strong> {clientNames}
+                </p>
+                <p className="text-sm text-muted-foreground">{error.suggestion}</p>
+            </div>
+        ),
+        variant: "destructive",
+        duration: 8000,
+    });
+}
+```
+
+### 4. 데이터 정리 스크립트
 
 **파일:** [scripts/cleanup-system-team-clients.ts](../scripts/cleanup-system-team-clients.ts)
 
@@ -244,7 +305,38 @@ curl -X PATCH http://localhost:3000/api/users/{admin-user-id}/client \
    - "⚠️ 시스템 운영팀 X명 포함 (할당 불가)" 배지 확인
    - 할당 버튼에 CLIENT 사용자 수만 표시됨
 
-### 3. 데이터 정리 테스트
+### 3. 역할 할당 테스트 (양방향 검증)
+
+```bash
+# CLIENT 역할 사용자가 "삼성전자" 고객사에 할당된 상태에서
+# ADMIN 역할을 부여하려는 경우 (실패해야 함)
+curl -X POST http://localhost:3000/api/users/{user-id}/roles \
+  -H "Content-Type: application/json" \
+  -d '{"roleIds": ["admin-role-id"]}'
+
+# 응답 예시:
+{
+  "error": "시스템 운영팀 역할은 고객사가 할당된 사용자에게 부여할 수 없습니다",
+  "details": "사용자는 현재 다음 고객사에 할당되어 있습니다: 삼성전자",
+  "suggestion": "먼저 고객사 할당을 해제한 후 시스템 운영팀 역할을 부여하세요.",
+  "systemRoles": "ADMIN",
+  "assignedClients": [
+    { "id": "...", "name": "삼성전자" }
+  ]
+}
+```
+
+**UI 테스트:**
+1. 역할 할당 다이얼로그 오픈
+2. 고객사 할당된 사용자에게 ADMIN/MANAGER/ENGINEER 역할 선택
+3. "저장" 버튼 클릭
+4. 상세한 오류 메시지 토스트 확인 (8초간 표시):
+   - "역할 할당 제한" 제목
+   - 할당된 고객사 목록
+   - 해결 방법 제안
+
+### 4. 데이터 정리 테스트
+
 ```bash
 # Dry-run으로 확인
 pnpm cleanup:system-team-clients:dry-run
