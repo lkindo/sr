@@ -25,7 +25,9 @@
     "test:e2e:files": "playwright test e2e/19-file-upload-download.spec.ts",
     "test:e2e:notifications": "playwright test e2e/20-notification-system.spec.ts",
     "report:slow-queries": "tsx scripts/summarize-slow-queries.ts",
-    "warm:dashboard": "tsx scripts/warm-dashboard.ts"
+    "warm:dashboard": "tsx scripts/warm-dashboard.ts",
+    "cleanup:system-team-clients": "tsx scripts/cleanup-system-team-clients.ts",
+    "cleanup:system-team-clients:dry-run": "tsx scripts/cleanup-system-team-clients.ts --dry-run"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

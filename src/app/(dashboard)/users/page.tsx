@@ -299,32 +299,53 @@ export default function UsersPage() {
     if (!selectedClient) return;
 
     try {
-      const promises = Array.from(selectedUserIds).map((userId) =>
-        fetch(`/api/users/${userId}/client`, {
+      const promises = Array.from(selectedUserIds).map(async (userId) => {
+        const response = await fetch(`/api/users/${userId}/client`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ clientId: bulkAssignClientId }),
-        })
-      );
+        });
 
-      const results = await Promise.allSettled(promises);
-      const successCount = results.filter((r) => r.status === "fulfilled").length;
-      const failCount = results.filter((r) => r.status === "rejected").length;
+        const data = await response.json();
 
-      if (successCount > 0) {
+        if (!response.ok) {
+          return { status: 'rejected', userId, error: data.error || data.details || '알 수 없는 오류' };
+        }
+
+        return { status: 'fulfilled', userId };
+      });
+
+      const results = await Promise.all(promises);
+      const successResults = results.filter((r) => r.status === 'fulfilled');
+      const failResults = results.filter((r) => r.status === 'rejected');
+
+      if (successResults.length > 0) {
         toast({
           title: "완료",
-          description: `${successCount}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${failCount > 0 ? ` (${failCount}명 실패)` : ""
+          description: `${successResults.length}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${failResults.length > 0 ? ` (${failResults.length}명 실패)` : ""
             }`,
         });
       }
 
-      if (failCount > 0) {
-        toast({
-          title: "일부 실패",
-          description: `${failCount}명의 사용자 할당에 실패했습니다.`,
-          variant: "destructive",
-        });
+      if (failResults.length > 0) {
+        // 시스템 운영팀 할당 오류 메시지 확인
+        const systemTeamErrors = failResults.filter((r: any) =>
+          r.error?.includes('시스템 운영팀')
+        );
+
+        if (systemTeamErrors.length > 0) {
+          toast({
+            title: "할당 제한",
+            description: `${systemTeamErrors.length}명은 시스템 운영팀(ADMIN, MANAGER, ENGINEER)이므로 고객사를 할당할 수 없습니다.`,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "일부 실패",
+            description: `${failResults.length}명의 사용자 할당에 실패했습니다.`,
+            variant: "destructive",
+          });
+        }
       }
 
       fetchUsers();
@@ -514,40 +535,65 @@ export default function UsersPage() {
         {/* Total Count & Bulk Actions - 테이블 바로 위 */}
         <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
           <div className="flex items-center gap-3">
-            {selectedUserIds.size > 0 && (
-              <>
-                <Badge variant="secondary" className="text-sm">
-                  {selectedUserIds.size}명 선택됨
-                </Badge>
-                {showBulkAssign ? (
-                  <div className="flex items-center gap-2">
-                    <Select value={bulkAssignClientId} onValueChange={setBulkAssignClientId}>
-                      <SelectTrigger className="w-[200px] h-8">
-                        <SelectValue placeholder="고객사 선택..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name} ({client.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button size="sm" onClick={handleBulkAssign} disabled={!bulkAssignClientId}>
-                      할당
+            {selectedUserIds.size > 0 && (() => {
+              // 선택된 사용자 중 시스템 운영팀 체크
+              const selectedUsers = users.filter((u) => selectedUserIds.has(u.id));
+              const systemTeamCount = selectedUsers.filter((u) =>
+                u.roles.some((ur) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+              ).length;
+              const clientUserCount = selectedUsers.length - systemTeamCount;
+
+              return (
+                <>
+                  <Badge variant="secondary" className="text-sm">
+                    {selectedUserIds.size}명 선택됨
+                  </Badge>
+                  {systemTeamCount > 0 && (
+                    <Badge variant="destructive" className="text-xs">
+                      ⚠️ 시스템 운영팀 {systemTeamCount}명 포함 (할당 불가)
+                    </Badge>
+                  )}
+                  {showBulkAssign ? (
+                    <div className="flex items-center gap-2">
+                      <Select value={bulkAssignClientId} onValueChange={setBulkAssignClientId}>
+                        <SelectTrigger className="w-[200px] h-8">
+                          <SelectValue placeholder="고객사 선택..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name} ({client.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        size="sm"
+                        onClick={handleBulkAssign}
+                        disabled={!bulkAssignClientId || clientUserCount === 0}
+                        title={clientUserCount === 0 ? '할당 가능한 사용자가 없습니다' : ''}
+                      >
+                        할당 ({clientUserCount}명)
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setShowBulkAssign(false)}>
+                        취소
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowBulkAssign(true)}
+                      disabled={clientUserCount === 0}
+                      title={clientUserCount === 0 ? '할당 가능한 사용자가 없습니다' : ''}
+                    >
+                      <Building2 className="mr-2 h-4 w-4" />
+                      일괄 할당
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setShowBulkAssign(false)}>
-                      취소
-                    </Button>
-                  </div>
-                ) : (
-                  <Button size="sm" variant="outline" onClick={() => setShowBulkAssign(true)}>
-                    <Building2 className="mr-2 h-4 w-4" />
-                    일괄 할당
-                  </Button>
-                )}
-              </>
-            )}
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div className="text-sm text-muted-foreground">
             Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{pagination.total}</span> items
@@ -641,25 +687,40 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex gap-1 flex-wrap justify-center">
-                          {user.clients.length === 0 ? (
-                            <ClientAssignDropdown
-                              userId={user.id}
-                              userName={user.name}
-                              clients={clients}
-                              onAssigned={fetchUsers}
-                            />
-                          ) : (
-                            user.clients.map((uc) => (
-                              <ClientBadgeWithActions
-                                key={uc.client.id}
+                          {(() => {
+                            // 시스템 운영팀(ADMIN, MANAGER, ENGINEER)은 고객사 할당 불가
+                            const isSystemTeam = user.roles.some((ur) =>
+                              ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+                            );
+
+                            if (isSystemTeam) {
+                              return (
+                                <Badge variant="secondary" className="text-xs text-muted-foreground">
+                                  할당 불가
+                                </Badge>
+                              );
+                            }
+
+                            return user.clients.length === 0 ? (
+                              <ClientAssignDropdown
                                 userId={user.id}
                                 userName={user.name}
-                                client={uc.client}
-                                allClients={clients}
-                                onChanged={fetchUsers}
+                                clients={clients}
+                                onAssigned={fetchUsers}
                               />
-                            ))
-                          )}
+                            ) : (
+                              user.clients.map((uc) => (
+                                <ClientBadgeWithActions
+                                  key={uc.client.id}
+                                  userId={user.id}
+                                  userName={user.name}
+                                  client={uc.client}
+                                  allClients={clients}
+                                  onChanged={fetchUsers}
+                                />
+                              ))
+                            );
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">

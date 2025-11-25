@@ -317,6 +317,33 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
   }
 
   async updateClientAssociations(userId: string, clientIds: string[]): Promise<void> {
+    // 시스템 운영팀(ADMIN, MANAGER, ENGINEER) 사용자는 고객사 할당 불가
+    const userRoles = await this.model.findUnique({
+      where: { id: userId },
+      select: {
+        roles: {
+          include: { role: true }
+        }
+      }
+    });
+
+    if (userRoles) {
+      const isSystemTeam = userRoles.roles.some((ur: any) =>
+        ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+      );
+
+      if (isSystemTeam && clientIds.length > 0) {
+        const systemRoles = userRoles.roles
+          .filter((ur: any) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+          .map((ur: any) => ur.role.name)
+          .join(', ');
+
+        throw new Error(
+          `시스템 운영팀(ADMIN, MANAGER, ENGINEER)은 고객사를 할당할 수 없습니다. 현재 역할: ${systemRoles}`
+        );
+      }
+    }
+
     await this.model.update({
       where: { id: userId },
       data: {

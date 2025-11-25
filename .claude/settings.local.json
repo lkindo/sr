@@ -87,7 +87,8 @@
       "Bash(do basename \"$file\" .tsx)",
       "Bash(done)",
       "Bash(ls:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npx tsx:*)"
     ],
     "deny": [],
     "ask": []

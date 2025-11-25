@@ -128,6 +128,31 @@ export async function PATCH(
             );
         }
 
+        // 대상 사용자의 역할 확인 - 시스템 운영팀은 고객사 할당 불가
+        const targetUserRoles = await prisma.userRole.findMany({
+            where: { userId },
+            include: { role: true }
+        });
+
+        const isSystemTeam = targetUserRoles.some((ur: any) =>
+            ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+        );
+
+        if (isSystemTeam) {
+            const systemRoles = targetUserRoles
+                .filter((ur: any) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+                .map((ur: any) => ur.role.name)
+                .join(', ');
+
+            return NextResponse.json(
+                {
+                    error: "시스템 운영팀(ADMIN, MANAGER, ENGINEER)은 고객사를 할당할 수 없습니다",
+                    details: `현재 역할: ${systemRoles}`
+                },
+                { status: 400 }
+            );
+        }
+
         // 기존 UserClient 관계 확인
         const existingRelation = await prisma.userClient.findFirst({
             where: { userId },
