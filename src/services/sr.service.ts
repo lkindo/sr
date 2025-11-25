@@ -168,6 +168,28 @@ export class SRService {
 
       this.srPolicy.ensureCanUpdate(sessionUser, existingSR);
 
+      // 고객사 변경 검증 (REQUESTED 상태에서만 허용)
+      if (validated.clientId && validated.clientId !== existingSR.clientId) {
+        if (existingSR.status !== 'REQUESTED') {
+          throw new Error(
+            `SR이 이미 접수된 상태(${existingSR.status})입니다. ` +
+            `접수 후에는 고객사를 변경할 수 없습니다. ` +
+            `잘못된 고객사로 생성된 경우 SR을 삭제하고 다시 생성하세요.`
+          );
+        }
+
+        // 새 고객사가 활성 상태인지 확인
+        const newClient = await this.clientRepository.findById(validated.clientId);
+        if (!newClient) {
+          throw new NotFoundError("변경하려는 고객사를 찾을 수 없습니다.");
+        }
+        if (!newClient.isActive) {
+          throw new Error(
+            `비활성 상태의 고객사(${newClient.name})로는 변경할 수 없습니다.`
+          );
+        }
+      }
+
       // 상태 전환 검증
       if (validated.status && validated.status !== existingSR.status) {
         const { canTransition, getRequiredFields } = await import("@/lib/sr-state-machine");
@@ -224,6 +246,7 @@ export class SRService {
       // basic fields
       if (validated.title !== undefined) updateData.title = validated.title;
       if (validated.description !== undefined) updateData.description = validated.description;
+      if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
       if (validated.priority !== undefined) updateData.priority = validated.priority;
       if (validated.status !== undefined) updateData.status = validated.status;
       if (validated.actualPriority !== undefined) updateData.actualPriority = validated.actualPriority;

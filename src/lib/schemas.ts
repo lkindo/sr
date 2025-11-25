@@ -86,6 +86,7 @@ export const srCreateSchema = z.object({
 export const srUpdateSchema = z.object({
   title: z.string().min(5, "제목은 최소 5자 이상이어야 합니다.").optional(),
   description: z.string().min(10, "설명은 최소 10자 이상이어야 합니다.").optional(),
+  clientId: z.string().optional(), // 고객사 변경 (REQUESTED 상태에서만 허용)
   serviceCategoryId: z.string().optional().nullable(),
   priority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]).optional(),
   status: z.enum([
