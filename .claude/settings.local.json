@@ -88,7 +88,8 @@
       "Bash(done)",
       "Bash(ls:*)",
       "Bash(rm:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
