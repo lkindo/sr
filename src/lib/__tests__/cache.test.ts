@@ -5,8 +5,8 @@ type CacheModule = typeof import('../cache')
 async function importCacheWithoutRedis(): Promise<CacheModule> {
 	vi.resetModules()
 	vi.unstubAllEnvs()
-	delete process.env.UPSTASH_REDIS_REST_URL
-	delete process.env.UPSTASH_REDIS_REST_TOKEN
+	vi.stubEnv('UPSTASH_REDIS_REST_URL', '')
+	vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '')
 
 	return import('../cache')
 }
@@ -38,7 +38,7 @@ async function importCacheWithRedis() {
 	class RedisMock {
 		get = getMock
 		set = setMock
-		constructor() {}
+		constructor() { }
 	}
 	vi.doMock('@upstash/redis', () => ({
 		Redis: RedisMock,
@@ -122,9 +122,9 @@ describe('cache (Upstash)', () => {
 		const revalidateValues = unstableCacheSpy.mock.calls.map(([, , options]) => options.revalidate)
 		expect(revalidateValues).toEqual([300, 300, 300, 600, 600])
 
-		await mod.getCachedSRs({ where: { status: 'OPEN' }, take: 10 })
+		await mod.getCachedSRs({ where: { status: 'REQUESTED' }, take: 10 })
 		expect(prismaMock.sR.findMany).toHaveBeenCalledWith({
-			where: { status: 'OPEN' },
+			where: { status: 'REQUESTED' },
 			orderBy: undefined,
 			skip: undefined,
 			take: 10,

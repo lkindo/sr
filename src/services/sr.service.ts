@@ -192,15 +192,16 @@ export class SRService {
 
       // 상태 전환 검증
       if (validated.status && validated.status !== existingSR.status) {
-        const { canTransition, getRequiredFields } = await import("@/lib/sr-state-machine");
+        const { validateTransition, getRequiredFields } = await import("@/lib/sr-state-machine");
 
-        if (!canTransition(existingSR.status as any, validated.status as any)) {
-          throw new Error(
-            `${existingSR.status}에서 ${validated.status}(으)로 직접 전환할 수 없습니다. ` +
-            `허용된 전환: REQUESTED→INTAKE/REJECTED, INTAKE→IN_PROGRESS/ON_HOLD/REJECTED, ` +
-            `IN_PROGRESS→COMPLETED/ON_HOLD, ON_HOLD→IN_PROGRESS/REJECTED, ` +
-            `COMPLETED→CONFIRMED/IN_PROGRESS, REJECTED→REQUESTED`
-          );
+        const transitionResult = validateTransition(
+          existingSR.status as any,
+          validated.status as any,
+          sessionUser.roles
+        );
+
+        if (!transitionResult.valid) {
+          throw new Error(transitionResult.message);
         }
 
         // 필수 필드 검증
@@ -234,7 +235,7 @@ export class SRService {
       // 완료/확정 상태에서 담당자 변경 차단
       const assigneeId = validated.assigneeId || validated.assignedToId;
       if ((existingSR.status === 'COMPLETED' || existingSR.status === 'CONFIRMED') &&
-          assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
+        assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
         throw new Error(
           "완료되거나 확정된 SR의 담당자는 변경할 수 없습니다. " +
           "변경이 필요한 경우 SR을 다시 열어주세요."
@@ -275,7 +276,6 @@ export class SRService {
         if (validated.serviceCategoryId) updateData.serviceCategoryId = validated.serviceCategoryId;
       }
 
-      const assigneeId = validated.assigneeId || validated.assignedToId;
       if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
 
       // priority SLA adjustment
@@ -398,9 +398,10 @@ export class SRService {
       await tx.sR.delete({ where: { id } });
     });
   }
+
   /**
- * SR 상태 변경 이력 조회 (페이징 지원)
- */
+   * SR 상태 변경 이력 조회 (페이징 지원)
+   */
   async getStatusHistory(
     srId: string,
     options?: {

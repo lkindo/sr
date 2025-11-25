@@ -15,7 +15,7 @@ export interface AuthenticatedUser {
   image: string | null;
   roles: string[];
   permissions: string[];
-  clientIds?: string[]; // 사용자가 속한 고객사 ID 목록
+  clientIds: string[]; // 사용자가 속한 고객사 ID 목록
 }
 
 /**

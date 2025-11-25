@@ -8,6 +8,7 @@ declare module "next-auth" {
     image: string | null;
     roles?: string[];
     permissions?: string[];
+    clientIds?: string[];
   }
 
   interface Session {
@@ -18,6 +19,7 @@ declare module "next-auth" {
       image: string | null;
       roles: string[];
       permissions: string[];
+      clientIds: string[];
     };
   }
 }
@@ -30,5 +32,6 @@ declare module "next-auth/jwt" {
     image: string | null;
     roles: string[];
     permissions: string[];
+    clientIds: string[];
   }
 }

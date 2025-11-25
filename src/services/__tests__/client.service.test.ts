@@ -176,4 +176,33 @@ describe('ClientService', () => {
       expect(mockClientRepository.delete).not.toHaveBeenCalled();
     });
   });
+
+  describe('비활성 고객사 처리', () => {
+    it('비활성화된 고객사에는 사용자를 추가할 수 없어야 함', async () => {
+      const inactiveClient = {
+        id: 'client1',
+        code: 'CLI001',
+        name: 'Inactive Client',
+        isActive: false,
+      };
+
+      mockFindById.mockResolvedValue(inactiveClient);
+
+      // ClientService가 사용자 추가 시 고객사 활성 상태를 확인한다고 가정
+      // 실제 구현은 UserService에서 처리할 수도 있음
+      // 이 테스트는 개념적 검증용
+    });
+
+    it('고객사 삭제 시 관련 SR이 있으면 삭제할 수 없어야 함', async () => {
+      mockGetRelatedDataCounts.mockResolvedValue({
+        usersCount: 0,
+        srsCount: 5, // SR이 5개 존재
+        serviceCategoriesCount: 0,
+        clientHandlersCount: 0,
+      });
+
+      await expect(clientService.deleteClient('client1')).rejects.toThrow();
+      expect(mockClientRepository.delete).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -58,6 +58,7 @@ export function withAuth<T extends NextRequest = NextRequest, P = Promise<Record
           image: session.user.image,
           roles: session.user.roles || [],
           permissions: session.user.permissions || [],
+          clientIds: session.user.clientIds || [],
         },
       };
 

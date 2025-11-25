@@ -43,8 +43,8 @@ describe('SR State Machine', () => {
             expect(canTransition('CONFIRMED', 'REQUESTED')).toBe(false);
         });
 
-        it('REJECTED에서 REQUESTED로 재요청 가능', () => {
-            expect(canTransition('REJECTED', 'REQUESTED')).toBe(true);
+        it('REJECTED에서 REQUESTED로 재요청 불가능 (삭제 후 새로 생성해야 함)', () => {
+            expect(canTransition('REJECTED', 'REQUESTED')).toBe(false);
         });
     });
 
@@ -88,19 +88,35 @@ describe('SR State Machine', () => {
     });
 
     describe('validateTransition', () => {
-        it('유효한 전환은 valid: true 반환', () => {
-            const result = validateTransition('REQUESTED', 'INTAKE');
+        const adminRoles = ['ADMIN'];
+        const managerRoles = ['MANAGER'];
+        const clientUserRoles = ['CLIENT_USER'];
+
+        it('유효한 전환은 valid: true 반환 (권한 있음)', () => {
+            const result = validateTransition('REQUESTED', 'INTAKE', managerRoles);
             expect(result.valid).toBe(true);
         });
 
         it('무효한 전환은 valid: false와 메시지 반환', () => {
-            const result = validateTransition('REQUESTED', 'COMPLETED');
+            const result = validateTransition('REQUESTED', 'COMPLETED', adminRoles);
             expect(result.valid).toBe(false);
             expect(result.message).toBeDefined();
         });
 
-        it('필수 필드가 있는 전환은 valid: true와 필수 필드 메시지 반환', () => {
-            const result = validateTransition('INTAKE', 'IN_PROGRESS');
+        it('권한이 없는 전환은 valid: false와 권한 오류 메시지 반환', () => {
+            // CLIENT_USER는 INTAKE 권한이 없음
+            const result = validateTransition('REQUESTED', 'INTAKE', clientUserRoles);
+            expect(result.valid).toBe(false);
+            expect(result.message).toContain('권한이 없습니다');
+        });
+
+        it('CLIENT_USER는 CONFIRMED로 전환 가능', () => {
+            const result = validateTransition('COMPLETED', 'CONFIRMED', clientUserRoles);
+            expect(result.valid).toBe(true);
+        });
+
+        it('필수 필드가 있는 전환은 valid: true와 필수 필드 메시지 반환 (권한 검증 통과 후)', () => {
+            const result = validateTransition('INTAKE', 'IN_PROGRESS', managerRoles);
             expect(result.valid).toBe(true);
             expect(result.message).toContain('assigneeId');
         });

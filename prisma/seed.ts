@@ -209,7 +209,7 @@ async function main() {
     const clientAdminPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: "SR" },
+          { resource: "SR", action: { in: ["CREATE", "READ", "UPDATE", "STATUS_CHANGE"] } },
           { resource: "CLIENT", action: "READ" },
           { resource: "USER", action: { in: ["READ", "UPDATE"] } },
           { resource: "COMMENT" },
@@ -243,7 +243,7 @@ async function main() {
     const clientUserPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: "SR", action: { in: ["CREATE", "READ"] } },
+          { resource: "SR", action: { in: ["CREATE", "READ", "UPDATE_SELF"] } },
           { resource: "COMMENT", action: { in: ["CREATE", "READ"] } },
           { resource: "ATTACHMENT", action: { in: ["CREATE", "READ"] } },
           { resource: "NOTIFICATION", action: "READ" },

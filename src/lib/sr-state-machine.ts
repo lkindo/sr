@@ -23,7 +23,35 @@ export const VALID_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
     ON_HOLD: ["IN_PROGRESS", "REJECTED"],
     COMPLETED: ["CONFIRMED", "IN_PROGRESS"], // IN_PROGRESS for Reopen
     CONFIRMED: [], // Terminal state
-    REJECTED: ["REQUESTED"], // Re-request
+    REJECTED: [], // Terminal state (No Re-request)
+};
+
+/**
+ * 상태 전이별 허용된 역할 정의
+ * FromStatus -> ToStatus -> Allowed Roles
+ */
+export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
+    REQUESTED: {
+        INTAKE: ["ADMIN", "MANAGER", "ENGINEER"],
+        REJECTED: ["ADMIN", "MANAGER", "ENGINEER"],
+    },
+    INTAKE: {
+        IN_PROGRESS: ["ADMIN", "MANAGER", "ENGINEER"],
+        ON_HOLD: ["ADMIN", "MANAGER", "ENGINEER"],
+        REJECTED: ["ADMIN", "MANAGER", "ENGINEER"],
+    },
+    IN_PROGRESS: {
+        COMPLETED: ["ADMIN", "MANAGER", "ENGINEER"],
+        ON_HOLD: ["ADMIN", "MANAGER", "ENGINEER"],
+    },
+    ON_HOLD: {
+        IN_PROGRESS: ["ADMIN", "MANAGER", "ENGINEER"],
+        REJECTED: ["ADMIN", "MANAGER", "ENGINEER"],
+    },
+    COMPLETED: {
+        CONFIRMED: ["ADMIN", "CLIENT_USER", "CLIENT_ADMIN"], // Requester confirms
+        IN_PROGRESS: ["ADMIN", "CLIENT_USER", "CLIENT_ADMIN"], // Requester reopens
+    },
 };
 
 /**
@@ -64,15 +92,18 @@ export const getRequiredFields = (toStatus: SRStatus): string[] => {
 };
 
 /**
- * 상태 전환 가능 여부와 사유를 함께 반환
+ * 상태 전환 가능 여부와 사유를 함께 반환 (권한 검증 포함)
  * @param from 현재 상태
  * @param to 목표 상태
+ * @param userRoles 사용자 역할 목록 (Optional)
  * @returns 가능 여부와 메시지
  */
 export const validateTransition = (
     from: SRStatus,
-    to: SRStatus
+    to: SRStatus,
+    userRoles?: string[]
 ): { valid: boolean; message?: string } => {
+    // 1. 상태 흐름 유효성 검사
     if (!canTransition(from, to)) {
         return {
             valid: false,
@@ -80,10 +111,27 @@ export const validateTransition = (
         };
     }
 
+    // 2. 역할 기반 권한 검사
+    if (userRoles && userRoles.length > 0) {
+        const allowedRoles = TRANSITION_ROLES[from]?.[to];
+        if (allowedRoles) {
+            const hasRole = userRoles.some(role => allowedRoles.includes(role));
+            if (!hasRole) {
+                return {
+                    valid: false,
+                    message: `이 상태 변경을 수행할 권한이 없습니다. (필요 역할: ${allowedRoles.join(", ")})`,
+                };
+            }
+        }
+    }
+
+    // 3. 필수 필드 검사는 Service 레벨에서 데이터 유무와 함께 수행하는 것이 더 적절할 수 있으나,
+    // 여기서는 "필요하다"는 정보만 제공하거나, 호출자가 getRequiredFields를 사용하도록 유도.
+    // 기존 로직 유지:
     const requiredFields = getRequiredFields(to);
     if (requiredFields.length > 0) {
         return {
-            valid: true,
+            valid: true, // Transition itself is valid, but needs data. Service should check data.
             message: `필수 입력: ${requiredFields.join(", ")}`,
         };
     }
