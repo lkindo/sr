@@ -84,7 +84,33 @@ export class UserService {
   }
 
   async deactivateUser(userId: string): Promise<User> {
+    // 1. 진행 중인 SR 확인
+    const prisma = (await import("@/lib/prisma")).default;
+    const activeSRs = await prisma.sR.findMany({
+      where: {
+        assigneeId: userId,
+        status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] }
+      },
+      select: {
+        id: true,
+        srNumber: true,
+        title: true,
+        status: true
+      }
+    });
+
+    // 2. 진행 중인 SR이 있으면 에러 반환
+    if (activeSRs.length > 0) {
+      const srList = activeSRs.map(sr => `${sr.srNumber} (${sr.status})`).join(', ');
+      throw new ValidationError(
+        `사용자에게 ${activeSRs.length}개의 진행 중인 SR이 할당되어 있습니다. ` +
+        `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
+      );
+    }
+
+    // 3. 진행 중인 SR이 없으면 비활성화
     const user = await this.userRepository.deactivateUser(userId);
+
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
     await invalidateCachePattern("user:list*");

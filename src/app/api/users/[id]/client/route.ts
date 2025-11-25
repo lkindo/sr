@@ -49,6 +49,32 @@ export async function DELETE(
             );
         }
 
+        // 고객사 팀 역할을 가진 사용자는 고객사 할당을 해제할 수 없음
+        const targetUserRoles = await prisma.userRole.findMany({
+            where: { userId },
+            include: { role: true }
+        });
+
+        const hasClientTeamRole = targetUserRoles.some((ur: any) =>
+            ['CLIENT_ADMIN', 'CLIENT_USER'].includes(ur.role.name)
+        );
+
+        if (hasClientTeamRole) {
+            const clientRoles = targetUserRoles
+                .filter((ur: any) => ['CLIENT_ADMIN', 'CLIENT_USER'].includes(ur.role.name))
+                .map((ur: any) => ur.role.name);
+
+            return NextResponse.json(
+                {
+                    error: "고객사 팀 역할을 가진 사용자는 고객사 할당을 해제할 수 없습니다",
+                    details: `현재 역할: ${clientRoles.join(', ')}`,
+                    suggestion: "먼저 고객사 팀 역할을 제거한 후 고객사 할당을 해제하세요.",
+                    clientRoles
+                },
+                { status: 400 }
+            );
+        }
+
         await prisma.userClient.delete({
             where: { id: existingRelation.id }
         });

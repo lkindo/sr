@@ -104,8 +104,28 @@ export function AssignRolesDialog({
       if (!response.ok) {
         const error = await response.json();
 
-        // 시스템 운영팀 역할 + 고객사 할당 충돌 에러 처리
-        if (error.assignedClients && error.assignedClients.length > 0) {
+        // 1. 시스템 운영팀 + 고객사 팀 역할 동시 할당 에러
+        if (error.systemRoles && error.clientRoles) {
+          toast({
+            title: "역할 충돌",
+            description: (
+              <div className="space-y-2">
+                <p>{error.error}</p>
+                <p className="text-sm">
+                  <strong>시스템 운영팀:</strong> {error.systemRoles.join(', ')}
+                </p>
+                <p className="text-sm">
+                  <strong>고객사 팀:</strong> {error.clientRoles.join(', ')}
+                </p>
+                <p className="text-sm text-muted-foreground">{error.suggestion}</p>
+              </div>
+            ),
+            variant: "destructive",
+            duration: 8000,
+          });
+        }
+        // 2. 시스템 운영팀 역할 + 고객사 할당 충돌 에러 처리
+        else if (error.assignedClients && error.assignedClients.length > 0) {
           const clientNames = error.assignedClients.map((c: any) => c.name).join(', ');
           toast({
             title: "역할 할당 제한",

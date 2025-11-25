@@ -46,8 +46,7 @@ export const POST = withAuthAndRateLimit(async (
     throw new NotFoundError("사용자");
   }
 
-  // 시스템 운영팀 역할(ADMIN, MANAGER, ENGINEER)을 할당하려는 경우
-  // 기존 고객사 할당이 있으면 차단
+  // 역할 상호 배타성 검증
   if (validated.roleIds.length > 0) {
     const roles = await prisma.role.findMany({
       where: {
@@ -56,16 +55,34 @@ export const POST = withAuthAndRateLimit(async (
       select: { id: true, name: true }
     });
 
-    const hasSystemTeamRole = roles.some(role =>
-      ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role.name)
-    );
+    const roleNames = roles.map(r => r.name);
+    const SYSTEM_TEAM_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
+    const CLIENT_TEAM_ROLES = ['CLIENT_ADMIN', 'CLIENT_USER'];
 
+    const hasSystemTeamRole = roleNames.some(name => SYSTEM_TEAM_ROLES.includes(name));
+    const hasClientTeamRole = roleNames.some(name => CLIENT_TEAM_ROLES.includes(name));
+
+    // 1. 시스템 운영팀과 고객사 팀 역할을 동시에 할당하려는 경우 차단
+    if (hasSystemTeamRole && hasClientTeamRole) {
+      const systemRoles = roleNames.filter(name => SYSTEM_TEAM_ROLES.includes(name));
+      const clientRoles = roleNames.filter(name => CLIENT_TEAM_ROLES.includes(name));
+
+      return NextResponse.json(
+        {
+          error: "시스템 운영팀과 고객사 팀 역할을 동시에 부여할 수 없습니다",
+          details: `시스템 운영팀 역할(${systemRoles.join(', ')})과 고객사 팀 역할(${clientRoles.join(', ')})은 상호 배타적입니다.`,
+          suggestion: "하나의 역할 그룹만 선택하세요.",
+          systemRoles,
+          clientRoles
+        },
+        { status: 400 }
+      );
+    }
+
+    // 2. 시스템 운영팀 역할을 고객사 할당 사용자에게 부여하려는 경우 차단
     if (hasSystemTeamRole && user.clients.length > 0) {
       const clientNames = user.clients.map(uc => uc.client.name).join(', ');
-      const systemRoles = roles
-        .filter(role => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role.name))
-        .map(role => role.name)
-        .join(', ');
+      const systemRoles = roleNames.filter(name => SYSTEM_TEAM_ROLES.includes(name));
 
       return NextResponse.json(
         {
@@ -77,6 +94,21 @@ export const POST = withAuthAndRateLimit(async (
             id: uc.client.id,
             name: uc.client.name
           }))
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. 고객사 팀 역할을 고객사 미할당 사용자에게 부여하려는 경우 차단
+    if (hasClientTeamRole && user.clients.length === 0) {
+      const clientRoles = roleNames.filter(name => CLIENT_TEAM_ROLES.includes(name));
+
+      return NextResponse.json(
+        {
+          error: "고객사 팀 역할은 고객사가 할당된 사용자에게만 부여할 수 있습니다",
+          details: `${clientRoles.join(', ')} 역할을 부여하려면 먼저 사용자에게 고객사를 할당해야 합니다.`,
+          suggestion: "먼저 사용자에게 고객사를 할당한 후 고객사 팀 역할을 부여하세요.",
+          clientRoles
         },
         { status: 400 }
       );

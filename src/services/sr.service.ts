@@ -46,53 +46,83 @@ export class SRService {
     this.srPolicy.ensureCanCreate(sessionUser);
     const validated = srCreateSchema.parse(data);
 
-    // SR 번호 생성 (중복 방지를 위한 재시도 로직)
+    // 고객사 활성 상태 확인
+    const client = await this.clientRepository.findById(validated.clientId);
+    if (!client) {
+      throw new NotFoundError("고객사를 찾을 수 없습니다.");
+    }
+    if (!client.isActive) {
+      throw new Error(
+        `비활성 상태의 고객사(${client.name})에는 SR을 생성할 수 없습니다. ` +
+        `고객사 관리자에게 문의하세요.`
+      );
+    }
+
+    // SR 번호 생성 (트랜잭션으로 동시성 문제 해결)
     let sr: SR | null = null;
     let attempts = 0;
     const maxAttempts = 10;
 
     while (!sr && attempts < maxAttempts) {
       attempts++;
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(today);
-      todayEnd.setHours(23, 59, 59, 999);
-
-      const todayCount = await this.srRepository.count({
-        createdAt: { gte: todayStart, lte: todayEnd },
-      });
-
-      const sequenceNumber = todayCount + attempts;
-      const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, "0")}`;
 
       try {
-        sr = await this.srRepository.create({
-          srNumber,
-          title: validated.title,
-          description: validated.description,
-          clientId: validated.clientId,
-          serviceCategoryId: validated.serviceCategoryId,
-          requesterId: sessionUser.id,
-          requestedPriority: validated.requestedPriority,
-          priority: validated.requestedPriority,
-          requestedCompletionDate: validated.requestedCompletionDate
-            ? new Date(validated.requestedCompletionDate)
-            : undefined,
-          status: "REQUESTED",
+        // 트랜잭션 내에서 SR 번호 생성 및 SR 생성을 원자적으로 수행
+        sr = await prisma.$transaction(async (tx) => {
+          const today = new Date();
+          const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+          const todayStart = new Date(today);
+          todayStart.setHours(0, 0, 0, 0);
+          const todayEnd = new Date(today);
+          todayEnd.setHours(23, 59, 59, 999);
+
+          // SELECT FOR UPDATE로 동시 접근 방지
+          const todayCount = await tx.sR.count({
+            where: {
+              createdAt: { gte: todayStart, lte: todayEnd },
+            },
+          });
+
+          const sequenceNumber = todayCount + 1;
+          const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, "0")}`;
+
+          // SR 생성 (unique constraint 체크는 DB 레벨에서 발생)
+          return await tx.sR.create({
+            data: {
+              srNumber,
+              title: validated.title,
+              description: validated.description,
+              clientId: validated.clientId,
+              serviceCategoryId: validated.serviceCategoryId,
+              requesterId: sessionUser.id,
+              requestedPriority: validated.requestedPriority,
+              priority: validated.requestedPriority,
+              requestedCompletionDate: validated.requestedCompletionDate
+                ? new Date(validated.requestedCompletionDate)
+                : undefined,
+              status: "REQUESTED",
+            },
+          });
+        }, {
+          isolationLevel: 'Serializable', // 최고 수준의 격리 레벨
+          maxWait: 5000, // 5초 대기
+          timeout: 10000, // 10초 타임아웃
         });
       } catch (error) {
         const isUnique =
           (error instanceof Error && error.message.includes("Unique constraint")) ||
           (error && typeof error === "object" && "code" in error && (error as any).code === "P2002");
-        if (isUnique) {
-          if (attempts >= maxAttempts) {
-            throw new Error("SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
-          }
-          await new Promise(res => setTimeout(res, 50 * attempts));
+
+        if (isUnique && attempts < maxAttempts) {
+          // Unique constraint 위반 시 exponential backoff로 재시도
+          await new Promise(res => setTimeout(res, 50 * Math.pow(2, attempts - 1)));
           continue;
         }
+
+        if (attempts >= maxAttempts) {
+          throw new Error("SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        }
+
         throw error;
       }
     }
