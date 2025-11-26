@@ -442,6 +442,187 @@ async function main() {
     console.log(`Service categories already exist (${existingCategories} found)`);
   }
 
+  // Create sample SRs with activities and status history
+  console.log("Creating sample SRs with activities...");
+
+  const existingSRs = await prisma.sR.count();
+
+  if (existingSRs === 0 && testClient1 && adminUser) {
+    const category = await prisma.serviceCategory.findFirst({
+      where: { clientId: testClient1.id },
+    });
+
+    if (category) {
+      // SR 1: IN_PROGRESS
+      const sr1 = await prisma.sR.create({
+        data: {
+          srNumber: "SR-2024-001",
+          title: "시스템 로그인 오류 해결 요청",
+          description: "특정 사용자 계정에서 로그인 시 오류가 발생합니다. 빠른 확인 부탁드립니다.",
+          status: "IN_PROGRESS",
+          requestedPriority: "HIGH",
+          actualPriority: "HIGH",
+          clientId: testClient1.id,
+          serviceCategoryId: category.id,
+          requesterId: adminUser.id,
+          assigneeId: adminUser.id,
+          intakeById: adminUser.id,
+          intakeAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2일 전
+        },
+      });
+
+      // SR 1 Activities
+      await prisma.sRActivity.createMany({
+        data: [
+          {
+            srId: sr1.id,
+            userId: adminUser.id,
+            type: "CREATED",
+            description: "SR이 생성되었습니다",
+            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          },
+          {
+            srId: sr1.id,
+            userId: adminUser.id,
+            type: "ASSIGNED",
+            description: "담당자가 할당되었습니다",
+            createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 1000),
+          },
+          {
+            srId: sr1.id,
+            userId: adminUser.id,
+            type: "STATUS_CHANGED",
+            description: "상태가 IN_PROGRESS로 변경되었습니다",
+            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          },
+        ],
+      });
+
+      // SR 1 Status History
+      await prisma.sRStatusHistory.createMany({
+        data: [
+          {
+            srId: sr1.id,
+            currentStatus: "REQUESTED",
+            changedBy: adminUser.id,
+            changeReason: "초기 생성",
+            changedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          },
+          {
+            srId: sr1.id,
+            previousStatus: "REQUESTED",
+            currentStatus: "IN_PROGRESS",
+            changedBy: adminUser.id,
+            changeReason: "작업 시작",
+            changedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          },
+        ],
+      });
+
+      // SR 2: COMPLETED
+      const sr2 = await prisma.sR.create({
+        data: {
+          srNumber: "SR-2024-002",
+          title: "데이터 백업 요청",
+          description: "월말 정기 데이터 백업을 요청합니다.",
+          status: "COMPLETED",
+          requestedPriority: "MEDIUM",
+          actualPriority: "MEDIUM",
+          clientId: testClient1.id,
+          serviceCategoryId: category.id,
+          requesterId: adminUser.id,
+          assigneeId: adminUser.id,
+          intakeById: adminUser.id,
+          intakeAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+        },
+      });
+
+      await prisma.sRActivity.createMany({
+        data: [
+          {
+            srId: sr2.id,
+            userId: adminUser.id,
+            type: "CREATED",
+            description: "SR이 생성되었습니다",
+            createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          },
+          {
+            srId: sr2.id,
+            userId: adminUser.id,
+            type: "STATUS_CHANGED",
+            description: "상태가 COMPLETED로 변경되었습니다",
+            createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          },
+        ],
+      });
+
+      await prisma.sRStatusHistory.createMany({
+        data: [
+          {
+            srId: sr2.id,
+            currentStatus: "REQUESTED",
+            changedBy: adminUser.id,
+            changeReason: "초기 생성",
+            changedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          },
+          {
+            srId: sr2.id,
+            previousStatus: "REQUESTED",
+            currentStatus: "IN_PROGRESS",
+            changedBy: adminUser.id,
+            changeReason: "작업 시작",
+            changedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+          },
+          {
+            srId: sr2.id,
+            previousStatus: "IN_PROGRESS",
+            currentStatus: "COMPLETED",
+            changedBy: adminUser.id,
+            changeReason: "작업 완료",
+            changedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          },
+        ],
+      });
+
+      // SR 3: REQUESTED (대기 중)
+      const sr3 = await prisma.sR.create({
+        data: {
+          srNumber: "SR-2024-003",
+          title: "신규 기능 개발 문의",
+          description: "대시보드에 차트 기능 추가를 요청합니다.",
+          status: "REQUESTED",
+          requestedPriority: "LOW",
+          clientId: testClient1.id,
+          serviceCategoryId: category.id,
+          requesterId: adminUser.id,
+        },
+      });
+
+      await prisma.sRActivity.create({
+        data: {
+          srId: sr3.id,
+          userId: adminUser.id,
+          type: "CREATED",
+          description: "SR이 생성되었습니다",
+        },
+      });
+
+      await prisma.sRStatusHistory.create({
+        data: {
+          srId: sr3.id,
+          currentStatus: "REQUESTED",
+          changedBy: adminUser.id,
+          changeReason: "초기 생성",
+        },
+      });
+
+      console.log("Created 3 sample SRs with activities and status history");
+    }
+  } else {
+    console.log(`Sample SRs already exist (${existingSRs} found)`);
+  }
+
   console.log("Seed completed successfully!");
 }
 

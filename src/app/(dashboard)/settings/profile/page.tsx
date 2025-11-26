@@ -49,6 +49,7 @@ export default function ProfilePage() {
   const { toast } = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [image, setImage] = useState("");
@@ -60,23 +61,35 @@ export default function ProfilePage() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchProfile = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const response = await fetch("/api/profile");
-      if (!response.ok) throw new Error("Failed to fetch profile");
+      if (!response.ok) {
+        console.error("Profile fetch failed:", response.status);
+        throw new Error("Failed to fetch profile");
+      }
       const data = await response.json();
       setProfile(data);
       setName(data.name);
       setImage(data.image || "");
-    } catch (error) {
+      setError(null);
+    } catch (err) {
+      console.error("Profile error:", err);
+      const errorMessage = "프로필 정보를 불러오는데 실패했습니다.";
+      setError(errorMessage);
+      setProfile(null);
+
+      // Toast 알림도 표시
       toast({
         title: "오류",
-        description: "프로필 정보를 불러오는데 실패했습니다.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, []); // toast 의존성 제거 - 무한 루프 방지
 
   useEffect(() => {
     fetchProfile();
@@ -162,10 +175,34 @@ export default function ProfilePage() {
     }
   };
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
+        <div className="text-center space-y-4">
+          <div className="sr-loading-spinner mx-auto"></div>
+          <p className="text-muted-foreground">프로필 정보를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <div className="text-destructive">
+            <h2 className="text-2xl font-bold mb-2">프로필 로드 실패</h2>
+            <p className="text-muted-foreground mb-4">
+              {error || "프로필 정보를 불러올 수 없습니다."}
+            </p>
+          </div>
+          <Button
+            onClick={fetchProfile}
+            className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
+          >
+            다시 시도
+          </Button>
+        </div>
       </div>
     );
   }

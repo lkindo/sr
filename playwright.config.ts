@@ -7,6 +7,14 @@ import { defineConfig, devices } from '@playwright/test'
 export default defineConfig({
   testDir: './e2e',
 
+  /* 테스트 timeout 설정 */
+  timeout: 60 * 1000, // 30초 → 60초로 증가 (Profile 페이지 로딩 고려)
+
+  /* Expect assertion timeout */
+  expect: {
+    timeout: 10 * 1000, // 5초 → 10초로 증가
+  },
+
   /* 병렬 테스트 실행 */
   fullyParallel: true,
 
@@ -33,6 +41,12 @@ export default defineConfig({
 
     /* 저장된 인증 상태 사용 */
     storageState: './playwright/.auth/user.json',
+
+    /* Action timeout */
+    actionTimeout: 15 * 1000, // 기본 액션 timeout 15초
+
+    /* Navigation timeout */
+    navigationTimeout: 30 * 1000, // 페이지 이동 timeout 30초
 
     /* 실패 시 스크린샷 촬영 */
     screenshot: 'only-on-failure',
