@@ -16,6 +16,7 @@ vi.mock('@/repositories/user.repository', () => {
   const mockFindById = vi.fn();
   const mockFindDetailsById = vi.fn();
   const mockFindAll = vi.fn();
+  const mockFindAllPaginated = vi.fn();
   const mockFindAllWithFilters = vi.fn();
   const mockCreate = vi.fn();
   const mockUpdate = vi.fn();
@@ -25,6 +26,7 @@ vi.mock('@/repositories/user.repository', () => {
     findById = mockFindById;
     findDetailsById = mockFindDetailsById;
     findAll = mockFindAll;
+    findAllPaginated = mockFindAllPaginated;
     findAllWithFilters = mockFindAllWithFilters;
     create = mockCreate;
     update = mockUpdate;
@@ -113,31 +115,36 @@ describe('UserService', () => {
         },
       ];
 
-      mockUserRepo.findAll.mockResolvedValue(users);
+      mockUserRepo.findAllPaginated = vi.fn().mockResolvedValue([users, users.length]);
 
       const result = await userService.getAllUsers();
 
-      expect(result).toEqual(users);
-      expect(mockUserRepo.findAll).toHaveBeenCalled();
+      expect(result).toEqual({ data: users, total: users.length });
+      expect(mockUserRepo.findAllPaginated).toHaveBeenCalled();
     });
 
     it('필터가 있으면 findAllWithFilters를 호출해야 함', async () => {
       const filters = { search: 'test', isActive: 'true' };
-      const filteredUsers = [
+      const filteredUsers: User[] = [
         {
           id: '1',
           name: 'Test User',
           email: 'test@example.com',
+          emailVerified: null,
+          password: '',
+          image: null,
           isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
         },
       ];
 
-      mockUserRepo.findAllWithFilters.mockResolvedValue(filteredUsers);
+      mockUserRepo.findAllWithFilters.mockResolvedValue([filteredUsers, filteredUsers.length]);
 
       const result = await userService.getAllUsers(filters);
 
-      expect(result).toEqual(filteredUsers);
-      expect(mockUserRepo.findAllWithFilters).toHaveBeenCalledWith(filters);
+      expect(result).toEqual({ data: filteredUsers, total: filteredUsers.length });
+      expect(mockUserRepo.findAllWithFilters).toHaveBeenCalledWith(filters, undefined);
     });
   });
 

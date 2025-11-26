@@ -95,7 +95,9 @@
       "Bash(pnpm prisma studio:*)",
       "Bash(cmd /c \"if exist .next rmdir /s /q .next\")",
       "Bash(cmd /c \"set SKIP_WEBSERVER=true &amp;&amp; pnpm exec playwright test --project=multi-user-setup --reporter=list\")",
-      "Bash(cmd /c \"set SKIP_WEBSERVER=true &amp;&amp; pnpm exec playwright test e2e/21-sr-status-transitions.spec.ts --grep \"\"COMPLETED → CONFIRMED\"\" --reporter=list\")"
+      "Bash(cmd /c \"set SKIP_WEBSERVER=true &amp;&amp; pnpm exec playwright test e2e/21-sr-status-transitions.spec.ts --grep \"\"COMPLETED → CONFIRMED\"\" --reporter=list\")",
+      "Bash(if exist \"src\\app\\api\\auth\\register\\route.ts\" del \"src\\app\\api\\auth\\register\\route.ts\")",
+      "Bash(pnpm exec tsc:*)"
     ],
     "deny": [],
     "ask": []

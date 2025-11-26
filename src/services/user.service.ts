@@ -121,27 +121,82 @@ export class UserService {
     email: string;
     name: string;
     password: string;
+    userType?: "ENGINEER" | "CLIENT";
     clientId?: string;
     clientIds?: string[];
+    roleIds?: string[];
   }): Promise<User> {
     const hashedPassword = await hash(userData.password, 10);
-
-    const user = await this.userRepository.create({
-      email: userData.email,
-      name: userData.name,
-      password: hashedPassword,
-      emailVerified: null,
-      isActive: true,
-    });
 
     // 클라이언트 연결 (clientIds 우선, 없으면 clientId 호환성 지원)
     const clientIds = userData.clientIds || (userData.clientId ? [userData.clientId] : []);
 
-    if (clientIds.length > 0) {
-      await this.userRepository.updateClientAssociations(user.id, clientIds);
-    }
+    // 트랜잭션으로 원자적 처리
+    const prisma = (await import("@/lib/prisma")).default;
 
-    return user;
+    return await prisma.$transaction(async (tx) => {
+      // 1. 사용자 생성
+      const user = await tx.user.create({
+        data: {
+          email: userData.email,
+          name: userData.name,
+          password: hashedPassword,
+          emailVerified: null,
+          isActive: true,
+        },
+      });
+
+      // 2. 역할 할당 (roleIds가 제공되거나 userType으로 자동 결정)
+      let roleIdsToAssign = userData.roleIds || [];
+
+      if (roleIdsToAssign.length === 0 && userData.userType) {
+        // userType 기반 기본 역할 자동 할당
+        const defaultRoleName = userData.userType === "CLIENT" ? "CLIENT_USER" : "ENGINEER";
+        const defaultRole = await tx.role.findFirst({
+          where: { name: defaultRoleName },
+        });
+
+        if (defaultRole) {
+          roleIdsToAssign = [defaultRole.id];
+        }
+      }
+
+      if (roleIdsToAssign.length > 0) {
+        await tx.userRole.createMany({
+          data: roleIdsToAssign.map((roleId) => ({
+            userId: user.id,
+            roleId,
+          })),
+        });
+      }
+
+      // 3. 고객사 할당
+      if (clientIds.length > 0) {
+        await tx.userClient.createMany({
+          data: clientIds.map((clientId) => ({
+            userId: user.id,
+            clientId,
+          })),
+        });
+      }
+
+      // 4. 전체 정보와 함께 반환
+      return await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+        include: {
+          roles: {
+            include: {
+              role: true,
+            },
+          },
+          clients: {
+            include: {
+              client: true,
+            },
+          },
+        },
+      });
+    });
   }
 
   async getUsersWithSRHandlingPermission(

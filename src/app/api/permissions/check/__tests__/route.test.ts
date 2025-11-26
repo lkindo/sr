@@ -28,13 +28,20 @@ vi.mock('@/lib/auth-wrapper', () => ({
     }),
 }));
 
-// Mock ForbiddenError
+// Mock errors
 vi.mock('@/lib/errors', () => ({
     ForbiddenError: class ForbiddenError extends Error {
         statusCode = 403;
         constructor(message: string) {
             super(message);
             this.name = 'ForbiddenError';
+        }
+    },
+    BadRequestError: class BadRequestError extends Error {
+        statusCode = 400;
+        constructor(message: string) {
+            super(message);
+            this.name = 'BadRequestError';
         }
     },
 }));
@@ -89,7 +96,7 @@ describe('POST /api/permissions/check', () => {
         expect(mockCheckPermission).toHaveBeenCalledWith('user123', 'USER:DELETE');
     });
 
-    it('resource가 없으면 ForbiddenError를 던져야 함', async () => {
+    it('resource가 없으면 BadRequestError를 던져야 함', async () => {
         // Arrange
         const requestBody = { action: 'CREATE' }; // resource 누락
         const request = new Request('http://localhost/api/permissions/check', {
@@ -103,10 +110,10 @@ describe('POST /api/permissions/check', () => {
         // Act & Assert
         await expect(
             POST(request, { session: { user: { id: 'user123' } } } as any)
-        ).rejects.toThrow('resource and action must be provided');
+        ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
     });
 
-    it('action이 없으면 ForbiddenError를 던져야 함', async () => {
+    it('action이 없으면 BadRequestError를 던져야 함', async () => {
         // Arrange
         const requestBody = { resource: 'SR' }; // action 누락
         const request = new Request('http://localhost/api/permissions/check', {
@@ -120,7 +127,7 @@ describe('POST /api/permissions/check', () => {
         // Act & Assert
         await expect(
             POST(request, { session: { user: { id: 'user123' } } } as any)
-        ).rejects.toThrow('resource and action must be provided');
+        ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
     });
 
     it('다양한 리소스와 액션 조합을 처리해야 함', async () => {

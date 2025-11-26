@@ -14,7 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ClipboardList, 
   Users, 
@@ -155,7 +154,7 @@ export default function Home() {
       {/* Auth Section */}
       <section id="auth" className="container mx-auto px-4 py-16">
         <div className="max-w-md mx-auto">
-          <AuthTabs />
+          <LoginCard />
         </div>
       </section>
 
@@ -170,222 +169,116 @@ export default function Home() {
   );
 }
 
-function AuthTabs() {
+function LoginCard() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"login" | "register">("login");
-
-  // Login State
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-
-  // Register State
-  const [registerError, setRegisterError] = useState("");
-  const [registerSuccess, setRegisterSuccess] = useState("");
-  const [registerLoading, setRegisterLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError("");
-    setLoginLoading(true);
+    setError("");
+    setIsLoading(true);
 
     try {
       const result = await signIn("credentials", {
-        email: loginEmail,
-        password: loginPassword,
+        email,
+        password,
         redirect: false,
       });
 
       if (result?.error) {
-        setLoginError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
       } else {
         router.push("/dashboard");
         router.refresh();
       }
     } catch (error) {
-      setLoginError("로그인 중 오류가 발생했습니다.");
+      setError("로그인 중 오류가 발생했습니다.");
     } finally {
-      setLoginLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setRegisterError("");
-    setRegisterSuccess("");
-    setRegisterLoading(true);
-
-    try {
-      const formData = new FormData(e.currentTarget);
-      const name = formData.get("name") as string;
-      const email = formData.get("email") as string;
-      const password = formData.get("password") as string;
-
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "회원가입에 실패했습니다.");
-      }
-
-      setRegisterSuccess("회원가입이 완료되었습니다. 로그인 해주세요.");
-      setTimeout(() => {
-        setActiveTab("login");
-      }, 2000);
-    } catch (error) {
-      setRegisterError(
-        error instanceof Error ? error.message : "회원가입 중 오류가 발생했습니다."
-      );
-    } finally {
-      setRegisterLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "register")}>
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="login">로그인</TabsTrigger>
-        <TabsTrigger value="register">회원가입</TabsTrigger>
-      </TabsList>
+    <Card>
+      <CardHeader>
+        <CardTitle>로그인</CardTitle>
+        <CardDescription>
+          SR 관리 시스템에 로그인하세요
+        </CardDescription>
+      </CardHeader>
+      <form onSubmit={handleLogin}>
+        <CardContent className="space-y-4">
+          {error && (
+            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
+              {error}
+            </div>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="email">이메일</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="name@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isLoading}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">비밀번호</Label>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isLoading}
+            />
+          </div>
+        </CardContent>
+        <CardFooter className="flex flex-col gap-4">
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                로그인 중...
+              </>
+            ) : (
+              "로그인"
+            )}
+          </Button>
 
-      <TabsContent value="login">
-        <Card>
-          <CardHeader>
-            <CardTitle>로그인</CardTitle>
-            <CardDescription>
-              SR 관리 시스템에 로그인하세요
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handleLogin}>
-            <CardContent className="space-y-4">
-              {loginError && (
-                <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-                  {loginError}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="login-email">이메일</Label>
-                <Input
-                  id="login-email"
-                  type="email"
-                  placeholder="name@example.com"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  required
-                  disabled={loginLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="login-password">비밀번호</Label>
-                <Input
-                  id="login-password"
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  required
-                  disabled={loginLoading}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={loginLoading}
-              >
-                {loginLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    로그인 중...
-                  </>
-                ) : (
-                  "로그인"
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      </TabsContent>
+          <div className="relative w-full">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">또는</span>
+            </div>
+          </div>
 
-      <TabsContent value="register">
-        <Card>
-          <CardHeader>
-            <CardTitle>회원가입</CardTitle>
-            <CardDescription>
-              새 계정을 만들어 SR 관리 시스템을 사용하세요
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handleRegister}>
-            <CardContent className="space-y-4">
-              {registerError && (
-                <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-                  {registerError}
-                </div>
-              )}
-              {registerSuccess && (
-                <div className="bg-green-500/15 text-green-700 dark:text-green-400 text-sm p-3 rounded-md">
-                  {registerSuccess}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="register-name">이름</Label>
-                <Input
-                  id="register-name"
-                  name="name"
-                  type="text"
-                  placeholder="홍길동"
-                  required
-                  disabled={registerLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-email">이메일</Label>
-                <Input
-                  id="register-email"
-                  name="email"
-                  type="email"
-                  placeholder="name@example.com"
-                  required
-                  disabled={registerLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="register-password">비밀번호</Label>
-                <Input
-                  id="register-password"
-                  name="password"
-                  type="password"
-                  placeholder="최소 8자 이상"
-                  required
-                  disabled={registerLoading}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={registerLoading}
-              >
-                {registerLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    회원가입 중...
-                  </>
-                ) : (
-                  "회원가입"
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      </TabsContent>
-    </Tabs>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => router.push("/register")}
+          >
+            새 계정 만들기
+          </Button>
+
+          <p className="text-xs text-muted-foreground text-center">
+            고객사 담당자 또는 기술 지원팀 계정을 선택하여 가입할 수 있습니다.
+          </p>
+        </CardFooter>
+      </form>
+    </Card>
   );
 }
