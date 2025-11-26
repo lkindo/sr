@@ -33,7 +33,7 @@
 
 - `sr-permissions.spec.ts` - **역할별 권한 검증 테스트**
 
-### 🆕 고도화 테스트 (17-20)
+### 🆕 고도화 테스트 (17-23)
 
 #### 17. 다중 사용자 협업 시나리오 (`17-multi-user-collaboration.spec.ts`)
 실제 현업 워크플로우를 시뮬레이션하는 통합 테스트:
@@ -91,6 +91,56 @@ pnpm test:e2e e2e/19-file-upload-download.spec.ts
 **실행:**
 ```bash
 pnpm test:e2e e2e/20-notification-system.spec.ts
+```
+
+#### 21. SR 상태 전이 (`21-sr-status-transitions.spec.ts`) 🆕
+SR 상태 전이 규칙 및 제약 조건 검증:
+- INTAKE → IN_PROGRESS (start 액션)
+- IN_PROGRESS → ON_HOLD (hold 액션 - 보류 사유 필수)
+- ON_HOLD → IN_PROGRESS (resume 액션)
+- IN_PROGRESS → COMPLETED (complete 액션 - 해결 내용 필수)
+- COMPLETED → CONFIRMED (confirm 액션 - 신청자만 가능)
+- REQUESTED → REJECTED (reject 액션 - 거절 사유 필수)
+- 잘못된 상태 전이 차단 검증
+- 상태 이력(Status History) 생성 확인
+
+**API:** `PATCH /api/srs/[id]/status`
+
+**실행:**
+```bash
+pnpm test:e2e e2e/21-sr-status-transitions.spec.ts
+```
+
+#### 22. SR 접수 프로세스 (`22-sr-intake-process.spec.ts`) 🆕
+SR 접수 관련 완전한 워크플로우 테스트:
+- SR 접수 처리 (POST) - REQUESTED → INTAKE 전이
+- 우선순위, 예상 작업 시간, 담당자 배정
+- SLA 기반 마감일 자동 계산
+- 접수 정보 조회 (GET)
+- 접수 정보 수정 (PATCH) - 우선순위/담당자 변경
+- Activity 로그 생성 확인 (STATUS_CHANGED, ASSIGNED, INTAKE_UPDATED)
+- 권한 테스트 (CLIENT는 접수 불가)
+
+**API:** `POST/GET/PATCH /api/srs/[id]/intake`
+
+**실행:**
+```bash
+pnpm test:e2e e2e/22-sr-intake-process.spec.ts
+```
+
+#### 23. 역할 상호 배타성 (`23-role-exclusivity.spec.ts`) 🆕
+역할 할당 시 비즈니스 규칙 준수 검증:
+- 시스템 운영팀(ADMIN/MANAGER/ENGINEER) vs 고객사 팀(CLIENT_ADMIN/CLIENT_USER) 동시 부여 차단
+- 시스템 운영팀 역할은 고객사 미할당 사용자에게만
+- 고객사 팀 역할은 고객사 할당 사용자에게만
+- 역할 변경 시 고객사 할당 정합성 검증
+- 에러 메시지 명확성 확인 (error, details, suggestion)
+
+**API:** `POST /api/users/[id]/roles`
+
+**실행:**
+```bash
+pnpm test:e2e e2e/23-role-exclusivity.spec.ts
 ```
 
 ## 테스트 실행

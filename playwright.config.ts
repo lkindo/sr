@@ -85,13 +85,13 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
-      testIgnore: ['**/17-*.spec.ts', '**/18-*.spec.ts', '**/19-*.spec.ts', '**/20-*.spec.ts'],
+      testIgnore: ['**/17-*.spec.ts', '**/18-*.spec.ts', '**/19-*.spec.ts', '**/20-*.spec.ts', '**/21-*.spec.ts', '**/22-*.spec.ts', '**/23-*.spec.ts'],
     },
 
-    // Multi-user 테스트 - multi-user-setup에 의존 (고도화 테스트 17-20)
+    // Multi-user 테스트 - multi-user-setup에 의존 (고도화 테스트 17-23)
     {
       name: 'multi-user',
-      testMatch: /(17|18|19|20)-.*\.spec\.ts/,
+      testMatch: /(17|18|19|20|21|22|23)-.*\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         // 다중 사용자 테스트는 각 테스트 내에서 storageState를 동적으로 설정

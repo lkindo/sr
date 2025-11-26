@@ -132,6 +132,11 @@ test.describe('SR 워크플로우 통합', () => {
   test('2. SR 상태 변경 및 댓글 작성', async ({ page }) => {
     await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
+    // 접수 완료 확인 (INTAKE 상태)
+    const intakeStatus = page.locator('text=/접수|INTAKE/i').first();
+    await expect(intakeStatus).toBeVisible({ timeout: 10000 });
+    console.log(`✅ SR 접수 상태 확인 (INTAKE)`);
+
     // 댓글 작성
     const commentTextarea = page.locator('textarea').first();
     await expect(commentTextarea).toBeVisible({ timeout: 10000 });
@@ -151,46 +156,51 @@ test.describe('SR 워크플로우 통합', () => {
 
     console.log(`✅ 댓글 작성 완료`);
 
-    // 상태 변경 테스트 (선택적 - 권한에 따라 버튼이 없을 수 있음)
-    console.log(`🔄 상태 변경 UI 테스트 시작...`);
+    // 상태 변경 테스트 - /api/srs/[id]/status API를 사용하는 버튼 테스트
+    console.log(`🔄 상태 변경 API 테스트 시작...`);
 
-    // 가능한 상태 변경 버튼들을 순서대로 찾기
-    const statusChangeButtons = [
-      { name: '진행 시작', selector: page.getByRole('button', { name: /진행 시작/i }) },
-      { name: '완료 처리', selector: page.getByRole('button', { name: /완료 처리/i }) },
-    ];
+    // 진행 시작 버튼 (INTAKE → IN_PROGRESS)
+    const startButton = page.getByRole('button', { name: /진행 시작|Start/i });
+    if (await startButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await startButton.click();
+      await page.waitForTimeout(2000);
 
-    for (const { name, selector } of statusChangeButtons) {
-      try {
-        if (await selector.isVisible({ timeout: 2000 })) {
-          console.log(`✅ '${name}' 버튼 발견`);
+      // IN_PROGRESS 상태 확인
+      const inProgressStatus = page.locator('text=/진행|IN_PROGRESS/i').first();
+      await expect(inProgressStatus).toBeVisible({ timeout: 5000 });
+      console.log(`✅ 진행 시작 완료 (INTAKE → IN_PROGRESS)`);
+    } else {
+      console.log(`⚠️ 진행 시작 버튼을 찾을 수 없습니다.`);
+    }
 
-          if (name === '완료 처리') {
-            // 완료 처리는 다이얼로그 필요
-            await selector.click();
-            const dialog = page.locator('dialog');
-            await dialog.waitFor({ state: 'visible', timeout: 5000 });
+    // 페이지 새로고침하여 최신 상태 확인
+    await page.reload();
+    await page.waitForLoadState('networkidle');
 
-            const resolutionTextarea = page.locator('textarea[id="resolution"]');
-            await resolutionTextarea.fill('테스트로 문제가 해결되었습니다.');
+    // 완료 처리 버튼 (IN_PROGRESS → COMPLETED)
+    const completeButton = page.getByRole('button', { name: /완료 처리|Complete/i });
+    if (await completeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await completeButton.click();
 
-            const submitBtn = dialog.getByRole('button', { name: /완료 처리/i });
-            await submitBtn.click();
-            await dialog.waitFor({ state: 'hidden', timeout: 5000 });
-            console.log(`✅ 완료 처리 성공`);
-          } else {
-            // 그 외 버튼은 바로 클릭
-            await selector.click();
-            console.log(`✅ '${name}' 클릭 완료`);
-          }
+      // 다이얼로그가 나타나면 해결 내용 입력
+      const dialog = page.locator('[role="dialog"], dialog').first();
+      if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const resolutionTextarea = dialog.locator('textarea').first();
+        await resolutionTextarea.fill('테스트로 문제가 해결되었습니다.');
 
-          await page.waitForTimeout(2000);
-          break;
-        }
-      } catch (e) {
-        // 버튼이 없으면 다음 버튼 확인
-        continue;
+        const submitBtn = dialog.getByRole('button', { name: /완료|Complete|확인/i }).first();
+        await submitBtn.click();
+        await page.waitForTimeout(2000);
+
+        // COMPLETED 상태 확인
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        const completedStatus = page.locator('text=/완료|COMPLETED/i').first();
+        await expect(completedStatus).toBeVisible({ timeout: 5000 });
+        console.log(`✅ 완료 처리 성공 (IN_PROGRESS → COMPLETED)`);
       }
+    } else {
+      console.log(`⚠️ 완료 처리 버튼을 찾을 수 없습니다.`);
     }
 
     console.log(`✅ 상태 변경 테스트 완료`);

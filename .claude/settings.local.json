@@ -89,7 +89,13 @@
       "Bash(ls:*)",
       "Bash(rm:*)",
       "Bash(npx tsx:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(set SKIP_WEBSERVER=true)",
+      "Bash(pnpm prisma db push:*)",
+      "Bash(pnpm prisma studio:*)",
+      "Bash(cmd /c \"if exist .next rmdir /s /q .next\")",
+      "Bash(cmd /c \"set SKIP_WEBSERVER=true &amp;&amp; pnpm exec playwright test --project=multi-user-setup --reporter=list\")",
+      "Bash(cmd /c \"set SKIP_WEBSERVER=true &amp;&amp; pnpm exec playwright test e2e/21-sr-status-transitions.spec.ts --grep \"\"COMPLETED → CONFIRMED\"\" --reporter=list\")"
     ],
     "deny": [],
     "ask": []

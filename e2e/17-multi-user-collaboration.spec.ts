@@ -104,7 +104,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       console.log(`✅ CLIENT가 SR 생성 완료: ${srId} - ${srTitle}`);
 
       // 상태 확인 (REQUESTED)
-      const statusBadge = page.locator('text=/신청|REQUESTED/i').first();
+      const statusBadge = page.locator('text=/요청됨|REQUESTED/i').first();
       await expect(statusBadge).toBeVisible({ timeout: 5000 });
     } finally {
       await context.close();
