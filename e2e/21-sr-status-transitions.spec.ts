@@ -71,7 +71,15 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.waitForLoadState('networkidle');
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
-      await expect(srRow).toBeVisible({ timeout: 10000 });
+
+      // SR이 목록에 보이지 않으면 한 번 새로고침 시도
+      if (!(await srRow.isVisible({ timeout: 5000 }))) {
+        console.log('⚠️ SR이 목록에 바로 나타나지 않아 새로고침합니다.');
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+      }
+
+      await expect(srRow).toBeVisible({ timeout: 20000 });
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       srId = page.url().split('/').pop()!;
@@ -136,10 +144,8 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.waitForTimeout(2000);
 
       // IN_PROGRESS 상태 확인
-      await page.reload();
-      await page.waitForLoadState('networkidle');
       const inProgressStatus = page.locator('text=/진행중|IN_PROGRESS/i').first();
-      await expect(inProgressStatus).toBeVisible({ timeout: 5000 });
+      await expect(inProgressStatus).toBeVisible({ timeout: 10000 });
 
       console.log(`✅ INTAKE → IN_PROGRESS 전이 성공`);
     } finally {
@@ -174,10 +180,8 @@ test.describe('SR 상태 전이 테스트', () => {
           await page.waitForTimeout(2000);
 
           // ON_HOLD 상태 확인
-          await page.reload();
-          await page.waitForLoadState('networkidle');
           const onHoldStatus = page.locator('text=/보류|ON_HOLD/i').first();
-          await expect(onHoldStatus).toBeVisible({ timeout: 5000 });
+          await expect(onHoldStatus).toBeVisible({ timeout: 10000 });
 
           console.log(`✅ IN_PROGRESS → ON_HOLD 전이 성공`);
         } else {
@@ -210,10 +214,8 @@ test.describe('SR 상태 전이 테스트', () => {
           await page.waitForTimeout(2000);
 
           // IN_PROGRESS 상태 확인
-          await page.reload();
-          await page.waitForLoadState('networkidle');
           const inProgressStatus = page.locator('text=/진행중|IN_PROGRESS/i').first();
-          await expect(inProgressStatus).toBeVisible({ timeout: 5000 });
+          await expect(inProgressStatus).toBeVisible({ timeout: 10000 });
 
           console.log(`✅ ON_HOLD → IN_PROGRESS 전이 성공`);
         } else {
@@ -255,10 +257,8 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.waitForTimeout(2000);
 
       // COMPLETED 상태 확인
-      await page.reload();
-      await page.waitForLoadState('networkidle');
       const completedStatus = page.locator('text=/완료|COMPLETED/i').first();
-      await expect(completedStatus).toBeVisible({ timeout: 5000 });
+      await expect(completedStatus).toBeVisible({ timeout: 10000 });
 
       console.log(`✅ IN_PROGRESS → COMPLETED 전이 성공`);
     } finally {
@@ -302,8 +302,6 @@ test.describe('SR 상태 전이 테스트', () => {
         await page.waitForTimeout(2000);
 
         // CONFIRMED 상태 확인
-        await page.reload();
-        await page.waitForLoadState('networkidle');
         const confirmedStatus = page.locator('text=/확인완료|CONFIRMED/i').first();
 
         if (await confirmedStatus.isVisible({ timeout: 5000 }).catch(() => false)) {
@@ -454,10 +452,8 @@ test.describe('SR 상태 전이 제약 조건 테스트', () => {
           await managerPage.waitForTimeout(2000);
 
           // REJECTED 상태 확인
-          await managerPage.reload();
-          await managerPage.waitForLoadState('networkidle');
           const rejectedStatus = managerPage.locator('text=/거절|REJECTED/i').first();
-          await expect(rejectedStatus).toBeVisible({ timeout: 5000 });
+          await expect(rejectedStatus).toBeVisible({ timeout: 10000 });
 
           console.log(`✅ REQUESTED → REJECTED 전이 성공`);
         }

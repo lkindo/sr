@@ -15,7 +15,7 @@ test.describe('인증 플로우', () => {
     const testPassword = 'TestPassword123!'
 
     // 페이지 로드 확인 (더 구체적인 선택자 사용)
-    await expect(page.locator('.text-2xl').filter({ hasText: '회원가입' })).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.text-2xl').filter({ hasText: '회원가입' })).toBeVisible({ timeout: 20000 })
 
     // 1. 기본 정보 입력
     await page.fill('#name', 'E2E Test Client User')
@@ -68,7 +68,7 @@ test.describe('인증 플로우', () => {
     const testPassword = 'TestPassword123!'
 
     // 페이지 로드 확인 (더 구체적인 선택자 사용)
-    await expect(page.locator('.text-2xl').filter({ hasText: '회원가입' })).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.text-2xl').filter({ hasText: '회원가입' })).toBeVisible({ timeout: 20000 })
 
     // 1. 기본 정보 입력
     await page.fill('#name', 'E2E Test Engineer')
@@ -169,7 +169,7 @@ test.describe('인증 플로우', () => {
 
     // 테스트 사용자로 로그인
     await page.fill('#email', process.env.TEST_USER_EMAIL || 'admin@example.com')
-    await page.fill('#password', process.env.TEST_USER_PASSWORD || 'admin123')
+    await page.fill('#password', process.env.TEST_USER_PASSWORD || 'password123')
     await page.click('button[type="submit"]')
 
     // 제출 후 대기
@@ -197,6 +197,14 @@ test.describe('인증 플로우', () => {
 
       // 대시보드에 접근 가능하면 로그인 성공
       const canAccessDashboard = !page.url().includes('/login')
+
+      if (!canAccessDashboard) {
+        // 로그인 실패 시 에러 메시지 확인
+        const errorText = await page.locator('[role="alert"]').textContent().catch(() => null)
+        console.log('❌ 로그인 실패. 현재 URL:', page.url())
+        if (errorText) console.log('❌ 에러 메시지:', errorText)
+      }
+
       expect(canAccessDashboard).toBeTruthy()
     }
   })

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle } from "lucide-react";
 import {
     Dialog,
@@ -33,6 +34,7 @@ export function CompleteSRDialog({
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const handleComplete = async (e?: React.FormEvent) => {
         if (e) {
@@ -74,6 +76,9 @@ export function CompleteSRDialog({
 
             setResolutionDescription("");
             onOpenChange(false);
+
+            // React Query 캐시 무효화
+            await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
 
             // SR 목록으로 이동
             router.push("/srs");

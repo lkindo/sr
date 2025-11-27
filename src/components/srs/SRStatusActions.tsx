@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import {
     CheckCircle,
     Play,
@@ -50,6 +51,7 @@ export function SRStatusActions({
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     // 권한 체크
     const hasRole = (roles: string[]) =>
@@ -80,6 +82,9 @@ export function SRStatusActions({
                 title: "성공",
                 description: "상태가 변경되었습니다.",
             });
+
+            // React Query 캐시 무효화하여 최신 데이터 가져오기
+            await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
 
             router.refresh();
         } catch (error) {

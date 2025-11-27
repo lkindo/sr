@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Shield } from "lucide-react";
+import { ArrowLeft, Pencil, Shield, UserX } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { useSession } from "next-auth/react";
 
 import { UserDialog } from "@/components/users/UserDialog";
 import { AssignRolesDialog } from "@/components/users/AssignRolesDialog";
-import { useToast } from "@/hooks/use-toast";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 
 interface Permission {
@@ -94,6 +95,7 @@ export default function UserDetailPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAssignRolesDialogOpen, setIsAssignRolesDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { data: session, update } = useSession();
 
   const fetchUser = useCallback(async () => {
     try {
@@ -194,6 +196,104 @@ export default function UserDetailPage() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
               <Pencil className="mr-2 h-4 w-4" />
               수정
+            </Button>
+          </PermissionGuard>
+          <PermissionGuard roles={["ADMIN"]}>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                // 세션 업데이트 시도
+                await update();
+                const currentRoles = session?.user?.roles || [];
+                const isAdmin = currentRoles.includes("ADMIN");
+
+                if (!isAdmin) {
+                  toast({
+                    title: "권한 없음",
+                    description: `사용자 삭제 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                // Check if user is trying to delete themselves
+                if (session?.user?.id === user.id) {
+                  toast({
+                    title: "삭제 불가",
+                    description: "자신의 계정은 삭제할 수 없습니다.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                // Check if user has system roles
+                const hasSystemRole = user.roles.some((ur) =>
+                  ['ADMIN', 'MANAGER'].includes(ur.role.name)
+                );
+
+                if (hasSystemRole) {
+                  toast({
+                    title: "삭제 제한",
+                    description: "시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+
+                const isHardDelete = !user.isActive;
+                const confirmMessage = isHardDelete
+                  ? `정말 사용자 ${user.name} (이메일: ${user.email}) 을 완전히 삭제하시겠습니까?\n\n주의: 이 작업은 영구적이며 모든 데이터가 삭제됩니다. SR 이력이 있는 사용자는 삭제할 수 없습니다.`
+                  : `정말 사용자 ${user.name} (이메일: ${user.email}) 을 비활성화하시겠습니까?\n\n경고: 이 작업은 되돌릴 수 없습니다.`;
+
+                if (window.confirm(confirmMessage)) {
+                  try {
+                    const url = isHardDelete ? `/api/users/${user.id}?hard=true` : `/api/users/${user.id}`;
+                    const res = await fetch(url, {
+                      method: "DELETE",
+                    });
+
+                    if (!res.ok) {
+                      const errorData = await res.json().catch(() => ({}));
+                      let errorMessage = errorData.error || errorData.message || "삭제 실패";
+
+                      if (errorMessage.includes("본인 계정은 삭제할 수 없습니다")) {
+                        errorMessage = "자신의 계정은 삭제할 수 없습니다.";
+                      } else if (errorMessage.includes("진행 중인 SR이 할당되어 있습니다")) {
+                        // 서버에서 보낸 상세 메시지(SR 번호 포함)를 그대로 사용
+                        // errorMessage = errorMessage; 
+                      } else if (errorMessage.includes("시스템 운영팀")) {
+                        errorMessage = "시스템 운영팀 사용자는 삭제할 수 없습니다.";
+                      } else if (errorMessage.includes("SR 요청 또는 처리 이력")) {
+                        errorMessage = "SR 요청/처리 이력이 있는 사용자는 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.";
+                      }
+
+                      toast({
+                        title: "삭제 실패",
+                        description: errorMessage,
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    toast({
+                      title: isHardDelete ? "완전 삭제 완료" : "비활성화 완료",
+                      description: isHardDelete ? "사용자가 영구적으로 삭제되었습니다." : "사용자가 성공적으로 비활성화되었습니다.",
+                    });
+
+                    router.push("/users");
+                  } catch (e) {
+                    toast({
+                      title: "삭제 실패",
+                      description: "사용자 삭제에 실패했습니다.",
+                      variant: "destructive",
+                    });
+                  }
+                }
+              }}
+              className="text-destructive border-destructive hover:bg-destructive hover:text-white"
+            >
+              <UserX className="mr-2 h-4 w-4" />
+              {user.isActive ? "비활성화" : "완전 삭제"}
             </Button>
           </PermissionGuard>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { XCircle } from "lucide-react";
 import {
     Dialog,
@@ -33,6 +34,7 @@ export function RejectSRDialog({
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     const handleReject = async (e?: React.FormEvent) => {
         if (e) {
@@ -74,6 +76,9 @@ export function RejectSRDialog({
 
             setReason("");
             onOpenChange(false);
+
+            // React Query 캐시 무효화
+            await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
 
             // SR 목록으로 이동
             router.push("/srs");

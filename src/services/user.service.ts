@@ -6,7 +6,7 @@ import { invalidateCachePattern } from "@/lib/redis-cache";
 import { hash, compare } from "bcryptjs";
 import { userUpdateSchema } from "@/lib/schemas";
 import { z } from "zod";
-import { NotFoundError, ValidationError } from "@/lib/errors";
+import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
 import type { User, Role, Permission } from "@prisma/client";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
@@ -115,6 +115,69 @@ export class UserService {
     await invalidateCachePattern(`user:*:${userId}`);
     await invalidateCachePattern("user:list*");
     return user;
+  }
+
+  async hardDeleteUser(userId: string): Promise<User> {
+    const prisma = (await import("@/lib/prisma")).default;
+
+    // 1. 연관 데이터 확인 (SR 관련)
+    const relatedDataCount = await prisma.sR.count({
+      where: {
+        OR: [
+          { requesterId: userId },
+          { assigneeId: userId },
+          { intakeById: userId },
+        ],
+      },
+    });
+
+    if (relatedDataCount > 0) {
+      throw new BusinessRuleError(
+        "해당 사용자는 SR 요청 또는 처리 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+      );
+    }
+
+    // 2. 활동 이력 확인
+    const activityCount = await prisma.sRActivity.count({
+      where: { userId },
+    });
+
+    if (activityCount > 0) {
+      throw new BusinessRuleError(
+        "해당 사용자는 SR 활동 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+      );
+    }
+
+    // 3. 댓글 이력 확인
+    const commentCount = await prisma.sRComment.count({
+      where: { userId },
+    });
+
+    if (commentCount > 0) {
+      throw new BusinessRuleError(
+        "해당 사용자는 SR 댓글 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+      );
+    }
+
+    // 4. 상태 변경 이력 확인
+    const statusHistoryCount = await prisma.sRStatusHistory.count({
+      where: { changedBy: userId },
+    });
+
+    if (statusHistoryCount > 0) {
+      throw new BusinessRuleError(
+        "해당 사용자는 SR 상태 변경 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+      );
+    }
+
+    // 5. 완전 삭제 수행
+    const deletedUser = await this.userRepository.delete(userId);
+
+    // 캐시 무효화
+    await invalidateCachePattern(`user:*:${userId}`);
+    await invalidateCachePattern("user:list*");
+
+    return deletedUser;
   }
 
   async createUser(userData: {
@@ -238,3 +301,4 @@ export class UserService {
     return this.userRepository.updatePassword(userId, hashedPassword);
   }
 }
+// Force rebuild

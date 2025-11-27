@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { RotateCcw } from "lucide-react";
 import {
     Dialog,
@@ -35,6 +36,7 @@ export function ReopenSRDialog({
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     // 7일 이내 확인 (완료일이 없으면 허용 - 서버에서 처리하거나 레거시 데이터)
     const canReopen = completedAt
@@ -91,6 +93,9 @@ export function ReopenSRDialog({
 
             setReason("");
             onOpenChange(false);
+
+            // React Query 캐시 무효화
+            await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
 
             // SR 목록으로 이동
             router.push("/srs");

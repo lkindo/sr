@@ -196,10 +196,10 @@ export function ClientBadgeWithActions({
             <AlertDialogDescription>
               <strong>{userName}</strong>님의 <strong>{client.name}</strong>{" "}
               소속을 해제하시겠습니까?
-              <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+              <span className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded block">
                 ⚠ 기존 SR은 그대로 유지되지만, 더 이상 해당 고객사의 SR을 처리할
                 수 없습니다.
-              </div>
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

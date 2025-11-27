@@ -128,6 +128,8 @@ export default function UsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [showBulkAssign, setShowBulkAssign] = useState(false);
   const [bulkAssignClientId, setBulkAssignClientId] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Pagination & Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -257,6 +259,51 @@ export default function UsersPage() {
   const handleCreateUser = () => {
     setSelectedUser(null);
     setUserDialogOpen(true);
+  };
+
+  const handleDeleteUser = async (userId: string, isHardDelete: boolean = false) => {
+    try {
+      const url = isHardDelete ? `/api/users/${userId}?hard=true` : `/api/users/${userId}`;
+      const res = await fetch(url, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.message || "삭제 실패";
+
+        // Provide more specific error messages based on the error content
+        let detailedMessage = errorMessage;
+
+        if (errorMessage.includes("본인 계정은 삭제할 수 없습니다")) {
+          detailedMessage = "자신의 계정은 삭제할 수 없습니다.";
+        } else if (errorMessage.includes("진행 중인 SR이 할당되어 있습니다")) {
+          // 서버에서 보낸 상세 메시지(SR 번호 포함)를 그대로 사용
+          detailedMessage = errorMessage;
+        } else if (errorMessage.includes("시스템 운영팀")) {
+          detailedMessage = "시스템 운영팀 사용자는 삭제할 수 없습니다.";
+        } else if (errorMessage.includes("SR 요청 또는 처리 이력")) {
+          detailedMessage = "SR 요청/처리 이력이 있는 사용자는 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.";
+        }
+
+        throw new Error(detailedMessage);
+      }
+
+      toast({
+        title: isHardDelete ? "완전 삭제 완료" : "비활성화 완료",
+        description: isHardDelete ? "사용자가 영구적으로 삭제되었습니다." : "사용자가 성공적으로 비활성화되었습니다.",
+      });
+
+      await fetchUsers();
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : "사용자 삭제에 실패했습니다.";
+      toast({
+        title: "삭제 실패",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      throw e;
+    }
   };
 
   const onUserSaved = () => {
@@ -793,18 +840,62 @@ export default function UsersPage() {
                             }}
                             className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
                           >
-                            {user.isActive ? (
-                              <>
-                                <UserX className="mr-1 h-4 w-4" />
-                                비활성화
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="mr-1 h-4 w-4" />
-                                활성화
-                              </>
-                            )}
+                            {user.isActive ? <UserX className="mr-1 h-4 w-4" /> : <UserCheck className="mr-1 h-4 w-4" />}
+                            {user.isActive ? "비활성화" : "활성화"}
                           </Button>
+                          <PermissionGuard roles={["ADMIN"]}>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                // 세션 업데이트 시도
+                                await update();
+                                const currentRoles = session?.user?.roles || [];
+                                const isAdmin = currentRoles.includes("ADMIN");
+
+                                if (!isAdmin) {
+                                  toast({
+                                    title: "권한 없음",
+                                    description: `사용자 삭제 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+
+                                // Check if user is trying to delete themselves
+                                if (session?.user?.id === user.id) {
+                                  toast({
+                                    title: "삭제 불가",
+                                    description: "자신의 계정은 삭제할 수 없습니다.",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+
+                                // Check if user has system roles
+                                const hasSystemRole = user.roles.some((ur) =>
+                                  ['ADMIN', 'MANAGER'].includes(ur.role.name)
+                                );
+
+                                if (hasSystemRole) {
+                                  toast({
+                                    title: "삭제 제한",
+                                    description: "시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+
+                                setUserToDelete(user);
+                                setDeleteDialogOpen(true);
+                              }}
+                              className="text-[hsl(var(--sr-gray-medium))] hover:text-destructive hover:bg-transparent"
+                            >
+                              <UserX className="mr-1 h-4 w-4" />
+                              삭제
+                            </Button>
+                          </PermissionGuard>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -894,6 +985,7 @@ export default function UsersPage() {
           </div>
         )}
 
+
         {/* Pagination Controls */}
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-center py-4 border-t border-[hsl(var(--sr-border))]">
@@ -935,6 +1027,63 @@ export default function UsersPage() {
         user={selectedUser}
         onSaved={onUserSaved}
       />
-    </div>
+
+      {/* Delete Confirmation Dialog */}
+      {
+        deleteDialogOpen && userToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md border border-[hsl(var(--sr-border))] shadow-lg">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-[hsl(var(--sr-primary-dark))]">
+                  {userToDelete.isActive ? "사용자 비활성화 확인" : "사용자 완전 삭제 확인"}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  사용자 <span className="font-medium text-[hsl(var(--sr-primary-dark))]">{userToDelete.name}</span> (이메일: {userToDelete.email}) 을
+                  {userToDelete.isActive ? " 비활성화하시겠습니까?" : " 완전히 삭제하시겠습니까?"}
+                </p>
+                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
+                  <p className="font-medium">경고: 이 작업은 되돌릴 수 없습니다.</p>
+                  {userToDelete.isActive ? (
+                    <p>사용자는 비활성화되며, 관련된 SR이 있다면 다른 담당자에게 재할당되어야 합니다.</p>
+                  ) : (
+                    <p className="text-red-600 font-bold">주의: 이 작업은 영구적이며 모든 데이터가 삭제됩니다. SR 이력이 있는 사용자는 삭제할 수 없습니다.</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDeleteDialogOpen(false);
+                    setUserToDelete(null);
+                  }}
+                >
+                  취소
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (userToDelete) {
+                      try {
+                        // 이미 비활성화된 상태라면 완전 삭제 시도
+                        const isHardDelete = !userToDelete.isActive;
+                        await handleDeleteUser(userToDelete.id, isHardDelete);
+                        setDeleteDialogOpen(false);
+                        setUserToDelete(null);
+                      } catch (error) {
+                        console.error("Error deleting user:", error);
+                        // Error handling is already in handleDeleteUser
+                      }
+                    }
+                  }}
+                >
+                  {userToDelete.isActive ? "예, 비활성화합니다" : "예, 완전히 삭제합니다"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 }

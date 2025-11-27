@@ -145,10 +145,8 @@ test.describe('SR 워크플로우 통합', () => {
     const submitButton = page.getByRole('button', { name: /댓글 추가/i });
     await submitButton.click();
 
-    // 댓글 등록 확인 - 잠시 대기 후 새로고침하여 댓글 목록에서 확인
-    await page.waitForTimeout(2000);
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    // 댓글 등록 확인 - 잠시 대기 후 댓글 목록에서 확인
+    await page.waitForTimeout(1000);
 
     // 작성한 댓글이 목록에 표시되는지 확인
     const commentContent = page.locator('text=작업을 시작합니다.').first();
@@ -173,9 +171,7 @@ test.describe('SR 워크플로우 통합', () => {
       console.log(`⚠️ 진행 시작 버튼을 찾을 수 없습니다.`);
     }
 
-    // 페이지 새로고침하여 최신 상태 확인
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    // 최신 상태 확인
 
     // 완료 처리 버튼 (IN_PROGRESS → COMPLETED)
     const completeButton = page.getByRole('button', { name: /완료 처리|Complete/i });
@@ -193,7 +189,6 @@ test.describe('SR 워크플로우 통합', () => {
         await page.waitForTimeout(2000);
 
         // COMPLETED 상태 확인
-        await page.reload();
         await page.waitForLoadState('networkidle');
         const completedStatus = page.locator('text=/완료|COMPLETED/i').first();
         await expect(completedStatus).toBeVisible({ timeout: 5000 });
