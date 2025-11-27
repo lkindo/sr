@@ -144,11 +144,28 @@ export async function getClientAction(id: string) {
 
 export async function getClientsForSelection() {
   try {
+    console.log("🔍 [getClientsForSelection] 고객사 목록 조회 시작");
+
     // No auth check needed for a simple selection list
     const clientService = new ClientService();
     const clients = await clientService.getAllClients();
+
+    console.log("✅ [getClientsForSelection] 고객사 조회 성공:", {
+      count: clients.length,
+      firstClient: clients[0] ? { id: clients[0].id, name: clients[0].name } : null,
+    });
+
     return { success: true, data: clients };
   } catch (error) {
-    return { success: false, error: "고객사 목록을 불러오는데 실패했습니다." };
+    console.error("❌ [getClientsForSelection] 고객사 목록 조회 실패:", error);
+    console.error("❌ [getClientsForSelection] 에러 상세:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "고객사 목록을 불러오는데 실패했습니다."
+    };
   }
 }

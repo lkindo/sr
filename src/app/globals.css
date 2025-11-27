@@ -6,6 +6,11 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  header .text-lg {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
 }
 
 
@@ -39,17 +44,26 @@
     --radius: 0.25rem;
 
     /* SR Management Design System Colors - Based on HTML Template */
-    --sr-primary-dark: 235 45% 23%; /* #2a3053 - Main sidebar color */
-    --sr-primary-darker: 233 47% 19%; /* #212642 - Sidebar submenu color */
-    --sr-sidebar-hover: 233 30% 29%; /* #34395b - Hover state */
-    --sr-gray-medium: 233 15% 60%; /* #9497a9 - Text muted */
-    --sr-gray-light: 233 15% 65%; /* #9092a0 - Submenu text */
-    --sr-bg-light: 232 45% 97%; /* #f5f6f9 - Light background */
+    --sr-primary-dark: 235 45% 23%;
+    /* #2a3053 - Main sidebar color */
+    --sr-primary-darker: 233 47% 19%;
+    /* #212642 - Sidebar submenu color */
+    --sr-sidebar-hover: 233 30% 29%;
+    /* #34395b - Hover state */
+    --sr-gray-medium: 233 15% 60%;
+    /* #9497a9 - Text muted */
+    --sr-gray-light: 233 15% 65%;
+    /* #9092a0 - Submenu text */
+    --sr-bg-light: 232 45% 97%;
+    /* #f5f6f9 - Light background */
     --sr-bg-lighter: 234 11% 93%;
-    --sr-border: 0 0% 88%; /* #e1e1e1 - Border light */
-    --sr-accent-orange: 16 100% 50%; /* #ff5000 - Accent color */
+    --sr-border: 0 0% 88%;
+    /* #e1e1e1 - Border light */
+    --sr-accent-orange: 16 100% 50%;
+    /* #ff5000 - Accent color */
     --sr-accent-blue: 228 31% 42%;
   }
+
   .dark {
     --background: 232 28% 10%;
     --foreground: 0 0% 98%;
@@ -95,6 +109,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -350,22 +365,45 @@
   }
 
   @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @keyframes slideIn {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
+    from {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
   }
 
   /* Animation Utilities */
@@ -544,7 +582,8 @@
 
   /* Header with Accent Border */
   .sr-header-accent {
-    @apply border-b-2 border-[hsl(var(--sr-accent-orange))];
+    border-bottom-width: 2px;
+    border-color: hsl(var(--sr-primary-dark));
   }
 
   /* Content Background */

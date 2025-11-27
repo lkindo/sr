@@ -36,8 +36,16 @@ export function SRAttachments({ srId }: SRAttachmentsProps) {
       const response = await fetch(`/api/srs/${srId}`);
       if (!response.ok) throw new Error("Failed to fetch attachments");
       const data = await response.json();
+
+      // 🔍 디버깅 로그: SR 데이터 확인
+      console.log("🔍 [SRAttachments] SR 전체 데이터:", data);
+      console.log("📎 [SRAttachments] Attachments 필드:", data.attachments);
+      console.log("📊 [SRAttachments] Attachments 개수:", data.attachments?.length || 0);
+      console.log("🔢 [SRAttachments] _count.attachments:", data._count?.attachments);
+
       setAttachments(data.attachments || []);
     } catch (error) {
+      console.error("❌ [SRAttachments] 첨부파일 조회 실패:", error);
       toast({
         title: "오류",
         description: "첨부파일을 불러오는데 실패했습니다.",

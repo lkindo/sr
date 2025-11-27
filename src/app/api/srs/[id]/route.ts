@@ -33,8 +33,30 @@ export const GET = withAuthAndRateLimit(async (
     throw new NotFoundError("SR을 찾을 수 없습니다.");
   }
 
+  // 🔍 디버깅 로그: SR 상세 조회 결과 확인
+  console.log("🔍 [API /srs/[id]] SR 조회 성공:", {
+    id: sr.id,
+    srNumber: sr.srNumber,
+    attachmentsCount: sr.attachments?.length,
+    attachmentsExists: !!sr.attachments,
+    _countAttachments: sr._count?.attachments,
+    cacheUsed: isCacheAvailable(),
+  });
+
+  if (sr.attachments && sr.attachments.length > 0) {
+    console.log("📎 [API /srs/[id]] Attachments 샘플:", sr.attachments[0]);
+  }
+
   // 날짜 객체를 문자열로 변환 (JSON 직렬화를 위해)
-  return NextResponse.json(serializeResponse(sr));
+  const serialized = serializeResponse(sr);
+
+  // 🔍 직렬화 후 attachments 확인
+  console.log("📦 [API /srs/[id]] 직렬화 후 attachments:", {
+    exists: !!(serialized as any).attachments,
+    count: (serialized as any).attachments?.length,
+  });
+
+  return NextResponse.json(serialized);
 }, { preset: 'standard' }); // 1분당 100회
 
 // PATCH /api/srs/[id] - SR 수정 (Rate Limit: 엄격)

@@ -72,11 +72,18 @@ export function CreateSRDialog({
   const canSelectClient = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
 
   const fetchClients = useCallback(async () => {
+    console.log("🔍 [CreateSRDialog] fetchClients 시작, isClientUser:", isClientUser);
+
     // 고객사 사용자인 경우 자신의 고객사만 가져오기
     if (isClientUser) {
+      console.log("📋 [CreateSRDialog] 고객사 사용자 - 프로필에서 고객사 가져오기");
       const profileResult = await getProfileAction();
+      console.log("📋 [CreateSRDialog] 프로필 조회 결과:", profileResult);
+
       if (profileResult.success && profileResult.data) {
         const userClients = (profileResult.data as { clients?: Array<{ client: { id: string; code: string; name: string } }> }).clients || [];
+        console.log("📋 [CreateSRDialog] 사용자 고객사:", userClients);
+
         if (userClients.length > 0) {
           // 첫 번째 고객사 사용 (일반적으로 사용자는 하나의 고객사에만 속함)
           const userClient = userClients[0].client;
@@ -87,7 +94,9 @@ export function CreateSRDialog({
           }]);
           // 자동으로 고객사 설정
           setClientId(userClient.id);
+          console.log("✅ [CreateSRDialog] 고객사 설정 완료:", userClient);
         } else {
+          console.error("❌ [CreateSRDialog] 사용자에게 연결된 고객사가 없음");
           toast({
             title: "오류",
             description: "고객사 정보를 찾을 수 없습니다.",
@@ -95,18 +104,25 @@ export function CreateSRDialog({
           });
         }
       } else {
+        const errorMsg = profileResult.success === false ? profileResult.error : "사용자 정보를 불러오지 못했습니다.";
+        console.error("❌ [CreateSRDialog] 프로필 조회 실패:", errorMsg);
         toast({
           title: "오류",
-          description: "사용자 정보를 불러오지 못했습니다.",
+          description: errorMsg,
           variant: "destructive",
         });
       }
     } else {
       // ADMIN, MANAGER, ENGINEER인 경우 모든 고객사 가져오기
+      console.log("📋 [CreateSRDialog] 관리자 사용자 - 전체 고객사 목록 가져오기");
       const result = await getClientsForSelection();
+      console.log("📋 [CreateSRDialog] getClientsForSelection 결과:", result);
+
       if (result.success) {
+        console.log("✅ [CreateSRDialog] 고객사 목록 설정:", result.data);
         setClients(result.data as Client[]);
       } else {
+        console.error("❌ [CreateSRDialog] 고객사 목록 조회 실패:", result.error);
         toast({
           title: "오류",
           description: "고객사 목록을 불러오지 못했습니다.",
@@ -160,8 +176,10 @@ export function CreateSRDialog({
   }, [open, isClientUser, clients, clientId]);
 
   const uploadAttachments = async (srId: string, files: File[]) => {
+    console.log(`📤 [CreateSRDialog] 파일 업로드 시작: SR ID=${srId}, 파일 개수=${files.length}`);
     const formData = new FormData();
     files.forEach((file) => {
+      console.log(`   - 파일 추가: ${file.name} (${file.size} bytes)`);
       formData.append("files", file);
     });
 
@@ -171,11 +189,19 @@ export function CreateSRDialog({
         body: formData,
       });
 
+      console.log(`📥 [CreateSRDialog] 업로드 응답 상태: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ [CreateSRDialog] 업로드 실패 응답:`, errorText);
         throw new Error("Failed to upload attachments");
       }
+
+      const result = await response.json();
+      console.log(`✅ [CreateSRDialog] 업로드 성공:`, result);
+
     } catch (error) {
-      console.error("첨부파일 업로드 실패:", error);
+      console.error("❌ [CreateSRDialog] 첨부파일 업로드 에러:", error);
       toast({
         title: "경고",
         description: "SR은 생성되었으나 첨부파일 업로드에 실패했습니다.",
@@ -215,11 +241,14 @@ export function CreateSRDialog({
       }
 
       const createdSR = result.data;
-      console.log(" [CreateSR] SR 생성 성공!", createdSR);
+      console.log("✅ [CreateSR] SR 생성 성공!", createdSR);
 
       // Upload attachments if any
       if (files.length > 0) {
+        console.log(`📂 [CreateSR] 첨부파일 업로드 시도: ${files.length}개`);
         await uploadAttachments(createdSR.id, files);
+      } else {
+        console.log("ℹ️ [CreateSR] 첨부파일 없음");
       }
 
       toast({

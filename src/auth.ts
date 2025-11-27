@@ -22,57 +22,79 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
+        console.log("🔐 [Auth] 로그인 시도:", { email: credentials?.email });
+
         if (!credentials?.email || !credentials?.password) {
+          console.warn("⚠️ [Auth] 이메일 또는 비밀번호 누락");
           return null;
         }
 
-        const db = ensurePrismaClient();
-        const user = await db.user.findUnique({
-          where: {
-            email: credentials.email as string,
-          },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            image: true,
-            password: true,
-            isActive: true,
-            roles: {
-              include: {
-                role: {
-                  include: {
-                    permissions: {
-                      include: {
-                        permission: true,
+        try {
+          const db = ensurePrismaClient();
+          console.log("🔍 [Auth] 사용자 조회 시작:", credentials.email);
+
+          const user = await db.user.findUnique({
+            where: {
+              email: credentials.email as string,
+            },
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              image: true,
+              password: true,
+              isActive: true,
+              roles: {
+                include: {
+                  role: {
+                    include: {
+                      permissions: {
+                        include: {
+                          permission: true,
+                        },
                       },
                     },
                   },
                 },
               },
             },
-          },
-        });
+          });
 
-        if (!user) {
+          if (!user) {
+            console.warn("❌ [Auth] 사용자 찾을 수 없음:", credentials.email);
+            return null;
+          }
+
+          console.log("🔍 [Auth] 사용자 찾음:", { id: user.id, email: user.email, isActive: user.isActive });
+
+          const isPasswordValid = await compare(
+            credentials.password as string,
+            user.password
+          );
+
+          if (!isPasswordValid) {
+            console.warn("❌ [Auth] 비밀번호 불일치:", credentials.email);
+            return null;
+          }
+
+          // 비활성 사용자 로그인 차단
+          if (!user.isActive) {
+            console.warn("❌ [Auth] 비활성 사용자:", credentials.email);
+            return null;
+          }
+
+          console.log("✅ [Auth] 로그인 성공:", user.email);
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          };
+        } catch (error) {
+          console.error("❌ [Auth] 로그인 처리 중 에러:", error);
           return null;
         }
-
-        const isPasswordValid = await compare(
-          credentials.password as string,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
       },
     }),
   ],
