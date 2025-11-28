@@ -33,7 +33,6 @@ export default defineConfig({
         'tests/',
         'e2e/',
         'src/lib/redis-cache.ts',
-        'src/lib/logger.ts',
         'src/lib/prisma.ts',
       ],
     },

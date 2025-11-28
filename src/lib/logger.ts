@@ -32,7 +32,7 @@ interface LogEntry {
 
 class Logger {
   private isProduction = process.env.NODE_ENV === "production";
-  private isDevelopment = process.env.NODE_ENV === "development";
+  private isDevelopment = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 
   /**
    * 로그 레벨에 따라 출력 여부 결정
@@ -97,7 +97,7 @@ class Logger {
       // 개발 환경: 가독성 좋은 형식으로 출력
       const prefix = `[${entry.level.toUpperCase()}]`;
       const time = new Date(entry.timestamp).toLocaleTimeString();
-      
+
       if (entry.error) {
         console.error(
           `${prefix} [${time}] ${entry.message}`,
@@ -105,9 +105,9 @@ class Logger {
           entry.context || {}
         );
       } else {
-        const logMethod = entry.level === "error" ? console.error : 
-                         entry.level === "warn" ? console.warn :
-                         entry.level === "info" ? console.info : console.log;
+        const logMethod = entry.level === "error" ? console.error :
+          entry.level === "warn" ? console.warn :
+            entry.level === "info" ? console.info : console.log;
         logMethod(
           `${prefix} [${time}] ${entry.message}`,
           entry.context || {}
@@ -169,7 +169,7 @@ class Logger {
   ): void {
     const message = `${method} ${path} - ${statusCode}${duration ? ` (${duration}ms)` : ""}`;
     const level = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
-    
+
     this.output(
       this.createLogEntry(level, message, {
         ...context,

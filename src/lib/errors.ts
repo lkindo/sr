@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 /**
  * 커스텀 에러 클래스들
  * 비즈니스 로직에서 발생하는 다양한 에러를 표현합니다.
@@ -114,8 +116,16 @@ export class DuplicateError extends ServiceError {
 /**
  * ServiceError를 Result 타입으로 변환하는 헬퍼 함수
  */
+
 export function errorToResult<T>(error: unknown): { success: false; error: string; code?: string } {
   if (error instanceof ServiceError) {
+    // ServiceError는 비즈니스 로직상의 예외이므로 warn 레벨로 로깅 (시스템 에러인 경우 error 레벨)
+    if (error.statusCode >= 500) {
+      logger.logError(error);
+    } else {
+      logger.warn(`Service Error: ${error.message}`, { code: error.code, statusCode: error.statusCode });
+    }
+
     return {
       success: false,
       error: error.message,
@@ -124,6 +134,7 @@ export function errorToResult<T>(error: unknown): { success: false; error: strin
   }
 
   if (error instanceof Error) {
+    logger.error(`Unexpected Error: ${error.message}`, error);
     return {
       success: false,
       error: error.message,
@@ -131,6 +142,7 @@ export function errorToResult<T>(error: unknown): { success: false; error: strin
     };
   }
 
+  logger.error("Unknown Error", undefined, { rawError: error });
   return {
     success: false,
     error: "알 수 없는 오류가 발생했습니다.",
