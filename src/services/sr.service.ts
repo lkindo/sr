@@ -164,7 +164,36 @@ export class SRService {
     if (!result) {
       throw new Error("SR 생성 후 조회에 실패했습니다.");
     }
+
+    // Mattermost 알림 발송 (비동기로 처리하여 응답 지연 방지)
+    console.log(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
+    this.sendCreationNotification(result).catch(err => {
+      console.error("[SRService] Failed to send Mattermost notification:", err);
+    });
+
     return result;
+  }
+
+  private async sendCreationNotification(sr: SRDetails) {
+    console.log(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
+    const { sendMattermostNotification } = await import("@/lib/mattermost");
+
+    const srUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${sr.id}`;
+    const message = `### 🆕 새로운 SR이 등록되었습니다.\n[SR 바로가기](${srUrl})`;
+
+    const attachments = [{
+      color: "#007bff", // Primary Blue
+      title: sr.title,
+      title_link: srUrl,
+      fields: [
+        { short: true, title: "SR 번호", value: sr.srNumber },
+        { short: true, title: "요청자", value: sr.requester.name },
+        { short: true, title: "우선순위", value: sr.requestedPriority },
+        { short: true, title: "카테고리", value: sr.serviceCategory.categoryName },
+      ],
+    }];
+
+    await sendMattermostNotification(message, attachments);
   }
 
   async updateSR(
