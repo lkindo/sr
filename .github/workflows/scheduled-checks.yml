@@ -1,0 +1,96 @@
+name: Code Quality & Security
+
+on:
+  schedule:
+    # 매일 오전 9시 (UTC 0시)에 실행
+    - cron: "0 0 * * *"
+  workflow_dispatch: # 수동 실행 가능
+
+jobs:
+  # 의존성 업데이트 확인
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: "8"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Check for outdated dependencies
+        run: |
+          pnpm outdated || true
+          echo "📦 Dependency check completed"
+
+      - name: Security audit
+        run: |
+          pnpm audit --audit-level=moderate || true
+          echo "🔒 Security audit completed"
+
+  # 코드 복잡도 분석
+  code-complexity:
+    name: Code Complexity Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: "8"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Analyze bundle size
+        run: |
+          pnpm build
+          echo "📊 Bundle size analysis completed"
+        env:
+          ANALYZE: "true"
+
+  # 성능 테스트
+  performance-test:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: "8"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run performance benchmark tests
+        run: |
+          pnpm test src/__tests__/performance/benchmark.test.ts || true
+          echo "⚡ Performance tests completed"
