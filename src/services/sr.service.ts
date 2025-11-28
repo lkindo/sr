@@ -71,19 +71,30 @@ export class SRService {
         sr = await prisma.$transaction(async (tx) => {
           const today = new Date();
           const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
-          const todayStart = new Date(today);
-          todayStart.setHours(0, 0, 0, 0);
-          const todayEnd = new Date(today);
-          todayEnd.setHours(23, 59, 59, 999);
 
-          // SELECT FOR UPDATE로 동시 접근 방지
-          const todayCount = await tx.sR.count({
+          // 가장 마지막 SR 번호 조회 (count는 삭제된 SR이 있을 경우 중복 번호를 생성할 수 있음)
+          const lastSR = await tx.sR.findFirst({
             where: {
-              createdAt: { gte: todayStart, lte: todayEnd },
+              srNumber: {
+                startsWith: `SR-${dateStr}-`,
+              },
+            },
+            orderBy: {
+              srNumber: "desc",
+            },
+            select: {
+              srNumber: true,
             },
           });
 
-          const sequenceNumber = todayCount + 1;
+          let sequenceNumber = 1;
+          if (lastSR) {
+            const lastSequence = parseInt(lastSR.srNumber.split("-")[2]);
+            if (!isNaN(lastSequence)) {
+              sequenceNumber = lastSequence + 1;
+            }
+          }
+
           const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, "0")}`;
 
           // SR 생성 (unique constraint 체크는 DB 레벨에서 발생)

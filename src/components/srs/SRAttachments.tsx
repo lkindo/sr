@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Upload, Download, Trash2, FileIcon } from "lucide-react";
+import { Upload, Download, Trash2, FileIcon, RefreshCw, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,9 +23,10 @@ interface Attachment {
 
 interface SRAttachmentsProps {
   srId: string;
+  canDelete?: boolean;
 }
 
-export function SRAttachments({ srId }: SRAttachmentsProps) {
+export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -33,17 +34,14 @@ export function SRAttachments({ srId }: SRAttachmentsProps) {
 
   const fetchAttachments = useCallback(async () => {
     try {
-      const response = await fetch(`/api/srs/${srId}`);
+      setLoading(true);
+      // SR 전체 정보가 아니라 첨부파일 목록만 조회하는 전용 API 사용
+      const response = await fetch(`/api/srs/${srId}/attachments`);
       if (!response.ok) throw new Error("Failed to fetch attachments");
       const data = await response.json();
 
-      // 🔍 디버깅 로그: SR 데이터 확인
-      console.log("🔍 [SRAttachments] SR 전체 데이터:", data);
-      console.log("📎 [SRAttachments] Attachments 필드:", data.attachments);
-      console.log("📊 [SRAttachments] Attachments 개수:", data.attachments?.length || 0);
-      console.log("🔢 [SRAttachments] _count.attachments:", data._count?.attachments);
-
-      setAttachments(data.attachments || []);
+      console.log("📎 [SRAttachments] 조회된 첨부파일:", data);
+      setAttachments(data || []);
     } catch (error) {
       console.error("❌ [SRAttachments] 첨부파일 조회 실패:", error);
       toast({
@@ -181,15 +179,26 @@ export function SRAttachments({ srId }: SRAttachmentsProps) {
               onChange={handleFileUpload}
               disabled={uploading}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => document.getElementById("file-upload")?.click()}
-              disabled={uploading}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              {uploading ? "업로드 중..." : "파일 업로드"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchAttachments}
+                disabled={loading || uploading}
+                title="새로고침"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById("file-upload")?.click()}
+                disabled={uploading}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {uploading ? "업로드 중..." : "파일 업로드"}
+              </Button>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -215,21 +224,49 @@ export function SRAttachments({ srId }: SRAttachmentsProps) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => window.open(attachment.fileUrl, "_blank")}
+                    title="미리보기"
                   >
-                    <Download className="h-4 w-4" />
+                    <Eye className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => handleDelete(attachment.id)}
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(attachment.fileUrl);
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = attachment.fileName;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } catch (e) {
+                        console.error("Download failed", e);
+                        window.open(attachment.fileUrl, "_blank");
+                      }
+                    }}
+                    title="다운로드"
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Download className="h-4 w-4" />
                   </Button>
+                  {canDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(attachment.id)}
+                      title="삭제"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

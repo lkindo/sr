@@ -4,6 +4,7 @@ import { deleteAttachmentBlob } from "@/lib/storage";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
 import { RouteContext } from "@/lib/api-helpers";
+import { SRPolicy } from "@/lib/policies/sr.policy";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -50,6 +51,11 @@ export const DELETE = withAuthAndRateLimit(async (
   if (!sr) {
     throw new NotFoundError("SR을 찾을 수 없습니다.");
   }
+
+  // 권한 체크: SR을 수정할 수 있는 권한이 있어야 첨부파일도 삭제 가능
+  const srPolicy = new SRPolicy();
+  // session.user는 AuthenticatedUser 타입을 만족해야 함
+  srPolicy.ensureCanUpdate(session.user as any, sr as any);
 
   // 파일 삭제 (Vercel Blob)
   const pathname =

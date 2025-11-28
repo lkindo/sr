@@ -56,11 +56,13 @@ const priorityColors: Record<string, "default" | "secondary" | "destructive"> = 
   LOW: "secondary",
 };
 
+
 export default function SRDetailPage() {
   const params = useParams();
   const router = useRouter();
   const srId = params.id as string;
 
+  const [activeTab, setActiveTab] = useState("comments");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -222,6 +224,21 @@ export default function SRDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Add Attachment Summary */}
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground">첨부파일</h4>
+                <div
+                  className="mt-1 flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
+                  onClick={() => setActiveTab("attachments")}
+                >
+                  <Paperclip className="h-4 w-4" />
+                  <span className="font-medium">
+                    {sr._count?.attachments || 0}개
+                  </span>
+                  <span className="text-xs text-muted-foreground">(클릭하여 확인)</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -239,7 +256,7 @@ export default function SRDetailPage() {
 
         {/* Tabs for comments, activities, attachments */}
         <div className="md:col-span-1 space-y-4">
-          <Tabs defaultValue="comments" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList>
               <TabsTrigger value="comments" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" /> 댓글 {sr._count?.comments > 0 && `(${sr._count.comments})`}
@@ -258,7 +275,13 @@ export default function SRDetailPage() {
               <SRActivities srId={sr.id} />
             </TabsContent>
             <TabsContent value="attachments" className="mt-6">
-              <SRAttachments srId={sr.id} />
+              <SRAttachments
+                srId={sr.id}
+                canDelete={
+                  hasAnyRole(["ADMIN", "MANAGER"]) ||
+                  (session?.user?.id === sr.requesterId && sr.status === "REQUESTED")
+                }
+              />
             </TabsContent>
           </Tabs>
         </div>

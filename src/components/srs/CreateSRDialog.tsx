@@ -253,7 +253,7 @@ export function CreateSRDialog({
 
       toast({
         title: "성공",
-        description: "SR이 생성되었습니다.",
+        description: `SR이 생성되었습니다.${files.length > 0 ? ` (첨부파일 ${files.length}개 업로드)` : ""}`,
       });
 
       // Reset form
