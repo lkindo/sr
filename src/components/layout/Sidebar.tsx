@@ -171,19 +171,10 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-[104px] z-30 h-[calc(100vh-104px)] w-64 sr-sidebar-bg text-white overflow-y-auto border-r border-[#3f4564]">
       <nav className="flex flex-col pt-5">
-        {/* Menu Title */}
-        <div className="px-8 pb-5 border-b border-[#3f4564]">
-          <h2 className="text-lg font-medium text-white">
-            {activeTopMenu === "/srs" && "SR 관리"}
-            {activeTopMenu === "/organization" && "조직 관리"}
 
-            {activeTopMenu === "/roles" && "권한 관리"}
-            {activeTopMenu === "/settings" && "설정"}
-          </h2>
-        </div>
 
         {/* Menu Sections */}
-        <div className="mt-5">
+        <div>
           {sections
             .filter((section) => {
               // 섹션 내에 접근 가능한 항목이 하나라도 있으면 섹션 표시
