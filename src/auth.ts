@@ -22,8 +22,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        console.log("🔐 [Auth] 로그인 시도:", { email: credentials?.email });
-
         if (!credentials?.email || !credentials?.password) {
           console.warn("⚠️ [Auth] 이메일 또는 비밀번호 누락");
           return null;
@@ -31,7 +29,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         try {
           const db = ensurePrismaClient();
-          console.log("🔍 [Auth] 사용자 조회 시작:", credentials.email);
 
           const user = await db.user.findUnique({
             where: {
@@ -65,8 +62,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
-          console.log("🔍 [Auth] 사용자 찾음:", { id: user.id, email: user.email, isActive: user.isActive });
-
           const isPasswordValid = await compare(
             credentials.password as string,
             user.password
@@ -82,8 +77,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             console.warn("❌ [Auth] 비활성 사용자:", credentials.email);
             return null;
           }
-
-          console.log("✅ [Auth] 로그인 성공:", user.email);
 
           return {
             id: user.id,

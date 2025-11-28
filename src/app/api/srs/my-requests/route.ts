@@ -10,19 +10,14 @@ export const revalidate = 0;
 
 // GET /api/srs/my-requests - 내가 요청한 SR 목록 조회
 export async function GET(request: NextRequest) {
-  console.log("[DEBUG] [GET /api/srs/my-requests] 요청 시작");
-
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      console.log("[DEBUG] No session found");
       return NextResponse.json(
         { error: "인증이 필요합니다" },
         { status: 401 }
       );
     }
-
-    console.log(`[DEBUG] User ID: ${session.user.id}`);
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
@@ -52,8 +47,6 @@ export async function GET(request: NextRequest) {
         orderBy = { createdAt: "desc" };
         break;
     }
-
-    console.log(`[DEBUG] Querying database with where:`, where);
 
     const srs = await prisma.sR.findMany({
       where,
@@ -111,8 +104,6 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    console.log(`[DEBUG] Retrieved ${srs.length} SRs from database`);
-
     // 각 SR에 대해 추가 정보 계산
     const srsWithExtras = srs.map((sr) => {
       let waitingMinutes = 0;
@@ -153,8 +144,6 @@ export async function GET(request: NextRequest) {
         progressPercentage,
       };
     });
-
-    console.log(`[DEBUG] Returning ${srsWithExtras.length} SRs`);
 
     return NextResponse.json({
       srs: srsWithExtras,
