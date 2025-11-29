@@ -1,6 +1,0 @@
-﻿
-> sr-management@0.1.0 type-check
-> tsc --noEmit
-
-src/app/(dashboard)/srs/[id]/page.tsx(429,32): error TS2339: Property 'changeReason' does not exist on type '{ id: string; currentStatus: string; previousStatus: string | null; changedAt: Date; user: { id: string; name: string; image: string | null; }; }'.
-src/app/(dashboard)/srs/[id]/page.tsx(430,76): error TS2339: Property 'changeReason' does not exist on type '{ id: string; currentStatus: string; previousStatus: string | null; changedAt: Date; user: { id: string; name: string; image: string | null; }; }'.
