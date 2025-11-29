@@ -1,57 +1,60 @@
 import { test, expect } from '@playwright/test'
+import { createTestSR } from './helpers/test-helpers'
 
 /**
  * SR 수정 플로우 테스트
  */
 
 test.describe('SR 수정', () => {
-  test('SR 수정 다이얼로그 열기', async ({ page }) => {
-    await page.goto('/srs')
-    
-    // SR 목록이 로드될 때까지 대기
-    await page.waitForLoadState('networkidle')
-    
-    // 첫 번째 SR의 수정 버튼 찾기 (있는 경우)
-    const editButton = page.locator('button').filter({ hasText: /수정|Edit/ }).first()
-    
-    // 수정 버튼이 있으면 클릭
-    const isVisible = await editButton.isVisible().catch(() => false)
-    if (isVisible) {
-      await editButton.click()
-      
-      // 수정 다이얼로그가 열리는지 확인
-      await expect(page.getByRole('heading', { name: /SR 수정|Edit SR/ })).toBeVisible({ timeout: 5000 })
-    } else {
-      // 수정 버튼이 없으면 테스트 스킵 (SR이 없거나 권한이 없을 수 있음)
-      test.skip()
+  // Manager 권한으로 실행 (수정 권한 보장)
+  test.use({ storageState: './playwright/.auth/manager.json' });
+
+  test('SR 생성 후 수정 플로우', async ({ page }) => {
+    // 1. 테스트용 SR 생성 (Helper 함수 사용)
+    const srId = await createTestSR(page, {
+      title: `수정 테스트용 SR ${Date.now()}`,
+      description: '이 SR은 수정 테스트를 위해 생성되었습니다.'
+    });
+
+    // 2. 상세 페이지로 이동
+    const detailResponsePromise = page.waitForResponse(resp => resp.url().includes(`/api/srs/${srId}`) && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
+    await page.goto(`/srs/${srId}`);
+    await detailResponsePromise;
+
+    // 3. 수정 버튼 확인 및 클릭
+    const editButton = page.locator('button').filter({ hasText: /수정|Edit/ }).first();
+    await expect(editButton).toBeVisible({ timeout: 5000 });
+    await editButton.click();
+
+    // 4. 수정 다이얼로그 확인
+    await expect(page.getByRole('heading', { name: /SR 수정|Edit SR/ })).toBeVisible({ timeout: 5000 });
+
+    // 5. 내용 수정
+    const newTitle = `수정된 제목 ${Date.now()}`;
+    await page.getByRole('textbox', { name: '제목' }).fill(newTitle);
+    // 설명이 비어있을 수 있으므로 다시 채움 (유효성 검사 통과 보장)
+    await page.getByRole('textbox', { name: '설명' }).fill('수정된 설명입니다. 길이를 10자 이상으로 맞춥니다.');
+
+    // 6. 저장
+    // Server Action을 사용하므로 PATCH 요청이 아닌 POST 요청이 발생함
+    // 다이얼로그가 닫히는 것을 기다림
+    await page.getByRole('button', { name: /저장|Save/ }).click();
+
+    // 다이얼로그가 닫히는지 확인 (타임아웃 20초)
+    await expect(page.getByRole('heading', { name: /SR 수정|Edit SR/ })).not.toBeVisible({ timeout: 20000 });
+
+    // 7. 수정 결과 확인 (제목이 변경되었는지)
+    // 페이지가 리로드되거나 UI가 갱신될 수 있음. 제목 요소가 새로운 텍스트를 포함하는지 확인
+    const titleLocator = page.locator('h1, h2, h3').filter({ hasText: newTitle });
+
+    try {
+      await expect(titleLocator).toBeVisible({ timeout: 5000 });
+    } catch (e) {
+      console.log('Title not updated immediately, reloading...');
+      await page.reload();
+      await expect(titleLocator).toBeVisible({ timeout: 10000 });
     }
-  })
 
-  test('SR 상세 페이지에서 수정', async ({ page }) => {
-    await page.goto('/srs')
-    await page.waitForLoadState('networkidle')
-    
-    // 첫 번째 SR 클릭
-    const firstSR = page.locator('tbody tr').first()
-    const isVisible = await firstSR.isVisible().catch(() => false)
-    
-    if (isVisible) {
-      await firstSR.click()
-      
-      // 상세 페이지로 이동 확인
-      await expect(page).toHaveURL(/\/srs\/[^/]+$/, { timeout: 5000 })
-      
-      // 수정 버튼 확인
-      const editButton = page.locator('button').filter({ hasText: /수정|Edit/ })
-      const editButtonVisible = await editButton.isVisible().catch(() => false)
-      
-      if (editButtonVisible) {
-        await expect(editButton).toBeVisible()
-      }
-    } else {
-      test.skip()
-    }
-  })
-})
-
-
+    console.log(`✅ SR 수정 완료: ${srId} -> ${newTitle}`);
+  });
+});

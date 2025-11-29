@@ -3,6 +3,7 @@ import { ClientService } from "@/services/client.service";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 import { usePagination } from "@/lib/pagination";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -19,7 +20,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
   const industry = searchParams.get("industry");
   const isActive = searchParams.get("isActive");
 
-  const where: any = {};
+  const where: Prisma.ClientWhereInput = {};
 
   if (search) {
     where.OR = [
@@ -41,7 +42,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
       skip,
       take,
       where,
-      orderBy: orderBy as any,
+      orderBy: orderBy as Prisma.ClientOrderByWithRelationInput,
       include: {
         _count: {
           select: {

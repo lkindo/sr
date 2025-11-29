@@ -1,0 +1,118 @@
+[2m[WebServer] [22mnpm warn Unknown env config "verify-deps-before-run". This will stop working in the next major version of npm.
+[2m[WebServer] [22mnpm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+[2m[WebServer] [22mnpm warn Unknown project config "store-dir". This will stop working in the next major version of npm.
+[2m[WebServer] [22m[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+🔐 Global Setup: 로그인 상태 저장 중...
+✅ 로그인 성공!
+🔥 페이지 워밍업 중...
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\3c004_@upstash_redis_nodejs_8d7548c3.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\1505d_next_276d3743._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22m캐시 조회 실패 (dashboard:stats:global:cmhqbg3co0044og101yh9gtdd:admin): Error [UpstashError]: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500000. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details
+[2m[WebServer] [22m    at AutoPipelineExecutor.withAutoPipeline [90m(D:\project\sr\[39m.next\dev\server\chunks\3c004_@upstash_redis_nodejs_8d7548c3.js:442:19[90m)[39m
+[2m[WebServer] [22m    at async getCachedData [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:1110:24[90m)[39m
+[2m[WebServer] [22m    at async GET.preset [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:1290:19[90m)[39m
+[2m[WebServer] [22m    at async [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:997:20[90m)[39m
+[2m[WebServer] [22m    at async [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:922:26[90m)[39m
+[2m[WebServer] [22m    at async responseGenerator [90m(D:\project\sr\[39m.next\dev\server\chunks\1505d_next_276d3743._.js:16104:38[90m)[39m
+[2m[WebServer] [22m    at async handleResponse [90m(D:\project\sr\[39m.next\dev\server\chunks\1505d_next_276d3743._.js:16166:32[90m)[39m
+[2m[WebServer] [22m    at async handler [90m(D:\project\sr\[39m.next\dev\server\chunks\1505d_next_276d3743._.js:16219:13[90m)[39m
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\3c004_@upstash_redis_nodejs_8d7548c3.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\compiled\next-server\app-route-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\1505d_next_276d3743._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22m캐시 조회 실패 (dashboard:stats:global:cmhqbg3co0044og101yh9gtdd:admin): Error [UpstashError]: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500000. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details
+[2m[WebServer] [22m    at AutoPipelineExecutor.withAutoPipeline [90m(D:\project\sr\[39m.next\dev\server\chunks\3c004_@upstash_redis_nodejs_8d7548c3.js:442:19[90m)[39m
+[2m[WebServer] [22m    at async getCachedData [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:1110:24[90m)[39m
+[2m[WebServer] [22m    at async GET.preset [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:1290:19[90m)[39m
+[2m[WebServer] [22m    at async [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:997:20[90m)[39m
+[2m[WebServer] [22m    at async [90m(D:\project\sr\[39m.next\dev\server\chunks\[root-of-the-server]__7e4b07de._.js:922:26[90m)[39m
+[2m[WebServer] [22m    at async responseGenerator [90m(D:\project\sr\[39m.next\dev\server\chunks\1505d_next_276d3743._.js:16104:38[90m)[39m
+[2m[WebServer] [22m    at async handleResponse [90m(D:\project\sr\[39m.next\dev\server\chunks\1505d_next_276d3743._.js:16166:32[90m)[39m
+[2m[WebServer] [22m    at async handler [90m(D:\project\sr\[39m.next\dev\server\chunks\1505d_next_276d3743._.js:16219:13[90m)[39m
+  ✓ /dashboard
+  ✓ /srs
+  ✓ /clients
+  ✓ /users
+✅ 페이지 워밍업 완료
+✅ 인증 상태 저장 완료: D:\project\sr\playwright\.auth\user.json
+
+Running 1 test using 1 worker
+
+Creating test SR...
+Navigated to /srs
+Clicked Create button
+Filled title and description
+Selected client
+Selected category
+Waiting for POST /api/srs...
+Waiting for API response: POST /api/srs
+Clicked Save button
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\ssr\node_modules__pnpm_18572e4e._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\compiled\next-server\app-page-turbo.runtime.dev.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\.next\dev\server\chunks\ssr\node_modules__pnpm_4e2d3f11._.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\base-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\next-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\dev\next-dev-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\trace\trace.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\lib\router-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22mD:\project\sr\node_modules\.pnpm\next@16.0.3_@babel+core@7.2_689a0e618c8b5f2bf5390e43d563b630\node_modules\next\dist\server\lib\start-server.js: Invalid source map. Only conformant source maps can be used to find the original code. Cause: Error: sourceMapURL could not be parsed
+[2m[WebServer] [22m캐시 조회 실패 (user:full:cmhqbg3co0044og101yh9gtdd): Error [UpstashError]: Command failed: ERR max requests limit exceeded. Limit: 500000, Usage: 500000. See https://upstash.com/docs/redis/troubleshooting/max_requests_limit for details
+[2m[WebServer] [22m    at async getCachedData [90m(D:\project\sr\[39m.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js:884:24[90m)[39m
+[2m[WebServer] [22m    at async PermissionService.checkPermission [90m(D:\project\sr\[39m.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js:1073:22[90m)[39m
+[2m[WebServer] [22m    at async PermissionService.requirePermission [90m(D:\project\sr\[39m.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js:1127:31[90m)[39m
+[2m[WebServer] [22m    at async requirePermission [90m(D:\project\sr\[39m.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js:2191:5[90m)[39m
+[2m[WebServer] [22m    at async authenticateAndAuthorize [90m(D:\project\sr\[39m.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js:2195:5[90m)[39m
+[2m[WebServer] [22m    at async createSRAction [90m(D:\project\sr\[39m.next\dev\server\chunks\ssr\[root-of-the-server]__ff0cbeeb._.js:3720:25[90m)[39m
+[2m[WebServer] [22m[WARN] [오전 12:52:29] [Mattermost] MATTERMOST_WEBHOOK_URL is not defined. Notification skipped. {}
+  ✘  1 [chromium] › e2e\06-sr-update.spec.ts:12:7 › SR 수정 › SR 생성 후 수정 플로우 (48.4s)
+
+
+  1) [chromium] › e2e\06-sr-update.spec.ts:12:7 › SR 수정 › SR 생성 후 수정 플로우 ───────────────────────────
+
+    TimeoutError: page.waitForResponse: Timeout 30000ms exceeded while waiting for event "response"
+
+       at helpers\test-helpers.ts:69
+
+      67 |     }
+      68 |
+    > 69 |     return page.waitForResponse(
+         |                 ^
+      70 |         resp => {
+      71 |             const urlMatches = typeof urlPattern === 'string'
+      72 |                 ? resp.url().includes(urlPattern)
+        at waitForAPIResponse (D:\project\sr\e2e\helpers\test-helpers.ts:69:17)
+        at createTestSR (D:\project\sr\e2e\helpers\test-helpers.ts:144:27)
+        at D:\project\sr\e2e\06-sr-update.spec.ts:14:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\06-sr-update-SR-수정-SR-생성-후-수정-플로우-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results\06-sr-update-SR-수정-SR-생성-후-수정-플로우-chromium\video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\06-sr-update-SR-수정-SR-생성-후-수정-플로우-chromium\error-context.md
+
+  1 failed
+    [chromium] › e2e\06-sr-update.spec.ts:12:7 › SR 수정 › SR 생성 후 수정 플로우 ────────────────────────────
+
+To open last HTML report run:
+[36m[39m
+[36m  pnpm exec playwright show-report test-results[39m
+[36m[39m

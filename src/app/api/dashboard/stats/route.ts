@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 import { getCachedData, CacheKeys } from "@/lib/redis-cache";
 import { getDashboardTtlSeconds } from "@/lib/cache-config";
+import { Prisma } from "@prisma/client";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -28,7 +29,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
     cacheKey,
     async () => {
       // 역할별 필터링 조건 설정
-      let baseWhere: any = {};
+      let baseWhere: Prisma.SRWhereInput = {};
       if (!isAdminManagerEngineer) {
         // 고객사 사용자는 자신의 고객사 SR만 조회
         const userClients = await prisma.userClient.findMany({
@@ -185,7 +186,13 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
       });
 
       // 내 담당 SR 목록 (ENGINEER용, 최대 5개)
-      let myAssignedSRsList: any[] = [];
+      let myAssignedSRsList: Prisma.SRGetPayload<{
+        include: {
+          client: { select: { name: true; code: true } };
+          requester: { select: { name: true } };
+          serviceCategory: { select: { categoryName: true } };
+        };
+      }>[] = [];
       if (isEngineer) {
         myAssignedSRsList = await prisma.sR.findMany({
           where: { ...baseWhere, assigneeId: userId },

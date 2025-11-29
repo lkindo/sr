@@ -158,55 +158,100 @@ test.describe('인증 플로우', () => {
     expect(errorVisible || stillOnLogin).toBeTruthy()
   })
 
-  test('로그인 플로우 - 성공', async ({ page }) => {
-    // 브라우저 컨텍스트 쿠키 초기화 (깨끗한 상태에서 시작)
-    await page.context().clearCookies()
+  test('로그인 플로우 - 성공 (신규 가입 후 로그인)', async ({ page }) => {
+    // 1. 회원가입 진행 (테스트 독립성 확보)
+    await page.goto('/register');
 
-    await page.goto('/login')
+    const timestamp = Date.now();
+    const randomNum = Math.floor(Math.random() * 10000);
+    const testEmail = `login_test_${timestamp}${randomNum}@example.com`;
+    const testPassword = 'TestPassword123!';
 
-    // 로그인 페이지 로드 확인
-    await expect(page.locator('.text-2xl').filter({ hasText: '로그인' })).toBeVisible({ timeout: 10000 })
+    await page.fill('#name', 'Login Test User');
+    await page.fill('#email', testEmail);
+    await page.fill('#password', testPassword);
+    await page.fill('#confirmPassword', testPassword);
 
-    // 테스트 사용자로 로그인
-    await page.fill('#email', process.env.TEST_USER_EMAIL || 'admin@example.com')
-    await page.fill('#password', process.env.TEST_USER_PASSWORD || 'password123')
-    await page.click('button[type="submit"]')
+    // CLIENT 선택 및 고객사 선택
+    const clientRadio = page.locator('#client');
+    await expect(clientRadio).toBeChecked();
 
-    // 제출 후 대기
-    await page.waitForTimeout(3000)
+    await page.waitForTimeout(1000);
+    const clientSelect = page.locator('#client-select');
+    await clientSelect.click();
+    await page.waitForTimeout(500);
+    const firstClient = page.locator('[role="option"]').first();
+    if (await firstClient.isVisible()) {
+      await firstClient.click();
+    }
 
-    // 대시보드 또는 다른 페이지로 리디렉션 확인
-    const currentUrl = page.url()
-    console.log('After login, current URL:', currentUrl)
+    await page.click('button[type="submit"]');
+    await page.waitForTimeout(2000);
 
-    // 로그인 페이지를 벗어났는지 확인 (성공)
-    const leftLoginPage = !currentUrl.includes('/login')
+    // 회원가입 후 로그인 페이지로 이동 확인
+    await page.waitForURL('/login', { timeout: 15000 });
 
-    if (leftLoginPage) {
-      // 대시보드로 이동했는지 확인
-      if (currentUrl.includes('/dashboard')) {
-        await expect(page.locator('text=/대시보드|Dashboard/')).toBeVisible({ timeout: 10000 })
-      } else {
-        // 다른 페이지로 이동했어도 로그인 성공으로 간주
-        console.log('Logged in successfully, redirected to:', currentUrl)
+    // 2. 로그인 진행
+    console.log(`로그인 시도: ${testEmail}`);
+    await page.fill('#email', testEmail);
+    await page.fill('#password', testPassword);
+
+    // 로그인 API 응답 대기 설정
+    const loginResponsePromise = page.waitForResponse(
+      resp => resp.url().includes('/api/auth') && resp.request().method() === 'POST',
+      { timeout: 15000 }
+    ).catch((e) => {
+      console.log('⚠️ 로그인 API 응답 대기 타임아웃 또는 에러:', e.message);
+      return null;
+    });
+
+    console.log('로그인 버튼 클릭 시도...');
+    await page.click('button[type="submit"]');
+    console.log('로그인 버튼 클릭 완료');
+
+    // API 응답 확인
+    const loginResponse = await loginResponsePromise;
+    if (loginResponse) {
+      console.log(`✅ 로그인 API 응답 수신: ${loginResponse.status()} ${loginResponse.url()}`);
+      if (loginResponse.status() !== 200) {
+        console.log('⚠️ 로그인 API 응답이 200이 아닙니다.');
       }
     } else {
-      // 여전히 로그인 페이지에 있으면 대시보드로 수동 이동 시도
-      await page.goto('/dashboard')
-      await page.waitForLoadState('domcontentloaded')
-
-      // 대시보드에 접근 가능하면 로그인 성공
-      const canAccessDashboard = !page.url().includes('/login')
-
-      if (!canAccessDashboard) {
-        // 로그인 실패 시 에러 메시지 확인
-        const errorText = await page.locator('[role="alert"]').textContent().catch(() => null)
-        console.log('❌ 로그인 실패. 현재 URL:', page.url())
-        if (errorText) console.log('❌ 에러 메시지:', errorText)
-      }
-
-      expect(canAccessDashboard).toBeTruthy()
+      console.log('⚠️ 로그인 API 응답을 감지하지 못했습니다.');
     }
+
+    // 대시보드로 리디렉션 대기
+    console.log('대시보드 리디렉션 대기 중...');
+    try {
+      await page.waitForURL(url => url.toString().includes('/dashboard'), { timeout: 20000, waitUntil: 'domcontentloaded' });
+      console.log('✅ 대시보드 리디렉션 성공');
+    } catch (e) {
+      console.log('⚠️ 대시보드 리디렉션 타임아웃. 현재 URL:', page.url());
+
+      // 현재 페이지의 에러 메시지 확인
+      const bodyText = await page.textContent('body');
+      console.log('현재 페이지 텍스트 요약:', bodyText?.substring(0, 200).replace(/\s+/g, ' '));
+
+      // 수동 이동 시도
+      if (page.url().includes('/login')) {
+        console.log('여전히 로그인 페이지입니다. 강제 이동 시도...');
+        await page.goto('/dashboard');
+        await page.waitForLoadState('domcontentloaded');
+      }
+    }
+
+    // 최종 확인
+    const currentUrl = page.url();
+    const onDashboard = currentUrl.includes('/dashboard');
+    console.log(`최종 URL: ${currentUrl}, 대시보드 진입 여부: ${onDashboard}`);
+
+    if (onDashboard) {
+      await expect(page.locator('text=/대시보드|Dashboard/')).toBeVisible({ timeout: 10000 });
+    } else {
+      const errorText = await page.locator('[role="alert"]').textContent().catch(() => null);
+      if (errorText) console.log('❌ 로그인 실패 에러:', errorText);
+    }
+
+    expect(onDashboard).toBeTruthy();
   })
 })
-

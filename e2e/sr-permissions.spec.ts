@@ -6,8 +6,10 @@ import { test, expect } from '@playwright/test';
 test.describe('SR 권한 및 접수 기능 테스트', () => {
   test('SR 목록 페이지 접근 및 기본 UI 확인', async ({ page }) => {
     // 인증 상태가 이미 로드되어 있으므로 바로 페이지로 이동
+    const responsePromise = page.waitForResponse(resp => resp.url().includes('/api/srs') && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
     await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('domcontentloaded'); // 제거
+    await responsePromise;
 
     // 테이블 확인
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
@@ -21,7 +23,7 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
 
   test('SR 상세 페이지 접근 및 버튼 확인', async ({ page }) => {
     await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('domcontentloaded'); // 제거
 
     // 첫 번째 SR 찾기
     const firstSRLink = page.locator('table tbody tr a').first();
@@ -31,8 +33,10 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
       const srId = href?.split('/').pop() || '';
 
       // SR 상세 페이지로 이동
+      const detailResponsePromise = page.waitForResponse(resp => resp.url().includes(`/api/srs/${srId}`) && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
       await page.goto(`/srs/${srId}`);
-      await page.waitForLoadState('networkidle');
+      // await page.waitForLoadState('domcontentloaded'); // 제거
+      await detailResponsePromise;
 
       // 상세 정보 확인
       await expect(page.locator('h3:has-text("상세 정보")')).toBeVisible({ timeout: 5000 });
@@ -59,7 +63,7 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
 
   test('접수 페이지 UI 확인 (기존 SR 사용)', async ({ page }) => {
     await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('domcontentloaded'); // 제거
 
     // 첫 번째 SR 찾기
     const firstSRLink = page.locator('table tbody tr a').first();
@@ -69,9 +73,11 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
       const srId = href?.split('/').pop() || '';
 
       try {
-        // 접수 페이지로 직접 이동 (타임아웃 증가)
-        await page.goto(`/srs/${srId}/intake`, { timeout: 90000 });
-        await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+        // 접수 페이지로 직접 이동
+        const intakeResponsePromise = page.waitForResponse(resp => resp.url().includes(`/api/srs/${srId}/intake`) && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
+        await page.goto(`/srs/${srId}/intake`);
+        // await page.waitForLoadState('domcontentloaded'); // 제거
+        await intakeResponsePromise;
         await page.waitForTimeout(3000); // 추가 렌더링 대기
 
         // 접수 폼 또는 에러 메시지 확인
@@ -123,7 +129,7 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
 
   test('SR 삭제 버튼 권한 확인 (ADMIN)', async ({ page }) => {
     await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('domcontentloaded'); // 제거
 
     const firstSRLink = page.locator('table tbody tr a').first();
 
@@ -132,7 +138,7 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
       const srId = href?.split('/').pop() || '';
 
       await page.goto(`/srs/${srId}`);
-      await page.waitForLoadState('networkidle');
+      // await page.waitForLoadState('domcontentloaded'); // 제거
 
       // ADMIN은 삭제 버튼이 보여야 함
       await expect(page.getByRole('button', { name: '삭제' })).toBeVisible();
@@ -159,7 +165,7 @@ test.describe('SR 권한 테스트 (ENGINEER)', () => {
       return;
     }
 
-    await page.waitForLoadState('networkidle');
+    // await page.waitForLoadState('domcontentloaded'); // 제거
 
     const firstSRLink = page.locator('table tbody tr a').first();
 
@@ -168,7 +174,7 @@ test.describe('SR 권한 테스트 (ENGINEER)', () => {
       const srId = href?.split('/').pop() || '';
 
       await page.goto(`/srs/${srId}`);
-      await page.waitForLoadState('networkidle');
+      // await page.waitForLoadState('domcontentloaded'); // 제거
 
       // ENGINEER는 삭제 버튼이 보이지 않아야 함
       await expect(page.getByRole('button', { name: '삭제' })).not.toBeVisible();

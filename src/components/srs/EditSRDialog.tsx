@@ -436,8 +436,8 @@ export function EditSRDialog({
                         categories.length === 0
                           ? "카테고리가 없습니다"
                           : categoryId
-                          ? categories.find((c) => c.id === categoryId)?.categoryName || "카테고리를 선택"
-                          : "카테고리를 선택"
+                            ? categories.find((c) => c.id === categoryId)?.categoryName || "카테고리를 선택"
+                            : "카테고리를 선택"
                       }
                     />
                   </SelectTrigger>
@@ -491,7 +491,7 @@ export function EditSRDialog({
 
             <div className="space-y-2">
               <Label>첨부파일 (선택사항)</Label>
-              
+
               {/* 기존 첨부 파일 목록 */}
               {existingAttachments.length > 0 && (
                 <div className="space-y-2 mb-4">

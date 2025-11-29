@@ -26,7 +26,7 @@ export async function DELETE(
             include: { role: true }
         });
 
-        const hasPermission = userRoles.some((ur: any) =>
+        const hasPermission = userRoles.some((ur) =>
             ['ADMIN', 'MANAGER'].includes(ur.role.name)
         );
 
@@ -55,14 +55,14 @@ export async function DELETE(
             include: { role: true }
         });
 
-        const hasClientTeamRole = targetUserRoles.some((ur: any) =>
+        const hasClientTeamRole = targetUserRoles.some((ur) =>
             ['CLIENT_ADMIN', 'CLIENT_USER'].includes(ur.role.name)
         );
 
         if (hasClientTeamRole) {
             const clientRoles = targetUserRoles
-                .filter((ur: any) => ['CLIENT_ADMIN', 'CLIENT_USER'].includes(ur.role.name))
-                .map((ur: any) => ur.role.name);
+                .filter((ur) => ['CLIENT_ADMIN', 'CLIENT_USER'].includes(ur.role.name))
+                .map((ur) => ur.role.name);
 
             return NextResponse.json(
                 {
@@ -131,7 +131,7 @@ export async function PATCH(
             include: { role: true }
         });
 
-        const hasPermission = userRoles.some((ur: any) =>
+        const hasPermission = userRoles.some((ur) =>
             ['ADMIN', 'MANAGER'].includes(ur.role.name)
         );
 
@@ -160,14 +160,14 @@ export async function PATCH(
             include: { role: true }
         });
 
-        const isSystemTeam = targetUserRoles.some((ur: any) =>
+        const isSystemTeam = targetUserRoles.some((ur) =>
             ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
         );
 
         if (isSystemTeam) {
             const systemRoles = targetUserRoles
-                .filter((ur: any) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
-                .map((ur: any) => ur.role.name)
+                .filter((ur) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+                .map((ur) => ur.role.name)
                 .join(', ');
 
             return NextResponse.json(

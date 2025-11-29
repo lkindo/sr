@@ -190,8 +190,13 @@ export async function PATCH(
         // 상태 업데이트
         const result = await srService.updateSR(srId, {
             status: newStatus,
-            ...updateData,
             changeReason: reason || `상태 변경: ${currentStatus} → ${newStatus}`,
+            ...(updateData.resolutionDescription &&
+                typeof updateData.resolutionDescription === 'string' &&
+                { resolutionDescription: updateData.resolutionDescription }),
+            ...(updateData.rejectionReason &&
+                typeof updateData.rejectionReason === 'string' &&
+                { rejectionReason: updateData.rejectionReason }),
         }, session.user);
 
         return NextResponse.json({

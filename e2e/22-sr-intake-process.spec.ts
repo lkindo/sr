@@ -72,13 +72,38 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.waitForTimeout(500);
 
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
-      await page.waitForTimeout(2000);
+
+      // SR 생성 API 응답 대기
+      const createResponse = await page.waitForResponse(
+        resp => resp.url().includes('/api/srs') && resp.request().method() === 'POST',
+        { timeout: 10000 }
+      );
+
+      if (createResponse.status() !== 200) {
+        throw new Error(`SR 생성 실패: ${createResponse.status()}`);
+      }
 
       await page.goto('/srs');
       await page.waitForLoadState('networkidle');
 
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
-      await expect(srRow).toBeVisible({ timeout: 10000 });
+      // 목록 API 응답 대기
+      await page.waitForResponse(
+        resp => resp.url().includes('/api/srs') && resp.request().method() === 'GET',
+        { timeout: 10000 }
+      );
+
+      await page.waitForTimeout(500);
+
+      // SR 찾기 (재시도 로직)
+      let srRow = page.locator('tr', { hasText: srTitle }).first();
+      for (let retry = 0; retry < 3; retry++) {
+        if (await srRow.isVisible({ timeout: 3000 }).catch(() => false)) break;
+        if (retry < 2) {
+          console.log(`⚠️  Retry ${retry + 1}/3: SR not found, reloading...`);
+          await page.reload({ waitUntil: 'networkidle' });
+          srRow = page.locator('tr', { hasText: srTitle }).first();
+        }
+      }
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       srId = page.url().split('/').pop()!;
@@ -410,12 +435,38 @@ test.describe('SR 접수 권한 테스트', () => {
       await page.waitForTimeout(500);
 
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
-      await page.waitForTimeout(2000);
+
+      // SR 생성 API 응답 대기
+      const createResponse = await page.waitForResponse(
+        resp => resp.url().includes('/api/srs') && resp.request().method() === 'POST',
+        { timeout: 10000 }
+      );
+
+      if (createResponse.status() !== 200) {
+        throw new Error(`SR 생성 실패: ${createResponse.status()}`);
+      }
 
       await page.goto('/srs');
       await page.waitForLoadState('networkidle');
 
-      const srRow = page.locator('tr', { hasText: title }).first();
+      // 목록 API 응답 대기
+      await page.waitForResponse(
+        resp => resp.url().includes('/api/srs') && resp.request().method() === 'GET',
+        { timeout: 10000 }
+      );
+
+      await page.waitForTimeout(500);
+
+      // SR 찾기 (재시도 로직)
+      let srRow = page.locator('tr', { hasText: title }).first();
+      for (let retry = 0; retry < 3; retry++) {
+        if (await srRow.isVisible({ timeout: 3000 }).catch(() => false)) break;
+        if (retry < 2) {
+          console.log(`⚠️  Retry ${retry + 1}/3: SR not found, reloading...`);
+          await page.reload({ waitUntil: 'networkidle' });
+          srRow = page.locator('tr', { hasText: title }).first();
+        }
+      }
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       const clientSrId = page.url().split('/').pop()!;

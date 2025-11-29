@@ -42,7 +42,19 @@ export function buildSRUpdateInput(formData: FormData): Record<string, any> {
   const processed: Record<string, any> = {}
   for (const [key, value] of Object.entries(rawData)) {
     if (value === "" || value === undefined || value === null) {
-      if (key === "priority" || key === "status" || key === "actualPriority") {
+      if (
+        key === "priority" ||
+        key === "status" ||
+        key === "actualPriority" ||
+        key === "estimatedHours" ||
+        key === "title" ||
+        key === "description" ||
+        key === "clientId" ||
+        key === "estimatedCompletionDate" ||
+        key === "intakeNotes" ||
+        key === "assigneeId" ||
+        key === "changeReason"
+      ) {
         processed[key] = undefined
       } else {
         processed[key] = null
