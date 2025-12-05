@@ -230,3 +230,163 @@ export async function gotoAndWaitForData(
     // React 컴포넌트 렌더링 완료 대기
     await page.waitForTimeout(500);
 }
+
+// ============================================================================
+// 인증 컨텍스트 헬퍼
+// ============================================================================
+
+import path from 'path';
+import { Browser, BrowserContext } from '@playwright/test';
+
+/**
+ * 인증 파일 경로
+ */
+export const AUTH_FILES = {
+    admin: path.join(process.cwd(), 'playwright/.auth/user.json'),
+    manager: path.join(process.cwd(), 'playwright/.auth/manager.json'),
+    engineer: path.join(process.cwd(), 'playwright/.auth/engineer.json'),
+    client: path.join(process.cwd(), 'playwright/.auth/client.json'),
+} as const;
+
+export type AuthRole = keyof typeof AUTH_FILES;
+
+/**
+ * 인증된 브라우저 컨텍스트 생성
+ * 
+ * @param browser - Playwright Browser 객체
+ * @param role - 사용자 역할 (admin, manager, engineer, client)
+ * @returns 인증된 BrowserContext
+ */
+export async function createAuthContext(
+    browser: Browser,
+    role: AuthRole
+): Promise<BrowserContext> {
+    const storageState = AUTH_FILES[role];
+    console.log(`🔑 Creating ${role} context from ${storageState}`);
+    return browser.newContext({ storageState });
+}
+
+/**
+ * 컨텍스트로 작업 후 자동 정리
+ * 
+ * @param browser - Playwright Browser 객체
+ * @param role - 사용자 역할
+ * @param action - 실행할 비동기 함수
+ */
+export async function withAuthContext<T>(
+    browser: Browser,
+    role: AuthRole,
+    action: (page: Page) => Promise<T>
+): Promise<T> {
+    const context = await createAuthContext(browser, role);
+    const page = await context.newPage();
+
+    try {
+        return await action(page);
+    } finally {
+        await context.close();
+    }
+}
+
+// ============================================================================
+// SR 워크플로우 헬퍼
+// ============================================================================
+
+/**
+ * SR 생성 및 접수 통합 헬퍼
+ * 
+ * CLIENT로 SR 생성 후 MANAGER로 접수 처리까지 수행합니다.
+ * 
+ * @param browser - Playwright Browser 객체
+ * @param data - SR 데이터
+ * @returns 생성된 SR ID
+ */
+export async function createAndIntakeSR(
+    browser: Browser,
+    data: { title: string; description: string }
+): Promise<string> {
+    let srId: string;
+
+    // Step 1: CLIENT로 SR 생성
+    srId = await withAuthContext(browser, 'client', async (page) => {
+        return await createTestSR(page, data);
+    });
+
+    console.log(`📋 SR 생성 완료: ${srId}`);
+
+    // Step 2: MANAGER로 접수 처리
+    await withAuthContext(browser, 'manager', async (page) => {
+        await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+
+        // 담당자 선택
+        const assigneeSelect = page.locator('[role="combobox"]').filter({ hasText: /담당자|Assignee/i }).first();
+        if (await assigneeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await assigneeSelect.click();
+            await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
+            await page.getByRole('option').first().click();
+        }
+
+        // 저장
+        await page.getByRole('button', { name: /저장/i }).click();
+        await page.waitForTimeout(2000);
+    });
+
+    console.log(`✅ SR 접수 완료: ${srId} (상태: INTAKE)`);
+    return srId;
+}
+
+/**
+ * SR 상태 변경 헬퍼
+ * 
+ * @param page - Playwright Page 객체
+ * @param srId - SR ID
+ * @param action - 상태 변경 액션 (start, complete, hold, resume, reject, confirm, reopen)
+ * @param options - 추가 옵션 (reason, resolutionDescription)
+ */
+export async function changeSRStatus(
+    page: Page,
+    srId: string,
+    action: 'start' | 'complete' | 'hold' | 'resume' | 'reject' | 'confirm' | 'reopen',
+    options?: { reason?: string; resolutionDescription?: string }
+): Promise<void> {
+    await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+
+    const actionButtons: Record<string, RegExp> = {
+        start: /진행 시작|Start/i,
+        complete: /완료 처리|Complete/i,
+        hold: /보류|Hold/i,
+        resume: /진행 재개|Resume/i,
+        reject: /거절|Reject/i,
+        confirm: /확인 완료|Confirm/i,
+        reopen: /재오픈|Reopen/i,
+    };
+
+    const button = page.getByRole('button', { name: actionButtons[action] });
+
+    if (await button.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await button.click();
+
+        // 다이얼로그가 나타나면 입력 처리
+        const dialog = page.locator('[role="dialog"]').first();
+        if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+            if (options?.reason) {
+                const reasonInput = dialog.locator('textarea').first();
+                await reasonInput.fill(options.reason);
+            }
+            if (options?.resolutionDescription) {
+                const descInput = dialog.locator('textarea').first();
+                await descInput.fill(options.resolutionDescription);
+            }
+
+            // 확인 버튼 클릭
+            const confirmButton = dialog.getByRole('button', { name: /확인|저장|완료|Submit/i });
+            await confirmButton.click();
+        }
+
+        await page.waitForTimeout(2000);
+        console.log(`✅ SR 상태 변경: ${action}`);
+    } else {
+        console.log(`⚠️ ${action} 버튼을 찾을 수 없습니다`);
+    }
+}
+

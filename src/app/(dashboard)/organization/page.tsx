@@ -232,6 +232,9 @@ export default function OrganizationPage() {
       targetClientId,
       targetClientName: targetClient.name,
     });
+    // 상태 초기화
+    setOngoingSRs([]);
+    setShowWarning(false);
     setIsReassignDialogOpen(true);
   };
 

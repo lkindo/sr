@@ -157,7 +157,7 @@ export function UserReassignDialog({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={isLoading}>취소</AlertDialogCancel>
-                    {hasOngoingSRs && showWarning ? (
+                    {showWarning ? (
                         <AlertDialogAction
                             onClick={(e) => {
                                 e.preventDefault(); // 자동 닫힘 방지

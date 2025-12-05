@@ -22,15 +22,9 @@ test.describe('고객사 관리', () => {
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    // 등록 버튼 찾기
-    const registerButton = page.locator('button').filter({ hasText: /등록|Register|새|New/ })
-    const isVisible = await registerButton.isVisible().catch(() => false)
-
-    if (isVisible) {
-      await expect(registerButton).toBeVisible()
-    } else {
-      test.skip()
-    }
+    // 등록 버튼 찾기 (getByRole 사용)
+    const registerButton = page.getByRole('button', { name: /등록/i })
+    await expect(registerButton).toBeVisible({ timeout: 5000 })
   })
 
   test('고객사 검색 기능', async ({ page }) => {
@@ -79,18 +73,16 @@ test.describe('고객사 관리', () => {
     // 고객사 정보 입력
     const timestamp = Date.now()
     const testClientName = `E2E Test Client ${timestamp}`
-    const testClientCode = `E2E${timestamp}`
+    const testClientCode = `E2E${timestamp.toString().slice(-6)}`
+
+    // 코드 먼저 입력 (필수 필드)
+    const codeInput = dialog.getByLabel(/고객사 코드/i).first()
+    await codeInput.fill(testClientCode)
+    await page.waitForTimeout(200)
 
     // 이름 입력
-    const nameInput = dialog.locator('input[name="name"], input[placeholder*="이름"], input[placeholder*="고객사"]').first()
+    const nameInput = dialog.getByLabel(/고객사명/i).first()
     await nameInput.fill(testClientName)
-
-    // 코드 입력
-    const codeInput = dialog.locator('input[name="code"], input[placeholder*="코드"]').first()
-    const codeVisible = await codeInput.isVisible({ timeout: 1000 }).catch(() => false)
-    if (codeVisible) {
-      await codeInput.fill(testClientCode)
-    }
 
     // 산업군 선택 (있을 경우)
     const industrySelect = dialog.locator('select[name="industry"], [role="combobox"]').first()

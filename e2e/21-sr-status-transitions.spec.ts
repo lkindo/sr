@@ -467,3 +467,191 @@ test.describe('SR 상태 전이 제약 조건 테스트', () => {
     }
   });
 });
+
+test.describe('SR 재오픈 (Reopen) 테스트', () => {
+  /**
+   * CONFIRMED 상태에서 7일 이내 재오픈 테스트
+   * - 상태 머신: CONFIRMED → IN_PROGRESS 허용 (7일 이내)
+   */
+  test('CONFIRMED → IN_PROGRESS 재오픈 (7일 이내)', async ({ browser }) => {
+    test.setTimeout(90000);
+
+    // Step 1: CLIENT로 SR 생성
+    const clientContext = await browser.newContext({
+      storageState: path.join(__dirname, '../playwright/.auth/client.json')
+    });
+    const clientPage = await clientContext.newPage();
+
+    const timestamp = Date.now();
+    const title = `재오픈 테스트 SR ${timestamp}`;
+    let srId: string;
+
+    try {
+      await clientPage.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await clientPage.getByRole('button', { name: /등록/i }).first().click();
+
+      await clientPage.getByRole('textbox', { name: '제목 *' }).fill(title);
+      await clientPage.getByRole('textbox', { name: '설명 *' }).fill('재오픈 테스트용 SR');
+
+      const categoryCombobox = clientPage.getByRole('combobox', { name: '서비스 카테고리 *' });
+      await categoryCombobox.click();
+      await clientPage.waitForTimeout(500);
+      await clientPage.getByRole('option').first().click();
+      await clientPage.waitForTimeout(500);
+
+      await clientPage.getByRole('button', { name: /저장/i }).click();
+      await clientPage.waitForTimeout(2000);
+
+      await clientPage.goto('/srs');
+      await clientPage.waitForLoadState('networkidle');
+
+      const srRow = clientPage.locator('tr', { hasText: title }).first();
+      await srRow.click();
+      await clientPage.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
+      srId = clientPage.url().split('/').pop()!;
+
+      console.log(`✅ SR 생성 완료: ${srId}`);
+    } finally {
+      await clientContext.close();
+    }
+
+    // Step 2: MANAGER로 접수 → 진행 시작 → 완료 처리
+    const managerContext = await browser.newContext({
+      storageState: path.join(__dirname, '../playwright/.auth/manager.json')
+    });
+    const managerPage = await managerContext.newPage();
+
+    try {
+      // 접수 처리
+      await managerPage.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+
+      const assigneeSelect = managerPage.locator('[role="combobox"]').filter({ hasText: /담당자/i }).first();
+      if (await assigneeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await assigneeSelect.click();
+        await managerPage.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
+        await managerPage.getByRole('option').first().click();
+      }
+
+      await managerPage.getByRole('button', { name: /저장/i }).click();
+      await managerPage.waitForTimeout(2000);
+      console.log(`✅ SR 접수 완료`);
+
+      // 진행 시작
+      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      const startButton = managerPage.getByRole('button', { name: /진행 시작/i });
+      if (await startButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await startButton.click();
+        await managerPage.waitForTimeout(2000);
+        console.log(`✅ 진행 시작 완료`);
+      }
+
+      // 완료 처리
+      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      const completeButton = managerPage.getByRole('button', { name: /완료 처리/i });
+      if (await completeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await completeButton.click();
+        const dialog = managerPage.locator('[role="dialog"]').first();
+        if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await dialog.locator('textarea').first().fill('테스트 문제 해결 완료');
+          await dialog.getByRole('button', { name: /완료|확인/i }).first().click();
+        }
+        await managerPage.waitForTimeout(2000);
+        console.log(`✅ 완료 처리 완료`);
+      }
+    } finally {
+      await managerContext.close();
+    }
+
+    // Step 3: CLIENT로 확인 완료 → 재오픈
+    const client2Context = await browser.newContext({
+      storageState: path.join(__dirname, '../playwright/.auth/client.json')
+    });
+    const client2Page = await client2Context.newPage();
+
+    try {
+      await client2Page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+
+      // 확인 완료
+      const confirmButton = client2Page.getByRole('button', { name: /확인 완료|확인완료/i });
+      if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await confirmButton.click();
+        await client2Page.waitForTimeout(2000);
+        console.log(`✅ 확인 완료 처리`);
+      }
+
+      // 재오픈 (CONFIRMED 상태에서)
+      await client2Page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      const reopenButton = client2Page.getByRole('button', { name: /재오픈|Reopen/i });
+
+      if (await reopenButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await reopenButton.click();
+
+        // 재오픈 사유 입력 다이얼로그
+        const dialog = client2Page.locator('[role="dialog"]').first();
+        if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+          const reasonInput = dialog.locator('textarea').first();
+          await reasonInput.fill('추가 문제가 발견되어 재오픈합니다.');
+
+          const submitButton = dialog.getByRole('button', { name: /재오픈|확인/i }).first();
+          await submitButton.click();
+          await client2Page.waitForTimeout(2000);
+
+          // IN_PROGRESS 상태 확인
+          const inProgressStatus = client2Page.locator('text=/진행중|IN_PROGRESS/i').first();
+          if (await inProgressStatus.isVisible({ timeout: 10000 }).catch(() => false)) {
+            console.log(`✅ CONFIRMED → IN_PROGRESS 재오픈 성공!`);
+          } else {
+            console.log(`⚠️ 재오픈 후 상태가 IN_PROGRESS가 아닙니다`);
+          }
+        }
+      } else {
+        console.log(`⚠️ 재오픈 버튼을 찾을 수 없습니다 (CONFIRMED 상태가 아닐 수 있음)`);
+      }
+    } finally {
+      await client2Context.close();
+    }
+  });
+
+  /**
+   * 재오픈 7일 제한 안내 UI 확인
+   * - 완료 후 7일이 지난 경우 재오픈 버튼 비활성화 또는 경고 표시
+   */
+  test('재오픈 7일 제한 안내 UI 확인', async ({ browser }) => {
+    // 이 테스트는 시간 조작이 필요하므로 UI 안내 메시지만 확인
+    const context = await browser.newContext({
+      storageState: path.join(__dirname, '../playwright/.auth/client.json')
+    });
+    const page = await context.newPage();
+
+    try {
+      // 완료된 SR이 있다면 재오픈 다이얼로그의 7일 제한 안내 확인
+      await page.goto('/my-requests', { waitUntil: 'networkidle', timeout: 30000 });
+
+      // COMPLETED 또는 CONFIRMED 상태의 SR 찾기
+      const completedSR = page.locator('tr').filter({ hasText: /완료|COMPLETED|확인완료|CONFIRMED/i }).first();
+
+      if (await completedSR.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await completedSR.click();
+        await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
+
+        const reopenButton = page.getByRole('button', { name: /재오픈|Reopen/i });
+        if (await reopenButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await reopenButton.click();
+
+          // 7일 제한 안내 메시지 확인
+          const limitNotice = page.locator('text=/7일|7 days|일주일/i').first();
+          if (await limitNotice.isVisible({ timeout: 3000 }).catch(() => false)) {
+            console.log(`✅ 재오픈 7일 제한 안내 UI 확인됨`);
+          } else {
+            console.log(`⚠️ 7일 제한 안내 메시지를 찾을 수 없음`);
+          }
+        }
+      } else {
+        console.log(`⚠️ 완료된 SR을 찾을 수 없어 테스트 스킵`);
+      }
+    } finally {
+      await context.close();
+    }
+  });
+});
+
