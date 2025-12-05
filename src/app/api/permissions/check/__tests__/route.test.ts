@@ -49,6 +49,7 @@ vi.mock('@/lib/errors', () => ({
 describe('POST /api/permissions/check', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.resetModules();
     });
 
     it('권한이 있으면 hasPermission true를 반환해야 함', async () => {
@@ -63,7 +64,8 @@ describe('POST /api/permissions/check', () => {
         }) as NextRequest;
 
         // Dynamically import after mocks are set up
-        const { POST } = await import('../route');
+        const routeModule = await import('../route');
+        const POST = routeModule.POST;
 
         // Act
         const response = await POST(request, { session: { user: { id: 'user123' } } } as any);

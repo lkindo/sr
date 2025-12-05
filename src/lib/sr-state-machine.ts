@@ -22,7 +22,7 @@ export const VALID_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
     IN_PROGRESS: ["COMPLETED", "ON_HOLD"],
     ON_HOLD: ["IN_PROGRESS", "REJECTED"],
     COMPLETED: ["CONFIRMED", "IN_PROGRESS"], // IN_PROGRESS for Reopen
-    CONFIRMED: [], // Terminal state
+    CONFIRMED: ["IN_PROGRESS"], // 7일 이내 재오픈 허용
     REJECTED: [], // Terminal state (No Re-request)
 };
 
@@ -51,6 +51,9 @@ export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
     COMPLETED: {
         CONFIRMED: ["ADMIN", "CLIENT_USER", "CLIENT_ADMIN"], // Requester confirms
         IN_PROGRESS: ["ADMIN", "CLIENT_USER", "CLIENT_ADMIN"], // Requester reopens
+    },
+    CONFIRMED: {
+        IN_PROGRESS: ["ADMIN", "CLIENT_USER", "CLIENT_ADMIN"], // 7일 이내 재오픈
     },
 };
 

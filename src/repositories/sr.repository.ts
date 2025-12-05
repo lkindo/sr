@@ -2,6 +2,7 @@ import { BaseRepository } from './base.repository';
 import { SR, Prisma, SRStatus, SRPriority } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { BaseRepositoryImpl } from './base.repository.impl';
+import { PAGINATION } from '@/lib/constants';
 
 export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUncheckedCreateInput, Prisma.SRUncheckedUpdateInput> {
   constructor() {
@@ -26,7 +27,7 @@ export class SRRepository extends BaseRepositoryImpl<SR, string, Prisma.SRUnchec
     statusHistory: (import("@prisma/client").SRStatusHistory & { user: { id: string; name: string; image: string | null } })[];
     _count: { comments: number; attachments: number };
   }) | null> {
-    const { activitiesLimit = 20, commentsLimit = 20 } = options || {};
+    const { activitiesLimit = PAGINATION.DEFAULT_LIMIT, commentsLimit = PAGINATION.DEFAULT_LIMIT } = options || {};
 
     return this.model.findUnique({
       where: { id },

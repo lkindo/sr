@@ -38,8 +38,11 @@ describe('SR State Machine', () => {
             expect(canTransition('COMPLETED', 'IN_PROGRESS')).toBe(true);
         });
 
-        it('CONFIRMED는 terminal state이므로 다른 상태로 전환 불가', () => {
-            expect(canTransition('CONFIRMED', 'IN_PROGRESS')).toBe(false);
+        it('CONFIRMED에서 IN_PROGRESS로 재오픈 가능 (7일 이내)', () => {
+            expect(canTransition('CONFIRMED', 'IN_PROGRESS')).toBe(true);
+        });
+
+        it('CONFIRMED에서 REQUESTED로 전환 불가', () => {
             expect(canTransition('CONFIRMED', 'REQUESTED')).toBe(false);
         });
 
@@ -59,9 +62,9 @@ describe('SR State Machine', () => {
             expect(transitions).toEqual(['COMPLETED', 'ON_HOLD']);
         });
 
-        it('CONFIRMED 상태는 빈 배열 반환 (terminal state)', () => {
+        it('CONFIRMED 상태는 IN_PROGRESS 재오픈 가능', () => {
             const transitions = getAvailableTransitions('CONFIRMED');
-            expect(transitions).toEqual([]);
+            expect(transitions).toEqual(['IN_PROGRESS']);
         });
     });
 
@@ -139,9 +142,10 @@ describe('SR State Machine', () => {
             });
         });
 
-        it('순환 참조가 없어야 함 (CONFIRMED 제외)', () => {
-            // CONFIRMED는 terminal state이므로 어디로도 전환 불가
-            expect(VALID_TRANSITIONS.CONFIRMED).toEqual([]);
+        it('CONFIRMED에서 재오픈 가능 (REJECTED만 terminal state)', () => {
+            // CONFIRMED는 7일 이내 재오픈 가능, REJECTED만 terminal state
+            expect(VALID_TRANSITIONS.CONFIRMED).toEqual(['IN_PROGRESS']);
+            expect(VALID_TRANSITIONS.REJECTED).toEqual([]);
         });
     });
 });

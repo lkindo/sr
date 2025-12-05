@@ -108,5 +108,79 @@ describe('SRService', () => {
         .rejects
         .toThrow(NotFoundError);
     });
+
+    it('should throw ForbiddenError if user cannot update SR', async () => {
+      const mockSR = { id: 'sr-1', clientId: 'client-1', requesterId: 'other-user' };
+      mockSRRepository.findById.mockResolvedValue(mockSR);
+      mockSRPolicy.ensureCanUpdate.mockImplementation(() => {
+        throw new Error('권한이 없습니다');
+      });
+
+      await expect(srService.updateSR('sr-1', { title: 'Updated' }, mockUser))
+        .rejects
+        .toThrow('권한이 없습니다');
+    });
+  });
+
+  describe('getSRById', () => {
+    it('should return SR by id', async () => {
+      const mockSR = { id: 'sr-1', title: 'Test SR' };
+      mockSRRepository.findById.mockResolvedValue(mockSR);
+
+      const result = await srService.getSRById('sr-1');
+
+      expect(result).toEqual(mockSR);
+      expect(mockSRRepository.findById).toHaveBeenCalledWith('sr-1');
+    });
+
+    it('should return null if SR not found', async () => {
+      mockSRRepository.findById.mockResolvedValue(null);
+
+      const result = await srService.getSRById('non-existent');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('deleteSR', () => {
+    it('should throw NotFoundError if SR does not exist', async () => {
+      mockSRRepository.findById.mockResolvedValue(null);
+
+      await expect(srService.deleteSR('sr-1', mockUser))
+        .rejects
+        .toThrow(NotFoundError);
+    });
+
+    it('should throw ForbiddenError if user cannot delete', async () => {
+      const mockSR = { id: 'sr-1', clientId: 'client-1' };
+      mockSRRepository.findById.mockResolvedValue(mockSR);
+      mockSRPolicy.ensureCanDelete.mockImplementation(() => {
+        throw new Error('삭제 권한이 없습니다');
+      });
+
+      await expect(srService.deleteSR('sr-1', mockUser))
+        .rejects
+        .toThrow('삭제 권한이 없습니다');
+    });
+  });
+
+  describe('countSRs', () => {
+    it('should return count of SRs', async () => {
+      mockSRRepository.count.mockResolvedValue(5);
+
+      const result = await srService.countSRs();
+
+      expect(result).toBe(5);
+    });
+
+    it('should return filtered count', async () => {
+      mockSRRepository.count.mockResolvedValue(3);
+      const filter = { where: { status: 'IN_PROGRESS' } };
+
+      const result = await srService.countSRs(filter);
+
+      expect(mockSRRepository.count).toHaveBeenCalledWith(filter.where);
+      expect(result).toBe(3);
+    });
   });
 });

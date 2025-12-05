@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { getSRActivitiesAction, getSRCommentsAction } from "@/actions/sr.actions";
+import { PAGINATION } from "@/lib/constants";
 
 /**
  * SR Activities 무한 스크롤 훅
@@ -10,7 +11,7 @@ export function useSRActivitiesInfinite(srId: string) {
     queryFn: async ({ pageParam }) => {
       const result = await getSRActivitiesAction(srId, {
         cursor: pageParam,
-        limit: 20,
+        limit: PAGINATION.DEFAULT_LIMIT,
       });
 
       if (!result.success) {
@@ -34,7 +35,7 @@ export function useSRCommentsInfinite(srId: string) {
     queryFn: async ({ pageParam }) => {
       const result = await getSRCommentsAction(srId, {
         cursor: pageParam,
-        limit: 20,
+        limit: PAGINATION.DEFAULT_LIMIT,
       });
 
       if (!result.success) {

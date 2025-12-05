@@ -97,61 +97,61 @@ export function UserReassignDialog({
                                 </div>
                             </div>
 
-                        {hasOngoingSRs && showWarning && (
-                            <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 p-4 rounded-md space-y-3">
-                                <div className="flex items-start gap-2">
-                                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
-                                    <div className="space-y-1">
-                                        <div className="font-semibold text-amber-900 dark:text-amber-100">
-                                            진행 중인 SR {ongoingSRs.length}건이 있습니다
-                                        </div>
-                                        <div className="text-sm text-amber-800 dark:text-amber-200">
-                                            이 사용자가 담당하거나 요청한 진행 중인 SR이 있습니다.
-                                            소속을 변경해도 기존 SR은 그대로 유지되지만,
-                                            다른 담당자에게 재할당하는 것을 권장합니다.
+                            {hasOngoingSRs && showWarning && (
+                                <div className="border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 p-4 rounded-md space-y-3">
+                                    <div className="flex items-start gap-2">
+                                        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5 shrink-0" />
+                                        <div className="space-y-1">
+                                            <div className="font-semibold text-amber-900 dark:text-amber-100">
+                                                진행 중인 SR {ongoingSRs.length}건이 있습니다
+                                            </div>
+                                            <div className="text-sm text-amber-800 dark:text-amber-200">
+                                                이 사용자가 담당하거나 요청한 진행 중인 SR이 있습니다.
+                                                소속을 변경해도 기존 SR은 그대로 유지되지만,
+                                                다른 담당자에게 재할당하는 것을 권장합니다.
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-amber-900 dark:text-amber-100">
-                                        <FileText className="h-4 w-4" />
-                                        진행 중인 SR 목록
-                                    </div>
-                                    <ScrollArea className="h-48 rounded-md border bg-white dark:bg-gray-950">
-                                        <div className="p-3 space-y-2">
-                                            {ongoingSRs.map((sr) => (
-                                                <div
-                                                    key={sr.id}
-                                                    className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md space-y-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                                >
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                                {sr.srNumber}
-                                                            </div>
-                                                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
-                                                                {sr.title}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-1 shrink-0">
-                                                            {getStatusBadge(sr.status)}
-                                                            {getPriorityBadge(sr.priority)}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
-                                                        <span>고객사: {sr.clientName}</span>
-                                                        {sr.assigneeName && (
-                                                            <span>담당자: {sr.assigneeName}</span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-amber-900 dark:text-amber-100">
+                                            <FileText className="h-4 w-4" />
+                                            진행 중인 SR 목록
                                         </div>
-                                    </ScrollArea>
+                                        <ScrollArea className="h-48 rounded-md border bg-white dark:bg-gray-950">
+                                            <div className="p-3 space-y-2">
+                                                {ongoingSRs.map((sr) => (
+                                                    <div
+                                                        key={sr.id}
+                                                        className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md space-y-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                                    {sr.srNumber}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
+                                                                    {sr.title}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-1 shrink-0">
+                                                                {getStatusBadge(sr.status)}
+                                                                {getPriorityBadge(sr.priority)}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                                                            <span>고객사: {sr.clientName}</span>
+                                                            {sr.assigneeName && (
+                                                                <span>담당자: {sr.assigneeName}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
                         </div>
                     </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -159,7 +159,10 @@ export function UserReassignDialog({
                     <AlertDialogCancel disabled={isLoading}>취소</AlertDialogCancel>
                     {hasOngoingSRs && showWarning ? (
                         <AlertDialogAction
-                            onClick={() => onConfirm(true)}
+                            onClick={(e) => {
+                                e.preventDefault(); // 자동 닫힘 방지
+                                onConfirm(true);
+                            }}
                             disabled={isLoading}
                             className="bg-amber-600 hover:bg-amber-700"
                         >
@@ -173,7 +176,13 @@ export function UserReassignDialog({
                             )}
                         </AlertDialogAction>
                     ) : (
-                        <AlertDialogAction onClick={() => onConfirm(false)} disabled={isLoading}>
+                        <AlertDialogAction
+                            onClick={(e) => {
+                                e.preventDefault(); // 자동 닫힘 방지
+                                onConfirm(false);
+                            }}
+                            disabled={isLoading}
+                        >
                             {isLoading ? (
                                 <span className="flex items-center gap-2">
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

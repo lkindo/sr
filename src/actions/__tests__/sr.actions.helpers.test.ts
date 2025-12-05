@@ -30,7 +30,7 @@ describe('sr.actions helpers', () => {
 
 		const processed = buildSRUpdateInput(formData)
 
-		expect(processed.title).toBeNull()
+		expect(processed.title).toBeUndefined()
 		expect(processed.satisfactionRating).toBe(5)
 		expect(processed.estimatedHours).toBe(2.5)
 		expect(processed.status).toBeUndefined()
