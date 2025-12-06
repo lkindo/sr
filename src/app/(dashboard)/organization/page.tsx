@@ -268,28 +268,40 @@ export default function OrganizationPage() {
       }
 
       // 성공 처리
-      // 데이터 새로고침
-      await fetchClients();
+      // 데이터를 먼저 모두 가져온 후 상태를 한 번에 업데이트 (깜빡임 방지)
+      const [clientsResponse, ...userResponses] = await Promise.all([
+        // 1. 고객사 목록 가져오기
+        fetch("/api/clients?pageSize=1000").then(res => res.ok ? res.json() : null),
+        // 2. 양쪽 고객사의 사용자 목록 가져오기
+        ...[reassignData.sourceClientId, reassignData.targetClientId]
+          .filter(clientId => expandedClients.has(clientId))
+          .map(clientId =>
+            fetch(`/api/clients/${clientId}`)
+              .then(res => res.ok ? res.json().then(data => ({ clientId, users: data.users || [] })) : null)
+              .catch(() => null)
+          )
+      ]);
 
-      // 양쪽 고객사의 사용자 목록 새로고침
-      const refreshPromises = [reassignData.sourceClientId, reassignData.targetClientId]
-        .filter(clientId => expandedClients.has(clientId))
-        .map(async (clientId) => {
-          try {
-            const response = await fetch(`/api/clients/${clientId}`);
-            if (response.ok) {
-              const data = await response.json();
-              setClientUsers(prev => ({
-                ...prev,
-                [clientId]: data.users || [],
-              }));
-            }
-          } catch (error) {
-            console.error(`Failed to refresh users for client ${clientId}:`, error);
-          }
-        });
+      // 상태를 한 번에 업데이트
+      if (clientsResponse) {
+        const clientData = Array.isArray(clientsResponse) ? clientsResponse : (clientsResponse.data || []);
+        setClients(clientData);
+      }
 
-      await Promise.all(refreshPromises);
+      // 사용자 목록 상태 한 번에 업데이트
+      const newClientUsers: Record<string, User[]> = {};
+      userResponses.forEach((response: any) => {
+        if (response && response.clientId) {
+          newClientUsers[response.clientId] = response.users;
+        }
+      });
+
+      if (Object.keys(newClientUsers).length > 0) {
+        setClientUsers(prev => ({
+          ...prev,
+          ...newClientUsers,
+        }));
+      }
 
       toast({
         title: "성공",

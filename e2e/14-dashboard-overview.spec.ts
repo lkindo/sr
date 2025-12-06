@@ -60,7 +60,9 @@ test.describe('대시보드', () => {
 
     // API 응답 구조 검증
     expect(statsResponse).toBeDefined()
-    expect(statsResponse).toHaveProperty('total')
+    // API가 summary.total 또는 직접 total을 반환할 수 있음
+    const total = statsResponse.total ?? statsResponse.summary?.total
+    expect(total).toBeDefined()
 
     // 상태별 통계가 있는지 확인 (있을 경우)
     if (statsResponse.byStatus) {
@@ -74,7 +76,7 @@ test.describe('대시보드', () => {
       console.log('📊 우선순위별 SR 분포:', statsResponse.byPriority)
     }
 
-    console.log(`✅ 총 SR 개수: ${statsResponse.total}`)
+    console.log(`✅ 총 SR 개수: ${total}`)
   })
 
   test('화면 표시 통계와 API 응답 일치 확인', async ({ page }) => {

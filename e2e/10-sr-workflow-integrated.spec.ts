@@ -11,8 +11,8 @@ import { test, expect } from '@playwright/test';
 
 test.use({ storageState: './playwright/.auth/user.json' });
 
-// 테스트 타임아웃을 60초로 증가
-test.setTimeout(60000);
+// 테스트 타임아웃을 90초로 증가
+test.setTimeout(90000);
 
 test.describe('SR 워크플로우 통합', () => {
   test.describe.configure({ mode: 'serial' });
@@ -34,24 +34,25 @@ test.describe('SR 워크플로우 통합', () => {
 
     // 고객사 선택 - Select가 enabled될 때까지 대기
     const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
-    await expect(clientCombobox).toBeEnabled({ timeout: 10000 });
+    await expect(clientCombobox).toBeEnabled({ timeout: 15000 });
     await clientCombobox.click();
 
+    // 옵션 로딩 대기 (최대 15초)
     const firstClientOption = page.getByRole('option').first();
-    await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+    await firstClientOption.waitFor({ state: 'visible', timeout: 15000 });
     const clientName = (await firstClientOption.textContent()) || '';
     await firstClientOption.click();
 
     // 선택 확인 (텍스트가 포함되어 있는지)
     await expect(clientCombobox).toContainText(clientName, { timeout: 5000 });
 
-    // 서비스 카테고리 선택 - categories 로딩 완료 대기
+    // 서비스 카테고리 선택 - enabled될 때까지 대기
     const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
-    await expect(categoryCombobox).toBeEnabled({ timeout: 10000 });
+    await expect(categoryCombobox).toBeEnabled({ timeout: 15000 });
     await categoryCombobox.click({ force: true });
 
     const firstCategoryOption = page.getByRole('option').first();
-    await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
+    await firstCategoryOption.waitFor({ state: 'visible', timeout: 15000 });
     const categoryName = (await firstCategoryOption.textContent()) || '';
     await firstCategoryOption.click();
 

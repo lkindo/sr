@@ -57,16 +57,16 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
       // 저장 후 UI 처리 대기 (다이얼로그 닫힘 또는 페이지 이동)
       // waitForResponse 대신 UI 변화를 감지
-      await page.waitForTimeout(2000); 
+      await page.waitForTimeout(2000);
 
       // 목록 페이지로 이동
       await page.goto('/srs');
       await page.waitForLoadState('networkidle');
-      
+
       // SR 찾기 (Polling 강화)
       let srRow = page.locator('tr', { hasText: srTitle }).first();
       let found = false;
-      
+
       for (let i = 0; i < 5; i++) {
         if (await srRow.isVisible().catch(() => false)) {
           found = true;
@@ -128,8 +128,16 @@ test.describe('SR 접수 프로세스 테스트', () => {
         .first()
         .locator('..')
         .locator('[role="combobox"]');
+
+      // 셀렉터가 보일 때까지 대기
+      await expect(prioritySelect).toBeVisible({ timeout: 10000 });
       await prioritySelect.click();
-      await page.getByRole('option', { name: /높음|HIGH/i }).first().click();
+      await page.waitForTimeout(500);
+
+      // 옵션이 보일 때까지 대기
+      const highOption = page.getByRole('option', { name: /높음|HIGH/i }).first();
+      await expect(highOption).toBeVisible({ timeout: 5000 });
+      await highOption.click();
       console.log(`✅ 우선순위 선택: HIGH`);
 
       // 2) 예상 작업 시간 입력
@@ -142,7 +150,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
         .first()
         .locator('..')
         .locator('[role="combobox"]');
-      
+
       // Combobox 키보드 조작
       await assigneeSelect.click({ force: true });
       await page.waitForTimeout(500);
@@ -248,13 +256,13 @@ test.describe('SR 접수 프로세스 테스트', () => {
         .locator('[role="combobox"]');
       await assigneeSelect2.click({ force: true });
       await page.waitForTimeout(500);
-      
+
       await assigneeSelect2.press('ArrowDown');
       await page.waitForTimeout(200);
       await assigneeSelect2.press('ArrowDown');
       await page.waitForTimeout(200);
       await assigneeSelect2.press('Enter');
-      
+
       const newAssigneeName = await assigneeSelect2.textContent();
       console.log(`✅ 담당자 재배정 (키보드): ${newAssigneeName}`);
 
@@ -268,7 +276,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.waitForTimeout(2000);
 
       // 상세 페이지로 복귀
-      await page.waitForURL(/\/srs\/[^/]+$/, { timeout: 10000 }).catch(() => {});
+      await page.waitForURL(/\/srs\/[^/]+$/, { timeout: 10000 }).catch(() => { });
       if (page.url().includes('/intake')) {
         await page.goto(`/srs/${srId}`);
         await page.waitForLoadState('domcontentloaded');
@@ -454,7 +462,7 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
         .first()
         .locator('..')
         .locator('[role="combobox"]');
-      
+
       // Combobox 키보드 조작
       await assigneeSelectSLA.click({ force: true });
       await managerPage.waitForTimeout(500);

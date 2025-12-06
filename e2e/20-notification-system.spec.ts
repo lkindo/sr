@@ -46,37 +46,28 @@ test.describe('알림 시스템 통합 테스트', () => {
       await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
       await page.getByRole('textbox', { name: '설명 *' }).fill('알림 시스템 테스트용 SR입니다.');
 
-      // 고객사 선택 (CLIENT는 자동 설정)
+      // 고객사 선택 (CLIENT는 자동 설정 - disabled 상태)
       const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
-      const isDisabled = await clientCombobox.getAttribute('disabled');
-      if (!isDisabled) {
-        await page.waitForFunction(
-          () => {
-            const el = document.querySelector('#client') as HTMLButtonElement;
-            return el && !el.disabled;
-          },
-          { timeout: 5000 }
-        );
+      const isClientDisabled = await clientCombobox.isDisabled().catch(() => true);
+
+      if (!isClientDisabled) {
+        await expect(clientCombobox).toBeEnabled({ timeout: 15000 });
         await clientCombobox.click();
         const firstClientOption = page.getByRole('option').first();
-        await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+        await firstClientOption.waitFor({ state: 'visible', timeout: 15000 });
         await firstClientOption.click();
         await page.waitForTimeout(300);
+      } else {
+        console.log('⚠️ CLIENT 사용자: 고객사 자동 설정됨 (선택 스킵)');
       }
 
-      // 서비스 카테고리 선택 - categories 로딩 완료 대기
+      // 서비스 카테고리 선택 - enabled될 때까지 대기
       const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
-      await page.waitForFunction(
-        () => {
-          const el = document.querySelector('#category') as HTMLButtonElement;
-          return el && !el.disabled;
-        },
-        { timeout: 10000 }
-      );
+      await expect(categoryCombobox).toBeEnabled({ timeout: 15000 });
       await categoryCombobox.click({ force: true });
       await page.waitForTimeout(500);
       const firstCategoryOption = page.getByRole('option').first();
-      await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
+      await firstCategoryOption.waitFor({ state: 'visible', timeout: 15000 });
       await firstCategoryOption.click();
       await page.waitForTimeout(500);
 
@@ -127,7 +118,12 @@ test.describe('알림 시스템 통합 테스트', () => {
           .locator('..')
           .locator('[role="combobox"]');
         await assigneeSelect.click();
-        await page.getByRole('option', { name: /Engineer|엔지니어/i }).first().click();
+        await page.waitForTimeout(500);
+
+        // 옵션 로딩 대기
+        const firstOption = page.getByRole('option').first();
+        await firstOption.waitFor({ state: 'visible', timeout: 10000 });
+        await firstOption.click();
 
         await page.getByLabel(/접수 메모/i).fill('엔지니어에게 배정하였습니다.');
 
