@@ -3,8 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { UserNav } from "./UserNav";
+import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
+
+const UserNav = dynamic(() => import("./UserNav").then((mod) => mod.UserNav), {
+  ssr: false,
+  loading: () => <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />,
+});
 import { usePermissions } from "@/hooks/use-permissions";
 import type { AuthenticatedUser } from "@/types/session";
 

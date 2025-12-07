@@ -81,6 +81,8 @@ export function CompleteSRDialog({
             await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
 
             // SR 목록으로 이동
+            // SR 목록으로 이동
+            router.refresh();
             router.push("/srs");
         } catch (error) {
             toast({

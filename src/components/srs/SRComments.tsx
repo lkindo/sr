@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,7 @@ export function SRComments({ srId }: SRCommentsProps) {
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // React Query 무한 스크롤
@@ -86,8 +88,9 @@ export function SRComments({ srId }: SRCommentsProps) {
 
       setNewComment("");
 
-      // React Query 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ["sr", srId, "comments"] });
+      // React Query 캐시 무효화 및 서버 컴포넌트 갱신
+      await queryClient.invalidateQueries({ queryKey: ["sr", srId, "comments"] });
+      router.refresh();
     } catch (error) {
       toast({
         title: "오류",
@@ -198,24 +201,24 @@ export function SRComments({ srId }: SRCommentsProps) {
                       <p className="text-sm whitespace-pre-wrap">
                         {comment.content}
                       </p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 무한 스크롤 트리거 */}
-            {hasNextPage && (
-              <div ref={loadMoreRef} className="mt-4 flex justify-center">
-                {isFetchingNextPage ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                ) : (
-                  <Button onClick={() => fetchNextPage()} variant="outline" size="sm">
-                    더 보기
-                  </Button>
-                )}
+                ))}
               </div>
-            )}
-          </>
+
+              {/* 무한 스크롤 트리거 */}
+              {hasNextPage && (
+                <div ref={loadMoreRef} className="mt-4 flex justify-center">
+                  {isFetchingNextPage ? (
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  ) : (
+                    <Button onClick={() => fetchNextPage()} variant="outline" size="sm">
+                      더 보기
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

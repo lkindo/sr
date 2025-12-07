@@ -51,6 +51,10 @@ model User {
   clientHandlers ClientHandler[] @relation("ClientHandlerUser")
   backupHandlers ClientHandler[] @relation("ClientHandlerBackup")
 
+  // Push Notification Relations
+  pushSubscriptions      PushSubscription[]
+  notificationPreference NotificationPreference?
+
   @@index([email])
   @@index([isActive])
   @@map("users")
@@ -404,6 +408,7 @@ enum NotificationType {
   EMAIL
   MATTERMOST
   IN_APP
+  PUSH
 }
 
 enum NotificationStatus {
@@ -448,4 +453,45 @@ model SRStatusHistory {
   @@index([srId, changedAt])
   @@index([changedBy])
   @@map("sr_status_history")
+}
+
+// ============================================================================
+// 푸시 알림
+// ============================================================================
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model NotificationPreference {
+  id                   String  @id @default(cuid())
+  userId               String  @unique @map("user_id")
+  // Email preferences
+  emailSRCreated       Boolean @default(true) @map("email_sr_created")
+  emailSRAssigned      Boolean @default(true) @map("email_sr_assigned")
+  emailSRStatusChanged Boolean @default(false) @map("email_sr_status_changed")
+  emailCommentAdded    Boolean @default(false) @map("email_comment_added")
+  // Push preferences
+  pushSRCreated        Boolean @default(true) @map("push_sr_created")
+  pushSRAssigned       Boolean @default(true) @map("push_sr_assigned")
+  pushSRStatusChanged  Boolean @default(false) @map("push_sr_status_changed")
+  pushCommentAdded     Boolean @default(false) @map("push_comment_added")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
 }

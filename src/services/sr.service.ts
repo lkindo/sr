@@ -5,6 +5,8 @@ import { SRActivityRepository } from "@/repositories/sr-activity.repository";
 import { SRCommentRepository } from "@/repositories/sr-comment.repository";
 import { SRAttachmentRepository } from "@/repositories/sr-attachment.repository";
 import { ClientRepository } from "@/repositories/client.repository";
+import { UserRepository } from "@/repositories/user.repository"; // 추가
+import { pushService } from "@/services/push.service"; // 추가
 import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { AuthenticatedUser } from "@/types/session";
@@ -33,7 +35,8 @@ export class SRService {
     private srAttachmentRepository: SRAttachmentRepository = new SRAttachmentRepository(),
     private clientRepository: ClientRepository = new ClientRepository(),
     private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository(),
-    private srPolicy: SRPolicy = new SRPolicy()
+    private srPolicy: SRPolicy = new SRPolicy(),
+    private userRepository: UserRepository = new UserRepository()
   ) { }
 
   /**
@@ -169,6 +172,18 @@ export class SRService {
     console.log(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
     this.sendCreationNotification(result).catch(err => {
       console.error("[SRService] Failed to send Mattermost notification:", err);
+    });
+
+    // 푸시 알림 전송 (ADMIN, MANAGER)
+    this.userRepository.findUserIdsByRoles(['ADMIN', 'MANAGER']).then(adminIds => {
+      if (adminIds.length > 0) {
+        pushService.sendToUsers(adminIds, {
+          title: "새로운 SR 등록",
+          body: `${result.srNumber}: ${result.title}`,
+          url: `/srs/${result.id}`,
+          tag: 'sr-created'
+        }).catch(err => console.error("[SRService] Failed to send push notification:", err));
+      }
     });
 
     return result;
@@ -375,6 +390,16 @@ export class SRService {
               description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
             },
           });
+
+          // 상태 변경 푸시 알림 (요청자에게)
+          if (existingSR.requesterId) {
+            pushService.sendToUser(existingSR.requesterId, {
+              title: "SR 상태 변경",
+              body: `${existingSR.srNumber} 상태가 ${validated.status}로 변경되었습니다.`,
+              url: `/srs/${id}`,
+              tag: 'sr-status-changed'
+            }).catch(console.error);
+          }
         }
 
         // 3. 담당자 변경 활동 로그
@@ -387,6 +412,16 @@ export class SRService {
               description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
             },
           });
+
+          // 담당자 배정 푸시 알림 (새 담당자에게)
+          if (assigneeId) {
+            pushService.sendToUser(assigneeId, {
+              title: "SR 담당 배정",
+              body: `${existingSR.srNumber} 담당자로 배정되었습니다.`,
+              url: `/srs/${id}`,
+              tag: 'sr-assigned'
+            }).catch(console.error);
+          }
         }
 
         return updatedSR;

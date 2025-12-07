@@ -225,6 +225,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
       });
 
       // SPA 방식으로 페이지 이동 (전체 reload 방지)
+      router.refresh();
       router.push("/srs");
 
       // 성공 시에는 submitting을 false로 설정하지 않음 (페이지 이동 중이므로)
