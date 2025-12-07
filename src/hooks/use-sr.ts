@@ -138,8 +138,6 @@ export function useDeleteSR() {
       });
 
       // 4. 캐시 정리 완료 후 페이지 이동
-      // 4. 캐시 정리 완료 후 페이지 이동
-      router.refresh();
       router.push("/srs");
     },
   });

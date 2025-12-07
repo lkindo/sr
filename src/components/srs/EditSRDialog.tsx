@@ -352,8 +352,14 @@ export function EditSRDialog({
         description: "SR이 수정되었습니다.",
       });
 
-      router.refresh();
-      await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
+      onOpenChange(false); // 다이얼로그 즉시 닫기
+
+      // 병렬 처리로 지연 최소화
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sr", srId] }),
+        Promise.resolve(router.refresh())
+      ]);
+
       onUpdated();
     } catch (error) {
       toast({

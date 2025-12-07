@@ -11,6 +11,8 @@ import type { SR } from "@prisma/client";
 import { buildSRCreateInput, buildSRUpdateInput } from "./sr-form.utils";
 import { SRCreateResult, SRUpdateResult, SRDetails } from "@/types/sr.types";
 
+import { revalidatePath } from "next/cache";
+
 export async function createSRAction(
   formData: FormData
 ): Promise<Result<SRCreateResult>> {
@@ -28,6 +30,7 @@ export async function createSRAction(
     const srService = new SRService();
     const sr = await srService.createSR(validated, session.user);
 
+    revalidatePath("/srs");
     return ok(sr);
   } catch (error) {
     return errorToResult(error);
@@ -52,6 +55,8 @@ export async function updateSRAction(
     const srService = new SRService();
     const sr = await srService.updateSR(id, validated, session.user);
 
+    revalidatePath("/srs");
+    revalidatePath(`/srs/${id}`);
     return ok(sr);
   } catch (error) {
     return errorToResult(error);
@@ -66,6 +71,7 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
     const srService = new SRService();
     await srService.deleteSR(id, session.user);
 
+    revalidatePath("/srs");
     return ok(undefined);
   } catch (error) {
     return errorToResult(error);

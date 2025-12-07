@@ -375,4 +375,24 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     });
     return users.map((u: { id: string }) => u.id);
   }
+
+  async findUsersByRoles(roleNames: string[]): Promise<User[]> {
+    return this.model.findMany({
+      where: {
+        roles: {
+          some: {
+            role: {
+              name: {
+                in: roleNames,
+              },
+            },
+          },
+        },
+        isActive: true,
+      },
+      include: {
+        notificationPreference: true,
+      }
+    });
+  }
 }

@@ -68,12 +68,14 @@ export const POST = withAuthAndRateLimit(async (
         select: {
           id: true,
           email: true,
+          notificationPreference: true,
         },
       },
       assignee: {
         select: {
           id: true,
           email: true,
+          notificationPreference: true,
         },
       },
     },
@@ -119,32 +121,39 @@ export const POST = withAuthAndRateLimit(async (
   }
 
   // Send email notifications to requester and assignee (non-blocking)
-  if (process.env.RESEND_API_KEY) {
-    const recipients = new Set<string>();
+  const { emailService } = await import("@/services/email.service");
 
-    // Notify requester if not the commenter
-    if (sr.requester.id !== session.user.id) {
-      recipients.add(sr.requester.email);
+  // Requester check
+  const requesterPrefs = sr.requester.notificationPreference;
+  // Schema: emailCommentAdded Boolean @default(false)
+  const shouldSendRequester = requesterPrefs?.emailCommentAdded ?? false;
+
+  if (sr.requester.id !== session.user.id && sr.requester.email && shouldSendRequester) {
+    emailService.sendCommentAdded(
+      sr.requester.email,
+      sr.srNumber,
+      sr.title,
+      comment.user.name,
+      validated.content,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${sr.id}`
+    ).catch(e => console.error("Failed to send comment email to requester:", e));
+  }
+
+  // Assignee check
+  if (sr.assignee && sr.assignee.id !== session.user.id && sr.assignee.email) {
+    const assigneePrefs = sr.assignee.notificationPreference;
+    const shouldSendAssignee = assigneePrefs?.emailCommentAdded ?? false;
+
+    if (shouldSendAssignee) {
+      emailService.sendCommentAdded(
+        sr.assignee.email,
+        sr.srNumber,
+        sr.title,
+        comment.user.name,
+        validated.content,
+        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${sr.id}`
+      ).catch(e => console.error("Failed to send comment email to assignee:", e));
     }
-
-    // Notify assignee if exists and not the commenter
-    if (sr.assignee && sr.assignee.id !== session.user.id) {
-      recipients.add(sr.assignee.email);
-    }
-
-    // Send emails to all recipients
-    recipients.forEach((email) => {
-      sendCommentNotificationEmail({
-        to: email,
-        srId: sr.id,
-        srNumber: sr.srNumber,
-        title: sr.title,
-        commentAuthor: comment.user.name,
-        commentContent: validated.content,
-      }).catch((error) => {
-        console.error("Failed to send comment notification email:", error);
-      });
-    });
   }
 
   return NextResponse.json(comment, { status: 201 });
