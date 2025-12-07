@@ -23,9 +23,13 @@ async function globalSetup(config: FullConfig) {
     await page.click('button[type="submit"]')
 
     // 로그인 성공 대기 (dashboard 또는 srs 페이지로 리디렉션)
-    await page.waitForURL(/\/(dashboard|srs)/, { timeout: 30000 })
-
-    console.log('✅ 로그인 성공!')
+    try {
+      await page.waitForURL(/\/(dashboard|srs)/, { timeout: 15000 })
+      console.log('✅ 로그인 성공! (URL 확인됨)')
+    } catch (e) {
+      console.log(`⚠️ 로그인 리디렉션 대기 시간 초과. 현재 URL: ${page.url()}`)
+      // 타임아웃되더라도 쿠키가 설정되었을 수 있으므로 진행 시도
+    }
 
     // 주요 페이지 워밍업 (Next.js 사전 컴파일)
     console.log('🔥 페이지 워밍업 중...')

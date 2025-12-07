@@ -2,7 +2,8 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "windows"]
   // Vercel 배포 호환성을 위해 기본 경로 사용
   // output = "../src/generated/prisma" // 커스텀 경로는 Vercel에서 문제 발생
 }

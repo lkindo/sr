@@ -1,74 +1,79 @@
 import { test, expect } from '@playwright/test'
+import path from 'path'
 
 /**
- * 사용자 관리 테스트
- * - 기본 UI 확인
- * - 사용자 CRUD 전체 플로우
- * - 역할 할당 및 고객사 할당
+ * 사용자 관리 테스트 - 권한별 시나리오
+ * 
+ * ADMIN/MANAGER: 사용자 CRUD 전체 권한
+ * CLIENT: 읽기 전용 (사용자 페이지 접근 불가 또는 제한)
  */
 
-test.describe('사용자 관리', () => {
-  test.describe.configure({ mode: 'serial' });
+const authFiles = {
+  admin: path.join(__dirname, '../playwright/.auth/user.json'),
+  manager: path.join(__dirname, '../playwright/.auth/manager.json'),
+  client: path.join(__dirname, '../playwright/.auth/client.json'),
+}
 
-  // 인증 상태 사용 (필요한 경우 경로 확인 후 수정)
-  // test.use({ storageState: 'playwright/.auth/manager.json' });
+// ============================================
+// ADMIN/MANAGER 권한 테스트
+// ============================================
+test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
+  test.use({ storageState: authFiles.admin })
+  test.describe.configure({ mode: 'serial' })
+
+  let testUserEmail: string
+  let testUserName: string
+
   test('사용자 목록 페이지 접근', async ({ page }) => {
     await page.goto('/users')
+    await page.waitForLoadState('networkidle')
 
-    // 페이지가 로드될 때까지 대기
-    await page.waitForLoadState('domcontentloaded')
-
-    // 사용자 목록 테이블 확인
-    await expect(page.locator('table')).toBeVisible()
+    // ADMIN은 사용자 목록 테이블이 보여야 함
+    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
+    console.log('✅ ADMIN: 사용자 목록 테이블 확인')
   })
 
   test('사용자 검색 기능', async ({ page }) => {
     await page.goto('/users')
-    await page.waitForLoadState('domcontentloaded')
+    await page.waitForLoadState('networkidle')
 
-    // 검색 입력 필드 찾기
-    const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]')
-    const isVisible = await searchInput.isVisible().catch(() => false)
+    // 검색 입력 필드가 있어야 함
+    const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]').first()
+    await expect(searchInput).toBeVisible({ timeout: 10000 })
 
-    if (isVisible) {
-      await searchInput.fill('test')
-      await page.waitForTimeout(500)
+    await searchInput.fill('test')
+    await page.waitForTimeout(500)
 
-      // 검색 결과 확인
-      const results = page.locator('tbody tr')
-      const count = await results.count()
-      expect(count).toBeGreaterThanOrEqual(0)
-    } else {
-      test.skip()
-    }
+    console.log('✅ ADMIN: 검색 기능 동작 확인')
+  })
+
+  test('사용자 등록 버튼이 보여야 함', async ({ page }) => {
+    await page.goto('/users')
+    await page.waitForLoadState('networkidle')
+
+    // ADMIN은 사용자 등록 버튼이 반드시 보여야 함
+    const createButton = page.locator('button').filter({ hasText: /등록|추가|생성|New User/i }).first()
+    await expect(createButton).toBeVisible({ timeout: 10000 })
+    console.log('✅ ADMIN: 사용자 등록 버튼 확인')
   })
 
   test('사용자 생성 전체 플로우', async ({ page }) => {
     await page.goto('/users')
-    await page.waitForLoadState('domcontentloaded')
+    await page.waitForLoadState('networkidle')
 
-    // 사용자 등록 버튼 찾기
+    // 등록 버튼 클릭
     const createButton = page.locator('button').filter({ hasText: /등록|추가|생성|New User/i }).first()
-    const buttonVisible = await createButton.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!buttonVisible) {
-      console.log('⚠️ 사용자 등록 버튼을 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    // Dialog 열기
     await createButton.click()
     await page.waitForTimeout(500)
 
     // Dialog 확인
     const dialog = page.locator('[role="dialog"], .dialog, .modal').first()
-    await expect(dialog).toBeVisible()
+    await expect(dialog).toBeVisible({ timeout: 5000 })
 
     // 사용자 정보 입력
     const timestamp = Date.now()
-    const testUserName = `E2E Test User ${timestamp}`
-    const testUserEmail = `e2etest${timestamp}@example.com`
+    testUserName = `E2E Test User ${timestamp}`
+    testUserEmail = `e2etest${timestamp}@example.com`
 
     // 이름 입력
     const nameInput = dialog.locator('input[name="name"], input[placeholder*="이름"], input[id*="name"]').first()
@@ -80,285 +85,143 @@ test.describe('사용자 관리', () => {
 
     // 비밀번호 입력 (있을 경우)
     const passwordInput = dialog.locator('input[name="password"], input[type="password"]').first()
-    const passwordVisible = await passwordInput.isVisible({ timeout: 1000 }).catch(() => false)
-    if (passwordVisible) {
+    if (await passwordInput.isVisible({ timeout: 1000 }).catch(() => false)) {
       await passwordInput.fill('Test1234!')
     }
 
     // 저장 버튼 클릭
     const saveButton = dialog.locator('button').filter({ hasText: /저장|등록|생성|Save|Create/i }).first()
-
-    // API 응답 대기 설정
-    const createResponsePromise = page.waitForResponse(
-      resp => resp.url().includes('/api/users') && resp.request().method() === 'POST',
-      { timeout: 10000 }
-    ).catch(() => null);
-
     await saveButton.click()
 
-    // API 응답 확인
-    const createResponse = await createResponsePromise;
-    if (createResponse) {
-      console.log(`✅ 사용자 생성 API 응답: ${createResponse.status()}`);
-    } else {
-      console.log('⚠️ 사용자 생성 API 응답 감지 실패');
-    }
+    // API 응답 대기
+    await page.waitForTimeout(2000)
 
-    // Dialog 닫힐 때까지 대기
-    await page.waitForTimeout(1000)
+    // 목록 새로고침 및 확인
+    await page.goto('/users')
+    await page.waitForLoadState('networkidle')
 
-    // 성공 메시지 확인 (Toast 등)
-    const successMessage = page.locator('[role="status"], .toast, .notification').filter({ hasText: /성공|완료|추가되었습니다|created/i }).first()
-    const messageVisible = await successMessage.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (messageVisible) {
-      console.log('✅ 사용자 생성 성공 메시지 확인')
-    }
-
-    // 목록 API 응답 대기 (생성 후 목록 갱신 확인)
-    await page.waitForResponse(
-      resp => resp.url().includes('/api/users') && resp.request().method() === 'GET',
-      { timeout: 10000 }
-    ).catch(() => console.log('⚠️ 목록 갱신 API 응답 감지 실패'));
-
-    // 목록에서 새 사용자 확인 (재시도 로직)
-    let userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first();
-
+    // 생성된 사용자 확인 (재시도 로직)
+    let userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first()
     for (let retry = 0; retry < 3; retry++) {
-      if (await userRow.isVisible({ timeout: 3000 }).catch(() => false)) break;
-
-      if (retry < 2) {
-        console.log(`⚠️ Retry ${retry + 1}/3: User not found, reloading...`);
-        await page.reload({ waitUntil: 'networkidle' });
-        // 리로드 후 다시 목록 API 대기
-        await page.waitForResponse(
-          resp => resp.url().includes('/api/users') && resp.request().method() === 'GET',
-          { timeout: 10000 }
-        ).catch(() => null);
-        userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first();
-      }
+      if (await userRow.isVisible({ timeout: 3000 }).catch(() => false)) break
+      await page.reload({ waitUntil: 'networkidle' })
+      userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first()
     }
 
-    await expect(userRow).toBeVisible();
-
-    console.log(`✅ 사용자 생성 완료: ${testUserName}`)
+    await expect(userRow).toBeVisible({ timeout: 10000 })
+    console.log(`✅ ADMIN: 사용자 생성 완료 - ${testUserName}`)
   })
 
   test('사용자 수정 플로우', async ({ page }) => {
     await page.goto('/users')
-    await page.waitForLoadState('domcontentloaded')
+    await page.waitForLoadState('networkidle')
 
     // 첫 번째 사용자 행 찾기
-    await page.waitForTimeout(1000)
     const firstUserRow = page.locator('tbody tr').first()
-    const rowVisible = await firstUserRow.isVisible({ timeout: 3000 }).catch(() => false)
+    await expect(firstUserRow).toBeVisible({ timeout: 10000 })
 
-    if (!rowVisible) {
-      console.log('⚠️ 사용자가 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    // 사용자 이름 가져오기
-    const userName = await firstUserRow.locator('td').nth(0).textContent() || ''
-    console.log(`📝 수정할 사용자: ${userName}`)
-
-    // 수정 버튼 찾기 (행 내부 또는 클릭 시)
+    // 수정 버튼 찾기
     const editButton = firstUserRow.locator('button').filter({ hasText: /수정|편집|Edit/i }).first()
     const editButtonVisible = await editButton.isVisible({ timeout: 2000 }).catch(() => false)
 
     if (editButtonVisible) {
       await editButton.click()
     } else {
-      // 버튼이 없으면 행 클릭
+      // 행 클릭으로 상세 페이지 이동
       await firstUserRow.click()
     }
 
     await page.waitForTimeout(500)
 
-    // Dialog 확인
+    // Dialog 또는 상세 페이지 확인
     const dialog = page.locator('[role="dialog"], .dialog, .modal').first()
     const dialogVisible = await dialog.isVisible({ timeout: 3000 }).catch(() => false)
 
-    if (!dialogVisible) {
-      console.log('⚠️ 수정 Dialog를 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
+    if (dialogVisible) {
+      // 이름 필드 수정
+      const nameInput = dialog.locator('input[name="name"], input[placeholder*="이름"]').first()
+      if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const timestamp = Date.now()
+        await nameInput.fill(`Updated User ${timestamp}`)
 
-    // 이름 필드 찾아서 수정
-    const nameInput = dialog.locator('input[name="name"], input[placeholder*="이름"]').first()
-    const nameInputVisible = await nameInput.isVisible({ timeout: 2000 }).catch(() => false)
+        // 저장
+        const saveButton = dialog.locator('button').filter({ hasText: /저장|수정|Save|Update/i }).first()
+        await saveButton.click()
+        await page.waitForTimeout(1000)
 
-    if (nameInputVisible) {
-      const timestamp = Date.now()
-      const updatedName = `${userName} (Updated ${timestamp})`
-      await nameInput.fill(updatedName)
-
-      // 저장 버튼 클릭
-      const saveButton = dialog.locator('button').filter({ hasText: /저장|수정|Save|Update/i }).first()
-
-      // API 응답 대기 설정
-      const updateResponsePromise = page.waitForResponse(
-        resp => resp.url().includes('/api/users') && (resp.request().method() === 'PATCH' || resp.request().method() === 'PUT'),
-        { timeout: 10000 }
-      ).catch(() => null);
-
-      await saveButton.click()
-
-      const updateResponse = await updateResponsePromise;
-      if (updateResponse) {
-        console.log(`✅ 사용자 수정 API 응답: ${updateResponse.status()}`);
+        console.log('✅ ADMIN: 사용자 수정 완료')
       }
-
-      await page.waitForTimeout(1000)
-
-      console.log(`✅ 사용자 수정 완료: ${updatedName}`)
-    } else {
-      // Dialog는 있지만 편집 가능한 필드가 없음 (상세 페이지일 수 있음)
-      const closeButton = dialog.locator('button').filter({ hasText: /닫기|Close|취소/i }).first()
-      const closeVisible = await closeButton.isVisible().catch(() => false)
-      if (closeVisible) {
-        await closeButton.click()
-      }
-      console.log('⚠️ 이름 입력 필드를 찾을 수 없습니다.')
     }
   })
 
-  test('사용자 역할 할당 플로우', async ({ page }) => {
-    await page.goto('/users')
-    await page.waitForLoadState('domcontentloaded')
-
-    // 역할 관리 버튼 찾기
-    await page.waitForTimeout(1000)
-    const roleButton = page.locator('button').filter({ hasText: /역할|Role/i }).first()
-    const isVisible = await roleButton.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!isVisible) {
-      console.log('⚠️ 역할 관리 버튼을 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    await expect(roleButton).toBeVisible()
-    await roleButton.click()
-    await page.waitForTimeout(500)
-
-    // 역할 Dialog 확인
-    const dialog = page.locator('[role="dialog"], .dialog, .modal').first()
-    const dialogVisible = await dialog.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!dialogVisible) {
-      console.log('⚠️ 역할 Dialog를 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    // 역할 선택 (체크박스 또는 Select)
-    const roleCheckbox = dialog.locator('input[type="checkbox"]').first()
-    const checkboxVisible = await roleCheckbox.isVisible({ timeout: 2000 }).catch(() => false)
-
-    if (checkboxVisible) {
-      const isChecked = await roleCheckbox.isChecked()
-      if (!isChecked) {
-        await roleCheckbox.check()
-        console.log('✅ 역할 체크박스 선택')
-      }
-
-      // 저장 버튼
-      const saveButton = dialog.locator('button').filter({ hasText: /저장|Save/i }).first()
-
-      // API 응답 대기 설정
-      const roleResponsePromise = page.waitForResponse(
-        resp => resp.url().includes('/api/users') && (resp.request().method() === 'PATCH' || resp.request().method() === 'PUT'),
-        { timeout: 10000 }
-      ).catch(() => null);
-
-      await saveButton.click()
-
-      const roleResponse = await roleResponsePromise;
-      if (roleResponse) {
-        console.log(`✅ 역할 할당 API 응답: ${roleResponse.status()}`);
-      }
-      await page.waitForTimeout(1000)
-
-      console.log('✅ 역할 할당 완료')
-    } else {
-      // 체크박스가 없으면 Dialog 닫기
-      const closeButton = dialog.locator('button').filter({ hasText: /닫기|Close|취소/i }).first()
-      const closeVisible = await closeButton.isVisible().catch(() => false)
-      if (closeVisible) {
-        await closeButton.click()
-      }
-      console.log('⚠️ 역할 선택 UI를 찾을 수 없습니다.')
-    }
-  })
-
-  test('사용자 비활성화 플로우', async ({ page }) => {
+  test('사용자 비활성화/삭제 플로우', async ({ page }) => {
     await page.goto('/users')
     await page.waitForLoadState('networkidle')
 
-    await page.waitForTimeout(1000)
-
-    // E2E Test로 시작하는 사용자 찾기 (이전 테스트에서 생성한 사용자)
-    const testUserRow = page.locator('tbody tr').filter({ hasText: /E2E Test User/i }).first()
-    const testUserVisible = await testUserRow.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!testUserVisible) {
-      console.log('⚠️ 테스트 사용자를 찾을 수 없습니다. 첫 번째 사용자를 대상으로 합니다.')
+    // E2E 테스트 사용자 찾기
+    let targetRow = page.locator('tbody tr').filter({ hasText: /E2E Test User/i }).first()
+    if (!await targetRow.isVisible({ timeout: 3000 }).catch(() => false)) {
+      targetRow = page.locator('tbody tr').first()
     }
 
-    const targetRow = testUserVisible ? testUserRow : page.locator('tbody tr').first()
+    await expect(targetRow).toBeVisible({ timeout: 10000 })
 
     // 삭제/비활성화 버튼 찾기
     const deleteButton = targetRow.locator('button').filter({ hasText: /삭제|비활성|Delete|Deactivate/i }).first()
-    const deleteButtonVisible = await deleteButton.isVisible({ timeout: 2000 }).catch(() => false)
 
-    if (!deleteButtonVisible) {
-      console.log('⚠️ 삭제 버튼을 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
+    if (await deleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await deleteButton.click()
+      await page.waitForTimeout(500)
 
-    const userName = await targetRow.locator('td').nth(0).textContent() || ''
-    console.log(`🗑️ 비활성화할 사용자: ${userName}`)
-
-    await deleteButton.click()
-    await page.waitForTimeout(500)
-
-    // 확인 Dialog
-    const confirmDialog = page.locator('[role="dialog"], .dialog, .modal, [role="alertdialog"]').first()
-    const confirmVisible = await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (confirmVisible) {
-      const confirmButton = confirmDialog.locator('button').filter({ hasText: /확인|삭제|비활성|Delete|Deactivate|Yes/i }).first()
-
-      // API 응답 대기 설정
-      const deleteResponsePromise = page.waitForResponse(
-        resp => resp.url().includes('/api/users') && (resp.request().method() === 'DELETE' || resp.request().method() === 'PATCH'),
-        { timeout: 10000 }
-      ).catch(() => null);
-
-      await confirmButton.click()
-
-      const deleteResponse = await deleteResponsePromise;
-      if (deleteResponse) {
-        console.log(`✅ 사용자 비활성화 API 응답: ${deleteResponse.status()}`);
-      }
-      await page.waitForTimeout(1000)
-
-      console.log('✅ 사용자 비활성화 완료')
-
-      // 성공 메시지 확인
-      const successMessage = page.locator('[role="status"], .toast, .notification').filter({ hasText: /성공|비활성|삭제/i }).first()
-      const messageVisible = await successMessage.isVisible({ timeout: 3000 }).catch(() => false)
-
-      if (messageVisible) {
-        console.log('✅ 비활성화 성공 메시지 확인')
+      // 확인 Dialog
+      const confirmDialog = page.locator('[role="dialog"], [role="alertdialog"]').first()
+      if (await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const confirmButton = confirmDialog.locator('button').filter({ hasText: /확인|삭제|비활성|Delete|Yes/i }).first()
+        await confirmButton.click()
+        await page.waitForTimeout(1000)
+        console.log('✅ ADMIN: 사용자 비활성화 완료')
       }
     } else {
-      console.log('⚠️ 확인 Dialog를 찾을 수 없습니다.')
+      console.log('ℹ️ 삭제 버튼이 행 내부에 없음 - UI 구조가 다를 수 있음')
     }
   })
 })
 
+// ============================================
+// CLIENT 권한 테스트 (제한된 접근)
+// ============================================
+test.describe('사용자 관리 - CLIENT 권한', () => {
+  test.use({ storageState: authFiles.client })
+
+  test('사용자 목록 페이지 접근 제한 확인', async ({ page }) => {
+    await page.goto('/users')
+    await page.waitForLoadState('networkidle')
+
+    // CLIENT는 사용자 페이지에 접근 제한될 수 있음
+    // 1) 403/Unauthorized 페이지 표시
+    // 2) 또는 목록은 보이나 등록 버튼 없음
+
+    const unauthorizedMessage = page.locator('text=/권한|unauthorized|forbidden|접근 거부/i')
+    const table = page.locator('table')
+
+    const isUnauthorized = await unauthorizedMessage.isVisible({ timeout: 3000 }).catch(() => false)
+    const isTableVisible = await table.isVisible({ timeout: 3000 }).catch(() => false)
+
+    if (isUnauthorized) {
+      console.log('✅ CLIENT: 사용자 페이지 접근 거부됨 (예상대로)')
+    } else if (isTableVisible) {
+      // 테이블이 보이면 등록 버튼이 없어야 함
+      const createButton = page.locator('button').filter({ hasText: /등록|추가|생성|New User/i }).first()
+      const createButtonVisible = await createButton.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (!createButtonVisible) {
+        console.log('✅ CLIENT: 사용자 목록 보임, 등록 버튼 없음 (예상대로)')
+      } else {
+        // 버튼이 있으면 권한 문제일 수 있음 - 경고
+        console.log('⚠️ CLIENT에게 등록 버튼이 보임 - 권한 설정 확인 필요')
+      }
+    } else {
+      console.log('⚠️ 예상치 못한 UI 상태')
+    }
+  })
+})

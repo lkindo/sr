@@ -1,13 +1,153 @@
-﻿node.exe : npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of np
-m.
-위치 줄:1 문자:1
-+ & "C:\Program Files\nodejs/node.exe" "C:\Users\sanle\AppData\Roaming\ ...
-+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (npm warn Unknow...version of npm.:String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
 npm warn Unknown project config "store-dir". This will stop working in the next major version of npm.
-
-> sr-management@0.1.0 test
-> vitest --run --reporter=json
-
+🔐 Global Setup: 로그인 상태 저장 중...
+❌ Global Setup 실패: page.waitForURL: Timeout 30000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "load"
+  navigated to "http://localhost:3000/api/auth/error"
+  navigated to "http://localhost:3000/api/auth/error"
+============================================================
+    at globalSetup (D:\project\sr\e2e\global-setup.ts:26:16) {
+  name: 'TimeoutError'
+}
+{
+  "config": {
+    "configFile": "D:\\project\\sr\\playwright.config.ts",
+    "rootDir": "D:/project/sr/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "D:\\project\\sr\\e2e\\global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "D:/project/sr/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "setup",
+        "name": "setup",
+        "testDir": "D:/project/sr/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/global-setup\\.ts/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "D:/project/sr/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "multi-user-setup",
+        "name": "multi-user-setup",
+        "testDir": "D:/project/sr/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/auth-multi-user\\.setup\\.ts/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "D:/project/sr/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/project/sr/e2e",
+        "testIgnore": [
+          "**/08-*.spec.ts",
+          "**/09-*.spec.ts",
+          "**/17-*.spec.ts",
+          "**/18-*.spec.ts",
+          "**/19-*.spec.ts",
+          "**/20-*.spec.ts",
+          "**/21-*.spec.ts",
+          "**/22-*.spec.ts",
+          "**/23-*.spec.ts"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "D:/project/sr/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "multi-user",
+        "name": "multi-user",
+        "testDir": "D:/project/sr/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/(08|09|17|18|19|20|21|22|23)-.*\\.spec\\.ts/"
+        ],
+        "timeout": 60000
+      },
+      {
+        "outputDir": "D:/project/sr/test-results",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "permissions",
+        "name": "permissions",
+        "testDir": "D:/project/sr/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/sr-permissions\\.spec\\.ts/"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 4,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3000",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [],
+  "errors": [
+    {
+      "message": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n  navigated to \"http://localhost:3000/api/auth/error\"\n  navigated to \"http://localhost:3000/api/auth/error\"\n============================================================",
+      "stack": "TimeoutError: page.waitForURL: Timeout 30000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n  navigated to \"http://localhost:3000/api/auth/error\"\n  navigated to \"http://localhost:3000/api/auth/error\"\n============================================================\n    at globalSetup (D:\\project\\sr\\e2e\\global-setup.ts:26:16)",
+      "location": {
+        "file": "D:\\project\\sr\\e2e\\global-setup.ts",
+        "column": 16,
+        "line": 26
+      },
+      "snippet": "\u001b[90m   at \u001b[39mglobal-setup.ts:26\n\n\u001b[0m \u001b[90m 24 |\u001b[39m\n \u001b[90m 25 |\u001b[39m     \u001b[90m// 로그인 성공 대기 (dashboard 또는 srs 페이지로 리디렉션)\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 26 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mwaitForURL(\u001b[35m/\\/(dashboard|srs)/\u001b[39m\u001b[33m,\u001b[39m { timeout\u001b[33m:\u001b[39m \u001b[35m30000\u001b[39m })\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 27 |\u001b[39m\n \u001b[90m 28 |\u001b[39m     console\u001b[33m.\u001b[39mlog(\u001b[32m'✅ 로그인 성공!'\u001b[39m)\n \u001b[90m 29 |\u001b[39m\u001b[0m"
+    }
+  ],
+  "stats": {
+    "startTime": "2025-12-06T15:30:45.918Z",
+    "duration": 66417.369,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -302,8 +302,15 @@ async function main() {
 
     console.log("Created admin user: admin@example.com / admin123");
   } else {
-    adminUser = existingAdmin;
-    console.log("Admin user already exists");
+    // Admin user already exists, update password to ensure it's "admin123"
+    const bcrypt = require("bcryptjs");
+    const hashedPassword = await bcrypt.hash("admin123", 10);
+
+    adminUser = await prisma.user.update({
+      where: { email: "admin@example.com" },
+      data: { password: hashedPassword },
+    });
+    console.log("Admin user already exists, updated password to admin123");
 
     // 클라이언트 사용자 생성 (clientuser@example.com)
     const clientEmail = 'clientuser@example.com';

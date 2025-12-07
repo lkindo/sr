@@ -46,40 +46,47 @@ test.describe('SR 상태 전이 테스트', () => {
 
       // 고객사 선택 (CLIENT 사용자는 자동 설정되어 disabled 상태이므로 skip)
       const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
-      const isClientEnabled = await clientCombobox.isEnabled().catch(() => false);
-      if (isClientEnabled) {
-        await clientCombobox.click();
-        await page.waitForTimeout(300);
-        await page.getByRole('option').first().click();
-        await page.waitForTimeout(300);
+      try {
+        const isClientEnabled = await clientCombobox.isEnabled({ timeout: 3000 });
+        if (isClientEnabled) {
+          await clientCombobox.click();
+          await page.waitForTimeout(500);
+          await page.getByRole('option').first().click();
+          await page.waitForTimeout(500);
+        }
+      } catch {
+        console.log('⚠️ CLIENT 사용자: 고객사 자동 설정됨');
       }
 
       // 서비스 카테고리 선택
       const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
-      await expect(categoryCombobox).toBeEnabled({ timeout: 10000 });
+      await expect(categoryCombobox).toBeEnabled({ timeout: 15000 });
       await categoryCombobox.click();
       await page.waitForTimeout(500);
       const firstOption = page.getByRole('option').first();
-      await expect(firstOption).toBeVisible({ timeout: 5000 });
+      await expect(firstOption).toBeVisible({ timeout: 10000 });
       await firstOption.click();
       await page.waitForTimeout(500);
 
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
 
       await page.goto('/srs');
       await page.waitForLoadState('networkidle');
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
 
-      // SR이 목록에 보이지 않으면 한 번 새로고침 시도
-      if (!(await srRow.isVisible({ timeout: 5000 }))) {
-        console.log('⚠️ SR이 목록에 바로 나타나지 않아 새로고침합니다.');
+      // SR이 목록에 보이지 않으면 여러 번 새로고침 시도
+      let retryCount = 0;
+      while (!(await srRow.isVisible({ timeout: 3000 }).catch(() => false)) && retryCount < 3) {
+        console.log(`⚠️ SR이 목록에 없음. 새로고침 시도 ${retryCount + 1}/3`);
         await page.reload();
         await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(1000);
+        retryCount++;
       }
 
-      await expect(srRow).toBeVisible({ timeout: 20000 });
+      await expect(srRow).toBeVisible({ timeout: 10000 });
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       srId = page.url().split('/').pop()!;

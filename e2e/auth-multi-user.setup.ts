@@ -50,8 +50,25 @@ for (const user of users) {
     // 로그인 버튼 클릭
     await page.getByRole('button', { name: /로그인|sign in/i }).click();
 
-    // 로그인 성공 대기 (dashboard 또는 srs 페이지로 리디렉션)
-    await page.waitForURL(/\/(dashboard|srs)/, { timeout: 30000 });
+    // 로그인 성공 대기 (dashboard, srs, 또는 기타 인증된 페이지로 리디렉션)
+    // URL 변경 대기에 더 유연하게 대응
+    try {
+      await page.waitForURL(/\/(dashboard|srs|clients|users|settings)/, { timeout: 60000 });
+    } catch (e) {
+      // URL 변경이 안됐으면 로그인 에러 메시지 확인
+      const currentUrl = page.url();
+      const errorAlert = page.locator('[role="alert"]');
+      if (await errorAlert.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const errorText = await errorAlert.textContent();
+        throw new Error(`${user.name} 로그인 실패: ${errorText} (URL: ${currentUrl})`);
+      }
+      // 그래도 dashboard 진입 확인
+      if (!currentUrl.includes('login')) {
+        console.log(`⚠️ ${user.name} URL 변경 감지됨 (예상치 못한 URL): ${currentUrl}`);
+      } else {
+        throw new Error(`${user.name} 로그인 실패: 여전히 로그인 페이지에 있음 (URL: ${currentUrl})`);
+      }
+    }
 
     console.log(`✅ ${user.name} 로그인 성공!!`);
 
