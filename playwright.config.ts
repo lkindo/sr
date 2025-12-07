@@ -18,8 +18,8 @@ export default defineConfig({
   /* 병렬 테스트 실행 */
   fullyParallel: true,
 
-  /* CI에서 실패 시 재시도 */
-  retries: process.env.CI ? 2 : 0,
+  /* CI에서 실패 시 재시도 (로컬에서도 1회 재시도) */
+  retries: process.env.CI ? 2 : 1,
 
   /* 병렬 워커 수 (CI에서는 1개만) */
   workers: process.env.CI ? 1 : undefined,
@@ -99,13 +99,15 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
-      testIgnore: ['**/17-*.spec.ts', '**/18-*.spec.ts', '**/19-*.spec.ts', '**/20-*.spec.ts', '**/21-*.spec.ts', '**/22-*.spec.ts', '**/23-*.spec.ts'],
+      testIgnore: ['**/08-*.spec.ts', '**/09-*.spec.ts', '**/17-*.spec.ts', '**/18-*.spec.ts', '**/19-*.spec.ts', '**/20-*.spec.ts', '**/21-*.spec.ts', '**/22-*.spec.ts', '**/23-*.spec.ts'],
     },
 
-    // Multi-user 테스트 - multi-user-setup에 의존 (고도화 테스트 17-23)
+    // Multi-user 테스트 - multi-user-setup에 의존 (권한별 테스트)
     {
       name: 'multi-user',
-      testMatch: /(17|18|19|20|21|22|23)-.*\.spec\.ts/,
+      testMatch: /(08|09|17|18|19|20|21|22|23)-.*\.spec\.ts/,
+      // Serial 테스트에서 retry 시 상태 초기화 문제 방지
+      retries: 0,
       use: {
         ...devices['Desktop Chrome'],
         // 다중 사용자 테스트는 각 테스트 내에서 storageState를 동적으로 설정

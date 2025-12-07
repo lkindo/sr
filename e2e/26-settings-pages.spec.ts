@@ -92,9 +92,25 @@ test.describe('Settings 페이지', () => {
     test('비밀번호 변경 기능', async ({ page }) => {
         await page.goto('/settings/profile')
         await page.waitForLoadState('networkidle')
+
+        // 프로필 로딩이 완료될 때까지 기다림 (로딩 스피너가 사라지고 프로필 헤더가 나타날 때까지)
+        const profileHeader = page.locator('h1:has-text("프로필")')
+        await profileHeader.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null)
+
+        // 추가 대기 후 페이지 안정화
         await page.waitForTimeout(1000)
 
         // 비밀번호 변경 관련 요소 찾기 (버튼 또는 입력 필드)
+        // 보안 탭 또는 비밀번호 변경 관련 텍스트
+        const securityTab = page.locator('button:has-text("보안")')
+        const securityTabVisible = await securityTab.isVisible({ timeout: 3000 }).catch(() => false)
+
+        if (securityTabVisible) {
+            console.log('✅ 보안 탭 발견 - 클릭')
+            await securityTab.click()
+            await page.waitForTimeout(500)
+        }
+
         const passwordElements = page.locator('text=/비밀번호|Password/i').first()
         const elementVisible = await passwordElements.isVisible({ timeout: 5000 }).catch(() => false)
 

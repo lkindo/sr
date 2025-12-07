@@ -69,18 +69,18 @@ export function CompleteSRDialog({
                 throw new Error(error.error || "상태 변경에 실패했습니다.");
             }
 
+            // UI 먼저 갱신
+            setResolutionDescription("");
+            onOpenChange(false);
+
             toast({
                 title: "성공",
                 description: "SR이 완료 처리되었습니다.",
             });
 
-            setResolutionDescription("");
-            onOpenChange(false);
-
-            // React Query 캐시 무효화
+            // 백그라운드 데이터 갱신 및 이동
             await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
-
-            // SR 목록으로 이동
+            router.refresh();
             router.push("/srs");
         } catch (error) {
             toast({

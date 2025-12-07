@@ -83,10 +83,11 @@ export function SRStatusActions({
                 description: "상태가 변경되었습니다.",
             });
 
-            // React Query 캐시 무효화하여 최신 데이터 가져오기
-            await queryClient.invalidateQueries({ queryKey: ["sr", srId] });
-
-            router.refresh();
+            // UI 블로킹 없이 병렬 처리
+            Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["sr", srId] }),
+                Promise.resolve(router.refresh())
+            ]);
         } catch (error) {
             toast({
                 title: "오류",
@@ -128,35 +129,6 @@ export function SRStatusActions({
                 );
 
             case "INTAKE":
-                // 접수 상태: 진행 시작, 보류, 거절
-                if (!canManage) return null;
-                return (
-                    <>
-                        <Button
-                            onClick={() => handleSimpleStatusChange("start")}
-                            disabled={loading}
-                        >
-                            <Play className="mr-2 h-4 w-4" />
-                            진행 시작
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setHoldDialogOpen(true)}
-                            disabled={loading}
-                        >
-                            <PauseCircle className="mr-2 h-4 w-4" />
-                            보류
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={() => setRejectDialogOpen(true)}
-                            disabled={loading}
-                        >
-                            <XCircle className="mr-2 h-4 w-4" />
-                            거절
-                        </Button>
-                    </>
-                );
 
             case "IN_PROGRESS":
                 // 진행중 상태: 완료 처리, 보류

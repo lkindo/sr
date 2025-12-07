@@ -24,6 +24,13 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
   test.describe.configure({ mode: 'serial' });
 
+  // SR ID가 없으면 후속 테스트를 스킵
+  test.beforeEach(async ({ }, testInfo) => {
+    if (testInfo.title !== '1. MANAGER: SR 생성 및 초기 담당자 배정' && !srId) {
+      test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
+    }
+  });
+
   test('1. MANAGER: SR 생성 및 초기 담당자 배정', async ({ browser }) => {
     const context = await browser.newContext({ storageState: authFiles.manager });
     const page = await context.newPage();
@@ -67,13 +74,24 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
       // SR 생성
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
 
       // 목록에서 생성된 SR 찾기
       await page.goto('/srs');
       await page.waitForLoadState('networkidle');
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
+
+      // SR이 목록에 보이지 않으면 여러 번 새로고침 시도
+      let retryCount = 0;
+      while (!(await srRow.isVisible({ timeout: 3000 }).catch(() => false)) && retryCount < 3) {
+        console.log(`⚠️ SR이 목록에 없음. 새로고침 시도 ${retryCount + 1}/3`);
+        await page.reload();
+        await page.waitForLoadState('networkidle');
+        await page.waitForTimeout(1000);
+        retryCount++;
+      }
+
       await expect(srRow).toBeVisible({ timeout: 10000 });
 
       // SR 상세 페이지로 이동하여 ID 추출

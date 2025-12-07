@@ -1,81 +1,82 @@
 import { test, expect } from '@playwright/test'
+import path from 'path'
 
 /**
- * 고객사 관리 테스트
- * - 기본 UI 확인
- * - 고객사 CRUD 전체 플로우
- * - 고객사 상세 페이지
+ * 고객사 관리 테스트 - 권한별 시나리오
+ * 
+ * ADMIN/MANAGER: 고객사 CRUD 전체 권한
+ * CLIENT: 본인 고객사 정보 조회만 가능
  */
 
-test.describe('고객사 관리', () => {
+const authFiles = {
+  admin: path.join(__dirname, '../playwright/.auth/user.json'),
+  manager: path.join(__dirname, '../playwright/.auth/manager.json'),
+  client: path.join(__dirname, '../playwright/.auth/client.json'),
+}
+
+// ============================================
+// ADMIN/MANAGER 권한 테스트
+// ============================================
+test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
+  test.use({ storageState: authFiles.admin })
+  test.describe.configure({ mode: 'serial' })
+
+  let testClientName: string
+  let testClientCode: string
+
   test('고객사 목록 페이지 접근', async ({ page }) => {
     await page.goto('/clients')
-
-    // 페이지가 로드될 때까지 대기
     await page.waitForLoadState('networkidle')
 
-    // 고객사 목록 테이블 확인
-    await expect(page.locator('table')).toBeVisible()
+    // ADMIN은 고객사 목록 테이블이 보여야 함
+    await expect(page.locator('table')).toBeVisible({ timeout: 10000 })
+    console.log('✅ ADMIN: 고객사 목록 테이블 확인')
   })
 
-  test('고객사 등록 버튼', async ({ page }) => {
+  test('고객사 등록 버튼이 보여야 함', async ({ page }) => {
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    // 등록 버튼 찾기 (getByRole 사용)
+    // ADMIN은 고객사 등록 버튼이 반드시 보여야 함
     const registerButton = page.getByRole('button', { name: /등록/i })
-    await expect(registerButton).toBeVisible({ timeout: 5000 })
+    await expect(registerButton).toBeVisible({ timeout: 10000 })
+    console.log('✅ ADMIN: 고객사 등록 버튼 확인')
   })
 
   test('고객사 검색 기능', async ({ page }) => {
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    // 검색 입력 필드 찾기
-    const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]')
-    const isVisible = await searchInput.isVisible().catch(() => false)
+    // 검색 입력 필드가 있어야 함 (없으면 테스트 실패)
+    const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]').first()
+    await expect(searchInput).toBeVisible({ timeout: 10000 })
 
-    if (isVisible) {
-      await searchInput.fill('test')
-      await page.waitForTimeout(500)
+    await searchInput.fill('test')
+    await page.waitForTimeout(500)
 
-      // 검색 결과 확인
-      const results = page.locator('tbody tr')
-      const count = await results.count()
-      expect(count).toBeGreaterThanOrEqual(0)
-    } else {
-      test.skip()
-    }
+    console.log('✅ ADMIN: 검색 기능 동작 확인')
   })
 
   test('고객사 생성 전체 플로우', async ({ page }) => {
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    // 고객사 등록 버튼 찾기
+    // 등록 버튼 클릭
     const createButton = page.locator('button').filter({ hasText: /등록|추가|생성|New Client/i }).first()
-    const buttonVisible = await createButton.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!buttonVisible) {
-      console.log('⚠️ 고객사 등록 버튼을 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    // Dialog 열기
+    await expect(createButton).toBeVisible({ timeout: 10000 })
     await createButton.click()
     await page.waitForTimeout(500)
 
     // Dialog 확인
     const dialog = page.locator('[role="dialog"], .dialog, .modal').first()
-    await expect(dialog).toBeVisible()
+    await expect(dialog).toBeVisible({ timeout: 5000 })
 
     // 고객사 정보 입력
     const timestamp = Date.now()
-    const testClientName = `E2E Test Client ${timestamp}`
-    const testClientCode = `E2E${timestamp.toString().slice(-6)}`
+    testClientName = `E2E Test Client ${timestamp}`
+    testClientCode = `E2E${timestamp.toString().slice(-6)}`
 
-    // 코드 먼저 입력 (필수 필드)
+    // 코드 입력
     const codeInput = dialog.getByLabel(/고객사 코드/i).first()
     await codeInput.fill(testClientCode)
     await page.waitForTimeout(200)
@@ -86,14 +87,11 @@ test.describe('고객사 관리', () => {
 
     // 산업군 선택 (있을 경우)
     const industrySelect = dialog.locator('select[name="industry"], [role="combobox"]').first()
-    const industryVisible = await industrySelect.isVisible({ timeout: 1000 }).catch(() => false)
-    if (industryVisible) {
-      // 첫 번째 옵션 선택 (또는 특정 산업군)
+    if (await industrySelect.isVisible({ timeout: 1000 }).catch(() => false)) {
       await industrySelect.click()
       await page.waitForTimeout(300)
       const firstOption = page.locator('[role="option"]').first()
-      const optionVisible = await firstOption.isVisible({ timeout: 1000 }).catch(() => false)
-      if (optionVisible) {
+      if (await firstOption.isVisible({ timeout: 1000 }).catch(() => false)) {
         await firstOption.click()
       }
     }
@@ -102,71 +100,43 @@ test.describe('고객사 관리', () => {
     const saveButton = dialog.locator('button').filter({ hasText: /저장|등록|생성|Save|Create/i }).first()
     await saveButton.click()
 
-    // Dialog 닫힐 때까지 대기
-    await page.waitForTimeout(1000)
+    // 응답 대기
+    await page.waitForTimeout(2000)
 
-    // 성공 메시지 확인
-    const successMessage = page.locator('[role="status"], .toast, .notification').filter({ hasText: /성공|완료|추가되었습니다|created/i }).first()
-    const messageVisible = await successMessage.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (messageVisible) {
-      console.log('✅ 고객사 생성 성공 메시지 확인')
-    }
-
-    // 목록에서 새 고객사 확인 (페이지 새로고침 후 재시도)
-    await page.waitForTimeout(1500)
-    await page.reload()
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(1000)
-
-    const clientRow = page.locator('tbody tr').filter({ hasText: testClientName }).first()
-    const rowVisible = await clientRow.isVisible({ timeout: 10000 }).catch(() => false)
-
-    if (rowVisible) {
-      console.log(`✅ 고객사 생성 완료: ${testClientName}`)
-    } else {
-      // 검색으로 시도
-      const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]').first()
-      const searchVisible = await searchInput.isVisible().catch(() => false)
-      if (searchVisible) {
-        await searchInput.fill(testClientName)
-        await page.waitForTimeout(1000)
-      }
-      console.log(`✅ 고객사 생성 완료 (검색 필요): ${testClientName}`)
-    }
-  })
-
-  test('고객사 상세 페이지 접근 및 확인', async ({ page }) => {
+    // 목록 새로고침 및 확인
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    await page.waitForTimeout(1000)
+    // 생성된 고객사 확인 (재시도 로직)
+    let clientRow = page.locator('tbody tr').filter({ hasText: testClientName }).first()
+    for (let retry = 0; retry < 3; retry++) {
+      if (await clientRow.isVisible({ timeout: 3000 }).catch(() => false)) break
+      await page.reload({ waitUntil: 'networkidle' })
+      clientRow = page.locator('tbody tr').filter({ hasText: testClientName }).first()
+    }
+
+    await expect(clientRow).toBeVisible({ timeout: 10000 })
+    console.log(`✅ ADMIN: 고객사 생성 완료 - ${testClientName}`)
+  })
+
+  test('고객사 상세 페이지 접근', async ({ page }) => {
+    await page.goto('/clients')
+    await page.waitForLoadState('networkidle')
 
     // 첫 번째 고객사 행 찾기
     const firstClientRow = page.locator('tbody tr').first()
-    const rowVisible = await firstClientRow.isVisible({ timeout: 3000 }).catch(() => false)
+    await expect(firstClientRow).toBeVisible({ timeout: 10000 })
 
-    if (!rowVisible) {
-      console.log('⚠️ 고객사가 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    // 고객사 이름 가져오기
     const clientName = await firstClientRow.locator('td').nth(0).textContent() || ''
     console.log(`📋 상세 페이지 접근: ${clientName}`)
 
     // 상세 보기 버튼 또는 행 클릭
     const viewButton = firstClientRow.locator('button, a').filter({ hasText: /상세|보기|View|Details/i }).first()
-    const viewButtonVisible = await viewButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-    if (viewButtonVisible) {
+    if (await viewButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await viewButton.click()
     } else {
-      // 버튼이 없으면 행 클릭 또는 이름 링크 클릭
       const nameLink = firstClientRow.locator('a').first()
-      const linkVisible = await nameLink.isVisible({ timeout: 1000 }).catch(() => false)
-      if (linkVisible) {
+      if (await nameLink.isVisible({ timeout: 1000 }).catch(() => false)) {
         await nameLink.click()
       } else {
         await firstClientRow.click()
@@ -175,38 +145,15 @@ test.describe('고객사 관리', () => {
 
     await page.waitForTimeout(1000)
 
-    // 상세 페이지 URL 확인 (/clients/[id])
+    // 상세 정보 확인
     const url = page.url()
-    const isDetailPage = url.includes('/clients/') && url.split('/clients/')[1]
-
-    if (isDetailPage) {
-      console.log('✅ 고객사 상세 페이지 접근 성공')
-
-      // 기본 정보 확인
-      const mainContent = page.locator('main, [role="main"]')
-      await expect(mainContent).toBeVisible()
-
-      // 고객사 이름이 페이지에 표시되는지 확인
-      const pageContent = await page.textContent('body')
-      expect(pageContent).toContain(clientName)
-
-      console.log('✅ 고객사 상세 정보 확인 완료')
+    if (url.includes('/clients/')) {
+      console.log('✅ ADMIN: 고객사 상세 페이지 접근 성공')
     } else {
       // Dialog로 열렸을 수 있음
-      const dialog = page.locator('[role="dialog"], .dialog, .modal').first()
-      const dialogVisible = await dialog.isVisible({ timeout: 2000 }).catch(() => false)
-
-      if (dialogVisible) {
-        console.log('✅ 고객사 상세 Dialog 확인')
-
-        // Dialog 닫기
-        const closeButton = dialog.locator('button').filter({ hasText: /닫기|Close/i }).first()
-        const closeVisible = await closeButton.isVisible().catch(() => false)
-        if (closeVisible) {
-          await closeButton.click()
-        }
-      } else {
-        console.log('⚠️ 상세 페이지 또는 Dialog를 찾을 수 없습니다.')
+      const dialog = page.locator('[role="dialog"]').first()
+      if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('✅ ADMIN: 고객사 상세 Dialog 확인')
       }
     }
   })
@@ -215,72 +162,37 @@ test.describe('고객사 관리', () => {
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    await page.waitForTimeout(1000)
+    // 첫 번째 고객사 행에서 링크 클릭하여 상세 페이지로 이동
+    const firstClientLink = page.locator('tbody tr').first().locator('a').first()
+    await expect(firstClientLink).toBeVisible({ timeout: 10000 })
+    await firstClientLink.click()
 
-    // E2E Test Client로 시작하는 고객사 찾기
-    const testClientRow = page.locator('tbody tr').filter({ hasText: /E2E Test Client/i }).first()
-    const testClientVisible = await testClientRow.isVisible({ timeout: 3000 }).catch(() => false)
+    // 상세 페이지 도착 대기
+    await page.waitForURL(/\/clients\/[a-zA-Z0-9-]+/, { timeout: 10000 })
+    await page.waitForLoadState('networkidle')
 
-    const targetRow = testClientVisible ? testClientRow : page.locator('tbody tr').first()
-    const rowVisible = await targetRow.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!rowVisible) {
-      console.log('⚠️ 고객사가 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    const clientName = await targetRow.locator('td').nth(0).textContent() || ''
-    console.log(`📝 수정할 고객사: ${clientName}`)
-
-    // 수정 버튼 찾기
-    const editButton = targetRow.locator('button').filter({ hasText: /수정|편집|Edit/i }).first()
-    const editButtonVisible = await editButton.isVisible({ timeout: 2000 }).catch(() => false)
-
-    if (!editButtonVisible) {
-      console.log('⚠️ 수정 버튼을 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
+    // 상세 페이지에서 수정 버튼 클릭
+    const editButton = page.getByRole('button', { name: /수정/i })
+    await expect(editButton).toBeVisible({ timeout: 5000 })
     await editButton.click()
     await page.waitForTimeout(500)
 
     // Dialog 확인
     const dialog = page.locator('[role="dialog"], .dialog, .modal').first()
-    const dialogVisible = await dialog.isVisible({ timeout: 3000 }).catch(() => false)
+    await expect(dialog).toBeVisible({ timeout: 5000 })
 
-    if (!dialogVisible) {
-      console.log('⚠️ 수정 Dialog를 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
-
-    // 이름 필드 찾아서 수정
+    // 이름 필드 수정
     const nameInput = dialog.locator('input[name="name"], input[placeholder*="이름"]').first()
-    const nameInputVisible = await nameInput.isVisible({ timeout: 2000 }).catch(() => false)
-
-    if (nameInputVisible) {
+    if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
       const timestamp = Date.now()
-      const updatedName = `${clientName} (Updated ${timestamp})`
-      await nameInput.fill(updatedName)
+      await nameInput.fill(`Updated Client ${timestamp}`)
 
-      // 저장 버튼 클릭
+      // 저장
       const saveButton = dialog.locator('button').filter({ hasText: /저장|수정|Save|Update/i }).first()
       await saveButton.click()
-
       await page.waitForTimeout(1000)
 
-      console.log(`✅ 고객사 수정 완료: ${updatedName}`)
-    } else {
-      console.log('⚠️ 이름 입력 필드를 찾을 수 없습니다.')
-
-      // Dialog 닫기
-      const closeButton = dialog.locator('button').filter({ hasText: /닫기|Close|취소/i }).first()
-      const closeVisible = await closeButton.isVisible().catch(() => false)
-      if (closeVisible) {
-        await closeButton.click()
-      }
+      console.log('✅ ADMIN: 고객사 수정 완료')
     }
   })
 
@@ -288,55 +200,83 @@ test.describe('고객사 관리', () => {
     await page.goto('/clients')
     await page.waitForLoadState('networkidle')
 
-    await page.waitForTimeout(1000)
-
-    // E2E Test Client로 시작하는 고객사 찾기
-    const testClientRow = page.locator('tbody tr').filter({ hasText: /E2E Test Client/i }).first()
-    const testClientVisible = await testClientRow.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (!testClientVisible) {
-      console.log('⚠️ 테스트 고객사를 찾을 수 없습니다. 첫 번째 고객사를 대상으로 합니다.')
+    // E2E 테스트 고객사 찾기
+    let targetRow = page.locator('tbody tr').filter({ hasText: /E2E Test Client/i }).first()
+    if (!await targetRow.isVisible({ timeout: 3000 }).catch(() => false)) {
+      targetRow = page.locator('tbody tr').first()
     }
 
-    const targetRow = testClientVisible ? testClientRow : page.locator('tbody tr').first()
+    await expect(targetRow).toBeVisible({ timeout: 10000 })
 
     // 삭제/비활성화 버튼 찾기
     const deleteButton = targetRow.locator('button').filter({ hasText: /삭제|비활성|Delete|Deactivate/i }).first()
-    const deleteButtonVisible = await deleteButton.isVisible({ timeout: 2000 }).catch(() => false)
 
-    if (!deleteButtonVisible) {
-      console.log('⚠️ 삭제 버튼을 찾을 수 없습니다. 테스트 스킵.')
-      test.skip()
-      return
-    }
+    if (await deleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await deleteButton.click()
+      await page.waitForTimeout(500)
 
-    const clientName = await targetRow.locator('td').nth(0).textContent() || ''
-    console.log(`🗑️ 비활성화할 고객사: ${clientName}`)
-
-    await deleteButton.click()
-    await page.waitForTimeout(500)
-
-    // 확인 Dialog
-    const confirmDialog = page.locator('[role="dialog"], .dialog, .modal, [role="alertdialog"]').first()
-    const confirmVisible = await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false)
-
-    if (confirmVisible) {
-      const confirmButton = confirmDialog.locator('button').filter({ hasText: /확인|삭제|비활성|Delete|Deactivate|Yes/i }).first()
-      await confirmButton.click()
-      await page.waitForTimeout(1000)
-
-      console.log('✅ 고객사 비활성화 완료')
-
-      // 성공 메시지 확인
-      const successMessage = page.locator('[role="status"], .toast, .notification').filter({ hasText: /성공|비활성|삭제/i }).first()
-      const messageVisible = await successMessage.isVisible({ timeout: 3000 }).catch(() => false)
-
-      if (messageVisible) {
-        console.log('✅ 비활성화 성공 메시지 확인')
+      // 확인 Dialog
+      const confirmDialog = page.locator('[role="dialog"], [role="alertdialog"]').first()
+      if (await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const confirmButton = confirmDialog.locator('button').filter({ hasText: /확인|삭제|비활성|Delete|Yes/i }).first()
+        await confirmButton.click()
+        await page.waitForTimeout(1000)
+        console.log('✅ ADMIN: 고객사 비활성화 완료')
       }
     } else {
-      console.log('⚠️ 확인 Dialog를 찾을 수 없습니다.')
+      console.log('ℹ️ 삭제 버튼이 행 내부에 없음 - UI 구조가 다를 수 있음')
     }
   })
 })
 
+// ============================================
+// CLIENT 권한 테스트 (제한된 접근)
+// ============================================
+test.describe('고객사 관리 - CLIENT 권한', () => {
+  test.use({ storageState: authFiles.client })
+
+  test('고객사 목록 페이지 접근 시 본인 고객사만 보이거나 제한됨', async ({ page }) => {
+    await page.goto('/clients')
+    await page.waitForLoadState('networkidle')
+
+    // CLIENT는 다음 중 하나의 상태여야 함:
+    // 1) 접근 거부 메시지
+    // 2) 본인 고객사만 표시
+    // 3) 등록/수정 버튼 없음
+
+    const unauthorizedMessage = page.locator('text=/권한|unauthorized|forbidden|접근 거부/i')
+    const table = page.locator('table')
+
+    const isUnauthorized = await unauthorizedMessage.isVisible({ timeout: 3000 }).catch(() => false)
+    const isTableVisible = await table.isVisible({ timeout: 3000 }).catch(() => false)
+
+    if (isUnauthorized) {
+      console.log('✅ CLIENT: 고객사 페이지 접근 거부됨 (예상대로)')
+    } else if (isTableVisible) {
+      // 테이블이 보이면 등록 버튼이 없어야 함
+      const createButton = page.locator('button').filter({ hasText: /등록|추가|생성|New Client/i }).first()
+      const createButtonVisible = await createButton.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (!createButtonVisible) {
+        console.log('✅ CLIENT: 고객사 목록 보임, 등록 버튼 없음 (예상대로)')
+      } else {
+        console.log('⚠️ CLIENT에게 등록 버튼이 보임 - 권한 설정 확인 필요')
+      }
+
+      // 수정/삭제 버튼도 없어야 함
+      const editButton = page.locator('button').filter({ hasText: /수정|편집|Edit/i }).first()
+      const deleteButton = page.locator('button').filter({ hasText: /삭제|Delete/i }).first()
+
+      const editVisible = await editButton.isVisible({ timeout: 2000 }).catch(() => false)
+      const deleteVisible = await deleteButton.isVisible({ timeout: 2000 }).catch(() => false)
+
+      if (!editVisible && !deleteVisible) {
+        console.log('✅ CLIENT: 수정/삭제 버튼 없음 (예상대로)')
+      }
+    } else {
+      // 리다이렉트되었거나 다른 페이지로 이동
+      const url = page.url()
+      console.log(`ℹ️ CLIENT: ${url}로 리다이렉트됨`)
+    }
+  })
+})

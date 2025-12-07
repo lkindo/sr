@@ -102,7 +102,10 @@ erDiagram
     User ||--o{ SR : creates
     User ||--o{ SR : assigned_to
     User ||--o{ SRActivity : performs
+    User ||--o{ SRActivity : performs
     User ||--o{ SRComment : writes
+    User ||--o{ PushSubscription : has
+    User ||--|| NotificationPreference : has
 
     Role ||--o{ UserRole : assigned_to
     Role ||--o{ Permission : has
@@ -247,6 +250,32 @@ erDiagram
         datetime sent_at
         string fail_reason
         datetime created_at
+    }
+
+    PushSubscription {
+        string id PK
+        string user_id FK
+        string endpoint UK
+        string p256dh
+        string auth
+        string user_agent
+        datetime created_at
+        datetime updated_at
+    }
+
+    NotificationPreference {
+        string id PK
+        string user_id FK
+        boolean email_sr_created
+        boolean email_sr_assigned
+        boolean email_sr_status_changed
+        boolean email_comment_added
+        boolean push_sr_created
+        boolean push_sr_assigned
+        boolean push_sr_status_changed
+        boolean push_comment_added
+        datetime created_at
+        datetime updated_at
     }
 ```
 
@@ -699,13 +728,67 @@ SR의 첨부파일 메타데이터
 | created_at | TIMESTAMP | NO | now() | 생성 시간 |
 
 **ENUM 타입:**
-- **type**: `EMAIL`, `MATTERMOST`, `IN_APP`
+- **type**: `EMAIL`, `MATTERMOST`, `IN_APP`, `PUSH`
 - **status**: `PENDING`, `SENT`, `FAILED`
 
 **인덱스:**
 - PRIMARY KEY: `id`
 - INDEX: `(status, created_at)`
 - INDEX: `recipient`
+
+
+---
+
+### 15. push_subscriptions (웹 푸시 구독)
+
+웹 푸시 알림을 위한 브라우저 구독 정보
+
+| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
+|--------|-------------|------|--------|------|
+| id | VARCHAR(30) | NO | cuid() | 구독 고유 ID (PK) |
+| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK) |
+| endpoint | TEXT | NO | - | 푸시 서비스 엔드포인트 URL (UK) |
+| p256dh | TEXT | NO | - | 암호화 키 (P256DH) |
+| auth | TEXT | NO | - | 인증 키 (Auth) |
+| user_agent | TEXT | YES | NULL | 구독한 브라우저/기기 정보 |
+| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+
+**인덱스:**
+- PRIMARY KEY: `id`
+- UNIQUE: `endpoint`
+- INDEX: `user_id`
+
+**외래 키:**
+- `user_id` REFERENCES `users(id)` ON DELETE CASCADE
+
+---
+
+### 16. notification_preferences (알림 설정)
+
+사용자별 이메일 및 푸시 알림 수신 설정
+
+| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
+|--------|-------------|------|--------|------|
+| id | VARCHAR(30) | NO | cuid() | 설정 고유 ID (PK) |
+| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK, UK) |
+| **email_sr_created** | BOOLEAN | NO | true | [이메일] 신규 SR 생성 알림 |
+| **email_sr_assigned** | BOOLEAN | NO | true | [이메일] SR 담당 배정 알림 |
+| **email_sr_status_changed** | BOOLEAN | NO | false | [이메일] SR 상태 변경 알림 |
+| **email_comment_added** | BOOLEAN | NO | false | [이메일] 새 댓글 알림 |
+| **push_sr_created** | BOOLEAN | NO | true | [푸시] 신규 SR 생성 알림 |
+| **push_sr_assigned** | BOOLEAN | NO | true | [푸시] SR 담당 배정 알림 |
+| **push_sr_status_changed** | BOOLEAN | NO | false | [푸시] SR 상태 변경 알림 |
+| **push_comment_added** | BOOLEAN | NO | false | [푸시] 새 댓글 알림 |
+| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+
+**인덱스:**
+- PRIMARY KEY: `id`
+- UNIQUE: `user_id`
+
+**외래 키:**
+- `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 
 ---
 

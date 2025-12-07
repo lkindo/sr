@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -110,6 +112,8 @@ export function EditSRDialog({
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
 
@@ -347,6 +351,14 @@ export function EditSRDialog({
         title: "성공",
         description: "SR이 수정되었습니다.",
       });
+
+      onOpenChange(false); // 다이얼로그 즉시 닫기
+
+      // 병렬 처리로 지연 최소화
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sr", srId] }),
+        Promise.resolve(router.refresh())
+      ]);
 
       onUpdated();
     } catch (error) {

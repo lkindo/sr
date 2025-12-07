@@ -1,24 +1,40 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function testConnection() {
     try {
-        console.log('🔍 Testing database connection...');
+        console.log('🔍 Testing database connection and Resetting Admin Password...');
+        console.log('Using DATABASE_URL:', process.env.DATABASE_URL);
 
-        // Simple query to test connection
+        // 1. Connection Test
         const userCount = await prisma.user.count();
         console.log('✅ Connected! User count:', userCount);
 
-        const clientCount = await prisma.client.count();
-        console.log('✅ Client count:', clientCount);
+        // 2. Admin Check & Update
+        const email = 'admin@example.com';
+        const adminUser = await prisma.user.findUnique({ where: { email } });
 
-        // Try to fetch one user
-        const users = await prisma.user.findMany({ take: 1 });
-        console.log('✅ Sample user:', users[0] || 'No users found');
+        if (adminUser) {
+            console.log('✅ Admin found:', adminUser.email);
 
-    } catch (error) {
-        console.error('❌ Connection failed:', error);
+            // Generate hash for 'admin123'
+            const hashedPassword = await bcrypt.hash("admin123", 10);
+
+            await prisma.user.update({
+                where: { email },
+                data: { password: hashedPassword }
+            });
+            console.log('✅ Password updated to "admin123" successfully!');
+        } else {
+            console.log('❌ Admin not found');
+        }
+
+    } catch (error: any) {
+        console.error('❌ Connection failed:', JSON.stringify(error, null, 2));
+        console.error('Error Message:', error.message);
     } finally {
         await prisma.$disconnect();
     }

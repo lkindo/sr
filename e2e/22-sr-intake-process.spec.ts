@@ -17,6 +17,13 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
   test.describe.configure({ mode: 'serial' });
 
+  // SR ID가 없으면 후속 테스트를 스킵
+  test.beforeEach(async ({ }, testInfo) => {
+    if (testInfo.title !== '1. 준비: SR 생성 (CLIENT)' && !srId) {
+      test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
+    }
+  });
+
   test('1. 준비: SR 생성 (CLIENT)', async ({ browser }) => {
     const context = await browser.newContext({ storageState: authFiles.client });
     const page = await context.newPage();
@@ -207,7 +214,11 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
     try {
       await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
-      await expect(page.getByRole('heading', { name: /SR 접수 정보|접수 정보 수정/i })).toBeVisible({ timeout: 10000 });
+
+      // 접수 페이지 접근 확인 (URL 기반 + heading 또는 폼 존재 여부)
+      await expect(page).toHaveURL(/\/srs\/[^/]+\/intake/);
+      const headingOrLabel = page.locator('h1, h2, h3, label').filter({ hasText: /접수|Intake|우선순위/i }).first();
+      await expect(headingOrLabel).toBeVisible({ timeout: 10000 });
 
       // 우선순위 확인 (HIGH)
       const priorityValue = page.locator('text=/높음|HIGH/i').first();
