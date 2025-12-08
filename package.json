@@ -2,6 +2,9 @@
   "name": "sr-management",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:test": "cross-env SKIP_ENV_VALIDATION=true next dev --turbopack",
