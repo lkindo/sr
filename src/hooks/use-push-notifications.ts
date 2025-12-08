@@ -132,10 +132,20 @@ export function usePushNotifications(): UsePushNotificationsReturn {
             const registration = await navigator.serviceWorker.register('/sw.js');
             await navigator.serviceWorker.ready;
 
-            // Get VAPID public key
-            const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+            // Get VAPID public key from API (Vercel 환경 변수 문제 우회)
+            let vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
             if (!vapidPublicKey || vapidPublicKey.length < 20) {
-                throw new Error('VAPID public key is not configured. Please add NEXT_PUBLIC_VAPID_PUBLIC_KEY to your .env file and restart the dev server.');
+                // Fallback: API에서 가져오기
+                const vapidResponse = await fetch('/api/push/vapid-key');
+                if (vapidResponse.ok) {
+                    const vapidData = await vapidResponse.json();
+                    vapidPublicKey = vapidData.vapidPublicKey;
+                }
+            }
+
+            if (!vapidPublicKey || vapidPublicKey.length < 20) {
+                throw new Error('VAPID public key is not configured. Please check your environment variables.');
             }
 
             // Subscribe to push

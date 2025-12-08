@@ -15,6 +15,7 @@ import { SRPolicy } from "@/lib/policies/sr.policy";
 import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from "@/types/sr.types";
 import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
+import { backgroundTask } from "@/lib/wait-until";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -169,43 +170,50 @@ export class SRService {
       throw new Error("SR 생성 후 조회에 실패했습니다.");
     }
 
-    // Mattermost 알림 발송
+    // Mattermost 알림 발송 (Vercel에서 응답 후에도 완료 보장)
     console.log(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
-    this.sendCreationNotification(result).catch(err => {
-      console.error("[SRService] Failed to send Mattermost notification:", err);
-    });
+    backgroundTask(
+      this.sendCreationNotification(result),
+      `Mattermost notification for ${result.srNumber}`
+    );
 
     // 푸시 알림 전송 (ADMIN, MANAGER)
-    this.userRepository.findUserIdsByRoles(['ADMIN', 'MANAGER']).then(adminIds => {
-      if (adminIds.length > 0) {
-        pushService.sendToUsers(adminIds, {
-          title: "새로운 SR 등록",
-          body: `${result.srNumber}: ${result.title}`,
-          url: `/srs/${result.id}`,
-          tag: 'sr-created'
-        }).catch(err => console.error("[SRService] Failed to send push notification:", err));
-      }
-    });
+    backgroundTask(
+      this.userRepository.findUserIdsByRoles(['ADMIN', 'MANAGER']).then(adminIds => {
+        if (adminIds.length > 0) {
+          return pushService.sendToUsers(adminIds, {
+            title: "새로운 SR 등록",
+            body: `${result.srNumber}: ${result.title}`,
+            url: `/srs/${result.id}`,
+            tag: 'sr-created'
+          });
+        }
+      }),
+      `Push notification for ${result.srNumber}`
+    );
 
     // 이메일 알림 전송 (ADMIN, MANAGER)
-    this.userRepository.findUsersByRoles(['ADMIN', 'MANAGER']).then(admins => {
-      admins.forEach(admin => {
-        // any 타입 캐스팅으로 접근 (UserRepository 수정사항 반영)
-        const adminWithPrefs = admin as any;
-        // 설정이 없거나(기본값 true) true인 경우만 발송
-        const shouldSend = adminWithPrefs.notificationPreference?.emailSRCreated ?? true;
-
-        if (admin.email && shouldSend) {
-          emailService.sendSRCreated(
-            admin.email,
-            result.srNumber,
-            result.title,
-            result.requester.name,
-            `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${result.id}`
-          ).catch(err => console.error("[SRService] Failed to send email:", err));
-        }
-      });
-    });
+    backgroundTask(
+      this.userRepository.findUsersByRoles(['ADMIN', 'MANAGER']).then(admins => {
+        const emailPromises = admins
+          .filter(admin => {
+            const adminWithPrefs = admin as any;
+            const shouldSend = adminWithPrefs.notificationPreference?.emailSRCreated ?? true;
+            return admin.email && shouldSend;
+          })
+          .map(admin =>
+            emailService.sendSRCreated(
+              admin.email!,
+              result.srNumber,
+              result.title,
+              result.requester.name,
+              `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${result.id}`
+            )
+          );
+        return Promise.all(emailPromises);
+      }),
+      `Email notifications for ${result.srNumber}`
+    );
 
     return result;
   }
@@ -428,33 +436,34 @@ export class SRService {
 
           // 상태 변경 푸시 알림 (요청자에게)
           if (existingSR.requesterId) {
-            pushService.sendToUser(existingSR.requesterId, {
-              title: "SR 상태 변경",
-              body: `${existingSR.srNumber} 상태가 ${validated.status}로 변경되었습니다.`,
-              url: `/srs/${id}`,
-              tag: 'sr-status-changed'
-            }).catch(console.error);
+            backgroundTask(
+              pushService.sendToUser(existingSR.requesterId, {
+                title: "SR 상태 변경",
+                body: `${existingSR.srNumber} 상태가 ${validated.status}로 변경되었습니다.`,
+                url: `/srs/${id}`,
+                tag: 'sr-status-changed'
+              }),
+              `Status change push for ${existingSR.srNumber}`
+            );
           }
 
           // 상태 변경 이메일 알림 (요청자에게)
-          // updatedSR은 업데이트된 경우 requester relations를 포함함
           const srWithRelations = updatedSR as any;
           const requesterPrefs = srWithRelations.requester?.notificationPreference;
-          // 설정이 없거나(기본값 false) true인 경우만 발송 (User Preference 기본값은 false로 되어있음 확인 필요)
-          // Schema: emailSRStatusChanged Boolean @default(false)
-          // 따라서 ?? false로 처리해야 함. 단, 스키마 기본값이 false인게 맞는지 확인. 보통 상태 변경은 중요해서 true가 나을수도.
-          // 스키마상 emailSRStatusChanged @default(false)로 되어있음.
           const shouldSendStatusEmail = requesterPrefs?.emailSRStatusChanged ?? false;
 
           if (srWithRelations.requester?.email && shouldSendStatusEmail) {
-            emailService.sendSRStatusChanged(
-              srWithRelations.requester.email,
-              srWithRelations.srNumber,
-              srWithRelations.title,
-              existingSR.status,
-              validated.status!,
-              `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${id}`
-            ).catch(console.error);
+            backgroundTask(
+              emailService.sendSRStatusChanged(
+                srWithRelations.requester.email,
+                srWithRelations.srNumber,
+                srWithRelations.title,
+                existingSR.status,
+                validated.status!,
+                `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${id}`
+              ),
+              `Status change email for ${existingSR.srNumber}`
+            );
           }
         }
 
@@ -471,28 +480,33 @@ export class SRService {
 
           // 담당자 배정 푸시 알림 (새 담당자에게)
           if (assigneeId) {
-            pushService.sendToUser(assigneeId, {
-              title: "SR 담당 배정",
-              body: `${existingSR.srNumber} 담당자로 배정되었습니다.`,
-              url: `/srs/${id}`,
-              tag: 'sr-assigned'
-            }).catch(console.error);
+            backgroundTask(
+              pushService.sendToUser(assigneeId, {
+                title: "SR 담당 배정",
+                body: `${existingSR.srNumber} 담당자로 배정되었습니다.`,
+                url: `/srs/${id}`,
+                tag: 'sr-assigned'
+              }),
+              `Assignment push for ${existingSR.srNumber}`
+            );
           }
 
           // 담당자 배정 이메일 알림
           const srWithRelations = updatedSR as any;
           const assigneePrefs = srWithRelations.assignee?.notificationPreference;
-          // Schema: emailSRAssigned Boolean @default(true)
           const shouldSendAssignEmail = assigneePrefs?.emailSRAssigned ?? true;
 
           if (srWithRelations.assignee?.email && shouldSendAssignEmail) {
-            emailService.sendSRAssigned(
-              srWithRelations.assignee.email,
-              srWithRelations.srNumber,
-              srWithRelations.title,
-              srWithRelations.assignee.name,
-              `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${id}`
-            ).catch(console.error);
+            backgroundTask(
+              emailService.sendSRAssigned(
+                srWithRelations.assignee.email,
+                srWithRelations.srNumber,
+                srWithRelations.title,
+                srWithRelations.assignee.name,
+                `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${id}`
+              ),
+              `Assignment email for ${existingSR.srNumber}`
+            );
           }
         }
 

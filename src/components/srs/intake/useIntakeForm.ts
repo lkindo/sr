@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -47,6 +48,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
   const [submitting, setSubmitting] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const form = useForm<IntakeFormValues>({
@@ -224,7 +226,13 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         description: isEditMode ? "접수 정보가 수정되었습니다." : "SR이 접수되었습니다.",
       });
 
-      // SPA 방식으로 페이지 이동 (전체 reload 방지)
+      // 캐시 무효화 (SR 목록 및 상세 페이지에 즉시 반영)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["sr", srId] }),
+        queryClient.invalidateQueries({ queryKey: ["srs"] }),
+      ]);
+
+      // SPA 방식으로 페이지 이동
       router.refresh();
       router.push("/srs");
 
