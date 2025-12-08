@@ -32,10 +32,10 @@ export const sendMattermostNotification = async (
     attachments: MattermostAttachment[] = [],
     channel?: string
 ): Promise<void> => {
-    // 환경 변수에서 모든 제어 문자, 보이지 않는 문자, 공백 제거
+    // 환경 변수에서 모든 제어 문자, 보이지 않는 문자, 공백, 따옴표 제거
     const rawUrl = process.env.MATTERMOST_WEBHOOK_URL || '';
-    // 모든 공백류 문자 제거 (줄바꿈, 탭, 일반 공백, 유니코드 공백 등)
-    const webhookUrl = rawUrl.replace(/[\s\u0000-\u001F\u007F-\u009F\uFEFF\u200B-\u200D]/g, '');
+    // 모든 공백류 문자, 따옴표 제거 (Vercel 환경 변수에 따옴표가 포함될 수 있음)
+    const webhookUrl = rawUrl.replace(/[\s\u0000-\u001F\u007F-\u009F\uFEFF\u200B-\u200D"'`]/g, '');
     const targetChannel = channel || process.env.MATTERMOST_CHANNEL?.trim();
 
     console.log(`[Mattermost] Sending notification to channel: ${targetChannel || 'Default (Webhook Config)'}`);
