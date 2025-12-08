@@ -16,6 +16,7 @@ import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from "@/types/s
 import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
 import { backgroundTask } from "@/lib/wait-until";
+import { getSRUrl } from "@/lib/app-url";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -207,7 +208,7 @@ export class SRService {
               result.srNumber,
               result.title,
               result.requester.name,
-              `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${result.id}`
+              getSRUrl(result.id)
             )
           );
         return Promise.all(emailPromises);
@@ -222,7 +223,7 @@ export class SRService {
     console.log(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
     const { sendMattermostNotification } = await import("@/lib/mattermost");
 
-    const srUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${sr.id}`;
+    const srUrl = getSRUrl(sr.id);
     const message = `### 🆕 새로운 SR이 등록되었습니다.\n[SR 바로가기](${srUrl})`;
 
     const attachments = [{
@@ -460,7 +461,7 @@ export class SRService {
                 srWithRelations.title,
                 existingSR.status,
                 validated.status!,
-                `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${id}`
+                getSRUrl(id)
               ),
               `Status change email for ${existingSR.srNumber}`
             );
@@ -503,7 +504,7 @@ export class SRService {
                 srWithRelations.srNumber,
                 srWithRelations.title,
                 srWithRelations.assignee.name,
-                `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${id}`
+                getSRUrl(id)
               ),
               `Assignment email for ${existingSR.srNumber}`
             );
