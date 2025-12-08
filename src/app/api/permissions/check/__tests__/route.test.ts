@@ -49,7 +49,7 @@ vi.mock('@/lib/errors', () => ({
 describe('POST /api/permissions/check', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.resetModules();
+        // vi.resetModules() 제거 - mock된 모듈 캐시를 유지해야 POST 함수가 정상 동작
     });
 
     it('권한이 있으면 hasPermission true를 반환해야 함', async () => {
