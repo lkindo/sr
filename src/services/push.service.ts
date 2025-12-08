@@ -40,7 +40,9 @@ interface WebPushSubscription {
 }
 
 // VAPID configuration
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
+// Fallback 값 추가 - 환경 변수 인식 문제 우회
+const VAPID_PUBLIC_KEY_FALLBACK = 'BMy2SareYpfTG73Ts9NjlQVhbwStorMrw_v2XrZi1JYA_V6vrL4iuVBAoBV1FUOPFLfsa-qsQ5O5Zvggv9DlMc4';
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY_FALLBACK;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:lkindo@gmail.com';
 
