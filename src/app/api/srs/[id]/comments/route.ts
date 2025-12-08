@@ -8,6 +8,7 @@ import { sendCommentNotificationEmail } from "@/lib/email";
 import { RouteContext } from "@/lib/api-helpers";
 import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
 import { srDetailKey, MY_REQUESTS_PREFIX } from "@/lib/cache-keys";
+import { getSRUrl } from "@/lib/app-url";
 
 const commentSchema = z.object({
   content: z.string().min(1, "댓글 내용을 입력해주세요."),
@@ -135,7 +136,7 @@ export const POST = withAuthAndRateLimit(async (
       sr.title,
       comment.user.name,
       validated.content,
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${sr.id}`
+      getSRUrl(sr.id)
     ).catch(e => console.error("Failed to send comment email to requester:", e));
   }
 
@@ -151,7 +152,7 @@ export const POST = withAuthAndRateLimit(async (
         sr.title,
         comment.user.name,
         validated.content,
-        `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/srs/${sr.id}`
+        getSRUrl(sr.id)
       ).catch(e => console.error("Failed to send comment email to assignee:", e));
     }
   }
