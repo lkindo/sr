@@ -1,35 +1,17 @@
 import { NextResponse } from "next/server";
 
 // VAPID public key를 반환하는 API
-// NEXT_PUBLIC_ 환경 변수가 Vercel에서 인식되지 않는 문제 우회용
+// Public key는 클라이언트에 노출되어도 안전함
+// Private key만 서버에서 비밀로 유지하면 됨
+
+// 환경 변수에서 가져오거나, 설정되지 않은 경우 하드코딩된 값 사용
+const VAPID_PUBLIC_KEY_FALLBACK = "BMy2SareYpfTG73Ts9NjlQVhbwStorMrw_v2XrZi1JYA_V6vrL4iuVBAoBV1FUOPFLfsa-qsQ5O5Zvggv9DlMc4";
+
 export async function GET() {
-    // 여러 환경 변수 이름 시도
     const vapidPublicKey =
         process.env.VAPID_PUBLIC_KEY ||
         process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-        process.env.VAPID_KEY;
-
-    // 디버그 정보
-    const debug = {
-        hasVAPID_PUBLIC_KEY: !!process.env.VAPID_PUBLIC_KEY,
-        hasNEXT_PUBLIC_VAPID_PUBLIC_KEY: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-        hasVAPID_KEY: !!process.env.VAPID_KEY,
-        nodeEnv: process.env.NODE_ENV,
-        vercel: process.env.VERCEL,
-    };
-
-    console.log('[VAPID API] Debug:', debug);
-
-    if (!vapidPublicKey) {
-        return NextResponse.json(
-            {
-                error: "VAPID public key is not configured",
-                debug,
-                hint: "Please add VAPID_PUBLIC_KEY to Vercel Environment Variables"
-            },
-            { status: 500 }
-        );
-    }
+        VAPID_PUBLIC_KEY_FALLBACK;
 
     return NextResponse.json({ vapidPublicKey });
 }
