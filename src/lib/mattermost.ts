@@ -32,8 +32,9 @@ export const sendMattermostNotification = async (
     attachments: MattermostAttachment[] = [],
     channel?: string
 ): Promise<void> => {
-    const webhookUrl = process.env.MATTERMOST_WEBHOOK_URL;
-    const targetChannel = channel || process.env.MATTERMOST_CHANNEL;
+    // 환경 변수에서 숨겨진 공백/특수문자 제거
+    const webhookUrl = process.env.MATTERMOST_WEBHOOK_URL?.trim();
+    const targetChannel = channel || process.env.MATTERMOST_CHANNEL?.trim();
 
     console.log(`[Mattermost] Sending notification to channel: ${targetChannel || 'Default (Webhook Config)'}`);
 

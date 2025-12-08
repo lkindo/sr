@@ -83,11 +83,12 @@ export function SRStatusActions({
                 description: "상태가 변경되었습니다.",
             });
 
-            // UI 블로킹 없이 병렬 처리
-            Promise.all([
+            // 캐시 무효화 및 페이지 새로고침 (완료될 때까지 대기)
+            await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ["sr", srId] }),
-                Promise.resolve(router.refresh())
+                queryClient.invalidateQueries({ queryKey: ["srs"] }),
             ]);
+            router.refresh();
         } catch (error) {
             toast({
                 title: "오류",
