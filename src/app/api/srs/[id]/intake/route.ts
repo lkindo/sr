@@ -181,16 +181,8 @@ export const POST = withAuthAndRateLimit(async (
     }
   });
 
-  // 7. 상태 이력 생성
-  await prisma.sRStatusHistory.create({
-    data: {
-      srId: id,
-      previousStatus: "REQUESTED",
-      currentStatus: "IN_PROGRESS",
-      changedBy: session.user.id,
-      changeReason: "접수 완료"
-    }
-  });
+  // 7. 상태 이력 생성 - 이미 94-110 라인에서 SR 업데이트 시 statusHistory가 INTAKE로 생성됨
+  // 중복 생성 코드 제거 (기존에 IN_PROGRESS로 잘못 기록되던 버그 수정)
 
   // 8. 담당자 배정 Activity 로그
   await prisma.sRActivity.create({

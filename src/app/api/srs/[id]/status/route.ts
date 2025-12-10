@@ -89,10 +89,10 @@ export async function PATCH(
                 break;
 
             case "hold":
-                // INTAKE/IN_PROGRESS → ON_HOLD
-                if (!["INTAKE", "IN_PROGRESS"].includes(currentStatus)) {
+                // IN_PROGRESS → ON_HOLD (INTAKE에서는 보류 불가)
+                if (currentStatus !== "IN_PROGRESS") {
                     return NextResponse.json(
-                        { error: "접수 또는 진행중 상태에서만 보류할 수 있습니다." },
+                        { error: "진행중 상태에서만 보류할 수 있습니다." },
                         { status: 400 }
                     );
                 }
