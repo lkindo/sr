@@ -1,34 +1,29 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-const permissionServiceMocks = vi.hoisted(() => {
-    const mockCheckPermission = vi.fn();
-    class PermissionServiceMock {
-        checkPermission = mockCheckPermission;
-    }
-    return { mockCheckPermission, PermissionServiceMock };
-});
+// Mock 함수들을 hoisted로 선언
+const mockCheckPermission = vi.fn();
 
-const { mockCheckPermission, PermissionServiceMock } = permissionServiceMocks;
-
+// PermissionService mock
 vi.mock('@/services/permission.service', () => ({
-    PermissionService: PermissionServiceMock,
+    PermissionService: class {
+        checkPermission = mockCheckPermission;
+    },
 }));
 
-// Mock auth-wrapper to return a simple handler
+// auth-wrapper mock - 핸들러를 감싸서 session 주입
 vi.mock('@/lib/auth-wrapper', () => ({
-    withAuthAndRateLimit: vi.fn((handler) => {
-        // Return a wrapper that injects session
-        return async (request: any, context?: any) => {
+    withAuthAndRateLimit: (handler: any) => {
+        return async (request: NextRequest, context?: any) => {
             const session = context?.session || {
                 user: { id: 'mock-user-id' }
             };
-            return handler(request, { session });
+            return handler(request, { session, ...context });
         };
-    }),
+    },
 }));
 
-// Mock errors
+// errors mock
 vi.mock('@/lib/errors', () => ({
     ForbiddenError: class ForbiddenError extends Error {
         statusCode = 403;
@@ -46,26 +41,24 @@ vi.mock('@/lib/errors', () => ({
     },
 }));
 
+// route 모듈은 mock 설정 후에 import
+import { POST } from '../route';
+
 describe('POST /api/permissions/check', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        // vi.resetModules() 제거 - mock된 모듈 캐시를 유지해야 POST 함수가 정상 동작
     });
 
-    it('권한이 있으면 hasPermission true를 반환해야 함', async () => {
+    it('should return hasPermission true when service approves', async () => {
         // Arrange
         mockCheckPermission.mockResolvedValue(true);
 
         const requestBody = { resource: 'SR', action: 'CREATE' };
-        const request = new Request('http://localhost/api/permissions/check', {
+        const request = new NextRequest('http://localhost/api/permissions/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-        }) as NextRequest;
-
-        // Dynamically import after mocks are set up
-        const routeModule = await import('../route');
-        const POST = routeModule.POST;
+        });
 
         // Act
         const response = await POST(request, { session: { user: { id: 'user123' } } } as any);
@@ -81,13 +74,11 @@ describe('POST /api/permissions/check', () => {
         mockCheckPermission.mockResolvedValue(false);
 
         const requestBody = { resource: 'USER', action: 'DELETE' };
-        const request = new Request('http://localhost/api/permissions/check', {
+        const request = new NextRequest('http://localhost/api/permissions/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-        }) as NextRequest;
-
-        const { POST } = await import('../route');
+        });
 
         // Act
         const response = await POST(request, { session: { user: { id: 'user123' } } } as any);
@@ -101,13 +92,11 @@ describe('POST /api/permissions/check', () => {
     it('resource가 없으면 BadRequestError를 던져야 함', async () => {
         // Arrange
         const requestBody = { action: 'CREATE' }; // resource 누락
-        const request = new Request('http://localhost/api/permissions/check', {
+        const request = new NextRequest('http://localhost/api/permissions/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-        }) as NextRequest;
-
-        const { POST } = await import('../route');
+        });
 
         // Act & Assert
         await expect(
@@ -118,13 +107,11 @@ describe('POST /api/permissions/check', () => {
     it('action이 없으면 BadRequestError를 던져야 함', async () => {
         // Arrange
         const requestBody = { resource: 'SR' }; // action 누락
-        const request = new Request('http://localhost/api/permissions/check', {
+        const request = new NextRequest('http://localhost/api/permissions/check', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
-        }) as NextRequest;
-
-        const { POST } = await import('../route');
+        });
 
         // Act & Assert
         await expect(
@@ -140,16 +127,14 @@ describe('POST /api/permissions/check', () => {
             { resource: 'ROLE', action: 'DELETE', expected: true },
         ];
 
-        const { POST } = await import('../route');
-
         for (const testCase of testCases) {
             mockCheckPermission.mockResolvedValue(testCase.expected);
 
-            const request = new Request('http://localhost/api/permissions/check', {
+            const request = new NextRequest('http://localhost/api/permissions/check', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ resource: testCase.resource, action: testCase.action }),
-            }) as NextRequest;
+            });
 
             // Act
             const response = await POST(request, { session: { user: { id: 'user123' } } } as any);
