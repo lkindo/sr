@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
@@ -9,12 +9,7 @@ export default defineConfig({
     globals: true,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./vitest.setup.ts'],
-    exclude: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/e2e/**',
-      '**/.next/**',
-    ],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -39,6 +34,8 @@ export default defineConfig({
     alias: {
       'next/server': path.resolve(__dirname, './src/__tests__/mocks/next-server.ts'),
       'next/navigation': path.resolve(__dirname, './src/__tests__/mocks/next-navigation.ts'),
+      'next/cache': path.resolve(__dirname, './src/__tests__/mocks/next-cache.ts'),
+      'server-only': path.resolve(__dirname, './src/__tests__/mocks/server-only.ts'),
     },
   },
   resolve: {
@@ -46,5 +43,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-})
-
+});

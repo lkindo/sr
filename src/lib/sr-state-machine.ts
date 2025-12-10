@@ -18,7 +18,7 @@ export type SRStatus =
  */
 export const VALID_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
     REQUESTED: ["INTAKE", "REJECTED"],
-    INTAKE: ["IN_PROGRESS", "ON_HOLD", "REJECTED"],
+    INTAKE: ["IN_PROGRESS", "REJECTED"],
     IN_PROGRESS: ["COMPLETED", "ON_HOLD"],
     ON_HOLD: ["IN_PROGRESS", "REJECTED"],
     COMPLETED: ["CONFIRMED", "IN_PROGRESS"], // IN_PROGRESS for Reopen
@@ -37,7 +37,6 @@ export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
     },
     INTAKE: {
         IN_PROGRESS: ["ADMIN", "MANAGER", "ENGINEER"],
-        ON_HOLD: ["ADMIN", "MANAGER", "ENGINEER"],
         REJECTED: ["ADMIN", "MANAGER", "ENGINEER"],
     },
     IN_PROGRESS: {
