@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { pushService } from "@/services/push.service";
 
 // Force refresh: 2025-12-07
-export async function POST(req: Request) {
+export async function POST(_req: Request) {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

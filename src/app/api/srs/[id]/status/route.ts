@@ -54,7 +54,7 @@ export async function PATCH(
 
         const currentStatus = currentSR.status;
         let newStatus: string;
-        let updateData: any = {};
+        const updateData: any = {};
 
         // 액션에 따른 상태 전이
         switch (action) {

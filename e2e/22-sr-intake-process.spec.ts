@@ -18,7 +18,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
   test.describe.configure({ mode: 'serial' });
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async ({ }, testInfo) => {
+  test.beforeEach(async (_args, testInfo) => {
     if (testInfo.title !== '1. 준비: SR 생성 (CLIENT)' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }

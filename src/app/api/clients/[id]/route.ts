@@ -1,23 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+
 import { ClientService } from "@/services/client.service";
 import { clientUpdateSchema } from "@/lib/schemas";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
 import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
-
-const clientSchema = z.object({
-  code: z.string().min(2).optional(),
-  name: z.string().min(2).optional(),
-  industry: z.string().optional(),
-  contactPerson: z.string().optional(),
-  contactEmail: z.string().email().optional().or(z.literal("")),
-  contactPhone: z.string().optional(),
-  address: z.string().optional(),
-  contractStartDate: z.string().optional(),
-  contractEndDate: z.string().optional(),
-  isActive: z.boolean().optional(),
-});
 
 // GET /api/clients/[id] - 고객사 상세 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (

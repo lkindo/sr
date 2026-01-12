@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createTestSR, findSRInList } from './helpers/test-helpers';
+import { createTestSR } from './helpers/test-helpers';
 
 /**
  * SR 상세 페이지 테스트

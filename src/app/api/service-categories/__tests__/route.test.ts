@@ -34,7 +34,7 @@ describe('GET /api/service-categories', () => {
         mockGetAll.mockResolvedValue(mockCategories);
 
         const request = new Request('http://localhost/api/service-categories') as NextRequest;
-        const response = await GET(request);
+        const response = await GET(request, { params: {} } as any);
         const json = await response.json();
 
         expect(json).toEqual(mockCategories);
@@ -45,7 +45,7 @@ describe('GET /api/service-categories', () => {
         mockGetAll.mockResolvedValue([]);
 
         const request = new Request('http://localhost/api/service-categories') as NextRequest;
-        const response = await GET(request);
+        const response = await GET(request, { params: {} } as any);
         const json = await response.json();
 
         expect(json).toEqual([]);
@@ -57,6 +57,6 @@ describe('GET /api/service-categories', () => {
 
         const request = new Request('http://localhost/api/service-categories') as NextRequest;
 
-        await expect(GET(request)).rejects.toThrow('Database error');
+        await expect(GET(request, { params: {} } as any)).rejects.toThrow('Database error');
     });
 });

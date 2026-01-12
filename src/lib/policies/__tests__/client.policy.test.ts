@@ -13,6 +13,7 @@ describe('ClientPolicy', () => {
     image: null,
     roles: ['ADMIN'],
     permissions: [],
+    clientIds: [],
   };
 
   const managerUser: AuthenticatedUser = {
@@ -22,6 +23,7 @@ describe('ClientPolicy', () => {
     image: null,
     roles: ['MANAGER'],
     permissions: ['CLIENT:READ', 'CLIENT:CREATE', 'CLIENT:UPDATE'],
+    clientIds: [],
   };
 
   const regularUser: AuthenticatedUser = {
@@ -38,15 +40,16 @@ describe('ClientPolicy', () => {
     id: 'client-1',
     name: 'Test Client',
     code: 'TC001',
-    description: null,
     industry: null,
-    contactName: null,
+    contactPerson: null,
     contactEmail: null,
     contactPhone: null,
     address: null,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
+    contractStartDate: null,
+    contractEndDate: null,
   };
 
   describe('canCreate', () => {

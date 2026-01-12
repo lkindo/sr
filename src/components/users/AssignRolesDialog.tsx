@@ -61,7 +61,7 @@ export function AssignRolesDialog({
       if (!response.ok) throw new Error("Failed to fetch roles");
       const data = await response.json();
       setRoles(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "역할 목록을 불러오는데 실패했습니다.",

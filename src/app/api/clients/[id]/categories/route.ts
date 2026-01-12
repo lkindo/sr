@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
-import { NotFoundError, ValidationError, BadRequestError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import { RouteContext } from "@/lib/api-helpers";
 
 const categorySchema = z.object({

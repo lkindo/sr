@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
-import { NotFoundError, ValidationError, BadRequestError } from "@/lib/errors";
+import { NotFoundError, BadRequestError } from "@/lib/errors";
 import { RouteContext } from "@/lib/api-helpers";
-import { validateFile, FileValidationError, formatBytes } from "@/lib/file-validator";
+import { validateFile, FileValidationError } from "@/lib/file-validator";
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';

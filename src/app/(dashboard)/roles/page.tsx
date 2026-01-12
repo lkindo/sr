@@ -3,13 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+
 import {
   Table,
   TableBody,
@@ -67,7 +61,7 @@ export default function RolesPage() {
         permissions: role.permissions || [],
       }));
       setRoles(rolesWithPermissions);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "역할 목록을 불러오는데 실패했습니다.",

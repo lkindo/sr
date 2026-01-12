@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * 구조화된 로깅 시스템
  * 프로덕션 환경에서 에러 트래킹 서비스(Sentry 등) 연동 가능

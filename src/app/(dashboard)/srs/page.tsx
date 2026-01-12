@@ -1,6 +1,4 @@
 import { SRService } from "@/services/sr.service";
-import { ClientService } from "@/services/client.service";
-import { UserService } from "@/services/user.service";
 import { SRsDataTable } from "@/components/srs/SRsDataTable";
 import { Prisma } from "@prisma/client";
 import { getCachedClients, getCachedUsers } from "@/lib/cache";
@@ -8,7 +6,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 
 type Props = {
-  params: Promise<{}>;
+  params: Promise<Record<string, unknown>>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
@@ -37,13 +35,11 @@ export default async function SRsPage({ searchParams }: Props) {
   const userRoles = session?.user?.roles || [];
 
   // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
-  const isAdminManagerEngineer = userRoles.some((role) => 
+  const isAdminManagerEngineer = userRoles.some((role) =>
     ["ADMIN", "MANAGER", "ENGINEER"].includes(role)
   );
 
   const srService = new SRService();
-  const clientService = new ClientService();
-  const userService = new UserService();
 
   const where: Prisma.SRWhereInput = {};
 
@@ -54,13 +50,13 @@ export default async function SRsPage({ searchParams }: Props) {
       where: { userId: session.user.id },
       select: { clientId: true },
     });
-    
+
     userClientIds = userClients.map((uc) => uc.clientId);
   }
-  
+
   if (status && status !== "all") where.status = status as "REQUESTED" | "INTAKE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CONFIRMED" | "REJECTED";
   if (priority && priority !== "all") where.priority = priority as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
-  
+
   // clientId 필터 처리
   if (clientId && clientId !== "all") {
     if (!isAdminManagerEngineer) {
@@ -112,7 +108,7 @@ export default async function SRsPage({ searchParams }: Props) {
   // 관계형 필드 정렬 처리
   const getOrderBy = (): Prisma.SROrderByWithRelationInput | undefined => {
     const order = sortOrder === "asc" ? "asc" : "desc";
-    
+
     // 관계형 필드인 경우 중첩 객체 형식 사용
     if (sortField === "client") {
       return { client: { name: order } };
@@ -123,7 +119,7 @@ export default async function SRsPage({ searchParams }: Props) {
     if (sortField === "assignee") {
       return { assignee: { name: order } };
     }
-    
+
     // 일반 필드는 직접 정렬
     return { [sortField]: order } as Prisma.SROrderByWithRelationInput;
   };
@@ -137,7 +133,7 @@ export default async function SRsPage({ searchParams }: Props) {
     skip: (page - 1) * itemsPerPage,
     take: itemsPerPage,
   });
-  
+
   // Use cached data for clients and users to reduce database connections
   const clients = await getCachedClients();
   const users = await getCachedUsers();
@@ -154,8 +150,8 @@ export default async function SRsPage({ searchParams }: Props) {
   };
 
   return (
-    <SRsDataTable 
-      srs={srData} 
+    <SRsDataTable
+      srs={srData}
       paginationInfo={paginationInfo}
       clients={clients}
       users={users}

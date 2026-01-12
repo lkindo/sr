@@ -82,7 +82,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
       } as UserProfile);
       setName(result.data.name);
       setImage(result.data.image || "");
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "프로필 정보를 불러오는데 실패했습니다.",

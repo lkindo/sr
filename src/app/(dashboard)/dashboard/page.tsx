@@ -12,21 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Legend,
-  Tooltip,
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
+
 import { FileText, Clock, CheckCircle, AlertCircle, ClipboardList, ArrowRight, AlertTriangle, TrendingUp, User, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -131,15 +117,14 @@ const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
 };
 
 const priorityColors: Record<string, "default" | "secondary" | "destructive"> =
-  {
-    CRITICAL: "destructive",
-    HIGH: "destructive",
-    MEDIUM: "default",
-    LOW: "secondary",
-  };
+{
+  CRITICAL: "destructive",
+  HIGH: "destructive",
+  MEDIUM: "default",
+  LOW: "secondary",
+};
 
-const STATUS_CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#6b7280", "#8b5cf6", "#ec4899"];
-const PRIORITY_CHART_COLORS = ["#ef4444", "#f59e0b", "#3b82f6", "#6b7280"];
+
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -147,7 +132,7 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const { hasAnyRole } = usePermissions();
   const router = useRouter();
-  
+
   const isAdminManagerEngineer = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
   const isEngineer = hasAnyRole(["ENGINEER"]);
 
@@ -157,7 +142,7 @@ export default function DashboardPage() {
       if (!response.ok) throw new Error("Failed to fetch stats");
       const data = await response.json();
       setStats(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "대시보드 통계를 불러오는데 실패했습니다.",
@@ -188,20 +173,7 @@ export default function DashboardPage() {
     );
   }
 
-  // Prepare chart data
-  const statusChartData = Object.entries(stats.byStatus).map(
-    ([status, count]) => ({
-      name: statusLabels[status] || status,
-      value: count,
-    })
-  );
 
-  const priorityChartData = Object.entries(stats.byPriority).map(
-    ([priority, count]) => ({
-      name: priorityLabels[priority] || priority,
-      value: count,
-    })
-  );
 
   // 접수 대기 시간 포맷팅
   const formatWaitingTime = (hours: number): string => {
@@ -408,7 +380,7 @@ export default function DashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card 
+        <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => router.push("/srs")}
         >
@@ -422,7 +394,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => router.push("/srs?status=IN_PROGRESS")}
         >
@@ -436,15 +408,15 @@ export default function DashboardPage() {
             </div>
             <p className="text-xs text-muted-foreground mt-1">처리 중인 SR</p>
             {stats.summary.total > 0 && (
-              <Progress 
-                value={(stats.summary.inProgress / stats.summary.total) * 100} 
+              <Progress
+                value={(stats.summary.inProgress / stats.summary.total) * 100}
                 className="mt-2 h-1.5"
               />
             )}
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => router.push("/srs?status=COMPLETED&status=CONFIRMED")}
         >
@@ -456,15 +428,15 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold text-green-600">{stats.summary.completed}</div>
             <p className="text-xs text-muted-foreground mt-1">완료된 SR</p>
             {stats.summary.total > 0 && (
-              <Progress 
-                value={(stats.summary.completed / stats.summary.total) * 100} 
+              <Progress
+                value={(stats.summary.completed / stats.summary.total) * 100}
                 className="mt-2 h-1.5"
               />
             )}
           </CardContent>
         </Card>
 
-        <Card 
+        <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => router.push("/srs?status=REQUESTED&status=INTAKE")}
         >
@@ -476,8 +448,8 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">{stats.summary.pending}</div>
             <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
             {stats.summary.total > 0 && (
-              <Progress 
-                value={(stats.summary.pending / stats.summary.total) * 100} 
+              <Progress
+                value={(stats.summary.pending / stats.summary.total) * 100}
                 className="mt-2 h-1.5"
               />
             )}
@@ -495,7 +467,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">
-                {stats.performance.avgProcessingHours > 0 
+                {stats.performance.avgProcessingHours > 0
                   ? `${Math.round(stats.performance.avgProcessingHours)}시간`
                   : "-"
                 }
@@ -511,15 +483,15 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {stats.performance.slaComplianceRate > 0 
+                {stats.performance.slaComplianceRate > 0
                   ? `${stats.performance.slaComplianceRate}%`
                   : "-"
                 }
               </div>
               <p className="text-xs text-muted-foreground mt-1">마감일 준수율</p>
               {stats.performance.slaComplianceRate > 0 && (
-                <Progress 
-                  value={stats.performance.slaComplianceRate} 
+                <Progress
+                  value={stats.performance.slaComplianceRate}
                   className="mt-2 h-1.5"
                 />
               )}
@@ -533,7 +505,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-orange-600">
-                {stats.performance.avgWaitingHours > 0 
+                {stats.performance.avgWaitingHours > 0
                   ? formatWaitingTime(stats.performance.avgWaitingHours)
                   : "-"
                 }

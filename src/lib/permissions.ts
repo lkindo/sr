@@ -1,4 +1,4 @@
-import { Session } from "next-auth";
+
 import { PermissionService } from "@/services/permission.service";
 
 // Singleton instance for permission service
@@ -19,7 +19,7 @@ export async function hasPermission(
   try {
     return await permissionService.checkPermission(userId, `${resource}:${action}`);
   } catch (error) {
-    console.error("Error checking permission:", error);
+
     return false;
   }
 }
@@ -37,7 +37,7 @@ export async function requirePermission(
   action: string
 ): Promise<void> {
   const hasAccess = await hasPermission(userId, resource, action);
-  
+
   if (!hasAccess) {
     throw new Error(`권한이 없습니다. 필요 권한: ${resource}.${action}`);
   }
@@ -89,7 +89,7 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
   try {
     return await permissionService.checkRole(userId, roleName);
   } catch (error) {
-    console.error("Error checking role:", error);
+
     return false;
   }
 }

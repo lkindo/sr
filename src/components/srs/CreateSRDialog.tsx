@@ -176,13 +176,13 @@ export function CreateSRDialog({
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
+        await response.text();
         throw new Error("Failed to upload attachments");
       }
 
-      const result = await response.json();
+      await response.json();
 
-    } catch (error) {
+    } catch {
       toast({
         title: "경고",
         description: "SR은 생성되었으나 첨부파일 업로드에 실패했습니다.",

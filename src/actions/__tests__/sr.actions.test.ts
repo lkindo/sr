@@ -53,6 +53,7 @@ describe('SR Actions', () => {
           image: null,
           roles: ['USER'],
           permissions: ['sr:create'],
+          clientIds: [],
         },
       };
 
@@ -122,7 +123,9 @@ describe('SR Actions', () => {
           image: null,
           roles: ['USER'],
           permissions: ['sr:update'],
+          clientIds: [],
         },
+        expires: new Date().toISOString(),
       };
 
       const mockUpdatedSR = {

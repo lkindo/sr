@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { PrismaClient } from '@prisma/client';
 
 // 환경 변수에서 URL 가져오기 (실제로는 .env에서 로드됨)

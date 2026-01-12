@@ -2,6 +2,7 @@
 import 'server-only';
 
 import prisma from '@/lib/prisma';
+import { logger } from "@/lib/logger";
 
 // Define types inline to avoid import conflicts with browser PushSubscription
 interface DBPushSubscription {
@@ -155,7 +156,7 @@ export class PushService {
      */
     async sendToUser(userId: string, payload: PushPayload): Promise<{ statusCode: number; body: string }[]> {
         if (!PushService.isConfigured()) {
-            console.warn('[PushService] VAPID not configured, skipping push notification');
+            logger.warn('[PushService] VAPID not configured, skipping push notification');
             return [];
         }
 
@@ -180,12 +181,12 @@ export class PushService {
                 results.push(result);
             } catch (error: unknown) {
                 const webPushError = error as { statusCode?: number };
-                console.error(`[PushService] Failed to send to ${sub.endpoint}:`, error);
+                logger.error(`[PushService] Failed to send to ${sub.endpoint}:`, error as Error);
 
                 // Remove invalid subscriptions (410 Gone or 404 Not Found)
                 if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
                     await this.removeSubscription(sub.endpoint);
-                    console.log(`[PushService] Removed invalid subscription: ${sub.endpoint}`);
+                    logger.info(`[PushService] Removed invalid subscription: ${sub.endpoint}`);
                 }
             }
         }
@@ -266,7 +267,7 @@ export class PushService {
         });
 
         if (eligibleUserIds.length === 0) {
-            console.log('[PushService] No eligible users for event:', eventType);
+            logger.info('[PushService] No eligible users for event:', { eventType });
             return;
         }
 

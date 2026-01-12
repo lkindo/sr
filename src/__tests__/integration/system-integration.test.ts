@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock all dependencies
 vi.mock('@/repositories/sr.repository');
@@ -257,7 +257,7 @@ describe('Integration Tests', () => {
 
     describe('Priority Handling', () => {
         it('우선순위가 올바르게 정렬되어야 함', () => {
-            const priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
             const priorityOrder = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
 
             expect(priorityOrder.CRITICAL).toBeGreaterThan(priorityOrder.HIGH);

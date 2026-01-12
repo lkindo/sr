@@ -175,7 +175,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
             return true;
         } catch (error) {
-            console.error('[usePushNotifications] Subscribe error:', error);
+
             setState((prev) => ({
                 ...prev,
                 isLoading: false,
@@ -211,7 +211,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
             return true;
         } catch (error) {
-            console.error('[usePushNotifications] Unsubscribe error:', error);
+
             setState((prev) => ({
                 ...prev,
                 isLoading: false,

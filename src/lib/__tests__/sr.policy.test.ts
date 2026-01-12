@@ -10,7 +10,7 @@ const baseSR = {
 
 const admin = { id: 'admin', roles: ['ADMIN'], permissions: ['SR:CREATE', 'SR:READ', 'SR:UPDATE', 'SR:DELETE'], permissionsGrantedAt: {}, clientIds: ['client-1'] } as any
 const requester = { id: 'user-1', roles: [], permissions: ['SR:CREATE', 'SR:UPDATE_SELF'], permissionsGrantedAt: {}, clientIds: ['client-1'] } as any
-const viewer = { id: 'viewer', roles: [], permissions: ['SR:READ'], permissionsGrantedAt: {}, clientIds: ['client-1'] } as any
+
 const noPerm = { id: 'user-2', roles: [], permissions: [], permissionsGrantedAt: {}, clientIds: ['client-1'] } as any
 
 describe('SRPolicy', () => {

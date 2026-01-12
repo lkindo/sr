@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
@@ -13,7 +12,7 @@ const roleAssignSchema = z.object({
 // POST /api/users/[id]/roles - 사용자에게 역할 할당 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(async (
   request: NextRequest,
-  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 

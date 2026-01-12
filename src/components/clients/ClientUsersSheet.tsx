@@ -74,7 +74,7 @@ export function ClientUsersSheet({
       // UserClient 구조에서 user 정보 추출
       const usersList = data.users?.map((uc: any) => uc.user) || [];
       setUsers(usersList);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "사용자 목록을 불러오는데 실패했습니다.",
@@ -98,7 +98,7 @@ export function ClientUsersSheet({
       });
       // Refresh list
       fetchUsers();
-    } catch (e) {
+    } catch {
       toast({
         title: "오류",
         description: "사용자 삭제에 실패했습니다.",

@@ -7,7 +7,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   MemoryRateLimiter,
-  RateLimitConfig,
   RateLimitResult,
   getClientIdentifier,
   rateLimiters,

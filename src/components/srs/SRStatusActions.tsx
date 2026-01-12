@@ -130,7 +130,7 @@ export function SRStatusActions({
                 );
 
             case "INTAKE":
-
+                return null;
             case "IN_PROGRESS":
                 // 진행중 상태: 완료 처리, 보류
                 if (!canManage) return null;

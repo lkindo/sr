@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Clock, Filter, CheckCircle, XCircle, AlertCircle, FileText } from "lucide-react";
+import { Clock, Filter, AlertCircle, FileText } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CreateSRDialog } from "@/components/srs/CreateSRDialog";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";

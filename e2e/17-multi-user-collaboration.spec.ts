@@ -19,14 +19,7 @@ const authFiles = {
   engineer: path.join(__dirname, '../playwright/.auth/engineer.json'),
 };
 
-// 헬퍼 함수: 로그인 상태 전환
-async function switchUser(page: Page, role: 'client' | 'manager' | 'engineer') {
-  const context = page.context();
-  await context.clearCookies();
-  // 인증 상태 파일이 있다면 적용
-  // Note: Playwright에서는 런타임에 storageState를 변경할 수 없으므로,
-  // 각 역할별로 새로운 브라우저 컨텍스트를 사용해야 합니다.
-}
+
 
 test.describe('다중 사용자 협업 워크플로우', () => {
   let srId: string;
@@ -35,7 +28,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
   test.describe.configure({ mode: 'serial' });
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async ({ }, testInfo) => {
+  test.beforeEach(async (_args, testInfo) => {
     if (testInfo.title !== '1. CLIENT: SR 생성' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }
@@ -430,13 +423,13 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 });
 
 test.describe('협업 시나리오 - 변형 케이스', () => {
-  test('동시 댓글 작성 및 충돌 방지', async ({ browser }) => {
+  test('동시 댓글 작성 및 충돌 방지', async ({ browser: _browser }) => {
     // 이 테스트는 동시성 처리를 확인합니다.
     // 현재는 스킵하고, 추후 구현합니다.
     test.skip();
   });
 
-  test('담당자 부재 시 재배정', async ({ browser }) => {
+  test('담당자 부재 시 재배정', async ({ browser: _browser }) => {
     // 이 테스트는 담당자 변경 시나리오를 확인합니다.
     // 추후 구현합니다.
     test.skip();

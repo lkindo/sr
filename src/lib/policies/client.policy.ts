@@ -45,7 +45,7 @@ export class ClientPolicy {
   /**
    * 고객사 수정 권한 확인
    */
-  canUpdate(user: AuthenticatedUser, client: Client): boolean {
+  canUpdate(user: AuthenticatedUser, _client: Client): boolean {
     return (
       user.roles.includes("ADMIN") ||
       hasPermissionFlag(user, PERMISSIONS.CLIENT.UPDATE)

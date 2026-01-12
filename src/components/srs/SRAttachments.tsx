@@ -40,10 +40,10 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
       if (!response.ok) throw new Error("Failed to fetch attachments");
       const data = await response.json();
 
-      console.log("📎 [SRAttachments] 조회된 첨부파일:", data);
+
       setAttachments(data || []);
-    } catch (error) {
-      console.error("❌ [SRAttachments] 첨부파일 조회 실패:", error);
+    } catch {
+
       toast({
         title: "오류",
         description: "첨부파일을 불러오는데 실패했습니다.",
@@ -133,7 +133,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
         title: "성공",
         description: "파일이 삭제되었습니다.",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "파일 삭제에 실패했습니다.",
@@ -249,7 +249,6 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                         window.URL.revokeObjectURL(url);
                         document.body.removeChild(a);
                       } catch (e) {
-                        console.error("Download failed", e);
                         window.open(attachment.fileUrl, "_blank");
                       }
                     }}

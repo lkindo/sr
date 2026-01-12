@@ -89,10 +89,10 @@ if (process.env.NODE_ENV === 'development' && process.env.VITEST !== 'true') {
         try {
           const m = getCacheMetrics()
           logger.info(`[Cache][Metrics] hit=${m.hit} miss=${m.miss} set=${m.set} invalidate=${m.invalidate}`)
-        } catch { }
+        } catch { /* ignore */ }
       }, Math.max(5000, intervalMs))
       g.__sr_cache_metrics_logger_started__ = true
-    } catch { }
+    } catch { /* ignore */ }
   }
 }
 

@@ -4,6 +4,7 @@ import SRCreatedEmail from "@/emails/SRCreatedEmail";
 import SRStatusChangedEmail from "@/emails/SRStatusChangedEmail";
 import SRAssignedEmail from "@/emails/SRAssignedEmail";
 import { getAppUrl } from "@/lib/app-url";
+import { logger } from "@/lib/logger";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
@@ -36,7 +37,7 @@ export async function sendSRCreatedEmail({
   requesterEmail,
 }: SendSRCreatedEmailParams) {
   if (!resend) {
-    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
     return null;
   }
 
@@ -64,14 +65,14 @@ export async function sendSRCreatedEmail({
     });
 
     if (error) {
-      console.error("Failed to send SR created email:", error);
+      logger.error("Failed to send SR created email:", error as Error);
       throw new Error(error.message);
     }
 
-    console.log("SR created email sent:", data);
+    logger.info("SR created email sent:", { data });
     return data;
   } catch (error) {
-    console.error("Error sending SR created email:", error);
+    logger.error("Error sending SR created email:", error as Error);
     throw error;
   }
 }
@@ -100,7 +101,7 @@ export async function sendSRStatusChangedEmail({
   clientName,
 }: SendSRStatusChangedEmailParams) {
   if (!resend) {
-    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
     return null;
   }
 
@@ -128,14 +129,14 @@ export async function sendSRStatusChangedEmail({
     });
 
     if (error) {
-      console.error("Failed to send SR status changed email:", error);
+      logger.error("Failed to send SR status changed email:", error as Error);
       throw new Error(error.message);
     }
 
-    console.log("SR status changed email sent:", data);
+    logger.info("SR status changed email sent:", { data });
     return data;
   } catch (error) {
-    console.error("Error sending SR status changed email:", error);
+    logger.error("Error sending SR status changed email:", error as Error);
     throw error;
   }
 }
@@ -164,7 +165,7 @@ export async function sendSRAssignedEmail({
   assignedByName,
 }: SendSRAssignedEmailParams) {
   if (!resend) {
-    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
     return null;
   }
 
@@ -192,14 +193,14 @@ export async function sendSRAssignedEmail({
     });
 
     if (error) {
-      console.error("Failed to send SR assigned email:", error);
+      logger.error("Failed to send SR assigned email:", error as Error);
       throw new Error(error.message);
     }
 
-    console.log("SR assigned email sent:", data);
+    logger.info("SR assigned email sent:", { data });
     return data;
   } catch (error) {
-    console.error("Error sending SR assigned email:", error);
+    logger.error("Error sending SR assigned email:", error as Error);
     throw error;
   }
 }
@@ -223,7 +224,7 @@ export async function sendCommentNotificationEmail({
   commentContent,
 }: SendCommentNotificationEmailParams) {
   if (!resend) {
-    console.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
     return null;
   }
 
@@ -250,14 +251,14 @@ export async function sendCommentNotificationEmail({
     });
 
     if (error) {
-      console.error("Failed to send comment notification email:", error);
+      logger.error("Failed to send comment notification email:", error as Error);
       throw new Error(error.message);
     }
 
-    console.log("Comment notification email sent:", data);
+    logger.info("Comment notification email sent:", { data });
     return data;
   } catch (error) {
-    console.error("Error sending comment notification email:", error);
+    logger.error("Error sending comment notification email:", error as Error);
     throw error;
   }
 }

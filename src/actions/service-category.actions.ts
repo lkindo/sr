@@ -3,7 +3,7 @@
 import { ServiceCategoryService } from "@/services/service-category.service";
 import { Result, ok } from "@/lib/result";
 import { errorToResult } from "@/lib/errors";
-import type { ServiceCategory } from "@prisma/client";
+
 
 type ServiceCategoryList = Awaited<ReturnType<ServiceCategoryService['getAll']>>;
 

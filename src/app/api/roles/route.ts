@@ -6,7 +6,7 @@ import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 export const runtime = 'nodejs';
 
 // GET /api/roles - 모든 역할 조회 (Rate Limit: 표준)
-export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
+export const GET = withAuthAndRateLimit(async (_request: NextRequest) => {
   const roleService = new RoleService();
   const roles = await roleService.getAllRoles();
 

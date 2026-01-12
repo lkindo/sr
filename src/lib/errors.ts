@@ -117,7 +117,7 @@ export class DuplicateError extends ServiceError {
  * ServiceError를 Result 타입으로 변환하는 헬퍼 함수
  */
 
-export function errorToResult<T>(error: unknown): { success: false; error: string; code?: string } {
+export function errorToResult(error: unknown): { success: false; error: string; code?: string } {
   if (error instanceof ServiceError) {
     // ServiceError는 비즈니스 로직상의 예외이므로 warn 레벨로 로깅 (시스템 에러인 경우 error 레벨)
     if (error.statusCode >= 500) {

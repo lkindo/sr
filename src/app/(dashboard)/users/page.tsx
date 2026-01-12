@@ -1,17 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, UserCheck, UserX, Shield, Filter, List, Grid, CheckSquare, Square, Building2 } from "lucide-react";
+import { Plus, Search, UserCheck, UserX, Shield, List, Grid, CheckSquare, Square, Building2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+
 import {
   Table,
   TableBody,
@@ -145,6 +139,7 @@ export default function UsersPage() {
   });
 
   const { toast } = useToast();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { hasRole, hasAnyRole } = usePermissions();
   const { data: session, update } = useSession();
 

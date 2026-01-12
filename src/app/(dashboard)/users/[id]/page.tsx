@@ -114,7 +114,7 @@ export default function UserDetailPage() {
       }
       const data = await response.json();
       setUser(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "사용자 정보를 불러오는데 실패했습니다.",
@@ -281,7 +281,7 @@ export default function UserDetailPage() {
                     });
 
                     router.push("/users");
-                  } catch (e) {
+                  } catch {
                     toast({
                       title: "삭제 실패",
                       description: "사용자 삭제에 실패했습니다.",

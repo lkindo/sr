@@ -2,7 +2,6 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 import prisma from "@/lib/prisma";
-import type { User } from "@prisma/client";
 import { authConfig } from "./auth.config";
 
 // Prisma 클라이언트가 초기화되었는지 확인하는 헬퍼 함수

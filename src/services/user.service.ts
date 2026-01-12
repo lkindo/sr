@@ -7,7 +7,7 @@ import { hash, compare } from "bcryptjs";
 import { userUpdateSchema } from "@/lib/schemas";
 import { z } from "zod";
 import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
-import type { User, Role, Permission } from "@prisma/client";
+import type { User } from "@prisma/client";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 

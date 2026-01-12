@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SRService } from '@/services/sr.service';
-import { UserService } from '@/services/user.service';
-import { PermissionService } from '@/services/permission.service';
-import { createSRAction, updateSRAction } from '@/actions/sr.actions';
+
 
 // 통합 테스트: SR 생성부터 수정까지의 전체 플로우
 describe('SR Flow Integration', () => {
@@ -12,13 +9,8 @@ describe('SR Flow Integration', () => {
 
   it('SR 생성 플로우가 올바르게 동작해야 함', async () => {
     // 1. 사용자 인증 확인
-    const mockUser = {
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      roles: ['USER'],
-      permissions: ['sr:create'],
-    };
+    // 1. 사용자 인증 확인
+    // mockUser removed as it was unused
 
     // 2. SR 생성
     const formData = new FormData();
@@ -58,15 +50,8 @@ describe('SR Flow Integration', () => {
   describe('전체 SR 생명주기 워크플로우', () => {
     it('SR 생성부터 완료까지 전체 워크플로우가 정상 동작해야 함', async () => {
       // 1. CLIENT_USER가 SR 생성
-      const clientUser = {
-        id: 'client1',
-        email: 'client@example.com',
-        name: 'Client User',
-        image: null,
-        roles: ['CLIENT_USER'],
-        permissions: ['sr:create'],
-        clientIds: ['client1'],
-      };
+      // 1. CLIENT_USER가 SR 생성
+      // clientUser removed as it was unused
 
       const srData = {
         title: 'Complete Workflow Test',
@@ -81,19 +66,13 @@ describe('SR Flow Integration', () => {
       const createdSR = { ...srData, id: 'sr-test', status: 'REQUESTED' };
 
       // 2. MANAGER가 SR을 INTAKE 상태로 변경
-      const managerUser = {
-        id: 'manager1',
-        roles: ['MANAGER'],
-        permissions: ['sr:update'],
-      };
+      // 2. MANAGER가 SR을 INTAKE 상태로 변경
+      // managerUser removed as it was unused
       const intakeSR = { ...createdSR, status: 'INTAKE' };
 
       // 3. ENGINEER가 SR을 IN_PROGRESS로 변경
-      const engineerUser = {
-        id: 'engineer1',
-        roles: ['ENGINEER'],
-        permissions: ['sr:update'],
-      };
+      // 3. ENGINEER가 SR을 IN_PROGRESS로 변경
+      // engineerUser removed as it was unused
       const inProgressSR = { ...intakeSR, status: 'IN_PROGRESS', assigneeId: 'engineer1' };
 
       // 4. ENGINEER가 SR을 COMPLETED로 변경
@@ -111,27 +90,18 @@ describe('SR Flow Integration', () => {
   describe('다중 사용자 협업 시나리오', () => {
     it('여러 사용자가 동시에 다른 SR에 작업할 수 있어야 함', async () => {
       // User 1: SR1을 생성하고 진행
-      const user1 = {
-        id: 'user1',
-        roles: ['CLIENT_USER'],
-        permissions: ['sr:create'],
-      };
+      // User 1: SR1을 생성하고 진행
+      // user1 removed as it was unused
       const sr1 = { id: 'sr1', title: 'User 1 SR', status: 'REQUESTED', requesterId: 'user1' };
 
       // User 2: SR2를 생성하고 진행
-      const user2 = {
-        id: 'user2',
-        roles: ['CLIENT_USER'],
-        permissions: ['sr:create'],
-      };
+      // User 2: SR2를 생성하고 진행
+      // user2 removed as it was unused
       const sr2 = { id: 'sr2', title: 'User 2 SR', status: 'REQUESTED', requesterId: 'user2' };
 
       // Manager: 두 SR을 모두 처리
-      const manager = {
-        id: 'manager1',
-        roles: ['MANAGER'],
-        permissions: ['sr:update'],
-      };
+      // Manager: 두 SR을 모두 처리
+      // manager removed as it was unused
 
       // SR1과 SR2가 독립적으로 진행됨을 검증
       expect(sr1.id).not.toBe(sr2.id);
@@ -171,7 +141,7 @@ describe('SR Flow Integration', () => {
           success = true;
           const createdSR = { ...srData, id: 'sr-retry', status: 'REQUESTED' };
           expect(createdSR.status).toBe('REQUESTED');
-        } catch (error) {
+        } catch {
           attempt++;
         }
       }
@@ -197,7 +167,7 @@ describe('SR Flow Integration', () => {
 
         // 트랜잭션 중 에러 발생
         throw new Error('Transaction failed');
-      } catch (error) {
+      } catch {
         // 롤백: 원래 상태로 복원
         currentSR = { ...originalSR };
       }

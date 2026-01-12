@@ -50,7 +50,7 @@ export default function OrganizationPage() {
       const result = await response.json();
       const clientData = Array.isArray(result) ? result : (result.data || []);
       setClients(clientData);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "고객사 목록을 불러오는데 실패했습니다.",
@@ -130,7 +130,7 @@ export default function OrganizationPage() {
         title: "성공",
         description: `${client.name}이(가) ${client.isActive ? "비활성화" : "활성화"}되었습니다.`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "상태 변경 중 오류가 발생했습니다.",
@@ -168,7 +168,7 @@ export default function OrganizationPage() {
         title: "성공",
         description: "사용자 상태가 변경되었습니다.",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "상태 변경 중 오류가 발생했습니다.",
@@ -178,11 +178,11 @@ export default function OrganizationPage() {
   };
 
   // 드래그 앤 드롭 핸들러
-  const handleDragStart = (event: DragStartEvent) => {
+  const handleDragStart = (_event: DragStartEvent) => {
     // 드래그 시작 시 추가 처리 (필요시)
   };
 
-  const handleDragOver = (event: DragOverEvent) => {
+  const handleDragOver = (_event: DragOverEvent) => {
     // 드래그 오버 시 추가 처리 (필요시)
   };
 

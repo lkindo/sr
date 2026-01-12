@@ -1,9 +1,10 @@
 import { put, del, list } from "@vercel/blob";
+import { logger } from "@/lib/logger";
 
 const READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
 if (!READ_WRITE_TOKEN) {
-  console.warn(
+  logger.warn(
     "[storage] BLOB_READ_WRITE_TOKEN is not set. Blob operations will fail at runtime."
   );
 }

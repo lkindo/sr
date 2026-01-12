@@ -30,7 +30,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
     cacheKey,
     async () => {
       // 역할별 필터링 조건 설정
-      let baseWhere: Prisma.SRWhereInput = {};
+      const baseWhere: Prisma.SRWhereInput = {};
       if (!isAdminManagerEngineer) {
         // 고객사 사용자는 자신의 고객사 SR만 조회
         const userClients = await prisma.userClient.findMany({

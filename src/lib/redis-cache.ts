@@ -40,7 +40,7 @@ function initializeRedis(): RedisClient | null {
         token: process.env.UPSTASH_REDIS_REST_TOKEN,
       }) as RedisClient;
     }
-  } catch (error) {
+  } catch {
     // Redis 패키지가 없거나 초기화 실패 시 무시 (선택적 기능)
     return null;
   }
@@ -110,13 +110,13 @@ export async function getCachedData<T>(
     const data = await fetcher();
 
     // 캐시 저장 (비동기, 에러가 나도 데이터는 반환)
-    redisClient.setex(key, ttl, JSON.stringify(data)).catch((error) => {
-      console.warn(`캐시 저장 실패 (${key}):`, error);
+    redisClient.setex(key, ttl, JSON.stringify(data)).catch(() => {
+      // ignore
     });
 
     return data;
   } catch (error) {
-    console.warn(`캐시 조회 실패 (${key}):`, error);
+
     // 캐시 실패 시 직접 fetcher 실행
     return fetcher();
   }
@@ -134,8 +134,8 @@ export async function invalidateCache(key: string): Promise<void> {
 
   try {
     await redisClient.del(key);
-  } catch (error) {
-    console.warn(`캐시 무효화 실패 (${key}):`, error);
+  } catch {
+    // ignore
   }
 }
 
@@ -166,8 +166,8 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     if (keys.length > 0) {
       await redisClient.del(...keys);
     }
-  } catch (error) {
-    console.warn(`캐시 패턴 무효화 실패 (${pattern}):`, error);
+  } catch {
+    // ignore
   }
 }
 
@@ -183,8 +183,8 @@ export async function invalidateCaches(keys: string[]): Promise<void> {
 
   try {
     await redisClient.del(...keys);
-  } catch (error) {
-    console.warn(`캐시 무효화 실패:`, error);
+  } catch {
+    // ignore
   }
 }
 
@@ -195,7 +195,7 @@ export async function invalidateCachePatterns(patterns: string[]): Promise<void>
 export function scheduleInvalidateCachePatterns(patterns: string[], delayMs = 0) {
   setTimeout(() => {
     invalidateCachePatterns(patterns).catch((error) => {
-      console.warn("Scheduled cache invalidation failed:", error);
+      // ignore
     });
   }, Math.max(0, delayMs));
 }
@@ -218,8 +218,8 @@ export async function setCache<T>(
 
   try {
     await redisClient.setex(key, ttl, JSON.stringify(data));
-  } catch (error) {
-    console.warn(`캐시 저장 실패 (${key}):`, error);
+  } catch {
+    // ignore
   }
 }
 
@@ -237,7 +237,7 @@ export async function getCache<T>(key: string): Promise<T | null> {
   try {
     return await redisClient.get<T>(key);
   } catch (error) {
-    console.warn(`캐시 조회 실패 (${key}):`, error);
+
     return null;
   }
 }
@@ -257,7 +257,7 @@ export async function existsCache(key: string): Promise<boolean> {
     const result = await redisClient.exists(key);
     return result === 1;
   } catch (error) {
-    console.warn(`캐시 존재 확인 실패 (${key}):`, error);
+
     return false;
   }
 }
@@ -276,7 +276,7 @@ export async function getCacheTTL(key: string): Promise<number> {
   try {
     return await redisClient.ttl(key);
   } catch (error) {
-    console.warn(`캐시 TTL 조회 실패 (${key}):`, error);
+
     return -2;
   }
 }

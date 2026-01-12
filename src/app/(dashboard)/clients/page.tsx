@@ -1,16 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, ChevronDown, ChevronRight, Search, Filter } from "lucide-react";
+import { Plus, ChevronDown, ChevronRight, Search } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+
 import {
   Table,
   TableBody,
@@ -99,7 +93,7 @@ export default function ClientsPage() {
         total: result.meta.total,
         totalPages: result.meta.totalPages,
       }));
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "고객사 목록을 불러오는데 실패했습니다.",
@@ -151,7 +145,7 @@ export default function ClientsPage() {
             }));
           }
         } catch (error) {
-          console.error("사용자 데이터 로드 실패:", error);
+          // console.error("사용자 데이터 로드 실패");
         }
       }
     }

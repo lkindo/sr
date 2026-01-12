@@ -25,7 +25,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
   test.describe.configure({ mode: 'serial' });
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async ({ }, testInfo) => {
+  test.beforeEach(async (_args, testInfo) => {
     if (testInfo.title !== '1. MANAGER: SR 생성 및 초기 담당자 배정' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }

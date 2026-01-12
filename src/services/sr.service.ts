@@ -1,4 +1,4 @@
-import { User, Prisma, SR } from "@prisma/client";
+import { Prisma, SR } from "@prisma/client";
 import { z } from "zod";
 import { SRRepository } from "@/repositories/sr.repository";
 import { SRActivityRepository } from "@/repositories/sr-activity.repository";
@@ -17,6 +17,7 @@ import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
 import { backgroundTask } from "@/lib/wait-until";
 import { getSRUrl } from "@/lib/app-url";
+import { logger } from "@/lib/logger";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -172,7 +173,7 @@ export class SRService {
     }
 
     // Mattermost 알림 발송 (Vercel에서 응답 후에도 완료 보장)
-    console.log(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
+    logger.info(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
     backgroundTask(
       this.sendCreationNotification(result),
       `Mattermost notification for ${result.srNumber}`
@@ -220,7 +221,7 @@ export class SRService {
   }
 
   private async sendCreationNotification(sr: SRDetails) {
-    console.log(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
+    logger.info(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
     const { sendMattermostNotification } = await import("@/lib/mattermost");
 
     const srUrl = getSRUrl(sr.id);

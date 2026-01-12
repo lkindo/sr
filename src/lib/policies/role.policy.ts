@@ -29,7 +29,7 @@ export class RolePolicy {
    * - ADMIN 역할
    * - ROLE:READ 권한 보유
    */
-  canRead(user: AuthenticatedUser, role?: Role): boolean {
+  canRead(user: AuthenticatedUser, _role?: Role): boolean {
     return (
       user.roles.includes("ADMIN") ||
       hasPermissionFlag(user, PERMISSIONS.ROLE.READ)

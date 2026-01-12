@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useState } from "react";
+
 import {
   Collapsible,
   CollapsibleContent,

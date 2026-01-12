@@ -41,7 +41,7 @@ interface UseIntakeFormOptions {
   onSuccess?: () => void;
 }
 
-export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
+export function useIntakeForm({ srId }: UseIntakeFormOptions) {
   const [sr, setSr] = useState<SRDetails | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,9 +94,9 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
           const usersResult = await getSRHandlersForSelection();
           if (usersResult.success && usersResult.data) {
             setUsers(usersResult.data);
-            console.log("로드된 사용자 목록:", usersResult.data.length, "명");
+
           } else {
-            console.error("사용자 목록 조회 실패:", usersResult.success === false ? usersResult.error : "알 수 없는 오류");
+
             setUsers([]);
             toast({
               title: "경고",
@@ -105,7 +105,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
             });
           }
         } catch (error) {
-          console.error("사용자 목록 조회 중 오류:", error);
+
           setUsers([]);
           toast({
             title: "경고",
@@ -141,7 +141,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
           form.setValue("estimatedCompletionDate", defaultDate);
         }
       } catch (error) {
-        console.error("Error fetching data:", error);
+
         toast({
           title: "오류",
           description: "데이터를 불러오는데 실패했습니다.",
@@ -171,7 +171,7 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
     try {
       setSubmitting(true);
 
-      console.log("Submitting intake:", { url, method, requestBody, isEditMode });
+
 
       const response = await fetch(url, {
         method,
@@ -181,21 +181,21 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
         body: JSON.stringify(requestBody),
       });
 
-      console.log("Response status:", response.status, response.statusText);
+
 
       if (!response.ok) {
         let errorMessage = isEditMode ? "수정에 실패했습니다" : "접수 처리에 실패했습니다";
         try {
           // 응답 본문을 텍스트로 먼저 읽기
           const responseText = await response.text();
-          console.error("Error response text:", responseText);
+
 
           if (responseText) {
             try {
               const errorData = JSON.parse(responseText);
-              console.error("Error response data:", errorData);
+
               errorMessage = errorData.error || errorData.message || errorMessage;
-            } catch (jsonError) {
+            } catch {
               // JSON이 아닌 경우 텍스트를 그대로 사용
               errorMessage = responseText || errorMessage;
             }
@@ -203,23 +203,22 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
             // 응답 본문이 비어있는 경우
             errorMessage = `서버 오류 (${response.status}): ${response.statusText || "알 수 없는 오류"}`;
           }
-        } catch (parseError) {
-          console.error("Failed to read error response:", parseError);
+        } catch {
+          // ignore
+
           // 응답 읽기 실패 시 상태 코드로 메시지 생성
           errorMessage = `서버 오류 (${response.status}): ${response.statusText || "응답을 읽을 수 없습니다"}`;
         }
         throw new Error(errorMessage);
       }
 
-      let data;
       try {
-        data = await response.json();
-        console.log("Success response:", data);
-      } catch (jsonError) {
-        console.warn("Failed to parse JSON response, but request was successful:", jsonError);
+        await response.json();
+      } catch {
+        // ignore
       }
 
-      console.log("Request successful, navigating to /srs...");
+
 
       toast({
         title: "성공",
@@ -239,15 +238,6 @@ export function useIntakeForm({ srId, onSuccess }: UseIntakeFormOptions) {
       // 성공 시에는 submitting을 false로 설정하지 않음 (페이지 이동 중이므로)
       // 페이지가 이동되면서 컴포넌트가 언마운트되므로 상태 업데이트 불필요
     } catch (error: any) {
-      console.error("Error submitting intake:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        url,
-        method,
-        requestBody,
-        isEditMode,
-      });
 
       const errorMessage = error instanceof Error
         ? error.message

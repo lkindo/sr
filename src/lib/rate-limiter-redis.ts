@@ -8,6 +8,7 @@
  */
 
 import { Redis } from '@upstash/redis';
+import { logger } from '@/lib/logger';
 
 export interface RateLimiterConfig {
   /**
@@ -129,7 +130,7 @@ export class RedisRateLimiter implements RateLimiter {
       };
     } catch (error) {
       // Redis 오류 시 요청 허용 (Fail-open)
-      console.error('Redis Rate Limiter error:', error);
+      logger.error('Redis Rate Limiter error:', error as Error);
       return {
         allowed: true,
         remaining: this.config.maxRequests,

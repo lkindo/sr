@@ -1,4 +1,5 @@
 
+/* eslint-disable no-console */
 import 'dotenv/config';
 import prisma from './src/lib/prisma';
 

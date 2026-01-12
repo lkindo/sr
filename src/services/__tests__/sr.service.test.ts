@@ -171,7 +171,7 @@ describe('SRService', () => {
 
     it('should return filtered count', async () => {
       mockSRRepository.count.mockResolvedValue(3);
-      const filter = { where: { status: 'IN_PROGRESS' } };
+      const filter = { where: { status: 'IN_PROGRESS' as const } };
 
       const result = await srService.countSRs(filter);
 

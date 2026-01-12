@@ -51,7 +51,7 @@ test.describe('역할 상호 배타성 테스트', () => {
           console.log(`✅ 테스트 사용자 ID: ${testUserId}`);
         }
       }
-    } catch (e) {
+    } catch {
       console.log('ℹ️ 테스트 셋업 중 오류 발생');
     }
   });

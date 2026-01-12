@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withAuth, withAuthAndRateLimit, AuthenticatedContext } from './auth-wrapper';
 import { apiResponse } from './api-response';
@@ -109,10 +109,11 @@ async function checkPermission(userId: string, permission?: string): Promise<voi
  * });
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function createCRUDHandler<
   TService extends CRUDService<any, any, any>,
-  T = any,
-  TCreateInput = any,
+  _T = any,
+  _TCreateInput = any,
   TUpdateInput = any
 >(config: CRUDConfig<TService>) {
   const {

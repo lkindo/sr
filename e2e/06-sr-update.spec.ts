@@ -50,7 +50,7 @@ test.describe.skip('SR 수정', () => {
 
     try {
       await expect(titleLocator).toBeVisible({ timeout: 5000 });
-    } catch (e) {
+    } catch {
       console.log('Title not updated immediately, reloading...');
       await page.reload();
       await expect(titleLocator).toBeVisible({ timeout: 10000 });

@@ -114,7 +114,7 @@ export function EditSRDialog({
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  // const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
 
   // CLIENT_ADMIN, CLIENT_USER인지 확인
@@ -171,7 +171,7 @@ export function EditSRDialog({
         setExistingAttachments(data.attachments || []);
       }
     } catch (error) {
-      console.error("첨부 파일 로드 실패:", error);
+      // console.error("첨부 파일 로드 실패");
     }
   }, []);
 
@@ -216,7 +216,7 @@ export function EditSRDialog({
     }
     fetchClients();
     fetchCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [open, srId]);
 
   const handleDeleteAttachment = async (attachmentId: string) => {
@@ -241,7 +241,7 @@ export function EditSRDialog({
         description: "파일이 삭제되었습니다.",
       });
     } catch (error) {
-      console.error("파일 삭제 오류:", error);
+
       toast({
         title: "오류",
         description: error instanceof Error ? error.message : "파일 삭제에 실패했습니다.",
@@ -274,7 +274,7 @@ export function EditSRDialog({
         throw new Error("Failed to upload attachments");
       }
     } catch (error) {
-      console.error("첨부파일 업로드 실패:", error);
+
       toast({
         title: "경고",
         description: "SR은 수정되었으나 첨부파일 업로드에 실패했습니다.",

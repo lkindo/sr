@@ -1,13 +1,12 @@
 "use server";
 
-import { z } from "zod";
 import { UserService } from "@/services/user.service";
 import { userUpdateSchema } from "@/lib/schemas";
 import { Result, ok, fail } from "@/lib/result";
-import { errorToResult, UnauthorizedError } from "@/lib/errors";
+import { errorToResult } from "@/lib/errors";
 import { getFormDataValue } from "@/lib/form-data-parser";
 import { authenticateAndAuthorize, validateWithSchema, getAuthenticatedSession } from "@/lib/action-helpers";
-import type { User, Role, Permission } from "@prisma/client";
+import type { User } from "@prisma/client";
 
 
 
