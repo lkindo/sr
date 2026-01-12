@@ -14,8 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CreateSRDialog } from "@/components/srs/CreateSRDialog";
 import { getDueDateStatus } from "@/lib/date-utils";
-import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { useQueryClient } from "@tanstack/react-query";
 import { SRService } from "@/services/sr.service";
 
 // These types and constants can be moved to a shared file if needed
@@ -65,7 +63,7 @@ export function SRsDataTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
-  const queryClient = useQueryClient();
+
   const { hasAnyRole } = usePermissions();
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
@@ -75,7 +73,7 @@ export function SRsDataTable({
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Read state from URL search params, with defaults
-  const page = searchParams.get("page") ?? "1";
+
   const itemsPerPage = searchParams.get("itemsPerPage") ?? "20";
   const sort = searchParams.get("sort") ?? "createdAt.desc";
   const [sortField, sortOrder] = sort.split(".") as [SortField, SortOrder];
@@ -114,9 +112,7 @@ export function SRsDataTable({
     router.push(`${pathname}?${createQueryString({ sort: `${field}.${newOrder}` })}`);
   };
 
-  const handlePagination = (newPage: number) => {
-    router.push(`${pathname}?${createQueryString({ page: newPage })}`);
-  };
+
 
   const handleItemsPerPageChange = (value: string) => {
     router.push(`${pathname}?${createQueryString({ itemsPerPage: value, page: 1 })}`);
@@ -147,10 +143,7 @@ export function SRsDataTable({
     return srs.filter(sr => sr.status === 'REQUESTED').length;
   }, [srs]);
 
-  const myAssignedCount = useMemo(() => {
-    if (!session?.user?.id) return 0;
-    return srs.filter(sr => sr.assigneeId === session.user.id).length;
-  }, [srs, session]);
+
 
   const urgentCount = useMemo(() => {
     return srs.filter(sr => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;

@@ -13,6 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -114,7 +124,7 @@ export function EditSRDialog({
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  // const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
 
   // CLIENT_ADMIN, CLIENT_USER인지 확인
@@ -171,7 +181,7 @@ export function EditSRDialog({
         setExistingAttachments(data.attachments || []);
       }
     } catch (error) {
-      console.error("첨부 파일 로드 실패:", error);
+      // console.error("첨부 파일 로드 실패");
     }
   }, []);
 
@@ -216,13 +226,20 @@ export function EditSRDialog({
     }
     fetchClients();
     fetchCategories();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [open, srId]);
 
-  const handleDeleteAttachment = async (attachmentId: string) => {
-    // TODO: 추후 모달 확인으로 대체
-    // eslint-disable-next-line no-alert
-    if (!confirm("이 파일을 삭제하시겠습니까?")) return;
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+
+  const handleDeleteAttachmentClick = (attachmentId: string) => {
+    setFileToDelete(attachmentId);
+  };
+
+  const executeDeleteAttachment = async () => {
+    if (!fileToDelete) return;
+
+    const attachmentId = fileToDelete;
+    setFileToDelete(null);
 
     try {
       const response = await fetch(`/api/attachments/${attachmentId}`, {
@@ -241,7 +258,7 @@ export function EditSRDialog({
         description: "파일이 삭제되었습니다.",
       });
     } catch (error) {
-      console.error("파일 삭제 오류:", error);
+
       toast({
         title: "오류",
         description: error instanceof Error ? error.message : "파일 삭제에 실패했습니다.",
@@ -274,7 +291,7 @@ export function EditSRDialog({
         throw new Error("Failed to upload attachments");
       }
     } catch (error) {
-      console.error("첨부파일 업로드 실패:", error);
+
       toast({
         title: "경고",
         description: "SR은 수정되었으나 첨부파일 업로드에 실패했습니다.",
@@ -538,7 +555,7 @@ export function EditSRDialog({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteAttachment(attachment.id)}
+                            onClick={() => handleDeleteAttachmentClick(attachment.id)}
                             disabled={loading}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -580,6 +597,23 @@ export function EditSRDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>파일 삭제 확인</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 이 첨부파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeleteAttachment} className="bg-destructive hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

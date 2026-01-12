@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
-import { NotFoundError, BadRequestError, ValidationError, UnauthorizedError } from "@/lib/errors";
+import { NotFoundError, ValidationError, UnauthorizedError } from "@/lib/errors";
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "현재 비밀번호를 입력하세요."),

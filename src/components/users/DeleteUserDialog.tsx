@@ -38,7 +38,7 @@ export function DeleteUserDialog({
             setTimeout(() => {
                 onOpenChange(false);
             }, 100);
-        } catch (error) {
+        } catch {
             // 에러를 다시 throw하지 않고, 부모에서 이미 처리됨
             // 에러 발생 시 다이얼로그는 열린 상태 유지
         } finally {

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { SRService } from "@/services/sr.service";
 import { srUpdateSchema } from "@/lib/schemas";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
 import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
-import { Prisma } from "@prisma/client";
 import { withCache, isCacheAvailable } from "@/lib/cache";
 import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
 import { srDetailKey, SR_LIST_PREFIX, DASHBOARD_STATS_PREFIX, MY_REQUESTS_PREFIX, srListPatternForClient, srListPatternForStatus, srListPatternForPriority } from "@/lib/cache-keys";
@@ -18,7 +16,7 @@ export const runtime = 'nodejs';
 // GET /api/srs/[id] - SR 상세 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
   request: NextRequest,
-  { session, params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
+  { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;
 

@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client'
 const prismaClientSingleton = () => {
   // 빌드 타임에는 DATABASE_URL이 없을 수 있으므로 체크
   if (!process.env.DATABASE_URL) {
+    // eslint-disable-next-line no-console
     console.warn('DATABASE_URL is not set, Prisma client will not be initialized');
     return null;
   }
@@ -55,6 +56,7 @@ if (process.env.NODE_ENV === 'development' && prisma) {
       const duration = Date.now() - startedAt
       if (duration >= slowMs) {
         const line = `[Prisma][SlowQuery] ${(params.model ?? 'raw')}.${params.action} ${duration}ms`
+        // eslint-disable-next-line no-console
         console.warn(line)
         if (append) append(line)
       }

@@ -7,7 +7,7 @@ import { hash, compare } from "bcryptjs";
 import { userUpdateSchema } from "@/lib/schemas";
 import { z } from "zod";
 import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
-import type { User, Role, Permission } from "@prisma/client";
+import type { User, Prisma } from "@prisma/client";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
@@ -40,7 +40,7 @@ export class UserService {
   }, params?: {
     skip?: number;
     take?: number;
-    orderBy?: any;
+    orderBy?: Prisma.UserOrderByWithRelationInput;
   }): Promise<{ data: User[]; total: number }> {
     if (filters && Object.keys(filters).length > 0) {
       const [data, total] = await this.userRepository.findAllWithFilters(filters, params);

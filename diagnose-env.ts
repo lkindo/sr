@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { config } from 'dotenv';
 config();
 
@@ -7,11 +8,11 @@ function maskPassword(url: string | undefined) {
         // postgresql://user:password@host:port/db
         const match = url.match(/(postgresql:\/\/)([^:]+):([^@]+)@([^:]+):(\d+)(\/.*)/);
         if (match) {
-            const [_, protocol, user, pass, host, port, rest] = match;
+            const [_, protocol, user, _pass, host, port, rest] = match;
             return `${protocol}${user}:****@${host}:${port}${rest}`;
         }
         return 'INVALID_FORMAT';
-    } catch (e) {
+    } catch {
         return 'ERROR_PARSING';
     }
 }

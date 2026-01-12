@@ -61,7 +61,7 @@ export function AssignRolesDialog({
       if (!response.ok) throw new Error("Failed to fetch roles");
       const data = await response.json();
       setRoles(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "역할 목록을 불러오는데 실패했습니다.",
@@ -126,7 +126,7 @@ export function AssignRolesDialog({
         }
         // 2. 시스템 운영팀 역할 + 고객사 할당 충돌 에러 처리
         else if (error.assignedClients && error.assignedClients.length > 0) {
-          const clientNames = error.assignedClients.map((c: any) => c.name).join(', ');
+          const clientNames = error.assignedClients.map((c: { name: string }) => c.name).join(', ');
           toast({
             title: "역할 할당 제한",
             description: (

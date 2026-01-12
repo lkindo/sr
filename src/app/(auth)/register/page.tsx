@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Progress } from "@/components/ui/progress";
 import {
   Card,
   CardContent,
@@ -102,7 +101,7 @@ export default function RegisterPage() {
       if (!response.ok) throw new Error("Failed to fetch clients");
       const result = await response.json();
       setClients(Array.isArray(result) ? result : result.data || []);
-    } catch (error) {
+    } catch {
       console.error("고객사 목록 조회 실패:", error);
       setClients([]);
     } finally {
@@ -162,7 +161,7 @@ export default function RegisterPage() {
       } else {
         setError(result.error || "");
       }
-    } catch (error) {
+    } catch {
       setError("회원가입 중 오류가 발생했습니다.");
     } finally {
       setIsLoading(false);
@@ -195,286 +194,285 @@ export default function RegisterPage() {
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>오류</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          {success && (
-            <Alert className="border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100">
-              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <AlertTitle>성공</AlertTitle>
-              <AlertDescription>{success}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* 섹션 1: 기본 정보 */}
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">이름</Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="홍길동"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">이메일</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">비밀번호</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="최소 8자 이상"
-                required
-                disabled={isLoading}
-                value={password}
-                onChange={handlePasswordChange}
-              />
-
-              {/* 비밀번호 강도 표시기 */}
-              {password && (
-                <div className="space-y-2 mt-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">비밀번호 강도:</span>
-                    <span className={`font-medium ${
-                      passwordStrength.score === 100 ? 'text-green-600' :
-                      passwordStrength.score >= 60 ? 'text-blue-600' :
-                      passwordStrength.score >= 40 ? 'text-yellow-600' :
-                      'text-red-600'
-                    }`}>
-                      {passwordStrength.label}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-300 ${passwordStrength.color}`}
-                      style={{ width: `${passwordStrength.score}%` }}
-                    />
-                  </div>
-
-                  {/* 비밀번호 요구사항 체크리스트 */}
-                  <div className="grid grid-cols-1 gap-1 mt-2">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      {passwordStrength.checks.length ? (
-                        <Check className="h-3 w-3 text-green-600" />
-                      ) : (
-                        <X className="h-3 w-3 text-gray-400" />
-                      )}
-                      <span className={passwordStrength.checks.length ? 'text-green-600' : 'text-muted-foreground'}>
-                        최소 8자 이상
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      {passwordStrength.checks.uppercase ? (
-                        <Check className="h-3 w-3 text-green-600" />
-                      ) : (
-                        <X className="h-3 w-3 text-gray-400" />
-                      )}
-                      <span className={passwordStrength.checks.uppercase ? 'text-green-600' : 'text-muted-foreground'}>
-                        대문자 포함
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      {passwordStrength.checks.lowercase ? (
-                        <Check className="h-3 w-3 text-green-600" />
-                      ) : (
-                        <X className="h-3 w-3 text-gray-400" />
-                      )}
-                      <span className={passwordStrength.checks.lowercase ? 'text-green-600' : 'text-muted-foreground'}>
-                        소문자 포함
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      {passwordStrength.checks.number ? (
-                        <Check className="h-3 w-3 text-green-600" />
-                      ) : (
-                        <X className="h-3 w-3 text-gray-400" />
-                      )}
-                      <span className={passwordStrength.checks.number ? 'text-green-600' : 'text-muted-foreground'}>
-                        숫자 포함
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      {passwordStrength.checks.special ? (
-                        <Check className="h-3 w-3 text-green-600" />
-                      ) : (
-                        <X className="h-3 w-3 text-gray-400" />
-                      )}
-                      <span className={passwordStrength.checks.special ? 'text-green-600' : 'text-muted-foreground'}>
-                        특수문자 포함 (@$!%*?&#)
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                placeholder="비밀번호를 다시 입력하세요"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          {/* 구분선 */}
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">계정 유형 선택</span>
-            </div>
-          </div>
-
-          {/* 섹션 2: 계정 유형 선택 */}
-          <div className="space-y-3">
-            <Label className="text-base font-semibold">어떤 계정으로 가입하시겠습니까?</Label>
-            <RadioGroup
-              value={accountType}
-              onValueChange={handleAccountTypeChange}
-              className="grid grid-cols-2 gap-4"
-              disabled={isLoading}
-            >
-              <div>
-                <RadioGroupItem
-                  value="CLIENT"
-                  id="client"
-                  className="peer sr-only"
-                />
-                <Label
-                  htmlFor="client"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-5 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
-                >
-                  <Users className="h-8 w-8 mb-2 text-primary" />
-                  <span className="text-sm font-medium">고객사 담당자</span>
-                  <span className="text-xs text-muted-foreground mt-1 text-center">
-                    SR 요청 및 진행 상황 확인
-                  </span>
-                </Label>
-              </div>
-              <div>
-                <RadioGroupItem
-                  value="ENGINEER"
-                  id="engineer"
-                  className="peer sr-only"
-                />
-                <Label
-                  htmlFor="engineer"
-                  className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-5 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
-                >
-                  <Wrench className="h-8 w-8 mb-2 text-primary" />
-                  <span className="text-sm font-medium">기술 지원팀</span>
-                  <span className="text-xs text-muted-foreground mt-1 text-center">
-                    SR 처리 및 기술 지원
-                  </span>
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {/* 고객사 선택 (CLIENT 유형일 때만 표시) */}
-          {accountType === "CLIENT" && (
-            <div className="space-y-2">
-              <Label htmlFor="client-select">
-                소속 고객사 <span className="text-destructive">*</span>
-              </Label>
-              {loadingClients ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 border rounded-md">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                  고객사 목록 로딩 중...
-                </div>
-              ) : clients.length === 0 ? (
-                <Alert>
-                  <Info className="h-4 w-4" />
-                  <AlertDescription className="text-sm">
-                    등록된 고객사가 없습니다. 관리자에게 문의하세요.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Select
-                  value={selectedClientId}
-                  onValueChange={setSelectedClientId}
-                  disabled={isLoading}
-                >
-                  <SelectTrigger id="client-select">
-                    <SelectValue placeholder="소속 고객사를 선택하세요" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} ({client.code})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <p className="text-xs text-muted-foreground">
-                소속 고객사가 목록에 없다면 관리자에게 문의하세요.
-              </p>
-            </div>
-          )}
-
-          {/* 기술 지원팀 안내 (ENGINEER 유형일 때만 표시) */}
-          {accountType === "ENGINEER" && (
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                기술 지원팀 계정은 <strong>관리자 승인</strong>이 필요합니다.
-                <br />
-                회원가입 후 관리자가 역할과 권한을 부여할 때까지 기다려주세요.
-              </AlertDescription>
-            </Alert>
-          )}
-
-        </CardContent>
-        <CardFooter className="flex flex-col gap-4">
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || (accountType === "CLIENT" && !selectedClientId)}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                회원가입 중...
-              </>
-            ) : (
-              "회원가입"
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>오류</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-          </Button>
-          <p className="text-sm text-muted-foreground text-center">
-            이미 계정이 있으신가요?{" "}
-            <Link href="/login" className="text-primary hover:underline font-medium">
-              로그인
-            </Link>
-          </p>
-        </CardFooter>
-      </form>
-    </Card>
+            {success && (
+              <Alert className="border-green-500 bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100">
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertTitle>성공</AlertTitle>
+                <AlertDescription>{success}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* 섹션 1: 기본 정보 */}
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">이름</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="홍길동"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">이메일</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="name@example.com"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">비밀번호</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="최소 8자 이상"
+                  required
+                  disabled={isLoading}
+                  value={password}
+                  onChange={handlePasswordChange}
+                />
+
+                {/* 비밀번호 강도 표시기 */}
+                {password && (
+                  <div className="space-y-2 mt-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">비밀번호 강도:</span>
+                      <span className={`font-medium ${passwordStrength.score === 100 ? 'text-green-600' :
+                          passwordStrength.score >= 60 ? 'text-blue-600' :
+                            passwordStrength.score >= 40 ? 'text-yellow-600' :
+                              'text-red-600'
+                        }`}>
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: `${passwordStrength.score}%` }}
+                      />
+                    </div>
+
+                    {/* 비밀번호 요구사항 체크리스트 */}
+                    <div className="grid grid-cols-1 gap-1 mt-2">
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {passwordStrength.checks.length ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <X className="h-3 w-3 text-gray-400" />
+                        )}
+                        <span className={passwordStrength.checks.length ? 'text-green-600' : 'text-muted-foreground'}>
+                          최소 8자 이상
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {passwordStrength.checks.uppercase ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <X className="h-3 w-3 text-gray-400" />
+                        )}
+                        <span className={passwordStrength.checks.uppercase ? 'text-green-600' : 'text-muted-foreground'}>
+                          대문자 포함
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {passwordStrength.checks.lowercase ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <X className="h-3 w-3 text-gray-400" />
+                        )}
+                        <span className={passwordStrength.checks.lowercase ? 'text-green-600' : 'text-muted-foreground'}>
+                          소문자 포함
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {passwordStrength.checks.number ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <X className="h-3 w-3 text-gray-400" />
+                        )}
+                        <span className={passwordStrength.checks.number ? 'text-green-600' : 'text-muted-foreground'}>
+                          숫자 포함
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {passwordStrength.checks.special ? (
+                          <Check className="h-3 w-3 text-green-600" />
+                        ) : (
+                          <X className="h-3 w-3 text-gray-400" />
+                        )}
+                        <span className={passwordStrength.checks.special ? 'text-green-600' : 'text-muted-foreground'}>
+                          특수문자 포함 (@$!%*?&#)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">비밀번호 확인</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="비밀번호를 다시 입력하세요"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+
+            {/* 구분선 */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">계정 유형 선택</span>
+              </div>
+            </div>
+
+            {/* 섹션 2: 계정 유형 선택 */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">어떤 계정으로 가입하시겠습니까?</Label>
+              <RadioGroup
+                value={accountType}
+                onValueChange={handleAccountTypeChange}
+                className="grid grid-cols-2 gap-4"
+                disabled={isLoading}
+              >
+                <div>
+                  <RadioGroupItem
+                    value="CLIENT"
+                    id="client"
+                    className="peer sr-only"
+                  />
+                  <Label
+                    htmlFor="client"
+                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-5 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                  >
+                    <Users className="h-8 w-8 mb-2 text-primary" />
+                    <span className="text-sm font-medium">고객사 담당자</span>
+                    <span className="text-xs text-muted-foreground mt-1 text-center">
+                      SR 요청 및 진행 상황 확인
+                    </span>
+                  </Label>
+                </div>
+                <div>
+                  <RadioGroupItem
+                    value="ENGINEER"
+                    id="engineer"
+                    className="peer sr-only"
+                  />
+                  <Label
+                    htmlFor="engineer"
+                    className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-5 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                  >
+                    <Wrench className="h-8 w-8 mb-2 text-primary" />
+                    <span className="text-sm font-medium">기술 지원팀</span>
+                    <span className="text-xs text-muted-foreground mt-1 text-center">
+                      SR 처리 및 기술 지원
+                    </span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* 고객사 선택 (CLIENT 유형일 때만 표시) */}
+            {accountType === "CLIENT" && (
+              <div className="space-y-2">
+                <Label htmlFor="client-select">
+                  소속 고객사 <span className="text-destructive">*</span>
+                </Label>
+                {loadingClients ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 border rounded-md">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    고객사 목록 로딩 중...
+                  </div>
+                ) : clients.length === 0 ? (
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription className="text-sm">
+                      등록된 고객사가 없습니다. 관리자에게 문의하세요.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Select
+                    value={selectedClientId}
+                    onValueChange={setSelectedClientId}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger id="client-select">
+                      <SelectValue placeholder="소속 고객사를 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {client.name} ({client.code})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  소속 고객사가 목록에 없다면 관리자에게 문의하세요.
+                </p>
+              </div>
+            )}
+
+            {/* 기술 지원팀 안내 (ENGINEER 유형일 때만 표시) */}
+            {accountType === "ENGINEER" && (
+              <Alert>
+                <Info className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  기술 지원팀 계정은 <strong>관리자 승인</strong>이 필요합니다.
+                  <br />
+                  회원가입 후 관리자가 역할과 권한을 부여할 때까지 기다려주세요.
+                </AlertDescription>
+              </Alert>
+            )}
+
+          </CardContent>
+          <CardFooter className="flex flex-col gap-4">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || (accountType === "CLIENT" && !selectedClientId)}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  회원가입 중...
+                </>
+              ) : (
+                "회원가입"
+              )}
+            </Button>
+            <p className="text-sm text-muted-foreground text-center">
+              이미 계정이 있으신가요?{" "}
+              <Link href="/login" className="text-primary hover:underline font-medium">
+                로그인
+              </Link>
+            </p>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }

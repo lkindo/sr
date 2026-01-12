@@ -133,7 +133,7 @@ export default function ClientDetailPage() {
       }
       const data = await response.json();
       setClient(data);
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "고객사 정보를 불러오는데 실패했습니다.",
@@ -196,7 +196,7 @@ export default function ClientDetailPage() {
       });
       fetchClient();
     } catch (error) {
-      console.error(error);
+      // console.error(error);
       toast({
         title: "오류",
         description: "사용자 제외에 실패했습니다.",
@@ -520,14 +520,14 @@ export default function ClientDetailPage() {
                         </TableCell>
                         <TableCell>{userClient.user.email}</TableCell>
                         <TableCell className="text-right">
-                           <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveUser(userClient.user.id)}
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            >
-                              <UserMinus className="h-4 w-4" />
-                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveUser(userClient.user.id)}
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          >
+                            <UserMinus className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

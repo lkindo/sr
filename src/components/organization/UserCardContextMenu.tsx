@@ -7,7 +7,7 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
 } from "@/components/ui/context-menu";
-import { Edit, Eye, Power, UserCog } from "lucide-react";
+import { Edit, Eye, Power } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
@@ -53,7 +53,7 @@ export function UserCardContextMenu({
                 title: "성공",
                 description: `${userName}이(가) ${isActive ? "비활성화" : "활성화"}되었습니다.`,
             });
-        } catch (error) {
+        } catch {
             toast({
                 title: "오류",
                 description: "상태 변경 중 오류가 발생했습니다.",

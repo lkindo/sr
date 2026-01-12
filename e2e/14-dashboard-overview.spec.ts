@@ -60,7 +60,7 @@ test.describe('대시보드', () => {
         if (statsResponse.byStatus) {
           console.log('📊 상태별 SR 분포:', statsResponse.byStatus)
         }
-      } catch (e) {
+      } catch {
         console.log('ℹ️ API 응답 파싱 불가 - 페이지 로드 확인만 진행')
       }
     } else {

@@ -5,16 +5,7 @@ import { test, expect } from '@playwright/test'
  * 주의: 이 테스트를 실행하기 전에 로그인이 필요합니다.
  */
 
-// 로그인 헬퍼 함수
-async function login(page: any) {
-  await page.goto('/login')
-  await page.fill('#email', process.env.TEST_USER_EMAIL || 'admin@example.com')
-  await page.fill('#password', process.env.TEST_USER_PASSWORD || 'admin123')
-  await page.click('button[type="submit"]')
 
-  // 로그인 성공 확인 - 대시보드로 이동
-  await page.waitForURL('/dashboard', { timeout: 15000 })
-}
 
 test.describe('SR 목록 관리', () => {
   // NOTE: Global setup을 통해 로그인 상태가 자동으로 로드됩니다.

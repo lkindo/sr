@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { UserService } from "@/services/user.service";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { BusinessRuleError, NotFoundError } from "@/lib/errors";
-import { z } from "zod";
 import { userUpdateSchema } from "@/lib/schemas";
 import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
 

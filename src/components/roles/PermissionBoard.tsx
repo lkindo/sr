@@ -69,8 +69,7 @@ export function PermissionBoard({
           } else {
             throw new Error(result.error || "권한 목록 로딩 실패");
           }
-        } catch (error) {
-          console.error(error);
+        } catch {
           toast({
             title: "오류",
             description: "권한 데이터를 불러오지 못했습니다.",
@@ -104,7 +103,7 @@ export function PermissionBoard({
       } else {
         throw new Error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "권한 저장 중 문제가 발생했습니다.",
@@ -118,14 +117,14 @@ export function PermissionBoard({
   // 데이터 그룹화 및 필터링
   const groupedPermissions = useMemo(() => {
     const groups: Record<string, Permission[]> = {};
-    
+
     allPermissions.forEach((p) => {
-      if (searchQuery && 
-          !p.resource.toLowerCase().includes(searchQuery.toLowerCase()) && 
-          !p.action.toLowerCase().includes(searchQuery.toLowerCase())) {
+      if (searchQuery &&
+        !p.resource.toLowerCase().includes(searchQuery.toLowerCase()) &&
+        !p.action.toLowerCase().includes(searchQuery.toLowerCase())) {
         return;
       }
-      
+
       if (!groups[p.resource]) groups[p.resource] = [];
       groups[p.resource].push(p);
     });
@@ -199,19 +198,19 @@ export function PermissionBoard({
                         checked={isAllSelected}
                         onCheckedChange={() => toggleGroup(permissions)}
                         className={cn(
-                          "data-[state=checked]:bg-primary scale-90", 
+                          "data-[state=checked]:bg-primary scale-90",
                           isPartiallySelected && "data-[state=unchecked]:bg-primary/60 data-[state=unchecked]:border-primary/60"
                         )}
                       />
                     </div>
                   </CardHeader>
-                  
+
                   <CardContent className="pt-3 pb-3 px-4 space-y-3 bg-white">
                     {permissions.map((p) => (
                       <div key={p.id} className="flex items-center justify-between group hover:bg-slate-50 -mx-2 px-2 py-1.5 rounded-md transition-colors">
                         <div className="flex flex-col gap-0.5">
-                          <Label 
-                            htmlFor={p.id} 
+                          <Label
+                            htmlFor={p.id}
                             className="font-medium text-sm cursor-pointer text-slate-700 group-hover:text-primary transition-colors"
                           >
                             {p.action}
@@ -232,7 +231,7 @@ export function PermissionBoard({
                 </Card>
               );
             })}
-            
+
             {Object.keys(groupedPermissions).length === 0 && (
               <div className="col-span-full text-center py-20 text-muted-foreground">
                 검색 결과가 없습니다.

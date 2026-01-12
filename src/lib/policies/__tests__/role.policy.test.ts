@@ -13,6 +13,7 @@ describe('RolePolicy', () => {
     image: null,
     roles: ['ADMIN'],
     permissions: [],
+    clientIds: [],
   };
 
   const managerUser: AuthenticatedUser = {
@@ -22,6 +23,7 @@ describe('RolePolicy', () => {
     image: null,
     roles: ['MANAGER'],
     permissions: ['ROLE:READ', 'ROLE:ASSIGN'],
+    clientIds: [],
   };
 
   const regularUser: AuthenticatedUser = {
@@ -31,13 +33,13 @@ describe('RolePolicy', () => {
     image: null,
     roles: ['USER'],
     permissions: [],
+    clientIds: [],
   };
 
   const adminRole: Role = {
     id: 'role-1',
     name: 'ADMIN',
     description: 'Administrator role',
-    isSystem: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -46,7 +48,6 @@ describe('RolePolicy', () => {
     id: 'role-2',
     name: 'CUSTOM',
     description: 'Custom role',
-    isSystem: false,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

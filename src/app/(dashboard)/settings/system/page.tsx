@@ -19,7 +19,7 @@ import { SystemSettings } from "@/types/settings";
 
 export default function SystemSettingsPage() {
   const { toast } = useToast();
-  const [settings, setSettings] = useState<SystemSettings | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -37,11 +37,12 @@ export default function SystemSettingsPage() {
           throw new Error("Failed to fetch system settings");
         }
         const data = await response.json();
-        setSettings(data);
+
         setSiteName(data.siteName || "");
         setSiteDescription(data.siteDescription || "");
         setAdminEmail(data.adminEmail || "");
       } catch (error) {
+        console.error(error);
         toast({
           title: "오류",
           description: "시스템 설정을 불러오는데 실패했습니다.",

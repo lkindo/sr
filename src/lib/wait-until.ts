@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 /**
  * 백그라운드 작업을 실행합니다.
  * Promise를 fire-and-forget 방식으로 실행하며 에러 로깅을 처리합니다.
@@ -12,11 +14,11 @@ export async function backgroundTask<T>(
     // Promise를 fire-and-forget으로 실행
     promise
         .then((result) => {
-            console.log(`[BackgroundTask] ${label || 'Task'} completed successfully`);
+            logger.info(`[BackgroundTask] ${label || 'Task'} completed successfully`);
             return result;
         })
         .catch((error) => {
-            console.error(`[BackgroundTask] ${label || 'Task'} failed:`, error);
+            logger.error(`[BackgroundTask] ${label || 'Task'} failed:`, error as Error);
         });
 }
 

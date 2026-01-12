@@ -187,8 +187,8 @@ describe('Auth Logic', () => {
     it('should handle user with no roles', () => {
       const userWithNoRoles = {
         ...mockUserWithRoles,
-        roles: [],
-        clients: [],
+        roles: [] as typeof mockUserWithRoles.roles,
+        clients: [] as typeof mockUserWithRoles.clients,
       };
 
       const roles = userWithNoRoles.roles.map((ur) => ur.role.name);
@@ -255,7 +255,7 @@ describe('Auth Logic', () => {
           id: '',
           email: '',
           name: '',
-          image: '',
+          image: null as string | null,
           roles: [] as string[],
           permissions: [] as string[],
           clientIds: [] as string[],
@@ -268,7 +268,7 @@ describe('Auth Logic', () => {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
-        session.user.image = token.image as string;
+        session.user.image = token.image as string | null;
         session.user.roles = (token.roles as string[]) || [];
         session.user.permissions = (token.permissions as string[]) || [];
         session.user.clientIds = (token.clientIds as string[]) || [];
@@ -307,9 +307,9 @@ describe('Auth Logic', () => {
 
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.roles = (token.roles as string[]) || [];
-        session.user.permissions = (token.permissions as string[]) || [];
-        session.user.clientIds = (token.clientIds as string[]) || [];
+        session.user.roles = (token.roles as string[] | undefined) || [];
+        session.user.permissions = (token.permissions as string[] | undefined) || [];
+        session.user.clientIds = (token.clientIds as string[] | undefined) || [];
       }
 
       expect(session.user.roles).toEqual([]);

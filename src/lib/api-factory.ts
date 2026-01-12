@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { withAuth, withAuthAndRateLimit, AuthenticatedContext } from './auth-wrapper';
 import { apiResponse } from './api-response';
@@ -55,9 +55,9 @@ export interface CRUDConfig<TService> {
 export interface CRUDService<T, TCreateInput, TUpdateInput> {
   findById?: (id: string, userId?: string) => Promise<T | null>;
   getAll?: (userId?: string) => Promise<T[]>;
-  create?: (data: TCreateInput, user: any) => Promise<T>;
-  update?: (id: string, data: TUpdateInput, user: any) => Promise<T>;
-  delete?: (id: string, user: any) => Promise<T>;
+  create?: (data: TCreateInput, user: { id: string }) => Promise<T>;
+  update?: (id: string, data: TUpdateInput, user: { id: string }) => Promise<T>;
+  delete?: (id: string, user: { id: string }) => Promise<T>;
 }
 
 /**
@@ -109,11 +109,13 @@ async function checkPermission(userId: string, permission?: string): Promise<voi
  * });
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createCRUDHandler<
   TService extends CRUDService<any, any, any>,
-  T = any,
-  TCreateInput = any,
-  TUpdateInput = any
+  _T = unknown,
+  _TCreateInput = unknown,
+  TUpdateInput = unknown
 >(config: CRUDConfig<TService>) {
   const {
     getService,
@@ -277,7 +279,10 @@ export function createListHandler<TService extends CRUDService<any, any, any>>(
  * });
  * ```
  */
-export function createCreateHandler<TService extends CRUDService<any, any, any>>(
+export function createCreateHandler<
+  TService extends CRUDService<any, TCreateInput, any>,
+  TCreateInput = any
+>(
   config: CRUDConfig<TService>
 ) {
   const {
@@ -303,11 +308,11 @@ export function createCreateHandler<TService extends CRUDService<any, any, any>>
     }
 
     // 입력 검증
-    let validated: any;
+    let validated: TCreateInput;
     if (schemas.create) {
-      validated = await validateRequestBody(request, schemas.create);
+      validated = await validateRequestBody(request, schemas.create) as TCreateInput;
     } else {
-      validated = await request.json();
+      validated = await request.json() as TCreateInput;
     }
 
     const created = await service.create(validated, session.user);

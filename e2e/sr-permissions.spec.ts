@@ -43,7 +43,7 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
   });
 
   test('SR 상세 페이지 접근 및 버튼 확인', async ({ page }) => {
-    if (!srId) test.skip('SR 생성을 실패하여 테스트를 건너뜁니다.');
+    test.skip(!srId, 'SR 생성을 실패하여 테스트를 건너뜁니다.');
 
     // SR 상세 페이지로 이동
     const detailResponsePromise = page.waitForResponse(resp => resp.url().includes(`/api/srs/${srId}`) && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
@@ -60,7 +60,7 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
   });
 
   test('접수 페이지 UI 확인', async ({ page }) => {
-    if (!srId) test.skip('SR 생성을 실패하여 테스트를 건너뜁니다.');
+    test.skip(!srId, 'SR 생성을 실패하여 테스트를 건너뜁니다.');
 
     try {
       // 접수 페이지로 직접 이동
@@ -91,7 +91,7 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
   });
 
   test('SR 삭제 버튼 권한 확인 (ADMIN)', async ({ page }) => {
-    if (!srId) test.skip('SR 생성을 실패하여 테스트를 건너뜁니다.');
+    test.skip(!srId, 'SR 생성을 실패하여 테스트를 건너뜁니다.');
 
     await page.goto(`/srs/${srId}`);
 

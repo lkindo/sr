@@ -1,7 +1,7 @@
 // src/app/(dashboard)/srs/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
@@ -10,14 +10,12 @@ import {
   Trash2,
   Clock,
   AlertCircle,
-  User,
   MessageSquare,
   Paperclip,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SRComments } from "@/components/srs/SRComments";
 import { SRActivities } from "@/components/srs/SRActivities";
@@ -28,11 +26,8 @@ import { SRStatusActions } from "@/components/srs/SRStatusActions";
 import { IntakeInfoCard } from "@/components/srs/IntakeInfoCard";
 import { SRStatusTimeline } from "@/components/srs/SRStatusTimeline";
 import { useToast } from "@/hooks/use-toast";
-import { getSRDetailsAction } from "@/actions/sr.actions";
-import type { SR } from "@prisma/client";
 import { TableSkeleton } from "@/components/loading/TableSkeleton";
 import { usePermissions } from "@/hooks/use-permissions";
-import type { SRDetails } from "@/types/sr.types";
 import { useSRDetails, useDeleteSR } from "@/hooks/use-sr";
 import {
   statusLabels,
@@ -81,10 +76,7 @@ export default function SRDetailPage() {
     // React Query가 자동으로 최신 데이터를 가져옴
   };
 
-  const handleSRDeleted = () => {
-    deleteMutation.mutate(srId);
-    setIsDeleteDialogOpen(false);
-  };
+
 
   if (isLoading) {
     return <TableSkeleton columns={5} />;

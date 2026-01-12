@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * 환경 변수 검증 모듈
  *

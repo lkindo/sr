@@ -70,7 +70,7 @@ export function normalizeFormDataValue(
     enumFields?: string[];
   } = {}
 ): string | null | undefined {
-  const { emptyAs = "null", enumFields = [] } = options;
+  const { emptyAs = "null" } = options;
 
   if (value === "" || value === null) {
     return emptyAs === "null" ? null : undefined;

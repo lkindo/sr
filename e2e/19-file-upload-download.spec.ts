@@ -317,7 +317,7 @@ test.describe('파일 업로드/다운로드 플로우', () => {
 
           // 파일 존재 확인
           expect(fs.existsSync(downloadPath)).toBeTruthy();
-        } catch (error) {
+        } catch {
           console.log(`⚠️ 다운로드 이벤트를 캐치하지 못했습니다. 링크가 새 탭으로 열릴 수 있습니다.`);
         }
       } else {

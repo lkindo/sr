@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
-import { NotFoundError, BadRequestError, ValidationError, UnauthorizedError } from "@/lib/errors";
+import { NotFoundError, ValidationError, UnauthorizedError } from "@/lib/errors";
 
 const updateProfileSchema = z.object({
   name: z.string().min(2, "이름은 최소 2자 이상이어야 합니다.").optional(),

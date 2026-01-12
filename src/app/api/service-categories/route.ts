@@ -3,7 +3,7 @@ import { ServiceCategoryService } from "@/services/service-category.service";
 import { withAuth } from "@/lib/auth-wrapper";
 
 // GET /api/service-categories - 모든 활성 서비스 카테고리 조회
-export const GET = withAuth(async (request: NextRequest) => {
+export const GET = withAuth(async (_request: NextRequest) => {
   const serviceCategoryService = new ServiceCategoryService();
   const categories = await serviceCategoryService.getAll();
 

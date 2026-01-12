@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError, ValidationError } from "@/lib/errors";
-import { sendCommentNotificationEmail } from "@/lib/email";
 import { RouteContext } from "@/lib/api-helpers";
 import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
 import { srDetailKey, MY_REQUESTS_PREFIX } from "@/lib/cache-keys";
@@ -16,7 +14,7 @@ const commentSchema = z.object({
 
 // GET /api/srs/[id]/comments - SR 댓글 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (
-  request: NextRequest,
+  _request: NextRequest,
   { params }: AuthenticatedContext<RouteContext<{ id: string }>["params"]>
 ) => {
   const { id } = await params;

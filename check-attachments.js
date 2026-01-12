@@ -1,11 +1,12 @@
 
+/* eslint-disable no-console */
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function checkAttachments() {
   try {
     console.log('Checking SR Attachments...');
-    
+
     // 1. Count total attachments
     const totalAttachments = await prisma.sRAttachment.count();
     console.log(`Total Attachments in DB: ${totalAttachments}`);

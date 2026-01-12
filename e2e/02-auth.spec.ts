@@ -225,7 +225,7 @@ test.describe('인증 플로우', () => {
     try {
       await page.waitForURL(url => url.toString().includes('/dashboard'), { timeout: 20000, waitUntil: 'domcontentloaded' });
       console.log('✅ 대시보드 리디렉션 성공');
-    } catch (e) {
+    } catch {
       console.log('⚠️ 대시보드 리디렉션 타임아웃. 현재 URL:', page.url());
 
       // 현재 페이지의 에러 메시지 확인

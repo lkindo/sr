@@ -10,6 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 
 interface Attachment {
@@ -40,10 +50,10 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
       if (!response.ok) throw new Error("Failed to fetch attachments");
       const data = await response.json();
 
-      console.log("📎 [SRAttachments] 조회된 첨부파일:", data);
+
       setAttachments(data || []);
-    } catch (error) {
-      console.error("❌ [SRAttachments] 첨부파일 조회 실패:", error);
+    } catch {
+
       toast({
         title: "오류",
         description: "첨부파일을 불러오는데 실패했습니다.",
@@ -113,10 +123,17 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
     }
   };
 
-  const handleDelete = async (attachmentId: string) => {
-    // TODO: 추후 모달 확인으로 대체
-    // eslint-disable-next-line no-alert
-    if (!confirm("이 파일을 삭제하시겠습니까?")) return;
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+
+  const handleDeleteClick = (attachmentId: string) => {
+    setFileToDelete(attachmentId);
+  };
+
+  const executeDelete = async () => {
+    if (!fileToDelete) return;
+
+    const attachmentId = fileToDelete;
+    setFileToDelete(null);
 
     try {
       const response = await fetch(`/api/attachments/${attachmentId}`, {
@@ -133,7 +150,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
         title: "성공",
         description: "파일이 삭제되었습니다.",
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "오류",
         description: "파일 삭제에 실패했습니다.",
@@ -249,7 +266,6 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                         window.URL.revokeObjectURL(url);
                         document.body.removeChild(a);
                       } catch (e) {
-                        console.error("Download failed", e);
                         window.open(attachment.fileUrl, "_blank");
                       }
                     }}
@@ -261,7 +277,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(attachment.id)}
+                      onClick={() => handleDeleteClick(attachment.id)}
                       title="삭제"
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
@@ -273,7 +289,25 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
           </div>
         )}
       </CardContent>
-    </Card>
+
+
+      <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>파일 삭제 확인</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 이 첨부파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDelete} className="bg-destructive hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card >
   );
 }
 

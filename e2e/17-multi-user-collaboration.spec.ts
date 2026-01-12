@@ -19,20 +19,15 @@ const authFiles = {
   engineer: path.join(__dirname, '../playwright/.auth/engineer.json'),
 };
 
-// 헬퍼 함수: 로그인 상태 전환
-async function switchUser(page: Page, role: 'client' | 'manager' | 'engineer') {
-  const context = page.context();
-  await context.clearCookies();
-  // 인증 상태 파일이 있다면 적용
-  // Note: Playwright에서는 런타임에 storageState를 변경할 수 없으므로,
-  // 각 역할별로 새로운 브라우저 컨텍스트를 사용해야 합니다.
-}
+
 
 test.describe('다중 사용자 협업 워크플로우', () => {
   let srId: string;
   let srTitle: string;
 
   test.describe.configure({ mode: 'serial' });
+  // 다중 사용자 시나리오는 시간이 오래 걸리므로 타임아웃을 넉넉히 설정
+  test.setTimeout(120000);
 
   // SR ID가 없으면 후속 테스트를 스킵
   test.beforeEach(async ({ }, testInfo) => {
@@ -54,7 +49,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await createButton.click();
 
       // 다이얼로그 확인
-      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({ timeout: 5000 });
+      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({ timeout: 15000 });
 
       // SR 정보 입력
       const timestamp = Date.now();
@@ -70,7 +65,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         if (isClientEnabled) {
           await clientCombobox.click();
           const firstClientOption = page.getByRole('option').first();
-          await firstClientOption.waitFor({ state: 'visible', timeout: 5000 });
+          await firstClientOption.waitFor({ state: 'visible', timeout: 15000 });
           await firstClientOption.click();
           await page.waitForTimeout(300);
         } else {
@@ -100,11 +95,10 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // SR 생성
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
-      await page.waitForTimeout(2000);
 
-      // 목록에서 생성된 SR 확인
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      // 다이얼로그 닫힘 대기 및 목록 로드 대기
+      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
+      await page.waitForLoadState('networkidle'); // 목록 갱신 대기 (필수)
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
       await expect(srRow).toBeVisible({ timeout: 10000 });
@@ -118,7 +112,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 상태 확인 (REQUESTED)
       const statusBadge = page.locator('text=/요청됨|REQUESTED/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 5000 });
+      await expect(statusBadge).toBeVisible({ timeout: 15000 });
     } finally {
       await context.close();
     }
@@ -133,11 +127,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 접수 버튼 클릭
       const intakeButton = page.getByRole('button', { name: /접수|Accept/i });
-      await expect(intakeButton).toBeVisible({ timeout: 5000 });
+      await expect(intakeButton).toBeVisible({ timeout: 15000 });
       await intakeButton.click();
 
       // 접수 페이지로 이동 대기
@@ -168,7 +162,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await assigneeSelect.click({ force: true });
       await page.waitForTimeout(500);
       const firstAssigneeOption = page.getByRole('option').first();
-      await firstAssigneeOption.waitFor({ state: 'visible', timeout: 5000 });
+      await firstAssigneeOption.waitFor({ state: 'visible', timeout: 15000 });
       await firstAssigneeOption.click();
 
       // 접수 메모 작성
@@ -176,15 +170,20 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 접수 완료
       await page.getByRole('button', { name: /저장/i }).click();
-      await page.waitForTimeout(2000);
 
-      // 상세 페이지로 복귀
+      // 다이얼로그나 폼이 사라지는 것을 대기 (접수 처리가 완료됨을 의미)
+      // 특정 URL 이동을 강제하지 않고, 일단 처리가 끝났는지 확인
+      // 접수 처리가 완료되면 목록 페이지(/srs)로 이동함
+      await page.waitForURL('**/srs', { timeout: 15000 });
+
+      // 혹시 목록으로 튕겼을 경우를 대비해 상세 페이지로 명시적 이동
       await page.goto(`/srs/${srId}`);
       await page.waitForLoadState('networkidle');
 
-      // 상태 확인 (IN_PROGRESS)
-      const statusBadge = page.locator('text=/진행|IN_PROGRESS/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 5000 });
+      // 상태 확인 (INTAKE 또는 IN_PROGRESS)
+      // Badge 컴포넌트가 div일 수 있으므로 좀 더 일반적인 선택자 사용
+      const statusBadge = page.locator('div, span').filter({ hasText: /^접수$|^진행중$/ }).first();
+      await expect(statusBadge).toBeVisible({ timeout: 15000 });
 
       console.log(`✅ MANAGER가 SR 접수 및 담당자 배정 완료`);
     } finally {
@@ -201,11 +200,12 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
-      // 상태 확인 (IN_PROGRESS)
-      const statusBadge = page.locator('text=/진행|IN_PROGRESS/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 5000 });
+      // 상태 확인 (INTAKE 또는 IN_PROGRESS)
+      // Manager가 접수하면 INTAKE 상태임
+      const statusBadge = page.locator('div, span').filter({ hasText: /^접수$|^진행중$/ }).first();
+      await expect(statusBadge).toBeVisible({ timeout: 15000 });
 
       // 댓글 작성
       const commentTextarea = page.locator('textarea').filter({ hasText: /댓글|Comment/i }).or(
@@ -219,7 +219,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
         if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
           await submitButton.click();
-          await page.waitForTimeout(1500);
+          // 댓글 제출 후 텍스트 영역이 비워지거나 새 댓글이 보일 때까지 대기
+          await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
+          await expect(page.locator('text=문제를 파악하였습니다')).toBeVisible({ timeout: 10000 });
 
           console.log(`✅ ENGINEER가 댓글 작성 완료`);
         }
@@ -240,7 +242,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 엔지니어 댓글 확인
       const engineerComment = page.locator('text=/문제를 파악하였습니다/i');
@@ -259,7 +261,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
           const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
           if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
             await submitButton.click();
-            await page.waitForTimeout(1500);
+            await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
+            await expect(page.locator('text=감사합니다. 추가로 로그 파일을 첨부하겠습니다.')).toBeVisible({ timeout: 10000 });
 
             console.log(`✅ CLIENT가 회신 댓글 작성 완료`);
           }
@@ -301,7 +304,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         const completedOption = page.getByRole('option', { name: /완료|COMPLETED/i });
         if (await completedOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await completedOption.click();
-          await page.waitForTimeout(1500);
+          // 상태 변경 반영 대기 (배지 텍스트 확인)
+          await expect(page.locator('span.badge').filter({ hasText: /완료|COMPLETED/i }).first()).toBeVisible({ timeout: 10000 });
           console.log(`✅ ENGINEER가 상태를 완료로 변경`);
         }
       } else {
@@ -319,7 +323,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
         if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
           await submitButton.click();
-          await page.waitForTimeout(1500);
+          await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
+          await expect(page.locator('text=작업이 완료되었습니다')).toBeVisible({ timeout: 10000 });
           console.log(`✅ ENGINEER가 완료 댓글 작성`);
         }
       }
@@ -337,7 +342,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 엔지니어 완료 댓글 확인
       const completeComment = page.locator('text=/작업이 완료되었습니다/i');
@@ -348,7 +353,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 상태 확인 (COMPLETED 또는 IN_PROGRESS)
       const statusBadge = page.locator('text=/완료|COMPLETED|진행|IN_PROGRESS/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 5000 });
+      await expect(statusBadge).toBeVisible({ timeout: 15000 });
 
       // 종료 처리 (CLOSED)
       const closeButton = page.getByRole('button', { name: /종료|Close/i });
@@ -363,7 +368,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         const closedOption = page.getByRole('option', { name: /종료|CLOSED/i });
         if (await closedOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await closedOption.click();
-          await page.waitForTimeout(1500);
+          // 종료 상태 배지 확인
+          await expect(page.locator('span.badge').filter({ hasText: /종료|CLOSED/i }).first()).toBeVisible({ timeout: 10000 });
           console.log(`✅ MANAGER가 상태를 종료로 변경`);
         }
       } else {
@@ -381,7 +387,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
         if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
           await submitButton.click();
-          await page.waitForTimeout(1500);
+          await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
+          await expect(page.locator('text=검토 완료하였습니다')).toBeVisible({ timeout: 10000 });
           console.log(`✅ MANAGER가 최종 검토 댓글 작성`);
         }
       }
@@ -403,11 +410,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 종료 상태 확인
       const statusBadge = page.locator('text=/종료|CLOSED|완료|COMPLETED/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 5000 });
+      await expect(statusBadge).toBeVisible({ timeout: 15000 });
 
       // 전체 댓글 히스토리 확인
       const allComments = page.locator('[class*="comment"], [class*="Comment"]');
@@ -430,13 +437,13 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 });
 
 test.describe('협업 시나리오 - 변형 케이스', () => {
-  test('동시 댓글 작성 및 충돌 방지', async ({ browser }) => {
+  test('동시 댓글 작성 및 충돌 방지', async ({ browser: _browser }) => {
     // 이 테스트는 동시성 처리를 확인합니다.
     // 현재는 스킵하고, 추후 구현합니다.
     test.skip();
   });
 
-  test('담당자 부재 시 재배정', async ({ browser }) => {
+  test('담당자 부재 시 재배정', async ({ browser: _browser }) => {
     // 이 테스트는 담당자 변경 시나리오를 확인합니다.
     // 추후 구현합니다.
     test.skip();

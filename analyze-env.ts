@@ -1,5 +1,6 @@
-import { config } from 'dotenv';
-config();
+/* eslint-disable no-console */
+import { loadEnvConfig } from '@next/env';
+loadEnvConfig(process.cwd());
 
 function analyzeUrl(name: string, url: string | undefined) {
     console.log(`\n🔍 Analyzing ${name}:`);
@@ -20,7 +21,7 @@ function analyzeUrl(name: string, url: string | undefined) {
             return;
         }
 
-        const [_, protocol, user, pass, host, port, rest] = match;
+        const [_, _protocol, _user, _pass, host, port, rest] = match;
         console.log(`   - Host: ${host}`);
         console.log(`   - Port: ${port}`);
 

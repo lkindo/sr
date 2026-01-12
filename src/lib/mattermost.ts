@@ -35,11 +35,12 @@ export const sendMattermostNotification = async (
     // 환경 변수에서 모든 제어 문자, 보이지 않는 문자, 공백, 따옴표 제거
     const rawUrl = process.env.MATTERMOST_WEBHOOK_URL || '';
     // 모든 공백류 문자, 따옴표 제거 (Vercel 환경 변수에 따옴표가 포함될 수 있음)
+    // eslint-disable-next-line no-control-regex
     const webhookUrl = rawUrl.replace(/[\s\u0000-\u001F\u007F-\u009F\uFEFF\u200B-\u200D"'`]/g, '');
     const targetChannel = channel || process.env.MATTERMOST_CHANNEL?.trim();
 
-    console.log(`[Mattermost] Sending notification to channel: ${targetChannel || 'Default (Webhook Config)'}`);
-    console.log(`[Mattermost] Webhook URL length: ${webhookUrl.length}, raw length: ${rawUrl.length}`);
+    logger.debug(`[Mattermost] Sending notification to channel: ${targetChannel || 'Default (Webhook Config)'}`);
+    logger.debug(`[Mattermost] Webhook URL length: ${webhookUrl.length}, raw length: ${rawUrl.length}`);
 
     if (!webhookUrl) {
         logger.warn("[Mattermost] MATTERMOST_WEBHOOK_URL is not defined. Notification skipped.");
@@ -50,10 +51,10 @@ export const sendMattermostNotification = async (
     let validatedUrl: URL;
     try {
         validatedUrl = new URL(webhookUrl);
-        console.log(`[Mattermost] Validated URL: ${validatedUrl.href}`);
+        if (validatedUrl) logger.debug(`[Mattermost] Validated URL: ${validatedUrl.href}`);
     } catch (urlError) {
         logger.error(`[Mattermost] Invalid webhook URL: "${webhookUrl}"`, urlError instanceof Error ? urlError : undefined);
-        console.log(`[Mattermost] URL char codes:`, [...webhookUrl].map(c => c.charCodeAt(0)));
+        logger.debug(`[Mattermost] URL char codes:`, { codes: [...webhookUrl].map(c => c.charCodeAt(0)) });
         return;
     }
 
@@ -68,7 +69,7 @@ export const sendMattermostNotification = async (
     }
 
     try {
-        console.log(`[Mattermost] Payload:`, JSON.stringify(payload, null, 2));
+        logger.debug(`[Mattermost] Payload:`, { payload });
         const response = await fetch(validatedUrl.href, {
             method: "POST",
             headers: {
@@ -83,7 +84,7 @@ export const sendMattermostNotification = async (
                 response: errorText,
             });
         } else {
-            console.log(`[Mattermost] Notification sent successfully. Status: ${response.status}`);
+            logger.info(`[Mattermost] Notification sent successfully. Status: ${response.status}`);
         }
     } catch (error) {
         logger.error("[Mattermost] Error sending notification", error instanceof Error ? error : new Error(String(error)));

@@ -1,4 +1,5 @@
-import { User, Prisma, SR } from "@prisma/client";
+import { Prisma, SR, PrismaClient, SRStatus } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { z } from "zod";
 import { SRRepository } from "@/repositories/sr.repository";
 import { SRActivityRepository } from "@/repositories/sr-activity.repository";
@@ -17,6 +18,7 @@ import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
 import { backgroundTask } from "@/lib/wait-until";
 import { getSRUrl } from "@/lib/app-url";
+import { logger } from "@/lib/logger";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -128,7 +130,7 @@ export class SRService {
       } catch (error) {
         const isUnique =
           (error instanceof Error && error.message.includes("Unique constraint")) ||
-          (error && typeof error === "object" && "code" in error && (error as any).code === "P2002");
+          (error instanceof PrismaClientKnownRequestError && error.code === "P2002");
 
         if (isUnique && attempts < maxAttempts) {
           // Unique constraint 위반 시 exponential backoff로 재시도
@@ -172,7 +174,7 @@ export class SRService {
     }
 
     // Mattermost 알림 발송 (Vercel에서 응답 후에도 완료 보장)
-    console.log(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
+    logger.info(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
     backgroundTask(
       this.sendCreationNotification(result),
       `Mattermost notification for ${result.srNumber}`
@@ -198,8 +200,7 @@ export class SRService {
       this.userRepository.findUsersByRoles(['ADMIN', 'MANAGER']).then(admins => {
         const emailPromises = admins
           .filter(admin => {
-            const adminWithPrefs = admin as any;
-            const shouldSend = adminWithPrefs.notificationPreference?.emailSRCreated ?? true;
+            const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
             return admin.email && shouldSend;
           })
           .map(admin =>
@@ -220,7 +221,7 @@ export class SRService {
   }
 
   private async sendCreationNotification(sr: SRDetails) {
-    console.log(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
+    logger.info(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
     const { sendMattermostNotification } = await import("@/lib/mattermost");
 
     const srUrl = getSRUrl(sr.id);
@@ -280,8 +281,8 @@ export class SRService {
         const { validateTransition, getRequiredFields } = await import("@/lib/sr-state-machine");
 
         const transitionResult = validateTransition(
-          existingSR.status as any,
-          validated.status as any,
+          existingSR.status,
+          validated.status as SRStatus,
           sessionUser.roles
         );
 
@@ -290,7 +291,7 @@ export class SRService {
         }
 
         // 필수 필드 검증
-        const requiredFields = getRequiredFields(validated.status as any);
+        const requiredFields = getRequiredFields(validated.status as SRStatus);
         const missingFields: string[] = [];
 
         for (const field of requiredFields) {
@@ -396,7 +397,13 @@ export class SRService {
       // 트랜잭션으로 업데이트 및 활동 로그 생성
       return await prisma.$transaction(async (tx) => {
         // 1. SR 업데이트 (statusHistory 포함)
-        let updatedSR: any = existingSR; // 기본값
+        let updatedSR: SR & {
+          client: { id: string; code: string; name: string };
+          requester: { id: string; name: string; email: string; notificationPreference: import("@prisma/client").NotificationPreference | null };
+          assignee: ({ id: string; name: string; email: string; notificationPreference: import("@prisma/client").NotificationPreference | null }) | null;
+          serviceCategory: { id: string; categoryName: string; slaHours: number; handlerId: string | null; handler: { id: string; name: string } | null };
+        } = existingSR as any; // 초기값은 existingSR이지만 타입 호환성을 위해 any 캐스팅 후 할당. 실제로는 update 호출 결과로 덮어씌워짐.
+
         if (Object.keys(updateData).length > 0) {
           updatedSR = await tx.sR.update({
             where: { id },
@@ -419,7 +426,20 @@ export class SRService {
                   notificationPreference: true // 추가
                 }
               },
-              serviceCategory: { select: { id: true, categoryName: true } },
+              serviceCategory: {
+                select: {
+                  id: true,
+                  categoryName: true,
+                  slaHours: true,
+                  handlerId: true,
+                  handler: {
+                    select: {
+                      id: true,
+                      name: true
+                    }
+                  }
+                }
+              },
             },
           });
         }
@@ -449,7 +469,7 @@ export class SRService {
           }
 
           // 상태 변경 이메일 알림 (요청자에게)
-          const srWithRelations = updatedSR as any;
+          const srWithRelations = updatedSR;
           const requesterPrefs = srWithRelations.requester?.notificationPreference;
           const shouldSendStatusEmail = requesterPrefs?.emailSRStatusChanged ?? false;
 
@@ -493,7 +513,7 @@ export class SRService {
           }
 
           // 담당자 배정 이메일 알림
-          const srWithRelations = updatedSR as any;
+          const srWithRelations = updatedSR;
           const assigneePrefs = srWithRelations.assignee?.notificationPreference;
           const shouldSendAssignEmail = assigneePrefs?.emailSRAssigned ?? true;
 

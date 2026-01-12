@@ -1,13 +1,13 @@
 "use server";
 
-import { z } from "zod";
+
+import { logger } from "@/lib/logger";
 import { ClientService } from "@/services/client.service";
 import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
 import { Result, ok } from "@/lib/result";
 import { errorToResult } from "@/lib/errors";
 import { getFormDataValue } from "@/lib/form-data-parser";
 import { authenticateAndAuthorize, validateWithSchema } from "@/lib/action-helpers";
-import type { Client } from "@prisma/client";
 
 type ClientCreateResult = Awaited<ReturnType<ClientService['createClient']>>;
 
@@ -144,24 +144,20 @@ export async function getClientAction(id: string) {
 
 export async function getClientsForSelection() {
   try {
-    console.log("🔍 [getClientsForSelection] 고객사 목록 조회 시작");
+    logger.debug("🔍 [getClientsForSelection] 고객사 목록 조회 시작");
 
     // No auth check needed for a simple selection list
     const clientService = new ClientService();
     const clients = await clientService.getAllClients();
 
-    console.log("✅ [getClientsForSelection] 고객사 조회 성공:", {
+    logger.debug("✅ [getClientsForSelection] 고객사 조회 성공:", {
       count: clients.length,
       firstClient: clients[0] ? { id: clients[0].id, name: clients[0].name } : null,
     });
 
     return { success: true, data: clients };
   } catch (error) {
-    console.error("❌ [getClientsForSelection] 고객사 목록 조회 실패:", error);
-    console.error("❌ [getClientsForSelection] 에러 상세:", {
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logger.error("❌ [getClientsForSelection] 고객사 목록 조회 실패:", error as Error);
 
     return {
       success: false,

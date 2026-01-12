@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { PrismaClient } from '@prisma/client';
 
 // 환경 변수에서 URL 가져와서 포트만 6543으로 변경하여 테스트

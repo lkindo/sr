@@ -42,7 +42,7 @@ export function Header({ user }: HeaderProps) {
   const activeMenu = getActiveMenu();
 
   // Dashboard 여부 확인
-  const isDashboard = activeMenu === "/dashboard";
+
 
   return (
     <header className="sticky top-0 z-50 w-full sr-header-accent bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 min-w-[1280px]">

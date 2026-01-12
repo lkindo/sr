@@ -13,6 +13,7 @@ describe('UserPolicy', () => {
     image: null,
     roles: ['ADMIN'],
     permissions: [],
+    clientIds: [],
   };
 
   const managerUser: AuthenticatedUser = {
@@ -22,6 +23,7 @@ describe('UserPolicy', () => {
     image: null,
     roles: ['MANAGER'],
     permissions: ['USER:READ', 'USER:UPDATE'],
+    clientIds: [],
   };
 
   const regularUser: AuthenticatedUser = {
@@ -31,6 +33,7 @@ describe('UserPolicy', () => {
     image: null,
     roles: ['USER'],
     permissions: ['USER:UPDATE_SELF'],
+    clientIds: [],
   };
 
   const mockUser: User = {
@@ -39,7 +42,7 @@ describe('UserPolicy', () => {
     email: 'test@example.com',
     emailVerified: null,
     image: null,
-    hashedPassword: 'hashed',
+    password: 'hashed',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),

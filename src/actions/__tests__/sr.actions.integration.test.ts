@@ -84,7 +84,7 @@ describe('SR actions integration-ish', () => {
 
 		const result = await createSRAction(formData)
 		expect(result.success).toBe(false)
-		expect(result.code).toBe('UNAUTHORIZED')
+		expect((result as any).code).toBe('UNAUTHORIZED')
 	})
 })
 
