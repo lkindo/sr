@@ -13,6 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -219,10 +229,17 @@ export function EditSRDialog({
 
   }, [open, srId]);
 
-  const handleDeleteAttachment = async (attachmentId: string) => {
-    // TODO: 추후 모달 확인으로 대체
-    // eslint-disable-next-line no-alert
-    if (!confirm("이 파일을 삭제하시겠습니까?")) return;
+  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+
+  const handleDeleteAttachmentClick = (attachmentId: string) => {
+    setFileToDelete(attachmentId);
+  };
+
+  const executeDeleteAttachment = async () => {
+    if (!fileToDelete) return;
+
+    const attachmentId = fileToDelete;
+    setFileToDelete(null);
 
     try {
       const response = await fetch(`/api/attachments/${attachmentId}`, {
@@ -538,7 +555,7 @@ export function EditSRDialog({
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteAttachment(attachment.id)}
+                            onClick={() => handleDeleteAttachmentClick(attachment.id)}
                             disabled={loading}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -580,6 +597,23 @@ export function EditSRDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>파일 삭제 확인</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말로 이 첨부파일을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={executeDeleteAttachment} className="bg-destructive hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

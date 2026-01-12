@@ -199,7 +199,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
   }, params?: {
     skip?: number;
     take?: number;
-    orderBy?: any;
+    orderBy?: Prisma.UserOrderByWithRelationInput;
   }): Promise<[User[], number]> {
     const where: Prisma.UserWhereInput = {};
 
@@ -288,7 +288,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
             },
           },
         },
-      }),
+      }) as Promise<(User & { clients: { client: { id: string; name: string; code: string } }[] })[]>,
       this.model.count({ where }),
     ]);
 
@@ -301,7 +301,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     // 추후 DB 스키마 변경(userType 컬럼 추가)을 제안하는 것이 좋음.
 
     // 임시: 가져온 데이터에 대해서만 userType 계산
-    const usersWithType = users.map((user: any) => ({
+    const usersWithType = users.map((user) => ({
       ...user,
       userType: user.clients.length > 0 ? ("CLIENT" as const) : ("ENGINEER" as const),
     }));
@@ -325,17 +325,17 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
           include: { role: true }
         }
       }
-    });
+    }) as { roles: { role: { name: string } }[] } | null;
 
     if (userRoles) {
-      const isSystemTeam = userRoles.roles.some((ur: any) =>
+      const isSystemTeam = userRoles.roles.some((ur) =>
         ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
       );
 
       if (isSystemTeam && clientIds.length > 0) {
         const systemRoles = userRoles.roles
-          .filter((ur: any) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
-          .map((ur: any) => ur.role.name)
+          .filter((ur) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+          .map((ur) => ur.role.name)
           .join(', ');
 
         throw new Error(
@@ -376,7 +376,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     return users.map((u: { id: string }) => u.id);
   }
 
-  async findUsersByRoles(roleNames: string[]): Promise<User[]> {
+  async findUsersByRoles(roleNames: string[]): Promise<(User & { notificationPreference: import("@prisma/client").NotificationPreference | null })[]> {
     return this.model.findMany({
       where: {
         roles: {

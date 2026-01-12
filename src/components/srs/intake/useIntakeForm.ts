@@ -237,7 +237,7 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
 
       // 성공 시에는 submitting을 false로 설정하지 않음 (페이지 이동 중이므로)
       // 페이지가 이동되면서 컴포넌트가 언마운트되므로 상태 업데이트 불필요
-    } catch (error: any) {
+    } catch (error) {
 
       const errorMessage = error instanceof Error
         ? error.message

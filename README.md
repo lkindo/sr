@@ -80,6 +80,32 @@ sr-management/
 - `pnpm lint`: ESLint 검사
 - `pnpm type-check`: TypeScript 타입 체크
 
+## 개발 가이드라인
+
+### 코드 품질
+- **Strict Typing**: 프로젝트는 `any` 타입 사용을 지양합니다. `strict` 모드가 활성화되어 있습니다.
+- **Commit Check**: 커밋 전 `pnpm type-check`와 `pnpm lint`를 통과해야 합니다.
+- **Server Components**: Next.js 15 Server Components 활용을 권장합니다.
+
+### 테스트
+이 프로젝트는 두 가지 레벨의 테스트를 운영합니다.
+
+#### 1. 단위 테스트 (Unit Tests)
+Vitest를 사용하여 서비스 로직 및 유틸리티를 검증합니다.
+```bash
+pnpm test          # 테스트 실행
+pnpm test:ui       # UI 모드로 실행
+pnpm test:coverage # 커버리지 확인
+```
+
+#### 2. E2E 테스트 (Playwright)
+실제 브라우저 환경에서 사용자 시나리오를 검증합니다.
+```bash
+pnpm test:e2e      # 전체 E2E 테스트
+pnpm test:e2e:ui   # UI 모드로 실행 (디버깅 용이)
+```
+- **주요 시나리오**: 로그인, SR 접수/처리, 관리자 기능 등
+
 ## 문서
 
 - [PRD](./docs/SR_Management_System_PRD.md): 비즈니스 요구사항

@@ -75,7 +75,14 @@ function highlightText(text: string, query: string) {
 }
 
 // 드래그 가능한 사용자 카드 컴포넌트
-function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: any) {
+interface DraggableUserCardProps {
+    user: User;
+    clientId: string;
+    searchQuery: string;
+    onToggleUserStatus?: (userId: string) => Promise<void>;
+}
+
+function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: DraggableUserCardProps) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `user-${user.id}`,
         data: { userId: user.id, sourceClientId: clientId, user },
@@ -133,7 +140,7 @@ function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: 
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                        {user.roles?.slice(0, 2).map((ur: any) => (
+                        {user.roles?.slice(0, 2).map((ur) => (
                             <Badge
                                 key={ur.role?.name || Math.random()}
                                 variant="secondary"
@@ -157,7 +164,17 @@ function DraggableUserCard({ user, clientId, searchQuery, onToggleUserStatus }: 
 }
 
 // 드롭 가능한 고객사 헤더 컴포넌트
-function DroppableClientHeader({ client, isExpanded, onToggleClient, onAddUser, onToggleClientStatus, searchQuery, userCount }: any) {
+interface DroppableClientHeaderProps {
+    client: Client;
+    isExpanded: boolean;
+    onToggleClient: (clientId: string) => void;
+    onAddUser: (clientId: string) => void;
+    onToggleClientStatus?: (clientId: string) => Promise<void>;
+    searchQuery: string;
+    userCount: number;
+}
+
+function DroppableClientHeader({ client, isExpanded, onToggleClient, onAddUser, onToggleClientStatus, searchQuery, userCount }: DroppableClientHeaderProps) {
     const { setNodeRef, isOver, active } = useDroppable({
         id: `client-${client.id}`,
         data: { clientId: client.id, client },
@@ -371,8 +388,8 @@ export function OrganizationTree({
                                             {/* 수직 연결선 */}
                                             <div className="absolute left-8 top-0 bottom-0 w-px bg-border"></div>
 
-                                            {users.map((uc: any) => {
-                                                const user = uc.user || uc;
+                                            {users.map((uc: User | { user: User }) => {
+                                                const user = 'user' in uc ? uc.user : uc;
                                                 return (
                                                     <DraggableUserCard
                                                         key={user.id || Math.random()}

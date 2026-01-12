@@ -126,7 +126,7 @@ export function AssignRolesDialog({
         }
         // 2. 시스템 운영팀 역할 + 고객사 할당 충돌 에러 처리
         else if (error.assignedClients && error.assignedClients.length > 0) {
-          const clientNames = error.assignedClients.map((c: any) => c.name).join(', ');
+          const clientNames = error.assignedClients.map((c: { name: string }) => c.name).join(', ');
           toast({
             title: "역할 할당 제한",
             description: (

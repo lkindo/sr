@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { SRService } from "@/services/sr.service";
 import { z } from "zod";
+import { SRStatus } from "@prisma/client";
 
 const statusActionSchema = z.object({
     action: z.enum([
@@ -53,8 +54,14 @@ export async function PATCH(
         }
 
         const currentStatus = currentSR.status;
-        let newStatus: string;
-        const updateData: any = {};
+        let newStatus: SRStatus;
+
+        interface UpdateData {
+            resolutionDescription?: string;
+            rejectionReason?: string;
+            completedAt?: Date;
+        }
+        const updateData: UpdateData = {};
 
         // 액션에 따른 상태 전이
         switch (action) {

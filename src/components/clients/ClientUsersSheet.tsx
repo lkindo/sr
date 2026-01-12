@@ -72,7 +72,7 @@ export function ClientUsersSheet({
       const data = await response.json();
 
       // UserClient 구조에서 user 정보 추출
-      const usersList = data.users?.map((uc: any) => uc.user) || [];
+      const usersList = data.users?.map((uc: { user: User }) => uc.user) || [];
       setUsers(usersList);
     } catch {
       toast({
