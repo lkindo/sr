@@ -309,7 +309,7 @@ export class UserRepository extends BaseRepositoryImpl<User, string, Prisma.User
     if (filters?.userType && filters.userType !== "all") {
       // 페이지네이션된 결과 내에서 필터링하므로 결과 개수가 줄어들 수 있음.
       // 이는 UX상 이상할 수 있으나, 현재 DB 구조상 최선임.
-      const filtered = usersWithType.filter((user: any) => user.userType === filters.userType);
+      const filtered = usersWithType.filter((user) => user.userType === filters.userType);
       return [filtered, total]; // total은 전체 개수 유지 (정확하지 않음)
     }
 

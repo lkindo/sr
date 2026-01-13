@@ -180,8 +180,8 @@ export function EditSRDialog({
         const data = await response.json();
         setExistingAttachments(data.attachments || []);
       }
-    } catch (error) {
-      // console.error("첨부 파일 로드 실패");
+    } catch {
+      // 첨부 파일 로드 실패 시 무시
     }
   }, []);
 
@@ -290,8 +290,8 @@ export function EditSRDialog({
       if (!response.ok) {
         throw new Error("Failed to upload attachments");
       }
-    } catch (error) {
-
+    } catch {
+      // 업로드 실패 시 toast로 사용자에게 알림
       toast({
         title: "경고",
         description: "SR은 수정되었으나 첨부파일 업로드에 실패했습니다.",

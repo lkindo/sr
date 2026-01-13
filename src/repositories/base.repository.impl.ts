@@ -1,5 +1,4 @@
 import { BaseRepository } from './base.repository';
-import { Prisma } from '@prisma/client';
 
 /**
  * Prisma Delegate Interface

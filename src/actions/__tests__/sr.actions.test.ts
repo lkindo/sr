@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createSRAction, updateSRAction, deleteSRAction } from '../sr.actions';
-import { SRService } from '@/services/sr.service';
 import { UnauthorizedError } from '@/lib/errors';
 import { getAuthenticatedSession } from '@/lib/action-helpers';
 

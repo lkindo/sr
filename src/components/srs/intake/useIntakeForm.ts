@@ -104,8 +104,8 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
               variant: "destructive",
             });
           }
-        } catch (error) {
-
+        } catch {
+          // 에러 발생 시 빈 배열로 설정, toast로 사용자에게 알림
           setUsers([]);
           toast({
             title: "경고",

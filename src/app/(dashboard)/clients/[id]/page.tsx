@@ -195,8 +195,7 @@ export default function ClientDetailPage() {
         description: "사용자가 고객사에서 제외되었습니다.",
       });
       fetchClient();
-    } catch (error) {
-      // console.error(error);
+    } catch {
       toast({
         title: "오류",
         description: "사용자 제외에 실패했습니다.",

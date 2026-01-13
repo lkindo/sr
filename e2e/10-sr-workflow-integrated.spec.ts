@@ -113,12 +113,16 @@ test.describe('SR 워크플로우 통합', () => {
     const hoursInput = page.getByLabel(/예상 작업 시간/i);
     await hoursInput.fill('4');
 
-    // 담당자 선택 (두 번째 콤보박스)
-    const assigneeSelect = comboboxes.nth(1);
+    // 담당자 선택
+    const assigneeSelect = page.getByRole('combobox', { name: /담당자|Assignee/i });
+    await expect(assigneeSelect).toBeVisible();
     await assigneeSelect.click();
-    // 담당자 목록이 로딩될 때까지 대기
-    await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByRole('option').first().click();
+
+    // 담당자 목록이 로딩될 때까지 대기 (로딩 텍스트가 사라지거나 유효한 옵션이 뜰 때까지)
+    // "담당자 목록을 불러오는 중..." 옵션이 뜰 수도 있으므로, 유효한 옵션(email 포함)을 기다림
+    const userOption = page.getByRole('option').filter({ hasText: /@/ }).first();
+    await userOption.waitFor({ state: 'visible', timeout: 10000 });
+    await userOption.click();
 
     await page.getByLabel(/접수 메모/i).fill('통합 테스트 접수');
 

@@ -42,7 +42,7 @@ vi.mock('@/lib/errors', () => ({
 }));
 
 // route 모듈은 mock 설정 후에 import
-import { POST } from '../route';
+// route 모듈은 테스트 내부에서 dynamic import 사용
 
 describe('POST /api/permissions/check', () => {
     beforeEach(() => {
@@ -61,6 +61,7 @@ describe('POST /api/permissions/check', () => {
         });
 
         // Act
+        const { POST } = await import('../route');
         const response = await POST(request, { session: { user: { id: 'user123' } } } as any);
         const json = await response.json();
 
@@ -79,6 +80,8 @@ describe('POST /api/permissions/check', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
         });
+
+        const { POST } = await import('../route');
 
         // Act
         const response = await POST(request, { session: { user: { id: 'user123' } } } as any);
@@ -99,6 +102,7 @@ describe('POST /api/permissions/check', () => {
         });
 
         // Act & Assert
+        const { POST } = await import('../route');
         await expect(
             POST(request, { session: { user: { id: 'user123' } } } as any)
         ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
@@ -114,6 +118,7 @@ describe('POST /api/permissions/check', () => {
         });
 
         // Act & Assert
+        const { POST } = await import('../route');
         await expect(
             POST(request, { session: { user: { id: 'user123' } } } as any)
         ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
@@ -126,6 +131,8 @@ describe('POST /api/permissions/check', () => {
             { resource: 'CLIENT', action: 'UPDATE', expected: false },
             { resource: 'ROLE', action: 'DELETE', expected: true },
         ];
+
+        const { POST } = await import('../route');
 
         for (const testCase of testCases) {
             mockCheckPermission.mockResolvedValue(testCase.expected);

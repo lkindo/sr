@@ -144,8 +144,8 @@ export default function ClientsPage() {
               [clientId]: data.users || [],
             }));
           }
-        } catch (error) {
-          // console.error("사용자 데이터 로드 실패");
+        } catch {
+          // 사용자 데이터 로드 실패 시 무시
         }
       }
     }

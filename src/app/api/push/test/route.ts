@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { pushService } from "@/services/push.service";
+import { logger } from "@/lib/logger";
 
 // Force refresh: 2025-12-07
 export async function POST(_req: Request) {
@@ -12,7 +13,7 @@ export async function POST(_req: Request) {
     try {
         // 구독 정보 확인
         const subscriptions = await pushService.getUserSubscriptions(session.user.id);
-        console.log(`[Test API] Found ${subscriptions.length} subscriptions for user ${session.user.id}`);
+        logger.debug(`[Test API] Found subscriptions for user`, { userId: session.user.id, custom_count: subscriptions.length });
 
         if (subscriptions.length === 0) {
             return NextResponse.json({ error: "No subscriptions found. Please enable push notifications in settings." }, { status: 404 });
@@ -26,10 +27,10 @@ export async function POST(_req: Request) {
             tag: "test-notification"
         });
 
-        console.log("[Test API] Send results:", results);
+        logger.debug("[Test API] Send results", { custom_count: results.length });
         return NextResponse.json({ success: true, count: subscriptions.length, results });
     } catch (error) {
-        console.error("Test push failed:", error);
+        logger.error("Test push failed", error as Error);
         return NextResponse.json({ error: "Failed to send test push" }, { status: 500 });
     }
 }

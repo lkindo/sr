@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { ClientPolicy } from '../client.policy';
+import {
+  canCreateClient,
+  canReadClient,
+  canUpdateClient,
+  canDeleteClient,
+  ensureCanCreateClient,
+  ensureCanReadClient,
+} from '@/lib/policies';
 import { Client } from '@prisma/client';
 import { AuthenticatedUser } from '@/types/session';
 
-describe('ClientPolicy', () => {
-  const policy = new ClientPolicy();
-
+describe('Client Policy Functions', () => {
   const adminUser: AuthenticatedUser = {
     id: 'admin-1',
     email: 'admin@example.com',
@@ -52,89 +57,89 @@ describe('ClientPolicy', () => {
     contractEndDate: null,
   };
 
-  describe('canCreate', () => {
+  describe('canCreateClient', () => {
     it('should allow ADMIN to create clients', () => {
-      expect(policy.canCreate(adminUser)).toBe(true);
+      expect(canCreateClient(adminUser)).toBe(true);
     });
 
     it('should allow users with CLIENT:CREATE permission', () => {
-      expect(policy.canCreate(managerUser)).toBe(true);
+      expect(canCreateClient(managerUser)).toBe(true);
     });
 
     it('should deny regular users without permission', () => {
-      expect(policy.canCreate(regularUser)).toBe(false);
+      expect(canCreateClient(regularUser)).toBe(false);
     });
   });
 
-  describe('canRead', () => {
+  describe('canReadClient', () => {
     it('should allow ADMIN to read all clients', () => {
-      expect(policy.canRead(adminUser)).toBe(true);
-      expect(policy.canRead(adminUser, mockClient)).toBe(true);
+      expect(canReadClient(adminUser)).toBe(true);
+      expect(canReadClient(adminUser, mockClient)).toBe(true);
     });
 
     it('should allow users with CLIENT:READ permission', () => {
-      expect(policy.canRead(managerUser)).toBe(true);
-      expect(policy.canRead(managerUser, mockClient)).toBe(true);
+      expect(canReadClient(managerUser)).toBe(true);
+      expect(canReadClient(managerUser, mockClient)).toBe(true);
     });
 
     it('should allow users to read their own client', () => {
-      expect(policy.canRead(regularUser, mockClient)).toBe(true);
+      expect(canReadClient(regularUser, mockClient)).toBe(true);
     });
 
     it('should deny users from reading other clients', () => {
       const otherClient = { ...mockClient, id: 'client-2' };
-      expect(policy.canRead(regularUser, otherClient)).toBe(false);
+      expect(canReadClient(regularUser, otherClient)).toBe(false);
     });
 
     it('should deny regular users from reading all clients', () => {
-      expect(policy.canRead(regularUser)).toBe(false);
+      expect(canReadClient(regularUser)).toBe(false);
     });
   });
 
-  describe('canUpdate', () => {
+  describe('canUpdateClient', () => {
     it('should allow ADMIN to update clients', () => {
-      expect(policy.canUpdate(adminUser, mockClient)).toBe(true);
+      expect(canUpdateClient(adminUser)).toBe(true);
     });
 
     it('should allow users with CLIENT:UPDATE permission', () => {
-      expect(policy.canUpdate(managerUser, mockClient)).toBe(true);
+      expect(canUpdateClient(managerUser)).toBe(true);
     });
 
     it('should deny regular users', () => {
-      expect(policy.canUpdate(regularUser, mockClient)).toBe(false);
+      expect(canUpdateClient(regularUser)).toBe(false);
     });
   });
 
-  describe('canDelete', () => {
+  describe('canDeleteClient', () => {
     it('should allow ADMIN to delete clients', () => {
-      expect(policy.canDelete(adminUser)).toBe(true);
+      expect(canDeleteClient(adminUser)).toBe(true);
     });
 
     it('should deny users without CLIENT:DELETE permission', () => {
-      expect(policy.canDelete(managerUser)).toBe(false);
-      expect(policy.canDelete(regularUser)).toBe(false);
+      expect(canDeleteClient(managerUser)).toBe(false);
+      expect(canDeleteClient(regularUser)).toBe(false);
     });
   });
 
-  describe('ensureCanCreate', () => {
+  describe('ensureCanCreateClient', () => {
     it('should not throw for authorized users', () => {
-      expect(() => policy.ensureCanCreate(adminUser)).not.toThrow();
+      expect(() => ensureCanCreateClient(adminUser)).not.toThrow();
     });
 
     it('should throw ForbiddenError for unauthorized users', () => {
-      expect(() => policy.ensureCanCreate(regularUser)).toThrow('고객사 생성 권한이 없습니다');
+      expect(() => ensureCanCreateClient(regularUser)).toThrow('고객사 생성 권한이 없습니다');
     });
   });
 
-  describe('ensureCanRead', () => {
+  describe('ensureCanReadClient', () => {
     it('should not throw for authorized users', () => {
-      expect(() => policy.ensureCanRead(adminUser, mockClient)).not.toThrow();
-      expect(() => policy.ensureCanRead(regularUser, mockClient)).not.toThrow();
+      expect(() => ensureCanReadClient(adminUser, mockClient)).not.toThrow();
+      expect(() => ensureCanReadClient(regularUser, mockClient)).not.toThrow();
     });
 
     it('should throw ForbiddenError for unauthorized users', () => {
       const otherClient = { ...mockClient, id: 'client-2' };
-      expect(() => policy.ensureCanRead(regularUser, otherClient)).toThrow('고객사 조회 권한이 없습니다');
+      expect(() => ensureCanReadClient(regularUser, otherClient)).toThrow('고객사 조회 권한이 없습니다');
     });
   });
 });

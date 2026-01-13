@@ -8,6 +8,7 @@ import { intakeUpdateSchema, intakeSchema } from "@/lib/schemas";
 import { validateRequestBody, RouteContext } from "@/lib/api-helpers";
 import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
 import { srDetailKey, SR_LIST_PREFIX, DASHBOARD_STATS_PREFIX, MY_REQUESTS_PREFIX } from "@/lib/cache-keys";
+import { logger } from "@/lib/logger";
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -158,7 +159,7 @@ export const POST = withAuthAndRateLimit(async (
       invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
     ]);
   } catch (e) {
-    console.warn('Cache invalidation failed after SR intake create:', e);
+    logger.warn('Cache invalidation failed after SR intake create', { custom_error: String(e) });
   }
 
   // 6. Activity 로그 생성
@@ -199,9 +200,9 @@ export const POST = withAuthAndRateLimit(async (
 
   // 9. 담당자에게 메일 발송 (non-blocking)
   if (!process.env.RESEND_API_KEY) {
-    console.warn(`[SR Intake] RESEND_API_KEY가 설정되지 않아 담당자(${updatedSR.assignee?.email || '이메일 없음'})에게 메일을 발송할 수 없습니다.`);
+    logger.warn('[SR Intake] RESEND_API_KEY 미설정', { custom_email: updatedSR.assignee?.email || '이메일 없음' });
   } else if (!updatedSR.assignee?.email) {
-    console.warn(`[SR Intake] 담당자(${updatedSR.assignee?.name || '이름 없음'})의 이메일 주소가 없어 메일을 발송할 수 없습니다.`);
+    logger.warn('[SR Intake] 담당자 이메일 없음', { custom_name: updatedSR.assignee?.name || '이름 없음' });
   } else {
     const priorityLabels: Record<string, string> = {
       CRITICAL: "긴급",
@@ -210,10 +211,10 @@ export const POST = withAuthAndRateLimit(async (
       LOW: "낮음",
     };
 
-    console.log(`[SR Intake] 담당자(${updatedSR.assignee?.email || 'N/A'})에게 SR 배정 메일 발송 시도: ${updatedSR.srNumber}`);
+    logger.info('[SR Intake] 담당자에게 SR 배정 메일 발송 시도', { srId: id, custom_srNumber: updatedSR.srNumber, custom_email: updatedSR.assignee?.email });
 
     if (!updatedSR.assignee) {
-      console.warn(`[SR Intake] 담당자가 없어 메일을 발송할 수 없습니다: ${updatedSR.srNumber}`);
+      logger.warn('[SR Intake] 담당자 없음', { custom_srNumber: updatedSR.srNumber });
       return NextResponse.json({
         success: true,
         sr: updatedSR,
@@ -234,13 +235,13 @@ export const POST = withAuthAndRateLimit(async (
     })
       .then((result) => {
         if (result) {
-          console.log(`[SR Intake] SR 배정 메일 발송 성공: ${updatedSR.srNumber} → ${updatedSR.assignee?.email || 'N/A'}`, result);
+          logger.info('[SR Intake] SR 배정 메일 발송 성공', { custom_srNumber: updatedSR.srNumber, custom_email: updatedSR.assignee?.email });
         } else {
-          console.warn(`[SR Intake] SR 배정 메일 발송 실패 (null 반환): ${updatedSR.srNumber} → ${updatedSR.assignee?.email || 'N/A'}`);
+          logger.warn('[SR Intake] SR 배정 메일 발송 실패 (null 반환)', { custom_srNumber: updatedSR.srNumber, custom_email: updatedSR.assignee?.email });
         }
       })
       .catch((error) => {
-        console.error(`[SR Intake] SR 배정 메일 발송 실패: ${updatedSR.srNumber} → ${updatedSR.assignee?.email || 'N/A'}`, error);
+        logger.error('[SR Intake] SR 배정 메일 발송 실패', error, { custom_srNumber: updatedSR.srNumber, custom_email: updatedSR.assignee?.email });
       });
   }
 
@@ -500,7 +501,7 @@ export const PATCH = withAuthAndRateLimit(async (
       invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
     ]);
   } catch (e) {
-    console.warn('Cache invalidation failed after SR intake update:', e);
+    logger.warn('Cache invalidation failed after SR intake update', { custom_error: String(e) });
   }
 
   // 8. 변경 사항 추적 및 이력 생성
@@ -579,9 +580,9 @@ export const PATCH = withAuthAndRateLimit(async (
     // 새 담당자에게만 메일 발송 (담당자가 배정된 경우만)
     if (validated.assigneeId && newAssignee) {
       if (!process.env.RESEND_API_KEY) {
-        console.warn(`[SR Intake Update] RESEND_API_KEY가 설정되지 않아 담당자(${newAssignee.email || '이메일 없음'})에게 메일을 발송할 수 없습니다.`);
+        logger.warn('[SR Intake Update] RESEND_API_KEY 미설정', { custom_email: newAssignee.email || '이메일 없음' });
       } else if (!newAssignee.email) {
-        console.warn(`[SR Intake Update] 담당자(${newAssignee.name || '이름 없음'})의 이메일 주소가 없어 메일을 발송할 수 없습니다.`);
+        logger.warn('[SR Intake Update] 담당자 이메일 없음', { custom_name: newAssignee.name || '이름 없음' });
       } else {
         const priorityLabels: Record<string, string> = {
           CRITICAL: "긴급",
@@ -590,7 +591,7 @@ export const PATCH = withAuthAndRateLimit(async (
           LOW: "낮음",
         };
 
-        console.log(`[SR Intake Update] 담당자(${newAssignee.email})에게 SR 배정 메일 발송 시도: ${updatedSR.srNumber}`);
+        logger.info('[SR Intake Update] 담당자에게 SR 배정 메일 발송 시도', { srId: id, custom_srNumber: updatedSR.srNumber, custom_email: newAssignee.email });
 
         sendSRAssignedEmail({
           to: newAssignee.email,
@@ -605,13 +606,13 @@ export const PATCH = withAuthAndRateLimit(async (
         })
           .then((result) => {
             if (result) {
-              console.log(`[SR Intake Update] SR 배정 메일 발송 성공: ${updatedSR.srNumber} → ${newAssignee.email}`, result);
+              logger.info('[SR Intake Update] SR 배정 메일 발송 성공', { custom_srNumber: updatedSR.srNumber, custom_email: newAssignee.email });
             } else {
-              console.warn(`[SR Intake Update] SR 배정 메일 발송 실패 (null 반환): ${updatedSR.srNumber} → ${newAssignee.email}`);
+              logger.warn('[SR Intake Update] SR 배정 메일 발송 실패 (null 반환)', { custom_srNumber: updatedSR.srNumber, custom_email: newAssignee.email });
             }
           })
           .catch((error) => {
-            console.error(`[SR Intake Update] SR 배정 메일 발송 실패: ${updatedSR.srNumber} → ${newAssignee.email}`, error);
+            logger.error('[SR Intake Update] SR 배정 메일 발송 실패', error, { custom_srNumber: updatedSR.srNumber, custom_email: newAssignee.email });
           });
       }
     }

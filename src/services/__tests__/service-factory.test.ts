@@ -4,7 +4,6 @@ import {
     createUserService,
     createClientService,
     repositories,
-    policies,
     resetAllInstances,
 } from '../service-factory';
 
@@ -66,12 +65,11 @@ vi.mock('@/repositories/role.repository', () => ({
     RoleRepository: class MockRoleRepository { },
 }));
 
-vi.mock('@/lib/policies/sr.policy', () => ({
-    SRPolicy: class MockSRPolicy {
-        ensureCanCreate = vi.fn();
-        ensureCanUpdate = vi.fn();
-        ensureCanDelete = vi.fn();
-    },
+// Mock policy functions (no longer class-based)
+vi.mock('@/lib/policies', () => ({
+    ensureCanCreateSR: vi.fn(),
+    ensureCanUpdateSR: vi.fn(),
+    ensureCanDeleteSR: vi.fn(),
 }));
 
 describe('Service Factory', () => {
@@ -125,14 +123,6 @@ describe('Service Factory', () => {
             resetAllInstances();
             const repo2 = repositories.sr();
             expect(repo1).not.toBe(repo2);
-        });
-    });
-
-    describe('policies', () => {
-        it('싱글톤 패턴으로 동일한 인스턴스를 반환해야 함', () => {
-            const policy1 = policies.sr();
-            const policy2 = policies.sr();
-            expect(policy1).toBe(policy2);
         });
     });
 });

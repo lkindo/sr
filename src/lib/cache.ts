@@ -82,7 +82,10 @@ if (process.env.NODE_ENV === 'development' && process.env.VITEST !== 'true') {
     Number(process.env.CACHE_METRICS_LOG_INTERVAL_MS ?? 60000)
 
   // Avoid multiple intervals in hot-reload by using globalThis flag
-  const g = globalThis as any
+  interface GlobalWithCacheMetricsLogger {
+    __sr_cache_metrics_logger_started__?: boolean;
+  }
+  const g = globalThis as GlobalWithCacheMetricsLogger & typeof globalThis;
   if (!g.__sr_cache_metrics_logger_started__) {
     try {
       setInterval(() => {

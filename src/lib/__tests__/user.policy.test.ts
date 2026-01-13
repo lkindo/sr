@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { UserPolicy } from '../user.policy';
+import {
+  canCreateUser,
+  canReadUser,
+  canUpdateUser,
+  canDeleteUser,
+  ensureCanDeleteUser,
+} from '@/lib/policies';
 import { User } from '@prisma/client';
 import { AuthenticatedUser } from '@/types/session';
 
-describe('UserPolicy', () => {
-  const policy = new UserPolicy();
-
+describe('User Policy Functions', () => {
   const adminUser: AuthenticatedUser = {
     id: 'admin-1',
     email: 'admin@example.com',
@@ -48,86 +52,85 @@ describe('UserPolicy', () => {
     updatedAt: new Date(),
   };
 
-  describe('canCreate', () => {
+  describe('canCreateUser', () => {
     it('should allow ADMIN to create users', () => {
-      expect(policy.canCreate(adminUser)).toBe(true);
+      expect(canCreateUser(adminUser)).toBe(true);
     });
 
     it('should deny regular users', () => {
-      expect(policy.canCreate(regularUser)).toBe(false);
+      expect(canCreateUser(regularUser)).toBe(false);
     });
   });
 
-  describe('canRead', () => {
+  describe('canReadUser', () => {
     it('should allow ADMIN to read all users', () => {
-      expect(policy.canRead(adminUser)).toBe(true);
-      expect(policy.canRead(adminUser, mockUser)).toBe(true);
+      expect(canReadUser(adminUser)).toBe(true);
+      expect(canReadUser(adminUser, mockUser)).toBe(true);
     });
 
     it('should allow users with USER:READ permission', () => {
-      expect(policy.canRead(managerUser)).toBe(true);
-      expect(policy.canRead(managerUser, mockUser)).toBe(true);
+      expect(canReadUser(managerUser)).toBe(true);
+      expect(canReadUser(managerUser, mockUser)).toBe(true);
     });
 
     it('should allow users to read themselves', () => {
-      expect(policy.canRead(regularUser, mockUser)).toBe(true);
+      expect(canReadUser(regularUser, mockUser)).toBe(true);
     });
 
     it('should deny users from reading others', () => {
       const otherUser = { ...mockUser, id: 'other-user' };
-      expect(policy.canRead(regularUser, otherUser)).toBe(false);
+      expect(canReadUser(regularUser, otherUser)).toBe(false);
     });
   });
 
-  describe('canUpdate', () => {
+  describe('canUpdateUser', () => {
     it('should allow ADMIN to update any user', () => {
-      expect(policy.canUpdate(adminUser, mockUser)).toBe(true);
+      expect(canUpdateUser(adminUser, mockUser)).toBe(true);
     });
 
     it('should allow users with USER:UPDATE permission', () => {
-      expect(policy.canUpdate(managerUser, mockUser)).toBe(true);
+      expect(canUpdateUser(managerUser, mockUser)).toBe(true);
     });
 
     it('should allow users to update themselves with UPDATE_SELF permission', () => {
-      expect(policy.canUpdate(regularUser, mockUser)).toBe(true);
+      expect(canUpdateUser(regularUser, mockUser)).toBe(true);
     });
 
     it('should deny users from updating others without permission', () => {
       const otherUser = { ...mockUser, id: 'other-user' };
-      expect(policy.canUpdate(regularUser, otherUser)).toBe(false);
+      expect(canUpdateUser(regularUser, otherUser)).toBe(false);
     });
   });
 
-  describe('canDelete', () => {
+  describe('canDeleteUser', () => {
     it('should allow ADMIN to delete other users', () => {
       const otherUser = { ...mockUser, id: 'other-user' };
-      expect(policy.canDelete(adminUser, otherUser)).toBe(true);
+      expect(canDeleteUser(adminUser, otherUser)).toBe(true);
     });
 
     it('should deny users from deleting themselves', () => {
       const adminSelf = { ...mockUser, id: 'admin-1' };
-      expect(policy.canDelete(adminUser, adminSelf)).toBe(false);
+      expect(canDeleteUser(adminUser, adminSelf)).toBe(false);
     });
 
     it('should deny regular users from deleting anyone', () => {
-      expect(policy.canDelete(regularUser, mockUser)).toBe(false);
+      expect(canDeleteUser(regularUser, mockUser)).toBe(false);
     });
   });
 
-  describe('ensureCanDelete', () => {
+  describe('ensureCanDeleteUser', () => {
     it('should throw specific error when trying to delete self', () => {
       const adminSelf = { ...mockUser, id: 'admin-1' };
-      expect(() => policy.ensureCanDelete(adminUser, adminSelf)).toThrow('자기 자신을 삭제할 수 없습니다');
+      expect(() => ensureCanDeleteUser(adminUser, adminSelf)).toThrow('자기 자신을 삭제할 수 없습니다');
     });
 
     it('should throw error when trying to delete self (takes precedence)', () => {
-      // User trying to delete themselves - this check comes before permission check
-      expect(() => policy.ensureCanDelete(regularUser, mockUser)).toThrow('자기 자신을 삭제할 수 없습니다');
+      expect(() => ensureCanDeleteUser(regularUser, mockUser)).toThrow('자기 자신을 삭제할 수 없습니다');
     });
 
     it('should throw permission error when deleting others without permission', () => {
       const otherUser = { ...mockUser, id: 'other-user' };
-      expect(() => policy.ensureCanDelete(regularUser, otherUser)).toThrow('사용자 삭제 권한이 없습니다');
+      expect(() => ensureCanDeleteUser(regularUser, otherUser)).toThrow('사용자 삭제 권한이 없습니다');
     });
   });
 });

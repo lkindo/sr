@@ -69,8 +69,8 @@ export default function NotificationsPage() {
           pushCommentAdded: data.pushCommentAdded ?? false,
         });
       }
-    } catch (error) {
-      console.error("Failed to load preferences:", error);
+    } catch {
+      // 실패 시 기본값 유지
     } finally {
       setIsLoadingPrefs(false);
     }

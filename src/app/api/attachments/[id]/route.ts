@@ -4,7 +4,7 @@ import { deleteAttachmentBlob } from "@/lib/storage";
 import { withAuthAndRateLimit, AuthenticatedContext } from "@/lib/auth-wrapper";
 import { NotFoundError } from "@/lib/errors";
 import { RouteContext } from "@/lib/api-helpers";
-import { SRPolicy } from "@/lib/policies/sr.policy";
+import { ensureCanUpdateSR } from "@/lib/policies";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -45,7 +45,6 @@ export const DELETE = withAuthAndRateLimit(async (
   // SR 접근 권한 체크
   const sr = await prisma.sR.findUnique({
     where: { id: attachment.srId },
-    select: { requesterId: true, assigneeId: true },
   });
 
   if (!sr) {
@@ -53,9 +52,7 @@ export const DELETE = withAuthAndRateLimit(async (
   }
 
   // 권한 체크: SR을 수정할 수 있는 권한이 있어야 첨부파일도 삭제 가능
-  const srPolicy = new SRPolicy();
-  // session.user는 AuthenticatedUser 타입을 만족해야 함
-  srPolicy.ensureCanUpdate(session.user as any, sr as any);
+  ensureCanUpdateSR(session.user, sr);
 
   // 파일 삭제 (Vercel Blob)
   const pathname =

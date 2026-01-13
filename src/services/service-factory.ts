@@ -29,7 +29,7 @@ import { RoleRepository } from "@/repositories/role.repository";
 import { SRService } from "./sr.service";
 import { UserService } from "./user.service";
 import { ClientService } from "./client.service";
-import { SRPolicy } from "@/lib/policies/sr.policy";
+
 
 // ============================================================================
 // Repository Factory (lazy singleton pattern)
@@ -43,7 +43,7 @@ let _clientRepository: ClientRepository | null = null;
 let _serviceCategoryRepository: ServiceCategoryRepository | null = null;
 let _userRepository: UserRepository | null = null;
 let _roleRepository: RoleRepository | null = null;
-let _srPolicy: SRPolicy | null = null;
+
 
 /**
  * Repository 인스턴스 getter (싱글톤)
@@ -59,12 +59,7 @@ export const repositories = {
     role: () => (_roleRepository ??= new RoleRepository()),
 };
 
-/**
- * Policy 인스턴스 getter (싱글톤)
- */
-export const policies = {
-    sr: () => (_srPolicy ??= new SRPolicy()),
-};
+
 
 // ============================================================================
 // Service Dependencies Types
@@ -80,7 +75,7 @@ export interface SRServiceDeps {
     srAttachmentRepository: SRAttachmentRepository;
     clientRepository: ClientRepository;
     serviceCategoryRepository: ServiceCategoryRepository;
-    srPolicy: SRPolicy;
+
 }
 
 /**
@@ -119,8 +114,7 @@ export function createSRService(deps?: Partial<SRServiceDeps>): SRService {
         deps?.srCommentRepository ?? repositories.srComment(),
         deps?.srAttachmentRepository ?? repositories.srAttachment(),
         deps?.clientRepository ?? repositories.client(),
-        deps?.serviceCategoryRepository ?? repositories.serviceCategory(),
-        deps?.srPolicy ?? policies.sr()
+        deps?.serviceCategoryRepository ?? repositories.serviceCategory()
     );
 }
 
@@ -171,5 +165,5 @@ export function resetAllInstances(): void {
     _serviceCategoryRepository = null;
     _userRepository = null;
     _roleRepository = null;
-    _srPolicy = null;
+
 }

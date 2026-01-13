@@ -1,4 +1,3 @@
-import { BaseRepository } from './base.repository';
 import { SR, Prisma, SRStatus, SRPriority } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { BaseRepositoryImpl } from './base.repository.impl';

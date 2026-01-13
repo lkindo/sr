@@ -76,8 +76,8 @@ export type SRCreateResult = SR & {
  */
 export type SRUpdateResult = SR & {
   client?: { id: string; code: string; name: string };
-  requester?: { id: string; name: string; email: string };
-  assignee?: { id: string; name: string; email: string } | null;
+  requester?: { id: string; name: string; email: string; notificationPreference?: import("@prisma/client").NotificationPreference | null };
+  assignee?: { id: string; name: string; email: string; notificationPreference?: import("@prisma/client").NotificationPreference | null } | null;
   serviceCategory?: {
     id: string;
     categoryName: string;

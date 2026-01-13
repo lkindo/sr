@@ -1,4 +1,4 @@
-import { Prisma, SR, PrismaClient, SRStatus } from "@prisma/client";
+import { Prisma, SR, SRStatus } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { z } from "zod";
 import { SRRepository } from "@/repositories/sr.repository";
@@ -12,7 +12,7 @@ import { emailService } from "@/services/email.service";
 import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { AuthenticatedUser } from "@/types/session";
-import { SRPolicy } from "@/lib/policies/sr.policy";
+import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from "@/lib/policies";
 import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from "@/types/sr.types";
 import prisma from "@/lib/prisma";
 import { NotFoundError } from "@/lib/errors";
@@ -40,7 +40,7 @@ export class SRService {
     private srAttachmentRepository: SRAttachmentRepository = new SRAttachmentRepository(),
     private clientRepository: ClientRepository = new ClientRepository(),
     private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository(),
-    private srPolicy: SRPolicy = new SRPolicy(),
+
     private userRepository: UserRepository = new UserRepository()
   ) { }
 
@@ -51,7 +51,7 @@ export class SRService {
     data: SrCreateData,
     sessionUser: AuthenticatedUser
   ): Promise<SRCreateResult> {
-    this.srPolicy.ensureCanCreate(sessionUser);
+    ensureCanCreateSR(sessionUser);
     const validated = srCreateSchema.parse(data);
 
     // 고객사 활성 상태 확인
@@ -252,7 +252,7 @@ export class SRService {
       const existingSR = await this.srRepository.findById(id);
       if (!existingSR) throw new NotFoundError("SR을 찾을 수 없습니다.");
 
-      this.srPolicy.ensureCanUpdate(sessionUser, existingSR);
+      ensureCanUpdateSR(sessionUser, existingSR);
 
       // 고객사 변경 검증 (REQUESTED 상태에서만 허용)
       if (validated.clientId && validated.clientId !== existingSR.clientId) {
@@ -397,12 +397,8 @@ export class SRService {
       // 트랜잭션으로 업데이트 및 활동 로그 생성
       return await prisma.$transaction(async (tx) => {
         // 1. SR 업데이트 (statusHistory 포함)
-        let updatedSR: SR & {
-          client: { id: string; code: string; name: string };
-          requester: { id: string; name: string; email: string; notificationPreference: import("@prisma/client").NotificationPreference | null };
-          assignee: ({ id: string; name: string; email: string; notificationPreference: import("@prisma/client").NotificationPreference | null }) | null;
-          serviceCategory: { id: string; categoryName: string; slaHours: number; handlerId: string | null; handler: { id: string; name: string } | null };
-        } = existingSR as any; // 초기값은 existingSR이지만 타입 호환성을 위해 any 캐스팅 후 할당. 실제로는 update 호출 결과로 덮어씌워짐.
+        // 1. SR 업데이트 (statusHistory 포함)
+        let updatedSR: SRUpdateResult = existingSR;
 
         if (Object.keys(updateData).length > 0) {
           updatedSR = await tx.sR.update({
@@ -566,7 +562,7 @@ export class SRService {
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
     const existingSR = await this.srRepository.findById(id);
     if (!existingSR) throw new NotFoundError("SR");
-    this.srPolicy.ensureCanDelete(sessionUser);
+    ensureCanDeleteSR(sessionUser);
 
     // 트랜잭션으로 관련 데이터와 함께 삭제
     await prisma.$transaction(async (tx) => {
