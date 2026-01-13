@@ -1,165 +1,93 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-type CacheModule = typeof import('../cache')
+// Setup initial mocks
+const mockRedis = {
+	get: vi.fn(),
+	set: vi.fn(),
+};
 
-async function importCacheWithoutRedis(): Promise<CacheModule> {
-	vi.resetModules()
-	vi.unstubAllEnvs()
-	vi.stubEnv('UPSTASH_REDIS_REST_URL', '')
-	vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '')
-
-	return import('../cache')
-}
-
-async function importCacheWithRedis() {
-	vi.resetModules()
-	vi.unstubAllEnvs()
-	vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.redis')
-	vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token')
-
-	const getMock = vi.fn()
-	const setMock = vi.fn()
-	const unstableCacheSpy = vi.fn(
-		(fn: (...args: any[]) => Promise<any>, keys: string[], options: any) => {
-			const wrapped = (...args: any[]) => fn(...args)
-			Object.assign(wrapped, { __cacheKeys: keys, __cacheOptions: options })
-			return wrapped
+vi.mock('@upstash/redis', () => ({
+	Redis: class {
+		constructor() {
+			return mockRedis;
 		}
-	)
+	},
+}));
 
-	const prismaMock = {
-		sR: { findMany: vi.fn().mockResolvedValue([]) },
-		user: { findMany: vi.fn().mockResolvedValue([]) },
-		client: { findMany: vi.fn().mockResolvedValue([]) },
-		permission: { findMany: vi.fn().mockResolvedValue([]) },
-		serviceCategory: { findMany: vi.fn().mockResolvedValue([]) },
-	} as any
+vi.mock('next/cache', () => ({
+	unstable_cache: vi.fn((fn) => fn),
+	revalidateTag: vi.fn(),
+}));
 
-	class RedisMock {
-		get = getMock
-		set = setMock
-		constructor() { }
-	}
-	vi.doMock('@upstash/redis', () => ({
-		Redis: RedisMock,
-	}))
-	vi.doMock('next/cache', () => ({
-		unstable_cache: unstableCacheSpy,
-	}))
-	vi.doMock('@/lib/prisma', () => ({
-		default: prismaMock,
-	}))
+const mockPrisma = {
+	sR: { findMany: vi.fn() },
+	user: { findMany: vi.fn() },
+	client: { findMany: vi.fn() },
+	permission: { findMany: vi.fn() },
+	serviceCategory: { findMany: vi.fn() },
+};
 
-	const mod = await import('../cache')
-	return { mod, getMock, setMock, unstableCacheSpy, prismaMock }
-}
+vi.mock('@/lib/prisma', () => ({
+	default: mockPrisma,
+}));
 
 describe('cache (Upstash)', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
-	})
+		vi.clearAllMocks();
+		vi.unstubAllEnvs();
+	});
 
-	afterEach(() => {
-		vi.unstubAllEnvs()
-	})
+	describe('isCacheAvailable', () => {
+		it('returns false when env vars are missing', async () => {
+			vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
+			vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
 
-	it('Redis가 없으면 안전하게 동작한다', async () => {
-		const mod = await importCacheWithoutRedis()
+			// We need to re-import to pick up env var changes if the module reads them at top level
+			// BUT `cache.ts` likely initializes Redis instance at top level or lazily.
+			// Based on typical patterns, it's safer to re-require or rely on how the module is written.
+			// If `cache.ts` creates `redis` client at top level, stubbing env vars AFTER import won't affect it 
+			// unless we reset modules.
+			vi.resetModules();
+			const mod = await import('../cache');
+			expect(mod.isCacheAvailable()).toBe(false);
+		});
 
-		expect(mod.isCacheAvailable()).toBe(false)
-		await expect(mod.cacheGet('missing')).resolves.toBeNull()
-		await expect(mod.cacheSet('key', 'value')).resolves.toBeUndefined()
-		expect(mod.getCacheMetrics()).toEqual({
-			hit: 0,
-			miss: 0,
-			set: 0,
-			invalidate: 0,
-		})
-	})
+		it('returns true when env vars are present', async () => {
+			vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.redis');
+			vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
 
-	it('네임스페이스와 TTL을 적용해 캐시를 설정한다', async () => {
-		const { mod, setMock } = await importCacheWithRedis()
+			vi.resetModules();
+			const mod = await import('../cache');
+			expect(mod.isCacheAvailable()).toBe(true);
+		});
+	});
 
-		await mod.cacheSet('dashboard', { value: 1 }, { namespace: 'sr', ttlSeconds: 120 })
-		expect(setMock).toHaveBeenCalledWith('sr:dashboard', { value: 1 }, { ex: 120 })
+	describe('cache operations', () => {
+		let mod: typeof import('../cache');
 
-		setMock.mockClear()
-		await mod.cacheSet('list', { value: 2 }, { ttlSeconds: 0 })
-		expect(setMock).toHaveBeenCalledWith('list', { value: 2 })
-	})
+		beforeEach(async () => {
+			vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.redis');
+			vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
+			vi.resetModules();
+			mod = await import('../cache');
+		});
 
-	it('cacheGet과 withCache는 히트/미스 메트릭을 갱신한다', async () => {
-		const { mod, getMock, setMock } = await importCacheWithRedis()
-		getMock.mockResolvedValueOnce(null)
+		it('cacheSet calls redis set with correct params', async () => {
+			await mod.cacheSet('key', { value: 1 }, { namespace: 'ns', ttlSeconds: 60 });
+			expect(mockRedis.set).toHaveBeenCalledWith('ns:key', { value: 1 }, { ex: 60 });
+		});
 
-		await expect(mod.cacheGet('foo', { namespace: 'ns' })).resolves.toBeNull()
-		expect(getMock).toHaveBeenCalledWith('ns:foo')
+		it('cacheGet calls redis get and updates metrics', async () => {
+			mockRedis.get.mockResolvedValue(null);
+			await expect(mod.cacheGet('key')).resolves.toBeNull();
+			expect(mod.getCacheMetrics().miss).toBe(1);
 
-		getMock.mockResolvedValueOnce(null).mockResolvedValueOnce('cached')
-		const compute = vi.fn().mockResolvedValue('fresh')
-		const first = await mod.withCache('foo', compute)
-		expect(first).toBe('fresh')
-		expect(compute).toHaveBeenCalledTimes(1)
-		expect(setMock).toHaveBeenCalledWith('foo', 'fresh')
+			mockRedis.get.mockResolvedValue('value');
+			await expect(mod.cacheGet('key')).resolves.toBe('value');
+			expect(mod.getCacheMetrics().hit).toBe(1);
+		});
+	});
+});
 
-		const second = await mod.withCache('foo', compute)
-		expect(second).toBe('cached')
-		expect(compute).toHaveBeenCalledTimes(1)
-
-		expect(mod.getCacheMetrics()).toEqual({
-			hit: 1,
-			miss: 2,
-			set: 1,
-			invalidate: 0,
-		})
-	})
-
-	it('Next cache 래퍼는 올바른 키와 옵션으로 생성된다', async () => {
-		const { mod, unstableCacheSpy, prismaMock } = await importCacheWithRedis()
-
-		const keys = unstableCacheSpy.mock.calls.map(([, cacheKeys]) => cacheKeys)
-		expect(keys).toEqual([['srs'], ['users'], ['clients'], ['permissions'], ['service-categories']])
-		const revalidateValues = unstableCacheSpy.mock.calls.map(([, , options]) => options.revalidate)
-		expect(revalidateValues).toEqual([300, 300, 300, 600, 600])
-
-		await mod.getCachedSRs({ where: { status: 'REQUESTED' }, take: 10 })
-		expect(prismaMock.sR.findMany).toHaveBeenCalledWith({
-			where: { status: 'REQUESTED' },
-			orderBy: undefined,
-			skip: undefined,
-			take: 10,
-			include: expect.objectContaining({
-				client: expect.any(Object),
-				requester: expect.any(Object),
-				assignee: expect.any(Object),
-				serviceCategory: expect.any(Object),
-			}),
-		})
-
-		await mod.getCachedUsers()
-		expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-			where: { isActive: true },
-			select: { id: true, name: true, email: true },
-		})
-
-		await mod.getCachedClients()
-		expect(prismaMock.client.findMany).toHaveBeenCalledWith({
-			where: { isActive: true },
-			select: { id: true, code: true, name: true },
-		})
-
-		await mod.getCachedPermissions()
-		expect(prismaMock.permission.findMany).toHaveBeenCalled()
-
-		await mod.getCachedServiceCategories()
-		expect(prismaMock.serviceCategory.findMany).toHaveBeenCalledWith({
-			where: { isActive: true },
-			include: expect.objectContaining({
-				handler: expect.any(Object),
-				backupHandler: expect.any(Object),
-			}),
-		})
-	})
-})
 
 

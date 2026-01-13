@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SRService } from '@/services/sr.service';
 import { SRRepository } from '@/repositories/sr.repository';
 import { ClientRepository } from '@/repositories/client.repository';
+import { UserRepository } from '@/repositories/user.repository';
 import { NotFoundError } from '@/lib/errors';
+import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from '@/lib/policies';
 
 // Mock dependencies
 vi.mock('@/repositories/sr.repository');
@@ -34,8 +36,6 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-// Import mocked functions
-import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from '@/lib/policies';
 
 describe('SRService', () => {
   let srService: SRService;
@@ -58,6 +58,12 @@ describe('SRService', () => {
 
     mockSRRepository = new SRRepository();
     mockClientRepository = new ClientRepository();
+    const mockUserRepository = new UserRepository();
+    // Default mock behavior
+    (mockUserRepository.findUserIdsByRoles as any).mockResolvedValue(['admin-1']);
+    (mockUserRepository.findUsersByRoles as any).mockResolvedValue([
+      { email: 'admin@test.com', notificationPreference: { emailSRCreated: true } }
+    ]);
 
     srService = new SRService(
       mockSRRepository,
@@ -66,6 +72,7 @@ describe('SRService', () => {
       undefined,
       mockClientRepository,
       undefined,
+      mockUserRepository,
     );
   });
 
@@ -232,6 +239,118 @@ describe('SRService', () => {
 
       const result = await srService.getSRDetailsById('non-existent');
       expect(result).toBeNull();
+    });
+  });
+  describe('getStatusHistory', () => {
+    it('should return status history with pagination', async () => {
+      const mockHistory = [
+        {
+          id: 'hist-1',
+          previousStatus: 'REQUESTED',
+          currentStatus: 'IN_PROGRESS',
+          changedAt: new Date(),
+          changeReason: 'Started work',
+          user: { id: 'user-1', name: 'User', email: 'user@test.com', image: null },
+        },
+      ];
+
+      const { default: prisma } = await import('@/lib/prisma');
+
+      // Since we imported prisma as default, we can try to cast it.
+      (prisma as any).sRStatusHistory = {
+        findMany: vi.fn().mockResolvedValue(mockHistory),
+        count: vi.fn().mockResolvedValue(1),
+      };
+
+      const result = await srService.getStatusHistory('sr-1', { skip: 0, take: 10 });
+
+      expect(result.items).toEqual(mockHistory);
+      expect(result.total).toBe(1);
+      // Verify call on the injected mock
+      expect((prisma as any).sRStatusHistory.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { srId: 'sr-1' }, skip: 0, take: 10 })
+      );
+    });
+  });
+
+  describe('createSR logic with notifications', () => {
+    it('should create SR and send notifications', async () => {
+      vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
+      mockClientRepository.findById.mockResolvedValue({ id: 'c-1', isActive: true, name: 'Client' });
+
+      const mockCreatedSR = {
+        id: 'sr-1',
+        srNumber: 'SR-001',
+        title: 'New SR',
+        requester: { name: 'Requester' },
+        serviceCategory: { categoryName: 'Category' }
+      };
+
+      const { default: prisma } = await import('@/lib/prisma');
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        if (typeof callback === 'function') {
+          // We need to pass a mock tx object to the callback if it expects one
+          return mockCreatedSR;
+        }
+        return mockCreatedSR;
+      });
+
+      mockSRRepository.findDetailsById.mockResolvedValue(mockCreatedSR);
+
+      vi.mock('@/lib/mattermost', () => ({
+        sendMattermostNotification: vi.fn(),
+      }));
+
+      const data = {
+        title: 'Test SR Title',
+        description: 'Test Description',
+        clientId: 'c-1',
+        serviceCategoryId: 'cat-1',
+        requestedPriority: 'MEDIUM' as const,
+      };
+
+      const result = await srService.createSR(data, mockUser);
+
+      expect(result).toEqual(mockCreatedSR);
+    });
+
+    describe('deleteSR', () => {
+      it('should delete SR successfully', async () => {
+        const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
+        mockSRRepository.findById.mockResolvedValue(mockSR);
+        vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
+
+        // Mock transaction for delete
+        const { default: prisma } = await import('@/lib/prisma');
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+          if (typeof callback === 'function') {
+            return undefined;
+          }
+        });
+
+        await srService.deleteSR('sr-1', mockUser);
+
+        // Verify findById called
+        expect(mockSRRepository.findById).toHaveBeenCalledWith('sr-1');
+        // Verify transaction called (implies delete logic executed)
+        expect(prisma.$transaction).toHaveBeenCalled();
+      });
+
+      it('should throw NotFoundError if SR to delete does not exist', async () => {
+        mockSRRepository.findById.mockResolvedValue(null);
+        await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow(NotFoundError);
+      });
+
+      it('should throw Error if delete fails', async () => {
+        const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
+        mockSRRepository.findById.mockResolvedValue(mockSR);
+        vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
+
+        const { default: prisma } = await import('@/lib/prisma');
+        vi.mocked(prisma.$transaction).mockRejectedValue(new Error('Delete failed'));
+
+        await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow('Delete failed');
+      });
     });
   });
 });

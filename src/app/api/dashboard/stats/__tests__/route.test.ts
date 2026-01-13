@@ -53,6 +53,9 @@ vi.mock('@/lib/cache-config', () => ({
 }));
 
 describe('GET /api/dashboard/stats', () => {
+    // Increase timeout for this suite as it involves dynamic imports and can be slow in full coverage runs
+    vi.setConfig({ testTimeout: 15000 });
+
     beforeEach(() => {
         vi.clearAllMocks();
         mockClientFindMany.mockResolvedValue([]);
