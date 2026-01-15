@@ -1,37 +1,11 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { auth } from '@/auth';
+import NextAuth from 'next-auth';
+import { authConfig } from '@/auth.config';
 
-export async function middleware(request: NextRequest) {
-    // 1. 공용 라우트 (비로그인 접근 허용) - 정적 파일 포함
-    const publicPaths = ['/login', '/register', '/api/auth', '/_next', '/favicon.ico', '/public'];
-    const isPublicPath = publicPaths.some(path =>
-        request.nextUrl.pathname.startsWith(path) ||
-        request.nextUrl.pathname === '/'
-    );
+// Edge-safe한 auth 설정만 사용하여 Edge Function 크기 제한 준수
+// bcryptjs, Prisma 등 Node.js 전용 의존성을 번들에서 제외
+const { auth } = NextAuth(authConfig);
 
-    if (isPublicPath) {
-        return NextResponse.next();
-    }
-
-    // 2. 인증 확인
-    const session = await auth();
-
-    // 3. 비로그인 사용자 리다이렉트
-    if (!session) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/login';
-        url.searchParams.set('callbackUrl', request.nextUrl.pathname);
-        return NextResponse.redirect(url);
-    }
-
-    // 4. 로그인 사용자 로그인 페이지 접근 시 대시보드로 리다이렉트
-    if (session && request.nextUrl.pathname === '/login') {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-
-    return NextResponse.next();
-}
+export default auth;
 
 export const config = {
     matcher: [
