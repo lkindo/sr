@@ -1,33 +1,62 @@
-import { UserRepository } from "@/repositories/user.repository";
-import { RoleRepository } from "@/repositories/role.repository";
-import { ClientRepository } from "@/repositories/client.repository";
 import { PermissionService } from "./permission.service";
 import { invalidateCachePattern } from "@/lib/redis-cache";
 import { hash, compare } from "bcryptjs";
 import { userUpdateSchema } from "@/lib/schemas";
 import { z } from "zod";
 import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
+import prisma from "@/lib/prisma";
 import type { User, Prisma } from "@prisma/client";
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
+/**
+ * 사용자 서비스 (User Service)
+ *
+ * 사용자 계정 관리 및 관련 비즈니스 로직을 처리합니다.
+ * - 사용자 CRUD 작업
+ * - 역할(Role) 및 고객사(Client) 할당
+ * - 비밀번호 관리 및 검증
+ * - 사용자 활성화/비활성화
+ *
+ * @example
+ * ```typescript
+ * const userService = new UserService();
+ * const user = await userService.getUserById('user-123');
+ * ```
+ */
 export class UserService {
-  constructor(
-    private userRepository: UserRepository = new UserRepository(),
-    private roleRepository: RoleRepository = new RoleRepository(),
-    private clientRepository: ClientRepository = new ClientRepository()
-  ) { }
+  constructor() { }
 
   async getUserById(id: string) {
-    return this.userRepository.findDetailsById(id);
+    return prisma.user.findUnique({
+      where: { id },
+      include: {
+        roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        clients: { include: { client: true } },
+      },
+    });
   }
 
   async getUserByEmail(email: string) {
-    return this.userRepository.findByEmail(email);
+    return prisma.user.findUnique({
+      where: { email },
+      include: {
+        roles: { include: { role: true } },
+        clients: { include: { client: true } },
+      },
+    });
   }
 
   async getUserByClientId(clientId: string): Promise<User[]> {
-    return this.userRepository.findByClientId(clientId);
+    return prisma.user.findMany({
+      where: {
+        clients: { some: { clientId } },
+      },
+      include: {
+        roles: { include: { role: true } },
+        clients: { include: { client: true } },
+      },
+    });
   }
 
   async getAllUsers(filters?: {
@@ -42,29 +71,114 @@ export class UserService {
     take?: number;
     orderBy?: Prisma.UserOrderByWithRelationInput;
   }): Promise<{ data: User[]; total: number }> {
-    if (filters && Object.keys(filters).length > 0) {
-      const [data, total] = await this.userRepository.findAllWithFilters(filters, params);
-      return { data, total };
+    const where: Prisma.UserWhereInput = {};
+
+    if (filters?.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: "insensitive" } },
+        { email: { contains: filters.search, mode: "insensitive" } },
+      ];
     }
-    const [data, total] = await this.userRepository.findAllPaginated(params);
-    return { data, total };
+
+    if (filters?.isActive !== null && filters?.isActive !== undefined && filters.isActive !== "all") {
+      where.isActive = filters.isActive === "true";
+    }
+
+    if (filters?.clientId && filters.clientId !== "all") {
+      if (filters.clientId === "unassigned") {
+        where.clients = { none: {} };
+      } else {
+        where.clients = { some: { clientId: filters.clientId } };
+      }
+    }
+
+    if (filters?.roleId && filters.roleId !== "all") {
+      if (filters.roleId === "none") {
+        where.roles = { none: {} };
+      } else {
+        where.roles = { some: { roleId: filters.roleId } };
+      }
+    }
+
+    if (filters?.role) {
+      const roleNames = filters.role.split(",");
+      where.roles = { some: { role: { name: { in: roleNames } } } };
+    }
+
+    const { skip, take, orderBy } = params || {};
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take,
+        orderBy: orderBy || { createdAt: "desc" },
+        include: {
+          roles: { include: { role: true } },
+          clients: { include: { client: { select: { id: true, name: true, code: true } } } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    const usersWithType = users.map((user) => ({
+      ...user,
+      userType: user.clients.length > 0 ? ("CLIENT" as const) : ("ENGINEER" as const),
+    }));
+
+    if (filters?.userType && filters.userType !== "all") {
+      const filtered = usersWithType.filter((user) => user.userType === filters.userType);
+      return { data: filtered as any, total };
+    }
+
+    return { data: usersWithType as any, total };
   }
 
   async updateUser(id: string, data: UserUpdateData): Promise<User> {
     const validated = userUpdateSchema.parse(data);
     const { clientIds, ...updateData } = validated;
 
-    const user = await this.userRepository.update(id, updateData);
+    const user = await prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
 
     if (clientIds) {
-      await this.userRepository.updateClientAssociations(id, clientIds);
+      // 시스템 운영팀 체크
+      const userRoles = await prisma.user.findUnique({
+        where: { id },
+        select: { roles: { include: { role: true } } }
+      }) as { roles: { role: { name: string } }[] } | null;
+
+      if (userRoles) {
+        const isSystemTeam = userRoles.roles.some((ur) =>
+          ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+        );
+
+        if (isSystemTeam && clientIds.length > 0) {
+          throw new BusinessRuleError("시스템 운영팀은 고객사를 할당할 수 없습니다.");
+        }
+      }
+
+      await prisma.user.update({
+        where: { id },
+        data: {
+          clients: {
+            deleteMany: {},
+            create: clientIds.map((clientId) => ({ clientId })),
+          },
+        },
+      });
     }
 
     return user;
   }
 
   async updatePassword(userId: string, hashedPassword: string): Promise<User> {
-    return this.userRepository.updatePassword(userId, hashedPassword);
+    return prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
   }
 
   async updateProfile(userId: string, profileData: {
@@ -72,11 +186,17 @@ export class UserService {
     email?: string;
     image?: string;
   }): Promise<User> {
-    return this.userRepository.updateProfile(userId, profileData);
+    return prisma.user.update({
+      where: { id: userId },
+      data: profileData,
+    });
   }
 
   async activateUser(userId: string): Promise<User> {
-    const user = await this.userRepository.activateUser(userId);
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: true },
+    });
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
     await invalidateCachePattern("user:list*");
@@ -109,7 +229,10 @@ export class UserService {
     }
 
     // 3. 진행 중인 SR이 없으면 비활성화
-    const user = await this.userRepository.deactivateUser(userId);
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { isActive: false },
+    });
 
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
@@ -171,7 +294,7 @@ export class UserService {
     }
 
     // 5. 완전 삭제 수행
-    const deletedUser = await this.userRepository.delete(userId);
+    const deletedUser = await prisma.user.delete({ where: { id: userId } });
 
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
@@ -281,7 +404,7 @@ export class UserService {
 
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<User> {
     // 사용자 조회
-    const user = await this.userRepository.findById(userId);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundError("사용자", userId);
     }
@@ -298,7 +421,10 @@ export class UserService {
     const hashedPassword = await hash(newPassword, 10);
 
     // 비밀번호 업데이트
-    return this.userRepository.updatePassword(userId, hashedPassword);
+    return prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
   }
 }
 // Force rebuild

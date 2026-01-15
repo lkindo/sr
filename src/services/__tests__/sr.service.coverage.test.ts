@@ -1,23 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SRService } from '@/services/sr.service';
-import { SRRepository } from '@/repositories/sr.repository';
-import { ClientRepository } from '@/repositories/client.repository';
-import { UserRepository } from '@/repositories/user.repository';
-import { ServiceCategoryRepository } from '@/repositories/service-category.repository';
-import { SRActivityRepository } from '@/repositories/sr-activity.repository';
-import { SRCommentRepository } from '@/repositories/sr-comment.repository';
-import { SRAttachmentRepository } from '@/repositories/sr-attachment.repository';
 import { ensureCanCreateSR, ensureCanUpdateSR } from '@/lib/policies';
+import prisma from '@/lib/prisma';
 
 // Mock dependencies
-vi.mock('@/repositories/sr.repository');
-vi.mock('@/repositories/sr-activity.repository');
-vi.mock('@/repositories/sr-comment.repository');
-vi.mock('@/repositories/sr-attachment.repository');
-vi.mock('@/repositories/client.repository');
-vi.mock('@/repositories/service-category.repository');
-vi.mock('@/repositories/user.repository');
-
 vi.mock('@/lib/policies', () => ({
     ensureCanCreateSR: vi.fn(),
     ensureCanUpdateSR: vi.fn(),
@@ -28,12 +14,47 @@ vi.mock('@/lib/wait-until', () => ({
     backgroundTask: vi.fn(async (promise) => {
         try { await promise; } catch (e) { }
     }),
-    backgroundTasks: vi.fn(async (tasks) => Promise.all(tasks.map(t => t.promise))),
+    backgroundTasks: vi.fn(async (tasks: any[]) => Promise.all(tasks.map((t: any) => t.promise))),
 }));
 
 vi.mock('@/lib/prisma', () => ({
     default: {
-        $transaction: vi.fn((callback) => callback({})),
+        $transaction: vi.fn((callback) => callback(prisma)),
+        sR: {
+            findUnique: vi.fn().mockResolvedValue(null),
+            findFirst: vi.fn().mockResolvedValue(null),
+            findMany: vi.fn().mockResolvedValue([]),
+            create: vi.fn().mockResolvedValue({}),
+            update: vi.fn().mockResolvedValue({}),
+            delete: vi.fn().mockResolvedValue({}),
+            count: vi.fn().mockResolvedValue(0),
+        },
+        sRActivity: {
+            create: vi.fn().mockResolvedValue({}),
+            deleteMany: vi.fn().mockResolvedValue({}),
+        },
+        sRComment: {
+            deleteMany: vi.fn().mockResolvedValue({}),
+        },
+        sRAttachment: {
+            deleteMany: vi.fn().mockResolvedValue({}),
+        },
+        sRStatusHistory: {
+            create: vi.fn().mockResolvedValue({}),
+            deleteMany: vi.fn().mockResolvedValue({}),
+            findMany: vi.fn().mockResolvedValue([]),
+            count: vi.fn().mockResolvedValue(0),
+        },
+        client: {
+            findUnique: vi.fn().mockResolvedValue(null),
+        },
+        serviceCategory: {
+            findUnique: vi.fn().mockResolvedValue(null),
+        },
+        user: {
+            findMany: vi.fn().mockResolvedValue([]),
+            findUnique: vi.fn().mockResolvedValue(null),
+        },
     },
 }));
 
@@ -44,15 +65,6 @@ vi.mock('@/lib/sr-state-machine', () => ({
 
 describe('SRService - Expanded Coverage', () => {
     let srService: SRService;
-    let mocks: {
-        sr: any;
-        activity: any;
-        comment: any;
-        attachment: any;
-        client: any;
-        category: any;
-        user: any;
-    };
 
     const mockUser = {
         id: 'user-1',
@@ -66,30 +78,7 @@ describe('SRService - Expanded Coverage', () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2023-10-10T10:00:00Z'));
 
-        mocks = {
-            sr: new SRRepository(),
-            activity: new SRActivityRepository(),
-            comment: new SRCommentRepository(),
-            attachment: new SRAttachmentRepository(),
-            client: new ClientRepository(),
-            category: new ServiceCategoryRepository(),
-            user: new UserRepository(),
-        };
-
-        mocks.user.findUserIdsByRoles.mockResolvedValue([]);
-        mocks.user.findUsersByRoles.mockResolvedValue([]);
-        mocks.activity.create.mockResolvedValue({});
-        mocks.sr.update.mockResolvedValue({});
-
-        srService = new SRService(
-            mocks.sr,
-            mocks.activity,
-            mocks.comment,
-            mocks.attachment,
-            mocks.client,
-            mocks.category,
-            mocks.user
-        );
+        srService = new SRService();
     });
 
     afterEach(() => {
@@ -99,7 +88,7 @@ describe('SRService - Expanded Coverage', () => {
     describe('updateSR - Validation Branches', () => {
         it('should throw error when missing required fields for status change', async () => {
             const existingSR = { id: 'sr-1', status: 'REQUESTED' };
-            mocks.sr.findById.mockResolvedValue(existingSR);
+            vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as any);
             vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
             const { validateTransition, getRequiredFields } = await import('@/lib/sr-state-machine');
@@ -114,20 +103,21 @@ describe('SRService - Expanded Coverage', () => {
     describe('createSR - Sequence Logic', () => {
         it('should handle sequential SR numbering correctly when lastSR is valid', async () => {
             vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
-            mocks.client.findById.mockResolvedValue({ id: 'c-1', isActive: true });
+            vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as any);
 
-            const { default: prisma } = await import('@/lib/prisma');
             const txMock = {
                 sR: {
                     findFirst: vi.fn().mockResolvedValue({ srNumber: 'SR-20231010-0005' }),
                     create: vi.fn().mockResolvedValue({ id: 'sr-1', srNumber: 'SR-20231010-0006' })
-                }
+                },
+                sRActivity: { create: vi.fn() }
             };
-            vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(txMock));
-            mocks.sr.findDetailsById.mockResolvedValue({
+            vi.mocked(prisma.$transaction).mockImplementation(async (callback) => callback(txMock as any));
+
+            vi.mocked(prisma.sR.findUnique).mockResolvedValue({
                 id: 'sr-1', srNumber: 'SR-20231010-0006', title: 'T',
-                requester: { name: 'R' }, serviceCategory: { categoryName: 'C' }
-            });
+                requester: { name: 'R', notificationPreference: {} }, serviceCategory: { categoryName: 'C' }
+            } as any);
 
             await srService.createSR({
                 title: 'Title Valid',

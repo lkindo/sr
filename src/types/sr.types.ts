@@ -18,36 +18,16 @@ export type SRDetails = SR & {
     handlerId?: string | null;
     handler?: { id: string; name: string } | null;
   };
-  comments: Array<{
-    id: string;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
+  comments: (import("@prisma/client").SRComment & {
     user: { id: string; name: string; image: string | null };
-  }>;
-  activities: Array<{
-    id: string;
-    type: string;
-    description: string;
-    createdAt: Date;
+  })[];
+  activities: (import("@prisma/client").SRActivity & {
     user: { id: string; name: string; image: string | null };
-  }>;
-  attachments: Array<{
-    id: string;
-    fileName: string;
-    fileSize: number;
-    fileType: string;
-    fileUrl: string;
-    createdAt: Date;
-  }>;
-  statusHistory: Array<{
-    id: string;
-    currentStatus: string;
-    previousStatus: string | null;
-    changedAt: Date;
-    changeReason: string | null;
+  })[];
+  attachments: import("@prisma/client").SRAttachment[];
+  statusHistory: (import("@prisma/client").SRStatusHistory & {
     user: { id: string; name: string; image: string | null };
-  }>;
+  })[];
   _count: { comments: number; attachments: number };
 };
 

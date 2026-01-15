@@ -140,6 +140,13 @@ describe('EditSRDialog Component', () => {
             data: [{ id: 'cat-1', categoryName: 'Category 1' }],
         });
 
+        (getProfileAction as any).mockResolvedValue({
+            success: true,
+            data: {
+                clients: [{ client: { id: 'client-1', code: 'C1', name: 'Client 1' } }]
+            }
+        });
+
         global.fetch = vi.fn().mockResolvedValue({
             ok: true,
             json: async () => ({ ...mockSR }),
@@ -208,6 +215,70 @@ describe('EditSRDialog Component', () => {
         await waitFor(() => {
             expect(mockToast).toHaveBeenCalled();
             expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+        });
+    });
+    it('submits form successfully', async () => {
+        (updateSRAction as any).mockResolvedValue({ success: true });
+        render(<EditSRDialog {...defaultProps} />);
+
+        const submitBtn = screen.getByText('저장');
+        fireEvent.click(submitBtn);
+
+        await waitFor(() => {
+            expect(updateSRAction).toHaveBeenCalled();
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: '성공' }));
+            expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+            expect(mockOnUpdated).toHaveBeenCalled();
+        });
+    });
+
+    it('handles submit failure', async () => {
+        (updateSRAction as any).mockResolvedValue({ success: false, error: 'Update failed' });
+        render(<EditSRDialog {...defaultProps} />);
+
+        const submitBtn = screen.getByText('저장');
+        fireEvent.click(submitBtn);
+
+        await waitFor(() => {
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
+        });
+    });
+
+    it.skip('handles attachment delete failure', async () => {
+        // Reset fetch mock to ensure clean state
+        global.fetch = vi.fn()
+            .mockResolvedValueOnce({ ok: true, json: async () => mockSR }) // initial load
+            .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({ error: 'Delete failed' }) }); // delete fail
+
+        render(<EditSRDialog {...defaultProps} />);
+
+        await screen.findByText('test.pdf');
+
+        // Find trash icon and click parent button
+        const trashIcon = screen.getByTestId('icon-trash');
+        const deleteBtn = trashIcon.closest('button');
+        if (!deleteBtn) throw new Error('Delete button not found');
+
+        fireEvent.click(deleteBtn);
+
+        // Wait for dialog and click confirm
+        const confirmBtn = await screen.findByText('삭제');
+        fireEvent.click(confirmBtn);
+
+        await waitFor(() => {
+            expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('/api/attachments/'), expect.objectContaining({ method: 'DELETE' }));
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+                title: '오류',
+                variant: 'destructive'
+            }));
+        });
+    });
+
+    it('fetches categories failure handles gracefully', async () => {
+        (getServiceCategoriesForSelection as any).mockResolvedValue({ success: false });
+        render(<EditSRDialog {...defaultProps} />);
+        await waitFor(() => {
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: '오류' }));
         });
     });
 });

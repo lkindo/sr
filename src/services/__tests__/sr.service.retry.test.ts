@@ -1,64 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SRService } from '@/services/sr.service';
-import { SRRepository } from '@/repositories/sr.repository';
-import { ClientRepository } from '@/repositories/client.repository';
-import { UserRepository } from '@/repositories/user.repository';
-import { ServiceCategoryRepository } from '@/repositories/service-category.repository';
-import { SRActivityRepository } from '@/repositories/sr-activity.repository';
-import { SRCommentRepository } from '@/repositories/sr-comment.repository';
-import { SRAttachmentRepository } from '@/repositories/sr-attachment.repository';
 import { ensureCanCreateSR } from '@/lib/policies';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import prisma from '@/lib/prisma';
 
-// Mock repositories
-vi.mock('@/repositories/sr.repository');
-vi.mock('@/repositories/sr-activity.repository');
-vi.mock('@/repositories/sr-comment.repository');
-vi.mock('@/repositories/sr-attachment.repository');
-vi.mock('@/repositories/client.repository');
-vi.mock('@/repositories/service-category.repository');
-vi.mock('@/repositories/user.repository');
-
-// Mock external services
-vi.mock('@/services/push.service', () => ({
-    pushService: { sendForEvent: vi.fn().mockResolvedValue(undefined) }
-}));
-vi.mock('@/services/email.service', () => ({
-    emailService: {
-        sendSREmail: vi.fn().mockResolvedValue(true),
-        sendSRCreated: vi.fn().mockResolvedValue(true),
-    }
+// Mock dependencies
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $transaction: vi.fn(),
+        client: { findUnique: vi.fn().mockResolvedValue(null) },
+        sR: { findUnique: vi.fn().mockResolvedValue(null), update: vi.fn().mockResolvedValue({}), delete: vi.fn().mockResolvedValue({}), count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
+        sRActivity: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+        user: { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null) },
+        sRStatusHistory: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+        sRComment: { deleteMany: vi.fn().mockResolvedValue({}) },
+        sRAttachment: { deleteMany: vi.fn().mockResolvedValue({}) },
+    },
 }));
 
 vi.mock('@/lib/policies', () => ({
     ensureCanCreateSR: vi.fn(),
-    ensureCanUpdateSR: vi.fn(),
-    ensureCanDeleteSR: vi.fn(),
 }));
 
-vi.mock('@/lib/wait-until', () => ({
-    backgroundTask: vi.fn((promise) => {
-        promise.catch(() => { });
-    }),
-    backgroundTasks: vi.fn(() => { }),
-}));
-
-vi.mock('@/lib/prisma', () => ({
-    default: {
-        $transaction: vi.fn(),
-    },
-}));
-
-vi.mock('@/lib/logger', () => ({
-    logger: {
-        info: vi.fn(),
-        error: vi.fn(),
-        warn: vi.fn(),
-        debug: vi.fn(),
-    }
-}));
-
-// Mock Prisma error
 vi.mock('@prisma/client/runtime/library', () => ({
     PrismaClientKnownRequestError: class extends Error {
         code: string;
@@ -71,50 +34,32 @@ vi.mock('@prisma/client/runtime/library', () => ({
 
 describe('SRService - Retry Logic', () => {
     let srService: SRService;
-    let mocks: any;
 
     beforeEach(() => {
         vi.clearAllMocks();
-
-        mocks = {
-            sr: new SRRepository(),
-            activity: new SRActivityRepository(),
-            comment: new SRCommentRepository(),
-            attachment: new SRAttachmentRepository(),
-            client: new ClientRepository(),
-            category: new ServiceCategoryRepository(),
-            user: new UserRepository(),
-        };
-
-        mocks.user.findUserIdsByRoles.mockResolvedValue([]);
-        mocks.user.findUsersByRoles.mockResolvedValue([]);
-        mocks.activity.create.mockResolvedValue({});
-
-        srService = new SRService(
-            mocks.sr, mocks.activity, mocks.comment, mocks.attachment, mocks.client, mocks.category, mocks.user
-        );
+        srService = new SRService();
     });
 
     it('retries SR number generation on P2002 error', async () => {
         vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
-        mocks.client.findById.mockResolvedValue({ id: 'c-1', isActive: true });
-
-        const { default: prisma } = await import('@/lib/prisma');
+        vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as any);
 
         const txMock = {
             sR: {
                 findFirst: vi.fn().mockResolvedValue({ srNumber: 'SR-20231010-0001' }),
                 create: vi.fn()
-                    .mockRejectedValueOnce(new PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002' }))
-                    .mockResolvedValueOnce({ id: 'sr-1', srNumber: 'SR-20231010-0002' })
-            }
+                    .mockRejectedValueOnce(new PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: '5.0.0' } as any))
+                    .mockResolvedValueOnce({ id: 'sr-1', srNumber: 'SR-20231010-0002' } as any)
+            },
+            sRActivity: { create: vi.fn() }
         };
 
-        vi.mocked(prisma.$transaction).mockImplementation(async (cb) => cb(txMock));
-        mocks.sr.findDetailsById.mockResolvedValue({
+        vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
+
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({
             id: 'sr-1', srNumber: 'SR-20231010-0002', title: 'Valid Title',
-            requester: { name: 'R' }, serviceCategory: { categoryName: 'C' }
-        });
+            requester: { name: 'R', notificationPreference: {} }, serviceCategory: { categoryName: 'C' }
+        } as any);
 
         await srService.createSR({
             title: 'Valid Title Long Enough',

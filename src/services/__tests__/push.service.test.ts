@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PushService } from '@/services/push.service';
 import prisma from '@/lib/prisma';
 
@@ -32,6 +32,14 @@ describe('PushService', () => {
         pushService = new PushService();
         // Spy on static method to bypass env var check during tests
         vi.spyOn(PushService, 'isConfigured').mockReturnValue(true);
+
+        // Test environment bypass disable
+        vi.stubEnv('NODE_ENV', 'development');
+        vi.stubEnv('TEST_MODE', 'false');
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
     });
 
     describe('isConfigured', () => {

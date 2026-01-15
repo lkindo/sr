@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ServiceCategoryService } from '../service-category.service';
-import { ServiceCategoryRepository } from '@/repositories/service-category.repository';
+import prisma from '@/lib/prisma';
 
-vi.mock('@/repositories/service-category.repository');
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        serviceCategory: {
+            findMany: vi.fn(),
+        },
+    },
+}));
 
 describe('ServiceCategoryService', () => {
     let service: ServiceCategoryService;
-    let mockRepository: any;
 
     beforeEach(() => {
-        mockRepository = {
-            findAll: vi.fn(),
-        };
-        service = new ServiceCategoryService(mockRepository);
+        vi.clearAllMocks();
+        service = new ServiceCategoryService();
     });
 
     describe('getAll', () => {
@@ -22,21 +25,21 @@ describe('ServiceCategoryService', () => {
                 { id: '2', name: 'Category 2', clientId: 'client1' },
             ];
 
-            mockRepository.findAll.mockResolvedValue(mockCategories);
+            vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue(mockCategories as any);
 
             const result = await service.getAll();
 
             expect(result).toEqual(mockCategories);
-            expect(mockRepository.findAll).toHaveBeenCalledTimes(1);
+            expect(prisma.serviceCategory.findMany).toHaveBeenCalled();
         });
 
         it('빈 배열을 반환할 수 있어야 함', async () => {
-            mockRepository.findAll.mockResolvedValue([]);
+            vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([]);
 
             const result = await service.getAll();
 
             expect(result).toEqual([]);
-            expect(mockRepository.findAll).toHaveBeenCalledTimes(1);
+            expect(prisma.serviceCategory.findMany).toHaveBeenCalled();
         });
     });
 });

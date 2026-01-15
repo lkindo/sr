@@ -1,58 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SRService } from '@/services/sr.service';
-import { SRRepository } from '@/repositories/sr.repository';
-import { ClientRepository } from '@/repositories/client.repository';
-import { UserRepository } from '@/repositories/user.repository';
-import { ServiceCategoryRepository } from '@/repositories/service-category.repository';
-import { SRActivityRepository } from '@/repositories/sr-activity.repository';
-import { SRCommentRepository } from '@/repositories/sr-comment.repository';
-import { SRAttachmentRepository } from '@/repositories/sr-attachment.repository';
 import { ensureCanUpdateSR } from '@/lib/policies';
 import { NotFoundError } from '@/lib/errors';
+import prisma from '@/lib/prisma';
 
 // Mock dependencies
-vi.mock('@/repositories/sr.repository');
-vi.mock('@/repositories/sr-activity.repository');
-vi.mock('@/repositories/sr-comment.repository');
-vi.mock('@/repositories/sr-attachment.repository');
-vi.mock('@/repositories/client.repository');
-vi.mock('@/repositories/service-category.repository');
-vi.mock('@/repositories/user.repository');
+vi.mock('@/lib/prisma', () => ({
+    default: {
+        $transaction: vi.fn((cb) => cb(prisma)),
+        sR: { findUnique: vi.fn(), update: vi.fn() },
+        client: { findUnique: vi.fn() },
+        serviceCategory: { findUnique: vi.fn() },
+        sRActivity: { create: vi.fn() },
+    },
+}));
 
 vi.mock('@/lib/policies', () => ({
     ensureCanUpdateSR: vi.fn(),
     ensureCanCreateSR: vi.fn(),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-    default: {
-        $transaction: vi.fn((cb) => cb({
-            sR: { update: vi.fn() },
-            sRActivity: { create: vi.fn() },
-        })),
-    },
-}));
-
 describe('SRService.updateSR Branches', () => {
     let srService: SRService;
-    let mocks: any;
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mocks = {
-            sr: new SRRepository(),
-            activity: new SRActivityRepository(),
-            comment: new SRCommentRepository(),
-            attachment: new SRAttachmentRepository(),
-            client: new ClientRepository(),
-            category: new ServiceCategoryRepository(),
-            user: new UserRepository(),
-        };
-        srService = new SRService(mocks.sr, mocks.activity, mocks.comment, mocks.attachment, mocks.client, mocks.category, mocks.user);
+        srService = new SRService();
     });
 
     it('throws error when changing client if status is not REQUESTED', async () => {
-        mocks.sr.findById.mockResolvedValue({ id: 'sr-1', status: 'IN_PROGRESS', clientId: 'old-c' });
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1', status: 'IN_PROGRESS', clientId: 'old-c' } as any);
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { clientId: 'new-c' }, { id: 'u1' } as any))
@@ -60,8 +37,8 @@ describe('SRService.updateSR Branches', () => {
     });
 
     it('throws NotFoundError when new client does not exist', async () => {
-        mocks.sr.findById.mockResolvedValue({ id: 'sr-1', status: 'REQUESTED', clientId: 'old-c' });
-        mocks.client.findById.mockResolvedValue(null);
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1', status: 'REQUESTED', clientId: 'old-c' } as any);
+        vi.mocked(prisma.client.findUnique).mockResolvedValue(null);
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { clientId: 'non-existent' }, { id: 'u1' } as any))
@@ -69,8 +46,8 @@ describe('SRService.updateSR Branches', () => {
     });
 
     it('throws error when new client is inactive', async () => {
-        mocks.sr.findById.mockResolvedValue({ id: 'sr-1', status: 'REQUESTED', clientId: 'old-c' });
-        mocks.client.findById.mockResolvedValue({ id: 'new-c', isActive: false, name: 'Inactive Corp' });
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1', status: 'REQUESTED', clientId: 'old-c' } as any);
+        vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'new-c', isActive: false, name: 'Inactive Corp' } as any);
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { clientId: 'new-c' }, { id: 'u1' } as any))
@@ -78,7 +55,7 @@ describe('SRService.updateSR Branches', () => {
     });
 
     it('throws error when missing required fields for status transition', async () => {
-        mocks.sr.findById.mockResolvedValue({ id: 'sr-1', status: 'INTAKE' });
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1', status: 'INTAKE' } as any);
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { status: 'IN_PROGRESS' }, { id: 'u1', roles: ['ADMIN'] } as any))
@@ -86,7 +63,7 @@ describe('SRService.updateSR Branches', () => {
     });
 
     it('throws error when changing assignee of COMPLETED SR', async () => {
-        mocks.sr.findById.mockResolvedValue({ id: 'sr-1', status: 'COMPLETED', assigneeId: 'old-a' });
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1', status: 'COMPLETED', assigneeId: 'old-a' } as any);
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { assigneeId: 'new-a' }, { id: 'u1' } as any))
@@ -94,20 +71,19 @@ describe('SRService.updateSR Branches', () => {
     });
 
     it('adjusts due date when actualPriority changes', async () => {
-        mocks.sr.findById.mockResolvedValue({
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({
             id: 'sr-1', status: 'IN_PROGRESS',
             serviceCategoryId: 'cat-1', actualPriority: 'LOW',
             intakeAt: new Date('2023-10-10T00:00:00Z')
-        });
-        mocks.category.findById.mockResolvedValue({ id: 'cat-1', slaHours: 24 });
+        } as any);
+        vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'cat-1', slaHours: 24 } as any);
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
-        const { default: prisma } = await import('@/lib/prisma');
         const txMock = {
             sR: { update: vi.fn().mockResolvedValue({ id: 'sr-1' }) },
             sRActivity: { create: vi.fn() }
         };
-        vi.mocked(prisma.$transaction).mockImplementation(async (cb) => cb(txMock));
+        vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
 
         await srService.updateSR('sr-1', { actualPriority: 'CRITICAL' }, { id: 'u1' } as any);
 

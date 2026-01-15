@@ -130,7 +130,17 @@ export function SRStatusActions({
                 );
 
             case "INTAKE":
-                return null;
+                // 접수됨 상태: 진행 시작, 보류(접수단계에선 보류불가?), 거절
+                if (!canManage) return null;
+                return (
+                    <Button
+                        onClick={() => handleSimpleStatusChange("start")}
+                        disabled={loading}
+                    >
+                        <Play className="mr-2 h-4 w-4" />
+                        진행 시작
+                    </Button>
+                );
             case "IN_PROGRESS":
                 // 진행중 상태: 완료 처리, 보류
                 if (!canManage) return null;

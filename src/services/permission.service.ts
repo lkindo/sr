@@ -1,7 +1,6 @@
 import { User, Role, Permission } from "@prisma/client";
-import { UserRepository } from "@/repositories/user.repository";
-import { PermissionRepository } from "@/repositories/permission.repository";
 import { getCachedData, CacheKeys, invalidateCache } from "@/lib/redis-cache";
+import prisma from "@/lib/prisma";
 
 type UserWithPermissions = User & {
   roles: {
@@ -24,10 +23,7 @@ type UserWithPermissions = User & {
  * 권한 형식: "리소스:액션" (예: "SR:CREATE", "CLIENT:UPDATE")
  */
 export class PermissionService {
-  constructor(
-    private userRepository: UserRepository = new UserRepository(),
-    private permissionRepository: PermissionRepository = new PermissionRepository()
-  ) {}
+  constructor() { }
 
   /**
    * 사용자 전체 정보 조회 (역할, 권한 포함)
@@ -43,7 +39,24 @@ export class PermissionService {
     return getCachedData(
       `user:full:${userId}`,
       async () => {
-        return this.userRepository.findDetailsById(userId) as Promise<UserWithPermissions | null>;
+        return prisma.user.findUnique({
+          where: { id: userId },
+          include: {
+            roles: {
+              include: {
+                role: {
+                  include: {
+                    permissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }) as Promise<UserWithPermissions | null>;
       },
       600 // 10분 캐시 (권한 정보는 자주 변경되지 않음)
     );
@@ -60,7 +73,7 @@ export class PermissionService {
     return getCachedData(
       CacheKeys.userPermissions("all"),
       async () => {
-        return this.permissionRepository.findAll();
+        return prisma.permission.findMany();
       },
       1800 // 30분 캐시 (권한 목록은 거의 변경되지 않음)
     );
@@ -186,7 +199,24 @@ export class PermissionService {
   }
 
   async getUsersWithPermissions(requiredPermissions: string[]) {
-    const users = await this.userRepository.findAllDetails();
+    const users = await prisma.user.findMany({
+      where: { isActive: true },
+      include: {
+        roles: {
+          include: {
+            role: {
+              include: {
+                permissions: {
+                  include: {
+                    permission: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
 
     const srHandlers = users.filter((user) => {
       const userPermissions = new Set<string>();

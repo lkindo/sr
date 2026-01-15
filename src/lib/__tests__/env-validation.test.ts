@@ -73,15 +73,15 @@ describe('EnvValidation', () => {
         process.env.NEXTAUTH_URL = 'http://localhost';
         process.env.BLOB_READ_WRITE_TOKEN = 'token';
 
-        // Invalid optional
-        process.env.MATTERMOST_WEBHOOK_URL = 'ftp://invalid-url';
+        // Invalid optional - use rate limit variable
+        process.env.RATE_LIMIT_STRICT_WINDOW_MS = 'not-a-number';
 
         try {
             validateEnv();
             expect(true).toBe(false);
         } catch (error: any) {
             expect(error).toBeInstanceOf(EnvValidationError);
-            expect(error.invalidVariables[0].variable.name).toBe('MATTERMOST_WEBHOOK_URL');
+            expect(error.invalidVariables[0].variable.name).toBe('RATE_LIMIT_STRICT_WINDOW_MS');
         }
     });
 });

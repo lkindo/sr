@@ -20,6 +20,9 @@ vi.mock('@/lib/prisma', () => ({
 	default: {
 		sR: { findMany: vi.fn() },
 		user: { findMany: vi.fn() },
+		client: { findMany: vi.fn() },
+		permission: { findMany: vi.fn() },
+		serviceCategory: { findMany: vi.fn() },
 	}
 }));
 
@@ -41,8 +44,28 @@ describe('Cache Utility', () => {
 			await expect(cacheUtils.cacheSet('test', 'val')).resolves.toBeUndefined();
 		});
 
+		it('does nothing for cacheSet with TTL', async () => {
+			await expect(cacheUtils.cacheSet('test', 'val', { ttlSeconds: 60 })).resolves.toBeUndefined();
+		});
+
 		it('isCacheAvailable returns false', () => {
 			expect(cacheUtils.isCacheAvailable()).toBe(false);
+		});
+
+		it('getCacheMetrics returns metrics object', () => {
+			const metrics = cacheUtils.getCacheMetrics();
+			expect(metrics).toHaveProperty('hit');
+			expect(metrics).toHaveProperty('miss');
+			expect(metrics).toHaveProperty('set');
+			expect(metrics).toHaveProperty('invalidate');
+			expect(typeof metrics.hit).toBe('number');
+		});
+
+		it('withCache calls compute function when no redis', async () => {
+			const compute = vi.fn().mockResolvedValue({ data: 'computed' });
+			const result = await cacheUtils.withCache('test-key', compute);
+			expect(compute).toHaveBeenCalled();
+			expect(result).toEqual({ data: 'computed' });
 		});
 	});
 
@@ -55,5 +78,42 @@ describe('Cache Utility', () => {
 			expect(result).toHaveLength(1);
 			expect(prisma.sR.findMany).toHaveBeenCalled();
 		});
+
+		it('getCachedUsers calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'u1', name: 'Test' }] as any);
+
+			const result = await cacheUtils.getCachedUsers();
+			expect(result).toHaveLength(1);
+			expect(prisma.user.findMany).toHaveBeenCalled();
+		});
+
+		it('getCachedClients calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.client.findMany).mockResolvedValue([{ id: 'c1', name: 'Client' }] as any);
+
+			const result = await cacheUtils.getCachedClients();
+			expect(result).toHaveLength(1);
+			expect(prisma.client.findMany).toHaveBeenCalled();
+		});
+
+		it('getCachedPermissions calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.permission.findMany).mockResolvedValue([{ id: 'p1' }] as any);
+
+			const result = await cacheUtils.getCachedPermissions();
+			expect(result).toHaveLength(1);
+			expect(prisma.permission.findMany).toHaveBeenCalled();
+		});
+
+		it('getCachedServiceCategories calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([{ id: 'sc1' }] as any);
+
+			const result = await cacheUtils.getCachedServiceCategories();
+			expect(result).toHaveLength(1);
+			expect(prisma.serviceCategory.findMany).toHaveBeenCalled();
+		});
 	});
 });
+

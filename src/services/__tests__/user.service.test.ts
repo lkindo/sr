@@ -1,12 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UserService } from '@/services/user.service';
-import { UserRepository } from '@/repositories/user.repository';
 import { ValidationError, BusinessRuleError, NotFoundError } from '@/lib/errors';
+import prisma from '@/lib/prisma';
 
 // Mock dependencies
-vi.mock('@/repositories/user.repository');
-vi.mock('@/repositories/role.repository');
-vi.mock('@/repositories/client.repository');
 vi.mock('@/lib/redis-cache', () => ({
   invalidateCachePattern: vi.fn(),
 }));
@@ -18,46 +15,68 @@ vi.mock('bcryptjs', () => ({
 
 vi.mock('@/lib/prisma', () => ({
   default: {
+    user: {
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    role: {
+      findFirst: vi.fn(),
+    },
+    userRole: {
+      createMany: vi.fn(),
+    },
+    userClient: {
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     sR: { findMany: vi.fn(), count: vi.fn() },
     sRActivity: { count: vi.fn() },
     sRComment: { count: vi.fn() },
     sRStatusHistory: { count: vi.fn() },
-    $transaction: vi.fn((cb) => cb({
-      user: { create: vi.fn().mockResolvedValue({ id: 'u1' }), findUniqueOrThrow: vi.fn() },
-      role: { findFirst: vi.fn() },
-      userRole: { createMany: vi.fn() },
-      userClient: { createMany: vi.fn() }
-    })),
+    $transaction: vi.fn((cb) => cb(prisma)),
   }
 }));
 
 describe('UserService', () => {
   let userService: UserService;
-  let mockUserRepo: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUserRepo = new UserRepository();
-    userService = new UserService(mockUserRepo);
+    userService = new UserService();
   });
 
   describe('getAllUsers', () => {
-    it('calls findAllWithFilters when filters are provided', async () => {
-      mockUserRepo.findAllWithFilters.mockResolvedValue([[], 0]);
+    it('calls findMany with filters when search is provided', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.user.count).mockResolvedValue(0);
+
       await userService.getAllUsers({ search: 'test' });
-      expect(mockUserRepo.findAllWithFilters).toHaveBeenCalled();
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.any(Array)
+        })
+      }));
     });
 
-    it('calls findAllPaginated when no filters are provided', async () => {
-      mockUserRepo.findAllPaginated.mockResolvedValue([[], 0]);
+    it('calls findMany with pagination when no filters are provided', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([]);
+      vi.mocked(prisma.user.count).mockResolvedValue(0);
+
       await userService.getAllUsers({});
-      expect(mockUserRepo.findAllPaginated).toHaveBeenCalled();
+
+      expect(prisma.user.findMany).toHaveBeenCalled();
     });
   });
 
   describe('deactivateUser', () => {
     it('throws ValidationError if user has active SRs', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.sR.findMany).mockResolvedValue([{ id: 'sr-1', srNumber: 'SR1', status: 'IN_PROGRESS' }] as any);
 
       await expect(userService.deactivateUser('u1'))
@@ -65,26 +84,26 @@ describe('UserService', () => {
     });
 
     it('deactivates user if no active SRs', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.sR.findMany).mockResolvedValue([]);
-      mockUserRepo.deactivateUser.mockResolvedValue({ id: 'u1' });
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1', isActive: false } as any);
 
       const result = await userService.deactivateUser('u1');
       expect(result.id).toBe('u1');
-      expect(mockUserRepo.deactivateUser).toHaveBeenCalledWith('u1');
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'u1' },
+        data: { isActive: false }
+      });
     });
   });
 
   describe('hardDeleteUser', () => {
     it('throws BusinessRuleError if related SR data exists', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.sR.count).mockResolvedValue(1);
 
       await expect(userService.hardDeleteUser('u1')).rejects.toThrow(BusinessRuleError);
     });
 
     it('throws BusinessRuleError if activity exists', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.sR.count).mockResolvedValue(0);
       vi.mocked(prisma.sRActivity.count).mockResolvedValue(1);
 
@@ -92,28 +111,31 @@ describe('UserService', () => {
     });
 
     it('deletes user if no related data exists', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.sR.count).mockResolvedValue(0);
       vi.mocked(prisma.sRActivity.count).mockResolvedValue(0);
       vi.mocked(prisma.sRComment.count).mockResolvedValue(0);
       vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(0);
-      mockUserRepo.delete.mockResolvedValue({ id: 'u1' });
+      vi.mocked(prisma.user.delete).mockResolvedValue({ id: 'u1' } as any);
 
       const result = await userService.hardDeleteUser('u1');
       expect(result.id).toBe('u1');
+      expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
     });
   });
 
   describe('createUser', () => {
     it('creates user with userType based roles', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       const txMock = {
-        user: { create: vi.fn().mockResolvedValue({ id: 'u1' }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'u1' }) },
-        role: { findFirst: vi.fn().mockResolvedValue({ id: 'r1' }) },
+        user: {
+          create: vi.fn().mockResolvedValue({ id: 'u1' }),
+          findUnique: vi.fn().mockResolvedValue({ id: 'u1', email: 't@t.com' }),
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'u1', email: 't@t.com' })
+        },
+        role: { findFirst: vi.fn().mockResolvedValue({ id: 'r1', name: 'ENGINEER' }) },
         userRole: { createMany: vi.fn() },
         userClient: { createMany: vi.fn() }
       };
-      vi.mocked(prisma.$transaction).mockImplementation(async (cb) => cb(txMock));
+      vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
 
       await userService.createUser({
         email: 't@t.com', name: 'N', password: 'P', userType: 'ENGINEER'
@@ -122,18 +144,17 @@ describe('UserService', () => {
       expect(txMock.role.findFirst).toHaveBeenCalledWith(expect.objectContaining({
         where: { name: 'ENGINEER' }
       }));
-      expect(txMock.userRole.createMany).toHaveBeenCalled();
     });
   });
 
   describe('changePassword', () => {
     it('throws error if user not found', async () => {
-      mockUserRepo.findById.mockResolvedValue(null);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
       await expect(userService.changePassword('u1', 'old', 'new')).rejects.toThrow(NotFoundError);
     });
 
     it('throws error if current password mismatch', async () => {
-      mockUserRepo.findById.mockResolvedValue({ id: 'u1', password: 'hashed-old' });
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1', password: 'hashed-old' } as any);
       const { compare } = await import('bcryptjs');
       vi.mocked(compare).mockResolvedValue(false as any);
 

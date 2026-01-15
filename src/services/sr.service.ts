@@ -1,15 +1,8 @@
 import { Prisma, SR, SRStatus } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { z } from "zod";
-import { SRRepository } from "@/repositories/sr.repository";
-import { SRActivityRepository } from "@/repositories/sr-activity.repository";
-import { SRCommentRepository } from "@/repositories/sr-comment.repository";
-import { SRAttachmentRepository } from "@/repositories/sr-attachment.repository";
-import { ClientRepository } from "@/repositories/client.repository";
-import { UserRepository } from "@/repositories/user.repository";
 import { pushService } from "@/services/push.service";
 import { emailService } from "@/services/email.service";
-import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
 import { AuthenticatedUser } from "@/types/session";
 import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from "@/lib/policies";
@@ -33,16 +26,7 @@ type SrCreateData = z.infer<typeof srCreateSchema>;
  * - 권한 정책 적용
  */
 export class SRService {
-  constructor(
-    private srRepository: SRRepository = new SRRepository(),
-    private srActivityRepository: SRActivityRepository = new SRActivityRepository(),
-    private srCommentRepository: SRCommentRepository = new SRCommentRepository(),
-    private srAttachmentRepository: SRAttachmentRepository = new SRAttachmentRepository(),
-    private clientRepository: ClientRepository = new ClientRepository(),
-    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository(),
-
-    private userRepository: UserRepository = new UserRepository()
-  ) { }
+  constructor() { }
 
   /**
    * SR을 생성합니다.
@@ -55,7 +39,7 @@ export class SRService {
     const validated = srCreateSchema.parse(data);
 
     // 고객사 활성 상태 확인
-    const client = await this.clientRepository.findById(validated.clientId);
+    const client = await prisma.client.findUnique({ where: { id: validated.clientId } });
     if (!client) {
       throw new NotFoundError("고객사");
     }
@@ -150,39 +134,46 @@ export class SRService {
       throw new Error("SR 생성에 실패했습니다.");
     }
 
-    await this.srActivityRepository.create({
-      srId: sr.id,
-      userId: sessionUser.id,
-      type: "CREATED",
-      description: "SR이 생성되었습니다.",
+    await prisma.sRActivity.create({
+      data: {
+        srId: sr.id,
+        userId: sessionUser.id,
+        type: "CREATED",
+        description: "SR이 생성되었습니다.",
+      }
     });
 
-    await this.srRepository.update(sr.id, {
-      statusHistory: {
-        create: {
-          previousStatus: null,
-          currentStatus: "REQUESTED",
-          changedBy: sessionUser.id,
-          changeReason: "SR 생성",
+    await prisma.sR.update({
+      where: { id: sr.id },
+      data: {
+        statusHistory: {
+          create: {
+            previousStatus: null,
+            currentStatus: "REQUESTED",
+            changedBy: sessionUser.id,
+            changeReason: "SR 생성",
+          },
         },
       },
     });
 
-    const result = await this.srRepository.findDetailsById(sr.id);
+    const result = await this.getSRDetailsById(sr.id);
     if (!result) {
       throw new Error("SR 생성 후 조회에 실패했습니다.");
     }
 
-    // Mattermost 알림 발송 (Vercel에서 응답 후에도 완료 보장)
-    logger.info(`[SRService] Attempting to send Mattermost notification for SR: ${result.srNumber}`);
-    backgroundTask(
-      this.sendCreationNotification(result),
-      `Mattermost notification for ${result.srNumber}`
-    );
+
 
     // 푸시 알림 전송 (ADMIN, MANAGER)
     backgroundTask(
-      this.userRepository.findUserIdsByRoles(['ADMIN', 'MANAGER']).then(adminIds => {
+      prisma.user.findMany({
+        where: {
+          roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
+          isActive: true
+        },
+        select: { id: true }
+      }).then(users => {
+        const adminIds = users.map(u => u.id);
         if (adminIds.length > 0) {
           return pushService.sendToUsers(adminIds, {
             title: "새로운 SR 등록",
@@ -197,7 +188,13 @@ export class SRService {
 
     // 이메일 알림 전송 (ADMIN, MANAGER)
     backgroundTask(
-      this.userRepository.findUsersByRoles(['ADMIN', 'MANAGER']).then(admins => {
+      prisma.user.findMany({
+        where: {
+          roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
+          isActive: true
+        },
+        include: { notificationPreference: true }
+      }).then(admins => {
         const emailPromises = admins
           .filter(admin => {
             const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
@@ -220,27 +217,7 @@ export class SRService {
     return result;
   }
 
-  private async sendCreationNotification(sr: SRDetails) {
-    logger.info(`[SRService] Preparing Mattermost notification payload for ${sr.srNumber}`);
-    const { sendMattermostNotification } = await import("@/lib/mattermost");
 
-    const srUrl = getSRUrl(sr.id);
-    const message = `### 🆕 새로운 SR이 등록되었습니다.\n[SR 바로가기](${srUrl})`;
-
-    const attachments = [{
-      color: "#007bff", // Primary Blue
-      title: sr.title,
-      title_link: srUrl,
-      fields: [
-        { short: true, title: "SR 번호", value: sr.srNumber },
-        { short: true, title: "요청자", value: sr.requester.name },
-        { short: true, title: "우선순위", value: sr.requestedPriority },
-        { short: true, title: "카테고리", value: sr.serviceCategory.categoryName },
-      ],
-    }];
-
-    await sendMattermostNotification(message, attachments);
-  }
 
   async updateSR(
     id: string,
@@ -249,7 +226,7 @@ export class SRService {
   ): Promise<SRUpdateResult> {
     try {
       const validated = srUpdateSchema.parse(data);
-      const existingSR = await this.srRepository.findById(id);
+      const existingSR = await prisma.sR.findUnique({ where: { id } });
       if (!existingSR) throw new NotFoundError("SR");
 
       ensureCanUpdateSR(sessionUser, existingSR);
@@ -265,7 +242,7 @@ export class SRService {
         }
 
         // 새 고객사가 활성 상태인지 확인
-        const newClient = await this.clientRepository.findById(validated.clientId);
+        const newClient = await prisma.client.findUnique({ where: { id: validated.clientId } });
         if (!newClient) {
           throw new NotFoundError("변경하려는 고객사");
         }
@@ -366,7 +343,7 @@ export class SRService {
 
       // priority SLA adjustment
       if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
-        const serviceCategory = await this.serviceCategoryRepository.findById(existingSR.serviceCategoryId);
+        const serviceCategory = await prisma.serviceCategory.findUnique({ where: { id: existingSR.serviceCategoryId } });
         if (serviceCategory) {
           const multiplier: Record<string, number> = { CRITICAL: 0.5, HIGH: 0.75, MEDIUM: 1.0, LOW: 1.5 };
           const adjustedHours = serviceCategory.slaHours * multiplier[validated.actualPriority];
@@ -539,11 +516,63 @@ export class SRService {
   }
 
   async getSRById(id: string): Promise<SR | null> {
-    return this.srRepository.findById(id);
+    return prisma.sR.findUnique({ where: { id } });
   }
 
-  async getSRDetailsById(id: string): Promise<SRDetails | null> {
-    return this.srRepository.findDetailsById(id);
+  async getSRDetailsById(id: string, options?: { activitiesLimit?: number; commentsLimit?: number }): Promise<SRDetails | null> {
+    const { activitiesLimit = 20, commentsLimit = 20 } = options || {};
+
+    return prisma.sR.findUnique({
+      where: { id },
+      include: {
+        client: true,
+        requester: {
+          select: { id: true, name: true, email: true, image: true },
+        },
+        assignee: {
+          select: { id: true, name: true, email: true, image: true },
+        },
+        intakeBy: {
+          select: { id: true, name: true, email: true, image: true },
+        },
+        serviceCategory: true,
+        activities: {
+          include: {
+            user: {
+              select: { id: true, name: true, image: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: activitiesLimit,
+        },
+        comments: {
+          include: {
+            user: {
+              select: { id: true, name: true, image: true },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: commentsLimit,
+        },
+        attachments: {
+          orderBy: { createdAt: "desc" },
+        },
+        statusHistory: {
+          include: {
+            user: {
+              select: { id: true, name: true, image: true },
+            },
+          },
+          orderBy: { changedAt: "desc" },
+        },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+          },
+        },
+      },
+    }) as Promise<SRDetails | null>;
   }
 
   async getAllSRs(params?: {
@@ -552,15 +581,48 @@ export class SRService {
     where?: Prisma.SRWhereInput;
     orderBy?: Prisma.SROrderByWithRelationInput;
   }): Promise<SRListItem[]> {
-    return this.srRepository.findAll(params);
+    const { skip, take, where, orderBy } = params || {};
+
+    return prisma.sR.findMany({
+      skip,
+      take,
+      where,
+      orderBy,
+      include: {
+        client: { select: { id: true, name: true } },
+        requester: { select: { id: true, name: true, email: true } },
+        assignee: { select: { id: true, name: true, email: true } },
+        serviceCategory: {
+          select: {
+            id: true,
+            categoryName: true,
+            priority: true,
+            slaHours: true,
+            handlerId: true,
+            handler: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+            attachments: true,
+          },
+        },
+      },
+    }) as Promise<SRListItem[]>;
   }
 
   async countSRs(params?: { where?: Prisma.SRWhereInput }): Promise<number> {
-    return this.srRepository.count(params?.where);
+    return prisma.sR.count({ where: params?.where });
   }
 
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
-    const existingSR = await this.srRepository.findById(id);
+    const existingSR = await prisma.sR.findUnique({ where: { id } });
     if (!existingSR) throw new NotFoundError("SR");
     ensureCanDeleteSR(sessionUser);
 

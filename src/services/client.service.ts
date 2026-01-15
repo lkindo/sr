@@ -1,10 +1,9 @@
 import { z } from "zod";
-import { ClientRepository } from "@/repositories/client.repository";
-import { UserRepository } from "@/repositories/user.repository";
-import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
 import { UserService } from "./user.service";
 import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
 import { NotFoundError, DuplicateError, ReferentialIntegrityError } from "@/lib/errors";
+import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
 type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
@@ -20,11 +19,8 @@ type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
  */
 export class ClientService {
   constructor(
-    private clientRepository: ClientRepository = new ClientRepository(),
-    private userRepository: UserRepository = new UserRepository(),
-    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository(),
     private userService: UserService = new UserService()
-  ) {}
+  ) { }
 
   /**
    * 고객사 ID로 조회
@@ -33,46 +29,44 @@ export class ClientService {
    * @returns 고객사 정보 또는 null
    */
   async getClientById(id: string) {
-    return this.clientRepository.findById(id);
+    return prisma.client.findUnique({ where: { id } });
   }
 
-  /**
-   * 고객사 상세 정보 조회 (담당자, 사용자 포함)
-   *
-   * @param id - 고객사 ID
-   * @returns 고객사 상세 정보 또는 null
-   */
   async getClientDetailsById(id: string) {
-    return this.clientRepository.findDetailsById(id);
+    return prisma.client.findUnique({
+      where: { id },
+      include: {
+        users: {
+          include: {
+            user: true,
+          },
+        },
+        srs: true,
+        serviceCategories: true,
+        clientHandlers: {
+          include: {
+            user: true,
+            backupHandler: true,
+          },
+        },
+      },
+    });
   }
 
-  /**
-   * 고객사 코드로 조회
-   *
-   * @param code - 고객사 코드
-   * @returns 고객사 정보 또는 null
-   */
   async getClientByCode(code: string) {
-    return this.clientRepository.findByCode(code);
+    return prisma.client.findUnique({
+      where: { code },
+    });
   }
 
-  /**
-   * 고객사명으로 조회
-   *
-   * @param name - 고객사명
-   * @returns 고객사 정보 또는 null
-   */
   async getClientByName(name: string) {
-    return this.clientRepository.findByName(name);
+    return prisma.client.findFirst({
+      where: { name: { contains: name, mode: 'insensitive' } },
+    });
   }
 
-  /**
-   * 전체 고객사 목록 조회
-   *
-   * @returns 고객사 목록
-   */
   async getAllClients() {
-    return this.clientRepository.findAll();
+    return prisma.client.findMany();
   }
 
   /**
@@ -112,22 +106,24 @@ export class ClientService {
     const validated = clientCreateSchema.parse(data);
 
     // 코드 중복 확인
-    const existingClient = await this.clientRepository.findByCode(validated.code);
+    const existingClient = await this.getClientByCode(validated.code);
     if (existingClient) {
       throw new DuplicateError("고객사 코드", "code", validated.code);
     }
 
-    return this.clientRepository.create({
-      code: validated.code,
-      name: validated.name,
-      industry: validated.industry,
-      contactPerson: validated.contactPerson,
-      contactEmail: validated.contactEmail,
-      contactPhone: validated.contactPhone,
-      address: validated.address,
-      contractStartDate: validated.contractStartDate ? new Date(validated.contractStartDate) : null,
-      contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
-      isActive: true,
+    return prisma.client.create({
+      data: {
+        code: validated.code,
+        name: validated.name,
+        industry: validated.industry,
+        contactPerson: validated.contactPerson,
+        contactEmail: validated.contactEmail,
+        contactPhone: validated.contactPhone,
+        address: validated.address,
+        contractStartDate: validated.contractStartDate ? new Date(validated.contractStartDate) : null,
+        contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+        isActive: true,
+      }
     });
   }
 
@@ -135,53 +131,49 @@ export class ClientService {
     const validated = clientUpdateSchema.parse(data);
 
     // 기존 고객사 정보 확인
-    const existingClient = await this.clientRepository.findById(id);
+    const existingClient = await prisma.client.findUnique({ where: { id } });
     if (!existingClient) {
       throw new NotFoundError("고객사", id);
     }
 
-    return this.clientRepository.update(id, {
-      name: validated.name,
-      industry: validated.industry,
-      contactPerson: validated.contactPerson,
-      contactEmail: validated.contactEmail,
-      contactPhone: validated.contactPhone,
-      address: validated.address,
-      contractStartDate: validated.contractStartDate ? new Date(validated.contractStartDate) : null,
-      contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+    return prisma.client.update({
+      where: { id },
+      data: {
+        name: validated.name,
+        industry: validated.industry,
+        contactPerson: validated.contactPerson,
+        contactEmail: validated.contactEmail,
+        contactPhone: validated.contactPhone,
+        address: validated.address,
+        contractStartDate: validated.contractStartDate ? new Date(validated.contractStartDate) : null,
+        contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+      }
     });
   }
 
   async deleteClient(id: string) {
     // 고객사 삭제 전 관련 데이터 확인
-    const client = await this.clientRepository.findById(id);
+    const client = await prisma.client.findUnique({ where: { id } });
     if (!client) {
       throw new NotFoundError("고객사", id);
     }
 
     // 참조 무결성 확인: 관련된 데이터가 있는지 체크
-    const relatedCounts = await this.clientRepository.getRelatedDataCounts(id);
+    const [srsCount, usersCount, serviceCategoriesCount, clientHandlersCount] = await Promise.all([
+      prisma.sR.count({ where: { clientId: id } }),
+      prisma.userClient.count({ where: { clientId: id } }),
+      prisma.serviceCategory.count({ where: { clientId: id } }),
+      prisma.clientHandler.count({ where: { clientId: id } }),
+    ]);
 
-    const hasRelatedData =
-      relatedCounts.srsCount > 0 ||
-      relatedCounts.usersCount > 0 ||
-      relatedCounts.serviceCategoriesCount > 0 ||
-      relatedCounts.clientHandlersCount > 0;
+    const hasRelatedData = srsCount > 0 || usersCount > 0 || serviceCategoriesCount > 0 || clientHandlersCount > 0;
 
     if (hasRelatedData) {
       const errorMessages: string[] = [];
-      if (relatedCounts.srsCount > 0) {
-        errorMessages.push(`${relatedCounts.srsCount}개의 SR`);
-      }
-      if (relatedCounts.usersCount > 0) {
-        errorMessages.push(`${relatedCounts.usersCount}개의 사용자 연결`);
-      }
-      if (relatedCounts.serviceCategoriesCount > 0) {
-        errorMessages.push(`${relatedCounts.serviceCategoriesCount}개의 서비스 카테고리`);
-      }
-      if (relatedCounts.clientHandlersCount > 0) {
-        errorMessages.push(`${relatedCounts.clientHandlersCount}개의 담당자 연결`);
-      }
+      if (srsCount > 0) errorMessages.push(`${srsCount}개의 SR`);
+      if (usersCount > 0) errorMessages.push(`${usersCount}개의 사용자 연결`);
+      if (serviceCategoriesCount > 0) errorMessages.push(`${serviceCategoriesCount}개의 서비스 카테고리`);
+      if (clientHandlersCount > 0) errorMessages.push(`${clientHandlersCount}개의 담당자 연결`);
 
       throw new ReferentialIntegrityError(
         `고객사를 삭제할 수 없습니다. 다음 관련 데이터가 존재합니다: ${errorMessages.join(', ')}. ` +
@@ -190,41 +182,41 @@ export class ClientService {
     }
 
     // 관련 데이터가 없으면 삭제 진행
-    return this.clientRepository.delete(id);
+    return prisma.client.delete({ where: { id } });
   }
 
   async activateClient(clientId: string) {
-    return this.clientRepository.activateClient(clientId);
+    return prisma.client.update({ where: { id: clientId }, data: { isActive: true } });
   }
 
   async deactivateClient(clientId: string) {
-    return this.clientRepository.deactivateClient(clientId);
+    return prisma.client.update({ where: { id: clientId }, data: { isActive: false } });
   }
 
   async getClientsByUserId(userId: string) {
-    return this.clientRepository.findByUserId(userId);
+    return prisma.client.findMany({
+      where: {
+        users: { some: { userId } },
+      },
+    });
   }
 
   async getClientWithDetailsAndCategories(id: string) {
-    const client = await this.clientRepository.findDetailsById(id);
+    const client = await this.getClientDetailsById(id);
     if (!client) {
       return null;
     }
 
     // 모든 활성화된 서비스 카테고리 조회
-    const serviceCategories = await this.serviceCategoryRepository.findAll({
+    const serviceCategories = await prisma.serviceCategory.findMany({
       where: { isActive: true },
       orderBy: { categoryName: "asc" },
     });
 
     // ADMIN 역할을 가진 사용자 제외
-    type ClientWithUsers = NonNullable<Awaited<ReturnType<ClientRepository['findDetailsById']>>> & {
-      users?: Array<{ user?: { roles?: Array<{ role?: { name?: string } }> } }>;
-    };
-    const clientWithUsers = client as ClientWithUsers;
-    const filteredUsers = clientWithUsers.users?.filter((userClient) => {
+    const filteredUsers = (client as any).users?.filter((userClient: any) => {
       const hasAdminRole = userClient.user?.roles?.some(
-        (userRole) => userRole.role?.name === "ADMIN"
+        (userRole: any) => userRole.role?.name === "ADMIN"
       );
       return !hasAdminRole;
     }) || [];
