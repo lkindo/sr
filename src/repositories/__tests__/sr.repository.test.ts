@@ -168,6 +168,14 @@ describe('SRRepository', () => {
         }),
       });
     });
+
+    it('중복된 데이터 생성 시 에러를 던져야 함', async () => {
+      const error = new Error('Unique constraint failed');
+      (error as any).code = 'P2002';
+      vi.mocked(prisma.sR.create).mockRejectedValue(error);
+
+      await expect(repository.create({} as any)).rejects.toThrow('Unique constraint failed');
+    });
   });
 
   describe('update', () => {
@@ -191,6 +199,14 @@ describe('SRRepository', () => {
         data: updateData,
         include: expect.any(Object),
       });
+    });
+
+    it('존재하지 않는 SR 업데이트 시 에러를 던져야 함', async () => {
+      const error = new Error('Record to update not found');
+      (error as any).code = 'P2025';
+      vi.mocked(prisma.sR.update).mockRejectedValue(error);
+
+      await expect(repository.update('nonexistent', {})).rejects.toThrow();
     });
   });
 

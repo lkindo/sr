@@ -399,7 +399,7 @@ export function EditSRDialog({
             SR 정보를 수정합니다. 제목, 설명, 고객사, 서비스 카테고리는 필수입니다.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} data-testid="edit-sr-form">
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="title">제목 *</Label>

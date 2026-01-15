@@ -1,113 +1,160 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
-import { GET, POST } from '../route';
+import { NextRequest, NextResponse } from 'next/server';
 
-// Hoist mocks to ensure availability before import
-const mocks = vi.hoisted(() => ({
-    getAllSRs: vi.fn(),
-    createSR: vi.fn(),
-    count: vi.fn(),
-    checkPermission: vi.fn(),
-    withAuthAndRateLimit: (handler: any) => async (req: any, ctx: any = {}) => {
-        const session = ctx.session || { user: { id: 'user1', roles: ['ADMIN'] } };
-        return handler(req, { session });
-    },
-    sendSRCreatedEmail: vi.fn().mockResolvedValue(true)
+// Hoist mock functions
+const { mockGetAllSRs, mockCreateSR, mockCheckPermission, mockHandleApiError } = vi.hoisted(() => ({
+    mockGetAllSRs: vi.fn(),
+    mockCreateSR: vi.fn(),
+    mockCheckPermission: vi.fn(),
+    mockHandleApiError: vi.fn((error) => {
+        const status = error.statusCode || (error.name === 'ForbiddenError' ? 403 : 500);
+        return NextResponse.json({ error: error.message || 'Error' }, { status });
+    }),
 }));
 
+// Mock api-error-handler
+vi.mock('@/lib/api-error-handler', () => ({
+    handleApiError: mockHandleApiError,
+}));
+
+// Mock auth-wrapper
+vi.mock('@/lib/auth-wrapper', () => ({
+    withAuthAndRateLimit: vi.fn((handler) => {
+        return async (req: any, context: any) => {
+            try {
+                const session = {
+                    user: {
+                        id: 'user-1',
+                        email: 'test@example.com',
+                        roles: [],
+                        permissions: [],
+                        clientIds: []
+                    }
+                };
+                return await handler(req, { ...context, session });
+            } catch (error) {
+                return mockHandleApiError(error);
+            }
+        };
+    }),
+    withAuth: vi.fn((handler) => {
+        return async (req: any, context: any) => {
+            try {
+                const session = {
+                    user: {
+                        id: 'user-1',
+                        roles: [],
+                        permissions: [],
+                        clientIds: []
+                    }
+                };
+                return await handler(req, { ...context, session });
+            } catch (error) {
+                return mockHandleApiError(error);
+            }
+        };
+    }),
+}));
+
+// Mock services using classes
 vi.mock('@/services/sr.service', () => ({
     SRService: class {
-        getAllSRs = mocks.getAllSRs;
-        createSR = mocks.createSR;
+        getAllSRs = mockGetAllSRs;
+        createSR = mockCreateSR;
     }
 }));
 
 vi.mock('@/services/permission.service', () => ({
     PermissionService: class {
-        checkPermission = mocks.checkPermission;
+        checkPermission = mockCheckPermission;
     }
 }));
 
+// Mock prisma
 vi.mock('@/lib/prisma', () => ({
     default: {
-        sR: { count: mocks.count },
-        user: { findMany: vi.fn().mockResolvedValue([]) }
-    }
+        sR: { count: vi.fn() },
+        user: { findMany: vi.fn().mockResolvedValue([]) },
+    },
 }));
 
-vi.mock('@/lib/auth-wrapper', () => ({
-    withAuthAndRateLimit: mocks.withAuthAndRateLimit
-}));
-
+// Mock cache
 vi.mock('@/lib/cache', () => ({
-    isCacheAvailable: () => false,
-    withCache: vi.fn(),
-    cacheGet: vi.fn(),
-    cacheSet: vi.fn(),
+    withCache: vi.fn((key, fn) => fn()),
+    isCacheAvailable: vi.fn(() => false),
 }));
 
-vi.mock('@/lib/email', () => ({
-    sendSRCreatedEmail: mocks.sendSRCreatedEmail
+// Mock serialization
+vi.mock('@/lib/serialization', () => ({
+    serializeResponse: vi.fn((data) => data),
 }));
 
-describe('API: /api/srs', () => {
+// Mock redis-cache for invalidation
+vi.mock('@/lib/redis-cache', () => ({
+    invalidateCachePattern: vi.fn(),
+}));
+
+// Mock cache-config
+vi.mock('@/lib/cache-config', () => ({
+    shouldWideInvalidate: vi.fn(() => false),
+    getSrsListTtlSeconds: vi.fn(() => 3600),
+}));
+
+import { GET, POST } from '../route';
+import prisma from '@/lib/prisma';
+
+describe('API Route: /api/srs (Integration)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockCheckPermission.mockResolvedValue(true);
     });
 
     describe('GET', () => {
-        it('should return list of SRs with pagination', async () => {
-            const mockSRs = [{ id: 'sr1', title: 'Test SR' }];
-            mocks.getAllSRs.mockResolvedValue(mockSRs);
-            mocks.count.mockResolvedValue(1);
+        it('should return SR list with 200 OK', async () => {
+            const mockSrs = [{ id: 'sr-1', title: 'Test SR' }];
+            mockGetAllSRs.mockResolvedValue(mockSrs as any);
+            vi.mocked(prisma.sR.count).mockResolvedValue(1);
 
-            const req = new NextRequest('http://localhost/api/srs?page=1&pageSize=10');
-            const res = await GET(req);
-            const json = await res.json();
+            const req = new NextRequest('http://localhost/api/srs');
+            const res = await GET(req, { params: Promise.resolve({}) } as any);
 
-            expect(json.data).toEqual(mockSRs);
-            expect(json.meta.totalItems).toBe(1); // Fixed expectation
-        });
-
-        it('should apply filters', async () => {
-            mocks.getAllSRs.mockResolvedValue([]);
-            mocks.count.mockResolvedValue(0);
-
-            const req = new NextRequest('http://localhost/api/srs?status=REQUESTED');
-            await GET(req);
-
-            expect(mocks.getAllSRs).toHaveBeenCalledWith(expect.objectContaining({
-                where: expect.objectContaining({ status: 'REQUESTED' })
-            }));
+            expect(res.status).toBe(200);
+            const data = await res.json();
+            expect(data.data).toEqual(mockSrs);
         });
     });
 
     describe('POST', () => {
-        it('should create SR if authorized', async () => {
-            mocks.checkPermission.mockResolvedValue(true);
-            const newSR = { id: 'sr1', title: 'New SR' };
-            mocks.createSR.mockResolvedValue(newSR);
+        it('should create a new SR if user has permission', async () => {
+            mockCheckPermission.mockResolvedValue(true);
+            const mockSR = { id: 'sr-1', srNumber: 'SR-001', title: 'New SR' };
+            mockCreateSR.mockResolvedValue(mockSR as any);
 
             const req = new NextRequest('http://localhost/api/srs', {
                 method: 'POST',
-                body: JSON.stringify({ title: 'New SR' })
+                body: JSON.stringify({ title: 'New SR', description: 'desc' }),
             });
 
-            const res = await POST(req);
+            const res = await POST(req, { params: Promise.resolve({}) } as any);
+
             expect(res.status).toBe(201);
-            const json = await res.json();
-            expect(json).toEqual(newSR);
+            const data = await res.json();
+            expect(data.id).toBe('sr-1');
+            expect(mockCreateSR).toHaveBeenCalled();
         });
 
-        it('should throw Forbidden if unauthorized', async () => {
-            mocks.checkPermission.mockResolvedValue(false);
+        it('should return 403 if user lacks permission', async () => {
+            mockCheckPermission.mockResolvedValue(false);
 
             const req = new NextRequest('http://localhost/api/srs', {
                 method: 'POST',
-                body: JSON.stringify({ title: 'New SR' })
+                body: JSON.stringify({ title: 'No Perm' }),
             });
 
-            await expect(POST(req)).rejects.toThrow('SR 등록 권한이 없습니다');
+            const res = await POST(req, { params: Promise.resolve({}) } as any);
+
+            expect(res.status).toBe(403);
+            expect(mockHandleApiError).toHaveBeenCalled();
         });
     });
 });

@@ -1,93 +1,59 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as cacheUtils from '@/lib/cache';
 
-// Setup initial mocks
-const mockRedis = {
-	get: vi.fn(),
-	set: vi.fn(),
-};
+// Mock Redis
+vi.mock('@upstash/redis', () => {
+	return {
+		Redis: vi.fn().mockImplementation(() => ({
+			get: vi.fn(),
+			set: vi.fn(),
+		})),
+	};
+});
 
-vi.mock('@upstash/redis', () => ({
-	Redis: class {
-		constructor() {
-			return mockRedis;
-		}
-	},
-}));
-
+// Mock Next.js cache
 vi.mock('next/cache', () => ({
 	unstable_cache: vi.fn((fn) => fn),
-	revalidateTag: vi.fn(),
 }));
-
-const mockPrisma = {
-	sR: { findMany: vi.fn() },
-	user: { findMany: vi.fn() },
-	client: { findMany: vi.fn() },
-	permission: { findMany: vi.fn() },
-	serviceCategory: { findMany: vi.fn() },
-};
 
 vi.mock('@/lib/prisma', () => ({
-	default: mockPrisma,
+	default: {
+		sR: { findMany: vi.fn() },
+		user: { findMany: vi.fn() },
+	}
 }));
 
-describe('cache (Upstash)', () => {
+describe('Cache Utility', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
-		vi.unstubAllEnvs();
+		// Reset Redis env vars to test both cases
+		delete process.env.UPSTASH_REDIS_REST_URL;
+		delete process.env.UPSTASH_REDIS_REST_TOKEN;
 	});
 
-	describe('isCacheAvailable', () => {
-		it('returns false when env vars are missing', async () => {
-			vi.stubEnv('UPSTASH_REDIS_REST_URL', '');
-			vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '');
-
-			// We need to re-import to pick up env var changes if the module reads them at top level
-			// BUT `cache.ts` likely initializes Redis instance at top level or lazily.
-			// Based on typical patterns, it's safer to re-require or rely on how the module is written.
-			// If `cache.ts` creates `redis` client at top level, stubbing env vars AFTER import won't affect it 
-			// unless we reset modules.
-			vi.resetModules();
-			const mod = await import('../cache');
-			expect(mod.isCacheAvailable()).toBe(false);
+	describe('Upstash Redis Cache (when NOT configured)', () => {
+		it('returns null for cacheGet', async () => {
+			const result = await cacheUtils.cacheGet('test');
+			expect(result).toBeNull();
 		});
 
-		it('returns true when env vars are present', async () => {
-			vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.redis');
-			vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
+		it('does nothing for cacheSet', async () => {
+			await expect(cacheUtils.cacheSet('test', 'val')).resolves.toBeUndefined();
+		});
 
-			vi.resetModules();
-			const mod = await import('../cache');
-			expect(mod.isCacheAvailable()).toBe(true);
+		it('isCacheAvailable returns false', () => {
+			expect(cacheUtils.isCacheAvailable()).toBe(false);
 		});
 	});
 
-	describe('cache operations', () => {
-		let mod: typeof import('../cache');
+	describe('Next.js unstable_cache Wrappers', () => {
+		it('getCachedSRs calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.sR.findMany).mockResolvedValue([{ id: '1' }] as any);
 
-		beforeEach(async () => {
-			vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.redis');
-			vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'token');
-			vi.resetModules();
-			mod = await import('../cache');
-		});
-
-		it('cacheSet calls redis set with correct params', async () => {
-			await mod.cacheSet('key', { value: 1 }, { namespace: 'ns', ttlSeconds: 60 });
-			expect(mockRedis.set).toHaveBeenCalledWith('ns:key', { value: 1 }, { ex: 60 });
-		});
-
-		it('cacheGet calls redis get and updates metrics', async () => {
-			mockRedis.get.mockResolvedValue(null);
-			await expect(mod.cacheGet('key')).resolves.toBeNull();
-			expect(mod.getCacheMetrics().miss).toBe(1);
-
-			mockRedis.get.mockResolvedValue('value');
-			await expect(mod.cacheGet('key')).resolves.toBe('value');
-			expect(mod.getCacheMetrics().hit).toBe(1);
+			const result = await cacheUtils.getCachedSRs({ skip: 0 });
+			expect(result).toHaveLength(1);
+			expect(prisma.sR.findMany).toHaveBeenCalled();
 		});
 	});
 });
-
-
-

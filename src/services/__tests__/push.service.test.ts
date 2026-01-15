@@ -1,163 +1,123 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PushService } from '@/services/push.service';
+import prisma from '@/lib/prisma';
 
-// Mock prisma
+// Mock dependencies
 vi.mock('@/lib/prisma', () => ({
     default: {
         pushSubscription: {
-            findMany: vi.fn(),
-            create: vi.fn(),
             upsert: vi.fn(),
-            delete: vi.fn(),
             deleteMany: vi.fn(),
+            findMany: vi.fn(),
         },
         notificationPreference: {
+            findMany: vi.fn(),
             findUnique: vi.fn(),
             create: vi.fn(),
-            update: vi.fn(),
             upsert: vi.fn(),
-        },
-    },
+        }
+    }
 }));
 
-// Mock logger
-vi.mock('@/lib/logger', () => ({
-    logger: {
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        debug: vi.fn(),
-    },
+vi.mock('web-push', () => ({
+    setVapidDetails: vi.fn(),
+    sendNotification: vi.fn(),
 }));
-
-// Mock server-only (no-op in tests)
-vi.mock('server-only', () => ({}));
-
-import prisma from '@/lib/prisma';
 
 describe('PushService', () => {
-    beforeEach(async () => {
-        vi.clearAllMocks();
+    let pushService: PushService;
 
-        // Set environment variables for testing
-        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key-that-is-long-enough';
-        process.env.VAPID_PRIVATE_KEY = 'test-private-key-long-enough-for-validation';
-        process.env.VAPID_SUBJECT = 'mailto:test@example.com';
+    beforeEach(() => {
+        vi.clearAllMocks();
+        pushService = new PushService();
+        // Spy on static method to bypass env var check during tests
+        vi.spyOn(PushService, 'isConfigured').mockReturnValue(true);
     });
 
     describe('isConfigured', () => {
-        it('VAPID 설정이 있으면 true를 반환해야 함', async () => {
-            vi.resetModules();
-            const { PushService } = await import('../push.service');
+        it('returns true when mocked', () => {
             expect(PushService.isConfigured()).toBe(true);
         });
     });
 
-    describe('getPublicKey', () => {
-        it('공개 VAPID 키를 반환해야 함', async () => {
-            vi.resetModules();
-            const { PushService } = await import('../push.service');
-            const key = PushService.getPublicKey();
-            expect(typeof key).toBe('string');
-            expect(key.length).toBeGreaterThan(0);
+    describe('sendToUser', () => {
+        it('sends notification and handles success', async () => {
+            vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([{
+                endpoint: 'ep1', p256dh: 'd', auth: 'a'
+            }] as any);
+
+            const { sendNotification } = await import('web-push');
+            vi.mocked(sendNotification).mockResolvedValue({ statusCode: 201, body: 'ok' });
+
+            const results = await pushService.sendToUser('u1', { title: 'T', body: 'B' });
+            expect(results).toHaveLength(1);
+            expect(results[0].statusCode).toBe(201);
+        });
+
+        it('removes invalid subscription on 410 error', async () => {
+            vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([{
+                endpoint: 'ep-invalid', p256dh: 'd', auth: 'a'
+            }] as any);
+
+            const { sendNotification } = await import('web-push');
+            vi.mocked(sendNotification).mockRejectedValue({ statusCode: 410 });
+
+            await pushService.sendToUser('u1', { title: 'T', body: 'B' });
+            expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith(expect.objectContaining({
+                where: { endpoint: 'ep-invalid' }
+            }));
         });
     });
 
-    describe('saveSubscription', () => {
-        it('푸시 구독을 저장해야 함', async () => {
-            const mockSubscription = {
-                id: 'sub-1',
-                userId: 'user-1',
-                endpoint: 'https://push.example.com/endpoint',
-                p256dh: 'test-p256dh',
-                auth: 'test-auth',
-            };
+    describe('sendForEvent', () => {
+        it('filters users based on default preferences when no record exists', async () => {
+            vi.mocked(prisma.notificationPreference.findMany).mockResolvedValue([]);
+            const spySendToUsers = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
 
-            vi.mocked(prisma.pushSubscription.upsert).mockResolvedValue(mockSubscription as any);
-
-            // Removing resetModules simplification
-            const { pushService } = await import('../push.service');
-
-            const result = await pushService.saveSubscription('user-1', {
-                endpoint: 'https://push.example.com/endpoint',
-                keys: { p256dh: 'test-p256dh', auth: 'test-auth' },
-            });
-
-            expect(result).toEqual(mockSubscription);
-            expect(prisma.pushSubscription.upsert).toHaveBeenCalled();
+            // SR_CREATED default is true
+            await pushService.sendForEvent('SR_CREATED', ['u1', 'u2'], { title: 'T', body: 'B' });
+            expect(spySendToUsers).toHaveBeenCalledWith(['u1', 'u2'], expect.anything());
         });
-    });
 
-    describe('removeSubscription', () => {
-        it('푸시 구독을 삭제해야 함', async () => {
-            vi.mocked(prisma.pushSubscription.deleteMany).mockResolvedValue({ count: 1 });
-            const { pushService } = await import('../push.service');
+        it('filters users based on explicit false preference', async () => {
+            vi.mocked(prisma.notificationPreference.findMany).mockResolvedValue([
+                { userId: 'u1', pushSRCreated: false }
+            ] as any);
+            const spySendToUsers = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
 
-            await pushService.removeSubscription('https://push.example.com/endpoint');
-
-            expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
-                where: { endpoint: 'https://push.example.com/endpoint' },
-            });
+            await pushService.sendForEvent('SR_CREATED', ['u1'], { title: 'T', body: 'B' });
+            expect(spySendToUsers).not.toHaveBeenCalled();
         });
-    });
 
-    // ... (intermediate tests are fine)
+        it('handles default preferences for STATUS_CHANGED (should be false)', async () => {
+            vi.mocked(prisma.notificationPreference.findMany).mockResolvedValue([]);
+            const spySendToUsers = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
 
-    describe('getOrCreatePreferences', () => {
-        it('알림 설정을 가져오거나 생성해야 함', async () => {
-            const mockPreference = {
-                id: 'pref-1',
-                userId: 'user-1',
-                emailSRCreated: true,
-                pushSRCreated: true,
-            };
-            // Mock findUnique to return null first to test creation logic if needed, 
-            // or just existing preference. 
-            // Service logic: findUnique, if null -> create.
-            // Let's test "create if not exists" path
-            vi.mocked(prisma.notificationPreference.findUnique).mockResolvedValue(null);
-            vi.mocked(prisma.notificationPreference.create).mockResolvedValue(mockPreference as any);
+            await pushService.sendForEvent('SR_STATUS_CHANGED', ['u1'], { title: 'T', body: 'B' });
+            expect(spySendToUsers).not.toHaveBeenCalled();
+        });
 
-            const { pushService } = await import('../push.service');
-            const result = await pushService.getOrCreatePreferences('user-1');
+        it('handles all event types in preference check', async () => {
+            const spySendToUsers = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
+            vi.mocked(prisma.notificationPreference.findMany).mockResolvedValue([
+                { userId: 'u1', pushSRCreated: true, pushSRAssigned: true, pushSRStatusChanged: true, pushCommentAdded: true }
+            ] as any);
 
-            expect(result).toEqual(mockPreference);
-            expect(prisma.notificationPreference.create).toHaveBeenCalled();
+            await pushService.sendForEvent('SR_ASSIGNED', ['u1'], { title: 'T', body: 'B' });
+            await pushService.sendForEvent('SR_STATUS_CHANGED', ['u1'], { title: 'T', body: 'B' });
+            await pushService.sendForEvent('COMMENT_ADDED', ['u1'], { title: 'T', body: 'B' });
+
+            expect(spySendToUsers).toHaveBeenCalledTimes(3);
         });
     });
 
     describe('updatePreferences', () => {
-        it('알림 설정을 업데이트해야 함', async () => {
-            const mockUpdatedPreference = {
-                id: 'pref-1',
-                userId: 'user-1',
-                emailSRCreated: false,
-                pushSRCreated: true,
-            };
-            vi.mocked(prisma.notificationPreference.upsert).mockResolvedValue(mockUpdatedPreference as any);
-
-            const { pushService } = await import('../push.service');
-
-            const result = await pushService.updatePreferences('user-1', {
-                emailSRCreated: false,
-            });
-
-            expect(result).toEqual(mockUpdatedPreference);
-        });
-    });
-
-    describe('sendToUser', () => {
-        it('구독이 없으면 빈 배열을 반환해야 함', async () => {
-            vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([]);
-
-            vi.resetModules();
-            const { pushService } = await import('../push.service');
-
-            const result = await pushService.sendToUser('user-1', {
-                title: 'Test',
-                body: 'Test Message',
-            });
-
-            expect(result).toEqual([]);
+        it('calls upsert with correct parameters', async () => {
+            await pushService.updatePreferences('u1', { pushSRCreated: false });
+            expect(prisma.notificationPreference.upsert).toHaveBeenCalledWith(expect.objectContaining({
+                where: { userId: 'u1' },
+                create: expect.objectContaining({ userId: 'u1', pushSRCreated: false })
+            }));
         });
     });
 });

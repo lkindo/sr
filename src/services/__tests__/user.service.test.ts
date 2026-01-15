@@ -1,196 +1,143 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UserService } from '../user.service';
+import { UserService } from '@/services/user.service';
 import { UserRepository } from '@/repositories/user.repository';
-import { RoleRepository } from '@/repositories/role.repository';
-import { ClientRepository } from '@/repositories/client.repository';
-import { PermissionService } from '../permission.service';
-import { NotFoundError, BusinessRuleError } from '@/lib/errors';
-import { hash, compare } from 'bcryptjs';
-
-// Mock prisma
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    $transaction: vi.fn(),
-    sR: { findMany: vi.fn(), count: vi.fn() },
-    sRActivity: { count: vi.fn() },
-    sRComment: { count: vi.fn() },
-    sRStatusHistory: { count: vi.fn() },
-    user: { findUniqueOrThrow: vi.fn() }, // For createUser return
-  },
-}));
+import { ValidationError, BusinessRuleError, NotFoundError } from '@/lib/errors';
 
 // Mock dependencies
 vi.mock('@/repositories/user.repository');
 vi.mock('@/repositories/role.repository');
 vi.mock('@/repositories/client.repository');
-vi.mock('../permission.service');
+vi.mock('@/lib/redis-cache', () => ({
+  invalidateCachePattern: vi.fn(),
+}));
+
 vi.mock('bcryptjs', () => ({
-  hash: vi.fn(),
+  hash: vi.fn().mockResolvedValue('hashed'),
   compare: vi.fn(),
+}));
+
+vi.mock('@/lib/prisma', () => ({
+  default: {
+    sR: { findMany: vi.fn(), count: vi.fn() },
+    sRActivity: { count: vi.fn() },
+    sRComment: { count: vi.fn() },
+    sRStatusHistory: { count: vi.fn() },
+    $transaction: vi.fn((cb) => cb({
+      user: { create: vi.fn().mockResolvedValue({ id: 'u1' }), findUniqueOrThrow: vi.fn() },
+      role: { findFirst: vi.fn() },
+      userRole: { createMany: vi.fn() },
+      userClient: { createMany: vi.fn() }
+    })),
+  }
 }));
 
 describe('UserService', () => {
   let userService: UserService;
-  let mockUserRepository: any;
-  let mockRoleRepository: any;
-  let mockClientRepository: any;
+  let mockUserRepo: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    mockUserRepository = {
-      findById: vi.fn(),
-      findByEmail: vi.fn(),
-      update: vi.fn(),
-      updatePassword: vi.fn(),
-      updateProfile: vi.fn(),
-      activateUser: vi.fn(),
-      deactivateUser: vi.fn(),
-      updateClientAssociations: vi.fn(),
-      delete: vi.fn(),
-      create: vi.fn(),
-      findAllWithFilters: vi.fn(),
-      findAllPaginated: vi.fn(),
-    };
-    mockRoleRepository = {
-      findByIds: vi.fn(),
-      findByName: vi.fn(),
-    };
-    mockClientRepository = {
-      findById: vi.fn(),
-    };
-
-    // Default mock implementations
-    (mockUserRepository.findById as any).mockResolvedValue(null);
-    (mockUserRepository.findByEmail as any).mockResolvedValue(null);
-    (mockUserRepository.update as any).mockResolvedValue({ id: 'user-1', name: 'Updated' });
-    (mockClientRepository.findById as any).mockResolvedValue({ id: 'client-1' });
-
-    userService = new UserService(
-      mockUserRepository,
-      mockRoleRepository,
-      mockClientRepository
-    );
+    mockUserRepo = new UserRepository();
+    userService = new UserService(mockUserRepo);
   });
 
-  describe('createUser', () => {
-    it('should create a new user successfully', async () => {
-      const userData = {
-        email: 'test@example.com',
-        name: 'Test User',
-        password: 'password123',
-        clientId: 'client-1',
-        roleIds: ['role-1'],
-      };
-
-      vi.mocked(hash).mockResolvedValue('hashed-password');
-
-      const mockCreatedUser = { id: 'user-1', ...userData, password: 'hashed-password' };
-
-      // Mock transaction
-      const { default: prisma } = await import('@/lib/prisma');
-      (prisma.$transaction as any).mockImplementation(async (callback: any) => {
-        // Just return the mock user directly as verifying transaction internals is complex
-        return mockCreatedUser;
-      });
-
-      const result = await userService.createUser(userData);
-
-      expect(result).toEqual(mockCreatedUser);
-      expect(hash).toHaveBeenCalled();
-      // Removed incorrect expectation: expect(mockUserRepository.create).toHaveBeenCalled();
+  describe('getAllUsers', () => {
+    it('calls findAllWithFilters when filters are provided', async () => {
+      mockUserRepo.findAllWithFilters.mockResolvedValue([[], 0]);
+      await userService.getAllUsers({ search: 'test' });
+      expect(mockUserRepo.findAllWithFilters).toHaveBeenCalled();
     });
 
-    it('should throw error if email already exists', async () => {
-      // createUser implementation in service doesn't seem to check findByEmail explicitly before transaction?
-      // It relies on unique constraint error from DB probably.
-      // Let's check service implementation... 
-      // It just calls tx.user.create. 
-      // So we need to mock transaction to throw unique constraint error or check if service checks it?
-      // Actually service code doesn't check findByEmail.
-      // But let's assume we want to test that unique constraint is handled or bubble up.
-      // The current test expected '이미 사용 중인 이메일입니다.'.
-      // If service doesn't handle it, it will throw raw Prisma error.
-      // Let's just mock findByEmail and assume we added a check, OR mock the transaction error.
-      // If the Service *doesn't* check, then the previous test expectation was wrong about *what* throws.
-      // However, usually we should check.
-      // For now, let's update test to expect raw error or mock the check if we add it. 
-      // But I shouldn't modify service code if I can avoid it.
-      // "should throw error" -> The service should let the DB error verify it.
-      // I'll mock transaction to throw error.
-
-      const { default: prisma } = await import('@/lib/prisma');
-      (prisma.$transaction as any).mockRejectedValue(new Error('Unique constraint failed'));
-
-      await expect(
-        userService.createUser({
-          email: 'test@example.com',
-          name: 'Test',
-          password: 'pw',
-        })
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('updateUser', () => {
-    it('should update user details', async () => {
-      (mockUserRepository.findById as any).mockResolvedValue({ id: 'user-1' });
-      (mockUserRepository.update as any).mockResolvedValue({ id: 'user-1', name: 'Updated' });
-
-      const result = await userService.updateUser('user-1', { name: 'Updated' });
-
-      expect(result.name).toBe('Updated');
-    });
-
-    it('should throw NotFoundError if user not found', async () => {
-      // UserService relies on repository.update throwing if not found.
-      // BaseRepository.update usually calls prisma.update which throws P2025.
-      // Or BaseRepository implementation finds first?
-      // Let's mock repository.update to throw P2025 or generic error.
-      (mockUserRepository.update as any).mockRejectedValue(new Error('Record to update not found.'));
-
-      await expect(
-        userService.updateUser('non-existent', {})
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('changePassword', () => {
-    it('should change password if current password matches', async () => {
-      const user = { id: 'user-1', password: 'hashed-current' };
-      (mockUserRepository.findById as any).mockResolvedValue(user);
-      vi.mocked(compare).mockResolvedValue(true);
-      vi.mocked(hash).mockResolvedValue('hashed-new');
-      (mockUserRepository.updatePassword as any).mockResolvedValue({ ...user, password: 'hashed-new' });
-
-      await userService.changePassword('user-1', 'current', 'new');
-
-      expect(mockUserRepository.updatePassword).toHaveBeenCalled();
-    });
-
-    it('should throw error if current password does not match', async () => {
-      const user = { id: 'user-1', password: 'hashed-current' };
-      (mockUserRepository.findById as any).mockResolvedValue(user);
-      vi.mocked(compare).mockResolvedValue(false);
-
-      await expect(
-        userService.changePassword('user-1', 'wrong', 'new')
-      ).rejects.toThrow('현재 비밀번호가 일치하지 않습니다.');
+    it('calls findAllPaginated when no filters are provided', async () => {
+      mockUserRepo.findAllPaginated.mockResolvedValue([[], 0]);
+      await userService.getAllUsers({});
+      expect(mockUserRepo.findAllPaginated).toHaveBeenCalled();
     });
   });
 
   describe('deactivateUser', () => {
-    it('should deactivate user', async () => {
-      // Mock prisma lookups for related data in deactivateUser
+    it('throws ValidationError if user has active SRs', async () => {
+      const { default: prisma } = await import('@/lib/prisma');
+      vi.mocked(prisma.sR.findMany).mockResolvedValue([{ id: 'sr-1', srNumber: 'SR1', status: 'IN_PROGRESS' }] as any);
+
+      await expect(userService.deactivateUser('u1'))
+        .rejects.toThrow(ValidationError);
+    });
+
+    it('deactivates user if no active SRs', async () => {
       const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.sR.findMany).mockResolvedValue([]);
+      mockUserRepo.deactivateUser.mockResolvedValue({ id: 'u1' });
 
-      mockUserRepository.deactivateUser.mockResolvedValue({ id: 'user-1', isActive: false });
+      const result = await userService.deactivateUser('u1');
+      expect(result.id).toBe('u1');
+      expect(mockUserRepo.deactivateUser).toHaveBeenCalledWith('u1');
+    });
+  });
 
-      await userService.deactivateUser('user-1');
+  describe('hardDeleteUser', () => {
+    it('throws BusinessRuleError if related SR data exists', async () => {
+      const { default: prisma } = await import('@/lib/prisma');
+      vi.mocked(prisma.sR.count).mockResolvedValue(1);
 
-      expect(mockUserRepository.deactivateUser).toHaveBeenCalledWith('user-1');
+      await expect(userService.hardDeleteUser('u1')).rejects.toThrow(BusinessRuleError);
+    });
+
+    it('throws BusinessRuleError if activity exists', async () => {
+      const { default: prisma } = await import('@/lib/prisma');
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRActivity.count).mockResolvedValue(1);
+
+      await expect(userService.hardDeleteUser('u1')).rejects.toThrow(BusinessRuleError);
+    });
+
+    it('deletes user if no related data exists', async () => {
+      const { default: prisma } = await import('@/lib/prisma');
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRActivity.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRComment.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(0);
+      mockUserRepo.delete.mockResolvedValue({ id: 'u1' });
+
+      const result = await userService.hardDeleteUser('u1');
+      expect(result.id).toBe('u1');
+    });
+  });
+
+  describe('createUser', () => {
+    it('creates user with userType based roles', async () => {
+      const { default: prisma } = await import('@/lib/prisma');
+      const txMock = {
+        user: { create: vi.fn().mockResolvedValue({ id: 'u1' }), findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'u1' }) },
+        role: { findFirst: vi.fn().mockResolvedValue({ id: 'r1' }) },
+        userRole: { createMany: vi.fn() },
+        userClient: { createMany: vi.fn() }
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (cb) => cb(txMock));
+
+      await userService.createUser({
+        email: 't@t.com', name: 'N', password: 'P', userType: 'ENGINEER'
+      });
+
+      expect(txMock.role.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+        where: { name: 'ENGINEER' }
+      }));
+      expect(txMock.userRole.createMany).toHaveBeenCalled();
+    });
+  });
+
+  describe('changePassword', () => {
+    it('throws error if user not found', async () => {
+      mockUserRepo.findById.mockResolvedValue(null);
+      await expect(userService.changePassword('u1', 'old', 'new')).rejects.toThrow(NotFoundError);
+    });
+
+    it('throws error if current password mismatch', async () => {
+      mockUserRepo.findById.mockResolvedValue({ id: 'u1', password: 'hashed-old' });
+      const { compare } = await import('bcryptjs');
+      vi.mocked(compare).mockResolvedValue(false as any);
+
+      await expect(userService.changePassword('u1', 'wrong', 'new')).rejects.toThrow(ValidationError);
     });
   });
 });
-

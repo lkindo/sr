@@ -59,6 +59,27 @@ describe('utils', () => {
 
 		expect(convertSessionToPlainObject(session)).toEqual(session.user)
 	})
-})
+	it('toPlainObject는 복잡한 중첩 객체와 Edge Case를 처리한다', () => {
+		const input = {
+			a: {
+				b: new Date('2025-01-01T00:00:00.000Z'),
+				c: [1, new Date('2025-01-01T00:00:00.000Z')]
+			},
+			d: null,
+			e: undefined
+		};
+
+		const result = toPlainObject(input);
+
+		expect(result).toEqual({
+			a: {
+				b: '2025-01-01T00:00:00.000Z',
+				c: [1, '2025-01-01T00:00:00.000Z']
+			},
+			d: null,
+			e: undefined
+		});
+	});
+});
 
 

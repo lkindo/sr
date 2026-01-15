@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { ServiceError, errorToResult, NotFoundError, ValidationError } from '@/lib/errors';
+import { ServiceError, errorToResult, NotFoundError, ValidationError, ForbiddenError, UnauthorizedError, DuplicateError, BusinessRuleError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 
 // Mock logger
@@ -62,6 +62,33 @@ describe('Errors Utility', () => {
       expect(result.success).toBe(false);
       expect(result.code).toBe('UNKNOWN_ERROR');
       expect(logger.error).toHaveBeenCalled();
+    });
+  });
+  describe('Other Error Classes', () => {
+    it('ForbiddenError should have correct defaults', () => {
+      const error = new ForbiddenError();
+      expect(error.code).toBe('FORBIDDEN');
+      expect(error.statusCode).toBe(403);
+    });
+
+    it('UnauthorizedError should have correct defaults', () => {
+      const error = new UnauthorizedError();
+      expect(error.code).toBe('UNAUTHORIZED');
+      expect(error.statusCode).toBe(401);
+    });
+
+    it('DuplicateError should have correct message and code', () => {
+      const error = new DuplicateError('Data', 'id', '123');
+      expect(error.code).toBe('DUPLICATE');
+      expect(error.statusCode).toBe(409);
+      expect(error.message).toContain('이미 존재하는 Data입니다');
+      expect(error.message).toContain('id: 123');
+    });
+
+    it('BusinessRuleError should have correct defaults', () => {
+      const error = new BusinessRuleError('Rule broken');
+      expect(error.code).toBe('BUSINESS_RULE_VIOLATION');
+      expect(error.statusCode).toBe(400);
     });
   });
 });

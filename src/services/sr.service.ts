@@ -57,7 +57,7 @@ export class SRService {
     // 고객사 활성 상태 확인
     const client = await this.clientRepository.findById(validated.clientId);
     if (!client) {
-      throw new NotFoundError("고객사를 찾을 수 없습니다.");
+      throw new NotFoundError("고객사");
     }
     if (!client.isActive) {
       throw new Error(
@@ -250,7 +250,7 @@ export class SRService {
     try {
       const validated = srUpdateSchema.parse(data);
       const existingSR = await this.srRepository.findById(id);
-      if (!existingSR) throw new NotFoundError("SR을 찾을 수 없습니다.");
+      if (!existingSR) throw new NotFoundError("SR");
 
       ensureCanUpdateSR(sessionUser, existingSR);
 
@@ -267,7 +267,7 @@ export class SRService {
         // 새 고객사가 활성 상태인지 확인
         const newClient = await this.clientRepository.findById(validated.clientId);
         if (!newClient) {
-          throw new NotFoundError("변경하려는 고객사를 찾을 수 없습니다.");
+          throw new NotFoundError("변경하려는 고객사");
         }
         if (!newClient.isActive) {
           throw new Error(
