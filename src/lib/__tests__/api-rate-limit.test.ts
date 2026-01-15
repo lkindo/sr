@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import { withRateLimit, rateLimit } from '../api-rate-limit';
 import { MemoryRateLimiter } from '../rate-limiter';
@@ -28,6 +28,14 @@ describe('withRateLimit', () => {
     mockHandler = vi.fn().mockResolvedValue(
       NextResponse.json({ success: true })
     ) as unknown as (req: NextRequest, context: { params: Record<string, string> }) => Promise<NextResponse>;
+
+    // Test environment bypass disable
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('TEST_MODE', 'false');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('Rate limit 내에서는 핸들러를 실행해야 함', async () => {

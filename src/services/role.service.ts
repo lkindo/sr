@@ -1,20 +1,18 @@
-import { RoleRepository } from "@/repositories/role.repository";
 import { z } from "zod";
 import { roleCreateSchema, roleUpdateSchema } from "@/lib/schemas";
 import { NotFoundError, ReferentialIntegrityError } from "@/lib/errors";
 import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
+import prisma from "@/lib/prisma";
 import type { Role, Permission } from "@prisma/client";
 
 type RoleCreateData = z.infer<typeof roleCreateSchema>;
 type RoleUpdateData = z.infer<typeof roleUpdateSchema>;
 
 export class RoleService {
-  constructor(
-    private roleRepository: RoleRepository = new RoleRepository()
-  ) {}
+  constructor() { }
 
   async getRoleById(id: string): Promise<Role | null> {
-    return this.roleRepository.findById(id);
+    return prisma.role.findUnique({ where: { id } });
   }
 
   async getAllRoles(): Promise<(Role & {
@@ -25,54 +23,70 @@ export class RoleService {
       users: number;
     };
   })[]> {
-    return this.roleRepository.findAll();
+    return prisma.role.findMany({
+      include: {
+        permissions: { include: { permission: true } },
+        _count: { select: { users: true } },
+      },
+    }) as Promise<(Role & { permissions: { permission: Permission }[]; _count: { users: number } })[]>;
   }
 
   async createRole(data: RoleCreateData): Promise<Role> {
     const validated = roleCreateSchema.parse(data);
-    return this.roleRepository.create(validated);
+    return prisma.role.create({ data: validated });
   }
 
   async updateRole(id: string, data: RoleUpdateData): Promise<Role> {
     const validated = roleUpdateSchema.parse(data);
-    return this.roleRepository.update(id, validated);
+    return prisma.role.update({ where: { id }, data: validated });
   }
 
   async deleteRole(id: string): Promise<Role> {
     // 역할 삭제 전 관련 데이터 확인
-    const role = await this.roleRepository.findById(id);
+    const role = await prisma.role.findUnique({ where: { id } });
     if (!role) {
       throw new NotFoundError("역할", id);
     }
 
-    // 참조 무결성 확인: 관련된 데이터가 있는지 체크
-    const relatedCounts = await this.roleRepository.getRelatedDataCounts(id);
+    // 참조 무결성 확인
+    const usersCount = await prisma.userRole.count({ where: { roleId: id } });
+    const permissionsCount = await prisma.rolePermission.count({ where: { roleId: id } });
 
-    if (relatedCounts.usersCount > 0) {
+    if (usersCount > 0) {
       throw new ReferentialIntegrityError(
-        `역할을 삭제할 수 없습니다. ${relatedCounts.usersCount}명의 사용자가 이 역할을 사용 중입니다. ` +
+        `역할을 삭제할 수 없습니다. ${usersCount}명의 사용자가 이 역할을 사용 중입니다. ` +
         `먼저 사용자의 역할을 변경한 후 삭제하세요.`
       );
     }
 
-    // 권한은 자동으로 삭제됨 (ON DELETE CASCADE)
-    // 하지만 사용자에게 알리기 위해 메시지에 포함
-    if (relatedCounts.permissionsCount > 0) {
-      // 권한은 있지만 사용자가 없으면 삭제 가능 (권한은 cascade로 자동 삭제됨)
+    if (permissionsCount > 0) {
       const { logger } = await import("@/lib/logger");
-      logger.info(`역할 삭제 시 ${relatedCounts.permissionsCount}개의 권한 연결이 함께 삭제됩니다.`, {
+      logger.info(`역할 삭제 시 ${permissionsCount}개의 권한 연결이 함께 삭제됩니다.`, {
         roleId: id,
-        permissionsCount: relatedCounts.permissionsCount,
+        permissionsCount,
       });
     }
 
-    // 관련 사용자가 없으면 삭제 진행 (권한은 자동 삭제됨)
-    return this.roleRepository.delete(id);
+    return prisma.role.delete({ where: { id } });
   }
 
   async updateRolePermissions(roleId: string, permissionIds: string[]): Promise<Role | null> {
-    // Repository의 트랜잭션 메서드 사용
-    await this.roleRepository.updateRolePermissions(roleId, permissionIds);
+    await prisma.$transaction(async (tx) => {
+      // 1. 기존 권한 매핑 삭제
+      await tx.rolePermission.deleteMany({
+        where: { roleId },
+      });
+
+      // 2. 새 권한 매핑 생성
+      if (permissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissionIds.map((permissionId) => ({
+            roleId,
+            permissionId,
+          })),
+        });
+      }
+    });
 
     // 캐시 무효화 (역할 권한 변경 시 모든 사용자 권한 캐시 무효화)
     await invalidateCachePattern("user:permissions:*");

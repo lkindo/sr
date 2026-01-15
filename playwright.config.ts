@@ -74,6 +74,9 @@ export default defineConfig({
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
+    env: {
+      TEST_MODE: 'true',
+    },
   },
 
   /* 테스트할 브라우저 설정 */

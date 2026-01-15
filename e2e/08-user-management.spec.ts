@@ -87,6 +87,12 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
     const passwordInput = dialog.locator('input[name="password"], input[type="password"]').first()
     if (await passwordInput.isVisible({ timeout: 1000 }).catch(() => false)) {
       await passwordInput.fill('Test1234!')
+
+      // 비밀번호 확인 입력 (필수)
+      const confirmPasswordInput = dialog.locator('input[name="confirmPassword"], input[placeholder*="확인"], input[id*="confirm"]').first()
+      if (await confirmPasswordInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await confirmPasswordInput.fill('Test1234!')
+      }
     }
 
     // 저장 버튼 클릭

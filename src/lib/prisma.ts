@@ -48,9 +48,19 @@ if (process.env.NODE_ENV === 'development' && prisma) {
     }
   }
   // Use middleware only if supported by current Prisma version
-  const applyMw = (prisma as unknown as { $use?: (fn: (params: any, next: any) => Promise<any>) => void }).$use
+  type PrismaMiddlewareParams = {
+    model?: string;
+    action: string;
+    args: unknown;
+    dataPath: string[];
+    runInTransaction: boolean;
+  };
+  type PrismaMiddlewareNext = (params: PrismaMiddlewareParams) => Promise<unknown>;
+
+  const applyMw = (prisma as unknown as { $use?: (fn: (params: PrismaMiddlewareParams, next: PrismaMiddlewareNext) => Promise<unknown>) => void }).$use;
+
   if (typeof applyMw === 'function') {
-    applyMw(async (params: any, next: any) => {
+    applyMw(async (params: PrismaMiddlewareParams, next: PrismaMiddlewareNext) => {
       const startedAt = Date.now()
       const result = await next(params)
       const duration = Date.now() - startedAt

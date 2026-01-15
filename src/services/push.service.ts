@@ -160,6 +160,11 @@ export class PushService {
             return [];
         }
 
+        // 테스트 환경에서는 발송 건너뛰기
+        if (process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true') {
+            return [];
+        }
+
         const webPush = await getWebPush();
         const subscriptions = await this.getUserSubscriptions(userId);
         const results: { statusCode: number; body: string }[] = [];

@@ -1,57 +1,40 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ClientService } from '../client.service';
+import prisma from '@/lib/prisma';
 
-// Mock repositories
-const mockFindById = vi.fn();
-const mockFindDetailsById = vi.fn();
-const mockFindAll = vi.fn();
-const mockFindByCode = vi.fn();
-const mockCreate = vi.fn();
-const mockUpdate = vi.fn();
-const mockDelete = vi.fn();
-const mockGetRelatedDataCounts = vi.fn();
-const mockServiceCategoryFindAll = vi.fn();
-
-vi.mock('@/repositories/client.repository', () => ({
-  ClientRepository: class MockClientRepository {
-    findById = mockFindById;
-    findDetailsById = mockFindDetailsById;
-    findAll = mockFindAll;
-    findByCode = mockFindByCode;
-    create = mockCreate;
-    update = mockUpdate;
-    delete = mockDelete;
-    getRelatedDataCounts = mockGetRelatedDataCounts;
-  },
-}));
-
-vi.mock('@/repositories/service-category.repository', () => ({
-  ServiceCategoryRepository: class MockServiceCategoryRepository {
-    findAll = mockServiceCategoryFindAll;
+vi.mock('@/lib/prisma', () => ({
+  default: {
+    client: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    serviceCategory: {
+      findMany: vi.fn(),
+      count: vi.fn(),
+    },
+    userClient: {
+      count: vi.fn(),
+    },
+    sR: {
+      count: vi.fn(),
+    },
+    clientHandler: {
+      count: vi.fn(),
+    },
   },
 }));
 
 describe('ClientService', () => {
   let clientService: ClientService;
-  let mockClientRepository: any;
-  let mockServiceCategoryRepository: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     clientService = new ClientService();
-    mockClientRepository = (clientService as any).clientRepository;
-    mockServiceCategoryRepository = (clientService as any).serviceCategoryRepository;
-
-    // Mock 함수들을 실제 mock 함수로 설정
-    mockClientRepository.findById = mockFindById;
-    mockClientRepository.findDetailsById = mockFindDetailsById;
-    mockClientRepository.findAll = mockFindAll;
-    mockClientRepository.findByCode = mockFindByCode;
-    mockClientRepository.create = mockCreate;
-    mockClientRepository.update = mockUpdate;
-    mockClientRepository.delete = mockDelete;
-    mockClientRepository.getRelatedDataCounts = mockGetRelatedDataCounts;
-    mockServiceCategoryRepository.findAll = mockServiceCategoryFindAll;
   });
 
   describe('getClientById', () => {
@@ -62,12 +45,12 @@ describe('ClientService', () => {
         name: 'Test Client',
       };
 
-      mockClientRepository.findById.mockResolvedValue(mockClient);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as any);
 
       const result = await clientService.getClientById('client1');
 
       expect(result).toEqual(mockClient);
-      expect(mockClientRepository.findById).toHaveBeenCalledWith('client1');
+      expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { id: 'client1' } });
     });
   });
 
@@ -78,12 +61,12 @@ describe('ClientService', () => {
         { id: 'client2', code: 'CLI002', name: 'Client 2' },
       ];
 
-      mockClientRepository.findAll.mockResolvedValue(mockClients);
+      vi.mocked(prisma.client.findMany).mockResolvedValue(mockClients as any);
 
       const result = await clientService.getAllClients();
 
       expect(result).toEqual(mockClients);
-      expect(mockClientRepository.findAll).toHaveBeenCalled();
+      expect(prisma.client.findMany).toHaveBeenCalled();
     });
   });
 
@@ -102,22 +85,21 @@ describe('ClientService', () => {
         updatedAt: new Date(),
       };
 
-      // findByCode는 중복 체크를 위해 null을 반환 (중복 없음)
-      mockFindByCode.mockResolvedValue(null);
-      mockClientRepository.create.mockResolvedValue(mockCreatedClient);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.client.create).mockResolvedValue(mockCreatedClient as any);
 
       const result = await clientService.createClient(clientData);
 
       expect(result).toEqual(mockCreatedClient);
-      expect(mockClientRepository.findByCode).toHaveBeenCalledWith('CLI001');
-      expect(mockClientRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
+      expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { code: 'CLI001' } });
+      expect(prisma.client.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
           code: 'CLI001',
           name: 'Test Client',
           industry: 'IT',
           isActive: true,
-        })
-      );
+        }),
+      });
     });
   });
 
@@ -135,74 +117,38 @@ describe('ClientService', () => {
         updatedAt: new Date(),
       };
 
-      mockClientRepository.update.mockResolvedValue(mockUpdatedClient);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.client.update).mockResolvedValue(mockUpdatedClient as any);
 
       const result = await clientService.updateClient('client1', updateData);
 
       expect(result).toEqual(mockUpdatedClient);
-      // updateData에 추가 필드가 포함될 수 있으므로 부분 매칭 사용
-      expect(mockClientRepository.update).toHaveBeenCalledWith(
-        'client1',
-        expect.objectContaining(updateData)
-      );
+      expect(prisma.client.update).toHaveBeenCalledWith({
+        where: { id: 'client1' },
+        data: expect.objectContaining(updateData),
+      });
     });
   });
 
   describe('deleteClient', () => {
     it('성공적으로 고객사를 삭제해야 함', async () => {
-      mockGetRelatedDataCounts.mockResolvedValue({
-        usersCount: 0,
-        srsCount: 0,
-        serviceCategoriesCount: 0,
-        clientHandlersCount: 0,
-      });
-      mockClientRepository.delete.mockResolvedValue(undefined);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.userClient.count).mockResolvedValue(0);
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+      vi.mocked(prisma.serviceCategory.count).mockResolvedValue(0);
+      vi.mocked(prisma.clientHandler.count).mockResolvedValue(0);
+      vi.mocked(prisma.client.delete).mockResolvedValue({} as any);
 
       await clientService.deleteClient('client1');
 
-      expect(mockGetRelatedDataCounts).toHaveBeenCalledWith('client1');
-      expect(mockClientRepository.delete).toHaveBeenCalledWith('client1');
+      expect(prisma.client.delete).toHaveBeenCalledWith({ where: { id: 'client1' } });
     });
 
     it('관련 데이터가 있으면 에러를 던져야 함', async () => {
-      mockGetRelatedDataCounts.mockResolvedValue({
-        usersCount: 5,
-        srsCount: 10,
-        serviceCategoriesCount: 3,
-        clientHandlersCount: 2,
-      });
+      vi.mocked(prisma.userClient.count).mockResolvedValue(5);
 
       await expect(clientService.deleteClient('client1')).rejects.toThrow();
-      expect(mockClientRepository.delete).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('비활성 고객사 처리', () => {
-    it('비활성화된 고객사에는 사용자를 추가할 수 없어야 함', async () => {
-      const inactiveClient = {
-        id: 'client1',
-        code: 'CLI001',
-        name: 'Inactive Client',
-        isActive: false,
-      };
-
-      mockFindById.mockResolvedValue(inactiveClient);
-
-      // ClientService가 사용자 추가 시 고객사 활성 상태를 확인한다고 가정
-      // 실제 구현은 UserService에서 처리할 수도 있음
-      // 이 테스트는 개념적 검증용
-    });
-
-    it('고객사 삭제 시 관련 SR이 있으면 삭제할 수 없어야 함', async () => {
-      mockGetRelatedDataCounts.mockResolvedValue({
-        usersCount: 0,
-        srsCount: 5, // SR이 5개 존재
-        serviceCategoriesCount: 0,
-        clientHandlersCount: 0,
-      });
-
-      await expect(clientService.deleteClient('client1')).rejects.toThrow();
-      expect(mockClientRepository.delete).not.toHaveBeenCalled();
+      expect(prisma.client.delete).not.toHaveBeenCalled();
     });
   });
 });

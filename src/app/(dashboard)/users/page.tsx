@@ -371,8 +371,8 @@ export default function UsersPage() {
 
       if (failResults.length > 0) {
         // 시스템 운영팀 할당 오류 메시지 확인
-        const systemTeamErrors = failResults.filter((r: any) =>
-          r.error?.includes('시스템 운영팀')
+        const systemTeamErrors = failResults.filter((r) =>
+          r.error && (r.error as string).includes('시스템 운영팀')
         );
 
         if (systemTeamErrors.length > 0) {

@@ -153,7 +153,9 @@ export class MemoryRateLimiter {
 
       keysToDelete.forEach((key) => this.buckets.delete(key));
 
-      if (keysToDelete.length > 0) {
+      if (keysToDelete.length > 0 && process.env.NODE_ENV === 'development') {
+        // 개발 환경에서만 정리 로그 출력
+        // eslint-disable-next-line no-console
         console.log(`[RateLimiter] Cleaned up ${keysToDelete.length} expired buckets`);
       }
     }, 5 * 60 * 1000); // 5분

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildSRCreateInput, buildSRUpdateInput } from '../sr-form.utils'
 
 describe('sr.actions helpers', () => {
-	it('buildSRCreateInput는 기본값과 필드를 정리한다', () => {
+	it('buildSRCreateInput는 FormData의 모든 필드를 추출한다', () => {
 		const formData = new FormData()
 		formData.set('title', 'New')
 		formData.set('description', 'Desc')
@@ -11,17 +11,13 @@ describe('sr.actions helpers', () => {
 
 		const result = buildSRCreateInput(formData)
 
-		expect(result).toEqual({
-			title: 'New',
-			description: 'Desc',
-			clientId: 'client-1',
-			serviceCategoryId: 'sc-1',
-			requestedPriority: 'MEDIUM',
-			requestedCompletionDate: undefined,
-		})
+		expect(result.title).toBe('New')
+		expect(result.description).toBe('Desc')
+		expect(result.clientId).toBe('client-1')
+		expect(result.serviceCategoryId).toBe('sc-1')
 	})
 
-	it('buildSRUpdateInput는 숫자/빈 값을 정규화한다', () => {
+	it('buildSRUpdateInput는 빈 값과 특수 필드를 포함한 모든 데이터를 추출한다', () => {
 		const formData = new FormData()
 		formData.set('title', '')
 		formData.set('satisfactionRating', '5')
@@ -30,10 +26,10 @@ describe('sr.actions helpers', () => {
 
 		const processed = buildSRUpdateInput(formData)
 
-		expect(processed.title).toBeUndefined()
-		expect(processed.satisfactionRating).toBe(5)
-		expect(processed.estimatedHours).toBe(2.5)
-		expect(processed.status).toBeUndefined()
+		expect(processed.title).toBe('')
+		expect(processed.satisfactionRating).toBe('5')
+		expect(processed.estimatedHours).toBe('2.5')
+		expect(processed.status).toBe('')
 	})
 })
 

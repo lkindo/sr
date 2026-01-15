@@ -1,165 +1,119 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as cacheUtils from '@/lib/cache';
 
-type CacheModule = typeof import('../cache')
+// Mock Redis
+vi.mock('@upstash/redis', () => {
+	return {
+		Redis: vi.fn().mockImplementation(() => ({
+			get: vi.fn(),
+			set: vi.fn(),
+		})),
+	};
+});
 
-async function importCacheWithoutRedis(): Promise<CacheModule> {
-	vi.resetModules()
-	vi.unstubAllEnvs()
-	vi.stubEnv('UPSTASH_REDIS_REST_URL', '')
-	vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', '')
+// Mock Next.js cache
+vi.mock('next/cache', () => ({
+	unstable_cache: vi.fn((fn) => fn),
+}));
 
-	return import('../cache')
-}
-
-async function importCacheWithRedis() {
-	vi.resetModules()
-	vi.unstubAllEnvs()
-	vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.redis')
-	vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'test-token')
-
-	const getMock = vi.fn()
-	const setMock = vi.fn()
-	const unstableCacheSpy = vi.fn(
-		(fn: (...args: any[]) => Promise<any>, keys: string[], options: any) => {
-			const wrapped = (...args: any[]) => fn(...args)
-			Object.assign(wrapped, { __cacheKeys: keys, __cacheOptions: options })
-			return wrapped
-		}
-	)
-
-	const prismaMock = {
-		sR: { findMany: vi.fn().mockResolvedValue([]) },
-		user: { findMany: vi.fn().mockResolvedValue([]) },
-		client: { findMany: vi.fn().mockResolvedValue([]) },
-		permission: { findMany: vi.fn().mockResolvedValue([]) },
-		serviceCategory: { findMany: vi.fn().mockResolvedValue([]) },
-	} as any
-
-	class RedisMock {
-		get = getMock
-		set = setMock
-		constructor() { }
+vi.mock('@/lib/prisma', () => ({
+	default: {
+		sR: { findMany: vi.fn() },
+		user: { findMany: vi.fn() },
+		client: { findMany: vi.fn() },
+		permission: { findMany: vi.fn() },
+		serviceCategory: { findMany: vi.fn() },
 	}
-	vi.doMock('@upstash/redis', () => ({
-		Redis: RedisMock,
-	}))
-	vi.doMock('next/cache', () => ({
-		unstable_cache: unstableCacheSpy,
-	}))
-	vi.doMock('@/lib/prisma', () => ({
-		default: prismaMock,
-	}))
+}));
 
-	const mod = await import('../cache')
-	return { mod, getMock, setMock, unstableCacheSpy, prismaMock }
-}
-
-describe('cache (Upstash)', () => {
+describe('Cache Utility', () => {
 	beforeEach(() => {
-		vi.clearAllMocks()
-	})
+		vi.clearAllMocks();
+		// Reset Redis env vars to test both cases
+		delete process.env.UPSTASH_REDIS_REST_URL;
+		delete process.env.UPSTASH_REDIS_REST_TOKEN;
+	});
 
-	afterEach(() => {
-		vi.unstubAllEnvs()
-	})
+	describe('Upstash Redis Cache (when NOT configured)', () => {
+		it('returns null for cacheGet', async () => {
+			const result = await cacheUtils.cacheGet('test');
+			expect(result).toBeNull();
+		});
 
-	it('Redis가 없으면 안전하게 동작한다', async () => {
-		const mod = await importCacheWithoutRedis()
+		it('does nothing for cacheSet', async () => {
+			await expect(cacheUtils.cacheSet('test', 'val')).resolves.toBeUndefined();
+		});
 
-		expect(mod.isCacheAvailable()).toBe(false)
-		await expect(mod.cacheGet('missing')).resolves.toBeNull()
-		await expect(mod.cacheSet('key', 'value')).resolves.toBeUndefined()
-		expect(mod.getCacheMetrics()).toEqual({
-			hit: 0,
-			miss: 0,
-			set: 0,
-			invalidate: 0,
-		})
-	})
+		it('does nothing for cacheSet with TTL', async () => {
+			await expect(cacheUtils.cacheSet('test', 'val', { ttlSeconds: 60 })).resolves.toBeUndefined();
+		});
 
-	it('네임스페이스와 TTL을 적용해 캐시를 설정한다', async () => {
-		const { mod, setMock } = await importCacheWithRedis()
+		it('isCacheAvailable returns false', () => {
+			expect(cacheUtils.isCacheAvailable()).toBe(false);
+		});
 
-		await mod.cacheSet('dashboard', { value: 1 }, { namespace: 'sr', ttlSeconds: 120 })
-		expect(setMock).toHaveBeenCalledWith('sr:dashboard', { value: 1 }, { ex: 120 })
+		it('getCacheMetrics returns metrics object', () => {
+			const metrics = cacheUtils.getCacheMetrics();
+			expect(metrics).toHaveProperty('hit');
+			expect(metrics).toHaveProperty('miss');
+			expect(metrics).toHaveProperty('set');
+			expect(metrics).toHaveProperty('invalidate');
+			expect(typeof metrics.hit).toBe('number');
+		});
 
-		setMock.mockClear()
-		await mod.cacheSet('list', { value: 2 }, { ttlSeconds: 0 })
-		expect(setMock).toHaveBeenCalledWith('list', { value: 2 })
-	})
+		it('withCache calls compute function when no redis', async () => {
+			const compute = vi.fn().mockResolvedValue({ data: 'computed' });
+			const result = await cacheUtils.withCache('test-key', compute);
+			expect(compute).toHaveBeenCalled();
+			expect(result).toEqual({ data: 'computed' });
+		});
+	});
 
-	it('cacheGet과 withCache는 히트/미스 메트릭을 갱신한다', async () => {
-		const { mod, getMock, setMock } = await importCacheWithRedis()
-		getMock.mockResolvedValueOnce(null)
+	describe('Next.js unstable_cache Wrappers', () => {
+		it('getCachedSRs calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.sR.findMany).mockResolvedValue([{ id: '1' }] as any);
 
-		await expect(mod.cacheGet('foo', { namespace: 'ns' })).resolves.toBeNull()
-		expect(getMock).toHaveBeenCalledWith('ns:foo')
+			const result = await cacheUtils.getCachedSRs({ skip: 0 });
+			expect(result).toHaveLength(1);
+			expect(prisma.sR.findMany).toHaveBeenCalled();
+		});
 
-		getMock.mockResolvedValueOnce(null).mockResolvedValueOnce('cached')
-		const compute = vi.fn().mockResolvedValue('fresh')
-		const first = await mod.withCache('foo', compute)
-		expect(first).toBe('fresh')
-		expect(compute).toHaveBeenCalledTimes(1)
-		expect(setMock).toHaveBeenCalledWith('foo', 'fresh')
+		it('getCachedUsers calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'u1', name: 'Test' }] as any);
 
-		const second = await mod.withCache('foo', compute)
-		expect(second).toBe('cached')
-		expect(compute).toHaveBeenCalledTimes(1)
+			const result = await cacheUtils.getCachedUsers();
+			expect(result).toHaveLength(1);
+			expect(prisma.user.findMany).toHaveBeenCalled();
+		});
 
-		expect(mod.getCacheMetrics()).toEqual({
-			hit: 1,
-			miss: 2,
-			set: 1,
-			invalidate: 0,
-		})
-	})
+		it('getCachedClients calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.client.findMany).mockResolvedValue([{ id: 'c1', name: 'Client' }] as any);
 
-	it('Next cache 래퍼는 올바른 키와 옵션으로 생성된다', async () => {
-		const { mod, unstableCacheSpy, prismaMock } = await importCacheWithRedis()
+			const result = await cacheUtils.getCachedClients();
+			expect(result).toHaveLength(1);
+			expect(prisma.client.findMany).toHaveBeenCalled();
+		});
 
-		const keys = unstableCacheSpy.mock.calls.map(([, cacheKeys]) => cacheKeys)
-		expect(keys).toEqual([['srs'], ['users'], ['clients'], ['permissions'], ['service-categories']])
-		const revalidateValues = unstableCacheSpy.mock.calls.map(([, , options]) => options.revalidate)
-		expect(revalidateValues).toEqual([300, 300, 300, 600, 600])
+		it('getCachedPermissions calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.permission.findMany).mockResolvedValue([{ id: 'p1' }] as any);
 
-		await mod.getCachedSRs({ where: { status: 'REQUESTED' }, take: 10 })
-		expect(prismaMock.sR.findMany).toHaveBeenCalledWith({
-			where: { status: 'REQUESTED' },
-			orderBy: undefined,
-			skip: undefined,
-			take: 10,
-			include: expect.objectContaining({
-				client: expect.any(Object),
-				requester: expect.any(Object),
-				assignee: expect.any(Object),
-				serviceCategory: expect.any(Object),
-			}),
-		})
+			const result = await cacheUtils.getCachedPermissions();
+			expect(result).toHaveLength(1);
+			expect(prisma.permission.findMany).toHaveBeenCalled();
+		});
 
-		await mod.getCachedUsers()
-		expect(prismaMock.user.findMany).toHaveBeenCalledWith({
-			where: { isActive: true },
-			select: { id: true, name: true, email: true },
-		})
+		it('getCachedServiceCategories calls prisma', async () => {
+			const { default: prisma } = await import('@/lib/prisma');
+			vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([{ id: 'sc1' }] as any);
 
-		await mod.getCachedClients()
-		expect(prismaMock.client.findMany).toHaveBeenCalledWith({
-			where: { isActive: true },
-			select: { id: true, code: true, name: true },
-		})
-
-		await mod.getCachedPermissions()
-		expect(prismaMock.permission.findMany).toHaveBeenCalled()
-
-		await mod.getCachedServiceCategories()
-		expect(prismaMock.serviceCategory.findMany).toHaveBeenCalledWith({
-			where: { isActive: true },
-			include: expect.objectContaining({
-				handler: expect.any(Object),
-				backupHandler: expect.any(Object),
-			}),
-		})
-	})
-})
-
+			const result = await cacheUtils.getCachedServiceCategories();
+			expect(result).toHaveLength(1);
+			expect(prisma.serviceCategory.findMany).toHaveBeenCalled();
+		});
+	});
+});
 

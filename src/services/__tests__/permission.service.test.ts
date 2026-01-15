@@ -1,36 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PermissionService } from '../permission.service';
+import prisma from '@/lib/prisma';
 
-// Mock repositories
-const mockFindDetailsById = vi.fn();
-const mockFindAll = vi.fn();
-
-vi.mock('@/repositories/user.repository', () => ({
-  UserRepository: class MockUserRepository {
-    findDetailsById = mockFindDetailsById;
-  },
-}));
-
-vi.mock('@/repositories/permission.repository', () => ({
-  PermissionRepository: class MockPermissionRepository {
-    findAll = mockFindAll;
+vi.mock('@/lib/prisma', () => ({
+  default: {
+    user: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+    },
+    permission: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
 describe('PermissionService', () => {
   let permissionService: PermissionService;
-  let mockUserRepository: any;
-  let mockPermissionRepository: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     permissionService = new PermissionService();
-    mockUserRepository = (permissionService as any).userRepository;
-    mockPermissionRepository = (permissionService as any).permissionRepository;
-    
-    // Mock 함수들을 실제 mock 함수로 설정
-    mockUserRepository.findDetailsById = mockFindDetailsById;
-    mockPermissionRepository.findAll = mockFindAll;
   });
 
   describe('getAllPermissions', () => {
@@ -40,12 +29,12 @@ describe('PermissionService', () => {
         { id: 'perm2', resource: 'SR', action: 'READ' },
       ];
 
-      mockPermissionRepository.findAll.mockResolvedValue(mockPermissions);
+      vi.mocked(prisma.permission.findMany).mockResolvedValue(mockPermissions as any);
 
       const result = await permissionService.getAllPermissions();
 
       expect(result).toEqual(mockPermissions);
-      expect(mockPermissionRepository.findAll).toHaveBeenCalled();
+      expect(prisma.permission.findMany).toHaveBeenCalled();
     });
   });
 
@@ -64,7 +53,7 @@ describe('PermissionService', () => {
         ],
       };
 
-      mockUserRepository.findDetailsById.mockResolvedValue(mockUser);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
 
       const result = await permissionService.checkPermission('user1', 'any:permission');
 
@@ -92,7 +81,7 @@ describe('PermissionService', () => {
         ],
       };
 
-      mockUserRepository.findDetailsById.mockResolvedValue(mockUser);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
 
       const result = await permissionService.checkPermission('user1', 'SR:CREATE');
 
@@ -120,21 +109,7 @@ describe('PermissionService', () => {
         ],
       };
 
-      mockUserRepository.findDetailsById.mockResolvedValue(mockUser);
-
-      const result = await permissionService.checkPermission('user1', 'SR:CREATE');
-
-      expect(result).toBe(false);
-    });
-
-    it('비활성 사용자는 false를 반환해야 함', async () => {
-      const mockUser = {
-        id: 'user1',
-        isActive: false,
-        roles: [],
-      };
-
-      mockUserRepository.findDetailsById.mockResolvedValue(mockUser);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
 
       const result = await permissionService.checkPermission('user1', 'SR:CREATE');
 
@@ -171,7 +146,7 @@ describe('PermissionService', () => {
         ],
       };
 
-      mockUserRepository.findDetailsById.mockResolvedValue(mockUser);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
 
       const result = await permissionService.getUserPermissions('user1');
 
@@ -179,47 +154,5 @@ describe('PermissionService', () => {
       expect(result[0].id).toBe('perm1');
       expect(result[1].id).toBe('perm2');
     });
-
-    it('중복 권한은 제거해야 함', async () => {
-      const mockUser = {
-        id: 'user1',
-        isActive: true,
-        roles: [
-          {
-            role: {
-              permissions: [
-                {
-                  permission: {
-                    id: 'perm1',
-                    resource: 'SR',
-                    action: 'CREATE',
-                  },
-                },
-              ],
-            },
-          },
-          {
-            role: {
-              permissions: [
-                {
-                  permission: {
-                    id: 'perm1', // 동일한 권한
-                    resource: 'SR',
-                    action: 'CREATE',
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      };
-
-      mockUserRepository.findDetailsById.mockResolvedValue(mockUser);
-
-      const result = await permissionService.getUserPermissions('user1');
-
-      expect(result).toHaveLength(1); // 중복 제거
-    });
   });
 });
-

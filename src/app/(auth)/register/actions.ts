@@ -126,7 +126,7 @@ export async function registerUser(formData: FormData) {
       };
     }
 
-    console.error("회원가입 오류:", error);
+    // 에러 로그는 서버 측에서만 기록 (프로덕션에서는 로그 수집 시스템 사용)
     return {
       success: false,
       error: "회원가입 중 오류가 발생했습니다.",

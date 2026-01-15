@@ -78,8 +78,8 @@ export default function OrganizationPage() {
               [clientId]: data.users || [],
             }));
           }
-        } catch (error) {
-          console.error("Failed to fetch client users:", error);
+        } catch {
+          // 에러는 toast로 사용자에게 표시
           toast({
             title: "오류",
             description: "사용자 정보를 불러오는데 실패했습니다.",

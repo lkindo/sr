@@ -109,6 +109,11 @@ export function withRateLimit<T extends NextRequest = NextRequest, P = Promise<R
     // 식별자 추출
     const key = await Promise.resolve(keyGenerator(request));
 
+    // 테스트 환경에서는 Rate Limit 무시
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true') {
+      return handler(request, context);
+    }
+
     // Rate limit 체크
     const result = await limiter.check(key);
 

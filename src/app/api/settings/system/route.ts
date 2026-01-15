@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SystemSettings } from "@/types/settings";
 import { withAuthAndRateLimit } from "@/lib/auth-wrapper";
 import { ForbiddenError } from "@/lib/errors";
+import { logger } from "@/lib/logger";
 
 // 시스템 설정 가져오기 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
@@ -39,8 +40,7 @@ export const PUT = withAuthAndRateLimit(async (request: NextRequest, { session }
   const settings: SystemSettings = await request.json();
 
   // 실제 설정 저장 로직은 여기에 구현해야 합니다.
-  // 현재는 더미 응답
-  console.log("Updating system settings:", settings);
+  logger.debug("Updating system settings", { custom_siteName: settings.siteName });
 
   return NextResponse.json({ message: "시스템 설정이 저장되었습니다." });
 }, { preset: 'strict' }); // 1분당 5회 (민감한 작업)

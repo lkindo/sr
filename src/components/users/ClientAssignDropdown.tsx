@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Building2, Loader2 } from "lucide-react";
+import { Building2, Loader2 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 

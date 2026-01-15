@@ -44,7 +44,7 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest) => {
         where: filters,
         skip,
         take,
-        orderBy: orderBy as any,
+        orderBy: orderBy as import("@prisma/client").Prisma.SROrderByWithRelationInput,
       }),
       prisma.sR.count({ where: filters }),
     ]);

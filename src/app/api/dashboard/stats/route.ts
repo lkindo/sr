@@ -74,35 +74,27 @@ export const GET = withAuthAndRateLimit(async (request: NextRequest, { session }
         return acc;
       }, {} as Record<string, number>);
 
-      // Get total counts
-      const totalSRs = await prisma.sR.count({ where: baseWhere });
-      const inProgressSRs = await prisma.sR.count({
-        where: { ...baseWhere, status: "IN_PROGRESS" },
-      });
-      const completedSRs = await prisma.sR.count({
-        where: { ...baseWhere, status: { in: ["COMPLETED", "CONFIRMED"] } },
-      });
-      const pendingSRs = await prisma.sR.count({
-        where: { ...baseWhere, status: { in: ["REQUESTED", "INTAKE"] } },
-      });
-      const requestedSRs = await prisma.sR.count({
-        where: { ...baseWhere, status: "REQUESTED" },
-      });
-      const urgentSRs = await prisma.sR.count({
-        where: { ...baseWhere, priority: { in: ["CRITICAL", "HIGH"] } },
-      });
-
-      // 내 담당 SR 통계 (ENGINEER용)
-      let myAssignedSRs = 0;
-      let myAssignedInProgress = 0;
-      if (isEngineer) {
-        myAssignedSRs = await prisma.sR.count({
-          where: { ...baseWhere, assigneeId: userId },
-        });
-        myAssignedInProgress = await prisma.sR.count({
-          where: { ...baseWhere, assigneeId: userId, status: "IN_PROGRESS" },
-        });
-      }
+      // Get total counts - parallelized for performance
+      const [
+        totalSRs,
+        inProgressSRs,
+        completedSRs,
+        pendingSRs,
+        requestedSRs,
+        urgentSRs,
+        myAssignedSRs,
+        myAssignedInProgress,
+      ] = await Promise.all([
+        prisma.sR.count({ where: baseWhere }),
+        prisma.sR.count({ where: { ...baseWhere, status: "IN_PROGRESS" } }),
+        prisma.sR.count({ where: { ...baseWhere, status: { in: ["COMPLETED", "CONFIRMED"] } } }),
+        prisma.sR.count({ where: { ...baseWhere, status: { in: ["REQUESTED", "INTAKE"] } } }),
+        prisma.sR.count({ where: { ...baseWhere, status: "REQUESTED" } }),
+        prisma.sR.count({ where: { ...baseWhere, priority: { in: ["CRITICAL", "HIGH"] } } }),
+        // Engineer-specific counts (returns 0 if not engineer)
+        isEngineer ? prisma.sR.count({ where: { ...baseWhere, assigneeId: userId } }) : Promise.resolve(0),
+        isEngineer ? prisma.sR.count({ where: { ...baseWhere, assigneeId: userId, status: "IN_PROGRESS" } }) : Promise.resolve(0),
+      ]);
 
       // Get SR counts by client
       const srByClient = await prisma.sR.groupBy({

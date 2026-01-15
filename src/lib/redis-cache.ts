@@ -115,8 +115,7 @@ export async function getCachedData<T>(
     });
 
     return data;
-  } catch (error) {
-
+  } catch {
     // 캐시 실패 시 직접 fetcher 실행
     return fetcher();
   }

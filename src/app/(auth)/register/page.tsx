@@ -102,7 +102,7 @@ export default function RegisterPage() {
       const result = await response.json();
       setClients(Array.isArray(result) ? result : result.data || []);
     } catch {
-      console.error("고객사 목록 조회 실패:", error);
+      // 에러 발생 시 빈 배열로 설정 (사용자에게 "등록된 고객사가 없습니다" 메시지 표시)
       setClients([]);
     } finally {
       setLoadingClients(false);
@@ -254,9 +254,9 @@ export default function RegisterPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">비밀번호 강도:</span>
                       <span className={`font-medium ${passwordStrength.score === 100 ? 'text-green-600' :
-                          passwordStrength.score >= 60 ? 'text-blue-600' :
-                            passwordStrength.score >= 40 ? 'text-yellow-600' :
-                              'text-red-600'
+                        passwordStrength.score >= 60 ? 'text-blue-600' :
+                          passwordStrength.score >= 40 ? 'text-yellow-600' :
+                            'text-red-600'
                         }`}>
                         {passwordStrength.label}
                       </span>

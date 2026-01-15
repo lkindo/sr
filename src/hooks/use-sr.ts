@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { SRStatus, SRPriority } from "@prisma/client";
 import { getSRDetailsAction, updateSRAction, deleteSRAction } from "@/actions/sr.actions";
 import type { SRDetails } from "@/types/sr.types";
 import { useToast } from "@/hooks/use-toast";
@@ -56,8 +57,8 @@ export function useUpdateSR(srId: string) {
           ...previousSR,
           ...(title && { title }),
           ...(description && { description }),
-          ...(status && { status: status as any }),
-          ...(priority && { priority: priority as any }),
+          ...(status && { status: status as SRStatus }),
+          ...(priority && { priority: priority as SRPriority }),
         });
       }
 

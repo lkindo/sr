@@ -133,15 +133,7 @@ export const ENV_VARIABLES: EnvVariable[] = [
     category: 'queue',
   },
 
-  // Mattermost (선택사항)
-  {
-    name: 'MATTERMOST_WEBHOOK_URL',
-    required: false,
-    description: 'Mattermost 웹훅 URL (알림용)',
-    category: 'webhook',
-    validate: (value) => value.startsWith('https://'),
-    validationError: 'MATTERMOST_WEBHOOK_URL은 https:// 로 시작해야 합니다.',
-  },
+
 
   // Rate Limiting (선택사항)
   {

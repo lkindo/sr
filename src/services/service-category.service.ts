@@ -1,11 +1,9 @@
-import { ServiceCategoryRepository } from "@/repositories/service-category.repository";
+import prisma from "@/lib/prisma";
 
 export class ServiceCategoryService {
-  constructor(
-    private serviceCategoryRepository: ServiceCategoryRepository = new ServiceCategoryRepository()
-  ) {}
+  constructor() { }
 
   async getAll() {
-    return this.serviceCategoryRepository.findAll();
+    return prisma.serviceCategory.findMany();
   }
 }

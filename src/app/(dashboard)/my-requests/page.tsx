@@ -124,8 +124,8 @@ export default function MyRequestsPage() {
 
       const data = await response.json();
       setSrs(data.srs || []);
-    } catch (error) {
-      console.error("Error fetching my requests:", error);
+    } catch {
+      // 에러는 toast로 사용자에게 표시
       toast({
         title: "오류",
         description: "요청 목록을 불러오는데 실패했습니다.",

@@ -9,6 +9,7 @@ import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
 import { srDetailKey, SR_LIST_PREFIX, DASHBOARD_STATS_PREFIX, MY_REQUESTS_PREFIX, srListPatternForClient, srListPatternForStatus, srListPatternForPriority } from "@/lib/cache-keys";
 import { getSrsDetailTtlSeconds, shouldWideInvalidate } from "@/lib/cache-config";
 import { serializeResponse } from "@/lib/serialization";
+import { logger } from "@/lib/logger";
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -31,27 +32,21 @@ export const GET = withAuthAndRateLimit(async (
     throw new NotFoundError("SR을 찾을 수 없습니다.");
   }
 
-  // 🔍 디버깅 로그: SR 상세 조회 결과 확인
-  console.log("🔍 [API /srs/[id]] SR 조회 성공:", {
-    id: sr.id,
-    srNumber: sr.srNumber,
-    attachmentsCount: sr.attachments?.length,
-    attachmentsExists: !!sr.attachments,
-    _countAttachments: sr._count?.attachments,
-    cacheUsed: isCacheAvailable(),
+  // 디버깅 로그: SR 상세 조회 결과 확인 (개발 환경에서만 출력)
+  logger.debug("[API /srs/[id]] SR 조회 성공", {
+    srId: sr.id,
+    custom_srNumber: sr.srNumber,
+    custom_attachmentsCount: sr.attachments?.length,
+    custom_cacheUsed: isCacheAvailable(),
   });
-
-  if (sr.attachments && sr.attachments.length > 0) {
-    console.log("📎 [API /srs/[id]] Attachments 샘플:", sr.attachments[0]);
-  }
 
   // 날짜 객체를 문자열로 변환 (JSON 직렬화를 위해)
   const serialized = serializeResponse(sr);
 
-  // 🔍 직렬화 후 attachments 확인
-  console.log("📦 [API /srs/[id]] 직렬화 후 attachments:", {
-    exists: !!(serialized as any).attachments,
-    count: (serialized as any).attachments?.length,
+  // 직렬화 후 attachments 확인 (개발 환경에서만 출력)
+  logger.debug("[API /srs/[id]] 직렬화 후 attachments", {
+    custom_exists: !!(serialized as Record<string, unknown>).attachments,
+    custom_count: ((serialized as Record<string, unknown>).attachments as unknown[] | undefined)?.length,
   });
 
   return NextResponse.json(serialized);
@@ -81,22 +76,22 @@ export const PATCH = withAuthAndRateLimit(async (
     ];
 
     // wide 모드에 따라 추가 무효화
-    if (!wide && (updatedSR as any).client?.id) {
-      cacheInvalidations.push(invalidateCachePattern(srListPatternForClient((updatedSR as any).client.id)));
+    if (!wide && updatedSR.client?.id) {
+      cacheInvalidations.push(invalidateCachePattern(srListPatternForClient(updatedSR.client.id)));
     }
-    if (!wide && (updatedSR as any).status) {
-      cacheInvalidations.push(invalidateCachePattern(srListPatternForStatus((updatedSR as any).status)));
+    if (!wide && updatedSR.status) {
+      cacheInvalidations.push(invalidateCachePattern(srListPatternForStatus(updatedSR.status)));
     }
-    if (!wide && (updatedSR as any).priority) {
-      cacheInvalidations.push(invalidateCachePattern(srListPatternForPriority((updatedSR as any).priority)));
+    if (!wide && updatedSR.priority) {
+      cacheInvalidations.push(invalidateCachePattern(srListPatternForPriority(updatedSR.priority)));
     }
-    if (wide || !(updatedSR as any).client?.id) {
+    if (wide || !updatedSR.client?.id) {
       cacheInvalidations.push(invalidateCachePattern(`${SR_LIST_PREFIX}*`));
     }
 
     await Promise.all(cacheInvalidations);
   } catch (e) {
-    console.warn('Cache invalidation failed after SR patch:', e);
+    logger.warn('Cache invalidation failed after SR patch', { custom_error: String(e) });
   }
 
   return NextResponse.json(updatedSR);
@@ -122,7 +117,7 @@ export const DELETE = withAuthAndRateLimit(async (
       invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
     ]);
   } catch (e) {
-    console.warn('Cache invalidation failed after SR delete:', e);
+    logger.warn('Cache invalidation failed after SR delete', { custom_error: String(e) });
   }
 
   return NextResponse.json(result);

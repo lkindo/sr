@@ -11,6 +11,14 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export type PlainObject<T> = T extends Date
+  ? string
+  : T extends (infer U)[]
+  ? PlainObject<U>[]
+  : T extends object
+  ? { [K in keyof T]: PlainObject<T[K]> }
+  : T;
+
 /**
  * 객체를 순수한 JavaScript 객체로 변환하는 헬퍼 함수
  * Next.js 15의 Server Components에서 Client Components로 객체 전달 시 필요
@@ -18,17 +26,17 @@ export function cn(...inputs: ClassValue[]) {
  * @param obj - 변환할 객체
  * @returns 순수한 JavaScript 객체
  */
-export function toPlainObject<T>(obj: T): any {
+export function toPlainObject<T>(obj: T): PlainObject<T> {
   if (obj === null || typeof obj !== "object") {
-    return obj as T extends Date ? string : T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : T;
+    return obj as PlainObject<T>;
   }
 
   if (obj instanceof Date) {
-    return obj.toISOString() as T extends Date ? string : never;
+    return obj.toISOString() as PlainObject<T>;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map(toPlainObject) as T extends (infer U)[] ? ReturnType<typeof toPlainObject<U>>[] : never;
+    return obj.map(toPlainObject) as PlainObject<T>;
   }
 
   const plainObj: Record<string, unknown> = {};
@@ -38,7 +46,7 @@ export function toPlainObject<T>(obj: T): any {
     }
   }
 
-  return plainObj as T extends object ? { [K in keyof T]: ReturnType<typeof toPlainObject<T[K]>> } : never;
+  return plainObj as PlainObject<T>;
 }
 
 /**

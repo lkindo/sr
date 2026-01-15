@@ -195,12 +195,41 @@ export function CreateSRDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ... (form validation logic remains the same)
-    if (title.length < 5) { /* ... */ return; }
-    if (description.length < 10) { /* ... */ return; }
-    if (!clientId) { /* ... */ return; }
-    if (!categoryId) { /* ... */ return; }
-    if (requestedCompletionDate) { /* ... */ }
+    if (title.length < 5) {
+      toast({
+        title: "오류",
+        description: "제목은 최소 5자 이상이어야 합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (description.length < 10) {
+      toast({
+        title: "오류",
+        description: "설명은 최소 10자 이상이어야 합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!clientId) {
+      toast({
+        title: "오류",
+        description: "고객사를 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!categoryId) {
+      toast({
+        title: "오류",
+        description: "서비스 카테고리를 선택해주세요.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
 
@@ -271,7 +300,7 @@ export function CreateSRDialog({
             서비스 요청(SR)을 등록합니다. 제목, 설명, 고객사, 서비스 카테고리는 필수입니다.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} data-testid="sr-form">
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="title">제목 *</Label>

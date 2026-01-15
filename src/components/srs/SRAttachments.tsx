@@ -265,7 +265,8 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                         a.click();
                         window.URL.revokeObjectURL(url);
                         document.body.removeChild(a);
-                      } catch (e) {
+                      } catch {
+                        // 다운로드 실패 시 새 탭에서 열기
                         window.open(attachment.fileUrl, "_blank");
                       }
                     }}

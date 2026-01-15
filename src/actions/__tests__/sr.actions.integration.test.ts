@@ -14,7 +14,7 @@ vi.mock('@/lib/action-helpers', () => ({
 }))
 
 describe('SR actions integration-ish', () => {
-	const service = new SRService()
+	const _service = new SRService() // 인스턴스 생성 확인용
 
 	beforeEach(() => {
 		vi.restoreAllMocks()

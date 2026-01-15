@@ -180,8 +180,8 @@ export function EditSRDialog({
         const data = await response.json();
         setExistingAttachments(data.attachments || []);
       }
-    } catch (error) {
-      // console.error("첨부 파일 로드 실패");
+    } catch {
+      // 첨부 파일 로드 실패 시 무시
     }
   }, []);
 
@@ -290,8 +290,8 @@ export function EditSRDialog({
       if (!response.ok) {
         throw new Error("Failed to upload attachments");
       }
-    } catch (error) {
-
+    } catch {
+      // 업로드 실패 시 toast로 사용자에게 알림
       toast({
         title: "경고",
         description: "SR은 수정되었으나 첨부파일 업로드에 실패했습니다.",
@@ -399,7 +399,7 @@ export function EditSRDialog({
             SR 정보를 수정합니다. 제목, 설명, 고객사, 서비스 카테고리는 필수입니다.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} data-testid="edit-sr-form">
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="title">제목 *</Label>
