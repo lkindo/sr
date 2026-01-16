@@ -6,6 +6,13 @@
 
 # testing
 /coverage
+/coverage_*.txt
+/test_output*.txt
+/.stryker-tmp/
+/reports/
+/test-results/
+/playwright-report/
+/playwright/.cache/
 
 # next.js
 /.next/
@@ -17,8 +24,11 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
+Desktop.ini
 
-# debug
+# debug / logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -27,6 +37,14 @@ server-debug.log*
 # local env files
 .env*.local
 .env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# secrets
+vapid.json
+vapid_final.json
 
 # vercel
 .vercel
@@ -39,11 +57,12 @@ next-env.d.ts
 /prisma/.env
 /src/generated
 
-# testing
-# /test-results/
-/playwright-report/
-/playwright/.cache/
+# editor
+.vscode
+.idea
 
 # uploads
 /public/uploads/
+
+# problematic files
 nul
