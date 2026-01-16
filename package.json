@@ -31,7 +31,9 @@
     "warm:dashboard": "tsx scripts/warm-dashboard.ts",
     "cleanup:system-team-clients": "tsx scripts/cleanup-system-team-clients.ts",
     "cleanup:system-team-clients:dry-run": "tsx scripts/cleanup-system-team-clients.ts --dry-run",
-    "prepare": "husky"
+    "prepare": "husky",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -91,6 +93,8 @@
   "devDependencies": {
     "@next/bundle-analyzer": "^16.0.3",
     "@playwright/test": "^1.56.1",
+    "@stryker-mutator/core": "^9.4.0",
+    "@stryker-mutator/vitest-runner": "^9.4.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
@@ -118,7 +122,17 @@
     "typescript": "^5",
     "typescript-eslint": "^8.52.0",
     "vitest": "^4.0.8",
-    "vitest-mock-extended": "^3.1.0"
+    "vitest-mock-extended": "^3.1.0",
+    "storybook": "^10.1.11",
+    "@storybook/nextjs-vite": "^10.1.11",
+    "@chromatic-com/storybook": "^5.0.0",
+    "@storybook/addon-vitest": "^10.1.11",
+    "@storybook/addon-a11y": "^10.1.11",
+    "@storybook/addon-docs": "^10.1.11",
+    "@storybook/addon-onboarding": "^10.1.11",
+    "vite": "^7.3.1",
+    "eslint-plugin-storybook": "^10.1.11",
+    "@vitest/browser-playwright": "^4.0.8"
   },
   "trustedDependencies": [
     "@prisma/client",

@@ -1,0 +1,18 @@
+운영서버와 개발서버 rootDomain이 실제 운영과 달라서 오류 발생
+was2 서버의 ip가 라이센스와 실제가 다름니다.
+
+현행 라이센스
+개발서버
+<rootDomain>lifelongadmin.kedi.re.kr,lifelong.kedi.re.kr,172.17.120.10,172.17.110.10</rootDomain>
+
+운영서버
+<ipAddress>172.17.120.10,172.17.110.10</ipAddress>
+
+
+
+실제 필요한 라이센스
+개발서버
+<rootDomain>lifelongadmin.kedi.re.kr,lifelong.kedi.re.kr,172.17.120.10,172.17.110.10,172.17.110.11,172.17.210.10</rootDomain>
+
+운영서버
+<ipAddress>172.17.120.10,172.17.120.11</ipAddress>

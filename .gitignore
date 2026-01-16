@@ -1,68 +1,59 @@
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
 
-# testing
+# Next.js
+/.next/
+/out/
+/build
+/dist
+
+# Environment Variables & Secrets
+.env
+.env*.local
+/prisma/.env
+vapid.json
+vapid_final.json
+*.pem
+
+# Testing & Coverage
 /coverage
 /coverage_*.txt
-/test_output*.txt
-/.stryker-tmp/
-/reports/
+/coverage_*.log
+/reports
 /test-results/
+test_output*.txt
+test_verbose*.txt
+test_failure.log
+*.log
+
+# Stryker (Mutation Testing)
+.stryker-tmp
+stryker.log
+stryker_debug.log
+.stryker*/
+
+# Playwright
 /playwright-report/
 /playwright/.cache/
 
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-Thumbs.db
-Desktop.ini
-
-# debug / logs
-*.log
+# Debug Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-server-debug.log*
+pnpm-debug.log*
 
-# local env files
-.env*.local
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
-
-# secrets
-vapid.json
-vapid_final.json
-
-# vercel
-.vercel
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-# prisma
-/prisma/.env
+# Misc & OS
+.DS_Store
+Thumbs.db
+nul
 /src/generated
 
-# editor
-.vscode
-.idea
-
-# uploads
-/public/uploads/
-
-# problematic files
-nul
+*storybook.log
+storybook-static

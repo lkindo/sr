@@ -1,23 +1,30 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { statusLabels, priorityLabels } from "@/lib/constants/sr";
+import { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
+import { statusLabels, priorityLabels } from '@/lib/constants/sr';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-
-import { FileText, Clock, CheckCircle, AlertCircle, ClipboardList, ArrowRight, AlertTriangle, TrendingUp, User, Target } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { usePermissions } from "@/hooks/use-permissions";
-import { Progress } from "@/components/ui/progress";
-import { useRouter } from "next/navigation";
+  FileText,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  ClipboardList,
+  ArrowRight,
+  AlertTriangle,
+  TrendingUp,
+  User,
+  Target,
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/use-permissions';
+import { Progress } from '@/components/ui/progress';
+import { useRouter } from 'next/navigation';
+import { DashboardSkeleton } from './DashboardSkeleton';
+import { ExportButton } from '@/components/dashboard/ExportButton';
 
 interface DashboardStats {
   summary: {
@@ -106,25 +113,22 @@ interface DashboardStats {
   }>;
 }
 
-const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
-  REQUESTED: "secondary",
-  INTAKE: "default",
-  IN_PROGRESS: "default",
-  ON_HOLD: "secondary",
-  COMPLETED: "default",
-  CONFIRMED: "default",
-  REJECTED: "destructive",
+const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  REQUESTED: 'secondary',
+  INTAKE: 'default',
+  IN_PROGRESS: 'default',
+  ON_HOLD: 'secondary',
+  COMPLETED: 'default',
+  CONFIRMED: 'default',
+  REJECTED: 'destructive',
 };
 
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> =
-{
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "default",
-  LOW: "secondary",
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
-
-
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -133,20 +137,20 @@ export default function DashboardPage() {
   const { hasAnyRole } = usePermissions();
   const router = useRouter();
 
-  const isAdminManagerEngineer = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
-  const isEngineer = hasAnyRole(["ENGINEER"]);
+  const isAdminManagerEngineer = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
+  const isEngineer = hasAnyRole(['ENGINEER']);
 
   const fetchStats = useCallback(async () => {
     try {
-      const response = await fetch("/api/dashboard/stats");
-      if (!response.ok) throw new Error("Failed to fetch stats");
+      const response = await fetch('/api/dashboard/stats');
+      if (!response.ok) throw new Error('Failed to fetch stats');
       const data = await response.json();
       setStats(data);
     } catch {
       toast({
-        title: "오류",
-        description: "대시보드 통계를 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '대시보드 통계를 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -157,23 +161,9 @@ export default function DashboardPage() {
     fetchStats();
   }, [fetchStats]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
-      </div>
-    );
+  if (loading || !stats) {
+    return <DashboardSkeleton />;
   }
-
-  if (!stats) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">통계를 불러올 수 없습니다.</p>
-      </div>
-    );
-  }
-
-
 
   // 접수 대기 시간 포맷팅
   const formatWaitingTime = (hours: number): string => {
@@ -194,6 +184,17 @@ export default function DashboardPage() {
 
   return (
     <div className="sr-content-area space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+            대시보드
+          </h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            SR 현황을 한눈에 확인하고 관리합니다.
+          </p>
+        </div>
+        <ExportButton />
+      </div>
       {/* 접수 대기 SR 강조 카드 (ADMIN/MANAGER/ENGINEER만) */}
       {isAdminManagerEngineer && stats.summary.requested > 0 && (
         <Card className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-orange))] bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20">
@@ -211,7 +212,7 @@ export default function DashboardPage() {
               <Button
                 variant="default"
                 className="bg-[hsl(var(--sr-accent-orange))] hover:bg-[hsl(var(--sr-accent-orange))]/90"
-                onClick={() => router.push("/srs?status=REQUESTED")}
+                onClick={() => router.push('/srs?status=REQUESTED')}
               >
                 접수하기
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -222,7 +223,8 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-2 mt-4">
                 {stats.waitingSRs.slice(0, 3).map((sr) => {
-                  const waitingHours = (new Date().getTime() - new Date(sr.createdAt).getTime()) / (1000 * 60 * 60);
+                  const waitingHours =
+                    (new Date().getTime() - new Date(sr.createdAt).getTime()) / (1000 * 60 * 60);
                   return (
                     <Link
                       key={sr.id}
@@ -232,13 +234,17 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
-                          <Badge variant={priorityColors[sr.priority] || "default"} className="text-xs">
+                          <Badge
+                            variant={priorityColors[sr.priority] || 'default'}
+                            className="text-xs"
+                          >
                             {priorityLabels[sr.priority] || sr.priority}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1 truncate">{sr.title}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {sr.client.name} • {sr.requester.name} • 대기: {formatWaitingTime(waitingHours)}
+                          {sr.client.name} • {sr.requester.name} • 대기:{' '}
+                          {formatWaitingTime(waitingHours)}
                         </p>
                       </div>
                       <ArrowRight className="h-4 w-4 text-muted-foreground ml-2" />
@@ -265,10 +271,7 @@ export default function DashboardPage() {
                   </CardDescription>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => router.push("/srs?assignee=me")}
-              >
+              <Button variant="outline" onClick={() => router.push('/srs?assignee=me')}>
                 전체 보기
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
@@ -289,10 +292,13 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
-                          <Badge variant={statusColors[sr.status] || "default"} className="text-xs">
+                          <Badge variant={statusColors[sr.status] || 'default'} className="text-xs">
                             {statusLabels[sr.status] || sr.status}
                           </Badge>
-                          <Badge variant={priorityColors[sr.priority] || "default"} className="text-xs">
+                          <Badge
+                            variant={priorityColors[sr.priority] || 'default'}
+                            className="text-xs"
+                          >
                             {priorityLabels[sr.priority] || sr.priority}
                           </Badge>
                           {isOverdue && (
@@ -305,8 +311,9 @@ export default function DashboardPage() {
                         <p className="text-xs text-muted-foreground mt-1">
                           {sr.client.name} • {sr.requester.name}
                           {sr.dueDate && (
-                            <span className={isOverdue ? "text-destructive font-medium" : ""}>
-                              {" "}• 마감: {new Date(sr.dueDate).toLocaleDateString("ko-KR")}
+                            <span className={isOverdue ? 'text-destructive font-medium' : ''}>
+                              {' '}
+                              • 마감: {new Date(sr.dueDate).toLocaleDateString('ko-KR')}
                               {daysUntilDue !== null && !isOverdue && ` (${daysUntilDue}일 남음)`}
                             </span>
                           )}
@@ -351,9 +358,7 @@ export default function DashboardPage() {
                 </div>
                 <ArrowRight className="h-5 w-5 text-muted-foreground" />
               </div>
-              <CardDescription className="mt-2">
-                모든 SR을 조회하고 관리하세요
-              </CardDescription>
+              <CardDescription className="mt-2">모든 SR을 조회하고 관리하세요</CardDescription>
             </CardHeader>
           </Link>
         </Card>
@@ -382,21 +387,23 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/srs")}
+          onClick={() => router.push('/srs')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">총 SR</CardTitle>
             <FileText className="h-5 w-5 text-[hsl(var(--sr-primary-dark))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">{stats.summary.total}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">
+              {stats.summary.total}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">전체 SR 수</p>
           </CardContent>
         </Card>
 
         <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/srs?status=IN_PROGRESS")}
+          onClick={() => router.push('/srs?status=IN_PROGRESS')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">진행 중</CardTitle>
@@ -418,7 +425,7 @@ export default function DashboardPage() {
 
         <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/srs?status=COMPLETED&status=CONFIRMED")}
+          onClick={() => router.push('/srs?status=COMPLETED&status=CONFIRMED')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">완료</CardTitle>
@@ -438,14 +445,16 @@ export default function DashboardPage() {
 
         <Card
           className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/srs?status=REQUESTED&status=INTAKE")}
+          onClick={() => router.push('/srs?status=REQUESTED&status=INTAKE')}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">대기 중</CardTitle>
             <AlertCircle className="h-5 w-5 text-[hsl(var(--sr-accent-orange))]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">{stats.summary.pending}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
+              {stats.summary.pending}
+            </div>
             <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -469,8 +478,7 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold text-blue-600">
                 {stats.performance.avgProcessingHours > 0
                   ? `${Math.round(stats.performance.avgProcessingHours)}시간`
-                  : "-"
-                }
+                  : '-'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">접수부터 완료까지</p>
             </CardContent>
@@ -485,15 +493,11 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold text-green-600">
                 {stats.performance.slaComplianceRate > 0
                   ? `${stats.performance.slaComplianceRate}%`
-                  : "-"
-                }
+                  : '-'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">마감일 준수율</p>
               {stats.performance.slaComplianceRate > 0 && (
-                <Progress
-                  value={stats.performance.slaComplianceRate}
-                  className="mt-2 h-1.5"
-                />
+                <Progress value={stats.performance.slaComplianceRate} className="mt-2 h-1.5" />
               )}
             </CardContent>
           </Card>
@@ -507,8 +511,7 @@ export default function DashboardPage() {
               <div className="text-2xl font-bold text-orange-600">
                 {stats.performance.avgWaitingHours > 0
                   ? formatWaitingTime(stats.performance.avgWaitingHours)
-                  : "-"
-                }
+                  : '-'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">접수 대기 평균 시간</p>
             </CardContent>
@@ -522,9 +525,7 @@ export default function DashboardPage() {
       <Card className="sr-card">
         <CardHeader>
           <CardTitle className="font-semibold">최근 SR 활동</CardTitle>
-          <CardDescription>
-            최근 생성된 SR 목록입니다. (최근 10개)
-          </CardDescription>
+          <CardDescription>최근 생성된 SR 목록입니다. (최근 10개)</CardDescription>
         </CardHeader>
         <CardContent>
           {stats.recentSRs.length === 0 ? (
@@ -547,18 +548,12 @@ export default function DashboardPage() {
                     </Link>
                     <p className="text-sm text-muted-foreground mt-0.5">{sr.title}</p>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-xs text-muted-foreground">
-                        {sr.client.name}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{sr.client.name}</span>
                       <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground">
-                        {sr.requester.name}
-                      </span>
+                      <span className="text-xs text-muted-foreground">{sr.requester.name}</span>
                       {sr.assignedTo && (
                         <>
-                          <span className="text-xs text-muted-foreground">
-                            •
-                          </span>
+                          <span className="text-xs text-muted-foreground">•</span>
                           <span className="text-xs text-muted-foreground">
                             담당: {sr.assignedTo.name}
                           </span>
@@ -570,9 +565,7 @@ export default function DashboardPage() {
                     <Badge variant={priorityColors[sr.priority]}>
                       {priorityLabels[sr.priority]}
                     </Badge>
-                    <Badge variant={statusColors[sr.status]}>
-                      {statusLabels[sr.status]}
-                    </Badge>
+                    <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
                   </div>
                 </div>
               ))}
@@ -594,9 +587,7 @@ export default function DashboardPage() {
                 <div key={client.clientId} className="flex items-center">
                   <div className="flex-1">
                     <div className="font-medium">{client.clientName}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {client.clientCode}
-                    </div>
+                    <div className="text-sm text-muted-foreground">{client.clientCode}</div>
                   </div>
                   <div className="text-2xl font-bold">{client.count}</div>
                 </div>
