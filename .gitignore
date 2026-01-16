@@ -54,3 +54,6 @@ next-env.d.ts
 Thumbs.db
 nul
 /src/generated
+
+*storybook.log
+storybook-static
