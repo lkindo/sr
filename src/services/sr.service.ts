@@ -12,6 +12,7 @@ import { NotFoundError } from "@/lib/errors";
 import { backgroundTask } from "@/lib/wait-until";
 import { getSRUrl } from "@/lib/app-url";
 import { logger } from "@/lib/logger";
+import { validateTransition, getRequiredFields } from "@/lib/sr-state-machine";
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -255,7 +256,7 @@ export class SRService {
 
       // 상태 전환 검증
       if (validated.status && validated.status !== existingSR.status) {
-        const { validateTransition, getRequiredFields } = await import("@/lib/sr-state-machine");
+
 
         const transitionResult = validateTransition(
           existingSR.status,

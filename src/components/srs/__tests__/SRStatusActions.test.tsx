@@ -75,6 +75,47 @@ describe('SRStatusActions Component', () => {
             render(<SRStatusActions {...defaultProps} status="COMPLETED" isRequestor={true} userRoles={['USER']} />);
             expect(screen.getByText('확인 완료')).toBeInTheDocument();
         });
+
+        it('renders "진행 시작" for INTAKE state if user can manage', () => {
+            render(<SRStatusActions {...defaultProps} status="INTAKE" />);
+            expect(screen.getByText('진행 시작')).toBeInTheDocument();
+        });
+
+        it('renders nothing for INTAKE state if user cannot manage', () => {
+            render(<SRStatusActions {...defaultProps} status="INTAKE" userRoles={['USER']} />);
+            expect(screen.queryByText('진행 시작')).not.toBeInTheDocument();
+        });
+
+        it('renders "진행 재개" and "거절" for ON_HOLD state', () => {
+            render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
+            expect(screen.getByText('진행 재개')).toBeInTheDocument();
+            expect(screen.getByText('거절')).toBeInTheDocument();
+        });
+
+        it('renders nothing for ON_HOLD state if user cannot manage', () => {
+            render(<SRStatusActions {...defaultProps} status="ON_HOLD" userRoles={['USER']} />);
+            expect(screen.queryByText('진행 재개')).not.toBeInTheDocument();
+        });
+
+        it('renders "재오픈" for CONFIRMED state if user is requestor or manager', () => {
+            render(<SRStatusActions {...defaultProps} status="CONFIRMED" isRequestor={true} userRoles={['USER']} />);
+            expect(screen.getByText('재오픈')).toBeInTheDocument();
+        });
+
+        it('renders nothing for CONFIRMED state if user is neither requestor nor manager', () => {
+            render(<SRStatusActions {...defaultProps} status="CONFIRMED" isRequestor={false} userRoles={['USER']} />);
+            expect(screen.queryByText('재오픈')).not.toBeInTheDocument();
+        });
+
+        it('renders nothing for REJECTED state', () => {
+            render(<SRStatusActions {...defaultProps} status="REJECTED" />);
+            expect(screen.queryByRole('button')).not.toBeInTheDocument();
+        });
+
+        it('renders "재오픈" for COMPLETED state if user is manager', () => {
+            render(<SRStatusActions {...defaultProps} status="COMPLETED" isRequestor={false} userRoles={['MANAGER']} />);
+            expect(screen.getByText('재오픈')).toBeInTheDocument();
+        });
     });
 
     describe('Interactions', () => {
@@ -101,6 +142,80 @@ describe('SRStatusActions Component', () => {
             expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
                 title: '성공',
             }));
+        });
+
+        it('calls status patch API when "진행 시작" is clicked (INTAKE)', async () => {
+            render(<SRStatusActions {...defaultProps} status="INTAKE" />);
+            fireEvent.click(screen.getByText('진행 시작'));
+
+            await waitFor(() => {
+                expect(global.fetch).toHaveBeenCalledWith(
+                    '/api/srs/sr-123/status',
+                    expect.objectContaining({
+                        method: 'PATCH',
+                        body: JSON.stringify({ action: 'start' }),
+                    })
+                );
+            });
+        });
+
+        it('calls status patch API when "확인 완료" is clicked (COMPLETED)', async () => {
+            render(<SRStatusActions {...defaultProps} status="COMPLETED" isRequestor={true} userRoles={['USER']} />);
+            fireEvent.click(screen.getByText('확인 완료'));
+
+            await waitFor(() => {
+                expect(global.fetch).toHaveBeenCalledWith(
+                    '/api/srs/sr-123/status',
+                    expect.objectContaining({
+                        method: 'PATCH',
+                        body: JSON.stringify({ action: 'confirm' }),
+                    })
+                );
+            });
+        });
+
+        it('shows error toast when API call fails', async () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                json: async () => ({ error: '상태 변경 권한이 없습니다.' }),
+            });
+
+            render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
+            fireEvent.click(screen.getByText('진행 재개'));
+
+            await waitFor(() => {
+                expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+                    title: '오류',
+                    variant: 'destructive',
+                }));
+            });
+        });
+
+        it('shows error toast when fetch throws an error', async () => {
+            global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+            render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
+            fireEvent.click(screen.getByText('진행 재개'));
+
+            await waitFor(() => {
+                expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+                    title: '오류',
+                    description: 'Network error',
+                    variant: 'destructive',
+                }));
+            });
+        });
+
+        it('invalidates queries after successful status change', async () => {
+            mockInvalidateQueries.mockResolvedValue(undefined);
+
+            render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
+            fireEvent.click(screen.getByText('진행 재개'));
+
+            await waitFor(() => {
+                expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['sr', 'sr-123'] });
+                expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['srs'] });
+            });
         });
     });
 });

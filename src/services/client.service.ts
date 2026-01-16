@@ -3,6 +3,7 @@ import { UserService } from "./user.service";
 import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
 import { NotFoundError, DuplicateError, ReferentialIntegrityError } from "@/lib/errors";
 import prisma from "@/lib/prisma";
+import { getCachedData, CacheKeys, invalidateCache } from "@/lib/redis-cache";
 import type { Prisma } from "@prisma/client";
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
@@ -66,7 +67,10 @@ export class ClientService {
   }
 
   async getAllClients() {
-    return prisma.client.findMany();
+    return getCachedData(
+      CacheKeys.clientList(),
+      () => prisma.client.findMany()
+    );
   }
 
   /**
@@ -111,7 +115,7 @@ export class ClientService {
       throw new DuplicateError("고객사 코드", "code", validated.code);
     }
 
-    return prisma.client.create({
+    const result = await prisma.client.create({
       data: {
         code: validated.code,
         name: validated.name,
@@ -125,6 +129,9 @@ export class ClientService {
         isActive: true,
       }
     });
+
+    await invalidateCache(CacheKeys.clientList());
+    return result;
   }
 
   async updateClient(id: string, data: ClientUpdateData) {
@@ -136,7 +143,7 @@ export class ClientService {
       throw new NotFoundError("고객사", id);
     }
 
-    return prisma.client.update({
+    const result = await prisma.client.update({
       where: { id },
       data: {
         name: validated.name,
@@ -149,6 +156,9 @@ export class ClientService {
         contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
       }
     });
+
+    await invalidateCache(CacheKeys.clientList());
+    return result;
   }
 
   async deleteClient(id: string) {
@@ -182,15 +192,21 @@ export class ClientService {
     }
 
     // 관련 데이터가 없으면 삭제 진행
-    return prisma.client.delete({ where: { id } });
+    const result = await prisma.client.delete({ where: { id } });
+    await invalidateCache(CacheKeys.clientList());
+    return result;
   }
 
   async activateClient(clientId: string) {
-    return prisma.client.update({ where: { id: clientId }, data: { isActive: true } });
+    const result = await prisma.client.update({ where: { id: clientId }, data: { isActive: true } });
+    await invalidateCache(CacheKeys.clientList());
+    return result;
   }
 
   async deactivateClient(clientId: string) {
-    return prisma.client.update({ where: { id: clientId }, data: { isActive: false } });
+    const result = await prisma.client.update({ where: { id: clientId }, data: { isActive: false } });
+    await invalidateCache(CacheKeys.clientList());
+    return result;
   }
 
   async getClientsByUserId(userId: string) {

@@ -48,6 +48,7 @@ const { mockPrisma } = vi.hoisted(() => {
   return { mockPrisma: mock };
 });
 
+// Mock dependencies
 vi.mock('@/lib/prisma', () => ({
   default: mockPrisma,
 }));
@@ -58,6 +59,9 @@ vi.mock('@/lib/policies', () => ({
   ensureCanUpdateSR: vi.fn(),
   ensureCanDeleteSR: vi.fn(),
 }));
+
+// Mock policies, wait-until, etc. are already mocked above.
+
 
 describe('SRService', () => {
   let srService: SRService;
@@ -155,6 +159,8 @@ describe('SRService', () => {
       stateMachine.validateTransition = vi.fn().mockReturnValue({ valid: true });
       // @ts-ignore
       stateMachine.getRequiredFields = vi.fn().mockReturnValue([]);
+
+      // removed internal prisma import
 
       // Mock the update result
       const mockUpdateResult = {
@@ -258,6 +264,8 @@ describe('SRService', () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
       vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
+      // removed internal prisma import
+
       const txMock = {
         sRActivity: { deleteMany: vi.fn() },
         sRComment: { deleteMany: vi.fn() },
@@ -286,6 +294,7 @@ describe('SRService', () => {
         { id: 'h-1', currentStatus: 'REQUESTED', changedAt: new Date() },
         { id: 'h-2', currentStatus: 'IN_PROGRESS', changedAt: new Date() }
       ];
+      // removed internal prisma import
 
       vi.mocked(prisma.sRStatusHistory.findMany).mockResolvedValue(mockHistory as any);
       vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(2);
@@ -439,6 +448,8 @@ describe('SRService', () => {
         },
       ];
 
+      // removed internal prisma import
+
       // Since we imported prisma as default, we can try to cast it.
       (prisma as any).sRStatusHistory = {
         findMany: vi.fn().mockResolvedValue(mockHistory),
@@ -469,6 +480,7 @@ describe('SRService', () => {
         serviceCategory: { categoryName: 'Category' }
       };
 
+      // removed internal prisma import
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
         if (typeof callback === 'function') {
           // We need to pass a mock tx object to the callback if it expects one
@@ -501,6 +513,7 @@ describe('SRService', () => {
         vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
         // Mock transaction for delete
+        // removed internal prisma import
         vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
           if (typeof callback === 'function') {
             return undefined;
@@ -525,6 +538,7 @@ describe('SRService', () => {
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
         vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
+        // removed internal prisma import
         vi.mocked(prisma.$transaction).mockRejectedValue(new Error('Delete failed'));
 
         await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow('Delete failed');
@@ -536,6 +550,7 @@ describe('SRService', () => {
       vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
       vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true, name: 'Client' } as any);
 
+      // removed internal prisma import
       const mockTransaction = vi.mocked(prisma.$transaction);
 
       // Setup failures then success
@@ -574,12 +589,24 @@ describe('SRService', () => {
         requestedPriority: 'MEDIUM' as const,
       };
 
+      // Mock timer to speed up test
+      // vi.useFakeTimers(); removed
+      // const promise = srService.createSR(data, mockUser);
+
       const result = await srService.createSR(data, mockUser);
 
+      // Fast-forward time for backoff
+      // await vi.runAllTimersAsync();
+      // vi.useRealTimers();
+
+      // const result = await promise;
       expect(attempts).toBe(3);
       expect(mockTransaction).toHaveBeenCalledTimes(3);
       expect(result.srNumber).toBe('SR-20231010-0001');
     });
+
+    // Tests for updateSR state transition and notifications
+
 
     // Tests for updateSR state transition and notifications
     describe('updateSR edge cases', () => {

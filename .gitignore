@@ -1,49 +1,56 @@
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
 
-# testing
-/coverage
-
-# next.js
+# Next.js
 /.next/
 /out/
-
-# production
 /build
+/dist
 
-# misc
-.DS_Store
+# Environment Variables & Secrets
+.env
+.env*.local
+/prisma/.env
+vapid.json
+vapid_final.json
 *.pem
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-server-debug.log*
+# Testing & Coverage
+/coverage
+/coverage_*.txt
+/coverage_*.log
+/reports
+/test-results/
+test_output*.txt
+test_verbose*.txt
+test_failure.log
+*.log
 
-# local env files
-.env*.local
-.env
+# Stryker (Mutation Testing)
+.stryker-tmp
+stryker.log
+stryker_debug.log
+.stryker*/
 
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# prisma
-/prisma/.env
-/src/generated
-
-# testing
-# /test-results/
+# Playwright
 /playwright-report/
 /playwright/.cache/
 
-# uploads
-/public/uploads/
+# Debug Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Misc & OS
+.DS_Store
+Thumbs.db
 nul
+/src/generated

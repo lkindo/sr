@@ -91,6 +91,8 @@
   "devDependencies": {
     "@next/bundle-analyzer": "^16.0.3",
     "@playwright/test": "^1.56.1",
+    "@stryker-mutator/core": "^9.4.0",
+    "@stryker-mutator/vitest-runner": "^9.4.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
