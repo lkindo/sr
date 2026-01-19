@@ -1,5 +1,5 @@
 // src/types/sr.types.ts
-import type { SR } from "@prisma/client";
+import type { SR } from '@prisma/client';
 
 /**
  * SR 상세 정보 타입
@@ -18,14 +18,14 @@ export type SRDetails = SR & {
     handlerId?: string | null;
     handler?: { id: string; name: string } | null;
   };
-  comments: (import("@prisma/client").SRComment & {
+  comments: (import('@prisma/client').SRComment & {
     user: { id: string; name: string; image: string | null };
   })[];
-  activities: (import("@prisma/client").SRActivity & {
+  activities: (import('@prisma/client').SRActivity & {
     user: { id: string; name: string; image: string | null };
   })[];
-  attachments: import("@prisma/client").SRAttachment[];
-  statusHistory: (import("@prisma/client").SRStatusHistory & {
+  attachments: import('@prisma/client').SRAttachment[];
+  statusHistory: (import('@prisma/client').SRStatusHistory & {
     user: { id: string; name: string; image: string | null };
   })[];
   _count: { comments: number; attachments: number };
@@ -45,9 +45,13 @@ export type SRCreateResult = SR & {
     handlerId?: string | null;
     handler?: { id: string; name: string } | null;
   };
-  comments: (import("@prisma/client").SRComment & { user: { id: string; name: string; image: string | null } })[];
-  activities: (import("@prisma/client").SRActivity & { user: { id: string; name: string; image: string | null } })[];
-  attachments: import("@prisma/client").SRAttachment[];
+  comments: (import('@prisma/client').SRComment & {
+    user: { id: string; name: string; image: string | null };
+  })[];
+  activities: (import('@prisma/client').SRActivity & {
+    user: { id: string; name: string; image: string | null };
+  })[];
+  attachments: import('@prisma/client').SRAttachment[];
   _count: { comments: number; attachments: number };
 };
 
@@ -56,8 +60,18 @@ export type SRCreateResult = SR & {
  */
 export type SRUpdateResult = SR & {
   client?: { id: string; code: string; name: string };
-  requester?: { id: string; name: string; email: string; notificationPreference?: import("@prisma/client").NotificationPreference | null };
-  assignee?: { id: string; name: string; email: string; notificationPreference?: import("@prisma/client").NotificationPreference | null } | null;
+  requester?: {
+    id: string;
+    name: string;
+    email: string;
+    notificationPreference?: import('@prisma/client').NotificationPreference | null;
+  };
+  assignee?: {
+    id: string;
+    name: string;
+    email: string;
+    notificationPreference?: import('@prisma/client').NotificationPreference | null;
+  } | null;
   serviceCategory?: {
     id: string;
     categoryName: string;

@@ -46,6 +46,7 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 ```
 
 ### 핵심 설계 패턴
+
 - **Service Layer Pattern**: 비즈니스 로직 캡슐화
 - **Policy Pattern**: 권한 검증 분리 (`canCreateSR`, `ensureCanUpdate`)
 - **Result Type**: 에러 처리 표준화 (`{ success, data, error }`)
@@ -54,21 +55,21 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 
 ## 🛠️ 기술 스택
 
-| 분류 | 기술 | 버전 |
-|---|---|---|
-| **Frontend** | Next.js | 16.x |
-| **UI** | React | 19.x |
-| **Language** | TypeScript | 5.x |
-| **Styling** | Tailwind CSS | 3.x |
-| **Database** | PostgreSQL | - |
-| **ORM** | Prisma | 6.x |
-| **Auth** | NextAuth.js | 5.0-beta |
-| **Validation** | Zod | 4.x |
-| **Cache** | Upstash Redis | - |
-| **Storage** | Vercel Blob | - |
-| **Email** | Resend | - |
-| **Testing** | Vitest, Playwright | - |
-| **Deploy** | Vercel | - |
+| 분류           | 기술               | 버전     |
+| -------------- | ------------------ | -------- |
+| **Frontend**   | Next.js            | 16.x     |
+| **UI**         | React              | 19.x     |
+| **Language**   | TypeScript         | 5.x      |
+| **Styling**    | Tailwind CSS       | 3.x      |
+| **Database**   | PostgreSQL         | -        |
+| **ORM**        | Prisma             | 6.x      |
+| **Auth**       | NextAuth.js        | 5.0-beta |
+| **Validation** | Zod                | 4.x      |
+| **Cache**      | Upstash Redis      | -        |
+| **Storage**    | Vercel Blob        | -        |
+| **Email**      | Resend             | -        |
+| **Testing**    | Vitest, Playwright | -        |
+| **Deploy**     | Vercel             | -        |
 
 ---
 
@@ -114,6 +115,7 @@ cp .env.example .env
 ```
 
 **필수 환경 변수**:
+
 - `DATABASE_URL` - PostgreSQL 연결 URL
 - `NEXTAUTH_SECRET` - 세션 암호화 키 (32자 이상)
 - `NEXTAUTH_URL` - 애플리케이션 URL
@@ -139,12 +141,14 @@ pnpm dev
 ## 🧪 테스트
 
 ### 단위 테스트 (Vitest)
+
 ```bash
 pnpm test              # 테스트 실행
 pnpm test:coverage     # 커버리지 리포트
 ```
 
 ### E2E 테스트 (Playwright)
+
 ```bash
 pnpm test:e2e          # 전체 E2E 테스트
 pnpm test:e2e:ui       # UI 모드 (디버깅)
@@ -156,31 +160,31 @@ pnpm test:e2e:ui       # UI 모드 (디버깅)
 
 ## 📡 API 엔드포인트
 
-| 메서드 | 경로 | 설명 |
-|---|---|---|
-| `GET` | `/api/srs` | SR 목록 조회 (페이징, 필터) |
-| `POST` | `/api/srs` | SR 생성 |
-| `GET` | `/api/srs/[id]` | SR 상세 조회 |
-| `PATCH` | `/api/srs/[id]` | SR 수정 |
-| `DELETE` | `/api/srs/[id]` | SR 삭제 |
-| `GET` | `/api/users` | 사용자 목록 |
-| `POST` | `/api/users` | 사용자 생성 |
-| `GET` | `/api/clients` | 고객사 목록 |
-| `GET` | `/api/dashboard/stats` | 대시보드 통계 |
+| 메서드   | 경로                   | 설명                        |
+| -------- | ---------------------- | --------------------------- |
+| `GET`    | `/api/srs`             | SR 목록 조회 (페이징, 필터) |
+| `POST`   | `/api/srs`             | SR 생성                     |
+| `GET`    | `/api/srs/[id]`        | SR 상세 조회                |
+| `PATCH`  | `/api/srs/[id]`        | SR 수정                     |
+| `DELETE` | `/api/srs/[id]`        | SR 삭제                     |
+| `GET`    | `/api/users`           | 사용자 목록                 |
+| `POST`   | `/api/users`           | 사용자 생성                 |
+| `GET`    | `/api/clients`         | 고객사 목록                 |
+| `GET`    | `/api/dashboard/stats` | 대시보드 통계               |
 
 ---
 
 ## 📜 스크립트
 
-| 명령어 | 설명 |
-|---|---|
-| `pnpm dev` | 개발 서버 실행 |
-| `pnpm build` | 프로덕션 빌드 |
-| `pnpm start` | 프로덕션 서버 |
-| `pnpm lint` | ESLint 검사 |
+| 명령어            | 설명                 |
+| ----------------- | -------------------- |
+| `pnpm dev`        | 개발 서버 실행       |
+| `pnpm build`      | 프로덕션 빌드        |
+| `pnpm start`      | 프로덕션 서버        |
+| `pnpm lint`       | ESLint 검사          |
 | `pnpm type-check` | TypeScript 타입 체크 |
-| `pnpm test` | 단위 테스트 |
-| `pnpm test:e2e` | E2E 테스트 |
+| `pnpm test`       | 단위 테스트          |
+| `pnpm test:e2e`   | E2E 테스트           |
 
 ---
 
@@ -196,4 +200,3 @@ pnpm test:e2e:ui       # UI 모드 (디버깅)
 ## 📄 라이선스
 
 Private
-

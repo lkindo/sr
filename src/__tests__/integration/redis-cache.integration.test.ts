@@ -40,10 +40,14 @@ const createRedisClient = (store: RedisStore) => ({
 
 async function loadRedisCache() {
   const store: RedisStore = { values: new Map() };
-  vi.unstubAllEnvs();
+  // 1. Clear any previously cached module
   vi.resetModules();
+  // 2. Ensure NODE_ENV is 'test' for the module initialization check
+  vi.stubEnv('NODE_ENV', 'test');
+  // 3. Set the global mock client (the fresh import will see this)
   (globalThis as typeof globalThis & { __SR_TEST_REDIS__?: any }).__SR_TEST_REDIS__ =
     createRedisClient(store) as any;
+  // 4. Import the module - it will now see __SR_TEST_REDIS__ during initialization
   const mod = await import('@/lib/redis-cache');
   return { cache: mod, store };
 }

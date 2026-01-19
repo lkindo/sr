@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Playwright E2E 테스트 설정
@@ -26,10 +26,7 @@ export default defineConfig({
 
   /* 리포터 설정 */
   outputDir: 'test-results',
-  reporter: [
-    ['list'],
-    ['html', { outputFolder: 'test-results', open: 'never' }],
-  ],
+  reporter: [['list'], ['html', { outputFolder: 'test-results', open: 'never' }]],
 
   /* Global Setup - 로그인 상태 저장 */
   globalSetup: require.resolve('./e2e/global-setup'),
@@ -69,15 +66,17 @@ export default defineConfig({
 
   /* 테스트 실행 전 개발 서버 시작 (선택사항) */
   // 수동으로 개발 서버를 실행하려면 아래를 주석 처리하세요
-  webServer: process.env.SKIP_WEBSERVER ? undefined : {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-    env: {
-      TEST_MODE: 'true',
-    },
-  },
+  webServer: process.env.SKIP_WEBSERVER
+    ? undefined
+    : {
+        command: 'npm run dev',
+        url: 'http://localhost:3000',
+        reuseExistingServer: !process.env.CI,
+        timeout: 120 * 1000,
+        env: {
+          TEST_MODE: 'true',
+        },
+      },
 
   /* 테스트할 브라우저 설정 */
   projects: [
@@ -102,7 +101,17 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
-      testIgnore: ['**/08-*.spec.ts', '**/09-*.spec.ts', '**/17-*.spec.ts', '**/18-*.spec.ts', '**/19-*.spec.ts', '**/20-*.spec.ts', '**/21-*.spec.ts', '**/22-*.spec.ts', '**/23-*.spec.ts'],
+      testIgnore: [
+        '**/08-*.spec.ts',
+        '**/09-*.spec.ts',
+        '**/17-*.spec.ts',
+        '**/18-*.spec.ts',
+        '**/19-*.spec.ts',
+        '**/20-*.spec.ts',
+        '**/21-*.spec.ts',
+        '**/22-*.spec.ts',
+        '**/23-*.spec.ts',
+      ],
     },
 
     // Multi-user 테스트 - multi-user-setup에 의존 (권한별 테스트)
@@ -145,5 +154,4 @@ export default defineConfig({
     //   use: { ...devices['Pixel 5'] },
     // },
   ],
-})
-
+});

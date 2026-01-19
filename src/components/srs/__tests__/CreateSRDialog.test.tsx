@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getClientsForSelection } from '@/actions/client.actions';
@@ -215,6 +215,107 @@ describe('CreateSRDialog Component', () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           description: 'Database constraint failed',
+          variant: 'destructive',
+        })
+      );
+    });
+  });
+
+  it('shows validation error for short description', async () => {
+    render(<CreateSRDialog {...defaultProps} />);
+
+    const titleInput = await screen.findByLabelText(/제목 \*/);
+    const descInput = await screen.findByLabelText(/설명 \*/);
+
+    fireEvent.change(titleInput, { target: { value: 'Valid Title' } });
+    fireEvent.change(descInput, { target: { value: 'Too short' } });
+    fireEvent.submit(screen.getByTestId('sr-form'));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: '설명은 최소 10자 이상이어야 합니다.',
+        })
+      );
+    });
+  });
+
+  it('shows validation error when client is not selected', async () => {
+    render(<CreateSRDialog {...defaultProps} />);
+
+    const titleInput = await screen.findByLabelText(/제목 \*/);
+    const descInput = await screen.findByLabelText(/설명 \*/);
+
+    fireEvent.change(titleInput, { target: { value: 'Valid Title' } });
+    fireEvent.change(descInput, { target: { value: 'This is a valid description.' } });
+    // Don't select a client, but select a category
+    const selects = screen.getAllByTestId('mock-select');
+    fireEvent.change(selects[1], { target: { value: 'cat-1' } });
+
+    fireEvent.submit(screen.getByTestId('sr-form'));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: '고객사를 선택해주세요.',
+        })
+      );
+    });
+  });
+
+  it('shows validation error when category is not selected', async () => {
+    render(<CreateSRDialog {...defaultProps} />);
+
+    const titleInput = await screen.findByLabelText(/제목 \*/);
+    const descInput = await screen.findByLabelText(/설명 \*/);
+
+    fireEvent.change(titleInput, { target: { value: 'Valid Title' } });
+    fireEvent.change(descInput, { target: { value: 'This is a valid description.' } });
+    // Select client but not category
+    const selects = screen.getAllByTestId('mock-select');
+    fireEvent.change(selects[0], { target: { value: 'client-1' } });
+
+    fireEvent.submit(screen.getByTestId('sr-form'));
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: '서비스 카테고리를 선택해주세요.',
+        })
+      );
+    });
+  });
+
+  it('shows error toast when fetching clients fails', async () => {
+    (getClientsForSelection as any).mockResolvedValue({
+      success: false,
+      error: 'Network error',
+    });
+
+    render(<CreateSRDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: '고객사 목록을 불러오지 못했습니다.',
+          variant: 'destructive',
+        })
+      );
+    });
+  });
+
+  it('shows error toast when fetching categories fails', async () => {
+    (getServiceCategoriesForSelection as any).mockResolvedValue({
+      success: false,
+      error: 'Network error',
+    });
+
+    render(<CreateSRDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: '서비스 카테고리 목록을 불러오지 못했습니다.',
           variant: 'destructive',
         })
       );

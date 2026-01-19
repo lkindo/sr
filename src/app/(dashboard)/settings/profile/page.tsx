@@ -1,7 +1,7 @@
 'use client';
 
-import { Lock, Save, User as UserIcon } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { Lock, Save, User as UserIcon } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';

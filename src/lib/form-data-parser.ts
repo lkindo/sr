@@ -3,15 +3,12 @@
  * 타입 안전한 FormData 파싱 및 검증
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * FormData에서 값을 안전하게 추출
  */
-export function getFormDataValue(
-  formData: FormData,
-  key: string
-): string | null {
+export function getFormDataValue(formData: FormData, key: string): string | null {
   const value = formData.get(key);
   return value instanceof File ? null : (value as string | null);
 }
@@ -46,16 +43,13 @@ export function formDataToObject(formData: FormData): Record<string, string | nu
 
 /**
  * FormData를 Zod 스키마로 파싱 및 검증
- * 
+ *
  * @example
  * ```typescript
  * const data = parseFormData(formData, srCreateSchema);
  * ```
  */
-export function parseFormData<T>(
-  formData: FormData,
-  schema: z.ZodSchema<T>
-): T {
+export function parseFormData<T>(formData: FormData, schema: z.ZodSchema<T>): T {
   const data = formDataToObject(formData);
   return schema.parse(data);
 }
@@ -66,14 +60,14 @@ export function parseFormData<T>(
 export function normalizeFormDataValue(
   value: string | null | undefined,
   options: {
-    emptyAs?: "null" | "undefined";
+    emptyAs?: 'null' | 'undefined';
     enumFields?: string[];
   } = {}
 ): string | null | undefined {
-  const { emptyAs = "null" } = options;
+  const { emptyAs = 'null' } = options;
 
-  if (value === "" || value === null) {
-    return emptyAs === "null" ? null : undefined;
+  if (value === '' || value === null) {
+    return emptyAs === 'null' ? null : undefined;
   }
 
   return value;
@@ -86,7 +80,7 @@ export function processFormData<T extends Record<string, unknown>>(
   formData: FormData,
   fieldConfig: {
     [K in keyof T]?: {
-      emptyAs?: "null" | "undefined";
+      emptyAs?: 'null' | 'undefined';
       transform?: (value: string | null) => T[K];
     };
   }
@@ -96,7 +90,7 @@ export function processFormData<T extends Record<string, unknown>>(
   for (const [key, config] of Object.entries(fieldConfig)) {
     const value = getFormDataValue(formData, key);
     const processedValue = normalizeFormDataValue(value, {
-      emptyAs: config?.emptyAs || "null",
+      emptyAs: config?.emptyAs || 'null',
     });
 
     if (config?.transform) {
@@ -108,5 +102,3 @@ export function processFormData<T extends Record<string, unknown>>(
 
   return result;
 }
-
-

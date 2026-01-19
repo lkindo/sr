@@ -18,35 +18,35 @@ export function getDueDateStatus(
   status?: string
 ): {
   label: string;
-  variant: "default" | "secondary" | "destructive";
+  variant: 'default' | 'secondary' | 'destructive';
   isOverdue: boolean;
   isUrgent: boolean;
 } | null {
   // 완료/확인완료 상태: 마감일 대신 완료 표시
-  if (status === "COMPLETED" || status === "CONFIRMED") {
+  if (status === 'COMPLETED' || status === 'CONFIRMED') {
     return {
-      label: "완료됨",
-      variant: "default",
+      label: '완료됨',
+      variant: 'default',
       isOverdue: false,
       isUrgent: false,
     };
   }
 
   // 보류 상태: 보류 표시
-  if (status === "ON_HOLD") {
+  if (status === 'ON_HOLD') {
     return {
-      label: "보류중",
-      variant: "secondary",
+      label: '보류중',
+      variant: 'secondary',
       isOverdue: false,
       isUrgent: false,
     };
   }
 
   // 거절 상태: 거절 표시
-  if (status === "REJECTED") {
+  if (status === 'REJECTED') {
     return {
-      label: "거절됨",
-      variant: "destructive",
+      label: '거절됨',
+      variant: 'destructive',
       isOverdue: false,
       isUrgent: false,
     };
@@ -62,7 +62,7 @@ export function getDueDateStatus(
   if (daysUntil < 0) {
     return {
       label: `${Math.abs(daysUntil)}일 지연`,
-      variant: "destructive",
+      variant: 'destructive',
       isOverdue: true,
       isUrgent: false,
     };
@@ -70,8 +70,8 @@ export function getDueDateStatus(
 
   if (daysUntil === 0) {
     return {
-      label: "오늘 마감",
-      variant: "destructive",
+      label: '오늘 마감',
+      variant: 'destructive',
       isOverdue: false,
       isUrgent: true,
     };
@@ -79,8 +79,8 @@ export function getDueDateStatus(
 
   if (daysUntil === 1) {
     return {
-      label: "내일 마감",
-      variant: "destructive",
+      label: '내일 마감',
+      variant: 'destructive',
       isOverdue: false,
       isUrgent: true,
     };
@@ -89,7 +89,7 @@ export function getDueDateStatus(
   if (daysUntil <= 3) {
     return {
       label: `D-${daysUntil}`,
-      variant: "destructive",
+      variant: 'destructive',
       isOverdue: false,
       isUrgent: true,
     };
@@ -98,7 +98,7 @@ export function getDueDateStatus(
   if (daysUntil <= 7) {
     return {
       label: `D-${daysUntil}`,
-      variant: "secondary",
+      variant: 'secondary',
       isOverdue: false,
       isUrgent: false,
     };
@@ -106,26 +106,26 @@ export function getDueDateStatus(
 
   return {
     label: `D-${daysUntil}`,
-    variant: "default",
+    variant: 'default',
     isOverdue: false,
     isUrgent: false,
   };
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
+  return new Date(date).toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
   });
 }
 
 export function formatDateTime(date: string | Date): string {
-  return new Date(date).toLocaleString("ko-KR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Date(date).toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }

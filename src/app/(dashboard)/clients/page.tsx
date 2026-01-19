@@ -1,8 +1,8 @@
 'use client';
 
-import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react';
-import Link from 'next/link';
 import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react';
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import { ClientUsersSheet } from '@/components/clients/ClientUsersSheet';

@@ -16,14 +16,14 @@ SR Management System의 CI/CD 파이프라인 구성 및 사용 방법을 안내
 
 현재 프로젝트는 다음 6개의 GitHub Actions 워크플로우를 사용합니다:
 
-| 워크플로우 | 트리거 | 목적 | 소요 시간 |
-|-----------|--------|------|----------|
-| `ci-cd.yml` | Push/PR (main, develop) | 전체 CI/CD 파이프라인 | ~10분 |
-| `ci.yml` | Push/PR | 빠른 코드 검증 | ~3분 |
-| `deploy.yml` | Push (main, dev) | Vercel 배포 | ~5분 |
-| `e2e.yml` | Push (main) | E2E 테스트 | ~15분 |
-| `prewarm.yml` | Scheduled | 서버 예열 | ~1분 |
-| `scheduled-checks.yml` | Daily 00:00 UTC | 정기 품질 점검 | ~8분 |
+| 워크플로우             | 트리거                  | 목적                  | 소요 시간 |
+| ---------------------- | ----------------------- | --------------------- | --------- |
+| `ci-cd.yml`            | Push/PR (main, develop) | 전체 CI/CD 파이프라인 | ~10분     |
+| `ci.yml`               | Push/PR                 | 빠른 코드 검증        | ~3분      |
+| `deploy.yml`           | Push (main, dev)        | Vercel 배포           | ~5분      |
+| `e2e.yml`              | Push (main)             | E2E 테스트            | ~15분     |
+| `prewarm.yml`          | Scheduled               | 서버 예열             | ~1분      |
+| `scheduled-checks.yml` | Daily 00:00 UTC         | 정기 품질 점검        | ~8분      |
 
 ---
 
@@ -34,22 +34,22 @@ graph TD
     A[Code Push] --> B{브랜치 확인}
     B -->|main/develop| C[CI/CD Pipeline]
     B -->|기타| D[CI Only]
-    
+
     C --> E[Code Quality]
     C --> F[Tests]
     C --> G[Build]
-    
+
     E --> H{통과?}
     F --> H
     G --> H
-    
+
     H -->|Yes| I[Security Scan]
     H -->|No| J[실패 알림]
-    
+
     I --> K{main 브랜치?}
     K -->|Yes| L[E2E Tests]
     K -->|No| M[완료]
-    
+
     L --> N[Deployment Ready]
     N --> O[Vercel 배포]
 ```
@@ -63,6 +63,7 @@ graph TD
 **트리거**: Push/PR to `main`, `develop`
 
 **작업 순서**:
+
 1. **Code Quality** (병렬)
    - ESLint 실행
    - TypeScript 타입 체크
@@ -93,6 +94,7 @@ graph TD
 **트리거**: 모든 Push/PR
 
 빠른 검증만 수행:
+
 - Lint
 - Type check
 - 기본 빌드
@@ -102,6 +104,7 @@ graph TD
 **트리거**: Push to `main` (Production), `dev` (Preview)
 
 **작업**:
+
 1. Prisma Client 생성
 2. Database 마이그레이션 (Production만)
 3. Vercel 배포
@@ -112,6 +115,7 @@ graph TD
 **트리거**: Push to `main`
 
 **작업**:
+
 - Playwright 브라우저 설치
 - E2E 테스트 실행 (20개 시나리오)
 - 테스트 리포트 및 스크린샷 업로드
@@ -121,6 +125,7 @@ graph TD
 **트리거**: 매일 00:00 UTC (또는 수동)
 
 **작업**:
+
 - 의존성 업데이트 확인
 - 보안 감사
 - 번들 크기 분석
@@ -173,6 +178,7 @@ CI/CD 파이프라인 실행을 위해 다음 Secrets가 필요합니다:
 [SECRETS_SETUP.md](./SECRETS_SETUP.md) 파일을 참조하세요.
 
 **필수 Secrets**:
+
 - `DATABASE_URL`
 - `DIRECT_URL`
 - `TEST_DATABASE_URL`
@@ -188,6 +194,7 @@ CI/CD 파이프라인 실행을 위해 다음 Secrets가 필요합니다:
 ### CI 실패 시
 
 #### 1. Type Check 실패
+
 ```bash
 # 로컬에서 확인
 pnpm type-check
@@ -196,6 +203,7 @@ pnpm type-check
 ```
 
 #### 2. 테스트 실패
+
 ```bash
 # 실패한 테스트 로컬 실행
 pnpm test
@@ -205,6 +213,7 @@ pnpm test src/__tests__/path/to/test.test.ts
 ```
 
 #### 3. 빌드 실패
+
 ```bash
 # 로컬 빌드 확인
 pnpm build
@@ -213,6 +222,7 @@ pnpm build
 ```
 
 #### 4. E2E 테스트 실패
+
 ```bash
 # 로컬 E2E 실행
 pnpm test:e2e
@@ -227,11 +237,13 @@ pnpm exec playwright test --ui
 ### 배포 실패 시
 
 #### 1. Vercel 배포 실패
+
 - Vercel Dashboard에서 로그 확인
 - GitHub Actions 로그에서 에러 메시지 확인
 - Secrets 설정 확인
 
 #### 2. Database 마이그레이션 실패
+
 ```bash
 # 로컬에서 마이그레이션 확인
 pnpm prisma migrate dev
@@ -241,6 +253,7 @@ pnpm prisma migrate status
 ```
 
 #### 3. 환경 변수 오류
+
 - `.env` 파일과 GitHub Secrets 동기화 확인
 - Vercel Environment Variables 설정 확인
 
@@ -260,14 +273,17 @@ pnpm prisma migrate status
 ## 성능 최적화 팁
 
 ### 1. 캐시 활용
+
 - `pnpm` 패키지 캐시 사용 (이미 적용됨)
 - Docker layer 캐시 (향후 Docker 사용 시)
 
 ### 2. 병렬 실행
+
 - Code Quality와 Tests는 병렬 실행
 - 의존성 없는 작업은 최대한 병렬 처리
 
 ### 3. 조건부 실행
+
 - E2E 테스트는 main 브랜치만
 - Database 마이그레이션은 Production 배포 시만
 
@@ -276,12 +292,14 @@ pnpm prisma migrate status
 ## 모범 사례
 
 ✅ **Do**:
+
 - PR 생성 전에 로컬에서 `pnpm type-check`, `pnpm test` 실행
 - Commit 메시지를 명확하게 작성
 - CI 실패 시 즉시 수정
 - Security scan 결과 정기적으로 확인
 
 ❌ **Don't**:
+
 - CI를 통과하지 않은 코드 병합
 - Secrets를 코드에 하드코딩
 - 테스트 없이 main 브랜치에 직접 Push
@@ -292,16 +310,19 @@ pnpm prisma migrate status
 ## 모니터링
 
 ### GitHub Actions
+
 - Actions 탭에서 워크플로우 실행 이력 확인
 - 실패한 워크플로우는 빨간색으로 표시
 - 각 Job의 로그 상세 확인 가능
 
 ### Vercel
+
 - Vercel Dashboard에서 배포 상태 모니터링
 - 배포 히스토리 및 롤백 기능 제공
 - 빌드 로그 및 런타임 로그 확인
 
 ### Codecov (선택사항)
+
 - 코드 커버리지 트렌드 확인
 - PR별 커버리지 변화 확인
 

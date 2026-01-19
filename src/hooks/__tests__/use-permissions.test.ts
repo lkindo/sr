@@ -1,5 +1,5 @@
-import { renderHook } from '@testing-library/react';
 import { useSession } from 'next-auth/react';
+import { renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePermissions } from '../use-permissions';

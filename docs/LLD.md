@@ -10,12 +10,12 @@
 
 ## 📚 문서 간 참조 가이드
 
-| 문서 | 역할 | 주요 내용 |
-|------|------|-----------|
+| 문서                                      | 역할              | 주요 내용                           |
+| ----------------------------------------- | ----------------- | ----------------------------------- |
 | **[PRD.md](SR_Management_System_PRD.md)** | 비즈니스 요구사항 | 기능 정의, 사용자 역할, SR 프로세스 |
-| **[DB.md](DB.md)** | 데이터베이스 설계 | Prisma 스키마, ERD, 테이블 명세 |
-| **[TRD.md](TRD.md)** | 기술 명세 | 아키텍처, 기술 스택, 배포 전략 |
-| **[LLD.md](LLD.md)** | 구현 상세 | **코드, 컴포넌트, 테스트 전략** ⭐ |
+| **[DB.md](DB.md)**                        | 데이터베이스 설계 | Prisma 스키마, ERD, 테이블 명세     |
+| **[TRD.md](TRD.md)**                      | 기술 명세         | 아키텍처, 기술 스택, 배포 전략      |
+| **[LLD.md](LLD.md)**                      | 구현 상세         | **코드, 컴포넌트, 테스트 전략** ⭐  |
 
 **권장 읽는 순서**: PRD → DB → TRD → LLD
 
@@ -279,19 +279,19 @@ DIRECT_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT].supabase.co:5432/postg
 **lib/db.ts**:
 
 ```typescript
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
+  prisma: PrismaClient | undefined;
+};
 
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  })
+  });
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
 ```
 
 ---
@@ -305,15 +305,15 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
 **server/actions/sr.ts**:
 
 ```typescript
-'use server'
+'use server';
 
-import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
-import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
-import { requirePermission, checkSROwnership } from '@/lib/auth/permissions'
-import { inngest } from '@/lib/inngest/client'
-import { SRStatus, SRPriority } from '@prisma/client'
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { requirePermission, checkSROwnership } from '@/lib/auth/permissions';
+import { inngest } from '@/lib/inngest/client';
+import { SRStatus, SRPriority } from '@prisma/client';
 
 // ============================================================================
 // Validation Schemas
@@ -325,47 +325,57 @@ const createSRSchema = z.object({
   clientId: z.string().cuid(),
   serviceCategoryId: z.string().cuid('서비스 카테고리를 선택해주세요'),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
-})
+});
 
 const updateSRSchema = z.object({
   id: z.string().cuid(),
   title: z.string().min(5).max(200).optional(),
   description: z.string().min(20).optional(),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional(),
-  status: z.enum(['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED']).optional(),
+  status: z
+    .enum(['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED'])
+    .optional(),
   assigneeId: z.string().cuid().nullable().optional(),
-})
+});
 
 const assignSRSchema = z.object({
   srId: z.string().cuid(),
   assigneeId: z.string().cuid(),
-})
+});
 
 const updateSRStatusSchema = z.object({
   srId: z.string().cuid(),
-  status: z.enum(['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED']),
+  status: z.enum([
+    'REQUESTED',
+    'INTAKE',
+    'IN_PROGRESS',
+    'ON_HOLD',
+    'COMPLETED',
+    'CONFIRMED',
+    'REJECTED',
+  ]),
   reason: z.string().optional(),
-})
+});
 
 // ============================================================================
 // SR CRUD Operations
 // ============================================================================
 
 export async function createSR(input: z.infer<typeof createSRSchema>) {
-  const session = await requirePermission('sr:create')
-  const validated = createSRSchema.parse(input)
+  const session = await requirePermission('sr:create');
+  const validated = createSRSchema.parse(input);
 
   // 고객사 접근 권한 체크
-  const hasAccess = await checkClientAccess(session.user.id, validated.clientId)
+  const hasAccess = await checkClientAccess(session.user.id, validated.clientId);
   if (!hasAccess) {
-    throw new Error('해당 고객사에 대한 권한이 없습니다')
+    throw new Error('해당 고객사에 대한 권한이 없습니다');
   }
 
   // SR 번호 생성
-  const srNumber = await generateSRNumber(validated.clientId)
+  const srNumber = await generateSRNumber(validated.clientId);
 
   // SLA 마감일 계산
-  const dueDate = calculateSLADeadline(validated.priority as SRPriority)
+  const dueDate = calculateSLADeadline(validated.priority as SRPriority);
 
   // SR 생성
   const sr = await db.sR.create({
@@ -390,7 +400,7 @@ export async function createSR(input: z.infer<typeof createSRSchema>) {
       client: true,
       requester: true,
     },
-  })
+  });
 
   // 알림 트리거 (Inngest)
   await inngest.send({
@@ -406,17 +416,17 @@ export async function createSR(input: z.infer<typeof createSRSchema>) {
       requesterName: sr.requester.name,
       requesterEmail: sr.requester.email,
     },
-  })
+  });
 
-  revalidatePath('/srs')
-  revalidatePath('/dashboard')
+  revalidatePath('/srs');
+  revalidatePath('/dashboard');
 
-  return { success: true, data: sr }
+  return { success: true, data: sr };
 }
 
 export async function getSRById(id: string) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
   const sr = await db.sR.findUnique({
     where: { id },
@@ -449,55 +459,52 @@ export async function getSRById(id: string) {
         orderBy: { createdAt: 'desc' },
       },
     },
-  })
+  });
 
   if (!sr) {
-    throw new Error('SR을 찾을 수 없습니다')
+    throw new Error('SR을 찾을 수 없습니다');
   }
 
   // 권한 체크: 해당 SR의 요청자, 담당자, 또는 관리자만 조회 가능
-  const hasPermission = await checkPermission(session.user.id, 'sr:read')
-  const isOwner = await checkSROwnership(session.user.id, id)
+  const hasPermission = await checkPermission(session.user.id, 'sr:read');
+  const isOwner = await checkSROwnership(session.user.id, id);
 
   if (!hasPermission && !isOwner) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
-  return sr
+  return sr;
 }
 
 export async function getSRs(params: {
-  clientId?: string
-  status?: SRStatus
-  priority?: SRPriority
-  assigneeId?: string
-  requesterId?: string
-  page?: number
-  limit?: number
+  clientId?: string;
+  status?: SRStatus;
+  priority?: SRPriority;
+  assigneeId?: string;
+  requesterId?: string;
+  page?: number;
+  limit?: number;
 }) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
-  const { clientId, status, priority, assigneeId, requesterId, page = 1, limit = 50 } = params
+  const { clientId, status, priority, assigneeId, requesterId, page = 1, limit = 50 } = params;
 
   // 권한에 따라 필터링
-  const hasAdminPermission = await checkPermission(session.user.id, 'sr:read')
+  const hasAdminPermission = await checkPermission(session.user.id, 'sr:read');
 
-  const where: any = {}
+  const where: any = {};
 
   if (!hasAdminPermission) {
     // 일반 사용자는 자신이 요청했거나 할당받은 SR만 조회
-    where.OR = [
-      { requesterId: session.user.id },
-      { assigneeId: session.user.id },
-    ]
+    where.OR = [{ requesterId: session.user.id }, { assigneeId: session.user.id }];
   }
 
-  if (clientId) where.clientId = clientId
-  if (status) where.status = status
-  if (priority) where.priority = priority
-  if (assigneeId) where.assigneeId = assigneeId
-  if (requesterId) where.requesterId = requesterId
+  if (clientId) where.clientId = clientId;
+  if (status) where.status = status;
+  if (priority) where.priority = priority;
+  if (assigneeId) where.assigneeId = assigneeId;
+  if (requesterId) where.requesterId = requesterId;
 
   const [srs, total] = await Promise.all([
     db.sR.findMany({
@@ -521,7 +528,7 @@ export async function getSRs(params: {
       take: limit,
     }),
     db.sR.count({ where }),
-  ])
+  ]);
 
   return {
     data: srs,
@@ -531,34 +538,34 @@ export async function getSRs(params: {
       total,
       totalPages: Math.ceil(total / limit),
     },
-  }
+  };
 }
 
 export async function updateSR(input: z.infer<typeof updateSRSchema>) {
-  const session = await requirePermission('sr:update')
-  const validated = updateSRSchema.parse(input)
+  const session = await requirePermission('sr:update');
+  const validated = updateSRSchema.parse(input);
 
   // 소유권 또는 권한 체크
-  const isOwner = await checkSROwnership(session.user.id, validated.id)
-  const hasPermission = await checkPermission(session.user.id, 'sr:update')
+  const isOwner = await checkSROwnership(session.user.id, validated.id);
+  const hasPermission = await checkPermission(session.user.id, 'sr:update');
 
   if (!isOwner && !hasPermission) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
-  const sr = await db.sR.findUnique({ where: { id: validated.id } })
-  if (!sr) throw new Error('SR을 찾을 수 없습니다')
+  const sr = await db.sR.findUnique({ where: { id: validated.id } });
+  if (!sr) throw new Error('SR을 찾을 수 없습니다');
 
   // 변경 사항 추적
-  const changes: string[] = []
+  const changes: string[] = [];
   if (validated.title && validated.title !== sr.title) {
-    changes.push(`제목 변경: "${sr.title}" → "${validated.title}"`)
+    changes.push(`제목 변경: "${sr.title}" → "${validated.title}"`);
   }
   if (validated.priority && validated.priority !== sr.priority) {
-    changes.push(`우선순위 변경: ${sr.priority} → ${validated.priority}`)
+    changes.push(`우선순위 변경: ${sr.priority} → ${validated.priority}`);
   }
   if (validated.status && validated.status !== sr.status) {
-    changes.push(`상태 변경: ${sr.status} → ${validated.status}`)
+    changes.push(`상태 변경: ${sr.status} → ${validated.status}`);
   }
 
   // SR 업데이트
@@ -586,31 +593,31 @@ export async function updateSR(input: z.infer<typeof updateSRSchema>) {
       requester: true,
       assignee: true,
     },
-  })
+  });
 
-  revalidatePath(`/srs/${validated.id}`)
-  revalidatePath('/srs')
-  revalidatePath('/dashboard')
+  revalidatePath(`/srs/${validated.id}`);
+  revalidatePath('/srs');
+  revalidatePath('/dashboard');
 
-  return { success: true, data: updatedSR }
+  return { success: true, data: updatedSR };
 }
 
 export async function assignSR(input: z.infer<typeof assignSRSchema>) {
-  const session = await requirePermission('sr:assign')
-  const validated = assignSRSchema.parse(input)
+  const session = await requirePermission('sr:assign');
+  const validated = assignSRSchema.parse(input);
 
   const sr = await db.sR.findUnique({
     where: { id: validated.srId },
     include: { client: true, requester: true },
-  })
+  });
 
-  if (!sr) throw new Error('SR을 찾을 수 없습니다')
+  if (!sr) throw new Error('SR을 찾을 수 없습니다');
 
   const assignee = await db.user.findUnique({
     where: { id: validated.assigneeId },
-  })
+  });
 
-  if (!assignee) throw new Error('담당자를 찾을 수 없습니다')
+  if (!assignee) throw new Error('담당자를 찾을 수 없습니다');
 
   // SR 할당
   const updatedSR = await db.sR.update({
@@ -631,7 +638,7 @@ export async function assignSR(input: z.infer<typeof assignSRSchema>) {
       requester: true,
       assignee: true,
     },
-  })
+  });
 
   // 알림 트리거
   await inngest.send({
@@ -646,33 +653,33 @@ export async function assignSR(input: z.infer<typeof assignSRSchema>) {
       priority: updatedSR.priority,
       dueDate: updatedSR.dueDate?.toISOString(),
     },
-  })
+  });
 
-  revalidatePath(`/srs/${validated.srId}`)
-  revalidatePath('/srs')
+  revalidatePath(`/srs/${validated.srId}`);
+  revalidatePath('/srs');
 
-  return { success: true, data: updatedSR }
+  return { success: true, data: updatedSR };
 }
 
 export async function updateSRStatus(input: z.infer<typeof updateSRStatusSchema>) {
-  const session = await requirePermission('sr:update')
-  const validated = updateSRStatusSchema.parse(input)
+  const session = await requirePermission('sr:update');
+  const validated = updateSRStatusSchema.parse(input);
 
-  const sr = await db.sR.findUnique({ where: { id: validated.srId } })
-  if (!sr) throw new Error('SR을 찾을 수 없습니다')
+  const sr = await db.sR.findUnique({ where: { id: validated.srId } });
+  if (!sr) throw new Error('SR을 찾을 수 없습니다');
 
   // 상태 전이 검증
   const canTransition = validateStateTransition(sr.status, validated.status as SRStatus, {
     requesterId: sr.requesterId,
     assigneeId: sr.assigneeId,
-  })
+  });
 
   if (!canTransition.valid) {
-    throw new Error(canTransition.error)
+    throw new Error(canTransition.error);
   }
 
   // 완료 시 완료 시간 기록
-  const completedAt = validated.status === 'COMPLETED' ? new Date() : sr.completedAt
+  const completedAt = validated.status === 'COMPLETED' ? new Date() : sr.completedAt;
 
   const updatedSR = await db.sR.update({
     where: { id: validated.srId },
@@ -699,7 +706,7 @@ export async function updateSRStatus(input: z.infer<typeof updateSRStatusSchema>
       requester: true,
       assignee: true,
     },
-  })
+  });
 
   // 알림 트리거
   if (validated.status === 'COMPLETED') {
@@ -713,7 +720,7 @@ export async function updateSRStatus(input: z.infer<typeof updateSRStatusSchema>
         assigneeId: updatedSR.assigneeId,
         completedAt: completedAt!.toISOString(),
       },
-    })
+    });
   } else if (validated.status === 'REJECTED') {
     await inngest.send({
       name: 'sr/rejected',
@@ -724,29 +731,29 @@ export async function updateSRStatus(input: z.infer<typeof updateSRStatusSchema>
         requesterId: updatedSR.requesterId,
         reason: validated.reason || '사유 없음',
       },
-    })
+    });
   }
 
-  revalidatePath(`/srs/${validated.srId}`)
-  revalidatePath('/srs')
+  revalidatePath(`/srs/${validated.srId}`);
+  revalidatePath('/srs');
 
-  return { success: true, data: updatedSR }
+  return { success: true, data: updatedSR };
 }
 
 export async function deleteSR(id: string) {
-  const session = await requirePermission('sr:delete')
+  const session = await requirePermission('sr:delete');
 
-  const sr = await db.sR.findUnique({ where: { id } })
-  if (!sr) throw new Error('SR을 찾을 수 없습니다')
+  const sr = await db.sR.findUnique({ where: { id } });
+  if (!sr) throw new Error('SR을 찾을 수 없습니다');
 
   // 소프트 삭제 또는 완전 삭제 (정책에 따라)
   // 여기서는 완전 삭제 예시
-  await db.sR.delete({ where: { id } })
+  await db.sR.delete({ where: { id } });
 
-  revalidatePath('/srs')
-  revalidatePath('/dashboard')
+  revalidatePath('/srs');
+  revalidatePath('/dashboard');
 
-  return { success: true }
+  return { success: true };
 }
 
 // ============================================================================
@@ -754,13 +761,13 @@ export async function deleteSR(id: string) {
 // ============================================================================
 
 async function generateSRNumber(clientId: string): Promise<string> {
-  const client = await db.client.findUnique({ where: { id: clientId } })
-  if (!client) throw new Error('고객사를 찾을 수 없습니다')
+  const client = await db.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new Error('고객사를 찾을 수 없습니다');
 
   // SR 번호 형식: CLIENT_CODE-YYYYMMDD-XXXX
-  const today = new Date()
-  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
-  const clientCode = client.code // Client.code 필드 사용
+  const today = new Date();
+  const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+  const clientCode = client.code; // Client.code 필드 사용
 
   // 오늘 생성된 SR 개수 조회
   const count = await db.sR.count({
@@ -771,10 +778,10 @@ async function generateSRNumber(clientId: string): Promise<string> {
         lt: new Date(today.setHours(23, 59, 59, 999)),
       },
     },
-  })
+  });
 
-  const sequence = String(count + 1).padStart(4, '0')
-  return `${clientCode}-${dateStr}-${sequence}`
+  const sequence = String(count + 1).padStart(4, '0');
+  return `${clientCode}-${dateStr}-${sequence}`;
 }
 
 function calculateSLADeadline(priority: SRPriority): Date {
@@ -783,12 +790,12 @@ function calculateSLADeadline(priority: SRPriority): Date {
     HIGH: 24,
     MEDIUM: 72,
     LOW: 168,
-  }
+  };
 
-  const hours = SLA_HOURS[priority]
-  const deadline = new Date()
-  deadline.setHours(deadline.getHours() + hours)
-  return deadline
+  const hours = SLA_HOURS[priority];
+  const deadline = new Date();
+  deadline.setHours(deadline.getHours() + hours);
+  return deadline;
 }
 
 function validateStateTransition(
@@ -797,20 +804,20 @@ function validateStateTransition(
   srData: { requesterId: string; assigneeId: string | null }
 ): { valid: boolean; error?: string } {
   const SR_STATE_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
-    REQUESTED: ['INTAKE', 'REJECTED'],           // 신청 → 접수 또는 거절
-    INTAKE: ['IN_PROGRESS', 'REJECTED'],         // 접수 → 진행 중 또는 거절
-    IN_PROGRESS: ['COMPLETED', 'ON_HOLD'],       // 진행 중 → 완료 또는 보류
-    ON_HOLD: ['IN_PROGRESS', 'REJECTED'],        // 보류 → 진행 중 또는 거절
-    COMPLETED: ['CONFIRMED'],                    // 완료 → 확인 완료
-    CONFIRMED: ['IN_PROGRESS', 'REJECTED'],      // 확인 완료 → 재오픈(진행 중) 또는 거절
-    REJECTED: ['INTAKE'],                        // 거절 → 재오픈(접수)
-  }
+    REQUESTED: ['INTAKE', 'REJECTED'], // 신청 → 접수 또는 거절
+    INTAKE: ['IN_PROGRESS', 'REJECTED'], // 접수 → 진행 중 또는 거절
+    IN_PROGRESS: ['COMPLETED', 'ON_HOLD'], // 진행 중 → 완료 또는 보류
+    ON_HOLD: ['IN_PROGRESS', 'REJECTED'], // 보류 → 진행 중 또는 거절
+    COMPLETED: ['CONFIRMED'], // 완료 → 확인 완료
+    CONFIRMED: ['IN_PROGRESS', 'REJECTED'], // 확인 완료 → 재오픈(진행 중) 또는 거절
+    REJECTED: ['INTAKE'], // 거절 → 재오픈(접수)
+  };
 
   if (!SR_STATE_TRANSITIONS[currentStatus]?.includes(targetStatus)) {
     return {
       valid: false,
       error: `${currentStatus}에서 ${targetStatus}로 변경할 수 없습니다`,
-    }
+    };
   }
 
   // IN_PROGRESS는 담당자가 있어야 함
@@ -818,10 +825,10 @@ function validateStateTransition(
     return {
       valid: false,
       error: '담당자가 할당되어야 진행 중 상태로 변경할 수 있습니다',
-    }
+    };
   }
 
-  return { valid: true }
+  return { valid: true };
 }
 ```
 
@@ -830,36 +837,36 @@ function validateStateTransition(
 **server/actions/comment.ts**:
 
 ```typescript
-'use server'
+'use server';
 
-import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
-import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
-import { checkSROwnership, checkPermission } from '@/lib/auth/permissions'
-import { inngest } from '@/lib/inngest/client'
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { checkSROwnership, checkPermission } from '@/lib/auth/permissions';
+import { inngest } from '@/lib/inngest/client';
 
 const createCommentSchema = z.object({
   srId: z.string().cuid(),
   content: z.string().min(1, '댓글 내용을 입력해주세요'),
   isInternal: z.boolean().default(false),
-})
+});
 
 const updateCommentSchema = z.object({
   id: z.string().cuid(),
   content: z.string().min(1),
-})
+});
 
 export async function createComment(input: z.infer<typeof createCommentSchema>) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
-  const validated = createCommentSchema.parse(input)
+  const validated = createCommentSchema.parse(input);
 
   // SR 접근 권한 체크
-  const hasAccess = await checkSROwnership(session.user.id, validated.srId)
+  const hasAccess = await checkSROwnership(session.user.id, validated.srId);
   if (!hasAccess) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
   const comment = await db.sRComment.create({
@@ -874,7 +881,7 @@ export async function createComment(input: z.infer<typeof createCommentSchema>) 
         select: { id: true, name: true, image: true },
       },
     },
-  })
+  });
 
   // SR 활동 내역 추가
   await db.sRActivity.create({
@@ -884,14 +891,14 @@ export async function createComment(input: z.infer<typeof createCommentSchema>) 
       type: 'COMMENTED',
       description: `댓글을 작성했습니다`,
     },
-  })
+  });
 
   // 알림 트리거 (내부 댓글이 아닌 경우)
   if (!validated.isInternal) {
     const sr = await db.sR.findUnique({
       where: { id: validated.srId },
       include: { requester: true, assignee: true },
-    })
+    });
 
     if (sr) {
       await inngest.send({
@@ -906,27 +913,27 @@ export async function createComment(input: z.infer<typeof createCommentSchema>) 
           requesterId: sr.requesterId,
           assigneeId: sr.assigneeId,
         },
-      })
+      });
     }
   }
 
-  revalidatePath(`/srs/${validated.srId}`)
+  revalidatePath(`/srs/${validated.srId}`);
 
-  return { success: true, data: comment }
+  return { success: true, data: comment };
 }
 
 export async function updateComment(input: z.infer<typeof updateCommentSchema>) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
-  const validated = updateCommentSchema.parse(input)
+  const validated = updateCommentSchema.parse(input);
 
-  const comment = await db.sRComment.findUnique({ where: { id: validated.id } })
-  if (!comment) throw new Error('댓글을 찾을 수 없습니다')
+  const comment = await db.sRComment.findUnique({ where: { id: validated.id } });
+  if (!comment) throw new Error('댓글을 찾을 수 없습니다');
 
   // 작성자 본인만 수정 가능
   if (comment.userId !== session.user.id) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
   const updatedComment = await db.sRComment.update({
@@ -937,31 +944,31 @@ export async function updateComment(input: z.infer<typeof updateCommentSchema>) 
         select: { id: true, name: true, image: true },
       },
     },
-  })
+  });
 
-  revalidatePath(`/srs/${comment.srId}`)
+  revalidatePath(`/srs/${comment.srId}`);
 
-  return { success: true, data: updatedComment }
+  return { success: true, data: updatedComment };
 }
 
 export async function deleteComment(id: string) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
-  const comment = await db.sRComment.findUnique({ where: { id } })
-  if (!comment) throw new Error('댓글을 찾을 수 없습니다')
+  const comment = await db.sRComment.findUnique({ where: { id } });
+  if (!comment) throw new Error('댓글을 찾을 수 없습니다');
 
   // 작성자 본인 또는 관리자만 삭제 가능
-  const hasPermission = await checkPermission(session.user.id, 'sr:delete')
+  const hasPermission = await checkPermission(session.user.id, 'sr:delete');
   if (comment.userId !== session.user.id && !hasPermission) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
-  await db.sRComment.delete({ where: { id } })
+  await db.sRComment.delete({ where: { id } });
 
-  revalidatePath(`/srs/${comment.srId}`)
+  revalidatePath(`/srs/${comment.srId}`);
 
-  return { success: true }
+  return { success: true };
 }
 ```
 
@@ -970,37 +977,34 @@ export async function deleteComment(id: string) {
 **app/api/srs/route.ts**:
 
 ```typescript
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
-import { checkPermission } from '@/lib/auth/permissions'
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { checkPermission } from '@/lib/auth/permissions';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
+    const session = await auth();
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url)
-    const clientId = searchParams.get('clientId')
-    const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const { searchParams } = new URL(request.url);
+    const clientId = searchParams.get('clientId');
+    const status = searchParams.get('status');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
-    const where: any = {}
+    const where: any = {};
 
     // 권한에 따른 필터링
-    const hasAdminPermission = await checkPermission(session.user.id, 'sr:read')
+    const hasAdminPermission = await checkPermission(session.user.id, 'sr:read');
     if (!hasAdminPermission) {
-      where.OR = [
-        { requesterId: session.user.id },
-        { assigneeId: session.user.id },
-      ]
+      where.OR = [{ requesterId: session.user.id }, { assigneeId: session.user.id }];
     }
 
-    if (clientId) where.clientId = clientId
-    if (status) where.status = status
+    if (clientId) where.clientId = clientId;
+    if (status) where.status = status;
 
     const [srs, total] = await Promise.all([
       db.sR.findMany({
@@ -1015,7 +1019,7 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       db.sR.count({ where }),
-    ])
+    ]);
 
     return NextResponse.json({
       data: srs,
@@ -1025,13 +1029,10 @@ export async function GET(request: NextRequest) {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    })
+    });
   } catch (error) {
-    console.error('GET /api/srs error:', error)
-    return NextResponse.json(
-      { error: 'Internal Server Error' },
-      { status: 500 }
-    )
+    console.error('GET /api/srs error:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 ```
@@ -1516,7 +1517,7 @@ export function SRTable({ data }: { data: SRWithRelations[] }) {
 
 ---
 
-*문서가 너무 길어 계속 이어서 작성하겠습니다...*
+_문서가 너무 길어 계속 이어서 작성하겠습니다..._
 
 ## 인증 및 권한
 
@@ -1525,17 +1526,17 @@ export function SRTable({ data }: { data: SRWithRelations[] }) {
 **lib/auth.ts**:
 
 ```typescript
-import NextAuth, { NextAuthConfig } from 'next-auth'
-import { PrismaAdapter } from '@auth/prisma-adapter'
-import CredentialsProvider from 'next-auth/providers/credentials'
-import { db } from '@/lib/db'
-import { compare } from 'bcrypt'
-import { z } from 'zod'
+import NextAuth, { NextAuthConfig } from 'next-auth';
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import { db } from '@/lib/db';
+import { compare } from 'bcrypt';
+import { z } from 'zod';
 
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
-})
+});
 
 export const authConfig: NextAuthConfig = {
   adapter: PrismaAdapter(db),
@@ -1556,7 +1557,7 @@ export const authConfig: NextAuthConfig = {
       },
       async authorize(credentials) {
         try {
-          const { email, password } = loginSchema.parse(credentials)
+          const { email, password } = loginSchema.parse(credentials);
 
           const user = await db.user.findUnique({
             where: { email },
@@ -1571,20 +1572,20 @@ export const authConfig: NextAuthConfig = {
                 },
               },
             },
-          })
+          });
 
           if (!user || !user.password) {
-            return null
+            return null;
           }
 
           if (!user.isActive) {
-            throw new Error('계정이 비활성화되었습니다')
+            throw new Error('계정이 비활성화되었습니다');
           }
 
-          const isPasswordValid = await compare(password, user.password)
+          const isPasswordValid = await compare(password, user.password);
 
           if (!isPasswordValid) {
-            return null
+            return null;
           }
 
           return {
@@ -1596,10 +1597,10 @@ export const authConfig: NextAuthConfig = {
             permissions: user.roles.flatMap((ur) =>
               ur.role.permissions.map((p) => `${p.resource}:${p.action}`)
             ),
-          }
+          };
         } catch (error) {
-          console.error('Authorization error:', error)
-          return null
+          console.error('Authorization error:', error);
+          return null;
         }
       },
     }),
@@ -1607,24 +1608,24 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.roles = user.roles
-        token.permissions = user.permissions
+        token.id = user.id;
+        token.roles = user.roles;
+        token.permissions = user.permissions;
       }
-      return token
+      return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string
-        session.user.roles = token.roles as string[]
-        session.user.permissions = token.permissions as string[]
+        session.user.id = token.id as string;
+        session.user.roles = token.roles as string[];
+        session.user.permissions = token.permissions as string[];
       }
-      return session
+      return session;
     },
   },
-}
+};
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
+export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
 ```
 
 ### 권한 관리 유틸리티
@@ -1632,8 +1633,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth(authConfig)
 **lib/auth/permissions.ts**:
 
 ```typescript
-import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
 
 export type PermissionAction =
   | 'sr:create'
@@ -1650,12 +1651,9 @@ export type PermissionAction =
   | 'user:update'
   | 'user:delete'
   | 'role:manage'
-  | 'system:admin'
+  | 'system:admin';
 
-export async function checkPermission(
-  userId: string,
-  action: PermissionAction
-): Promise<boolean> {
+export async function checkPermission(userId: string, action: PermissionAction): Promise<boolean> {
   const user = await db.user.findUnique({
     where: { id: userId },
     include: {
@@ -1669,55 +1667,55 @@ export async function checkPermission(
         },
       },
     },
-  })
+  });
 
-  if (!user || !user.isActive) return false
+  if (!user || !user.isActive) return false;
 
   // System Admin has all permissions
-  const hasAdminRole = user.roles.some((ur) => ur.role.name === 'SYSTEM_ADMIN')
-  if (hasAdminRole) return true
+  const hasAdminRole = user.roles.some((ur) => ur.role.name === 'SYSTEM_ADMIN');
+  if (hasAdminRole) return true;
 
   // Check specific permission
   const hasPermission = user.roles.some((ur) =>
     ur.role.permissions.some((p) => `${p.resource}:${p.action}` === action)
-  )
+  );
 
-  return hasPermission
+  return hasPermission;
 }
 
 export async function requirePermission(action: PermissionAction) {
-  const session = await auth()
+  const session = await auth();
 
   if (!session?.user?.id) {
-    throw new Error('Unauthorized: No session')
+    throw new Error('Unauthorized: No session');
   }
 
-  const hasPermission = await checkPermission(session.user.id, action)
+  const hasPermission = await checkPermission(session.user.id, action);
 
   if (!hasPermission) {
-    throw new Error(`Forbidden: Missing permission ${action}`)
+    throw new Error(`Forbidden: Missing permission ${action}`);
   }
 
-  return session
+  return session;
 }
 
 export async function checkSROwnership(userId: string, srId: string): Promise<boolean> {
   const sr = await db.sR.findUnique({
     where: { id: srId },
     select: { requesterId: true, assigneeId: true },
-  })
+  });
 
-  if (!sr) return false
-  return sr.requesterId === userId || sr.assigneeId === userId
+  if (!sr) return false;
+  return sr.requesterId === userId || sr.assigneeId === userId;
 }
 
 export async function checkClientAccess(userId: string, clientId: string): Promise<boolean> {
   const userClients = await db.userClient.findMany({
     where: { userId },
     select: { clientId: true },
-  })
+  });
 
-  return userClients.some((uc) => uc.clientId === clientId)
+  return userClients.some((uc) => uc.clientId === clientId);
 }
 ```
 
@@ -1730,23 +1728,23 @@ export async function checkClientAccess(userId: string, clientId: string): Promi
 **server/services/sr-service.ts**:
 
 ```typescript
-import { db } from '@/lib/db'
-import { SRStatus, SRPriority, Prisma } from '@prisma/client'
-import { calculateSLADeadline, isSLABreached } from '@/lib/sr/sla'
+import { db } from '@/lib/db';
+import { SRStatus, SRPriority, Prisma } from '@prisma/client';
+import { calculateSLADeadline, isSLABreached } from '@/lib/sr/sla';
 
 export class SRService {
   /**
    * SR 생성
    */
   static async create(data: {
-    title: string
-    description: string
-    clientId: string
-    requesterId: string
-    priority: SRPriority
+    title: string;
+    description: string;
+    clientId: string;
+    requesterId: string;
+    priority: SRPriority;
   }) {
-    const srNumber = await this.generateSRNumber(data.clientId)
-    const dueDate = calculateSLADeadline(data.priority)
+    const srNumber = await this.generateSRNumber(data.clientId);
+    const dueDate = calculateSLADeadline(data.priority);
 
     return db.sR.create({
       data: {
@@ -1766,22 +1764,22 @@ export class SRService {
         client: true,
         requester: true,
       },
-    })
+    });
   }
 
   /**
    * SR 번호 생성 로직
    */
   static async generateSRNumber(clientId: string): Promise<string> {
-    const client = await db.client.findUnique({ where: { id: clientId } })
-    if (!client) throw new Error('고객사를 찾을 수 없습니다')
+    const client = await db.client.findUnique({ where: { id: clientId } });
+    if (!client) throw new Error('고객사를 찾을 수 없습니다');
 
-    const today = new Date()
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
-    const clientCode = client.code // Client.code 필드 사용
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const clientCode = client.code; // Client.code 필드 사용
 
-    const todayStart = new Date(today.setHours(0, 0, 0, 0))
-    const todayEnd = new Date(today.setHours(23, 59, 59, 999))
+    const todayStart = new Date(today.setHours(0, 0, 0, 0));
+    const todayEnd = new Date(today.setHours(23, 59, 59, 999));
 
     const count = await db.sR.count({
       where: {
@@ -1791,26 +1789,26 @@ export class SRService {
           lt: todayEnd,
         },
       },
-    })
+    });
 
-    const sequence = String(count + 1).padStart(4, '0')
-    return `${clientCode}-${dateStr}-${sequence}`
+    const sequence = String(count + 1).padStart(4, '0');
+    return `${clientCode}-${dateStr}-${sequence}`;
   }
 
   /**
    * SR 목록 조회 (필터링, 페이지네이션)
    */
   static async list(params: {
-    userId: string
-    isAdmin: boolean
-    clientId?: string
-    status?: SRStatus
-    priority?: SRPriority
-    assigneeId?: string
-    requesterId?: string
-    searchQuery?: string
-    page?: number
-    limit?: number
+    userId: string;
+    isAdmin: boolean;
+    clientId?: string;
+    status?: SRStatus;
+    priority?: SRPriority;
+    assigneeId?: string;
+    requesterId?: string;
+    searchQuery?: string;
+    page?: number;
+    limit?: number;
   }) {
     const {
       userId,
@@ -1823,27 +1821,27 @@ export class SRService {
       searchQuery,
       page = 1,
       limit = 50,
-    } = params
+    } = params;
 
-    const where: Prisma.SRWhereInput = {}
+    const where: Prisma.SRWhereInput = {};
 
     // 권한에 따른 필터링
     if (!isAdmin) {
-      where.OR = [{ requesterId: userId }, { assigneeId: userId }]
+      where.OR = [{ requesterId: userId }, { assigneeId: userId }];
     }
 
-    if (clientId) where.clientId = clientId
-    if (status) where.status = status
-    if (priority) where.priority = priority
-    if (assigneeId) where.assigneeId = assigneeId
-    if (requesterId) where.requesterId = requesterId
+    if (clientId) where.clientId = clientId;
+    if (status) where.status = status;
+    if (priority) where.priority = priority;
+    if (assigneeId) where.assigneeId = assigneeId;
+    if (requesterId) where.requesterId = requesterId;
 
     if (searchQuery) {
       where.OR = [
         { srNumber: { contains: searchQuery, mode: 'insensitive' } },
         { title: { contains: searchQuery, mode: 'insensitive' } },
         { description: { contains: searchQuery, mode: 'insensitive' } },
-      ]
+      ];
     }
 
     const [srs, total] = await Promise.all([
@@ -1859,7 +1857,7 @@ export class SRService {
         take: limit,
       }),
       db.sR.count({ where }),
-    ])
+    ]);
 
     return {
       data: srs,
@@ -1869,7 +1867,7 @@ export class SRService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 
   /**
@@ -1887,19 +1885,19 @@ export class SRService {
         requester: true,
         assignee: true,
       },
-    })
+    });
 
-    return srs.filter((sr) => isSLABreached(sr.priority, sr.createdAt))
+    return srs.filter((sr) => isSLABreached(sr.priority, sr.createdAt));
   }
 
   /**
    * 대시보드 통계
    */
   static async getDashboardStats(userId: string, isAdmin: boolean) {
-    const where: Prisma.SRWhereInput = {}
+    const where: Prisma.SRWhereInput = {};
 
     if (!isAdmin) {
-      where.OR = [{ requesterId: userId }, { assigneeId: userId }]
+      where.OR = [{ requesterId: userId }, { assigneeId: userId }];
     }
 
     const [
@@ -1937,7 +1935,7 @@ export class SRService {
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
-    ])
+    ]);
 
     return {
       total,
@@ -1952,13 +1950,13 @@ export class SRService {
       },
       byPriority: byPriority.reduce(
         (acc, item) => {
-          acc[item.priority] = item._count
-          return acc
+          acc[item.priority] = item._count;
+          return acc;
         },
         {} as Record<SRPriority, number>
       ),
       recentSRs,
-    }
+    };
   }
 }
 ```
@@ -1968,19 +1966,19 @@ export class SRService {
 **server/services/notification-service.ts**:
 
 ```typescript
-import { db } from '@/lib/db'
-import { NotificationType, NotificationStatus } from '@prisma/client'
+import { db } from '@/lib/db';
+import { NotificationType, NotificationStatus } from '@prisma/client';
 
 export class NotificationService {
   /**
    * 알림 생성
    */
   static async create(data: {
-    type: NotificationType
-    recipient: string
-    subject?: string
-    content: string
-    metadata?: Record<string, any>
+    type: NotificationType;
+    recipient: string;
+    subject?: string;
+    content: string;
+    metadata?: Record<string, any>;
   }) {
     return db.notification.create({
       data: {
@@ -1991,7 +1989,7 @@ export class NotificationService {
         metadata: data.metadata,
         status: 'PENDING',
       },
-    })
+    });
   }
 
   /**
@@ -2004,7 +2002,7 @@ export class NotificationService {
         status: 'SENT',
         sentAt: new Date(),
       },
-    })
+    });
   }
 
   /**
@@ -2017,7 +2015,7 @@ export class NotificationService {
         status: 'FAILED',
         failReason: reason,
       },
-    })
+    });
   }
 
   /**
@@ -2032,7 +2030,7 @@ export class NotificationService {
         createdAt: 'asc',
       },
       take: limit,
-    })
+    });
   }
 
   /**
@@ -2046,10 +2044,10 @@ export class NotificationService {
           gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // 최근 24시간
         },
       },
-    })
+    });
 
     // 재시도 로직은 Inngest에서 처리
-    return failedNotifications
+    return failedNotifications;
   }
 }
 ```
@@ -2059,93 +2057,93 @@ export class NotificationService {
 **inngest/functions/send-email.ts**:
 
 ```typescript
-import { inngest } from '@/inngest/client'
-import { sendEmail } from '@/server/email/send'
-import { NotificationService } from '@/server/services/notification-service'
-import { db } from '@/lib/db'
+import { inngest } from '@/inngest/client';
+import { sendEmail } from '@/server/email/send';
+import { NotificationService } from '@/server/services/notification-service';
+import { db } from '@/lib/db';
 
 export const sendEmailFunction = inngest.createFunction(
   { id: 'send-email' },
   { event: 'notification/send' },
   async ({ event, step }) => {
-    const { notificationId, recipient, subject, content, template } = event.data
+    const { notificationId, recipient, subject, content, template } = event.data;
 
     try {
       // 이메일 발송
       await step.run('send-email', async () => {
-        await sendEmail(recipient, subject, content, template)
-      })
+        await sendEmail(recipient, subject, content, template);
+      });
 
       // 발송 성공 처리
       await step.run('mark-as-sent', async () => {
-        await NotificationService.markAsSent(notificationId)
-      })
+        await NotificationService.markAsSent(notificationId);
+      });
 
-      return { success: true, notificationId }
+      return { success: true, notificationId };
     } catch (error) {
       // 발송 실패 처리
       await step.run('mark-as-failed', async () => {
-        await NotificationService.markAsFailed(notificationId, error.message)
-      })
+        await NotificationService.markAsFailed(notificationId, error.message);
+      });
 
-      throw error
+      throw error;
     }
   }
-)
+);
 ```
 
 **inngest/functions/send-mattermost.ts**:
 
 ```typescript
-import { inngest } from '@/inngest/client'
-import { db } from '@/lib/db'
-import { NotificationService } from '@/server/services/notification-service'
-import { MattermostWebhookService } from '@/lib/mattermost'
+import { inngest } from '@/inngest/client';
+import { db } from '@/lib/db';
+import { NotificationService } from '@/server/services/notification-service';
+import { MattermostWebhookService } from '@/lib/mattermost';
 
 export const sendMattermostFunction = inngest.createFunction(
   { id: 'send-mattermost' },
   { event: 'notification/send-mattermost' },
   async ({ event, step }) => {
-    const { notificationId, recipient, message } = event.data
+    const { notificationId, recipient, message } = event.data;
 
     try {
       // Mattermost 발송
       await step.run('send-mattermost', async () => {
-        await MattermostWebhookService.sendMessage(recipient, message)
-      })
+        await MattermostWebhookService.sendMessage(recipient, message);
+      });
 
       // 발송 성공 처리
       await step.run('mark-as-sent', async () => {
-        await NotificationService.markAsSent(notificationId)
-      })
+        await NotificationService.markAsSent(notificationId);
+      });
 
-      return { success: true, notificationId }
+      return { success: true, notificationId };
     } catch (error) {
       // 발송 실패 처리
       await step.run('mark-as-failed', async () => {
-        await NotificationService.markAsFailed(notificationId, error.message)
-      })
+        await NotificationService.markAsFailed(notificationId, error.message);
+      });
 
-      throw error
+      throw error;
     }
   }
-)
+);
 ```
 
 **inngest/functions/sla-monitor.ts**:
 
 ```typescript
-import { inngest } from '@/inngest/client'
-import { db } from '@/lib/db'
-import { SRStatus, SRPriority } from '@prisma/client'
-import { NotificationService } from '@/server/services/notification-service'
+import { inngest } from '@/inngest/client';
+import { db } from '@/lib/db';
+import { SRStatus, SRPriority } from '@prisma/client';
+import { NotificationService } from '@/server/services/notification-service';
 
 export const slaMonitorFunction = inngest.createFunction(
   { id: 'sla-monitor' },
   { cron: '0 */1 * * *' }, // 매시 시작 시 체크
   async ({ step }) => {
     // SLA 위반 임박 또는 위반된 SR 조회
-    const now = new Date()
+    const now = new Date();
     const srs = await step.run('get-srs-nearing-sla', async () => {
       return db.sR.findMany({
         where: {
@@ -2164,76 +2162,79 @@ export const slaMonitorFunction = inngest.createFunction(
           requester: true,
           assignee: true,
         },
-      })
-    })
+      });
+    });
 
-    const notifications = []
+    const notifications = [];
     for (const sr of srs) {
-      const timeDiffHours = (sr.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60)
+      const timeDiffHours = (sr.dueDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-      let type: 'SLA_WARNING' | 'SLA_VIOLATED' = 'SLA_WARNING'
-      let message = ''
-      
+      let type: 'SLA_WARNING' | 'SLA_VIOLATED' = 'SLA_WARNING';
+      let message = '';
+
       if (timeDiffHours < 0) {
-        type = 'SLA_VIOLATED'
-        message = `SR #${sr.srNumber}가 SLA를 ${Math.abs(Math.round(timeDiffHours))}시간 초과했습니다.`
+        type = 'SLA_VIOLATED';
+        message = `SR #${sr.srNumber}가 SLA를 ${Math.abs(Math.round(timeDiffHours))}시간 초과했습니다.`;
       } else if (timeDiffHours <= 1) {
-        message = `SR #${sr.srNumber}가 1시간 이내에 SLA를 초과합니다.`
+        message = `SR #${sr.srNumber}가 1시간 이내에 SLA를 초과합니다.`;
       } else {
         // 1시간보다 더 남았으면 경고 보내지 않음
-        continue
+        continue;
       }
 
       // 관련자에게 알림
-      const recipients = [sr.assigneeId, sr.requesterId].filter(Boolean)
-      
+      const recipients = [sr.assigneeId, sr.requesterId].filter(Boolean);
+
       for (const recipientId of recipients) {
-        const notification = await step.run(`create-notification-${sr.id}-${recipientId}`, async () => {
-          return NotificationService.create({
-            type: 'EMAIL',
-            recipient: recipientId,
-            subject: `SLA ${type === 'SLA_VIOLATED' ? '위반' : '임박'} 알림 - SR #${sr.srNumber}`,
-            content: message,
-            metadata: {
-              srId: sr.id,
-              srNumber: sr.srNumber,
-              type,
-              priority: sr.priority
-            }
-          })
-        })
-        notifications.push(notification)
+        const notification = await step.run(
+          `create-notification-${sr.id}-${recipientId}`,
+          async () => {
+            return NotificationService.create({
+              type: 'EMAIL',
+              recipient: recipientId,
+              subject: `SLA ${type === 'SLA_VIOLATED' ? '위반' : '임박'} 알림 - SR #${sr.srNumber}`,
+              content: message,
+              metadata: {
+                srId: sr.id,
+                srNumber: sr.srNumber,
+                type,
+                priority: sr.priority,
+              },
+            });
+          }
+        );
+        notifications.push(notification);
       }
     }
 
-    return { 
+    return {
       processed: srs.length,
-      notifications: notifications.length 
-    }
+      notifications: notifications.length,
+    };
   }
-)
+);
 ```
 
 **inngest/functions/generate-reports.ts**:
 
 ```typescript
-import { inngest } from '@/inngest/client'
-import { db } from '@/lib/db'
-import { PDFGenerator } from '@/lib/pdf'
-import { EmailService } from '@/server/services/email-service'
-import { SRStatus, SRPriority } from '@prisma/client'
+import { inngest } from '@/inngest/client';
+import { db } from '@/lib/db';
+import { PDFGenerator } from '@/lib/pdf';
+import { EmailService } from '@/server/services/email-service';
+import { SRStatus, SRPriority } from '@prisma/client';
 
 export const generateReportsFunction = inngest.createFunction(
   { id: 'generate-reports' },
   { cron: '0 9 * * 1' }, // 매주 월요일 오전 9시
   async ({ step }) => {
-    const startOfWeek = new Date()
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()) // 지난 일요일
-    startOfWeek.setHours(0, 0, 0, 0)
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // 지난 일요일
+    startOfWeek.setHours(0, 0, 0, 0);
 
-    const endOfWeek = new Date(startOfWeek)
-    endOfWeek.setDate(endOfWeek.getDate() + 6) // 이번 토요일
-    endOfWeek.setHours(23, 59, 59, 999)
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6); // 이번 토요일
+    endOfWeek.setHours(23, 59, 59, 999);
 
     // 주간 리포트 생성
     const reportData = await step.run('generate-report-data', async () => {
@@ -2285,34 +2286,34 @@ export const generateReportsFunction = inngest.createFunction(
           },
           _count: true,
         }),
-      ])
+      ]);
 
       return {
         totalSRs,
         completedSRs,
         byPriority: byPriority.reduce((acc, item) => {
-          acc[item.priority] = item._count
-          return acc
+          acc[item.priority] = item._count;
+          return acc;
         }, {}),
         byStatus: byStatus.reduce((acc, item) => {
-          acc[item.status] = item._count
-          return acc
+          acc[item.status] = item._count;
+          return acc;
         }, {}),
         byClient: byClient.reduce((acc, item) => {
-          acc[item.clientId] = item._count
-          return acc
+          acc[item.clientId] = item._count;
+          return acc;
         }, {}),
         period: {
           start: startOfWeek,
           end: endOfWeek,
         },
-      }
-    })
+      };
+    });
 
     // PDF 리포트 생성
     const pdfBuffer = await step.run('generate-pdf', async () => {
-      return PDFGenerator.generateWeeklyReport(reportData)
-    })
+      return PDFGenerator.generateWeeklyReport(reportData);
+    });
 
     // 관리자에게 리포트 이메일 발송
     const adminUsers = await step.run('get-admin-users', async () => {
@@ -2331,10 +2332,10 @@ export const generateReportsFunction = inngest.createFunction(
           email: true,
           name: true,
         },
-      })
-    })
+      });
+    });
 
-    const emailResults = []
+    const emailResults = [];
     for (const admin of adminUsers) {
       const result = await step.run(`send-report-email-${admin.id}`, async () => {
         return EmailService.sendWeeklyReport({
@@ -2342,18 +2343,18 @@ export const generateReportsFunction = inngest.createFunction(
           subject: `주간 SR 리포트 (${reportData.period.start.toLocaleDateString()} - ${reportData.period.end.toLocaleDateString()})`,
           reportData,
           pdfBuffer,
-        })
-      })
-      emailResults.push(result)
+        });
+      });
+      emailResults.push(result);
     }
 
-    return { 
+    return {
       reportData,
       emailsSent: emailResults.length,
-      success: emailResults.every(r => r.success)
-    }
+      success: emailResults.every((r) => r.success),
+    };
   }
-)
+);
 ```
 
 ### Complete Email Template Implementations
@@ -2361,17 +2362,17 @@ export const generateReportsFunction = inngest.createFunction(
 **emails/sr-created.tsx**:
 
 ```tsx
-import React from 'react'
-import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components'
+import React from 'react';
+import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components';
 
 interface SRCreatedEmailProps {
-  srNumber: string
-  title: string
-  requesterName: string
-  clientName: string
-  priority: string
-  dueDate?: string
-  srUrl: string
+  srNumber: string;
+  title: string;
+  requesterName: string;
+  clientName: string;
+  priority: string;
+  dueDate?: string;
+  srUrl: string;
 }
 
 export const SRCreatedEmail = ({
@@ -2381,99 +2382,132 @@ export const SRCreatedEmail = ({
   clientName = 'Sample Client',
   priority = 'MEDIUM',
   dueDate = '2025-01-01',
-  srUrl = 'https://example.com/sr/1'
+  srUrl = 'https://example.com/sr/1',
 }: SRCreatedEmailProps) => {
   const priorityColors = {
     CRITICAL: '#dc2626', // red-600
-    HIGH: '#ea580c',     // orange-600
-    MEDIUM: '#ca8a04',   // yellow-600
-    LOW: '#166534',      // green-700
-  }
+    HIGH: '#ea580c', // orange-600
+    MEDIUM: '#ca8a04', // yellow-600
+    LOW: '#166534', // green-700
+  };
 
   return (
     <Html>
       <Head />
-      <Preview>New SR Created: {srNumber} - {title}</Preview>
+      <Preview>
+        New SR Created: {srNumber} - {title}
+      </Preview>
       <Body style={{ backgroundColor: '#f3f4f6', padding: '20px 0' }}>
-        <Container style={{ backgroundColor: '#ffffff', maxWidth: '600px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
+        <Container
+          style={{
+            backgroundColor: '#ffffff',
+            maxWidth: '600px',
+            margin: '0 auto',
+            borderRadius: '8px',
+            overflow: 'hidden',
+          }}
+        >
           <div style={{ backgroundColor: '#1f2937', padding: '24px', textAlign: 'center' }}>
             <Heading style={{ color: '#ffffff', margin: '0', fontSize: '24px' }}>
               SR Management System
             </Heading>
           </div>
-          
+
           <div style={{ padding: '32px 24px' }}>
             <Heading style={{ color: '#111827', margin: '0 0 16px', fontSize: '20px' }}>
               New Service Request Created
             </Heading>
-            
-            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}>
+
+            <Text
+              style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}
+            >
               <strong>SR #{srNumber}</strong> has been created by {requesterName} from {clientName}.
             </Text>
-            
-            <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '16px', margin: '16px 0' }}>
+
+            <div
+              style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                padding: '16px',
+                margin: '16px 0',
+              }}
+            >
               <Text style={{ color: '#374151', margin: '0 0 8px', fontWeight: 'bold' }}>
                 Title: {title}
               </Text>
               <Text style={{ color: '#374151', margin: '0 0 8px' }}>
-                Priority: <span style={{ color: priorityColors[priority as keyof typeof priorityColors] || '#166534', fontWeight: 'bold' }}>{priority}</span>
+                Priority:{' '}
+                <span
+                  style={{
+                    color: priorityColors[priority as keyof typeof priorityColors] || '#166534',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {priority}
+                </span>
               </Text>
               {dueDate && (
-                <Text style={{ color: '#374151', margin: '0' }}>
-                  Due Date: {dueDate}
-                </Text>
+                <Text style={{ color: '#374151', margin: '0' }}>Due Date: {dueDate}</Text>
               )}
             </div>
-            
-            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}>
+
+            <Text
+              style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}
+            >
               Please review the new SR and take appropriate action.
             </Text>
-            
-            <Link 
+
+            <Link
               href={srUrl}
-              style={{ 
-                display: 'inline-block', 
-                backgroundColor: '#3b82f6', 
-                color: '#ffffff', 
-                textDecoration: 'none', 
-                padding: '12px 24px', 
+              style={{
+                display: 'inline-block',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                textDecoration: 'none',
+                padding: '12px 24px',
                 borderRadius: '4px',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
               }}
             >
               View SR Details
             </Link>
           </div>
-          
-          <div style={{ backgroundColor: '#f3f4f6', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-            <Text style={{ margin: '0' }}>
-              This email was sent by SR Management System
-            </Text>
+
+          <div
+            style={{
+              backgroundColor: '#f3f4f6',
+              padding: '16px',
+              textAlign: 'center',
+              fontSize: '12px',
+              color: '#6b7280',
+            }}
+          >
+            <Text style={{ margin: '0' }}>This email was sent by SR Management System</Text>
           </div>
         </Container>
       </Body>
     </Html>
-  )
-}
+  );
+};
 
-export default SRCreatedEmail
+export default SRCreatedEmail;
 ```
 
 **emails/sr-assigned.tsx**:
 
 ```tsx
-import React from 'react'
-import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components'
+import React from 'react';
+import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components';
 
 interface SRAssignedEmailProps {
-  srNumber: string
-  title: string
-  assigneeName: string
-  requesterName: string
-  clientName: string
-  priority: string
-  dueDate?: string
-  srUrl: string
+  srNumber: string;
+  title: string;
+  assigneeName: string;
+  requesterName: string;
+  clientName: string;
+  priority: string;
+  dueDate?: string;
+  srUrl: string;
 }
 
 export const SRAssignedEmail = ({
@@ -2484,99 +2518,133 @@ export const SRAssignedEmail = ({
   clientName = 'Sample Client',
   priority = 'MEDIUM',
   dueDate = '2025-01-01',
-  srUrl = 'https://example.com/sr/1'
+  srUrl = 'https://example.com/sr/1',
 }: SRAssignedEmailProps) => {
   const priorityColors = {
     CRITICAL: '#dc2626', // red-600
-    HIGH: '#ea580c',     // orange-600
-    MEDIUM: '#ca8a04',   // yellow-600
-    LOW: '#166534',      // green-700
-  }
+    HIGH: '#ea580c', // orange-600
+    MEDIUM: '#ca8a04', // yellow-600
+    LOW: '#166534', // green-700
+  };
 
   return (
     <Html>
       <Head />
-      <Preview>SR #{srNumber} assigned to you - {title}</Preview>
+      <Preview>
+        SR #{srNumber} assigned to you - {title}
+      </Preview>
       <Body style={{ backgroundColor: '#f3f4f6', padding: '20px 0' }}>
-        <Container style={{ backgroundColor: '#ffffff', maxWidth: '600px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
+        <Container
+          style={{
+            backgroundColor: '#ffffff',
+            maxWidth: '600px',
+            margin: '0 auto',
+            borderRadius: '8px',
+            overflow: 'hidden',
+          }}
+        >
           <div style={{ backgroundColor: '#1f2937', padding: '24px', textAlign: 'center' }}>
             <Heading style={{ color: '#ffffff', margin: '0', fontSize: '24px' }}>
               SR Management System
             </Heading>
           </div>
-          
+
           <div style={{ padding: '32px 24px' }}>
             <Heading style={{ color: '#111827', margin: '0 0 16px', fontSize: '20px' }}>
               Service Request Assigned
             </Heading>
-            
-            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}>
-              SR <strong>#{srNumber}</strong> has been assigned to <strong>{assigneeName}</strong> by {requesterName} from {clientName}.
+
+            <Text
+              style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}
+            >
+              SR <strong>#{srNumber}</strong> has been assigned to <strong>{assigneeName}</strong>{' '}
+              by {requesterName} from {clientName}.
             </Text>
-            
-            <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '16px', margin: '16px 0' }}>
+
+            <div
+              style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                padding: '16px',
+                margin: '16px 0',
+              }}
+            >
               <Text style={{ color: '#374151', margin: '0 0 8px', fontWeight: 'bold' }}>
                 Title: {title}
               </Text>
               <Text style={{ color: '#374151', margin: '0 0 8px' }}>
-                Priority: <span style={{ color: priorityColors[priority as keyof typeof priorityColors] || '#166534', fontWeight: 'bold' }}>{priority}</span>
+                Priority:{' '}
+                <span
+                  style={{
+                    color: priorityColors[priority as keyof typeof priorityColors] || '#166534',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {priority}
+                </span>
               </Text>
               {dueDate && (
-                <Text style={{ color: '#374151', margin: '0' }}>
-                  Due Date: {dueDate}
-                </Text>
+                <Text style={{ color: '#374151', margin: '0' }}>Due Date: {dueDate}</Text>
               )}
             </div>
-            
-            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}>
+
+            <Text
+              style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}
+            >
               The assigned user should review and process this SR as soon as possible.
             </Text>
-            
-            <Link 
+
+            <Link
               href={srUrl}
-              style={{ 
-                display: 'inline-block', 
-                backgroundColor: '#3b82f6', 
-                color: '#ffffff', 
-                textDecoration: 'none', 
-                padding: '12px 24px', 
+              style={{
+                display: 'inline-block',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                textDecoration: 'none',
+                padding: '12px 24px',
                 borderRadius: '4px',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
               }}
             >
               View SR Details
             </Link>
           </div>
-          
-          <div style={{ backgroundColor: '#f3f4f6', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-            <Text style={{ margin: '0' }}>
-              This email was sent by SR Management System
-            </Text>
+
+          <div
+            style={{
+              backgroundColor: '#f3f4f6',
+              padding: '16px',
+              textAlign: 'center',
+              fontSize: '12px',
+              color: '#6b7280',
+            }}
+          >
+            <Text style={{ margin: '0' }}>This email was sent by SR Management System</Text>
           </div>
         </Container>
       </Body>
     </Html>
-  )
-}
+  );
+};
 
-export default SRAssignedEmail
+export default SRAssignedEmail;
 ```
 
 **emails/sr-completed.tsx**:
 
 ```tsx
-import React from 'react'
-import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components'
+import React from 'react';
+import { Body, Container, Head, Heading, Html, Preview, Text, Link } from '@react-email/components';
 
 interface SRCompletedEmailProps {
-  srNumber: string
-  title: string
-  assigneeName: string
-  requesterName: string
-  clientName: string
-  completedAt: string
-  resolutionDescription?: string
-  srUrl: string
+  srNumber: string;
+  title: string;
+  assigneeName: string;
+  requesterName: string;
+  clientName: string;
+  completedAt: string;
+  resolutionDescription?: string;
+  srUrl: string;
 }
 
 export const SRCompletedEmail = ({
@@ -2587,30 +2655,49 @@ export const SRCompletedEmail = ({
   clientName = 'Sample Client',
   completedAt = '2025-01-01 10:00:00',
   resolutionDescription = 'The issue has been resolved successfully.',
-  srUrl = 'https://example.com/sr/1'
+  srUrl = 'https://example.com/sr/1',
 }: SRCompletedEmailProps) => {
   return (
     <Html>
       <Head />
-      <Preview>SR #{srNumber} completed - {title}</Preview>
+      <Preview>
+        SR #{srNumber} completed - {title}
+      </Preview>
       <Body style={{ backgroundColor: '#f3f4f6', padding: '20px 0' }}>
-        <Container style={{ backgroundColor: '#ffffff', maxWidth: '600px', margin: '0 auto', borderRadius: '8px', overflow: 'hidden' }}>
+        <Container
+          style={{
+            backgroundColor: '#ffffff',
+            maxWidth: '600px',
+            margin: '0 auto',
+            borderRadius: '8px',
+            overflow: 'hidden',
+          }}
+        >
           <div style={{ backgroundColor: '#1f2937', padding: '24px', textAlign: 'center' }}>
             <Heading style={{ color: '#ffffff', margin: '0', fontSize: '24px' }}>
               SR Management System
             </Heading>
           </div>
-          
+
           <div style={{ padding: '32px 24px' }}>
             <Heading style={{ color: '#111827', margin: '0 0 16px', fontSize: '20px' }}>
               Service Request Completed
             </Heading>
-            
-            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}>
+
+            <Text
+              style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '0 0 16px' }}
+            >
               SR <strong>#{srNumber}</strong> has been completed by <strong>{assigneeName}</strong>.
             </Text>
-            
-            <div style={{ backgroundColor: '#f9fafb', borderRadius: '6px', padding: '16px', margin: '16px 0' }}>
+
+            <div
+              style={{
+                backgroundColor: '#f9fafb',
+                borderRadius: '6px',
+                padding: '16px',
+                margin: '16px 0',
+              }}
+            >
               <Text style={{ color: '#374151', margin: '0 0 8px', fontWeight: 'bold' }}>
                 Title: {title}
               </Text>
@@ -2626,39 +2713,47 @@ export const SRCompletedEmail = ({
                 </Text>
               )}
             </div>
-            
-            <Text style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}>
+
+            <Text
+              style={{ color: '#374151', fontSize: '16px', lineHeight: '1.5', margin: '16px 0' }}
+            >
               The SR has been marked as completed. Please review and confirm the resolution.
             </Text>
-            
-            <Link 
+
+            <Link
               href={srUrl}
-              style={{ 
-                display: 'inline-block', 
-                backgroundColor: '#3b82f6', 
-                color: '#ffffff', 
-                textDecoration: 'none', 
-                padding: '12px 24px', 
+              style={{
+                display: 'inline-block',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                textDecoration: 'none',
+                padding: '12px 24px',
                 borderRadius: '4px',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
               }}
             >
               View SR Details
             </Link>
           </div>
-          
-          <div style={{ backgroundColor: '#f3f4f6', padding: '16px', textAlign: 'center', fontSize: '12px', color: '#6b7280' }}>
-            <Text style={{ margin: '0' }}>
-              This email was sent by SR Management System
-            </Text>
+
+          <div
+            style={{
+              backgroundColor: '#f3f4f6',
+              padding: '16px',
+              textAlign: 'center',
+              fontSize: '12px',
+              color: '#6b7280',
+            }}
+          >
+            <Text style={{ margin: '0' }}>This email was sent by SR Management System</Text>
           </div>
         </Container>
       </Body>
     </Html>
-  )
-}
+  );
+};
 
-export default SRCompletedEmail
+export default SRCompletedEmail;
 ```
 
 ## 8. 알림 시스템
@@ -2682,20 +2777,20 @@ export enum NotificationTrigger {
   SR_COMMENT_ADDED = 'SR_COMMENT_ADDED',
   SLA_WARNING = 'SLA_WARNING',
   SLA_VIOLATED = 'SLA_VIOLATED',
-  CONTRACT_EXPIRING = 'CONTRACT_EXPIRING'
+  CONTRACT_EXPIRING = 'CONTRACT_EXPIRING',
 }
 
 /**
  * 알림 발송 조건
  */
 export interface NotificationCondition {
-  trigger: NotificationTrigger
-  description: string
-  recipients: (sr: SR) => Promise<string[]> // User IDs 또는 Emails
-  channels: ('EMAIL' | 'MATTERMOST' | 'IN_APP')[]
-  immediate: boolean // 즉시 발송 여부
-  template: string
-  enabled: boolean
+  trigger: NotificationTrigger;
+  description: string;
+  recipients: (sr: SR) => Promise<string[]>; // User IDs 또는 Emails
+  channels: ('EMAIL' | 'MATTERMOST' | 'IN_APP')[];
+  immediate: boolean; // 즉시 발송 여부
+  template: string;
+  enabled: boolean;
 }
 
 export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCondition> = {
@@ -2706,14 +2801,14 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
       // 해당 고객사의 담당자들
       const handlers = await db.clientHandler.findMany({
         where: { clientId: sr.clientId, unassignedDate: null },
-        select: { userId: true }
-      })
-      return handlers.map(h => h.userId)
+        select: { userId: true },
+      });
+      return handlers.map((h) => h.userId);
     },
     channels: ['EMAIL', 'MATTERMOST'],
     immediate: true,
     template: 'sr-created',
-    enabled: true
+    enabled: true,
   },
 
   SR_ASSIGNED: {
@@ -2721,12 +2816,12 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SR이 담당자에게 배정되었을 때',
     recipients: async (sr) => {
       // 배정된 담당자
-      return sr.assigneeId ? [sr.assigneeId] : []
+      return sr.assigneeId ? [sr.assigneeId] : [];
     },
     channels: ['EMAIL', 'MATTERMOST', 'IN_APP'],
     immediate: true,
     template: 'sr-assigned',
-    enabled: true
+    enabled: true,
   },
 
   SR_STATUS_CHANGED: {
@@ -2734,16 +2829,16 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SR 상태가 변경되었을 때',
     recipients: async (sr) => {
       // 신청자 + 담당자
-      const recipients = [sr.requesterId]
+      const recipients = [sr.requesterId];
       if (sr.assigneeId) {
-        recipients.push(sr.assigneeId)
+        recipients.push(sr.assigneeId);
       }
-      return recipients
+      return recipients;
     },
     channels: ['EMAIL', 'IN_APP'],
     immediate: true,
     template: 'sr-status-changed',
-    enabled: true
+    enabled: true,
   },
 
   SR_COMPLETED: {
@@ -2751,12 +2846,12 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SR이 완료되었을 때',
     recipients: async (sr) => {
       // 신청자
-      return [sr.requesterId]
+      return [sr.requesterId];
     },
     channels: ['EMAIL', 'IN_APP'],
     immediate: true,
     template: 'sr-completed',
-    enabled: true
+    enabled: true,
   },
 
   SR_REJECTED: {
@@ -2764,12 +2859,12 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SR이 거절되었을 때',
     recipients: async (sr) => {
       // 신청자
-      return [sr.requesterId]
+      return [sr.requesterId];
     },
     channels: ['EMAIL', 'IN_APP'],
     immediate: true,
     template: 'sr-rejected',
-    enabled: true
+    enabled: true,
   },
 
   SR_COMMENT_ADDED: {
@@ -2777,16 +2872,16 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SR에 댓글이 추가되었을 때',
     recipients: async (sr) => {
       // 신청자 + 담당자 (댓글 작성자 제외)
-      const recipients = [sr.requesterId]
+      const recipients = [sr.requesterId];
       if (sr.assigneeId) {
-        recipients.push(sr.assigneeId)
+        recipients.push(sr.assigneeId);
       }
-      return recipients
+      return recipients;
     },
     channels: ['EMAIL', 'IN_APP'],
     immediate: false, // 배치로 5분마다 발송
     template: 'sr-comment-added',
-    enabled: true
+    enabled: true,
   },
 
   SLA_WARNING: {
@@ -2794,10 +2889,10 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SLA 위반 임박 (남은 시간 < 25%)',
     recipients: async (sr) => {
       // 담당자 + 고객사 관리자
-      const recipients: string[] = []
+      const recipients: string[] = [];
 
       if (sr.assigneeId) {
-        recipients.push(sr.assigneeId)
+        recipients.push(sr.assigneeId);
       }
 
       // 고객사 관리자
@@ -2807,22 +2902,22 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
           user: {
             roles: {
               some: {
-                role: { name: 'CLIENT_ADMIN' }
-              }
-            }
-          }
+                role: { name: 'CLIENT_ADMIN' },
+              },
+            },
+          },
         },
-        select: { userId: true }
-      })
+        select: { userId: true },
+      });
 
-      recipients.push(...admins.map(a => a.userId))
+      recipients.push(...admins.map((a) => a.userId));
 
-      return [...new Set(recipients)] // 중복 제거
+      return [...new Set(recipients)]; // 중복 제거
     },
     channels: ['EMAIL', 'MATTERMOST'],
     immediate: true,
     template: 'sla-warning',
-    enabled: true
+    enabled: true,
   },
 
   SLA_VIOLATED: {
@@ -2830,25 +2925,25 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
     description: 'SLA 위반',
     recipients: async (sr) => {
       // SLA_WARNING과 동일 + 시스템 관리자
-      const warningRecipients = await NOTIFICATION_CONDITIONS.SLA_WARNING.recipients(sr)
+      const warningRecipients = await NOTIFICATION_CONDITIONS.SLA_WARNING.recipients(sr);
 
       const sysAdmins = await db.user.findMany({
         where: {
           roles: {
             some: {
-              role: { name: 'SYSTEM_ADMIN' }
-            }
-          }
+              role: { name: 'SYSTEM_ADMIN' },
+            },
+          },
         },
-        select: { id: true }
-      })
+        select: { id: true },
+      });
 
-      return [...warningRecipients, ...sysAdmins.map(a => a.id)]
+      return [...warningRecipients, ...sysAdmins.map((a) => a.id)];
     },
     channels: ['EMAIL', 'MATTERMOST'],
     immediate: true,
     template: 'sla-violated',
-    enabled: true
+    enabled: true,
   },
 
   CONTRACT_EXPIRING: {
@@ -2862,51 +2957,48 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
           user: {
             roles: {
               some: {
-                role: { name: 'CLIENT_ADMIN' }
-              }
-            }
-          }
+                role: { name: 'CLIENT_ADMIN' },
+              },
+            },
+          },
         },
-        select: { userId: true }
-      })
+        select: { userId: true },
+      });
 
       const sysAdmins = await db.user.findMany({
         where: {
           roles: {
             some: {
-              role: { name: 'SYSTEM_ADMIN' }
-            }
-          }
+              role: { name: 'SYSTEM_ADMIN' },
+            },
+          },
         },
-        select: { id: true }
-      })
+        select: { id: true },
+      });
 
-      return [...admins.map(a => a.userId), ...sysAdmins.map(a => a.id)]
+      return [...admins.map((a) => a.userId), ...sysAdmins.map((a) => a.id)];
     },
     channels: ['EMAIL'],
     immediate: false, // 크론 작업으로 일일 체크
     template: 'contract-expiring',
-    enabled: true
-  }
-}
+    enabled: true,
+  },
+};
 
 /**
  * 알림 발송 함수
  */
-export async function sendNotification(
-  trigger: NotificationTrigger,
-  sr: SR
-) {
-  const condition = NOTIFICATION_CONDITIONS[trigger]
+export async function sendNotification(trigger: NotificationTrigger, sr: SR) {
+  const condition = NOTIFICATION_CONDITIONS[trigger];
 
   if (!condition.enabled) {
-    return
+    return;
   }
 
-  const recipients = await condition.recipients(sr)
+  const recipients = await condition.recipients(sr);
 
   if (recipients.length === 0) {
-    return
+    return;
   }
 
   // 각 채널별로 발송
@@ -2922,10 +3014,10 @@ export async function sendNotification(
           metadata: {
             trigger,
             srId: sr.id,
-            srNumber: sr.srNumber
-          }
-        }
-      })
+            srNumber: sr.srNumber,
+          },
+        },
+      });
     }
   }
 
@@ -2933,8 +3025,8 @@ export async function sendNotification(
   if (condition.immediate) {
     await inngest.send({
       name: 'notification/send',
-      data: { trigger, srId: sr.id }
-    })
+      data: { trigger, srId: sr.id },
+    });
   }
 }
 ```
@@ -2948,13 +3040,13 @@ export async function sendNotification(
 **lib/storage.ts**:
 
 ```typescript
-import { put, head, del, list } from '@vercel/blob'
+import { put, head, del, list } from '@vercel/blob';
 
 export const STORAGE_PATHS = {
   SR_ATTACHMENTS: 'sr-attachments',
   USER_AVATARS: 'user-avatars',
   CLIENT_LOGOS: 'client-logos',
-} as const
+} as const;
 
 /**
  * 파일 업로드
@@ -2967,15 +3059,17 @@ export async function uploadFile(
     const blob = await put(pathname, file, {
       access: 'public',
       token: process.env.BLOB_READ_WRITE_TOKEN!,
-    })
+    });
 
     return {
       url: blob.url,
       downloadUrl: blob.downloadUrl,
       pathname: blob.pathname,
-    }
+    };
   } catch (error) {
-    throw new Error(`파일 업로드 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+    throw new Error(
+      `파일 업로드 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
+    );
   }
 }
 
@@ -2986,11 +3080,13 @@ export async function getFileInfo(url: string) {
   try {
     const info = await head(url, {
       token: process.env.BLOB_READ_WRITE_TOKEN!,
-    })
+    });
 
-    return info
+    return info;
   } catch (error) {
-    throw new Error(`파일 정보 조회 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+    throw new Error(
+      `파일 정보 조회 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
+    );
   }
 }
 
@@ -3001,9 +3097,11 @@ export async function deleteFile(url: string): Promise<void> {
   try {
     await del(url, {
       token: process.env.BLOB_READ_WRITE_TOKEN!,
-    })
+    });
   } catch (error) {
-    throw new Error(`파일 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+    throw new Error(
+      `파일 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
+    );
   }
 }
 
@@ -3014,9 +3112,11 @@ export async function deleteFiles(urls: string[]): Promise<void> {
   try {
     await del(urls, {
       token: process.env.BLOB_READ_WRITE_TOKEN!,
-    })
+    });
   } catch (error) {
-    throw new Error(`파일 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+    throw new Error(
+      `파일 삭제 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
+    );
   }
 }
 
@@ -3028,11 +3128,13 @@ export async function listFiles(prefix: string = '') {
     const { blobs } = await list({
       prefix,
       token: process.env.BLOB_READ_WRITE_TOKEN!,
-    })
+    });
 
-    return blobs
+    return blobs;
   } catch (error) {
-    throw new Error(`파일 목록 조회 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`)
+    throw new Error(
+      `파일 목록 조회 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`
+    );
   }
 }
 
@@ -3043,17 +3145,17 @@ export async function uploadSRAttachment(
   srId: string,
   file: File
 ): Promise<{ url: string; downloadUrl: string; pathname: string; size: number; type: string }> {
-  const timestamp = Date.now()
-  const fileName = `${timestamp}-${file.name}`
-  const pathname = `${STORAGE_PATHS.SR_ATTACHMENTS}/${srId}/${fileName}`
+  const timestamp = Date.now();
+  const fileName = `${timestamp}-${file.name}`;
+  const pathname = `${STORAGE_PATHS.SR_ATTACHMENTS}/${srId}/${fileName}`;
 
-  const result = await uploadFile(pathname, file)
+  const result = await uploadFile(pathname, file);
 
   return {
     ...result,
     size: file.size,
     type: file.type,
-  }
+  };
 }
 ```
 
@@ -3062,41 +3164,41 @@ export async function uploadSRAttachment(
 **server/actions/attachment.ts**:
 
 ```typescript
-'use server'
+'use server';
 
-import { z } from 'zod'
-import { revalidatePath } from 'next/cache'
-import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
-import { checkSROwnership } from '@/lib/auth/permissions'
-import { uploadSRAttachment, deleteFile } from '@/lib/storage'
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
+import { auth } from '@/lib/auth';
+import { db } from '@/lib/db';
+import { checkSROwnership } from '@/lib/auth/permissions';
+import { uploadSRAttachment, deleteFile } from '@/lib/storage';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export async function addSRAttachment(formData: FormData) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
-  const srId = formData.get('srId') as string
-  const file = formData.get('file') as File
+  const srId = formData.get('srId') as string;
+  const file = formData.get('file') as File;
 
   if (!srId || !file) {
-    throw new Error('SR ID와 파일이 필요합니다')
+    throw new Error('SR ID와 파일이 필요합니다');
   }
 
   // 파일 크기 검증
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error('파일 크기는 10MB를 초과할 수 없습니다')
+    throw new Error('파일 크기는 10MB를 초과할 수 없습니다');
   }
 
   // SR 접근 권한 체크
-  const hasAccess = await checkSROwnership(session.user.id, srId)
+  const hasAccess = await checkSROwnership(session.user.id, srId);
   if (!hasAccess) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
   // 파일 업로드
-  const uploadResult = await uploadSRAttachment(srId, file)
+  const uploadResult = await uploadSRAttachment(srId, file);
 
   // DB에 첨부파일 정보 저장
   const attachment = await db.sRAttachment.create({
@@ -3108,7 +3210,7 @@ export async function addSRAttachment(formData: FormData) {
       fileUrl: uploadResult.url,
       uploadedBy: session.user.id,
     },
-  })
+  });
 
   // 활동 내역 추가
   await db.sRActivity.create({
@@ -3118,31 +3220,31 @@ export async function addSRAttachment(formData: FormData) {
       type: 'ATTACHMENT_ADDED',
       description: `파일 추가: ${file.name}`,
     },
-  })
+  });
 
-  revalidatePath(`/srs/${srId}`)
+  revalidatePath(`/srs/${srId}`);
 
-  return { success: true, data: attachment }
+  return { success: true, data: attachment };
 }
 
 export async function deleteSRAttachment(id: string) {
-  const session = await auth()
-  if (!session) throw new Error('Unauthorized')
+  const session = await auth();
+  if (!session) throw new Error('Unauthorized');
 
-  const attachment = await db.sRAttachment.findUnique({ where: { id } })
-  if (!attachment) throw new Error('첨부파일을 찾을 수 없습니다')
+  const attachment = await db.sRAttachment.findUnique({ where: { id } });
+  if (!attachment) throw new Error('첨부파일을 찾을 수 없습니다');
 
   // SR 접근 권한 체크
-  const hasAccess = await checkSROwnership(session.user.id, attachment.srId)
+  const hasAccess = await checkSROwnership(session.user.id, attachment.srId);
   if (!hasAccess) {
-    throw new Error('권한이 없습니다')
+    throw new Error('권한이 없습니다');
   }
 
   // 파일 삭제 (fileUrl을 사용)
-  await deleteFile(attachment.fileUrl)
+  await deleteFile(attachment.fileUrl);
 
   // DB에서 삭제
-  await db.sRAttachment.delete({ where: { id } })
+  await db.sRAttachment.delete({ where: { id } });
 
   // 활동 내역 추가
   await db.sRActivity.create({
@@ -3152,11 +3254,11 @@ export async function deleteSRAttachment(id: string) {
       type: 'ATTACHMENT_REMOVED',
       description: `파일 삭제: ${attachment.fileName}`,
     },
-  })
+  });
 
-  revalidatePath(`/srs/${attachment.srId}`)
+  revalidatePath(`/srs/${attachment.srId}`);
 
-  return { success: true }
+  return { success: true };
 }
 ```
 
@@ -3169,12 +3271,12 @@ export async function deleteSRAttachment(id: string) {
 **lib/cache.ts**:
 
 ```typescript
-import { Redis } from '@upstash/redis'
+import { Redis } from '@upstash/redis';
 
 export const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL!,
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-})
+});
 
 /**
  * 캐시 키 생성
@@ -3185,7 +3287,7 @@ export const CacheKeys = {
   srDetail: (srId: string) => `sr:detail:${srId}`,
   clientList: () => `client:list`,
   userPermissions: (userId: string) => `user:permissions:${userId}`,
-} as const
+} as const;
 
 /**
  * 캐시된 데이터 조회 또는 생성
@@ -3196,18 +3298,18 @@ export async function getCachedData<T>(
   ttl: number = 300 // 5분
 ): Promise<T> {
   // 캐시 조회
-  const cached = await redis.get<T>(key)
+  const cached = await redis.get<T>(key);
   if (cached !== null) {
-    return cached
+    return cached;
   }
 
   // 캐시 미스: 데이터 생성
-  const data = await fetcher()
+  const data = await fetcher();
 
   // 캐시 저장
-  await redis.setex(key, ttl, data)
+  await redis.setex(key, ttl, data);
 
-  return data
+  return data;
 }
 
 /**
@@ -3215,10 +3317,10 @@ export async function getCachedData<T>(
  */
 export async function invalidateCache(pattern: string) {
   // Upstash Redis는 SCAN 명령 지원
-  const keys = await redis.keys(pattern)
+  const keys = await redis.keys(pattern);
 
   if (keys.length > 0) {
-    await redis.del(...keys)
+    await redis.del(...keys);
   }
 }
 
@@ -3226,7 +3328,7 @@ export async function invalidateCache(pattern: string) {
  * 여러 캐시 무효화
  */
 export async function invalidateCaches(patterns: string[]) {
-  await Promise.all(patterns.map((pattern) => invalidateCache(pattern)))
+  await Promise.all(patterns.map((pattern) => invalidateCache(pattern)));
 }
 ```
 
@@ -3235,48 +3337,45 @@ export async function invalidateCaches(patterns: string[]) {
 **lib/rate-limit.ts**:
 
 ```typescript
-import { Ratelimit } from '@upstash/ratelimit'
-import { redis } from './cache'
+import { Ratelimit } from '@upstash/ratelimit';
+import { redis } from './cache';
 
 // API 요청 제한: 10 요청/10초
 export const apiRateLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(10, '10 s'),
   analytics: true,
-})
+});
 
 // 로그인 시도 제한: 5 요청/15분
 export const loginRateLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(5, '15 m'),
   analytics: true,
-})
+});
 
 // SR 생성 제한: 20 요청/시간
 export const srCreationRateLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(20, '1 h'),
   analytics: true,
-})
+});
 
 /**
  * Rate limit 체크 미들웨어
  */
-export async function checkRateLimit(
-  identifier: string,
-  limiter: Ratelimit = apiRateLimiter
-) {
-  const { success, limit, remaining, reset } = await limiter.limit(identifier)
+export async function checkRateLimit(identifier: string, limiter: Ratelimit = apiRateLimiter) {
+  const { success, limit, remaining, reset } = await limiter.limit(identifier);
 
   if (!success) {
-    throw new Error('Rate limit exceeded')
+    throw new Error('Rate limit exceeded');
   }
 
   return {
     limit,
     remaining,
     reset,
-  }
+  };
 }
 ```
 
@@ -3295,38 +3394,38 @@ export class AppError extends Error {
     public message: string,
     public isOperational = true
   ) {
-    super(message)
-    Object.setPrototypeOf(this, AppError.prototype)
+    super(message);
+    Object.setPrototypeOf(this, AppError.prototype);
   }
 }
 
 export class ValidationError extends AppError {
   constructor(message: string) {
-    super(400, message)
+    super(400, message);
   }
 }
 
 export class AuthenticationError extends AppError {
   constructor(message: string = '인증이 필요합니다') {
-    super(401, message)
+    super(401, message);
   }
 }
 
 export class AuthorizationError extends AppError {
   constructor(message: string = '권한이 없습니다') {
-    super(403, message)
+    super(403, message);
   }
 }
 
 export class NotFoundError extends AppError {
   constructor(resource: string) {
-    super(404, `${resource}을(를) 찾을 수 없습니다`)
+    super(404, `${resource}을(를) 찾을 수 없습니다`);
   }
 }
 
 export class ConflictError extends AppError {
   constructor(message: string) {
-    super(409, message)
+    super(409, message);
   }
 }
 
@@ -3336,9 +3435,9 @@ export class ConflictError extends AppError {
 export function logError(error: Error, context?: Record<string, any>) {
   if (process.env.NODE_ENV === 'production') {
     // Sentry로 전송
-    console.error('Error:', error, context)
+    console.error('Error:', error, context);
   } else {
-    console.error('Error:', error, context)
+    console.error('Error:', error, context);
   }
 }
 
@@ -3350,21 +3449,21 @@ export function handleApiError(error: unknown) {
     return {
       error: error.message,
       statusCode: error.statusCode,
-    }
+    };
   }
 
   if (error instanceof Error) {
-    logError(error)
+    logError(error);
     return {
       error: 'Internal Server Error',
       statusCode: 500,
-    }
+    };
   }
 
   return {
     error: 'Unknown Error',
     statusCode: 500,
-  }
+  };
 }
 ```
 
@@ -3450,49 +3549,49 @@ export function ReactQueryProvider({ children }: { children: React.ReactNode }) 
 **hooks/use-srs.ts**:
 
 ```typescript
-'use client'
+'use client';
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getSRs, createSR, updateSR } from '@/server/actions/sr'
-import { SRStatus, SRPriority } from '@prisma/client'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getSRs, createSR, updateSR } from '@/server/actions/sr';
+import { SRStatus, SRPriority } from '@prisma/client';
 
 export function useSRs(params: {
-  clientId?: string
-  status?: SRStatus
-  priority?: SRPriority
-  page?: number
+  clientId?: string;
+  status?: SRStatus;
+  priority?: SRPriority;
+  page?: number;
 }) {
   return useQuery({
     queryKey: ['srs', params],
     queryFn: () => getSRs(params),
     staleTime: 30 * 1000, // 30초
-  })
+  });
 }
 
 export function useCreateSR() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: createSR,
     onSuccess: () => {
       // SR 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ['srs'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['srs'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
-  })
+  });
 }
 
 export function useUpdateSR() {
-  const queryClient = useQueryClient()
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: updateSR,
     onSuccess: (data) => {
       // 특정 SR 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ['sr', data.data.id] })
-      queryClient.invalidateQueries({ queryKey: ['srs'] })
+      queryClient.invalidateQueries({ queryKey: ['sr', data.data.id] });
+      queryClient.invalidateQueries({ queryKey: ['srs'] });
     },
-  })
+  });
 }
 ```
 
@@ -3504,22 +3603,22 @@ export function useUpdateSR() {
 // 정적 데이터 (빌드 시 캐시)
 const staticData = await fetch('https://...', {
   cache: 'force-cache',
-})
+});
 
 // 동적 데이터 (요청마다 재검증)
 const dynamicData = await fetch('https://...', {
   cache: 'no-store',
-})
+});
 
 // ISR (60초마다 재검증)
 const revalidatedData = await fetch('https://...', {
   next: { revalidate: 60 },
-})
+});
 
 // 태그 기반 재검증
 const taggedData = await fetch('https://...', {
   next: { tags: ['srs'] },
-})
+});
 ```
 
 ---
@@ -3531,14 +3630,14 @@ const taggedData = await fetch('https://...', {
 모든 입력은 Zod 스키마로 검증:
 
 ```typescript
-import { z } from 'zod'
+import { z } from 'zod';
 
 export const srSchema = z.object({
   title: z.string().min(5).max(200).trim(),
   description: z.string().min(20).trim(),
   clientId: z.string().cuid(),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
-})
+});
 ```
 
 ### SQL Injection 방지
@@ -3549,7 +3648,7 @@ Prisma ORM 사용으로 자동 방지:
 // ✅ Safe - Parameterized query
 const user = await db.user.findUnique({
   where: { email: userInput },
-})
+});
 
 // ❌ Never use raw SQL with user input
 // const users = await db.$queryRawUnsafe(`SELECT * FROM users WHERE email = '${userInput}'`)
@@ -3593,9 +3692,9 @@ const nextConfig = {
           },
         ],
       },
-    ]
+    ];
   },
-}
+};
 ```
 
 ### CSRF 방지
@@ -3615,19 +3714,19 @@ NextAuth.js가 자동으로 처리:
 **tests/unit/sr-service.test.ts**:
 
 ```typescript
-import { describe, it, expect, beforeEach } from 'vitest'
-import { SRService } from '@/server/services/sr-service'
-import { db } from '@/lib/db'
+import { describe, it, expect, beforeEach } from 'vitest';
+import { SRService } from '@/server/services/sr-service';
+import { db } from '@/lib/db';
 
 describe('SRService', () => {
   describe('generateSRNumber', () => {
     it('should generate SR number in correct format', async () => {
-      const clientId = 'test-client-id'
-      const srNumber = await SRService.generateSRNumber(clientId)
+      const clientId = 'test-client-id';
+      const srNumber = await SRService.generateSRNumber(clientId);
 
-      expect(srNumber).toMatch(/^[A-Z]{3}-\d{8}-\d{4}$/)
-    })
-  })
+      expect(srNumber).toMatch(/^[A-Z]{3}-\d{8}-\d{4}$/);
+    });
+  });
 
   describe('create', () => {
     it('should create SR with correct data', async () => {
@@ -3637,17 +3736,17 @@ describe('SRService', () => {
         clientId: 'client-id',
         requesterId: 'user-id',
         priority: 'MEDIUM' as const,
-      }
+      };
 
-      const sr = await SRService.create(data)
+      const sr = await SRService.create(data);
 
-      expect(sr).toHaveProperty('id')
-      expect(sr).toHaveProperty('srNumber')
-      expect(sr.title).toBe(data.title)
-      expect(sr.status).toBe('INTAKE')
-    })
-  })
-})
+      expect(sr).toHaveProperty('id');
+      expect(sr).toHaveProperty('srNumber');
+      expect(sr.title).toBe(data.title);
+      expect(sr.status).toBe('INTAKE');
+    });
+  });
+});
 ```
 
 ### Integration Tests
@@ -3655,8 +3754,8 @@ describe('SRService', () => {
 **tests/integration/sr-api.test.ts**:
 
 ```typescript
-import { describe, it, expect } from 'vitest'
-import { createSR, getSRById } from '@/server/actions/sr'
+import { describe, it, expect } from 'vitest';
+import { createSR, getSRById } from '@/server/actions/sr';
 
 describe('SR API Integration', () => {
   it('should create and retrieve SR', async () => {
@@ -3666,16 +3765,16 @@ describe('SR API Integration', () => {
       description: 'This is an integration test SR with sufficient description',
       clientId: 'test-client-id',
       priority: 'HIGH',
-    })
+    });
 
-    expect(createResult.success).toBe(true)
-    expect(createResult.data).toHaveProperty('id')
+    expect(createResult.success).toBe(true);
+    expect(createResult.data).toHaveProperty('id');
 
     // Retrieve SR
-    const sr = await getSRById(createResult.data.id)
-    expect(sr.title).toBe('Integration Test SR')
-  })
-})
+    const sr = await getSRById(createResult.data.id);
+    expect(sr.title).toBe('Integration Test SR');
+  });
+});
 ```
 
 ### E2E Tests (Playwright)
@@ -3683,36 +3782,36 @@ describe('SR API Integration', () => {
 **tests/e2e/sr-workflow.spec.ts**:
 
 ```typescript
-import { test, expect } from '@playwright/test'
+import { test, expect } from '@playwright/test';
 
 test.describe('SR Workflow', () => {
   test('should create, assign, and complete SR', async ({ page }) => {
     // Login
-    await page.goto('/login')
-    await page.fill('input[name="email"]', 'admin@example.com')
-    await page.fill('input[name="password"]', 'password123')
-    await page.click('button[type="submit"]')
+    await page.goto('/login');
+    await page.fill('input[name="email"]', 'admin@example.com');
+    await page.fill('input[name="password"]', 'password123');
+    await page.click('button[type="submit"]');
 
     // Navigate to SR creation
-    await page.goto('/srs/new')
+    await page.goto('/srs/new');
 
     // Fill SR form
-    await page.fill('input[name="title"]', 'E2E Test SR')
-    await page.fill('textarea[name="description"]', 'This is an E2E test SR description')
-    await page.selectOption('select[name="clientId"]', { index: 1 })
-    await page.selectOption('select[name="priority"]', 'HIGH')
+    await page.fill('input[name="title"]', 'E2E Test SR');
+    await page.fill('textarea[name="description"]', 'This is an E2E test SR description');
+    await page.selectOption('select[name="clientId"]', { index: 1 });
+    await page.selectOption('select[name="priority"]', 'HIGH');
 
     // Submit form
-    await page.click('button[type="submit"]')
+    await page.click('button[type="submit"]');
 
     // Verify SR created
-    await expect(page.locator('text=SR 생성 완료')).toBeVisible()
+    await expect(page.locator('text=SR 생성 완료')).toBeVisible();
 
     // Verify SR appears in list
-    await page.goto('/srs')
-    await expect(page.locator('text=E2E Test SR')).toBeVisible()
-  })
-})
+    await page.goto('/srs');
+    await expect(page.locator('text=E2E Test SR')).toBeVisible();
+  });
+});
 ```
 
 ---
@@ -3829,6 +3928,7 @@ AXIOM_ORG_ID="<org-id>"
 ### 환경별 설정 체크리스트
 
 **Development**:
+
 - [ ] Docker PostgreSQL 또는 Supabase Dev 프로젝트
 - [ ] Local Redis (Docker) 또는 Upstash Free
 - [ ] NextAuth secret 생성
@@ -3836,6 +3936,7 @@ AXIOM_ORG_ID="<org-id>"
 - [ ] Inngest Dev Server
 
 **Staging**:
+
 - [ ] Supabase Staging 프로젝트
 - [ ] Upstash Staging 인스턴스
 - [ ] Vercel Preview Deployment
@@ -3843,6 +3944,7 @@ AXIOM_ORG_ID="<org-id>"
 - [ ] E2E 테스트 실행
 
 **Production**:
+
 - [ ] Supabase Production 프로젝트
 - [ ] Connection Pooling 설정 (6543 포트)
 - [ ] Upstash Production
@@ -3856,10 +3958,10 @@ AXIOM_ORG_ID="<org-id>"
 
 **문서 버전 관리:**
 
-| 버전 | 작성자 | 변경 사항 | 작성일 |
-|------|--------|-----------|--------|
-| 1.0 | Development Team | LLD 초안 작성 | 2025-11-06 |
+| 버전 | 작성자           | 변경 사항     | 작성일     |
+| ---- | ---------------- | ------------- | ---------- |
+| 1.0  | Development Team | LLD 초안 작성 | 2025-11-06 |
 
 ---
 
-*이 문서는 SR 관리 시스템의 구현 수준 설계를 정의하는 Low-Level Design 문서입니다. 실제 개발 시 이 문서를 기반으로 코드를 작성하며, 변경사항이 발생할 경우 문서를 업데이트합니다.*
+_이 문서는 SR 관리 시스템의 구현 수준 설계를 정의하는 Low-Level Design 문서입니다. 실제 개발 시 이 문서를 기반으로 코드를 작성하며, 변경사항이 발생할 경우 문서를 업데이트합니다._

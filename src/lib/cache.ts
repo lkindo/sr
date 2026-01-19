@@ -104,8 +104,8 @@ if (process.env.NODE_ENV === 'development' && process.env.VITEST !== 'true') {
   }
 }
 
-import type { Prisma } from '@prisma/client';
 import { unstable_cache as cache } from 'next/cache';
+import type { Prisma } from '@prisma/client';
 
 import prisma from '@/lib/prisma';
 

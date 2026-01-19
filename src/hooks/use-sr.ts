@@ -1,6 +1,6 @@
+import { useRouter } from 'next/navigation';
 import { SRPriority, SRStatus } from '@prisma/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 
 import { deleteSRAction, getSRDetailsAction, updateSRAction } from '@/actions/sr.actions';
 import { useToast } from '@/hooks/use-toast';

@@ -2,11 +2,11 @@
  * SR 접수 정보 입력 폼 카드 컴포넌트
  */
 
+import { UseFormReturn } from 'react-hook-form';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, CalendarIcon, CheckCircle, Clock, User } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { UseFormReturn } from 'react-hook-form';
 
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';

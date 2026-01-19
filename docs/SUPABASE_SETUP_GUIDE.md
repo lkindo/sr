@@ -28,12 +28,12 @@
 2. Organization 선택 (없으면 자동 생성됨)
 3. 프로젝트 정보 입력:
 
-   | 항목 | 값 | 설명 |
-   |------|-----|------|
-   | **Name** | `sr-management` | 프로젝트 이름 (원하는 대로) |
-   | **Database Password** | sr1234 | **⚠️ 반드시 저장!** |
-   | **Region** | `Northeast Asia (Seoul)` | 한국에 가장 가까운 지역 |
-   | **Pricing Plan** | `Free` | 무료 플랜 (500MB DB, 1GB 전송) |
+   | 항목                  | 값                       | 설명                           |
+   | --------------------- | ------------------------ | ------------------------------ |
+   | **Name**              | `sr-management`          | 프로젝트 이름 (원하는 대로)    |
+   | **Database Password** | sr1234                   | **⚠️ 반드시 저장!**            |
+   | **Region**            | `Northeast Asia (Seoul)` | 한국에 가장 가까운 지역        |
+   | **Pricing Plan**      | `Free`                   | 무료 플랜 (500MB DB, 1GB 전송) |
 
 4. **"Create new project"** 클릭
 5. ⏳ 프로젝트 생성 대기 (약 2-3분)
@@ -99,13 +99,13 @@ NEXT_PUBLIC_APP_URL="http://localhost:3001"
 
 ### 3.2 환경 변수 설명
 
-| 변수 | 설명 | 필수 |
-|------|------|------|
-| `DATABASE_URL` | Prisma 클라이언트가 사용하는 연결 (Pooling) | ✅ |
-| `DIRECT_URL` | 마이그레이션 실행 시 사용하는 직접 연결 | ✅ |
-| `NEXTAUTH_SECRET` | NextAuth 암호화 키 | ✅ |
-| `NEXTAUTH_URL` | 앱 URL | ✅ |
-| `RESEND_API_KEY` | 이메일 발송 API 키 | ❌ (선택) |
+| 변수              | 설명                                        | 필수      |
+| ----------------- | ------------------------------------------- | --------- |
+| `DATABASE_URL`    | Prisma 클라이언트가 사용하는 연결 (Pooling) | ✅        |
+| `DIRECT_URL`      | 마이그레이션 실행 시 사용하는 직접 연결     | ✅        |
+| `NEXTAUTH_SECRET` | NextAuth 암호화 키                          | ✅        |
+| `NEXTAUTH_URL`    | 앱 URL                                      | ✅        |
+| `RESEND_API_KEY`  | 이메일 발송 API 키                          | ❌ (선택) |
 
 ---
 
@@ -152,6 +152,7 @@ Connection Pooler를 사용할 때는 Prisma CLI 마이그레이션이 작동하
 #### 4.4 Enum 타입 확인
 
 1. SQL Editor에서 다음 쿼리 실행:
+
 ```sql
 SELECT typname FROM pg_type WHERE typtype = 'e';
 ```
@@ -176,6 +177,7 @@ npx prisma db push
 ```
 
 **⚠️ 주의**: Connection Pooler URL을 사용하면 다음 오류가 발생합니다:
+
 ```
 Error: P1001: Can't reach database server
 ```
@@ -197,6 +199,7 @@ Error: P1001: Can't reach database server
 #### 5.2 Seed 데이터 확인
 
 생성되는 데이터:
+
 - **31개 권한** (SR, CLIENT, USER, ROLE, COMMENT, ATTACHMENT)
 - **5개 기본 역할**:
   - `ADMIN` - 시스템 관리자 (모든 권한)
@@ -206,6 +209,7 @@ Error: P1001: Can't reach database server
   - `CLIENT_USER` - 고객사 사용자 (SR 생성 및 조회)
 
 Supabase Table Editor에서 확인:
+
 1. `roles` 테이블 → 5개 행 확인
 2. `permissions` 테이블 → 31개 행 확인
 3. `role_permissions` 테이블 → 매핑 데이터 확인
@@ -233,23 +237,26 @@ npx tsx prisma/seed.ts
 ### 6.1 Health Check API로 데이터베이스 연결 확인
 
 1. 개발 서버 실행:
+
 ```bash
 pnpm dev
 ```
 
 2. Health check endpoint 호출:
+
 ```bash
 curl http://localhost:3000/api/health
 ```
 
 3. 성공 응답 예시:
+
 ```json
 {
   "status": "healthy",
   "database": {
     "connected": true,
-    "result": [{"connected": 1}],
-    "serverTime": [{"server_time": "2025-11-08T06:14:21.206Z"}]
+    "result": [{ "connected": 1 }],
+    "serverTime": [{ "server_time": "2025-11-08T06:14:21.206Z" }]
   },
   "timestamp": "2025-11-08T06:14:22.963Z"
 }
@@ -262,6 +269,7 @@ npx prisma studio
 ```
 
 브라우저가 자동으로 열리고 Prisma Studio가 실행됩니다.
+
 - URL: http://localhost:5555
 - 모든 테이블 데이터를 GUI로 확인 가능
 
@@ -278,6 +286,7 @@ npx prisma studio
 생성한 계정에 관리자 권한을 부여하려면:
 
 1. Supabase SQL Editor에서 실행:
+
 ```sql
 -- 사용자 ID 확인
 SELECT id, email, name FROM users;
@@ -299,6 +308,7 @@ ON CONFLICT (user_id, role_id) DO NOTHING;
 **원인**: `.env` 파일이 제대로 로드되지 않음
 
 **해결**:
+
 ```bash
 # .env 파일이 프로젝트 루트에 있는지 확인
 ls .env
@@ -312,6 +322,7 @@ pnpm dev
 **원인**: Connection String이 잘못되었거나 네트워크 문제
 
 **해결**:
+
 1. `.env` 파일의 `DATABASE_URL` 확인
 2. 비밀번호에 특수문자가 있다면 URL 인코딩 필요:
    ```
@@ -328,6 +339,7 @@ pnpm dev
 **원인**: 마이그레이션 실행 권한 문제
 
 **해결**:
+
 - `DIRECT_URL` 사용:
   ```bash
   # .env 파일에 DIRECT_URL이 있는지 확인
@@ -340,6 +352,7 @@ pnpm dev
 **원인**: 중복된 데이터 또는 외래 키 오류
 
 **해결**:
+
 ```bash
 # 기존 데이터 삭제 (주의: 모든 데이터 삭제!)
 npx prisma migrate reset
@@ -353,6 +366,7 @@ pnpm db:seed
 **원인**: Prisma Client가 제대로 생성되지 않음
 
 **해결**:
+
 ```bash
 # Prisma Client 재생성
 npx prisma generate
@@ -365,14 +379,14 @@ npx prisma generate
 
 ## 📊 Supabase 무료 플랜 제한
 
-| 항목 | 제한 |
-|------|------|
-| 데이터베이스 크기 | 500 MB |
-| 데이터 전송 | 1 GB/월 |
-| 인증 사용자 | 50,000명 |
-| 스토리지 | 1 GB |
-| 파일 업로드 크기 | 50 MB |
-| API 요청 | 무제한 |
+| 항목              | 제한     |
+| ----------------- | -------- |
+| 데이터베이스 크기 | 500 MB   |
+| 데이터 전송       | 1 GB/월  |
+| 인증 사용자       | 50,000명 |
+| 스토리지          | 1 GB     |
+| 파일 업로드 크기  | 50 MB    |
+| API 요청          | 무제한   |
 
 ⚠️ 제한 초과 시 업그레이드 필요 (Pro: $25/월)
 

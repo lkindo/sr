@@ -1,9 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { PauseCircle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {

@@ -1,11 +1,53 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
+const { mockPrisma } = vi.hoisted(() => {
+  const mock = {
+    $transaction: vi.fn((cb) => cb(mock)),
+    sR: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      delete: vi.fn().mockResolvedValue({}),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    sRActivity: {
+      create: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({}),
+    },
+    sRComment: {
+      deleteMany: vi.fn().mockResolvedValue({}),
+    },
+    sRAttachment: {
+      deleteMany: vi.fn().mockResolvedValue({}),
+    },
+    sRStatusHistory: {
+      create: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    client: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    serviceCategory: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+    user: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+  } as any;
+  return { mockPrisma: mock };
+});
+
 vi.mock('@/lib/policies', () => ({
   ensureCanUpdateSR: vi.fn(),
   ensureCanCreateSR: vi.fn(),
@@ -13,44 +55,7 @@ vi.mock('@/lib/policies', () => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({
-  default: {
-    $transaction: vi.fn((cb) => cb(prisma)),
-    sR: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    sRActivity: {
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    sRComment: {
-      deleteMany: vi.fn(),
-    },
-    sRAttachment: {
-      deleteMany: vi.fn(),
-    },
-    sRStatusHistory: {
-      create: vi.fn(),
-      deleteMany: vi.fn(),
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
-    client: {
-      findUnique: vi.fn(),
-    },
-    serviceCategory: {
-      findUnique: vi.fn(),
-    },
-    user: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-    },
-  },
+  default: mockPrisma,
 }));
 
 vi.mock('@/services/push.service', () => ({
@@ -73,6 +78,21 @@ describe('SRService Extended Branches', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     srService = new SRService();
+
+    // Set default mock values for all tests
+    vi.mocked(prisma.client.findUnique).mockResolvedValue({
+      id: 'c1',
+      name: 'Client 1',
+      isActive: true,
+    } as any);
+    vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+      id: 'sc-1',
+      categoryName: 'C1',
+      slaHours: 24,
+    } as any);
+    vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
+    vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
+    vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
   });
 
   describe('updateSR Notifications', () => {
@@ -212,6 +232,12 @@ describe('SRService Extended Branches', () => {
       expect(updateData.dueDate).toBeInstanceOf(Date);
     });
   });
+
+  // Note: createSR branch tests are covered in sr.service.test.ts
+  // The complex transaction mocking required makes them difficult to test here.
+
+  // Note: updateSR client change branch tests are covered in sr.service.test.ts
+  // (see updateSR edge cases tests at lines 599-621)
 
   describe('Direct Prisma Proxy Methods', () => {
     it('proxies correctly', async () => {

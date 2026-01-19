@@ -1,8 +1,8 @@
-import './globals.css';
-
 import type { Metadata } from 'next';
 
 import ClientLayout from '@/components/providers/ClientLayout';
+
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'SR Management System',

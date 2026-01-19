@@ -15,17 +15,17 @@ export const ALLOWED_FILE_TYPES = {
   'application/msword': { ext: ['.doc'], maxSize: 20 * 1024 * 1024 }, // 20MB
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
     ext: ['.docx'],
-    maxSize: 20 * 1024 * 1024
+    maxSize: 20 * 1024 * 1024,
   }, // 20MB
   'application/vnd.ms-excel': { ext: ['.xls'], maxSize: 20 * 1024 * 1024 }, // 20MB
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
     ext: ['.xlsx'],
-    maxSize: 20 * 1024 * 1024
+    maxSize: 20 * 1024 * 1024,
   }, // 20MB
   'application/vnd.ms-powerpoint': { ext: ['.ppt'], maxSize: 50 * 1024 * 1024 }, // 50MB
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': {
     ext: ['.pptx'],
-    maxSize: 50 * 1024 * 1024
+    maxSize: 50 * 1024 * 1024,
   }, // 50MB
 
   // 텍스트
@@ -42,8 +42,24 @@ export const ALLOWED_FILE_TYPES = {
  * 금지된 파일 확장자 목록 (실행 파일, 스크립트 등)
  */
 const DANGEROUS_EXTENSIONS = [
-  '.exe', '.bat', '.cmd', '.com', '.pif', '.scr', '.vbs', '.js', '.jar',
-  '.msi', '.app', '.deb', '.rpm', '.dmg', '.pkg', '.sh', '.bash', '.ps1',
+  '.exe',
+  '.bat',
+  '.cmd',
+  '.com',
+  '.pif',
+  '.scr',
+  '.vbs',
+  '.js',
+  '.jar',
+  '.msi',
+  '.app',
+  '.deb',
+  '.rpm',
+  '.dmg',
+  '.pkg',
+  '.sh',
+  '.bash',
+  '.ps1',
 ];
 
 /**
@@ -102,10 +118,7 @@ export function validateFileExtension(fileName: string): void {
  * @returns 검증된 MIME 타입
  * @throws {FileValidationError} MIME 타입 불일치 또는 허용되지 않은 타입
  */
-export async function validateFileContent(
-  buffer: ArrayBuffer,
-  fileName: string
-): Promise<string> {
+export async function validateFileContent(buffer: ArrayBuffer, fileName: string): Promise<string> {
   const uint8Array = new Uint8Array(buffer);
 
   // file-type 라이브러리로 실제 파일 타입 감지
@@ -119,10 +132,7 @@ export async function validateFileContent(
       return ext === '.txt' ? 'text/plain' : 'text/csv';
     }
 
-    throw new FileValidationError(
-      '파일 형식을 인식할 수 없습니다.',
-      'INVALID_TYPE'
-    );
+    throw new FileValidationError('파일 형식을 인식할 수 없습니다.', 'INVALID_TYPE');
   }
 
   // 허용된 MIME 타입인지 확인

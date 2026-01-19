@@ -31,34 +31,36 @@ async function main() {
         some: {
           role: {
             name: {
-              in: SYSTEM_ROLES
-            }
-          }
-        }
-      }
+              in: SYSTEM_ROLES,
+            },
+          },
+        },
+      },
     },
     include: {
       roles: {
         include: {
-          role: true
-        }
+          role: true,
+        },
       },
       clients: {
         include: {
-          client: true
-        }
-      }
-    }
+          client: true,
+        },
+      },
+    },
   });
 
   console.log(`   ✓ 총 ${systemTeamUsers.length}명의 시스템 운영팀 사용자 발견`);
   console.log();
 
   // 2. 고객사가 할당된 시스템 운영팀 사용자 필터링
-  const usersWithClients = systemTeamUsers.filter(user => user.clients.length > 0);
+  const usersWithClients = systemTeamUsers.filter((user) => user.clients.length > 0);
 
   if (usersWithClients.length === 0) {
-    console.log('✅ 정리가 필요한 데이터가 없습니다. 모든 시스템 운영팀 사용자는 고객사가 할당되지 않았습니다.');
+    console.log(
+      '✅ 정리가 필요한 데이터가 없습니다. 모든 시스템 운영팀 사용자는 고객사가 할당되지 않았습니다.'
+    );
     console.log();
     return;
   }
@@ -70,8 +72,8 @@ async function main() {
   let totalUserClientRelations = 0;
 
   for (const user of usersWithClients) {
-    const userRoles = user.roles.map(ur => ur.role.name).join(', ');
-    const clientNames = user.clients.map(uc => uc.client.name).join(', ');
+    const userRoles = user.roles.map((ur) => ur.role.name).join(', ');
+    const clientNames = user.clients.map((uc) => uc.client.name).join(', ');
     totalUserClientRelations += user.clients.length;
 
     console.log(`   📋 사용자: ${user.name} (${user.email})`);
@@ -92,16 +94,16 @@ async function main() {
   } else {
     console.log('4️⃣  UserClient 관계 삭제 중...');
 
-    const userClientIdsToDelete = usersWithClients.flatMap(user =>
-      user.clients.map(uc => uc.id)
+    const userClientIdsToDelete = usersWithClients.flatMap((user) =>
+      user.clients.map((uc) => uc.id)
     );
 
     const deleteResult = await prisma.userClient.deleteMany({
       where: {
         id: {
-          in: userClientIdsToDelete
-        }
-      }
+          in: userClientIdsToDelete,
+        },
+      },
     });
 
     console.log(`   ✓ ${deleteResult.count}개의 UserClient 관계가 삭제되었습니다.`);

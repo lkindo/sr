@@ -1,7 +1,7 @@
 'use server';
 
-import type { SR } from '@prisma/client';
 import { revalidatePath } from 'next/cache';
+import type { SR } from '@prisma/client';
 
 import {
   authenticateAndAuthorize,
