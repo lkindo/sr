@@ -1,20 +1,6 @@
 import { Prisma, SR, SRStatus } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
-<<<<<<< HEAD
-import { pushService } from '@/services/push.service';
-import { emailService } from '@/services/email.service';
-import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
-import { AuthenticatedUser } from '@/types/session';
-import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from '@/lib/policies';
-import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from '@/types/sr.types';
-import prisma from '@/lib/prisma';
-import { NotFoundError } from '@/lib/errors';
-import { backgroundTask } from '@/lib/wait-until';
-import { getSRUrl } from '@/lib/app-url';
-import { logger } from '@/lib/logger';
-import { validateTransition, getRequiredFields } from '@/lib/sr-state-machine';
-=======
 
 import { getSRUrl } from '@/lib/app-url';
 import { NotFoundError } from '@/lib/errors';
@@ -28,7 +14,6 @@ import { emailService } from '@/services/email.service';
 import { pushService } from '@/services/push.service';
 import { AuthenticatedUser } from '@/types/session';
 import { SRCreateResult, SRDetails, SRListItem, SRUpdateResult } from '@/types/sr.types';
->>>>>>> dev
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;

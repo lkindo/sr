@@ -21,7 +21,7 @@ type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
  * - 고객사 담당자(Handler) 관리
  */
 export class ClientService {
-  constructor(private userService: UserService = new UserService()) { }
+  constructor(private userService: UserService = new UserService()) {}
 
   /**
    * 고객사 ID로 조회
@@ -190,7 +190,7 @@ export class ClientService {
 
       throw new ReferentialIntegrityError(
         `고객사를 삭제할 수 없습니다. 다음 관련 데이터가 존재합니다: ${errorMessages.join(', ')}. ` +
-        `먼저 관련 데이터를 삭제하거나 고객사를 비활성화하세요.`
+          `먼저 관련 데이터를 삭제하거나 고객사를 비활성화하세요.`
       );
     }
 

@@ -9,11 +9,8 @@ import {
   getSRAction,
   getSRActivitiesAction,
   getSRCommentsAction,
-<<<<<<< HEAD
-=======
   getSRDetailsAction,
   updateSRAction,
->>>>>>> dev
 } from '../sr.actions';
 
 // Mock dependencies
