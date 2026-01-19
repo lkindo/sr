@@ -1,20 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock Redis with controllable behavior
-const mockGet = vi.fn();
-const mockSet = vi.fn();
-
-vi.mock('@upstash/redis', () => {
-  return {
-    Redis: vi.fn().mockImplementation(function () {
-      return {
-        get: mockGet,
-        set: mockSet,
-      };
-    }),
-  };
-});
-
 // Mock Next.js cache
 vi.mock('next/cache', () => ({
   unstable_cache: vi.fn((fn) => fn),
@@ -33,120 +18,57 @@ vi.mock('@/lib/prisma', () => ({
 describe('Cache Utility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGet.mockReset();
-    mockSet.mockReset();
   });
 
-  describe('Upstash Redis Cache Functions', () => {
-    it('returns null for cacheGet when redis is not configured', async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
+  describe('Cache Functions (No Redis)', () => {
+    it('isCacheAvailable returns false', async () => {
+      const { isCacheAvailable } = await import('../cache');
+      expect(isCacheAvailable()).toBe(false);
+    });
+
+    it('cacheGet always returns null', async () => {
       const { cacheGet } = await import('../cache');
       const result = await cacheGet('test');
       expect(result).toBeNull();
     });
 
-    it('isCacheAvailable returns false when redis is not configured', async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
-      const { isCacheAvailable } = await import('../cache');
-      expect(isCacheAvailable()).toBe(false);
-    });
-
-    it('isCacheAvailable returns true when redis is configured', async () => {
-      vi.resetModules();
-      process.env.UPSTASH_REDIS_REST_URL = 'https://fake-redis.upstash.io';
-      process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
-      // Trigger reassignment of redis client if needed, or re-import
-      const { isCacheAvailable } = await import('../cache');
-      // Assuming the module creates redis client on load if env vars are present
-      expect(isCacheAvailable()).toBe(true);
-    });
-
-    describe('When Redis is configured', () => {
-      beforeEach(async () => {
-        vi.resetModules();
-        process.env.UPSTASH_REDIS_REST_URL = 'https://fake-redis.upstash.io';
-        process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
-      });
-
-      it('cacheGet returns value on hit', async () => {
-        mockGet.mockResolvedValue('cached-value');
-        const { cacheGet } = await import('../cache');
-        const result = await cacheGet('key');
-        expect(result).toBe('cached-value');
-        expect(mockGet).toHaveBeenCalled();
-      });
-
-      it('cacheGet returns null on miss', async () => {
-        mockGet.mockResolvedValue(null);
-        const { cacheGet } = await import('../cache');
-        const result = await cacheGet('key');
-        expect(result).toBeNull();
-      });
-
-      it('cacheSet calls redis.set with options', async () => {
-        const { cacheSet } = await import('../cache');
-        await cacheSet('key', 'value', { ttlSeconds: 60 });
-        expect(mockSet).toHaveBeenCalledWith(
-          expect.stringContaining('key'),
-          'value',
-          expect.objectContaining({ ex: 60 })
-        );
-      });
-
-      it('withCache returns cached value if hit', async () => {
-        mockGet.mockResolvedValue('cached-data');
-        const compute = vi.fn();
-        const { withCache } = await import('../cache');
-
-        const result = await withCache('key', compute);
-
-        expect(result).toBe('cached-data');
-        expect(compute).not.toHaveBeenCalled();
-      });
-
-      it('withCache computes and sets value if miss', async () => {
-        mockGet.mockResolvedValue(null);
-        const compute = vi.fn().mockResolvedValue('computed-data');
-        const { withCache } = await import('../cache');
-
-        const result = await withCache('key', compute);
-
-        expect(result).toBe('computed-data');
-        expect(compute).toHaveBeenCalled();
-        expect(mockSet).toHaveBeenCalled();
-      });
-    });
-
-    it('getCacheMetrics returns metrics object', async () => {
-      const { getCacheMetrics } = await import('../cache');
-      const metrics = getCacheMetrics();
-      expect(metrics).toHaveProperty('hit');
-    });
-
-    it('withCache calls compute function when no redis', async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
+    it('withCache calls compute function immediately', async () => {
       const { withCache } = await import('../cache');
-      const compute = vi.fn().mockResolvedValue({ data: 'computed' });
-      const result = await withCache('test-key', compute);
+      const compute = vi.fn().mockResolvedValue('computed-data');
+
+      const result = await withCache('key', compute);
+
+      expect(result).toBe('computed-data');
       expect(compute).toHaveBeenCalled();
-      expect(result).toEqual({ data: 'computed' });
     });
 
-    it('cacheSet does nothing when redis is not configured', async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
+    it('withCache does not cache result (subsequent calls trigger compute)', async () => {
+      const { withCache } = await import('../cache');
+      const compute = vi.fn().mockResolvedValue('computed-data');
+
+      await withCache('key', compute);
+      await withCache('key', compute);
+
+      expect(compute).toHaveBeenCalledTimes(2);
+    });
+
+    it('cacheSet resolves successfully (no-op)', async () => {
       const { cacheSet } = await import('../cache');
       await expect(cacheSet('test', 'val')).resolves.toBeUndefined();
     });
 
-    it('cacheSet with TTL does nothing when redis is not configured', async () => {
-      vi.resetModules();
-      delete process.env.UPSTASH_REDIS_REST_URL;
-      const { cacheSet } = await import('../cache');
-      await expect(cacheSet('test', 'val', { ttlSeconds: 60 })).resolves.toBeUndefined();
+    it('getCacheMetrics returns metrics object with updated counts', async () => {
+      const { getCacheMetrics, cacheGet, cacheSet } = await import('../cache');
+
+      // Reset logic not available in module, but we can check it increments
+      const initialMetrics = getCacheMetrics();
+
+      await cacheGet('test'); // miss++
+      await cacheSet('test', 'value'); // set++
+
+      const newMetrics = getCacheMetrics();
+      expect(newMetrics.miss).toBeGreaterThan(initialMetrics.miss);
+      expect(newMetrics.set).toBeGreaterThan(initialMetrics.set);
     });
   });
 
