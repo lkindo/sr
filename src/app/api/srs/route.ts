@@ -10,7 +10,6 @@ import {
   srListPatternForClient,
   srListPatternForPriority,
 } from '@/lib/cache-keys';
-import { sendSRCreatedEmail } from '@/lib/email';
 import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
 import prisma from '@/lib/prisma';
@@ -89,53 +88,6 @@ export const POST = withAuthAndRateLimit(
     const sr = await srService.createSR(body, session.user);
 
     // Send email notification to MANAGER role users (non-blocking)
-    if (process.env.RESEND_API_KEY) {
-      // MANAGER 역할을 가진 활성 사용자들 조회
-      prisma.user
-        .findMany({
-          where: {
-            isActive: true,
-            roles: {
-              some: {
-                role: {
-                  name: 'MANAGER',
-                },
-              },
-            },
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        })
-        .then((managers) => {
-          // 각 MANAGER에게 메일 발송
-          managers.forEach((manager) => {
-            if (manager.email) {
-              sendSRCreatedEmail({
-                to: manager.email,
-                srId: sr.id,
-                srNumber: sr.srNumber,
-                title: sr.title,
-                description: sr.description,
-                priority: sr.priority || sr.requestedPriority || 'MEDIUM',
-                clientName: sr.client?.name || '',
-                requesterName: sr.requester?.name || '',
-                requesterEmail: sr.requester?.email || '',
-              }).catch((error) => {
-                console.error(
-                  `Failed to send SR created email to manager ${manager.email}:`,
-                  error
-                );
-              });
-            }
-          });
-        })
-        .catch((error) => {
-          console.error('Failed to fetch MANAGER users:', error);
-        });
-    }
 
     // 캐시 무효화: 목록/대시보드 관련 키
     try {

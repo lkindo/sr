@@ -9,7 +9,6 @@ import {
   SR_LIST_PREFIX,
   srDetailKey,
 } from '@/lib/cache-keys';
-import { sendSRAssignedEmail } from '@/lib/email';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
@@ -207,70 +206,6 @@ export const POST = withAuthAndRateLimit(
         },
       },
     });
-
-    // 9. 담당자에게 메일 발송 (non-blocking)
-    if (!process.env.RESEND_API_KEY) {
-      logger.warn('[SR Intake] RESEND_API_KEY 미설정', {
-        custom_email: updatedSR.assignee?.email || '이메일 없음',
-      });
-    } else if (!updatedSR.assignee?.email) {
-      logger.warn('[SR Intake] 담당자 이메일 없음', {
-        custom_name: updatedSR.assignee?.name || '이름 없음',
-      });
-    } else {
-      const priorityLabels: Record<string, string> = {
-        CRITICAL: '긴급',
-        HIGH: '높음',
-        MEDIUM: '보통',
-        LOW: '낮음',
-      };
-
-      logger.info('[SR Intake] 담당자에게 SR 배정 메일 발송 시도', {
-        srId: id,
-        custom_srNumber: updatedSR.srNumber,
-        custom_email: updatedSR.assignee?.email,
-      });
-
-      if (!updatedSR.assignee) {
-        logger.warn('[SR Intake] 담당자 없음', { custom_srNumber: updatedSR.srNumber });
-        return NextResponse.json({
-          success: true,
-          sr: updatedSR,
-          message: 'SR 접수가 완료되었습니다.',
-        });
-      }
-
-      sendSRAssignedEmail({
-        to: updatedSR.assignee.email,
-        srId: updatedSR.id,
-        srNumber: updatedSR.srNumber,
-        title: updatedSR.title,
-        description: updatedSR.description || '',
-        priority: priorityLabels[validated.actualPriority] || validated.actualPriority,
-        clientName: updatedSR.client?.name || '',
-        assignedToName: updatedSR.assignee.name,
-        assignedByName: updatedSR.intakeBy?.name || session.user.name || '시스템',
-      })
-        .then((result) => {
-          if (result) {
-            logger.info('[SR Intake] SR 배정 메일 발송 성공', {
-              custom_srNumber: updatedSR.srNumber,
-              custom_email: updatedSR.assignee?.email,
-            });
-          } else {
-            logger.warn('[SR Intake] SR 배정 메일 발송 실패 (null 반환)', {
-              custom_srNumber: updatedSR.srNumber,
-              custom_email: updatedSR.assignee?.email,
-            });
-          }
-        })
-        .catch((error) => {
-          logger.error('[SR Intake] SR 배정 메일 발송 실패', error, {
-            custom_srNumber: updatedSR.srNumber,
-            custom_email: updatedSR.assignee?.email,
-          });
-        });
-    }
 
     return NextResponse.json(
       {
@@ -631,61 +566,6 @@ export const PATCH = withAuthAndRateLimit(
       });
 
       // 새 담당자에게만 메일 발송 (담당자가 배정된 경우만)
-      if (validated.assigneeId && newAssignee) {
-        if (!process.env.RESEND_API_KEY) {
-          logger.warn('[SR Intake Update] RESEND_API_KEY 미설정', {
-            custom_email: newAssignee.email || '이메일 없음',
-          });
-        } else if (!newAssignee.email) {
-          logger.warn('[SR Intake Update] 담당자 이메일 없음', {
-            custom_name: newAssignee.name || '이름 없음',
-          });
-        } else {
-          const priorityLabels: Record<string, string> = {
-            CRITICAL: '긴급',
-            HIGH: '높음',
-            MEDIUM: '보통',
-            LOW: '낮음',
-          };
-
-          logger.info('[SR Intake Update] 담당자에게 SR 배정 메일 발송 시도', {
-            srId: id,
-            custom_srNumber: updatedSR.srNumber,
-            custom_email: newAssignee.email,
-          });
-
-          sendSRAssignedEmail({
-            to: newAssignee.email,
-            srId: updatedSR.id,
-            srNumber: updatedSR.srNumber,
-            title: updatedSR.title,
-            description: updatedSR.description || '',
-            priority: priorityLabels[updatedSR.actualPriority || 'MEDIUM'] || '보통',
-            clientName: updatedSR.client?.name || '',
-            assignedToName: newAssignee.name,
-            assignedByName: session.user.name || session.user.email || '시스템',
-          })
-            .then((result) => {
-              if (result) {
-                logger.info('[SR Intake Update] SR 배정 메일 발송 성공', {
-                  custom_srNumber: updatedSR.srNumber,
-                  custom_email: newAssignee.email,
-                });
-              } else {
-                logger.warn('[SR Intake Update] SR 배정 메일 발송 실패 (null 반환)', {
-                  custom_srNumber: updatedSR.srNumber,
-                  custom_email: newAssignee.email,
-                });
-              }
-            })
-            .catch((error) => {
-              logger.error('[SR Intake Update] SR 배정 메일 발송 실패', error, {
-                custom_srNumber: updatedSR.srNumber,
-                custom_email: newAssignee.email,
-              });
-            });
-        }
-      }
     }
 
     return NextResponse.json(

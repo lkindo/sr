@@ -1,54 +1,36 @@
-import { Redis } from '@upstash/redis';
+import { unstable_cache as cache } from 'next/cache';
+import type { Prisma } from '@prisma/client';
 
 import { logger } from '@/lib/logger';
+import prisma from '@/lib/prisma';
 
 type CacheOptions = {
   ttlSeconds?: number;
   namespace?: string;
 };
 
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Redis 제거로 인해 항상 null (No-op)
+const redis: null = null;
 
-let redis: Redis | null = null;
 const metrics = {
   hit: 0,
   miss: 0,
   set: 0,
   invalidate: 0,
 };
-if (redisUrl && redisToken) {
-  redis = new Redis({
-    url: redisUrl,
-    token: redisToken,
-  });
-}
 
 function buildKey(key: string, namespace?: string) {
   return namespace ? `${namespace}:${key}` : key;
 }
 
 export async function cacheGet<T>(key: string, options?: CacheOptions): Promise<T | null> {
-  if (!redis) return null;
-  const k = buildKey(key, options?.namespace);
-  const v = await redis.get<T>(k);
-  if (v === null) {
-    metrics.miss++;
-    return null;
-  }
-  metrics.hit++;
-  return v;
+  // 항상 Cache Miss
+  metrics.miss++;
+  return null;
 }
 
 export async function cacheSet<T>(key: string, value: T, options?: CacheOptions): Promise<void> {
-  if (!redis) return;
-  const k = buildKey(key, options?.namespace);
-  const ttl = options?.ttlSeconds;
-  if (ttl && ttl > 0) {
-    await redis.set(k, value, { ex: ttl });
-  } else {
-    await redis.set(k, value);
-  }
+  // No-op
   metrics.set++;
 }
 
@@ -57,59 +39,20 @@ export async function withCache<T>(
   compute: () => Promise<T>,
   options?: CacheOptions
 ): Promise<T> {
-  const hit = await cacheGet<T>(key, options);
-  if (hit !== null) return hit;
+  // 항상 compute 실행 (Caching Disabled)
   const value = await compute();
-  await cacheSet(key, value, options);
   return value;
 }
 
 export function isCacheAvailable(): boolean {
-  return !!redis;
+  return false;
 }
 
 export function getCacheMetrics() {
   return { ...metrics };
 }
 
-// Development-only periodic metrics logger
-// Disabled in test environment to prevent unhandled timer errors
-if (process.env.NODE_ENV === 'development' && process.env.VITEST !== 'true') {
-  const intervalMs = Number(process.env.CACHE_METRICS_LOG_INTERVAL_MS ?? 60000);
-
-  // Avoid multiple intervals in hot-reload by using globalThis flag
-  interface GlobalWithCacheMetricsLogger {
-    __sr_cache_metrics_logger_started__?: boolean;
-  }
-  const g = globalThis as GlobalWithCacheMetricsLogger & typeof globalThis;
-  if (!g.__sr_cache_metrics_logger_started__) {
-    try {
-      setInterval(
-        () => {
-          try {
-            const m = getCacheMetrics();
-            logger.info(
-              `[Cache][Metrics] hit=${m.hit} miss=${m.miss} set=${m.set} invalidate=${m.invalidate}`
-            );
-          } catch {
-            /* ignore */
-          }
-        },
-        Math.max(5000, intervalMs)
-      );
-      g.__sr_cache_metrics_logger_started__ = true;
-    } catch {
-      /* ignore */
-    }
-  }
-}
-
-import { unstable_cache as cache } from 'next/cache';
-import type { Prisma } from '@prisma/client';
-
-import prisma from '@/lib/prisma';
-
-// SR 목록 캐싱
+// SR 목록 캐싱 (Next.js unstable_cache 사용 - 이는 유지됨)
 export const getCachedSRs = cache(
   async (params: {
     where?: Prisma.SRWhereInput;

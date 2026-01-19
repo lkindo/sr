@@ -57,3 +57,7 @@ nul
 
 *storybook.log
 storybook-static
+
+# Local uploads
+public/uploads/*
+!public/uploads/.gitkeep

@@ -1,11 +1,14 @@
-import { del, list, put } from '@vercel/blob';
+import fs from 'fs';
+import path from 'path';
 
 import { logger } from '@/lib/logger';
 
-const READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+// 업로드 디렉토리 설정 (프로젝트 루트의 pubic/uploads)
+const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads');
 
-if (!READ_WRITE_TOKEN) {
-  logger.warn('[storage] BLOB_READ_WRITE_TOKEN is not set. Blob operations will fail at runtime.');
+// 디렉토리 존재 여부 확인 및 생성
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 export interface UploadResult {
@@ -19,17 +22,30 @@ export interface UploadResult {
 export async function uploadAttachmentBlob(srId: string, file: File): Promise<UploadResult> {
   const safeName = file.name.replace(/\s+/g, '-');
   const timestamp = Date.now();
-  const pathname = `attachments/${srId}/${timestamp}-${safeName}`;
 
-  const blob = await put(pathname, file, {
-    access: 'public',
-    token: READ_WRITE_TOKEN,
-  });
+  // SR ID별로 하위 디렉토리 생성
+  const srDir = path.join(UPLOAD_DIR, 'attachments', srId);
+  if (!fs.existsSync(srDir)) {
+    fs.mkdirSync(srDir, { recursive: true });
+  }
+
+  const filename = `${timestamp}-${safeName}`;
+  const filepath = path.join(srDir, filename);
+
+  // File 객체를 Buffer로 변환하여 저장
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+
+  await fs.promises.writeFile(filepath, buffer);
+
+  // URL 생성 (public 폴더 기준)
+  const pathname = `attachments/${srId}/${filename}`; // DB 저장용 경로
+  const url = `/uploads/${pathname}`; // 웹 접근용 URL
 
   return {
-    url: blob.url,
-    pathname: blob.pathname,
-    downloadUrl: blob.downloadUrl ?? blob.url,
+    url: url,
+    pathname: pathname,
+    downloadUrl: url,
     size: file.size,
     type: file.type,
   };
@@ -38,18 +54,36 @@ export async function uploadAttachmentBlob(srId: string, file: File): Promise<Up
 export async function deleteAttachmentBlob(pathname: string) {
   if (!pathname) return;
 
-  await del(pathname, {
-    token: READ_WRITE_TOKEN,
-  });
+  try {
+    // pathname이 "attachments/..."로 시작한다고 가정
+    // 실제 파일 경로는 public/uploads/ + pathname
+    const filepath = path.join(UPLOAD_DIR, pathname);
+
+    // 경로 탐색(Directory Traversal) 방지
+    const resolvedPath = path.resolve(filepath);
+    if (!resolvedPath.startsWith(path.resolve(UPLOAD_DIR))) {
+      logger.warn(`[storage] Attempted path traversal attack: ${pathname}`);
+      return;
+    }
+
+    if (fs.existsSync(filepath)) {
+      await fs.promises.unlink(filepath);
+    }
+  } catch (error: unknown) {
+    logger.error(
+      `[storage] Failed to delete file: ${pathname}`,
+      error instanceof Error ? error : undefined
+    );
+  }
 }
 
 export async function listAttachmentBlobs(
   prefix: string
-): Promise<Awaited<ReturnType<typeof list>> | null> {
-  if (!prefix) return null;
-
-  return list({
-    prefix,
-    token: READ_WRITE_TOKEN,
-  });
+): Promise<{ blobs: { url: string; pathname: string; size: number; uploadedAt: Date }[] } | null> {
+  // 로컬 파일 시스템 리스트 구현은 복잡하고 현재 요구사항에서 필수적이지 않을 수 있어
+  // 간단히 null 반환하거나 필요한 경우 구현.
+  // 기존 Vercel Blob list 반환 타입과 맞추기 위해 간단한 스터브 제공.
+  // 실제 로직이 필요하다면 재귀적 디렉토리 탐색이 필요함.
+  logger.warn('[storage] listAttachmentBlobs is not fully implemented for local storage.');
+  return { blobs: [] };
 }
