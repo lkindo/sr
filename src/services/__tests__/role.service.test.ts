@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { RoleService } from '../role.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+
+import { RoleService } from '../role.service';
 
 vi.mock('@/lib/prisma', () => ({
   default: {

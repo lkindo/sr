@@ -1,21 +1,17 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Save, Lock, User as UserIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/hooks/use-toast";
+import { Lock, Save, User as UserIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 interface Role {
   role: {
@@ -50,40 +46,40 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [name, setName] = useState("");
-  const [image, setImage] = useState("");
+  const [name, setName] = useState('');
+  const [image, setImage] = useState('');
 
   // 비밀번호 변경
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/profile");
+      const response = await fetch('/api/profile');
       if (!response.ok) {
-        console.error("Profile fetch failed:", response.status);
-        throw new Error("Failed to fetch profile");
+        console.error('Profile fetch failed:', response.status);
+        throw new Error('Failed to fetch profile');
       }
       const data = await response.json();
       setProfile(data);
       setName(data.name);
-      setImage(data.image || "");
+      setImage(data.image || '');
       setError(null);
     } catch (err) {
-      console.error("Profile error:", err);
-      const errorMessage = "프로필 정보를 불러오는데 실패했습니다.";
+      console.error('Profile error:', err);
+      const errorMessage = '프로필 정보를 불러오는데 실패했습니다.';
       setError(errorMessage);
       setProfile(null);
 
       // Toast 알림도 표시
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -97,29 +93,30 @@ export default function ProfilePage() {
   const handleUpdateProfile = async () => {
     setSaving(true);
     try {
-      const response = await fetch("/api/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, image }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to update profile");
+        throw new Error(error.error || 'Failed to update profile');
       }
 
       toast({
-        title: "성공",
-        description: "프로필이 업데이트되었습니다.",
+        title: '성공',
+        description: '프로필이 업데이트되었습니다.',
       });
 
       fetchProfile();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "프로필 업데이트에 실패했습니다.";
+      const errorMessage =
+        error instanceof Error ? error.message : '프로필 업데이트에 실패했습니다.';
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setSaving(false);
@@ -129,18 +126,18 @@ export default function ProfilePage() {
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
       toast({
-        title: "오류",
-        description: "새 비밀번호가 일치하지 않습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '새 비밀번호가 일치하지 않습니다.',
+        variant: 'destructive',
       });
       return;
     }
 
     setChangingPassword(true);
     try {
-      const response = await fetch("/api/profile/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/profile/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           currentPassword,
           newPassword,
@@ -150,24 +147,24 @@ export default function ProfilePage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Failed to change password");
+        throw new Error(error.error || 'Failed to change password');
       }
 
       toast({
-        title: "성공",
-        description: "비밀번호가 변경되었습니다.",
+        title: '성공',
+        description: '비밀번호가 변경되었습니다.',
       });
 
       // 비밀번호 필드 초기화
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "비밀번호 변경에 실패했습니다.";
+      const errorMessage = error instanceof Error ? error.message : '비밀번호 변경에 실패했습니다.';
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setChangingPassword(false);
@@ -192,7 +189,7 @@ export default function ProfilePage() {
           <div className="text-destructive">
             <h2 className="text-2xl font-bold mb-2">프로필 로드 실패</h2>
             <p className="text-muted-foreground mb-4">
-              {error || "프로필 정보를 불러올 수 없습니다."}
+              {error || '프로필 정보를 불러올 수 없습니다.'}
             </p>
           </div>
           <Button
@@ -206,19 +203,18 @@ export default function ProfilePage() {
     );
   }
 
-  const initials = profile.name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase() || profile.email[0].toUpperCase();
+  const initials =
+    profile.name
+      ?.split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase() || profile.email[0].toUpperCase();
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">프로필</h1>
-        <p className="text-muted-foreground">
-          개인 정보를 관리합니다.
-        </p>
+        <p className="text-muted-foreground">개인 정보를 관리합니다.</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -237,8 +233,8 @@ export default function ProfilePage() {
                 <p className="text-lg font-semibold">{profile.name}</p>
                 <p className="text-sm text-muted-foreground">{profile.email}</p>
               </div>
-              <Badge variant={profile.isActive ? "default" : "secondary"}>
-                {profile.isActive ? "활성" : "비활성"}
+              <Badge variant={profile.isActive ? 'default' : 'secondary'}>
+                {profile.isActive ? '활성' : '비활성'}
               </Badge>
             </div>
 
@@ -259,7 +255,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {profile.clients.length > 0 && !profile.roles.some(r => r.role.name === "ADMIN") && (
+            {profile.clients.length > 0 && !profile.roles.some((r) => r.role.name === 'ADMIN') && (
               <>
                 <Separator />
                 <div>
@@ -281,7 +277,7 @@ export default function ProfilePage() {
             <Separator />
 
             <div className="text-xs text-muted-foreground">
-              <p>가입일: {new Date(profile.createdAt).toLocaleDateString("ko-KR")}</p>
+              <p>가입일: {new Date(profile.createdAt).toLocaleDateString('ko-KR')}</p>
             </div>
           </CardContent>
         </Card>
@@ -322,15 +318,8 @@ export default function ProfilePage() {
 
                   <div className="space-y-2">
                     <Label htmlFor="email">이메일</Label>
-                    <Input
-                      id="email"
-                      value={profile.email}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      이메일은 변경할 수 없습니다.
-                    </p>
+                    <Input id="email" value={profile.email} disabled className="bg-muted" />
+                    <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
                   </div>
 
                   <div className="space-y-2">
@@ -349,7 +338,7 @@ export default function ProfilePage() {
                   <div className="flex justify-end pt-4">
                     <Button onClick={handleUpdateProfile} disabled={saving}>
                       <Save className="mr-2 h-4 w-4" />
-                      {saving ? "저장 중..." : "저장"}
+                      {saving ? '저장 중...' : '저장'}
                     </Button>
                   </div>
                 </div>
@@ -401,14 +390,11 @@ export default function ProfilePage() {
                     <Button
                       onClick={handleChangePassword}
                       disabled={
-                        changingPassword ||
-                        !currentPassword ||
-                        !newPassword ||
-                        !confirmPassword
+                        changingPassword || !currentPassword || !newPassword || !confirmPassword
                       }
                     >
                       <Lock className="mr-2 h-4 w-4" />
-                      {changingPassword ? "변경 중..." : "비밀번호 변경"}
+                      {changingPassword ? '변경 중...' : '비밀번호 변경'}
                     </Button>
                   </div>
                 </div>

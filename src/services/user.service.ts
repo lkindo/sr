@@ -1,11 +1,13 @@
-import { PermissionService } from "./permission.service";
-import { invalidateCachePattern } from "@/lib/redis-cache";
-import { hash, compare } from "bcryptjs";
-import { userUpdateSchema } from "@/lib/schemas";
-import { z } from "zod";
-import { NotFoundError, ValidationError, BusinessRuleError } from "@/lib/errors";
-import prisma from "@/lib/prisma";
-import type { User, Prisma } from "@prisma/client";
+import type { Prisma, User } from '@prisma/client';
+import { compare, hash } from 'bcryptjs';
+import { z } from 'zod';
+
+import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
+import prisma from '@/lib/prisma';
+import { invalidateCachePattern } from '@/lib/redis-cache';
+import { userUpdateSchema } from '@/lib/schemas';
+
+import { PermissionService } from './permission.service';
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
 
@@ -25,13 +27,15 @@ type UserUpdateData = z.infer<typeof userUpdateSchema>;
  * ```
  */
 export class UserService {
-  constructor() { }
+  constructor() {}
 
   async getUserById(id: string) {
     return prisma.user.findUnique({
       where: { id },
       include: {
-        roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        roles: {
+          include: { role: { include: { permissions: { include: { permission: true } } } } },
+        },
         clients: { include: { client: true } },
       },
     });
@@ -59,41 +63,48 @@ export class UserService {
     });
   }
 
-  async getAllUsers(filters?: {
-    search?: string;
-    isActive?: string;
-    userType?: string;
-    roleId?: string;
-    role?: string;
-    clientId?: string;
-  }, params?: {
-    skip?: number;
-    take?: number;
-    orderBy?: Prisma.UserOrderByWithRelationInput;
-  }): Promise<{ data: User[]; total: number }> {
+  async getAllUsers(
+    filters?: {
+      search?: string;
+      isActive?: string;
+      userType?: string;
+      roleId?: string;
+      role?: string;
+      clientId?: string;
+    },
+    params?: {
+      skip?: number;
+      take?: number;
+      orderBy?: Prisma.UserOrderByWithRelationInput;
+    }
+  ): Promise<{ data: User[]; total: number }> {
     const where: Prisma.UserWhereInput = {};
 
     if (filters?.search) {
       where.OR = [
-        { name: { contains: filters.search, mode: "insensitive" } },
-        { email: { contains: filters.search, mode: "insensitive" } },
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
-    if (filters?.isActive !== null && filters?.isActive !== undefined && filters.isActive !== "all") {
-      where.isActive = filters.isActive === "true";
+    if (
+      filters?.isActive !== null &&
+      filters?.isActive !== undefined &&
+      filters.isActive !== 'all'
+    ) {
+      where.isActive = filters.isActive === 'true';
     }
 
-    if (filters?.clientId && filters.clientId !== "all") {
-      if (filters.clientId === "unassigned") {
+    if (filters?.clientId && filters.clientId !== 'all') {
+      if (filters.clientId === 'unassigned') {
         where.clients = { none: {} };
       } else {
         where.clients = { some: { clientId: filters.clientId } };
       }
     }
 
-    if (filters?.roleId && filters.roleId !== "all") {
-      if (filters.roleId === "none") {
+    if (filters?.roleId && filters.roleId !== 'all') {
+      if (filters.roleId === 'none') {
         where.roles = { none: {} };
       } else {
         where.roles = { some: { roleId: filters.roleId } };
@@ -101,7 +112,7 @@ export class UserService {
     }
 
     if (filters?.role) {
-      const roleNames = filters.role.split(",");
+      const roleNames = filters.role.split(',');
       where.roles = { some: { role: { name: { in: roleNames } } } };
     }
 
@@ -112,7 +123,7 @@ export class UserService {
         where,
         skip,
         take,
-        orderBy: orderBy || { createdAt: "desc" },
+        orderBy: orderBy || { createdAt: 'desc' },
         include: {
           roles: { include: { role: true } },
           clients: { include: { client: { select: { id: true, name: true, code: true } } } },
@@ -123,10 +134,10 @@ export class UserService {
 
     const usersWithType = users.map((user) => ({
       ...user,
-      userType: user.clients.length > 0 ? ("CLIENT" as const) : ("ENGINEER" as const),
+      userType: user.clients.length > 0 ? ('CLIENT' as const) : ('ENGINEER' as const),
     }));
 
-    if (filters?.userType && filters.userType !== "all") {
+    if (filters?.userType && filters.userType !== 'all') {
       const filtered = usersWithType.filter((user) => user.userType === filters.userType);
       return { data: filtered as any, total };
     }
@@ -145,10 +156,10 @@ export class UserService {
 
     if (clientIds) {
       // 시스템 운영팀 체크
-      const userRoles = await prisma.user.findUnique({
+      const userRoles = (await prisma.user.findUnique({
         where: { id },
-        select: { roles: { include: { role: true } } }
-      }) as { roles: { role: { name: string } }[] } | null;
+        select: { roles: { include: { role: true } } },
+      })) as { roles: { role: { name: string } }[] } | null;
 
       if (userRoles) {
         const isSystemTeam = userRoles.roles.some((ur) =>
@@ -156,7 +167,7 @@ export class UserService {
         );
 
         if (isSystemTeam && clientIds.length > 0) {
-          throw new BusinessRuleError("시스템 운영팀은 고객사를 할당할 수 없습니다.");
+          throw new BusinessRuleError('시스템 운영팀은 고객사를 할당할 수 없습니다.');
         }
       }
 
@@ -181,11 +192,14 @@ export class UserService {
     });
   }
 
-  async updateProfile(userId: string, profileData: {
-    name?: string;
-    email?: string;
-    image?: string;
-  }): Promise<User> {
+  async updateProfile(
+    userId: string,
+    profileData: {
+      name?: string;
+      email?: string;
+      image?: string;
+    }
+  ): Promise<User> {
     return prisma.user.update({
       where: { id: userId },
       data: profileData,
@@ -199,32 +213,32 @@ export class UserService {
     });
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
-    await invalidateCachePattern("user:list*");
+    await invalidateCachePattern('user:list*');
     return user;
   }
 
   async deactivateUser(userId: string): Promise<User> {
     // 1. 진행 중인 SR 확인
-    const prisma = (await import("@/lib/prisma")).default;
+    const prisma = (await import('@/lib/prisma')).default;
     const activeSRs = await prisma.sR.findMany({
       where: {
         assigneeId: userId,
-        status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] }
+        status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
       },
       select: {
         id: true,
         srNumber: true,
         title: true,
-        status: true
-      }
+        status: true,
+      },
     });
 
     // 2. 진행 중인 SR이 있으면 에러 반환
     if (activeSRs.length > 0) {
-      const srList = activeSRs.map(sr => `${sr.srNumber} (${sr.status})`).join(', ');
+      const srList = activeSRs.map((sr) => `${sr.srNumber} (${sr.status})`).join(', ');
       throw new ValidationError(
         `사용자에게 ${activeSRs.length}개의 진행 중인 SR이 할당되어 있습니다. ` +
-        `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
+          `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
       );
     }
 
@@ -236,27 +250,23 @@ export class UserService {
 
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
-    await invalidateCachePattern("user:list*");
+    await invalidateCachePattern('user:list*');
     return user;
   }
 
   async hardDeleteUser(userId: string): Promise<User> {
-    const prisma = (await import("@/lib/prisma")).default;
+    const prisma = (await import('@/lib/prisma')).default;
 
     // 1. 연관 데이터 확인 (SR 관련)
     const relatedDataCount = await prisma.sR.count({
       where: {
-        OR: [
-          { requesterId: userId },
-          { assigneeId: userId },
-          { intakeById: userId },
-        ],
+        OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
       },
     });
 
     if (relatedDataCount > 0) {
       throw new BusinessRuleError(
-        "해당 사용자는 SR 요청 또는 처리 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+        '해당 사용자는 SR 요청 또는 처리 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
 
@@ -267,7 +277,7 @@ export class UserService {
 
     if (activityCount > 0) {
       throw new BusinessRuleError(
-        "해당 사용자는 SR 활동 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+        '해당 사용자는 SR 활동 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
 
@@ -278,7 +288,7 @@ export class UserService {
 
     if (commentCount > 0) {
       throw new BusinessRuleError(
-        "해당 사용자는 SR 댓글 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+        '해당 사용자는 SR 댓글 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
 
@@ -289,7 +299,7 @@ export class UserService {
 
     if (statusHistoryCount > 0) {
       throw new BusinessRuleError(
-        "해당 사용자는 SR 상태 변경 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요."
+        '해당 사용자는 SR 상태 변경 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
 
@@ -298,7 +308,7 @@ export class UserService {
 
     // 캐시 무효화
     await invalidateCachePattern(`user:*:${userId}`);
-    await invalidateCachePattern("user:list*");
+    await invalidateCachePattern('user:list*');
 
     return deletedUser;
   }
@@ -307,7 +317,7 @@ export class UserService {
     email: string;
     name: string;
     password: string;
-    userType?: "ENGINEER" | "CLIENT";
+    userType?: 'ENGINEER' | 'CLIENT';
     clientId?: string;
     clientIds?: string[];
     roleIds?: string[];
@@ -318,7 +328,7 @@ export class UserService {
     const clientIds = userData.clientIds || (userData.clientId ? [userData.clientId] : []);
 
     // 트랜잭션으로 원자적 처리
-    const prisma = (await import("@/lib/prisma")).default;
+    const prisma = (await import('@/lib/prisma')).default;
 
     return await prisma.$transaction(async (tx) => {
       // 1. 사용자 생성
@@ -337,7 +347,7 @@ export class UserService {
 
       if (roleIdsToAssign.length === 0 && userData.userType) {
         // userType 기반 기본 역할 자동 할당
-        const defaultRoleName = userData.userType === "CLIENT" ? "CLIENT_USER" : "ENGINEER";
+        const defaultRoleName = userData.userType === 'CLIENT' ? 'CLIENT_USER' : 'ENGINEER';
         const defaultRole = await tx.role.findFirst({
           where: { name: defaultRoleName },
         });
@@ -389,31 +399,35 @@ export class UserService {
     permissionService: PermissionService = new PermissionService()
   ): Promise<Array<{ id: string; name: string; email: string }>> {
     const requiredPermissions = [
-      "SR:CREATE",
-      "SR:READ",
-      "SR:UPDATE",
-      "SR:DELETE",
-      "SR:ASSIGN",
-      "SR:STATUS_CHANGE",
-      "COMMENT:CREATE",
-      "COMMENT:READ",
-      "COMMENT:UPDATE",
+      'SR:CREATE',
+      'SR:READ',
+      'SR:UPDATE',
+      'SR:DELETE',
+      'SR:ASSIGN',
+      'SR:STATUS_CHANGE',
+      'COMMENT:CREATE',
+      'COMMENT:READ',
+      'COMMENT:UPDATE',
     ];
     return permissionService.getUsersWithPermissions(requiredPermissions);
   }
 
-  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<User> {
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<User> {
     // 사용자 조회
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
-      throw new NotFoundError("사용자", userId);
+      throw new NotFoundError('사용자', userId);
     }
 
     // 현재 비밀번호 확인
     if (user.password) {
       const isPasswordValid = await compare(currentPassword, user.password);
       if (!isPasswordValid) {
-        throw new ValidationError("현재 비밀번호가 일치하지 않습니다.");
+        throw new ValidationError('현재 비밀번호가 일치하지 않습니다.');
       }
     }
 

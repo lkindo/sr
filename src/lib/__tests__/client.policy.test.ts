@@ -1,13 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { Client } from '@prisma/client';
+import { describe, expect, it } from 'vitest';
+
 import {
   canCreateClient,
+  canDeleteClient,
   canReadClient,
   canUpdateClient,
-  canDeleteClient,
   ensureCanCreateClient,
   ensureCanReadClient,
 } from '@/lib/policies';
-import { Client } from '@prisma/client';
 import { AuthenticatedUser } from '@/types/session';
 
 describe('Client Policy Functions', () => {
@@ -139,7 +140,9 @@ describe('Client Policy Functions', () => {
 
     it('should throw ForbiddenError for unauthorized users', () => {
       const otherClient = { ...mockClient, id: 'client-2' };
-      expect(() => ensureCanReadClient(regularUser, otherClient)).toThrow('고객사 조회 권한이 없습니다');
+      expect(() => ensureCanReadClient(regularUser, otherClient)).toThrow(
+        '고객사 조회 권한이 없습니다'
+      );
     });
   });
 });

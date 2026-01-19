@@ -1,12 +1,11 @@
-import { put, del, list } from "@vercel/blob";
-import { logger } from "@/lib/logger";
+import { del, list, put } from '@vercel/blob';
+
+import { logger } from '@/lib/logger';
 
 const READ_WRITE_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
 
 if (!READ_WRITE_TOKEN) {
-  logger.warn(
-    "[storage] BLOB_READ_WRITE_TOKEN is not set. Blob operations will fail at runtime."
-  );
+  logger.warn('[storage] BLOB_READ_WRITE_TOKEN is not set. Blob operations will fail at runtime.');
 }
 
 export interface UploadResult {
@@ -17,16 +16,13 @@ export interface UploadResult {
   type: string;
 }
 
-export async function uploadAttachmentBlob(
-  srId: string,
-  file: File
-): Promise<UploadResult> {
-  const safeName = file.name.replace(/\s+/g, "-");
+export async function uploadAttachmentBlob(srId: string, file: File): Promise<UploadResult> {
+  const safeName = file.name.replace(/\s+/g, '-');
   const timestamp = Date.now();
   const pathname = `attachments/${srId}/${timestamp}-${safeName}`;
 
   const blob = await put(pathname, file, {
-    access: "public",
+    access: 'public',
     token: READ_WRITE_TOKEN,
   });
 
@@ -57,4 +53,3 @@ export async function listAttachmentBlobs(
     token: READ_WRITE_TOKEN,
   });
 }
-

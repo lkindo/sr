@@ -1,6 +1,7 @@
-import { User, Role, Permission } from "@prisma/client";
-import { getCachedData, CacheKeys, invalidateCache } from "@/lib/redis-cache";
-import prisma from "@/lib/prisma";
+import { Permission, Role, User } from '@prisma/client';
+
+import prisma from '@/lib/prisma';
+import { CacheKeys, getCachedData, invalidateCache } from '@/lib/redis-cache';
 
 type UserWithPermissions = User & {
   roles: {
@@ -23,7 +24,7 @@ type UserWithPermissions = User & {
  * 권한 형식: "리소스:액션" (예: "SR:CREATE", "CLIENT:UPDATE")
  */
 export class PermissionService {
-  constructor() { }
+  constructor() {}
 
   /**
    * 사용자 전체 정보 조회 (역할, 권한 포함)
@@ -71,7 +72,7 @@ export class PermissionService {
    */
   async getAllPermissions(): Promise<Permission[]> {
     return getCachedData(
-      CacheKeys.userPermissions("all"),
+      CacheKeys.userPermissions('all'),
       async () => {
         return prisma.permission.findMany();
       },
@@ -112,9 +113,9 @@ export class PermissionService {
       return false;
     }
 
-    const userRoles = user.roles.map(ur => ur.role);
+    const userRoles = user.roles.map((ur) => ur.role);
 
-    if (userRoles.some(role => role.name === 'ADMIN')) {
+    if (userRoles.some((role) => role.name === 'ADMIN')) {
       return true;
     }
 
@@ -147,7 +148,7 @@ export class PermissionService {
     const user = await this.getFullUser(userId);
     if (!user) return false;
 
-    return user.roles.some(ur => ur.role.name === roleName);
+    return user.roles.some((ur) => ur.role.name === roleName);
   }
 
   async getUserPermissions(userId: string): Promise<Permission[]> {
@@ -158,8 +159,8 @@ export class PermissionService {
         if (!user) return [];
 
         const permissionsSet = new Map<string, Permission>();
-        user.roles.forEach(ur => {
-          ur.role.permissions.forEach(rp => {
+        user.roles.forEach((ur) => {
+          ur.role.permissions.forEach((rp) => {
             permissionsSet.set(rp.permission.id, rp.permission);
           });
         });
@@ -177,7 +178,7 @@ export class PermissionService {
         const user = await this.getFullUser(userId);
         if (!user) return [];
 
-        return user.roles.map(ur => ur.role);
+        return user.roles.map((ur) => ur.role);
       },
       600 // 10분 캐시
     );
@@ -186,7 +187,7 @@ export class PermissionService {
   async requirePermission(userId: string, action: string): Promise<void> {
     const hasPermission = await this.checkPermission(userId, action);
     if (!hasPermission) {
-      const { ForbiddenError } = await import("@/lib/errors");
+      const { ForbiddenError } = await import('@/lib/errors');
       throw new ForbiddenError(`권한이 없습니다: ${action}`);
     }
   }
@@ -228,9 +229,7 @@ export class PermissionService {
         });
       });
 
-      return requiredPermissions.every((permission) =>
-        userPermissions.has(permission)
-      );
+      return requiredPermissions.every((permission) => userPermissions.has(permission));
     });
 
     return srHandlers.map((user) => ({

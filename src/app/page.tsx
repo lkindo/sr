@@ -1,12 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import { BarChart3, CheckCircle2, ClipboardList, Loader2, Shield, Users } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -14,15 +13,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import {
-  ClipboardList,
-  Users,
-  BarChart3,
-  Shield,
-  CheckCircle2,
-  Loader2
-} from "lucide-react";
+} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function Home() {
   return (
@@ -52,8 +46,7 @@ export default function Home() {
             효율적인 서비스 요청 관리
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            SR Management System으로 고객사의 모든 서비스 요청을
-            체계적으로 관리하고 추적하세요
+            SR Management System으로 고객사의 모든 서비스 요청을 체계적으로 관리하고 추적하세요
           </p>
           <div className="flex items-center justify-center gap-4 pt-4">
             <a href="#auth">
@@ -78,8 +71,8 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  서비스 요청을 생성, 추적, 관리하고 상태별로 분류하여
-                  효율적으로 처리할 수 있습니다.
+                  서비스 요청을 생성, 추적, 관리하고 상태별로 분류하여 효율적으로 처리할 수
+                  있습니다.
                 </p>
               </CardContent>
             </Card>
@@ -91,8 +84,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  여러 고객사의 정보를 관리하고, 각 고객사별 서비스 요청을
-                  체계적으로 분류합니다.
+                  여러 고객사의 정보를 관리하고, 각 고객사별 서비스 요청을 체계적으로 분류합니다.
                 </p>
               </CardContent>
             </Card>
@@ -104,8 +96,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  SR 현황을 실시간으로 확인하고, 통계와 차트로
-                  한눈에 파악할 수 있습니다.
+                  SR 현황을 실시간으로 확인하고, 통계와 차트로 한눈에 파악할 수 있습니다.
                 </p>
               </CardContent>
             </Card>
@@ -117,8 +108,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  역할 기반 접근 제어(RBAC)로 사용자별 권한을
-                  세밀하게 관리할 수 있습니다.
+                  역할 기반 접근 제어(RBAC)로 사용자별 권한을 세밀하게 관리할 수 있습니다.
                 </p>
               </CardContent>
             </Card>
@@ -130,8 +120,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  모든 SR의 활동 이력과 댓글을 기록하여
-                  투명한 의사소통을 지원합니다.
+                  모든 SR의 활동 이력과 댓글을 기록하여 투명한 의사소통을 지원합니다.
                 </p>
               </CardContent>
             </Card>
@@ -143,8 +132,7 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  SR에 관련 문서와 이미지를 첨부하여
-                  상세한 정보를 공유할 수 있습니다.
+                  SR에 관련 문서와 이미지를 첨부하여 상세한 정보를 공유할 수 있습니다.
                 </p>
               </CardContent>
             </Card>
@@ -172,16 +160,16 @@ export default function Home() {
 
 function LoginCard() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // 컴포넌트 마운트 시 저장된 로그인 정보 불러오기
   useEffect(() => {
-    const savedEmail = localStorage.getItem("sr-remembered-email");
-    const savedPassword = localStorage.getItem("sr-remembered-password");
+    const savedEmail = localStorage.getItem('sr-remembered-email');
+    const savedPassword = localStorage.getItem('sr-remembered-password');
 
     if (savedEmail) {
       setEmail(savedEmail);
@@ -195,33 +183,33 @@ function LoginCard() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError('');
     setIsLoading(true);
 
     try {
-      const result = await signIn("credentials", {
+      const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
       });
 
       if (result?.error) {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       } else {
         // 로그인 성공 시 로그인 정보 저장 또는 삭제
         if (rememberMe) {
-          localStorage.setItem("sr-remembered-email", email);
-          localStorage.setItem("sr-remembered-password", password);
+          localStorage.setItem('sr-remembered-email', email);
+          localStorage.setItem('sr-remembered-password', password);
         } else {
-          localStorage.removeItem("sr-remembered-email");
-          localStorage.removeItem("sr-remembered-password");
+          localStorage.removeItem('sr-remembered-email');
+          localStorage.removeItem('sr-remembered-password');
         }
 
-        router.push("/dashboard");
+        router.push('/dashboard');
         router.refresh();
       }
     } catch {
-      setError("로그인 중 오류가 발생했습니다.");
+      setError('로그인 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -231,16 +219,12 @@ function LoginCard() {
     <Card>
       <CardHeader>
         <CardTitle>로그인</CardTitle>
-        <CardDescription>
-          SR 관리 시스템에 로그인하세요
-        </CardDescription>
+        <CardDescription>SR 관리 시스템에 로그인하세요</CardDescription>
       </CardHeader>
       <form onSubmit={handleLogin}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-              {error}
-            </div>
+            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">{error}</div>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">이메일</Label>
@@ -281,18 +265,14 @@ function LoginCard() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 로그인 중...
               </>
             ) : (
-              "로그인"
+              '로그인'
             )}
           </Button>
 
@@ -309,7 +289,7 @@ function LoginCard() {
             type="button"
             variant="outline"
             className="w-full"
-            onClick={() => router.push("/register")}
+            onClick={() => router.push('/register')}
           >
             새 계정 만들기
           </Button>

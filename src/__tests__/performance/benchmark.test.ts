@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 /**
  * 성능 벤치마크 테스트
@@ -45,7 +45,7 @@ describe('Performance Benchmarks', () => {
 
       const start = performance.now();
 
-      const filtered = items.filter(item => item.status === 'active');
+      const filtered = items.filter((item) => item.status === 'active');
 
       const end = performance.now();
       const duration = end - start;
@@ -64,16 +64,16 @@ describe('Performance Benchmarks', () => {
 
       const start = performance.now();
 
-      const sorted = items.sort((a, b) =>
-        b.createdAt.getTime() - a.createdAt.getTime()
-      );
+      const sorted = items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
       const end = performance.now();
       const duration = end - start;
 
       // 5,000개 항목 정렬이 30ms 이내에 완료되어야 함
       expect(duration).toBeLessThan(30);
-      expect(sorted[0].createdAt.getTime()).toBeGreaterThan(sorted[sorted.length - 1].createdAt.getTime());
+      expect(sorted[0].createdAt.getTime()).toBeGreaterThan(
+        sorted[sorted.length - 1].createdAt.getTime()
+      );
     });
   });
 
@@ -84,8 +84,8 @@ describe('Performance Benchmarks', () => {
       const start = performance.now();
 
       const result = strings
-        .map(s => s.toUpperCase())
-        .filter(s => s.includes('STRING'))
+        .map((s) => s.toUpperCase())
+        .filter((s) => s.includes('STRING'))
         .join(',');
 
       const end = performance.now();
@@ -107,7 +107,7 @@ describe('Performance Benchmarks', () => {
 
       const start = performance.now();
 
-      const mapped = items.map(item => ({
+      const mapped = items.map((item) => ({
         ...item,
         displayName: `${item.name} (${item.status})`,
       }));

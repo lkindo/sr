@@ -1,8 +1,9 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
+import { Check, Loader2, Search, Shield } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,11 +11,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Shield, Loader2, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface Role {
   id: string;
@@ -41,31 +42,26 @@ interface AssignRolesDialogProps {
   onSaved: () => void;
 }
 
-export function AssignRolesDialog({
-  open,
-  onOpenChange,
-  user,
-  onSaved,
-}: AssignRolesDialogProps) {
+export function AssignRolesDialog({ open, onOpenChange, user, onSaved }: AssignRolesDialogProps) {
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/roles");
-      if (!response.ok) throw new Error("Failed to fetch roles");
+      const response = await fetch('/api/roles');
+      if (!response.ok) throw new Error('Failed to fetch roles');
       const data = await response.json();
       setRoles(data);
     } catch {
       toast({
-        title: "오류",
-        description: "역할 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '역할 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -78,15 +74,13 @@ export function AssignRolesDialog({
       if (user) {
         setSelectedRoleIds(user.roles.map((ur) => ur.role.id));
       }
-      setSearchQuery("");
+      setSearchQuery('');
     }
   }, [open, user, fetchRoles]);
 
   const handleToggleRole = (roleId: string) => {
     setSelectedRoleIds((prev) =>
-      prev.includes(roleId)
-        ? prev.filter((id) => id !== roleId)
-        : [...prev, roleId]
+      prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
     );
   };
 
@@ -96,8 +90,8 @@ export function AssignRolesDialog({
     setSubmitting(true);
     try {
       const response = await fetch(`/api/users/${user.id}/roles`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roleIds: selectedRoleIds }),
       });
 
@@ -107,7 +101,7 @@ export function AssignRolesDialog({
         // 1. 시스템 운영팀 + 고객사 팀 역할 동시 할당 에러
         if (error.systemRoles && error.clientRoles) {
           toast({
-            title: "역할 충돌",
+            title: '역할 충돌',
             description: (
               <div className="space-y-2">
                 <p>{error.error}</p>
@@ -120,7 +114,7 @@ export function AssignRolesDialog({
                 <p className="text-sm text-muted-foreground">{error.suggestion}</p>
               </div>
             ),
-            variant: "destructive",
+            variant: 'destructive',
             duration: 8000,
           });
         }
@@ -128,7 +122,7 @@ export function AssignRolesDialog({
         else if (error.assignedClients && error.assignedClients.length > 0) {
           const clientNames = error.assignedClients.map((c: { name: string }) => c.name).join(', ');
           toast({
-            title: "역할 할당 제한",
+            title: '역할 할당 제한',
             description: (
               <div className="space-y-2">
                 <p>{error.error}</p>
@@ -138,28 +132,27 @@ export function AssignRolesDialog({
                 <p className="text-sm text-muted-foreground">{error.suggestion}</p>
               </div>
             ),
-            variant: "destructive",
+            variant: 'destructive',
             duration: 8000,
           });
         } else {
-          throw new Error(error.error || "Failed to assign roles");
+          throw new Error(error.error || 'Failed to assign roles');
         }
         return;
       }
 
       toast({
-        title: "성공",
-        description: "역할이 성공적으로 할당되었습니다.",
+        title: '성공',
+        description: '역할이 성공적으로 할당되었습니다.',
       });
 
       onSaved();
       onOpenChange(false);
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error ? error.message : "역할 할당에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '역할 할당에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setSubmitting(false);
@@ -169,9 +162,7 @@ export function AssignRolesDialog({
   // 검색 필터링
   const filteredRoles = useMemo(() => {
     if (!searchQuery) return roles;
-    return roles.filter((role) =>
-      role.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    return roles.filter((role) => role.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [roles, searchQuery]);
 
   return (
@@ -183,7 +174,8 @@ export function AssignRolesDialog({
             역할 할당
           </DialogTitle>
           <DialogDescription>
-            <span className="font-semibold text-foreground">{user?.name}</span>님에게 부여할 역할을 선택하세요.
+            <span className="font-semibold text-foreground">{user?.name}</span>님에게 부여할 역할을
+            선택하세요.
           </DialogDescription>
         </DialogHeader>
 
@@ -215,10 +207,10 @@ export function AssignRolesDialog({
                     key={role.id}
                     onClick={() => handleToggleRole(role.id)}
                     className={cn(
-                      "cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-white",
+                      'cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-white',
                       isSelected
-                        ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "hover:border-primary/50"
+                        ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                        : 'hover:border-primary/50'
                     )}
                   >
                     {/* 선택 표시 아이콘 */}
@@ -231,8 +223,8 @@ export function AssignRolesDialog({
                     <div className="flex flex-col gap-1.5">
                       <h4
                         className={cn(
-                          "font-semibold flex items-center gap-2 transition-colors",
-                          isSelected ? "text-primary" : "text-foreground"
+                          'font-semibold flex items-center gap-2 transition-colors',
+                          isSelected ? 'text-primary' : 'text-foreground'
                         )}
                       >
                         {role.name}
@@ -242,9 +234,7 @@ export function AssignRolesDialog({
                           {role.description}
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground/50 italic">
-                          설명 없음
-                        </p>
+                        <p className="text-sm text-muted-foreground/50 italic">설명 없음</p>
                       )}
                     </div>
                   </div>
@@ -263,11 +253,7 @@ export function AssignRolesDialog({
           <div className="flex-1 text-sm text-muted-foreground flex items-center">
             {selectedRoleIds.length}개 역할 선택됨
           </div>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             취소
           </Button>
           <Button onClick={handleSubmit} disabled={submitting || loading}>
@@ -279,4 +265,3 @@ export function AssignRolesDialog({
     </Dialog>
   );
 }
-

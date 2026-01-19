@@ -1,15 +1,12 @@
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
-import { auth } from "@/auth";
-import MainContent from "./MainContent";
-import { convertSessionToPlainObject } from "@/lib/utils";
-import type { AuthenticatedUser } from "@/types/session";
+import { auth } from '@/auth';
+import { Footer } from '@/components/layout/Footer';
+import { Header } from '@/components/layout/Header';
+import { convertSessionToPlainObject } from '@/lib/utils';
+import type { AuthenticatedUser } from '@/types/session';
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+import MainContent from './MainContent';
+
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
   // session.user 객체를 순수한 객체로 변환

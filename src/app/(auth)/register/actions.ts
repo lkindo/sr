@@ -1,39 +1,40 @@
-"use server";
+'use server';
 
-import { hash } from "bcryptjs";
-import { z } from "zod";
-import { UserService } from "@/services/user.service";
-import prisma from "@/lib/prisma";
+import { hash } from 'bcryptjs';
+import { z } from 'zod';
+
+import prisma from '@/lib/prisma';
+import { UserService } from '@/services/user.service';
 
 const registerSchema = z
   .object({
-    name: z.string().min(2, "이름은 최소 2자 이상이어야 합니다."),
-    email: z.string().email("유효한 이메일 주소를 입력하세요."),
+    name: z.string().min(2, '이름은 최소 2자 이상이어야 합니다.'),
+    email: z.string().email('유효한 이메일 주소를 입력하세요.'),
     password: z
       .string()
-      .min(8, "비밀번호는 최소 8자 이상이어야 합니다.")
+      .min(8, '비밀번호는 최소 8자 이상이어야 합니다.')
       .regex(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]/,
-        "대소문자, 숫자, 특수문자를 포함해야 합니다."
+        '대소문자, 숫자, 특수문자를 포함해야 합니다.'
       ),
     confirmPassword: z.string(),
-    accountType: z.enum(["ENGINEER", "CLIENT"]),
+    accountType: z.enum(['ENGINEER', 'CLIENT']),
     clientId: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "비밀번호가 일치하지 않습니다.",
-    path: ["confirmPassword"],
+    message: '비밀번호가 일치하지 않습니다.',
+    path: ['confirmPassword'],
   });
 
 export async function registerUser(formData: FormData) {
   try {
-    const clientIdValue = formData.get("clientId");
+    const clientIdValue = formData.get('clientId');
     const data = {
-      name: formData.get("name") as string,
-      email: formData.get("email") as string,
-      password: formData.get("password") as string,
-      confirmPassword: formData.get("confirmPassword") as string,
-      accountType: formData.get("accountType") as "ENGINEER" | "CLIENT",
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      password: formData.get('password') as string,
+      confirmPassword: formData.get('confirmPassword') as string,
+      accountType: formData.get('accountType') as 'ENGINEER' | 'CLIENT',
       // null을 undefined로 변환 (Zod optional은 undefined만 허용)
       clientId: clientIdValue ? (clientIdValue as string) : undefined,
     };
@@ -41,10 +42,10 @@ export async function registerUser(formData: FormData) {
     const validated = registerSchema.parse(data);
 
     // 고객사 담당자인데 고객사 미선택 시 에러
-    if (validated.accountType === "CLIENT" && !validated.clientId) {
+    if (validated.accountType === 'CLIENT' && !validated.clientId) {
       return {
         success: false,
-        error: "고객사 담당자는 소속 고객사를 선택해야 합니다.",
+        error: '고객사 담당자는 소속 고객사를 선택해야 합니다.',
       };
     }
 
@@ -55,7 +56,7 @@ export async function registerUser(formData: FormData) {
     if (existingUser) {
       return {
         success: false,
-        error: "이미 등록된 이메일 주소입니다.",
+        error: '이미 등록된 이메일 주소입니다.',
       };
     }
 
@@ -65,14 +66,14 @@ export async function registerUser(formData: FormData) {
     // 역할 자동 결정
     const defaultRole = await prisma.role.findFirst({
       where: {
-        name: validated.accountType === "CLIENT" ? "CLIENT_USER" : "ENGINEER",
+        name: validated.accountType === 'CLIENT' ? 'CLIENT_USER' : 'ENGINEER',
       },
     });
 
     if (!defaultRole) {
       return {
         success: false,
-        error: "시스템 설정 오류: 기본 역할을 찾을 수 없습니다. 관리자에게 문의하세요.",
+        error: '시스템 설정 오류: 기본 역할을 찾을 수 없습니다. 관리자에게 문의하세요.',
       };
     }
 
@@ -85,7 +86,7 @@ export async function registerUser(formData: FormData) {
           email: validated.email,
           password: hashedPassword,
           // CLIENT는 즉시 활성화, ENGINEER는 승인 대기
-          isActive: validated.accountType === "CLIENT",
+          isActive: validated.accountType === 'CLIENT',
         },
       });
 
@@ -98,7 +99,7 @@ export async function registerUser(formData: FormData) {
       });
 
       // 3. 고객사 할당 (CLIENT인 경우)
-      if (validated.accountType === "CLIENT" && validated.clientId) {
+      if (validated.accountType === 'CLIENT' && validated.clientId) {
         await tx.userClient.create({
           data: {
             userId: user.id,
@@ -110,9 +111,9 @@ export async function registerUser(formData: FormData) {
 
     // 계정 유형별 안내 메시지
     const message =
-      validated.accountType === "CLIENT"
-        ? "회원가입이 완료되었습니다. 로그인해주세요."
-        : "회원가입이 완료되었습니다. 관리자 승인 후 사용 가능합니다.";
+      validated.accountType === 'CLIENT'
+        ? '회원가입이 완료되었습니다. 로그인해주세요.'
+        : '회원가입이 완료되었습니다. 관리자 승인 후 사용 가능합니다.';
 
     return {
       success: true,
@@ -129,7 +130,7 @@ export async function registerUser(formData: FormData) {
     // 에러 로그는 서버 측에서만 기록 (프로덕션에서는 로그 수집 시스템 사용)
     return {
       success: false,
-      error: "회원가입 중 오류가 발생했습니다.",
+      error: '회원가입 중 오류가 발생했습니다.',
     };
   }
 }

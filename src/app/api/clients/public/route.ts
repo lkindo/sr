@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+
+import prisma from '@/lib/prisma';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -20,16 +21,13 @@ export async function GET() {
         code: true,
       },
       orderBy: {
-        name: "asc",
+        name: 'asc',
       },
     });
 
     return NextResponse.json(clients);
   } catch (error) {
-    console.error("공개 고객사 목록 조회 오류:", error);
-    return NextResponse.json(
-      { error: "고객사 목록을 불러올 수 없습니다." },
-      { status: 500 }
-    );
+    console.error('공개 고객사 목록 조회 오류:', error);
+    return NextResponse.json({ error: '고객사 목록을 불러올 수 없습니다.' }, { status: 500 });
   }
 }

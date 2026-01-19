@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // Mock all dependencies
 vi.mock('@/repositories/sr.repository');
@@ -9,260 +9,252 @@ vi.mock('@/services/permission.service');
 vi.mock('@/lib/policies/sr.policy');
 
 describe('Integration Tests', () => {
-    describe('User Permission Flow', () => {
-        it('사용자가 권한이 있으면 SR을 생성할 수 있어야 함', () => {
-            // 통합 테스트 시나리오
-            const user = {
-                id: 'user1',
-                email: 'user@example.com',
-                roles: ['USER'],
-                permissions: ['sr:create'],
-            };
+  describe('User Permission Flow', () => {
+    it('사용자가 권한이 있으면 SR을 생성할 수 있어야 함', () => {
+      // 통합 테스트 시나리오
+      const user = {
+        id: 'user1',
+        email: 'user@example.com',
+        roles: ['USER'],
+        permissions: ['sr:create'],
+      };
 
-            expect(user.permissions).toContain('sr:create');
-        });
-
-        it('사용자가 권한이 없으면 SR을 생성할 수 없어야 함', () => {
-            const user = {
-                id: 'user2',
-                email: 'user2@example.com',
-                roles: ['USER'],
-                permissions: [],
-            };
-
-            expect(user.permissions).not.toContain('sr:create');
-        });
+      expect(user.permissions).toContain('sr:create');
     });
 
-    describe('SR Lifecycle', () => {
-        it('SR이 생성되고 상태가 변경되는 전체 흐름을 테스트해야 함', () => {
-            const srStates = ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'COMPLETED', 'CONFIRMED'];
+    it('사용자가 권한이 없으면 SR을 생성할 수 없어야 함', () => {
+      const user = {
+        id: 'user2',
+        email: 'user2@example.com',
+        roles: ['USER'],
+        permissions: [],
+      };
 
-            let currentState = 'REQUESTED';
+      expect(user.permissions).not.toContain('sr:create');
+    });
+  });
 
-            // REQUESTED -> INTAKE
-            currentState = 'INTAKE';
-            expect(currentState).toBe('INTAKE');
+  describe('SR Lifecycle', () => {
+    it('SR이 생성되고 상태가 변경되는 전체 흐름을 테스트해야 함', () => {
+      const srStates = ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'COMPLETED', 'CONFIRMED'];
 
-            // INTAKE -> IN_PROGRESS
-            currentState = 'IN_PROGRESS';
-            expect(currentState).toBe('IN_PROGRESS');
+      let currentState = 'REQUESTED';
 
-            // IN_PROGRESS -> COMPLETED
-            currentState = 'COMPLETED';
-            expect(currentState).toBe('COMPLETED');
+      // REQUESTED -> INTAKE
+      currentState = 'INTAKE';
+      expect(currentState).toBe('INTAKE');
 
-            // COMPLETED -> CONFIRMED
-            currentState = 'CONFIRMED';
-            expect(currentState).toBe('CONFIRMED');
+      // INTAKE -> IN_PROGRESS
+      currentState = 'IN_PROGRESS';
+      expect(currentState).toBe('IN_PROGRESS');
 
-            expect(srStates).toContain(currentState);
-        });
+      // IN_PROGRESS -> COMPLETED
+      currentState = 'COMPLETED';
+      expect(currentState).toBe('COMPLETED');
 
-        it('SR 상태 변경 시 활동 기록이 생성되어야 함', () => {
-            const activities: Array<{ type: string; from: string; to: string }> = [];
+      // COMPLETED -> CONFIRMED
+      currentState = 'CONFIRMED';
+      expect(currentState).toBe('CONFIRMED');
 
-            // REQUESTED -> INTAKE
-            activities.push({ type: 'STATUS_CHANGED', from: 'REQUESTED', to: 'INTAKE' });
-
-            // INTAKE -> IN_PROGRESS
-            activities.push({ type: 'STATUS_CHANGED', from: 'INTAKE', to: 'IN_PROGRESS' });
-
-            expect(activities).toHaveLength(2);
-            expect(activities[0].from).toBe('REQUESTED');
-            expect(activities[0].to).toBe('INTAKE');
-            expect(activities[1].from).toBe('INTAKE');
-            expect(activities[1].to).toBe('IN_PROGRESS');
-        });
+      expect(srStates).toContain(currentState);
     });
 
-    describe('Role-Based Access Control', () => {
-        it('ADMIN은 모든 권한을 가져야 함', () => {
-            const adminPermissions = [
-                'sr:create',
-                'sr:read',
-                'sr:update',
-                'sr:delete',
-                'user:create',
-                'user:read',
-                'user:update',
-                'user:delete',
-            ];
+    it('SR 상태 변경 시 활동 기록이 생성되어야 함', () => {
+      const activities: Array<{ type: string; from: string; to: string }> = [];
 
-            const admin = {
-                id: 'admin1',
-                roles: ['ADMIN'],
-                permissions: adminPermissions,
-            };
+      // REQUESTED -> INTAKE
+      activities.push({ type: 'STATUS_CHANGED', from: 'REQUESTED', to: 'INTAKE' });
 
-            expect(admin.permissions).toContain('sr:create');
-            expect(admin.permissions).toContain('sr:delete');
-            expect(admin.permissions).toContain('user:create');
-            expect(admin.permissions).toContain('user:delete');
-        });
+      // INTAKE -> IN_PROGRESS
+      activities.push({ type: 'STATUS_CHANGED', from: 'INTAKE', to: 'IN_PROGRESS' });
 
-        it('ENGINEER는 SR 관련 권한만 가져야 함', () => {
-            const engineerPermissions = [
-                'sr:create',
-                'sr:read',
-                'sr:update',
-            ];
+      expect(activities).toHaveLength(2);
+      expect(activities[0].from).toBe('REQUESTED');
+      expect(activities[0].to).toBe('INTAKE');
+      expect(activities[1].from).toBe('INTAKE');
+      expect(activities[1].to).toBe('IN_PROGRESS');
+    });
+  });
 
-            const engineer = {
-                id: 'engineer1',
-                roles: ['ENGINEER'],
-                permissions: engineerPermissions,
-            };
+  describe('Role-Based Access Control', () => {
+    it('ADMIN은 모든 권한을 가져야 함', () => {
+      const adminPermissions = [
+        'sr:create',
+        'sr:read',
+        'sr:update',
+        'sr:delete',
+        'user:create',
+        'user:read',
+        'user:update',
+        'user:delete',
+      ];
 
-            expect(engineer.permissions).toContain('sr:create');
-            expect(engineer.permissions).toContain('sr:read');
-            expect(engineer.permissions).toContain('sr:update');
-            expect(engineer.permissions).not.toContain('sr:delete');
-            expect(engineer.permissions).not.toContain('user:create');
-        });
+      const admin = {
+        id: 'admin1',
+        roles: ['ADMIN'],
+        permissions: adminPermissions,
+      };
 
-        it('CLIENT_USER는 제한된 권한만 가져야 함', () => {
-            const clientPermissions = [
-                'sr:create',
-                'sr:read',
-            ];
-
-            const client = {
-                id: 'client1',
-                roles: ['CLIENT_USER'],
-                permissions: clientPermissions,
-            };
-
-            expect(client.permissions).toContain('sr:create');
-            expect(client.permissions).toContain('sr:read');
-            expect(client.permissions).not.toContain('sr:update');
-            expect(client.permissions).not.toContain('sr:delete');
-        });
+      expect(admin.permissions).toContain('sr:create');
+      expect(admin.permissions).toContain('sr:delete');
+      expect(admin.permissions).toContain('user:create');
+      expect(admin.permissions).toContain('user:delete');
     });
 
-    describe('Data Validation', () => {
-        it('필수 필드가 없으면 검증 실패해야 함', () => {
-            const invalidSRData = {
-                // title 누락
-                description: 'Test description',
-                clientId: 'client1',
-            };
+    it('ENGINEER는 SR 관련 권한만 가져야 함', () => {
+      const engineerPermissions = ['sr:create', 'sr:read', 'sr:update'];
 
-            const hasTitle = 'title' in invalidSRData;
-            expect(hasTitle).toBe(false);
-        });
+      const engineer = {
+        id: 'engineer1',
+        roles: ['ENGINEER'],
+        permissions: engineerPermissions,
+      };
 
-        it('모든 필수 필드가 있으면 검증 성공해야 함', () => {
-            const validSRData = {
-                title: 'Test SR',
-                description: 'Test description',
-                clientId: 'client1',
-                serviceCategoryId: 'category1',
-                requestedPriority: 'MEDIUM',
-                requesterId: 'requester1',
-            };
-
-            expect(validSRData.title).toBeDefined();
-            expect(validSRData.description).toBeDefined();
-            expect(validSRData.clientId).toBeDefined();
-            expect(validSRData.serviceCategoryId).toBeDefined();
-            expect(validSRData.requestedPriority).toBeDefined();
-            expect(validSRData.requesterId).toBeDefined();
-        });
+      expect(engineer.permissions).toContain('sr:create');
+      expect(engineer.permissions).toContain('sr:read');
+      expect(engineer.permissions).toContain('sr:update');
+      expect(engineer.permissions).not.toContain('sr:delete');
+      expect(engineer.permissions).not.toContain('user:create');
     });
 
-    describe('Error Handling', () => {
-        it('데이터베이스 오류를 적절히 처리해야 함', () => {
-            const dbError = new Error('Database connection failed');
+    it('CLIENT_USER는 제한된 권한만 가져야 함', () => {
+      const clientPermissions = ['sr:create', 'sr:read'];
 
-            expect(dbError).toBeInstanceOf(Error);
-            expect(dbError.message).toBe('Database connection failed');
-        });
+      const client = {
+        id: 'client1',
+        roles: ['CLIENT_USER'],
+        permissions: clientPermissions,
+      };
 
-        it('권한 오류를 적절히 처리해야 함', () => {
-            const permissionError = new Error('Permission denied');
+      expect(client.permissions).toContain('sr:create');
+      expect(client.permissions).toContain('sr:read');
+      expect(client.permissions).not.toContain('sr:update');
+      expect(client.permissions).not.toContain('sr:delete');
+    });
+  });
 
-            expect(permissionError).toBeInstanceOf(Error);
-            expect(permissionError.message).toBe('Permission denied');
-        });
+  describe('Data Validation', () => {
+    it('필수 필드가 없으면 검증 실패해야 함', () => {
+      const invalidSRData = {
+        // title 누락
+        description: 'Test description',
+        clientId: 'client1',
+      };
 
-        it('검증 오류를 적절히 처리해야 함', () => {
-            const validationError = new Error('Validation failed');
-
-            expect(validationError).toBeInstanceOf(Error);
-            expect(validationError.message).toBe('Validation failed');
-        });
+      const hasTitle = 'title' in invalidSRData;
+      expect(hasTitle).toBe(false);
     });
 
-    describe('Caching', () => {
-        it('캐시 키가 올바르게 생성되어야 함', () => {
-            const userId = 'user123';
-            const resource = 'dashboard';
-            const cacheKey = `${resource}:${userId}`;
+    it('모든 필수 필드가 있으면 검증 성공해야 함', () => {
+      const validSRData = {
+        title: 'Test SR',
+        description: 'Test description',
+        clientId: 'client1',
+        serviceCategoryId: 'category1',
+        requestedPriority: 'MEDIUM',
+        requesterId: 'requester1',
+      };
 
-            expect(cacheKey).toBe('dashboard:user123');
-        });
+      expect(validSRData.title).toBeDefined();
+      expect(validSRData.description).toBeDefined();
+      expect(validSRData.clientId).toBeDefined();
+      expect(validSRData.serviceCategoryId).toBeDefined();
+      expect(validSRData.requestedPriority).toBeDefined();
+      expect(validSRData.requesterId).toBeDefined();
+    });
+  });
 
-        it('캐시 TTL이 올바르게 설정되어야 함', () => {
-            const defaultTTL = 300; // 5 minutes
-            const dashboardTTL = 60; // 1 minute
+  describe('Error Handling', () => {
+    it('데이터베이스 오류를 적절히 처리해야 함', () => {
+      const dbError = new Error('Database connection failed');
 
-            expect(defaultTTL).toBeGreaterThan(dashboardTTL);
-            expect(dashboardTTL).toBeGreaterThan(0);
-        });
+      expect(dbError).toBeInstanceOf(Error);
+      expect(dbError.message).toBe('Database connection failed');
     });
 
-    describe('Pagination', () => {
-        it('페이지네이션 파라미터가 올바르게 계산되어야 함', () => {
-            const page = 2;
-            const limit = 10;
-            const skip = (page - 1) * limit;
+    it('권한 오류를 적절히 처리해야 함', () => {
+      const permissionError = new Error('Permission denied');
 
-            expect(skip).toBe(10);
-        });
-
-        it('총 페이지 수가 올바르게 계산되어야 함', () => {
-            const totalItems = 95;
-            const limit = 10;
-            const totalPages = Math.ceil(totalItems / limit);
-
-            expect(totalPages).toBe(10);
-        });
-
-        it('마지막 페이지의 아이템 수가 올바르게 계산되어야 함', () => {
-            const totalItems = 95;
-            const limit = 10;
-            const lastPageItems = totalItems % limit || limit;
-
-            expect(lastPageItems).toBe(5);
-        });
+      expect(permissionError).toBeInstanceOf(Error);
+      expect(permissionError.message).toBe('Permission denied');
     });
 
-    describe('Date Handling', () => {
-        it('날짜 범위 필터가 올바르게 작동해야 함', () => {
-            const now = new Date();
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    it('검증 오류를 적절히 처리해야 함', () => {
+      const validationError = new Error('Validation failed');
 
-            expect(now.getTime()).toBeGreaterThan(thirtyDaysAgo.getTime());
-        });
+      expect(validationError).toBeInstanceOf(Error);
+      expect(validationError.message).toBe('Validation failed');
+    });
+  });
 
-        it('날짜 포맷이 올바르게 변환되어야 함', () => {
-            const date = new Date('2024-11-14T00:00:00Z');
-            const dateStr = date.toISOString().split('T')[0];
+  describe('Caching', () => {
+    it('캐시 키가 올바르게 생성되어야 함', () => {
+      const userId = 'user123';
+      const resource = 'dashboard';
+      const cacheKey = `${resource}:${userId}`;
 
-            expect(dateStr).toBe('2024-11-14');
-        });
+      expect(cacheKey).toBe('dashboard:user123');
     });
 
-    describe('Priority Handling', () => {
-        it('우선순위가 올바르게 정렬되어야 함', () => {
+    it('캐시 TTL이 올바르게 설정되어야 함', () => {
+      const defaultTTL = 300; // 5 minutes
+      const dashboardTTL = 60; // 1 minute
 
-            const priorityOrder = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
-
-            expect(priorityOrder.CRITICAL).toBeGreaterThan(priorityOrder.HIGH);
-            expect(priorityOrder.HIGH).toBeGreaterThan(priorityOrder.MEDIUM);
-            expect(priorityOrder.MEDIUM).toBeGreaterThan(priorityOrder.LOW);
-        });
+      expect(defaultTTL).toBeGreaterThan(dashboardTTL);
+      expect(dashboardTTL).toBeGreaterThan(0);
     });
+  });
+
+  describe('Pagination', () => {
+    it('페이지네이션 파라미터가 올바르게 계산되어야 함', () => {
+      const page = 2;
+      const limit = 10;
+      const skip = (page - 1) * limit;
+
+      expect(skip).toBe(10);
+    });
+
+    it('총 페이지 수가 올바르게 계산되어야 함', () => {
+      const totalItems = 95;
+      const limit = 10;
+      const totalPages = Math.ceil(totalItems / limit);
+
+      expect(totalPages).toBe(10);
+    });
+
+    it('마지막 페이지의 아이템 수가 올바르게 계산되어야 함', () => {
+      const totalItems = 95;
+      const limit = 10;
+      const lastPageItems = totalItems % limit || limit;
+
+      expect(lastPageItems).toBe(5);
+    });
+  });
+
+  describe('Date Handling', () => {
+    it('날짜 범위 필터가 올바르게 작동해야 함', () => {
+      const now = new Date();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      expect(now.getTime()).toBeGreaterThan(thirtyDaysAgo.getTime());
+    });
+
+    it('날짜 포맷이 올바르게 변환되어야 함', () => {
+      const date = new Date('2024-11-14T00:00:00Z');
+      const dateStr = date.toISOString().split('T')[0];
+
+      expect(dateStr).toBe('2024-11-14');
+    });
+  });
+
+  describe('Priority Handling', () => {
+    it('우선순위가 올바르게 정렬되어야 함', () => {
+      const priorityOrder = { LOW: 1, MEDIUM: 2, HIGH: 3, CRITICAL: 4 };
+
+      expect(priorityOrder.CRITICAL).toBeGreaterThan(priorityOrder.HIGH);
+      expect(priorityOrder.HIGH).toBeGreaterThan(priorityOrder.MEDIUM);
+      expect(priorityOrder.MEDIUM).toBeGreaterThan(priorityOrder.LOW);
+    });
+  });
 });

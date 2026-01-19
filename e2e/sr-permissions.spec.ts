@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+
 import { createTestSR } from './helpers/test-helpers';
 
 // 이 테스트는 setup 프로젝트에서 생성한 인증 상태를 사용합니다
@@ -15,7 +16,7 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
     try {
       srId = await createTestSR(page, {
         title: `권한 테스트용 SR ${Date.now()}`,
-        description: '권한 및 접수 기능 테스트를 위한 자동 생성 SR입니다.'
+        description: '권한 및 접수 기능 테스트를 위한 자동 생성 SR입니다.',
       });
       console.log(`✅ 권한 테스트용 SR 생성 완료: ${srId}`);
     } catch (e) {
@@ -28,7 +29,12 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
 
   test('SR 목록 페이지 접근 및 기본 UI 확인', async ({ page }) => {
     // 인증 상태가 이미 로드되어 있으므로 바로 페이지로 이동
-    const responsePromise = page.waitForResponse(resp => resp.url().includes('/api/srs') && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
+    const responsePromise = page
+      .waitForResponse(
+        (resp) => resp.url().includes('/api/srs') && resp.request().method() === 'GET',
+        { timeout: 10000 }
+      )
+      .catch(() => null);
     await page.goto('/srs');
     await responsePromise;
 
@@ -46,7 +52,12 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
     test.skip(!srId, 'SR 생성을 실패하여 테스트를 건너뜁니다.');
 
     // SR 상세 페이지로 이동
-    const detailResponsePromise = page.waitForResponse(resp => resp.url().includes(`/api/srs/${srId}`) && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
+    const detailResponsePromise = page
+      .waitForResponse(
+        (resp) => resp.url().includes(`/api/srs/${srId}`) && resp.request().method() === 'GET',
+        { timeout: 10000 }
+      )
+      .catch(() => null);
     await page.goto(`/srs/${srId}`);
     await detailResponsePromise;
 
@@ -64,19 +75,28 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
 
     try {
       // 접수 페이지로 직접 이동
-      const intakeResponsePromise = page.waitForResponse(resp => resp.url().includes(`/api/srs/${srId}/intake`) && resp.request().method() === 'GET', { timeout: 10000 }).catch(() => null);
+      const intakeResponsePromise = page
+        .waitForResponse(
+          (resp) =>
+            resp.url().includes(`/api/srs/${srId}/intake`) && resp.request().method() === 'GET',
+          { timeout: 10000 }
+        )
+        .catch(() => null);
       await page.goto(`/srs/${srId}/intake`);
       await intakeResponsePromise;
       await page.waitForTimeout(3000); // 추가 렌더링 대기
 
       // 접수 폼 또는 에러 메시지 확인
-      const hasIntakeForm = await page.getByRole('heading', { name: /SR 접수 처리|SR 접수 정보 수정/i })
+      const hasIntakeForm = await page
+        .getByRole('heading', { name: /SR 접수 처리|SR 접수 정보 수정/i })
         .isVisible({ timeout: 15000 })
         .catch(() => false);
 
       if (hasIntakeForm) {
         // 접수 폼이 표시됨
-        await expect(page.locator('label', { hasText: '실제 우선순위' })).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('label', { hasText: '실제 우선순위' })).toBeVisible({
+          timeout: 5000,
+        });
         console.log('✅ 접수 페이지 접근 가능 - 폼 표시됨');
       } else {
         // 접수 폼이 없음 (이미 접수되었거나 권한 없음)

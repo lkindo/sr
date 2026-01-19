@@ -2,18 +2,19 @@
  * SR 정보 검토 카드 컴포넌트
  */
 
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { priorityLabels } from "@/lib/constants/sr";
-import type { SRDetails } from "@/types/sr.types";
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "default",
-  LOW: "secondary",
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { priorityLabels } from '@/lib/constants/sr';
+import type { SRDetails } from '@/types/sr.types';
+
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
 
 interface SRReviewCardProps {
@@ -30,7 +31,9 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
             1
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">SR 정보 검토</h3>
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+              SR 정보 검토
+            </h3>
             <p className="text-sm text-muted-foreground mt-0.5">
               요청자가 등록한 SR 내용을 검토하세요
             </p>
@@ -59,7 +62,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
               <div>
                 <p className="text-sm text-muted-foreground">희망 완료일</p>
                 <p className="font-medium">
-                  {format(new Date(sr.requestedCompletionDate), "PPP", { locale: ko })}
+                  {format(new Date(sr.requestedCompletionDate), 'PPP', { locale: ko })}
                 </p>
               </div>
             </>
@@ -76,9 +79,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
 
         <div>
           <p className="text-sm font-medium text-muted-foreground">상세 내용</p>
-          <p className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-md">
-            {sr.description}
-          </p>
+          <p className="text-sm whitespace-pre-wrap bg-muted p-4 rounded-md">{sr.description}</p>
         </div>
 
         <Separator />
@@ -94,9 +95,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
           <div>
             <p className="text-sm font-medium text-muted-foreground">서비스 카테고리</p>
             <p className="font-medium">{sr.serviceCategory.categoryName}</p>
-            <p className="text-xs text-muted-foreground">
-              SLA: {sr.serviceCategory.slaHours}시간
-            </p>
+            <p className="text-xs text-muted-foreground">SLA: {sr.serviceCategory.slaHours}시간</p>
           </div>
 
           <div>
@@ -144,5 +143,3 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
     </div>
   );
 }
-
-

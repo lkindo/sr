@@ -1,20 +1,15 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Bell, Mail, Loader2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
-import { useToast } from "@/hooks/use-toast";
-import { usePushNotifications } from "@/hooks/use-push-notifications";
+import { AlertCircle, Bell, CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { useToast } from '@/hooks/use-toast';
 
 interface NotificationPreferences {
   emailSRCreated: boolean;
@@ -55,7 +50,7 @@ export default function NotificationsPage() {
   // Load preferences from API
   const loadPreferences = useCallback(async () => {
     try {
-      const response = await fetch("/api/settings/notifications");
+      const response = await fetch('/api/settings/notifications');
       if (response.ok) {
         const data = await response.json();
         setPreferences({
@@ -89,25 +84,25 @@ export default function NotificationsPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch("/api/settings/notifications", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
+      const response = await fetch('/api/settings/notifications', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(preferences),
       });
 
       if (response.ok) {
         toast({
-          title: "성공",
-          description: "알림 설정이 저장되었습니다.",
+          title: '성공',
+          description: '알림 설정이 저장되었습니다.',
         });
       } else {
-        throw new Error("Failed to save preferences");
+        throw new Error('Failed to save preferences');
       }
     } catch {
       toast({
-        title: "오류",
-        description: "알림 설정 저장에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '알림 설정 저장에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -120,22 +115,22 @@ export default function NotificationsPage() {
       const success = await unsubscribe();
       if (success) {
         toast({
-          title: "푸시 알림 비활성화",
-          description: "푸시 알림이 비활성화되었습니다.",
+          title: '푸시 알림 비활성화',
+          description: '푸시 알림이 비활성화되었습니다.',
         });
       }
     } else {
       const success = await subscribe();
       if (success) {
         toast({
-          title: "푸시 알림 활성화",
-          description: "푸시 알림이 활성화되었습니다.",
+          title: '푸시 알림 활성화',
+          description: '푸시 알림이 활성화되었습니다.',
         });
-      } else if (permission === "denied") {
+      } else if (permission === 'denied') {
         toast({
-          title: "권한 거부됨",
-          description: "브라우저 설정에서 알림 권한을 허용해주세요.",
-          variant: "destructive",
+          title: '권한 거부됨',
+          description: '브라우저 설정에서 알림 권한을 허용해주세요.',
+          variant: 'destructive',
         });
       }
     }
@@ -161,7 +156,7 @@ export default function NotificationsPage() {
       );
     }
 
-    if (permission === "denied") {
+    if (permission === 'denied') {
       return (
         <div className="flex items-center gap-1.5 text-sm text-destructive">
           <AlertCircle className="h-4 w-4" />
@@ -199,9 +194,7 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">알림 설정</h1>
-        <p className="text-muted-foreground">
-          이메일 및 푸시 알림을 관리합니다.
-        </p>
+        <p className="text-muted-foreground">이메일 및 푸시 알림을 관리합니다.</p>
       </div>
 
       <Card>
@@ -210,22 +203,18 @@ export default function NotificationsPage() {
             <Mail className="h-5 w-5" />
             <CardTitle>이메일 알림</CardTitle>
           </div>
-          <CardDescription>
-            SR 관련 이벤트에 대한 이메일 알림을 설정합니다.
-          </CardDescription>
+          <CardDescription>SR 관련 이벤트에 대한 이메일 알림을 설정합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="email-sr-created">SR 생성</Label>
-              <p className="text-sm text-muted-foreground">
-                새로운 SR이 생성되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">새로운 SR이 생성되었을 때</p>
             </div>
             <Switch
               id="email-sr-created"
               checked={preferences.emailSRCreated}
-              onCheckedChange={(v) => handlePreferenceChange("emailSRCreated", v)}
+              onCheckedChange={(v) => handlePreferenceChange('emailSRCreated', v)}
             />
           </div>
 
@@ -234,14 +223,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="email-sr-assigned">SR 배정</Label>
-              <p className="text-sm text-muted-foreground">
-                SR이 나에게 배정되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">SR이 나에게 배정되었을 때</p>
             </div>
             <Switch
               id="email-sr-assigned"
               checked={preferences.emailSRAssigned}
-              onCheckedChange={(v) => handlePreferenceChange("emailSRAssigned", v)}
+              onCheckedChange={(v) => handlePreferenceChange('emailSRAssigned', v)}
             />
           </div>
 
@@ -250,14 +237,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="email-sr-status">상태 변경</Label>
-              <p className="text-sm text-muted-foreground">
-                SR 상태가 변경되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">SR 상태가 변경되었을 때</p>
             </div>
             <Switch
               id="email-sr-status"
               checked={preferences.emailSRStatusChanged}
-              onCheckedChange={(v) => handlePreferenceChange("emailSRStatusChanged", v)}
+              onCheckedChange={(v) => handlePreferenceChange('emailSRStatusChanged', v)}
             />
           </div>
 
@@ -266,14 +251,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="email-comment">댓글 추가</Label>
-              <p className="text-sm text-muted-foreground">
-                SR에 새로운 댓글이 추가되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">SR에 새로운 댓글이 추가되었을 때</p>
             </div>
             <Switch
               id="email-comment"
               checked={preferences.emailCommentAdded}
-              onCheckedChange={(v) => handlePreferenceChange("emailCommentAdded", v)}
+              onCheckedChange={(v) => handlePreferenceChange('emailCommentAdded', v)}
             />
           </div>
         </CardContent>
@@ -288,9 +271,7 @@ export default function NotificationsPage() {
             </div>
             {renderPushStatusBadge()}
           </div>
-          <CardDescription>
-            브라우저 푸시 알림을 설정합니다.
-          </CardDescription>
+          <CardDescription>브라우저 푸시 알림을 설정합니다.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Push subscription toggle */}
@@ -299,24 +280,22 @@ export default function NotificationsPage() {
               <Label className="text-base font-medium">푸시 알림 활성화</Label>
               <p className="text-sm text-muted-foreground">
                 {isSubscribed
-                  ? "현재 이 브라우저에서 푸시 알림을 받고 있습니다."
-                  : "푸시 알림을 활성화하면 브라우저로 실시간 알림을 받을 수 있습니다."}
+                  ? '현재 이 브라우저에서 푸시 알림을 받고 있습니다.'
+                  : '푸시 알림을 활성화하면 브라우저로 실시간 알림을 받을 수 있습니다.'}
               </p>
-              {pushError && (
-                <p className="text-sm text-destructive">{pushError}</p>
-              )}
+              {pushError && <p className="text-sm text-destructive">{pushError}</p>}
             </div>
             <Button
-              variant={isSubscribed ? "outline" : "default"}
+              variant={isSubscribed ? 'outline' : 'default'}
               onClick={handlePushToggle}
               disabled={!isSupported || isPushLoading}
             >
               {isPushLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : isSubscribed ? (
-                "비활성화"
+                '비활성화'
               ) : (
-                "활성화"
+                '활성화'
               )}
             </Button>
           </div>
@@ -326,14 +305,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="push-sr-created">SR 생성</Label>
-              <p className="text-sm text-muted-foreground">
-                새로운 SR이 생성되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">새로운 SR이 생성되었을 때</p>
             </div>
             <Switch
               id="push-sr-created"
               checked={preferences.pushSRCreated}
-              onCheckedChange={(v) => handlePreferenceChange("pushSRCreated", v)}
+              onCheckedChange={(v) => handlePreferenceChange('pushSRCreated', v)}
               disabled={!isSubscribed}
             />
           </div>
@@ -343,14 +320,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="push-sr-assigned">SR 배정</Label>
-              <p className="text-sm text-muted-foreground">
-                SR이 나에게 배정되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">SR이 나에게 배정되었을 때</p>
             </div>
             <Switch
               id="push-sr-assigned"
               checked={preferences.pushSRAssigned}
-              onCheckedChange={(v) => handlePreferenceChange("pushSRAssigned", v)}
+              onCheckedChange={(v) => handlePreferenceChange('pushSRAssigned', v)}
               disabled={!isSubscribed}
             />
           </div>
@@ -360,14 +335,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="push-sr-status">상태 변경</Label>
-              <p className="text-sm text-muted-foreground">
-                SR 상태가 변경되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">SR 상태가 변경되었을 때</p>
             </div>
             <Switch
               id="push-sr-status"
               checked={preferences.pushSRStatusChanged}
-              onCheckedChange={(v) => handlePreferenceChange("pushSRStatusChanged", v)}
+              onCheckedChange={(v) => handlePreferenceChange('pushSRStatusChanged', v)}
               disabled={!isSubscribed}
             />
           </div>
@@ -377,14 +350,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="push-comment">댓글 추가</Label>
-              <p className="text-sm text-muted-foreground">
-                SR에 새로운 댓글이 추가되었을 때
-              </p>
+              <p className="text-sm text-muted-foreground">SR에 새로운 댓글이 추가되었을 때</p>
             </div>
             <Switch
               id="push-comment"
               checked={preferences.pushCommentAdded}
-              onCheckedChange={(v) => handlePreferenceChange("pushCommentAdded", v)}
+              onCheckedChange={(v) => handlePreferenceChange('pushCommentAdded', v)}
               disabled={!isSubscribed}
             />
           </div>
@@ -399,7 +370,7 @@ export default function NotificationsPage() {
               저장 중...
             </>
           ) : (
-            "설정 저장"
+            '설정 저장'
           )}
         </Button>
       </div>

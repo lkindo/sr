@@ -5,11 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import {
-  MemoryRateLimiter,
-  RateLimitResult,
   getClientIdentifier,
+  MemoryRateLimiter,
   rateLimiters,
+  RateLimitResult,
 } from './rate-limiter';
 
 /**
@@ -58,10 +59,7 @@ export interface RateLimitMiddlewareOptions {
 /**
  * Rate Limit 헤더 추가
  */
-function addRateLimitHeaders(
-  response: NextResponse,
-  result: RateLimitResult
-): NextResponse {
+function addRateLimitHeaders(response: NextResponse, result: RateLimitResult): NextResponse {
   response.headers.set('X-RateLimit-Limit', result.limit.toString());
   response.headers.set('X-RateLimit-Remaining', result.remaining.toString());
   response.headers.set('X-RateLimit-Reset', new Date(Date.now() + result.resetTime).toISOString());
@@ -91,14 +89,14 @@ function addRateLimitHeaders(
  * );
  * ```
  */
-export function withRateLimit<T extends NextRequest = NextRequest, P = Promise<Record<string, string>>>(
+export function withRateLimit<
+  T extends NextRequest = NextRequest,
+  P = Promise<Record<string, string>>,
+>(
   handler: (request: T, context: { params: P }) => Promise<NextResponse>,
   options: RateLimitMiddlewareOptions
 ) {
-  return async (
-    request: T,
-    context: { params: P }
-  ): Promise<NextResponse> => {
+  return async (request: T, context: { params: P }): Promise<NextResponse> => {
     const {
       limiter,
       keyGenerator = getClientIdentifier,
@@ -189,7 +187,10 @@ export function rateLimit<T extends NextRequest = NextRequest, P = Promise<Recor
  * );
  * ```
  */
-export function withUserRateLimit<T extends NextRequest = NextRequest, P = Promise<Record<string, string>>>(
+export function withUserRateLimit<
+  T extends NextRequest = NextRequest,
+  P = Promise<Record<string, string>>,
+>(
   handler: (request: T, context: { params: P }) => Promise<NextResponse>,
   options: Omit<RateLimitMiddlewareOptions, 'keyGenerator'> & {
     getUserId?: (request: T) => Promise<string | null>;

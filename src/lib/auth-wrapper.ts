@@ -5,10 +5,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
+import type { AuthenticatedSession } from '@/types/session';
+
 import { handleApiError } from './api-error-handler';
 import { UnauthorizedError } from './errors';
-import type { AuthenticatedSession } from '@/types/session';
 
 /**
  * 인증된 사용자 정보를 포함하는 컨텍스트
@@ -91,9 +93,10 @@ export function withAuth<T extends NextRequest = NextRequest, P = Promise<Record
  * });
  * ```
  */
-export function withErrorHandler<T extends NextRequest = NextRequest, P = Promise<Record<string, string>>>(
-  handler: (request: T, context: { params: P }) => Promise<NextResponse>
-) {
+export function withErrorHandler<
+  T extends NextRequest = NextRequest,
+  P = Promise<Record<string, string>>,
+>(handler: (request: T, context: { params: P }) => Promise<NextResponse>) {
   return async (request: T, routeContext: { params: P }): Promise<NextResponse> => {
     try {
       return await handler(request, routeContext);
@@ -118,7 +121,10 @@ export function withErrorHandler<T extends NextRequest = NextRequest, P = Promis
  * );
  * ```
  */
-export function withAuthAndRateLimit<T extends NextRequest = NextRequest, P = Promise<Record<string, string>>>(
+export function withAuthAndRateLimit<
+  T extends NextRequest = NextRequest,
+  P = Promise<Record<string, string>>,
+>(
   handler: (request: T, context: AuthenticatedContext<P>) => Promise<NextResponse>,
   rateLimitOptions: {
     preset?: 'strict' | 'standard' | 'relaxed' | 'fileUpload';
@@ -127,8 +133,5 @@ export function withAuthAndRateLimit<T extends NextRequest = NextRequest, P = Pr
   // Rate limiting을 먼저 적용하고, 그 다음 인증 체크
   const { rateLimit } = require('./api-rate-limit');
 
-  return rateLimit(
-    withAuth(handler),
-    rateLimitOptions.preset
-  );
+  return rateLimit(withAuth(handler), rateLimitOptions.preset);
 }

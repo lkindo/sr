@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+
+import { ForbiddenError, UnauthorizedError } from '@/lib/errors';
 
 // Mock auth before importing helpers
 vi.mock('@/auth', () => ({
@@ -29,15 +30,22 @@ describe('Action Helpers', () => {
   describe('getAuthenticatedSession', () => {
     it('throws UnauthorizedError if no session', async () => {
       const { auth } = await import('@/auth');
-      vi.mocked(auth).mockResolvedValue(null);
+      vi.mocked(auth).mockResolvedValue(null as any);
       await expect(helpers.getAuthenticatedSession()).rejects.toThrow(UnauthorizedError);
     });
 
     it('returns session if authenticated', async () => {
       const { auth } = await import('@/auth');
       const mockSession = {
-        user: { id: 'u1', name: 'N', email: 'test@example.com', roles: ['ADMIN'], permissions: [], clientIds: [] },
-        expires: '2099-01-01'
+        user: {
+          id: 'u1',
+          name: 'N',
+          email: 'test@example.com',
+          roles: ['ADMIN'],
+          permissions: [],
+          clientIds: [],
+        },
+        expires: '2099-01-01',
       };
       vi.mocked(auth).mockResolvedValue(mockSession as any);
       const result = await helpers.getAuthenticatedSession();
@@ -54,7 +62,9 @@ describe('Action Helpers', () => {
 
     it('throws when permission service throws', async () => {
       mockRequirePermission.mockRejectedValue(new ForbiddenError('No permission'));
-      await expect(helpers.requirePermission('user-123', 'sr:delete')).rejects.toThrow(ForbiddenError);
+      await expect(helpers.requirePermission('user-123', 'sr:delete')).rejects.toThrow(
+        ForbiddenError
+      );
     });
   });
 
@@ -62,8 +72,15 @@ describe('Action Helpers', () => {
     it('returns session when authenticated and authorized', async () => {
       const { auth } = await import('@/auth');
       const mockSession = {
-        user: { id: 'u1', name: 'Test', email: 'test@example.com', roles: ['ADMIN'], permissions: [], clientIds: [] },
-        expires: '2099-01-01'
+        user: {
+          id: 'u1',
+          name: 'Test',
+          email: 'test@example.com',
+          roles: ['ADMIN'],
+          permissions: [],
+          clientIds: [],
+        },
+        expires: '2099-01-01',
       };
       vi.mocked(auth).mockResolvedValue(mockSession as any);
       mockRequirePermission.mockResolvedValue(undefined);
@@ -76,7 +93,7 @@ describe('Action Helpers', () => {
 
     it('throws UnauthorizedError when not authenticated', async () => {
       const { auth } = await import('@/auth');
-      vi.mocked(auth).mockResolvedValue(null);
+      vi.mocked(auth).mockResolvedValue(null as any);
 
       await expect(helpers.authenticateAndAuthorize('sr:read')).rejects.toThrow(UnauthorizedError);
     });
@@ -84,8 +101,15 @@ describe('Action Helpers', () => {
     it('throws ForbiddenError when not authorized', async () => {
       const { auth } = await import('@/auth');
       const mockSession = {
-        user: { id: 'u1', name: 'Test', email: 'test@example.com', roles: ['USER'], permissions: [], clientIds: [] },
-        expires: '2099-01-01'
+        user: {
+          id: 'u1',
+          name: 'Test',
+          email: 'test@example.com',
+          roles: ['USER'],
+          permissions: [],
+          clientIds: [],
+        },
+        expires: '2099-01-01',
       };
       vi.mocked(auth).mockResolvedValue(mockSession as any);
       mockRequirePermission.mockRejectedValue(new ForbiddenError('Insufficient permissions'));
@@ -114,7 +138,11 @@ describe('Action Helpers', () => {
     });
 
     it('throws on non-ZodError', () => {
-      const buggedSchema = { parse: () => { throw new Error('Bug'); } } as any;
+      const buggedSchema = {
+        parse: () => {
+          throw new Error('Bug');
+        },
+      } as any;
       expect(() => helpers.validateWithSchema({}, buggedSchema)).toThrow('Bug');
     });
   });
@@ -128,7 +156,12 @@ describe('Action Helpers', () => {
 
     it('returns fail result for ZodError', async () => {
       const zodError = new z.ZodError([
-        { code: 'invalid_type', expected: 'string', path: ['id'], message: 'Expected string' } as any
+        {
+          code: 'invalid_type',
+          expected: 'string',
+          path: ['id'],
+          message: 'Expected string',
+        } as any,
       ]);
       const action = vi.fn().mockRejectedValue(zodError);
 

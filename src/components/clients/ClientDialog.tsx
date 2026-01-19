@@ -1,7 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from 'react';
+
+import { createClientAction, updateClientAction } from '@/actions/client.actions';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -9,12 +12,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { createClientAction, updateClientAction } from "@/actions/client.actions";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -37,21 +38,16 @@ interface ClientDialogProps {
   onSaved: () => void;
 }
 
-export function ClientDialog({
-  open,
-  onOpenChange,
-  client,
-  onSaved,
-}: ClientDialogProps) {
-  const [code, setCode] = useState("");
-  const [name, setName] = useState("");
-  const [industry, setIndustry] = useState("");
-  const [contactPerson, setContactPerson] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [contractStartDate, setContractStartDate] = useState("");
-  const [contractEndDate, setContractEndDate] = useState("");
+export function ClientDialog({ open, onOpenChange, client, onSaved }: ClientDialogProps) {
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [industry, setIndustry] = useState('');
+  const [contactPerson, setContactPerson] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [contractStartDate, setContractStartDate] = useState('');
+  const [contractEndDate, setContractEndDate] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -60,52 +56,49 @@ export function ClientDialog({
     if (client) {
       setCode(client.code);
       setName(client.name);
-      setIndustry(client.industry || "");
-      setContactPerson(client.contactPerson || "");
-      setContactEmail(client.contactEmail || "");
-      setContactPhone(client.contactPhone || "");
-      setAddress(client.address || "");
+      setIndustry(client.industry || '');
+      setContactPerson(client.contactPerson || '');
+      setContactEmail(client.contactEmail || '');
+      setContactPhone(client.contactPhone || '');
+      setAddress(client.address || '');
       setContractStartDate(
         client.contractStartDate
-          ? new Date(client.contractStartDate).toISOString().split("T")[0]
-          : ""
+          ? new Date(client.contractStartDate).toISOString().split('T')[0]
+          : ''
       );
       setContractEndDate(
-        client.contractEndDate
-          ? new Date(client.contractEndDate).toISOString().split("T")[0]
-          : ""
+        client.contractEndDate ? new Date(client.contractEndDate).toISOString().split('T')[0] : ''
       );
       setIsActive(client.isActive);
     } else {
-      setCode("");
-      setName("");
-      setIndustry("");
-      setContactPerson("");
-      setContactEmail("");
-      setContactPhone("");
-      setAddress("");
-      setContractStartDate("");
-      setContractEndDate("");
+      setCode('');
+      setName('');
+      setIndustry('');
+      setContactPerson('');
+      setContactEmail('');
+      setContactPhone('');
+      setAddress('');
+      setContractStartDate('');
+      setContractEndDate('');
       setIsActive(true);
     }
   }, [client, open]);
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     const formData = new FormData();
-    formData.append("code", code);
-    formData.append("name", name);
-    formData.append("industry", industry);
-    formData.append("contactPerson", contactPerson);
-    formData.append("contactEmail", contactEmail);
-    formData.append("contactPhone", contactPhone);
-    formData.append("address", address);
-    formData.append("contractStartDate", contractStartDate);
-    formData.append("contractEndDate", contractEndDate);
-    formData.append("isActive", String(isActive));
+    formData.append('code', code);
+    formData.append('name', name);
+    formData.append('industry', industry);
+    formData.append('contactPerson', contactPerson);
+    formData.append('contactEmail', contactEmail);
+    formData.append('contactPhone', contactPhone);
+    formData.append('address', address);
+    formData.append('contractStartDate', contractStartDate);
+    formData.append('contractEndDate', contractEndDate);
+    formData.append('isActive', String(isActive));
 
     try {
       let result;
@@ -116,25 +109,20 @@ export function ClientDialog({
       }
 
       if (!result.success) {
-        throw new Error(result.error || "고객사 저장에 실패했습니다.");
+        throw new Error(result.error || '고객사 저장에 실패했습니다.');
       }
 
       toast({
-        title: "성공",
-        description: client
-          ? "고객사가 수정되었습니다."
-          : "고객사가 생성되었습니다.",
+        title: '성공',
+        description: client ? '고객사가 수정되었습니다.' : '고객사가 생성되었습니다.',
       });
 
       onSaved();
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error
-            ? error.message
-            : "고객사 저장에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '고객사 저장에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -145,13 +133,9 @@ export function ClientDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {client ? "고객사 수정" : "새 고객사 추가"}
-          </DialogTitle>
+          <DialogTitle>{client ? '고객사 수정' : '새 고객사 추가'}</DialogTitle>
           <DialogDescription>
-            {client
-              ? "고객사 정보를 수정합니다."
-              : "새로운 고객사를 등록합니다."}
+            {client ? '고객사 정보를 수정합니다.' : '새로운 고객사를 등록합니다.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -268,10 +252,7 @@ export function ClientDialog({
                 onCheckedChange={(checked) => setIsActive(checked as boolean)}
                 disabled={loading}
               />
-              <Label
-                htmlFor="isActive"
-                className="text-sm font-normal cursor-pointer"
-              >
+              <Label htmlFor="isActive" className="text-sm font-normal cursor-pointer">
                 활성 상태
               </Label>
             </div>
@@ -286,7 +267,7 @@ export function ClientDialog({
               취소
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "저장 중..." : "저장"}
+              {loading ? '저장 중...' : '저장'}
             </Button>
           </DialogFooter>
         </form>

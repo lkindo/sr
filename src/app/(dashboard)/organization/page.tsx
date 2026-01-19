@@ -1,23 +1,28 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Building2, Users, Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { useDebounce } from "@/hooks/use-debounce";
-import { ClientDialog } from "@/components/clients/ClientDialog";
-import { UserDialog } from "@/components/users/UserDialog";
-import { OrganizationTree, type Client, type User } from "@/components/organization/OrganizationTree";
-import { UserReassignDialog } from "@/components/organization/UserReassignDialog";
-import type { DragEndEvent, DragStartEvent, DragOverEvent } from "@dnd-kit/core";
+import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
+import { Building2, Plus, Search, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { ClientDialog } from '@/components/clients/ClientDialog';
+import {
+  type Client,
+  OrganizationTree,
+  type User,
+} from '@/components/organization/OrganizationTree';
+import { UserReassignDialog } from '@/components/organization/UserReassignDialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { UserDialog } from '@/components/users/UserDialog';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useToast } from '@/hooks/use-toast';
 
 export default function OrganizationPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [clientUsers, setClientUsers] = useState<Record<string, User[]>>({});
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [isClientDialogOpen, setIsClientDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -45,16 +50,16 @@ export default function OrganizationPage() {
   const fetchClients = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/clients?pageSize=1000");
-      if (!response.ok) throw new Error("Failed to fetch clients");
+      const response = await fetch('/api/clients?pageSize=1000');
+      if (!response.ok) throw new Error('Failed to fetch clients');
       const result = await response.json();
-      const clientData = Array.isArray(result) ? result : (result.data || []);
+      const clientData = Array.isArray(result) ? result : result.data || [];
       setClients(clientData);
     } catch {
       toast({
-        title: "오류",
-        description: "고객사 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '고객사 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -81,9 +86,9 @@ export default function OrganizationPage() {
         } catch {
           // 에러는 toast로 사용자에게 표시
           toast({
-            title: "오류",
-            description: "사용자 정보를 불러오는데 실패했습니다.",
-            variant: "destructive",
+            title: '오류',
+            description: '사용자 정보를 불러오는데 실패했습니다.',
+            variant: 'destructive',
           });
         }
       }
@@ -114,7 +119,7 @@ export default function OrganizationPage() {
   // 고객사 상태 변경 핸들러
   const handleToggleClientStatus = async (clientId: string) => {
     try {
-      const client = clients.find(c => c.id === clientId);
+      const client = clients.find((c) => c.id === clientId);
       if (!client) return;
 
       const response = await fetch(`/api/clients/${clientId}`, {
@@ -127,14 +132,14 @@ export default function OrganizationPage() {
 
       await fetchClients();
       toast({
-        title: "성공",
-        description: `${client.name}이(가) ${client.isActive ? "비활성화" : "활성화"}되었습니다.`,
+        title: '성공',
+        description: `${client.name}이(가) ${client.isActive ? '비활성화' : '활성화'}되었습니다.`,
       });
     } catch {
       toast({
-        title: "오류",
-        description: "상태 변경 중 오류가 발생했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '상태 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
       });
     }
   };
@@ -165,14 +170,14 @@ export default function OrganizationPage() {
       }
 
       toast({
-        title: "성공",
-        description: "사용자 상태가 변경되었습니다.",
+        title: '성공',
+        description: '사용자 상태가 변경되었습니다.',
       });
     } catch {
       toast({
-        title: "오류",
-        description: "상태 변경 중 오류가 발생했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '상태 변경 중 오류가 발생했습니다.',
+        variant: 'destructive',
       });
     }
   };
@@ -203,22 +208,22 @@ export default function OrganizationPage() {
     // 같은 고객사로 드롭하면 무시
     if (sourceClientId === targetClientId) {
       toast({
-        title: "알림",
-        description: "같은 고객사로는 이동할 수 없습니다.",
-        variant: "default",
+        title: '알림',
+        description: '같은 고객사로는 이동할 수 없습니다.',
+        variant: 'default',
       });
       return;
     }
 
     // 고객사 정보 찾기
-    const sourceClient = clients.find(c => c.id === sourceClientId);
-    const targetClient = clients.find(c => c.id === targetClientId);
+    const sourceClient = clients.find((c) => c.id === sourceClientId);
+    const targetClient = clients.find((c) => c.id === targetClientId);
 
     if (!sourceClient || !targetClient) {
       toast({
-        title: "오류",
-        description: "고객사 정보를 찾을 수 없습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '고객사 정보를 찾을 수 없습니다.',
+        variant: 'destructive',
       });
       return;
     }
@@ -249,7 +254,7 @@ export default function OrganizationPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clientId: reassignData.targetClientId,
-          force
+          force,
         }),
       });
 
@@ -271,20 +276,24 @@ export default function OrganizationPage() {
       // 데이터를 먼저 모두 가져온 후 상태를 한 번에 업데이트 (깜빡임 방지)
       const [clientsResponse, ...userResponses] = await Promise.all([
         // 1. 고객사 목록 가져오기
-        fetch("/api/clients?pageSize=1000").then(res => res.ok ? res.json() : null),
+        fetch('/api/clients?pageSize=1000').then((res) => (res.ok ? res.json() : null)),
         // 2. 양쪽 고객사의 사용자 목록 가져오기
         ...[reassignData.sourceClientId, reassignData.targetClientId]
-          .filter(clientId => expandedClients.has(clientId))
-          .map(clientId =>
+          .filter((clientId) => expandedClients.has(clientId))
+          .map((clientId) =>
             fetch(`/api/clients/${clientId}`)
-              .then(res => res.ok ? res.json().then(data => ({ clientId, users: data.users || [] })) : null)
+              .then((res) =>
+                res.ok ? res.json().then((data) => ({ clientId, users: data.users || [] })) : null
+              )
               .catch(() => null)
-          )
+          ),
       ]);
 
       // 상태를 한 번에 업데이트
       if (clientsResponse) {
-        const clientData = Array.isArray(clientsResponse) ? clientsResponse : (clientsResponse.data || []);
+        const clientData = Array.isArray(clientsResponse)
+          ? clientsResponse
+          : clientsResponse.data || [];
         setClients(clientData);
       }
 
@@ -297,14 +306,14 @@ export default function OrganizationPage() {
       });
 
       if (Object.keys(newClientUsers).length > 0) {
-        setClientUsers(prev => ({
+        setClientUsers((prev) => ({
           ...prev,
           ...newClientUsers,
         }));
       }
 
       toast({
-        title: "성공",
+        title: '성공',
         description: `${reassignData.userName}이(가) ${reassignData.targetClientName}(으)로 이동되었습니다.${result.data?.ongoingSRsHandled > 0 ? ` (진행 중인 SR ${result.data.ongoingSRsHandled}건 유지됨)` : ''}`,
       });
 
@@ -314,11 +323,12 @@ export default function OrganizationPage() {
       setOngoingSRs([]);
       setShowWarning(false);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "소속 변경 중 오류가 발생했습니다.";
+      const errorMessage =
+        error instanceof Error ? error.message : '소속 변경 중 오류가 발생했습니다.';
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsReassigning(false);
@@ -365,7 +375,7 @@ export default function OrganizationPage() {
   const filteredClients = clients.filter((client) =>
     debouncedSearchQuery
       ? client.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-      client.code.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+        client.code.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
       : true
   );
 
@@ -442,9 +452,7 @@ export default function OrganizationPage() {
       <div className="sr-card-template bg-white">
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
-              조직 트리
-            </h3>
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">조직 트리</h3>
             <div className="relative w-80">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input

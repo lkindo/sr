@@ -1,38 +1,82 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useCallback } from "react";
-import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { usePermissions } from "@/hooks/use-permissions";
-import { Plus, Filter, Search, ArrowUpDown, ArrowUp, ArrowDown, Clock, User, AlertCircle, AlertTriangle, TrendingUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreateSRDialog } from "@/components/srs/CreateSRDialog";
-import { getDueDateStatus } from "@/lib/date-utils";
-import { SRService } from "@/services/sr.service";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Clock,
+  Filter,
+  Plus,
+  Search,
+  TrendingUp,
+  User,
+} from 'lucide-react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useCallback, useMemo, useState } from 'react';
+
+import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { usePermissions } from '@/hooks/use-permissions';
+import { getDueDateStatus } from '@/lib/date-utils';
+import { SRService } from '@/services/sr.service';
 
 // These types and constants can be moved to a shared file if needed
 const statusLabels: Record<string, string> = {
-  REQUESTED: "요청됨", INTAKE: "접수", IN_PROGRESS: "진행중", ON_HOLD: "대기",
-  COMPLETED: "완료", CONFIRMED: "확인완료", REJECTED: "거부",
+  REQUESTED: '요청됨',
+  INTAKE: '접수',
+  IN_PROGRESS: '진행중',
+  ON_HOLD: '대기',
+  COMPLETED: '완료',
+  CONFIRMED: '확인완료',
+  REJECTED: '거부',
 };
-const priorityLabels: Record<string, string> = { CRITICAL: "긴급", HIGH: "높음", MEDIUM: "보통", LOW: "낮음" };
-const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
-  REQUESTED: "secondary", INTAKE: "default", IN_PROGRESS: "default", ON_HOLD: "secondary",
-  COMPLETED: "default", CONFIRMED: "default", REJECTED: "destructive",
+const priorityLabels: Record<string, string> = {
+  CRITICAL: '긴급',
+  HIGH: '높음',
+  MEDIUM: '보통',
+  LOW: '낮음',
 };
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
-  CRITICAL: "destructive", HIGH: "destructive", MEDIUM: "default", LOW: "secondary",
+const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  REQUESTED: 'secondary',
+  INTAKE: 'default',
+  IN_PROGRESS: 'default',
+  ON_HOLD: 'secondary',
+  COMPLETED: 'default',
+  CONFIRMED: 'default',
+  REJECTED: 'destructive',
+};
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
 
-type SortField = "srNumber" | "title" | "client" | "priority" | "status" | "createdAt" | "dueDate";
-type SortOrder = "asc" | "desc";
+type SortField = 'srNumber' | 'title' | 'client' | 'priority' | 'status' | 'createdAt' | 'dueDate';
+type SortOrder = 'asc' | 'desc';
 
 // SR 타입 정의
 type SRListItem = Awaited<ReturnType<SRService['getAllSRs']>>[number];
@@ -52,12 +96,12 @@ export function SRsDataTable({
   srs,
   paginationInfo,
   clients,
-  users
+  users,
 }: {
   srs: SRListItem[];
   paginationInfo: PaginationInfo;
   clients: ClientListItem[];
-  users: UserListItem[]
+  users: UserListItem[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -67,40 +111,46 @@ export function SRsDataTable({
   const { hasAnyRole } = usePermissions();
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
-  const isClientUser = !hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
+  const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Read state from URL search params, with defaults
 
-  const itemsPerPage = searchParams.get("itemsPerPage") ?? "20";
-  const sort = searchParams.get("sort") ?? "createdAt.desc";
-  const [sortField, sortOrder] = sort.split(".") as [SortField, SortOrder];
+  const itemsPerPage = searchParams.get('itemsPerPage') ?? '20';
+  const sort = searchParams.get('sort') ?? 'createdAt.desc';
+  const [sortField, sortOrder] = sort.split('.') as [SortField, SortOrder];
 
-  const filters = useMemo(() => ({
-    status: searchParams.get("status") ?? "all",
-    priority: searchParams.get("priority") ?? "all",
-    clientId: searchParams.get("clientId") ?? "all",
-    assigneeId: searchParams.get("assigneeId") ?? "all",
-    search: searchParams.get("search") ?? "",
-    dateFrom: searchParams.get("dateFrom") ?? "",
-    dateTo: searchParams.get("dateTo") ?? "",
-  }), [searchParams]);
+  const filters = useMemo(
+    () => ({
+      status: searchParams.get('status') ?? 'all',
+      priority: searchParams.get('priority') ?? 'all',
+      clientId: searchParams.get('clientId') ?? 'all',
+      assigneeId: searchParams.get('assigneeId') ?? 'all',
+      search: searchParams.get('search') ?? '',
+      dateFrom: searchParams.get('dateFrom') ?? '',
+      dateTo: searchParams.get('dateTo') ?? '',
+    }),
+    [searchParams]
+  );
 
   const [searchQuery, setSearchQuery] = useState(filters.search);
 
-  const createQueryString = useCallback((params: Record<string, string | number | null>) => {
-    const newSearchParams = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(params)) {
-      if (value === null || value === "all" || value === "") {
-        newSearchParams.delete(key);
-      } else {
-        newSearchParams.set(key, String(value));
+  const createQueryString = useCallback(
+    (params: Record<string, string | number | null>) => {
+      const newSearchParams = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(params)) {
+        if (value === null || value === 'all' || value === '') {
+          newSearchParams.delete(key);
+        } else {
+          newSearchParams.set(key, String(value));
+        }
       }
-    }
-    return newSearchParams.toString();
-  }, [searchParams]);
+      return newSearchParams.toString();
+    },
+    [searchParams]
+  );
 
   const handleFilterChange = (key: string, value: string) => {
     // When filtering, always go back to the first page
@@ -108,28 +158,30 @@ export function SRsDataTable({
   };
 
   const handleSort = (field: SortField) => {
-    const newOrder = sortField === field && sortOrder === "asc" ? "desc" : "asc";
+    const newOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
     router.push(`${pathname}?${createQueryString({ sort: `${field}.${newOrder}` })}`);
   };
-
-
 
   const handleItemsPerPageChange = (value: string) => {
     router.push(`${pathname}?${createQueryString({ itemsPerPage: value, page: 1 })}`);
   };
 
   const handleSearch = () => {
-    handleFilterChange("search", searchQuery);
+    handleFilterChange('search', searchQuery);
   };
 
   const resetFilters = () => {
-    setSearchQuery("");
+    setSearchQuery('');
     router.push(pathname);
   };
 
   const getSortIcon = (field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortOrder === "asc" ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="ml-2 h-4 w-4" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4" />
+    );
   };
 
   const handleSRCreated = () => {
@@ -140,27 +192,28 @@ export function SRsDataTable({
 
   // Calculate filter counts
   const waitingCount = useMemo(() => {
-    return srs.filter(sr => sr.status === 'REQUESTED').length;
+    return srs.filter((sr) => sr.status === 'REQUESTED').length;
   }, [srs]);
 
-
-
   const urgentCount = useMemo(() => {
-    return srs.filter(sr => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;
+    return srs.filter((sr) => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;
   }, [srs]);
 
   const inProgressCount = useMemo(() => {
-    return srs.filter(sr => sr.status === 'IN_PROGRESS').length;
+    return srs.filter((sr) => sr.status === 'IN_PROGRESS').length;
   }, [srs]);
 
   const dueTodayCount = useMemo(() => {
-    return srs.filter(sr => {
+    return srs.filter((sr) => {
       if (!sr.dueDate) return false;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const due = new Date(sr.dueDate);
       due.setHours(0, 0, 0, 0);
-      return due.getTime() === today.getTime() && ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status);
+      return (
+        due.getTime() === today.getTime() &&
+        ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)
+      );
     }).length;
   }, [srs]);
 
@@ -223,11 +276,14 @@ export function SRsDataTable({
               <div className="flex items-center justify-between gap-2 mb-4">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${activeQuickFilter === 'waiting'
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                      : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
-                      }`}
+                    onClick={() =>
+                      handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
+                    }
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      activeQuickFilter === 'waiting'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                    }`}
                   >
                     <Clock className="h-4 w-4" />
                     <span>접수 대기</span>
@@ -238,21 +294,27 @@ export function SRsDataTable({
                     )}
                   </button>
                   <button
-                    onClick={() => handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${activeQuickFilter === 'myAssigned'
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                      : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
-                      }`}
+                    onClick={() =>
+                      handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
+                    }
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      activeQuickFilter === 'myAssigned'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                    }`}
                   >
                     <User className="h-4 w-4" />
                     <span>내 담당</span>
                   </button>
                   <button
-                    onClick={() => handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${activeQuickFilter === 'urgent'
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                      : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
-                      }`}
+                    onClick={() =>
+                      handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
+                    }
+                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                      activeQuickFilter === 'urgent'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                    }`}
                   >
                     <AlertTriangle className="h-4 w-4" />
                     <span>긴급</span>
@@ -281,49 +343,67 @@ export function SRsDataTable({
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div>
                       <Label className="text-sm mb-2 block">상태</Label>
-                      <Select value={filters.status} onValueChange={(v) => handleFilterChange('status', v)}>
+                      <Select
+                        value={filters.status}
+                        onValueChange={(v) => handleFilterChange('status', v)}
+                      >
                         <SelectTrigger className="sr-input-template w-full">
                           <SelectValue placeholder="모든 상태" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">모든 상태</SelectItem>
                           {Object.entries(statusLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label className="text-sm mb-2 block">우선순위</Label>
-                      <Select value={filters.priority} onValueChange={(v) => handleFilterChange('priority', v)}>
+                      <Select
+                        value={filters.priority}
+                        onValueChange={(v) => handleFilterChange('priority', v)}
+                      >
                         <SelectTrigger className="sr-input-template w-full">
                           <SelectValue placeholder="모든 우선순위" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">모든 우선순위</SelectItem>
                           {Object.entries(priorityLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>{label}</SelectItem>
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label className="text-sm mb-2 block">고객사</Label>
-                      <Select value={filters.clientId} onValueChange={(v) => handleFilterChange('clientId', v)}>
+                      <Select
+                        value={filters.clientId}
+                        onValueChange={(v) => handleFilterChange('clientId', v)}
+                      >
                         <SelectTrigger className="sr-input-template w-full">
                           <SelectValue placeholder="모든 고객사" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">모든 고객사</SelectItem>
                           {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div>
                       <Label className="text-sm mb-2 block">담당자</Label>
-                      <Select value={filters.assigneeId} onValueChange={(v) => handleFilterChange('assigneeId', v)}>
+                      <Select
+                        value={filters.assigneeId}
+                        onValueChange={(v) => handleFilterChange('assigneeId', v)}
+                      >
                         <SelectTrigger className="sr-input-template w-full">
                           <SelectValue placeholder="모든 담당자" />
                         </SelectTrigger>
@@ -331,7 +411,9 @@ export function SRsDataTable({
                           <SelectItem value="all">모든 담당자</SelectItem>
                           <SelectItem value="unassigned">미배정</SelectItem>
                           {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -397,45 +479,101 @@ export function SRsDataTable({
           <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("srNumber")}>SR 번호{getSortIcon("srNumber")}</Button></TableHead>
-                <TableHead className="min-w-[150px]"><Button variant="ghost" onClick={() => handleSort("title")}>제목{getSortIcon("title")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("client")}>고객사{getSortIcon("client")}</Button></TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('srNumber')}>
+                    SR 번호{getSortIcon('srNumber')}
+                  </Button>
+                </TableHead>
+                <TableHead className="min-w-[150px]">
+                  <Button variant="ghost" onClick={() => handleSort('title')}>
+                    제목{getSortIcon('title')}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('client')}>
+                    고객사{getSortIcon('client')}
+                  </Button>
+                </TableHead>
                 <TableHead>요청자</TableHead>
                 <TableHead>담당자</TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("priority")}>우선순위{getSortIcon("priority")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("status")}>상태{getSortIcon("status")}</Button></TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("dueDate")}>마감일{getSortIcon("dueDate")}</Button></TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('priority')}>
+                    우선순위{getSortIcon('priority')}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('status')}>
+                    상태{getSortIcon('status')}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('dueDate')}>
+                    마감일{getSortIcon('dueDate')}
+                  </Button>
+                </TableHead>
                 <TableHead>댓글/첨부</TableHead>
-                <TableHead><Button variant="ghost" onClick={() => handleSort("createdAt")}>생성일{getSortIcon("createdAt")}</Button></TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => handleSort('createdAt')}>
+                    생성일{getSortIcon('createdAt')}
+                  </Button>
+                </TableHead>
                 <TableHead>작업</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {srs && srs.length > 0 ? (
                 srs.map((sr) => {
-                  const dueDateStatus = getDueDateStatus(sr.dueDate ? new Date(sr.dueDate).toISOString() : null, sr.status);
+                  const dueDateStatus = getDueDateStatus(
+                    sr.dueDate ? new Date(sr.dueDate).toISOString() : null,
+                    sr.status
+                  );
 
                   return (
-                    <TableRow key={sr.id} className="cursor-pointer" onClick={() => router.push(`/srs/${sr.id}`)}>
-                      <TableCell className="font-medium text-primary hover:underline text-center"><Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link></TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={sr.title}>{sr.title}</TableCell>
+                    <TableRow
+                      key={sr.id}
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/srs/${sr.id}`)}
+                    >
+                      <TableCell className="font-medium text-primary hover:underline text-center">
+                        <Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link>
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={sr.title}>
+                        {sr.title}
+                      </TableCell>
                       <TableCell>{sr.client.name}</TableCell>
                       <TableCell className="text-center">{sr.requester.name}</TableCell>
-                      <TableCell className="text-center">{sr.assignee?.name || "-"}</TableCell>
-                      <TableCell className="text-center"><Badge variant={priorityColors[sr.priority]}>{priorityLabels[sr.priority]}</Badge></TableCell>
-                      <TableCell className="text-center"><Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge></TableCell>
-                      <TableCell className="text-center">{dueDateStatus ? <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge> : '-'}</TableCell>
-                      <TableCell className="text-center">{sr._count?.comments || 0} / {sr._count?.attachments || 0}</TableCell>
+                      <TableCell className="text-center">{sr.assignee?.name || '-'}</TableCell>
                       <TableCell className="text-center">
-                        {new Date(sr.createdAt).toLocaleDateString("ko-KR", {
-                          year: 'numeric',
-                          month: '2-digit',
-                          day: '2-digit'
-                        }).replace(/\./g, '. ').trim()}
+                        <Badge variant={priorityColors[sr.priority]}>
+                          {priorityLabels[sr.priority]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {dueDateStatus ? (
+                          <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {sr._count?.comments || 0} / {sr._count?.attachments || 0}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {new Date(sr.createdAt)
+                          .toLocaleDateString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                          })
+                          .replace(/\./g, '. ')
+                          .trim()}
                       </TableCell>
                       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                         {/* ADMIN/MANAGER/ENGINEER만 접수 및 접수 수정 가능 */}
-                        {hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]) ? (
+                        {hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']) ? (
                           <>
                             {sr.status === 'REQUESTED' ? (
                               <Button
@@ -473,7 +611,11 @@ export function SRsDataTable({
                   );
                 })
               ) : (
-                <TableRow><TableCell colSpan={11} className="text-center py-8">데이터가 없습니다.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    데이터가 없습니다.
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
@@ -483,7 +625,10 @@ export function SRsDataTable({
         <div className="md:hidden space-y-4 p-4">
           {srs && srs.length > 0 ? (
             srs.map((sr) => {
-              const dueDateStatus = getDueDateStatus(sr.dueDate ? new Date(sr.dueDate).toISOString() : null, sr.status);
+              const dueDateStatus = getDueDateStatus(
+                sr.dueDate ? new Date(sr.dueDate).toISOString() : null,
+                sr.status
+              );
               return (
                 <div
                   key={sr.id}
@@ -493,7 +638,10 @@ export function SRsDataTable({
                   <div className="flex justify-between items-start">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <Link href={`/srs/${sr.id}`} className="font-medium text-primary hover:underline">
+                        <Link
+                          href={`/srs/${sr.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
                           {sr.srNumber}
                         </Link>
                         <Badge variant={statusColors[sr.status]} className="flex-shrink-0">
@@ -515,31 +663,42 @@ export function SRsDataTable({
                         </div>
                         <div className="flex">
                           <span className="text-muted-foreground w-20">담당자</span>
-                          <span>{sr.assignee?.name || "-"}</span>
+                          <span>{sr.assignee?.name || '-'}</span>
                         </div>
                         <div className="flex">
                           <span className="text-muted-foreground w-20">마감일</span>
-                          <span>{dueDateStatus ? <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge> : '-'}</span>
+                          <span>
+                            {dueDateStatus ? (
+                              <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge>
+                            ) : (
+                              '-'
+                            )}
+                          </span>
                         </div>
                         <div className="flex">
                           <span className="text-muted-foreground w-20">등록일</span>
-                          <span>{new Date(sr.createdAt).toLocaleDateString("ko-KR")}</span>
+                          <span>{new Date(sr.createdAt).toLocaleDateString('ko-KR')}</span>
                         </div>
                         <div className="flex">
                           <span className="text-muted-foreground w-20">댓글/첨부</span>
-                          <span>{sr._count?.comments || 0} / {sr._count?.attachments || 0}</span>
+                          <span>
+                            {sr._count?.comments || 0} / {sr._count?.attachments || 0}
+                          </span>
                         </div>
                       </div>
                     </div>
                     {/* ADMIN/MANAGER/ENGINEER만 접수 및 접수 수정 가능 */}
-                    {hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]) ? (
+                    {hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']) ? (
                       <>
                         {sr.status === 'REQUESTED' && (
                           <Button
                             variant="default"
                             size="sm"
                             className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
-                            onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}/intake`); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/srs/${sr.id}/intake`);
+                            }}
                           >
                             접수
                           </Button>
@@ -548,7 +707,10 @@ export function SRsDataTable({
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); router.push(`/srs/${sr.id}/intake`); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/srs/${sr.id}/intake`);
+                            }}
                             title="접수 정보 수정"
                           >
                             <Clock className="h-4 w-4" />
@@ -573,7 +735,9 @@ export function SRsDataTable({
               </SelectTrigger>
               <SelectContent>
                 {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={String(option)}>{option}</SelectItem>
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -582,7 +746,11 @@ export function SRsDataTable({
         </div>
       </div>
 
-      <CreateSRDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} onCreated={handleSRCreated} />
+      <CreateSRDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onCreated={handleSRCreated}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+
+import prisma from '@/lib/prisma';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -10,15 +11,15 @@ export async function GET() {
   try {
     // SR 처리에 필요한 권한 목록
     const requiredPermissions = [
-      "SR:CREATE",
-      "SR:READ",
-      "SR:UPDATE",
-      "SR:DELETE",
-      "SR:ASSIGN",
-      "SR:STATUS_CHANGE",
-      "COMMENT:CREATE",
-      "COMMENT:READ",
-      "COMMENT:UPDATE",
+      'SR:CREATE',
+      'SR:READ',
+      'SR:UPDATE',
+      'SR:DELETE',
+      'SR:ASSIGN',
+      'SR:STATUS_CHANGE',
+      'COMMENT:CREATE',
+      'COMMENT:READ',
+      'COMMENT:UPDATE',
     ];
 
     // 모든 활성 사용자 조회 (권한 포함)
@@ -45,7 +46,7 @@ export async function GET() {
         },
       },
       orderBy: {
-        name: "asc",
+        name: 'asc',
       },
     });
 
@@ -62,9 +63,7 @@ export async function GET() {
       });
 
       // 필요한 모든 권한을 가지고 있는지 확인
-      return requiredPermissions.every((permission) =>
-        userPermissions.has(permission)
-      );
+      return requiredPermissions.every((permission) => userPermissions.has(permission));
     });
 
     // 응답 데이터 정리 (권한 정보 제외)
@@ -76,9 +75,9 @@ export async function GET() {
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error("Error fetching SR handlers:", error);
+    console.error('Error fetching SR handlers:', error);
     return NextResponse.json(
-      { error: "SR 담당자 목록을 불러오는데 실패했습니다." },
+      { error: 'SR 담당자 목록을 불러오는데 실패했습니다.' },
       { status: 500 }
     );
   }

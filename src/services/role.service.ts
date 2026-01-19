@@ -1,34 +1,39 @@
-import { z } from "zod";
-import { roleCreateSchema, roleUpdateSchema } from "@/lib/schemas";
-import { NotFoundError, ReferentialIntegrityError } from "@/lib/errors";
-import { invalidateCache, invalidateCachePattern } from "@/lib/redis-cache";
-import prisma from "@/lib/prisma";
-import type { Role, Permission } from "@prisma/client";
+import type { Permission, Role } from '@prisma/client';
+import { z } from 'zod';
+
+import { NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
+import prisma from '@/lib/prisma';
+import { invalidateCache, invalidateCachePattern } from '@/lib/redis-cache';
+import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
 
 type RoleCreateData = z.infer<typeof roleCreateSchema>;
 type RoleUpdateData = z.infer<typeof roleUpdateSchema>;
 
 export class RoleService {
-  constructor() { }
+  constructor() {}
 
   async getRoleById(id: string): Promise<Role | null> {
     return prisma.role.findUnique({ where: { id } });
   }
 
-  async getAllRoles(): Promise<(Role & {
-    permissions: Array<{
-      permission: Permission;
-    }>;
-    _count: {
-      users: number;
-    };
-  })[]> {
+  async getAllRoles(): Promise<
+    (Role & {
+      permissions: Array<{
+        permission: Permission;
+      }>;
+      _count: {
+        users: number;
+      };
+    })[]
+  > {
     return prisma.role.findMany({
       include: {
         permissions: { include: { permission: true } },
         _count: { select: { users: true } },
       },
-    }) as Promise<(Role & { permissions: { permission: Permission }[]; _count: { users: number } })[]>;
+    }) as Promise<
+      (Role & { permissions: { permission: Permission }[]; _count: { users: number } })[]
+    >;
   }
 
   async createRole(data: RoleCreateData): Promise<Role> {
@@ -45,7 +50,7 @@ export class RoleService {
     // 역할 삭제 전 관련 데이터 확인
     const role = await prisma.role.findUnique({ where: { id } });
     if (!role) {
-      throw new NotFoundError("역할", id);
+      throw new NotFoundError('역할', id);
     }
 
     // 참조 무결성 확인
@@ -55,12 +60,12 @@ export class RoleService {
     if (usersCount > 0) {
       throw new ReferentialIntegrityError(
         `역할을 삭제할 수 없습니다. ${usersCount}명의 사용자가 이 역할을 사용 중입니다. ` +
-        `먼저 사용자의 역할을 변경한 후 삭제하세요.`
+          `먼저 사용자의 역할을 변경한 후 삭제하세요.`
       );
     }
 
     if (permissionsCount > 0) {
-      const { logger } = await import("@/lib/logger");
+      const { logger } = await import('@/lib/logger');
       logger.info(`역할 삭제 시 ${permissionsCount}개의 권한 연결이 함께 삭제됩니다.`, {
         roleId: id,
         permissionsCount,
@@ -89,10 +94,10 @@ export class RoleService {
     });
 
     // 캐시 무효화 (역할 권한 변경 시 모든 사용자 권한 캐시 무효화)
-    await invalidateCachePattern("user:permissions:*");
-    await invalidateCachePattern("user:roles:*");
-    await invalidateCachePattern("user:full:*");
-    await invalidateCachePattern("role:list*");
+    await invalidateCachePattern('user:permissions:*');
+    await invalidateCachePattern('user:roles:*');
+    await invalidateCachePattern('user:full:*');
+    await invalidateCachePattern('role:list*');
 
     // 업데이트된 역할 정보 반환
     return this.getRoleById(roleId);

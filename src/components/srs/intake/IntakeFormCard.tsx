@@ -2,12 +2,14 @@
  * SR 접수 정보 입력 폼 카드 컴포넌트
  */
 
-import { useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
-import { CalendarIcon, Clock, AlertCircle, User, CheckCircle } from "lucide-react";
-import { UseFormReturn } from "react-hook-form";
-import { Button } from "@/components/ui/button";
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { AlertCircle, CalendarIcon, CheckCircle, Clock, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { UseFormReturn } from 'react-hook-form';
+
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Form,
   FormControl,
@@ -16,26 +18,22 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-import { priorityLabels } from "@/lib/constants/sr";
-import type { IntakeFormValues } from "./useIntakeForm";
-import type { SRDetails } from "@/types/sr.types";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { priorityLabels } from '@/lib/constants/sr';
+import { cn } from '@/lib/utils';
+import type { SRDetails } from '@/types/sr.types';
+
+import type { IntakeFormValues } from './useIntakeForm';
 
 interface UserType {
   id: string;
@@ -71,7 +69,9 @@ export function IntakeFormCard({
             2
           </div>
           <div>
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">접수 정보 입력</h3>
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+              접수 정보 입력
+            </h3>
             <p className="text-sm text-muted-foreground mt-0.5">
               실제 우선순위, 예상 작업시간, 담당자 등을 결정하세요
             </p>
@@ -90,10 +90,7 @@ export function IntakeFormCard({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>실제 우선순위 *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="우선순위를 선택하세요" />
@@ -151,9 +148,7 @@ export function IntakeFormCard({
                       onChange={(e) => field.onChange(Number(e.target.value))}
                     />
                   </FormControl>
-                  <FormDescription>
-                    SLA 기준: {sr.serviceCategory.slaHours}시간
-                  </FormDescription>
+                  <FormDescription>SLA 기준: {sr.serviceCategory.slaHours}시간</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -172,12 +167,12 @@ export function IntakeFormCard({
                         <Button
                           variant="outline"
                           className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
+                            'w-full pl-3 text-left font-normal',
+                            !field.value && 'text-muted-foreground'
                           )}
                         >
                           {field.value ? (
-                            format(field.value, "PPP", { locale: ko })
+                            format(field.value, 'PPP', { locale: ko })
                           ) : (
                             <span>날짜를 선택하세요</span>
                           )}
@@ -190,9 +185,7 @@ export function IntakeFormCard({
                         mode="single"
                         selected={field.value}
                         onSelect={field.onChange}
-                        disabled={(date) =>
-                          date < new Date(new Date().setHours(0, 0, 0, 0))
-                        }
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                         initialFocus
                       />
                     </PopoverContent>
@@ -200,8 +193,8 @@ export function IntakeFormCard({
                   <FormDescription>
                     {sr.requestedCompletionDate && (
                       <>
-                        요청자 희망일:{" "}
-                        {format(new Date(sr.requestedCompletionDate), "PPP", {
+                        요청자 희망일:{' '}
+                        {format(new Date(sr.requestedCompletionDate), 'PPP', {
                           locale: ko,
                         })}
                       </>
@@ -219,10 +212,7 @@ export function IntakeFormCard({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>담당자 *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="담당자를 선택하세요" />
@@ -247,9 +237,7 @@ export function IntakeFormCard({
                   </Select>
                   <FormDescription>
                     {sr.serviceCategory.handler && (
-                      <>
-                        추천 담당자: {sr.serviceCategory.handler.name}
-                      </>
+                      <>추천 담당자: {sr.serviceCategory.handler.name}</>
                     )}
                   </FormDescription>
                   <FormMessage />
@@ -271,9 +259,7 @@ export function IntakeFormCard({
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>
-                    SR 처리에 도움이 될 정보를 기록하세요
-                  </FormDescription>
+                  <FormDescription>SR 처리에 도움이 될 정보를 기록하세요</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -283,7 +269,7 @@ export function IntakeFormCard({
             <div className="flex gap-4">
               <Button
                 type="button"
-                onClick={() => router.push("/srs")}
+                onClick={() => router.push('/srs')}
                 className="flex-1 sr-btn-template"
                 disabled={submitting}
               >
@@ -297,12 +283,12 @@ export function IntakeFormCard({
                 {submitting ? (
                   <>
                     <Clock className="mr-2 h-4 w-4 animate-spin" />
-                    {isEditMode ? "수정 중..." : "접수 처리 중..."}
+                    {isEditMode ? '수정 중...' : '접수 처리 중...'}
                   </>
                 ) : (
                   <>
                     <CheckCircle className="mr-2 h-4 w-4" />
-                    {isEditMode ? "저장" : "저장"}
+                    {isEditMode ? '저장' : '저장'}
                   </>
                 )}
               </Button>
@@ -313,5 +299,3 @@ export function IntakeFormCard({
     </div>
   );
 }
-
-

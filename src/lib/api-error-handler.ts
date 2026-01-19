@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
-import { ServiceError } from "./errors";
-import { ZodError } from "zod";
-import { logger } from "./logger";
+import { NextResponse } from 'next/server';
+import { ZodError } from 'zod';
+
+import { ServiceError } from './errors';
+import { logger } from './logger';
 
 /**
  * API Routes에서 에러를 처리하고 적절한 HTTP 응답을 반환하는 헬퍼 함수
@@ -25,15 +26,15 @@ export function handleApiError(
   // Zod 유효성 검증 에러 처리
   if (error instanceof ZodError) {
     const firstError = error.issues?.[0];
-    logger.warn("Validation error", {
+    logger.warn('Validation error', {
       ...context,
       custom_validationError: firstError?.message,
-      custom_path: firstError?.path?.join("."),
+      custom_path: firstError?.path?.join('.'),
     });
     return NextResponse.json(
       {
-        error: firstError?.message || "유효성 검사 실패",
-        code: "VALIDATION_ERROR",
+        error: firstError?.message || '유효성 검사 실패',
+        code: 'VALIDATION_ERROR',
       },
       { status: 400 }
     );
@@ -41,26 +42,26 @@ export function handleApiError(
 
   // 일반 Error 처리
   if (error instanceof Error) {
-    logger.error("Unexpected error", error, context);
+    logger.error('Unexpected error', error, context);
     return NextResponse.json(
       {
         error: error.message,
-        code: "INTERNAL_ERROR",
+        code: 'INTERNAL_ERROR',
       },
       { status: 500 }
     );
   }
 
   // 알 수 없는 에러
-  logger.error("Unknown error", undefined, {
+  logger.error('Unknown error', undefined, {
     ...context,
     custom_errorType: typeof error,
     custom_errorValue: String(error),
   });
   return NextResponse.json(
     {
-      error: "알 수 없는 오류가 발생했습니다.",
-      code: "UNKNOWN_ERROR",
+      error: '알 수 없는 오류가 발생했습니다.',
+      code: 'UNKNOWN_ERROR',
     },
     { status: 500 }
   );

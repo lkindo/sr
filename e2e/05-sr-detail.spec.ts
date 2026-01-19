@@ -1,9 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+
 import { createTestSR } from './helpers/test-helpers';
 
 /**
  * SR 상세 페이지 테스트
- * 
+ *
  * 개선사항:
  * - SR이 없을 경우 직접 생성하여 테스트 안정성 향상
  * - 탭 셀렉터를 더 유연하게 개선
@@ -15,7 +16,7 @@ test.describe('SR 상세 페이지', () => {
   test.beforeAll(async ({ browser }) => {
     // 테스트용 SR이 있는지 확인하고 없으면 생성
     const context = await browser.newContext({
-      storageState: './playwright/.auth/user.json'
+      storageState: './playwright/.auth/user.json',
     });
     const page = await context.newPage();
 
@@ -49,7 +50,10 @@ test.describe('SR 상세 페이지', () => {
     await page.goto(`/srs/${testSRId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
     // 상세 정보 섹션 확인 (여러 가능한 셀렉터)
-    const detailSection = page.locator('h3, h2, h4').filter({ hasText: /상세 정보|상세|Details/i }).first();
+    const detailSection = page
+      .locator('h3, h2, h4')
+      .filter({ hasText: /상세 정보|상세|Details/i })
+      .first();
     await expect(detailSection).toBeVisible({ timeout: 10000 });
 
     console.log('✅ SR 상세 페이지 접근 성공');
@@ -81,9 +85,9 @@ test.describe('SR 상세 페이지', () => {
       }
     } else {
       // 대안: 텍스트로 탭 찾기
-      const commentTab = page.getByRole('tab', { name: /댓글|Comments/i }).or(
-        page.locator('button').filter({ hasText: /댓글|Comments/i })
-      );
+      const commentTab = page
+        .getByRole('tab', { name: /댓글|Comments/i })
+        .or(page.locator('button').filter({ hasText: /댓글|Comments/i }));
 
       if (await commentTab.isVisible({ timeout: 3000 }).catch(() => false)) {
         await commentTab.click();
@@ -100,9 +104,9 @@ test.describe('SR 상세 페이지', () => {
     await page.goto(`/srs/${testSRId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
     // 댓글 탭 클릭 (있다면)
-    const commentTab = page.getByRole('tab', { name: /댓글|Comments/i }).or(
-      page.locator('button').filter({ hasText: /댓글|Comments/i })
-    );
+    const commentTab = page
+      .getByRole('tab', { name: /댓글|Comments/i })
+      .or(page.locator('button').filter({ hasText: /댓글|Comments/i }));
 
     if (await commentTab.isVisible({ timeout: 3000 }).catch(() => false)) {
       await commentTab.click();
@@ -110,13 +114,14 @@ test.describe('SR 상세 페이지', () => {
     }
 
     // 댓글 입력 (여러 가능한 셀렉터)
-    const commentTextarea = page.locator('textarea').filter({
-      hasText: ''
-    }).or(
-      page.locator('textarea[placeholder*="댓글"]')
-    ).or(
-      page.locator('textarea[placeholder*="comment"]')
-    ).first();
+    const commentTextarea = page
+      .locator('textarea')
+      .filter({
+        hasText: '',
+      })
+      .or(page.locator('textarea[placeholder*="댓글"]'))
+      .or(page.locator('textarea[placeholder*="comment"]'))
+      .first();
 
     if (await commentTextarea.isVisible({ timeout: 5000 }).catch(() => false)) {
       const timestamp = Date.now();
@@ -125,16 +130,18 @@ test.describe('SR 상세 페이지', () => {
       await commentTextarea.fill(testComment);
 
       // 제출 버튼 찾기
-      const submitButton = page.getByRole('button', { name: /댓글 추가|등록|Submit|Add/i }).or(
-        page.locator('button[type="submit"]').filter({ hasText: /댓글|추가|등록/i })
-      );
+      const submitButton = page
+        .getByRole('button', { name: /댓글 추가|등록|Submit|Add/i })
+        .or(page.locator('button[type="submit"]').filter({ hasText: /댓글|추가|등록/i }));
 
       if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         // API 응답 대기
-        const commentResponsePromise = page.waitForResponse(
-          resp => resp.url().includes('/api/') && resp.request().method() === 'POST',
-          { timeout: 10000 }
-        ).catch(() => null);
+        const commentResponsePromise = page
+          .waitForResponse(
+            (resp) => resp.url().includes('/api/') && resp.request().method() === 'POST',
+            { timeout: 10000 }
+          )
+          .catch(() => null);
 
         await submitButton.click();
 

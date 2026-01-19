@@ -1,7 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+
+import { deleteRoleAction } from '@/actions/role.actions';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,9 +11,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { deleteRoleAction } from "@/actions/role.actions";
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface Role {
   id: string;
@@ -25,15 +26,9 @@ interface DeleteRoleDialogProps {
   onDeleted: () => void;
 }
 
-export function DeleteRoleDialog({
-  open,
-  onOpenChange,
-  role,
-  onDeleted,
-}: DeleteRoleDialogProps) {
+export function DeleteRoleDialog({ open, onOpenChange, role, onDeleted }: DeleteRoleDialogProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-
 
   const handleDelete = async () => {
     if (!role) return;
@@ -44,12 +39,12 @@ export function DeleteRoleDialog({
       const result = await deleteRoleAction(role.id);
 
       if (!result.success) {
-        throw new Error(result.error || "역할 삭제에 실패했습니다.");
+        throw new Error(result.error || '역할 삭제에 실패했습니다.');
       }
 
       toast({
-        title: "성공",
-        description: "역할이 삭제되었습니다.",
+        title: '성공',
+        description: '역할이 삭제되었습니다.',
       });
 
       // 모달 즉시 닫고 → 후속 갱신
@@ -57,10 +52,9 @@ export function DeleteRoleDialog({
       onDeleted();
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error ? error.message : "역할 삭제에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '역할 삭제에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -86,13 +80,8 @@ export function DeleteRoleDialog({
           >
             취소
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={loading}
-          >
-            {loading ? "삭제 중..." : "삭제"}
+          <Button type="button" variant="destructive" onClick={handleDelete} disabled={loading}>
+            {loading ? '삭제 중...' : '삭제'}
           </Button>
         </DialogFooter>
       </DialogContent>

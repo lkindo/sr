@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
 /**
@@ -25,7 +25,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
   test.describe.configure({ mode: 'serial' });
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async ({ }, testInfo) => {
+  test.beforeEach(async (_, testInfo) => {
     if (testInfo.title !== '1. MANAGER: SR 생성 및 초기 담당자 배정' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }
@@ -44,14 +44,18 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       await createButton.click();
 
       // 다이얼로그 확인
-      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({ timeout: 5000 });
+      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({
+        timeout: 5000,
+      });
 
       // SR 정보 입력
       const timestamp = Date.now();
       srTitle = `재배정 테스트 SR ${timestamp}`;
 
       await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
-      await page.getByRole('textbox', { name: '설명 *' }).fill('담당자 재배정 및 우선순위 에스컬레이션 테스트');
+      await page
+        .getByRole('textbox', { name: '설명 *' })
+        .fill('담당자 재배정 및 우선순위 에스컬레이션 테스트');
 
       // 고객사 선택 - Select가 enabled될 때까지 대기
       const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
@@ -108,24 +112,32 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         await page.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 10000 });
 
         // 우선순위: LOW 설정
-        const prioritySelect = page.locator('label', { hasText: '실제 우선순위' })
+        const prioritySelect = page
+          .locator('label', { hasText: '실제 우선순위' })
           .first()
           .locator('..')
           .locator('[role="combobox"]');
         await prioritySelect.click();
-        await page.getByRole('option', { name: /낮음|LOW/i }).first().click();
+        await page
+          .getByRole('option', { name: /낮음|LOW/i })
+          .first()
+          .click();
 
         // 예상 작업 시간
         const hoursInput = page.getByLabel(/예상 작업 시간/i);
         await hoursInput.fill('4');
 
         // 담당자: Engineer A (첫 번째 엔지니어)
-        const assigneeSelect = page.locator('label', { hasText: '담당자' })
+        const assigneeSelect = page
+          .locator('label', { hasText: '담당자' })
           .first()
           .locator('..')
           .locator('[role="combobox"]');
         await assigneeSelect.click();
-        await page.getByRole('option', { name: /Engineer|엔지니어/i }).first().click();
+        await page
+          .getByRole('option', { name: /Engineer|엔지니어/i })
+          .first()
+          .click();
 
         // 접수 메모
         await page.getByLabel(/접수 메모/i).fill('초기 담당자로 Engineer A 배정');
@@ -164,7 +176,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         });
       } else if (await intakeLink.isVisible({ timeout: 3000 }).catch(() => false)) {
         await intakeLink.click();
-        await page.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 20000 }).catch(() => { });
+        await page.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 20000 }).catch(() => {});
       }
 
       // URL이 intake가 아니면 직접 이동
@@ -174,7 +186,8 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       }
 
       // 담당자 변경
-      const assigneeSelect = page.locator('label', { hasText: '담당자' })
+      const assigneeSelect = page
+        .locator('label', { hasText: '담당자' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
@@ -228,14 +241,18 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 우선순위 변경: HIGH
-      const prioritySelect = page.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = page
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
 
       if (await prioritySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
         await prioritySelect.click();
-        await page.getByRole('option', { name: /높음|HIGH/i }).first().click();
+        await page
+          .getByRole('option', { name: /높음|HIGH/i })
+          .first()
+          .click();
 
         // 접수 메모 업데이트
         const memoField = page.getByLabel(/접수 메모/i);
@@ -275,14 +292,18 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 우선순위 변경: CRITICAL
-      const prioritySelect = page.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = page
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
 
       if (await prioritySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
         await prioritySelect.click();
-        await page.getByRole('option', { name: /긴급|CRITICAL/i }).first().click();
+        await page
+          .getByRole('option', { name: /긴급|CRITICAL/i })
+          .first()
+          .click();
 
         // 예상 시간 단축
         const hoursInput = page.getByLabel(/예상 작업 시간/i);
@@ -334,10 +355,15 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         await page.waitForTimeout(500);
 
         // 우선순위 필터 선택
-        const priorityFilter = page.locator('select, [role="combobox"]').filter({ hasText: /우선순위|Priority/i });
+        const priorityFilter = page
+          .locator('select, [role="combobox"]')
+          .filter({ hasText: /우선순위|Priority/i });
         if (await priorityFilter.isVisible({ timeout: 3000 }).catch(() => false)) {
           await priorityFilter.click();
-          await page.getByRole('option', { name: /긴급|CRITICAL/i }).first().click();
+          await page
+            .getByRole('option', { name: /긴급|CRITICAL/i })
+            .first()
+            .click();
           await page.waitForTimeout(1000);
         }
       }
@@ -364,12 +390,16 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         }
 
         // 댓글 작성
-        const commentTextarea = page.locator('textarea').filter({ hasText: /댓글|Comment/i }).or(
-          page.locator('textarea[placeholder*="댓글"]')
-        ).first();
+        const commentTextarea = page
+          .locator('textarea')
+          .filter({ hasText: /댓글|Comment/i })
+          .or(page.locator('textarea[placeholder*="댓글"]'))
+          .first();
 
         if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await commentTextarea.fill('긴급 SR로 에스컬레이션되었습니다. 최우선으로 처리하겠습니다.');
+          await commentTextarea.fill(
+            '긴급 SR로 에스컬레이션되었습니다. 최우선으로 처리하겠습니다.'
+          );
 
           const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
           if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -398,4 +428,3 @@ test.describe('에스컬레이션 추가 시나리오', () => {
   // - 백업 담당자 자동 배정: 주 담당자 부재 시 자동 배정 로직
   // - 다운그레이드 시나리오: 에스컬레이션 해제 워크플로우
 });
-

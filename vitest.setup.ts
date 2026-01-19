@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
-import { expect, afterEach, vi } from 'vitest';
+
 import { cleanup } from '@testing-library/react';
+import { afterEach, expect, vi } from 'vitest';
 
 // Mock server-only module (used by push.service.ts)
 vi.mock('server-only', () => ({}));

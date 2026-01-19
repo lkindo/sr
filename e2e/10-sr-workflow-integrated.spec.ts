@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 /**
  * SR 워크플로우 통합 테스트
@@ -67,7 +67,9 @@ test.describe('SR 워크플로우 통합', () => {
     await expect(page.getByText('SR이 생성되었습니다.').first()).toBeVisible({ timeout: 20000 });
 
     // 다이얼로그 닫힘 대기
-    await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).not.toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).not.toBeVisible({
+      timeout: 10000,
+    });
 
     // 목록에서 SR 찾기
     // 목록 페이지로 이동 (이미 있다면 새로고침 효과)
@@ -99,7 +101,9 @@ test.describe('SR 워크플로우 통합', () => {
     await page.goto(`/srs/${srId}/intake`);
 
     // 접수 폼 로딩 대기
-    await expect(page.getByRole('heading', { name: /접수 정보 입력/i })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: /접수 정보 입력/i })).toBeVisible({
+      timeout: 15000,
+    });
 
     // 접수 폼 입력
     const comboboxes = page.getByRole('combobox');
@@ -107,7 +111,10 @@ test.describe('SR 워크플로우 통합', () => {
     // 실제 우선순위
     const prioritySelect = comboboxes.nth(0);
     await prioritySelect.click();
-    await page.getByRole('option', { name: /보통|MEDIUM/i }).first().click();
+    await page
+      .getByRole('option', { name: /보통|MEDIUM/i })
+      .first()
+      .click();
 
     // 예상 작업 시간
     const hoursInput = page.getByLabel(/예상 작업 시간/i);
@@ -211,12 +218,18 @@ test.describe('SR 워크플로우 통합', () => {
     await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
     // 댓글 섹션 확인
-    const commentSection = page.locator('section, div').filter({ hasText: /댓글|Comment/i }).first();
+    const commentSection = page
+      .locator('section, div')
+      .filter({ hasText: /댓글|Comment/i })
+      .first();
     await expect(commentSection).toBeVisible();
     console.log(`✅ 댓글 섹션 확인`);
 
     // 첨부파일 섹션 확인
-    const attachmentSection = page.locator('section, div').filter({ hasText: /첨부|Attachment/i }).first();
+    const attachmentSection = page
+      .locator('section, div')
+      .filter({ hasText: /첨부|Attachment/i })
+      .first();
     await expect(attachmentSection).toBeVisible();
     console.log(`✅ 첨부파일 섹션 확인`);
 

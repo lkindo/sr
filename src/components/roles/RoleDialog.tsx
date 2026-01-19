@@ -1,7 +1,9 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from 'react';
+
+import { createRoleAction, updateRoleAction } from '@/actions/role.actions';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,11 +11,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { createRoleAction, updateRoleAction } from "@/actions/role.actions";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface Role {
   id: string;
@@ -28,36 +29,30 @@ interface RoleDialogProps {
   onSaved: () => void;
 }
 
-export function RoleDialog({
-  open,
-  onOpenChange,
-  role,
-  onSaved,
-}: RoleDialogProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+export function RoleDialog({ open, onOpenChange, role, onSaved }: RoleDialogProps) {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (role) {
       setName(role.name);
-      setDescription(role.description || "");
+      setDescription(role.description || '');
     } else {
-      setName("");
-      setDescription("");
+      setName('');
+      setDescription('');
     }
   }, [role, open]);
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     const formData = new FormData();
-    formData.append("name", name);
+    formData.append('name', name);
     if (description) {
-      formData.append("description", description);
+      formData.append('description', description);
     }
 
     try {
@@ -69,23 +64,20 @@ export function RoleDialog({
       }
 
       if (!result.success) {
-        throw new Error(result.error || "역할 저장에 실패했습니다.");
+        throw new Error(result.error || '역할 저장에 실패했습니다.');
       }
 
       toast({
-        title: "성공",
-        description: role
-          ? "역할이 수정되었습니다."
-          : "역할이 생성되었습니다.",
+        title: '성공',
+        description: role ? '역할이 수정되었습니다.' : '역할이 생성되었습니다.',
       });
 
       onSaved();
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error ? error.message : "역할 저장에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '역할 저장에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -96,11 +88,9 @@ export function RoleDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{role ? "역할 수정" : "새 역할 추가"}</DialogTitle>
+          <DialogTitle>{role ? '역할 수정' : '새 역할 추가'}</DialogTitle>
           <DialogDescription>
-            {role
-              ? "역할 정보를 수정합니다."
-              : "새로운 역할을 생성합니다."}
+            {role ? '역할 정보를 수정합니다.' : '새로운 역할을 생성합니다.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -137,7 +127,7 @@ export function RoleDialog({
               취소
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "저장 중..." : "저장"}
+              {loading ? '저장 중...' : '저장'}
             </Button>
           </DialogFooter>
         </form>

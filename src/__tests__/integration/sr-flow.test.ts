@@ -1,5 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // 통합 테스트: SR 생성부터 수정까지의 전체 플로우
 describe('SR Flow Integration', () => {
@@ -178,4 +177,3 @@ describe('SR Flow Integration', () => {
     });
   });
 });
-

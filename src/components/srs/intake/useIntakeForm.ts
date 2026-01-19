@@ -2,15 +2,16 @@
  * SR 접수 폼 커스텀 훅
  */
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { useToast } from "@/hooks/use-toast";
-import { getSRHandlersForSelection } from "@/actions/user.actions";
-import type { SRDetails } from "@/types/sr.types";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+
+import { getSRHandlersForSelection } from '@/actions/user.actions';
+import { useToast } from '@/hooks/use-toast';
+import type { SRDetails } from '@/types/sr.types';
 
 interface User {
   id: string;
@@ -20,18 +21,18 @@ interface User {
 
 // Intake 폼 스키마
 export const intakeFormSchema = z.object({
-  actualPriority: z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"], {
-    message: "실제 우선순위를 선택해주세요",
+  actualPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'], {
+    message: '실제 우선순위를 선택해주세요',
   }),
   estimatedHours: z
     .number()
-    .positive("예상 작업 시간은 0보다 커야 합니다")
-    .max(1000, "예상 작업 시간은 1000시간을 초과할 수 없습니다"),
+    .positive('예상 작업 시간은 0보다 커야 합니다')
+    .max(1000, '예상 작업 시간은 1000시간을 초과할 수 없습니다'),
   estimatedCompletionDate: z.date({
-    message: "예상 완료일을 선택해주세요",
+    message: '예상 완료일을 선택해주세요',
   }),
   intakeNotes: z.string().optional(),
-  assigneeId: z.string().min(1, "담당자를 선택해주세요"),
+  assigneeId: z.string().min(1, '담당자를 선택해주세요'),
 });
 
 export type IntakeFormValues = z.infer<typeof intakeFormSchema>;
@@ -54,9 +55,9 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
   const form = useForm<IntakeFormValues>({
     resolver: zodResolver(intakeFormSchema),
     defaultValues: {
-      actualPriority: "MEDIUM",
+      actualPriority: 'MEDIUM',
       estimatedHours: 0,
-      intakeNotes: "",
+      intakeNotes: '',
     },
   });
 
@@ -68,22 +69,22 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
 
         // SR 정보 조회
         const srResponse = await fetch(`/api/srs/${srId}/intake`);
-        if (!srResponse.ok) throw new Error("SR을 불러오는데 실패했습니다");
+        if (!srResponse.ok) throw new Error('SR을 불러오는데 실패했습니다');
         const srData = await srResponse.json();
 
         // 상태에 따라 모드 결정
-        if (srData.status === "REQUESTED") {
+        if (srData.status === 'REQUESTED') {
           setIsEditMode(false); // 접수 모드
-        } else if (srData.status === "INTAKE" || srData.status === "IN_PROGRESS") {
+        } else if (srData.status === 'INTAKE' || srData.status === 'IN_PROGRESS') {
           setIsEditMode(true); // 수정 모드
         } else {
           // 수정 불가능한 상태 (ON_HOLD, COMPLETED, CONFIRMED, REJECTED)
           toast({
-            title: "알림",
-            description: "이 SR은 수정할 수 없습니다. SR 목록으로 이동합니다.",
-            variant: "default",
+            title: '알림',
+            description: '이 SR은 수정할 수 없습니다. SR 목록으로 이동합니다.',
+            variant: 'default',
           });
-          router.push("/srs");
+          router.push('/srs');
           return;
         }
 
@@ -94,58 +95,61 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
           const usersResult = await getSRHandlersForSelection();
           if (usersResult.success && usersResult.data) {
             setUsers(usersResult.data);
-
           } else {
-
             setUsers([]);
             toast({
-              title: "경고",
-              description: usersResult.success === false ? usersResult.error : "담당자 목록을 불러오는데 실패했습니다.",
-              variant: "destructive",
+              title: '경고',
+              description:
+                usersResult.success === false
+                  ? usersResult.error
+                  : '담당자 목록을 불러오는데 실패했습니다.',
+              variant: 'destructive',
             });
           }
         } catch {
           // 에러 발생 시 빈 배열로 설정, toast로 사용자에게 알림
           setUsers([]);
           toast({
-            title: "경고",
-            description: "담당자 목록을 불러오는데 실패했습니다. 페이지를 새로고침해주세요.",
-            variant: "destructive",
+            title: '경고',
+            description: '담당자 목록을 불러오는데 실패했습니다. 페이지를 새로고침해주세요.',
+            variant: 'destructive',
           });
         }
 
         // 수정 모드인 경우 기존 값 설정, 접수 모드인 경우 기본값 설정
-        if (srData.status === "INTAKE" || srData.status === "IN_PROGRESS") {
+        if (srData.status === 'INTAKE' || srData.status === 'IN_PROGRESS') {
           // 수정 모드: 기존 접수 정보 로드
-          form.setValue("actualPriority", srData.actualPriority || "MEDIUM");
-          form.setValue("estimatedHours", srData.estimatedHours || srData.serviceCategory.slaHours);
-          form.setValue("estimatedCompletionDate", srData.estimatedCompletionDate ? new Date(srData.estimatedCompletionDate) : new Date());
-          form.setValue("intakeNotes", srData.intakeNotes || "");
-          form.setValue("assigneeId", srData.assignee?.id || "");
+          form.setValue('actualPriority', srData.actualPriority || 'MEDIUM');
+          form.setValue('estimatedHours', srData.estimatedHours || srData.serviceCategory.slaHours);
+          form.setValue(
+            'estimatedCompletionDate',
+            srData.estimatedCompletionDate ? new Date(srData.estimatedCompletionDate) : new Date()
+          );
+          form.setValue('intakeNotes', srData.intakeNotes || '');
+          form.setValue('assigneeId', srData.assignee?.id || '');
         } else {
           // 접수 모드: 기본값 설정
           // 서비스 카테고리 담당자가 있으면 자동 선택
           if (srData.serviceCategory.handler) {
-            form.setValue("assigneeId", srData.serviceCategory.handler.id);
+            form.setValue('assigneeId', srData.serviceCategory.handler.id);
           }
 
           // 요청자가 희망한 우선순위를 기본값으로 설정
-          form.setValue("actualPriority", srData.requestedPriority);
+          form.setValue('actualPriority', srData.requestedPriority);
 
           // SLA 기반 기본 예상 시간 설정
-          form.setValue("estimatedHours", srData.serviceCategory.slaHours);
+          form.setValue('estimatedHours', srData.serviceCategory.slaHours);
 
           // 기본 완료 예정일 설정 (오늘 + SLA 시간)
           const defaultDate = new Date();
           defaultDate.setHours(defaultDate.getHours() + srData.serviceCategory.slaHours);
-          form.setValue("estimatedCompletionDate", defaultDate);
+          form.setValue('estimatedCompletionDate', defaultDate);
         }
       } catch (error) {
-
         toast({
-          title: "오류",
-          description: "데이터를 불러오는데 실패했습니다.",
-          variant: "destructive",
+          title: '오류',
+          description: '데이터를 불러오는데 실패했습니다.',
+          variant: 'destructive',
         });
       } finally {
         setLoading(false);
@@ -159,36 +163,31 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
   const onSubmit = async (values: IntakeFormValues) => {
     // 변수를 상위 스코프로 이동
     const url = `/api/srs/${srId}/intake`;
-    const method = isEditMode ? "PATCH" : "POST";
+    const method = isEditMode ? 'PATCH' : 'POST';
     const requestBody = {
       actualPriority: values.actualPriority,
       estimatedHours: values.estimatedHours,
       estimatedCompletionDate: values.estimatedCompletionDate.toISOString(),
-      intakeNotes: values.intakeNotes || "",
+      intakeNotes: values.intakeNotes || '',
       assigneeId: values.assigneeId,
     };
 
     try {
       setSubmitting(true);
 
-
-
       const response = await fetch(url, {
         method,
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
       });
 
-
-
       if (!response.ok) {
-        let errorMessage = isEditMode ? "수정에 실패했습니다" : "접수 처리에 실패했습니다";
+        let errorMessage = isEditMode ? '수정에 실패했습니다' : '접수 처리에 실패했습니다';
         try {
           // 응답 본문을 텍스트로 먼저 읽기
           const responseText = await response.text();
-
 
           if (responseText) {
             try {
@@ -201,13 +200,13 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
             }
           } else {
             // 응답 본문이 비어있는 경우
-            errorMessage = `서버 오류 (${response.status}): ${response.statusText || "알 수 없는 오류"}`;
+            errorMessage = `서버 오류 (${response.status}): ${response.statusText || '알 수 없는 오류'}`;
           }
         } catch {
           // ignore
 
           // 응답 읽기 실패 시 상태 코드로 메시지 생성
-          errorMessage = `서버 오류 (${response.status}): ${response.statusText || "응답을 읽을 수 없습니다"}`;
+          errorMessage = `서버 오류 (${response.status}): ${response.statusText || '응답을 읽을 수 없습니다'}`;
         }
         throw new Error(errorMessage);
       }
@@ -218,37 +217,35 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
         // ignore
       }
 
-
-
       toast({
-        title: "성공",
-        description: isEditMode ? "접수 정보가 수정되었습니다." : "SR이 접수되었습니다.",
+        title: '성공',
+        description: isEditMode ? '접수 정보가 수정되었습니다.' : 'SR이 접수되었습니다.',
       });
 
       // 캐시 무효화 (SR 목록 및 상세 페이지에 즉시 반영)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["sr", srId] }),
-        queryClient.invalidateQueries({ queryKey: ["srs"] }),
+        queryClient.invalidateQueries({ queryKey: ['sr', srId] }),
+        queryClient.invalidateQueries({ queryKey: ['srs'] }),
       ]);
 
       // SPA 방식으로 페이지 이동
       router.refresh();
-      router.push("/srs");
+      router.push('/srs');
 
       // 성공 시에는 submitting을 false로 설정하지 않음 (페이지 이동 중이므로)
       // 페이지가 이동되면서 컴포넌트가 언마운트되므로 상태 업데이트 불필요
     } catch (error) {
-
-      const errorMessage = error instanceof Error
-        ? error.message
-        : typeof error === 'string'
-          ? error
-          : "접수 처리 중 오류가 발생했습니다.";
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : '접수 처리 중 오류가 발생했습니다.';
 
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
 
       // 에러 발생 시에만 submitting을 false로 설정
@@ -266,5 +263,3 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
     onSubmit,
   };
 }
-
-

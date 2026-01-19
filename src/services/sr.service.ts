@@ -1,18 +1,19 @@
-import { Prisma, SR, SRStatus } from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
-import { z } from "zod";
-import { pushService } from "@/services/push.service";
-import { emailService } from "@/services/email.service";
-import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
-import { AuthenticatedUser } from "@/types/session";
-import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from "@/lib/policies";
-import { SRCreateResult, SRUpdateResult, SRDetails, SRListItem } from "@/types/sr.types";
-import prisma from "@/lib/prisma";
-import { NotFoundError } from "@/lib/errors";
-import { backgroundTask } from "@/lib/wait-until";
-import { getSRUrl } from "@/lib/app-url";
-import { logger } from "@/lib/logger";
-import { validateTransition, getRequiredFields } from "@/lib/sr-state-machine";
+import { Prisma, SR, SRStatus } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { z } from 'zod';
+
+import { getSRUrl } from '@/lib/app-url';
+import { NotFoundError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
+import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import prisma from '@/lib/prisma';
+import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
+import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
+import { backgroundTask } from '@/lib/wait-until';
+import { emailService } from '@/services/email.service';
+import { pushService } from '@/services/push.service';
+import { AuthenticatedUser } from '@/types/session';
+import { SRCreateResult, SRDetails, SRListItem, SRUpdateResult } from '@/types/sr.types';
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -27,27 +28,24 @@ type SrCreateData = z.infer<typeof srCreateSchema>;
  * - 권한 정책 적용
  */
 export class SRService {
-  constructor() { }
+  constructor() {}
 
   /**
    * SR을 생성합니다.
    */
-  async createSR(
-    data: SrCreateData,
-    sessionUser: AuthenticatedUser
-  ): Promise<SRCreateResult> {
+  async createSR(data: SrCreateData, sessionUser: AuthenticatedUser): Promise<SRCreateResult> {
     ensureCanCreateSR(sessionUser);
     const validated = srCreateSchema.parse(data);
 
     // 고객사 활성 상태 확인
     const client = await prisma.client.findUnique({ where: { id: validated.clientId } });
     if (!client) {
-      throw new NotFoundError("고객사");
+      throw new NotFoundError('고객사');
     }
     if (!client.isActive) {
       throw new Error(
         `비활성 상태의 고객사(${client.name})에는 SR을 생성할 수 없습니다. ` +
-        `고객사 관리자에게 문의하세요.`
+          `고객사 관리자에게 문의하세요.`
       );
     }
 
@@ -61,70 +59,73 @@ export class SRService {
 
       try {
         // 트랜잭션 내에서 SR 번호 생성 및 SR 생성을 원자적으로 수행
-        sr = await prisma.$transaction(async (tx) => {
-          const today = new Date();
-          const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+        sr = await prisma.$transaction(
+          async (tx) => {
+            const today = new Date();
+            const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
 
-          // 가장 마지막 SR 번호 조회 (count는 삭제된 SR이 있을 경우 중복 번호를 생성할 수 있음)
-          const lastSR = await tx.sR.findFirst({
-            where: {
-              srNumber: {
-                startsWith: `SR-${dateStr}-`,
+            // 가장 마지막 SR 번호 조회 (count는 삭제된 SR이 있을 경우 중복 번호를 생성할 수 있음)
+            const lastSR = await tx.sR.findFirst({
+              where: {
+                srNumber: {
+                  startsWith: `SR-${dateStr}-`,
+                },
               },
-            },
-            orderBy: {
-              srNumber: "desc",
-            },
-            select: {
-              srNumber: true,
-            },
-          });
+              orderBy: {
+                srNumber: 'desc',
+              },
+              select: {
+                srNumber: true,
+              },
+            });
 
-          let sequenceNumber = 1;
-          if (lastSR) {
-            const lastSequence = parseInt(lastSR.srNumber.split("-")[2]);
-            if (!isNaN(lastSequence)) {
-              sequenceNumber = lastSequence + 1;
+            let sequenceNumber = 1;
+            if (lastSR) {
+              const lastSequence = parseInt(lastSR.srNumber.split('-')[2]);
+              if (!isNaN(lastSequence)) {
+                sequenceNumber = lastSequence + 1;
+              }
             }
+
+            const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, '0')}`;
+
+            // SR 생성 (unique constraint 체크는 DB 레벨에서 발생)
+            return await tx.sR.create({
+              data: {
+                srNumber,
+                title: validated.title,
+                description: validated.description,
+                clientId: validated.clientId,
+                serviceCategoryId: validated.serviceCategoryId,
+                requesterId: sessionUser.id,
+                requestedPriority: validated.requestedPriority,
+                priority: validated.requestedPriority,
+                requestedCompletionDate: validated.requestedCompletionDate
+                  ? new Date(validated.requestedCompletionDate)
+                  : undefined,
+                status: 'REQUESTED',
+              },
+            });
+          },
+          {
+            isolationLevel: 'Serializable', // 최고 수준의 격리 레벨
+            maxWait: 5000, // 5초 대기
+            timeout: 10000, // 10초 타임아웃
           }
-
-          const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, "0")}`;
-
-          // SR 생성 (unique constraint 체크는 DB 레벨에서 발생)
-          return await tx.sR.create({
-            data: {
-              srNumber,
-              title: validated.title,
-              description: validated.description,
-              clientId: validated.clientId,
-              serviceCategoryId: validated.serviceCategoryId,
-              requesterId: sessionUser.id,
-              requestedPriority: validated.requestedPriority,
-              priority: validated.requestedPriority,
-              requestedCompletionDate: validated.requestedCompletionDate
-                ? new Date(validated.requestedCompletionDate)
-                : undefined,
-              status: "REQUESTED",
-            },
-          });
-        }, {
-          isolationLevel: 'Serializable', // 최고 수준의 격리 레벨
-          maxWait: 5000, // 5초 대기
-          timeout: 10000, // 10초 타임아웃
-        });
+        );
       } catch (error) {
         const isUnique =
-          (error instanceof Error && error.message.includes("Unique constraint")) ||
-          (error instanceof PrismaClientKnownRequestError && error.code === "P2002");
+          (error instanceof Error && error.message.includes('Unique constraint')) ||
+          (error instanceof PrismaClientKnownRequestError && error.code === 'P2002');
 
         if (isUnique && attempts < maxAttempts) {
           // Unique constraint 위반 시 exponential backoff로 재시도
-          await new Promise(res => setTimeout(res, 50 * Math.pow(2, attempts - 1)));
+          await new Promise((res) => setTimeout(res, 50 * Math.pow(2, attempts - 1)));
           continue;
         }
 
         if (attempts >= maxAttempts) {
-          throw new Error("SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.");
+          throw new Error('SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.');
         }
 
         throw error;
@@ -132,16 +133,16 @@ export class SRService {
     }
 
     if (!sr) {
-      throw new Error("SR 생성에 실패했습니다.");
+      throw new Error('SR 생성에 실패했습니다.');
     }
 
     await prisma.sRActivity.create({
       data: {
         srId: sr.id,
         userId: sessionUser.id,
-        type: "CREATED",
-        description: "SR이 생성되었습니다.",
-      }
+        type: 'CREATED',
+        description: 'SR이 생성되었습니다.',
+      },
     });
 
     await prisma.sR.update({
@@ -150,9 +151,9 @@ export class SRService {
         statusHistory: {
           create: {
             previousStatus: null,
-            currentStatus: "REQUESTED",
+            currentStatus: 'REQUESTED',
             changedBy: sessionUser.id,
-            changeReason: "SR 생성",
+            changeReason: 'SR 생성',
           },
         },
       },
@@ -160,65 +161,65 @@ export class SRService {
 
     const result = await this.getSRDetailsById(sr.id);
     if (!result) {
-      throw new Error("SR 생성 후 조회에 실패했습니다.");
+      throw new Error('SR 생성 후 조회에 실패했습니다.');
     }
-
-
 
     // 푸시 알림 전송 (ADMIN, MANAGER)
     backgroundTask(
-      prisma.user.findMany({
-        where: {
-          roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
-          isActive: true
-        },
-        select: { id: true }
-      }).then(users => {
-        const adminIds = users.map(u => u.id);
-        if (adminIds.length > 0) {
-          return pushService.sendToUsers(adminIds, {
-            title: "새로운 SR 등록",
-            body: `${result.srNumber}: ${result.title}`,
-            url: `/srs/${result.id}`,
-            tag: 'sr-created'
-          });
-        }
-      }),
+      prisma.user
+        .findMany({
+          where: {
+            roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
+            isActive: true,
+          },
+          select: { id: true },
+        })
+        .then((users) => {
+          const adminIds = users.map((u) => u.id);
+          if (adminIds.length > 0) {
+            return pushService.sendToUsers(adminIds, {
+              title: '새로운 SR 등록',
+              body: `${result.srNumber}: ${result.title}`,
+              url: `/srs/${result.id}`,
+              tag: 'sr-created',
+            });
+          }
+        }),
       `Push notification for ${result.srNumber}`
     );
 
     // 이메일 알림 전송 (ADMIN, MANAGER)
     backgroundTask(
-      prisma.user.findMany({
-        where: {
-          roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
-          isActive: true
-        },
-        include: { notificationPreference: true }
-      }).then(admins => {
-        const emailPromises = admins
-          .filter(admin => {
-            const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
-            return admin.email && shouldSend;
-          })
-          .map(admin =>
-            emailService.sendSRCreated(
-              admin.email!,
-              result.srNumber,
-              result.title,
-              result.requester.name,
-              getSRUrl(result.id)
-            )
-          );
-        return Promise.all(emailPromises);
-      }),
+      prisma.user
+        .findMany({
+          where: {
+            roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
+            isActive: true,
+          },
+          include: { notificationPreference: true },
+        })
+        .then((admins) => {
+          const emailPromises = admins
+            .filter((admin) => {
+              const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
+              return admin.email && shouldSend;
+            })
+            .map((admin) =>
+              emailService.sendSRCreated(
+                admin.email!,
+                result.srNumber,
+                result.title,
+                result.requester.name,
+                getSRUrl(result.id)
+              )
+            );
+          return Promise.all(emailPromises);
+        }),
       `Email notifications for ${result.srNumber}`
     );
 
     return result;
   }
-
-
 
   async updateSR(
     id: string,
@@ -228,7 +229,7 @@ export class SRService {
     try {
       const validated = srUpdateSchema.parse(data);
       const existingSR = await prisma.sR.findUnique({ where: { id } });
-      if (!existingSR) throw new NotFoundError("SR");
+      if (!existingSR) throw new NotFoundError('SR');
 
       ensureCanUpdateSR(sessionUser, existingSR);
 
@@ -237,27 +238,23 @@ export class SRService {
         if (existingSR.status !== 'REQUESTED') {
           throw new Error(
             `SR이 이미 접수된 상태(${existingSR.status})입니다. ` +
-            `접수 후에는 고객사를 변경할 수 없습니다. ` +
-            `잘못된 고객사로 생성된 경우 SR을 삭제하고 다시 생성하세요.`
+              `접수 후에는 고객사를 변경할 수 없습니다. ` +
+              `잘못된 고객사로 생성된 경우 SR을 삭제하고 다시 생성하세요.`
           );
         }
 
         // 새 고객사가 활성 상태인지 확인
         const newClient = await prisma.client.findUnique({ where: { id: validated.clientId } });
         if (!newClient) {
-          throw new NotFoundError("변경하려는 고객사");
+          throw new NotFoundError('변경하려는 고객사');
         }
         if (!newClient.isActive) {
-          throw new Error(
-            `비활성 상태의 고객사(${newClient.name})로는 변경할 수 없습니다.`
-          );
+          throw new Error(`비활성 상태의 고객사(${newClient.name})로는 변경할 수 없습니다.`);
         }
       }
 
       // 상태 전환 검증
       if (validated.status && validated.status !== existingSR.status) {
-
-
         const transitionResult = validateTransition(
           existingSR.status,
           validated.status as SRStatus,
@@ -298,11 +295,14 @@ export class SRService {
 
       // 완료/확정 상태에서 담당자 변경 차단
       const assigneeId = validated.assigneeId || validated.assignedToId;
-      if ((existingSR.status === 'COMPLETED' || existingSR.status === 'CONFIRMED') &&
-        assigneeId !== undefined && assigneeId !== existingSR.assigneeId) {
+      if (
+        (existingSR.status === 'COMPLETED' || existingSR.status === 'CONFIRMED') &&
+        assigneeId !== undefined &&
+        assigneeId !== existingSR.assigneeId
+      ) {
         throw new Error(
-          "완료되거나 확정된 SR의 담당자는 변경할 수 없습니다. " +
-          "변경이 필요한 경우 SR을 다시 열어주세요."
+          '완료되거나 확정된 SR의 담당자는 변경할 수 없습니다. ' +
+            '변경이 필요한 경우 SR을 다시 열어주세요.'
         );
       }
 
@@ -314,26 +314,39 @@ export class SRService {
       if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
       if (validated.priority !== undefined) updateData.priority = validated.priority;
       if (validated.status !== undefined) updateData.status = validated.status;
-      if (validated.actualPriority !== undefined) updateData.actualPriority = validated.actualPriority;
+      if (validated.actualPriority !== undefined)
+        updateData.actualPriority = validated.actualPriority;
       if (validated.estimatedHours !== undefined)
-        updateData.estimatedHours = typeof validated.estimatedHours === "string"
-          ? parseFloat(validated.estimatedHours)
-          : validated.estimatedHours;
-      if (validated.intakeNotes !== undefined) updateData.intakeNotes = validated.intakeNotes || null;
-      if (validated.resolutionDescription !== undefined) updateData.resolutionDescription = validated.resolutionDescription || null;
-      if (validated.rejectionReason !== undefined) updateData.rejectionReason = validated.rejectionReason || null;
-      if (validated.satisfactionRating !== undefined) updateData.satisfactionRating = validated.satisfactionRating || null;
-      if (validated.additionalFeedback !== undefined) updateData.additionalFeedback = validated.additionalFeedback || null;
+        updateData.estimatedHours =
+          typeof validated.estimatedHours === 'string'
+            ? parseFloat(validated.estimatedHours)
+            : validated.estimatedHours;
+      if (validated.intakeNotes !== undefined)
+        updateData.intakeNotes = validated.intakeNotes || null;
+      if (validated.resolutionDescription !== undefined)
+        updateData.resolutionDescription = validated.resolutionDescription || null;
+      if (validated.rejectionReason !== undefined)
+        updateData.rejectionReason = validated.rejectionReason || null;
+      if (validated.satisfactionRating !== undefined)
+        updateData.satisfactionRating = validated.satisfactionRating || null;
+      if (validated.additionalFeedback !== undefined)
+        updateData.additionalFeedback = validated.additionalFeedback || null;
 
       // dates
       if (validated.expectedCompletionDate !== undefined)
-        updateData.expectedCompletionDate = validated.expectedCompletionDate ? new Date(validated.expectedCompletionDate) : null;
+        updateData.expectedCompletionDate = validated.expectedCompletionDate
+          ? new Date(validated.expectedCompletionDate)
+          : null;
       if (validated.dueDate !== undefined)
         updateData.dueDate = validated.dueDate ? new Date(validated.dueDate) : null;
       if (validated.actualCompletionDate !== undefined)
-        updateData.actualCompletionDate = validated.actualCompletionDate ? new Date(validated.actualCompletionDate) : null;
+        updateData.actualCompletionDate = validated.actualCompletionDate
+          ? new Date(validated.actualCompletionDate)
+          : null;
       if (validated.estimatedCompletionDate !== undefined)
-        updateData.estimatedCompletionDate = validated.estimatedCompletionDate ? new Date(validated.estimatedCompletionDate) : null;
+        updateData.estimatedCompletionDate = validated.estimatedCompletionDate
+          ? new Date(validated.estimatedCompletionDate)
+          : null;
 
       // relations
       if (validated.serviceCategoryId !== undefined) {
@@ -344,9 +357,16 @@ export class SRService {
 
       // priority SLA adjustment
       if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
-        const serviceCategory = await prisma.serviceCategory.findUnique({ where: { id: existingSR.serviceCategoryId } });
+        const serviceCategory = await prisma.serviceCategory.findUnique({
+          where: { id: existingSR.serviceCategoryId },
+        });
         if (serviceCategory) {
-          const multiplier: Record<string, number> = { CRITICAL: 0.5, HIGH: 0.75, MEDIUM: 1.0, LOW: 1.5 };
+          const multiplier: Record<string, number> = {
+            CRITICAL: 0.5,
+            HIGH: 0.75,
+            MEDIUM: 1.0,
+            LOW: 1.5,
+          };
           const adjustedHours = serviceCategory.slaHours * multiplier[validated.actualPriority];
           const due = new Date(existingSR.intakeAt || new Date());
           due.setHours(due.getHours() + adjustedHours);
@@ -362,10 +382,11 @@ export class SRService {
             previousStatus: existingSR.status,
             currentStatus: validated.status!,
             changedBy: sessionUser.id,
-            changeReason: validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
+            changeReason:
+              validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
           },
         };
-        if (validated.status === "COMPLETED" && !updateData.actualCompletionDate) {
+        if (validated.status === 'COMPLETED' && !updateData.actualCompletionDate) {
           updateData.actualCompletionDate = new Date();
         }
       }
@@ -389,16 +410,16 @@ export class SRService {
                   id: true,
                   name: true,
                   email: true,
-                  notificationPreference: true // 추가
-                }
+                  notificationPreference: true, // 추가
+                },
               },
               assignee: {
                 select: {
                   id: true,
                   name: true,
                   email: true,
-                  notificationPreference: true // 추가
-                }
+                  notificationPreference: true, // 추가
+                },
               },
               serviceCategory: {
                 select: {
@@ -409,10 +430,10 @@ export class SRService {
                   handler: {
                     select: {
                       id: true,
-                      name: true
-                    }
-                  }
-                }
+                      name: true,
+                    },
+                  },
+                },
               },
             },
           });
@@ -424,7 +445,7 @@ export class SRService {
             data: {
               srId: id,
               userId: sessionUser.id,
-              type: "STATUS_CHANGED",
+              type: 'STATUS_CHANGED',
               description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
             },
           });
@@ -433,10 +454,10 @@ export class SRService {
           if (existingSR.requesterId) {
             backgroundTask(
               pushService.sendToUser(existingSR.requesterId, {
-                title: "SR 상태 변경",
+                title: 'SR 상태 변경',
                 body: `${existingSR.srNumber} 상태가 ${validated.status}로 변경되었습니다.`,
                 url: `/srs/${id}`,
-                tag: 'sr-status-changed'
+                tag: 'sr-status-changed',
               }),
               `Status change push for ${existingSR.srNumber}`
             );
@@ -468,8 +489,10 @@ export class SRService {
             data: {
               srId: id,
               userId: sessionUser.id,
-              type: "ASSIGNED",
-              description: assigneeId ? "담당자가 할당되었습니다." : "담당자 할당이 해제되었습니다.",
+              type: 'ASSIGNED',
+              description: assigneeId
+                ? '담당자가 할당되었습니다.'
+                : '담당자 할당이 해제되었습니다.',
             },
           });
 
@@ -477,10 +500,10 @@ export class SRService {
           if (assigneeId) {
             backgroundTask(
               pushService.sendToUser(assigneeId, {
-                title: "SR 담당 배정",
+                title: 'SR 담당 배정',
                 body: `${existingSR.srNumber} 담당자로 배정되었습니다.`,
                 url: `/srs/${id}`,
-                tag: 'sr-assigned'
+                tag: 'sr-assigned',
               }),
               `Assignment push for ${existingSR.srNumber}`
             );
@@ -508,8 +531,8 @@ export class SRService {
         return updatedSR;
       });
     } catch (error) {
-      const { logger } = await import("@/lib/logger");
-      logger.error("SR 업데이트 서비스 오류", error instanceof Error ? error : undefined, {
+      const { logger } = await import('@/lib/logger');
+      logger.error('SR 업데이트 서비스 오류', error instanceof Error ? error : undefined, {
         srId: id,
       });
       throw error;
@@ -520,7 +543,10 @@ export class SRService {
     return prisma.sR.findUnique({ where: { id } });
   }
 
-  async getSRDetailsById(id: string, options?: { activitiesLimit?: number; commentsLimit?: number }): Promise<SRDetails | null> {
+  async getSRDetailsById(
+    id: string,
+    options?: { activitiesLimit?: number; commentsLimit?: number }
+  ): Promise<SRDetails | null> {
     const { activitiesLimit = 20, commentsLimit = 20 } = options || {};
 
     return prisma.sR.findUnique({
@@ -543,7 +569,7 @@ export class SRService {
               select: { id: true, name: true, image: true },
             },
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
           take: activitiesLimit,
         },
         comments: {
@@ -552,11 +578,11 @@ export class SRService {
               select: { id: true, name: true, image: true },
             },
           },
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
           take: commentsLimit,
         },
         attachments: {
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: 'desc' },
         },
         statusHistory: {
           include: {
@@ -564,7 +590,7 @@ export class SRService {
               select: { id: true, name: true, image: true },
             },
           },
-          orderBy: { changedAt: "desc" },
+          orderBy: { changedAt: 'desc' },
         },
         _count: {
           select: {
@@ -624,7 +650,7 @@ export class SRService {
 
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
     const existingSR = await prisma.sR.findUnique({ where: { id } });
-    if (!existingSR) throw new NotFoundError("SR");
+    if (!existingSR) throw new NotFoundError('SR');
     ensureCanDeleteSR(sessionUser);
 
     // 트랜잭션으로 관련 데이터와 함께 삭제
@@ -679,7 +705,7 @@ export class SRService {
             },
           },
         },
-        orderBy: { changedAt: "desc" },
+        orderBy: { changedAt: 'desc' },
         skip,
         take,
       }),

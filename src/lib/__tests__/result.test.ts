@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { ok, fail, Result } from '../result';
+import { describe, expect, it } from 'vitest';
+
+import { fail, ok, Result } from '../result';
 
 describe('Result', () => {
   describe('ok', () => {
@@ -55,4 +56,3 @@ describe('Result', () => {
     });
   });
 });
-

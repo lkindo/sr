@@ -1,13 +1,10 @@
-import prisma from "@/lib/prisma";
-import { getCachedData, CacheKeys } from "@/lib/redis-cache";
+import prisma from '@/lib/prisma';
+import { CacheKeys, getCachedData } from '@/lib/redis-cache';
 
 export class ServiceCategoryService {
-  constructor() { }
+  constructor() {}
 
   async getAll() {
-    return getCachedData(
-      CacheKeys.serviceCategoryList(),
-      () => prisma.serviceCategory.findMany()
-    );
+    return getCachedData(CacheKeys.serviceCategoryList(), () => prisma.serviceCategory.findMany());
   }
 }

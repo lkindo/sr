@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
 /**
@@ -19,8 +19,6 @@ const authFiles = {
   engineer: path.join(__dirname, '../playwright/.auth/engineer.json'),
 };
 
-
-
 test.describe('다중 사용자 협업 워크플로우', () => {
   let srId: string;
   let srTitle: string;
@@ -30,7 +28,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
   test.setTimeout(120000);
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async ({ }, testInfo) => {
+  test.beforeEach(async (_, testInfo) => {
     if (testInfo.title !== '1. CLIENT: SR 생성' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }
@@ -49,14 +47,18 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await createButton.click();
 
       // 다이얼로그 확인
-      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({ timeout: 15000 });
+      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({
+        timeout: 15000,
+      });
 
       // SR 정보 입력
       const timestamp = Date.now();
       srTitle = `협업 테스트 SR ${timestamp}`;
 
       await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
-      await page.getByRole('textbox', { name: '설명 *' }).fill('다중 사용자 협업 시나리오 테스트입니다.');
+      await page
+        .getByRole('textbox', { name: '설명 *' })
+        .fill('다중 사용자 협업 시나리오 테스트입니다.');
 
       // 고객사 선택 (CLIENT 사용자는 자동 설정되어 disabled 상태일 수 있음)
       const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
@@ -139,23 +141,31 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 접수 폼 확인 (URL 기반 + 페이지 요소 확인)
       await expect(page).toHaveURL(/\/srs\/[^/]+\/intake/);
-      const formElement = page.locator('label, h1, h2, h3').filter({ hasText: /접수|우선순위|Intake/i }).first();
+      const formElement = page
+        .locator('label, h1, h2, h3')
+        .filter({ hasText: /접수|우선순위|Intake/i })
+        .first();
       await expect(formElement).toBeVisible({ timeout: 10000 });
 
       // 우선순위 선택
-      const prioritySelect = page.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = page
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
       await prioritySelect.click();
-      await page.getByRole('option', { name: /높음|HIGH/i }).first().click();
+      await page
+        .getByRole('option', { name: /높음|HIGH/i })
+        .first()
+        .click();
 
       // 예상 작업 시간 입력
       const hoursInput = page.getByLabel(/예상 작업 시간/i);
       await hoursInput.fill('8');
 
       // 담당자 선택 (첫 번째 사용 가능한 담당자)
-      const assigneeSelect = page.locator('label', { hasText: '담당자' })
+      const assigneeSelect = page
+        .locator('label', { hasText: '담당자' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
@@ -166,7 +176,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await firstAssigneeOption.click();
 
       // 접수 메모 작성
-      await page.getByLabel(/접수 메모/i).fill('엔지니어에게 배정하였습니다. 빠른 처리 부탁드립니다.');
+      await page
+        .getByLabel(/접수 메모/i)
+        .fill('엔지니어에게 배정하였습니다. 빠른 처리 부탁드립니다.');
 
       // 접수 완료
       await page.getByRole('button', { name: /저장/i }).click();
@@ -182,7 +194,10 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 상태 확인 (INTAKE 또는 IN_PROGRESS)
       // Badge 컴포넌트가 div일 수 있으므로 좀 더 일반적인 선택자 사용
-      const statusBadge = page.locator('div, span').filter({ hasText: /^접수$|^진행중$/ }).first();
+      const statusBadge = page
+        .locator('div, span')
+        .filter({ hasText: /^접수$|^진행중$/ })
+        .first();
       await expect(statusBadge).toBeVisible({ timeout: 15000 });
 
       console.log(`✅ MANAGER가 SR 접수 및 담당자 배정 완료`);
@@ -204,13 +219,18 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 상태 확인 (INTAKE 또는 IN_PROGRESS)
       // Manager가 접수하면 INTAKE 상태임
-      const statusBadge = page.locator('div, span').filter({ hasText: /^접수$|^진행중$/ }).first();
+      const statusBadge = page
+        .locator('div, span')
+        .filter({ hasText: /^접수$|^진행중$/ })
+        .first();
       await expect(statusBadge).toBeVisible({ timeout: 15000 });
 
       // 댓글 작성
-      const commentTextarea = page.locator('textarea').filter({ hasText: /댓글|Comment/i }).or(
-        page.locator('textarea[placeholder*="댓글"]')
-      ).first();
+      const commentTextarea = page
+        .locator('textarea')
+        .filter({ hasText: /댓글|Comment/i })
+        .or(page.locator('textarea[placeholder*="댓글"]'))
+        .first();
 
       if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
         await commentTextarea.fill('문제를 파악하였습니다. 현재 작업 진행 중입니다.');
@@ -251,9 +271,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         console.log(`✅ CLIENT가 엔지니어 댓글 확인`);
 
         // 답글 작성
-        const commentTextarea = page.locator('textarea').filter({ hasText: /댓글|Comment/i }).or(
-          page.locator('textarea[placeholder*="댓글"]')
-        ).first();
+        const commentTextarea = page
+          .locator('textarea')
+          .filter({ hasText: /댓글|Comment/i })
+          .or(page.locator('textarea[placeholder*="댓글"]'))
+          .first();
 
         if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
           await commentTextarea.fill('감사합니다. 추가로 로그 파일을 첨부하겠습니다.');
@@ -262,7 +284,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
           if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
             await submitButton.click();
             await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
-            await expect(page.locator('text=감사합니다. 추가로 로그 파일을 첨부하겠습니다.')).toBeVisible({ timeout: 10000 });
+            await expect(
+              page.locator('text=감사합니다. 추가로 로그 파일을 첨부하겠습니다.')
+            ).toBeVisible({ timeout: 10000 });
 
             console.log(`✅ CLIENT가 회신 댓글 작성 완료`);
           }
@@ -293,7 +317,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       // 완료 처리 (상태 변경)
       // 상태 변경 UI 찾기 (버튼 또는 셀렉트)
       const statusChangeButton = page.getByRole('button', { name: /완료|Complete|상태 변경/i });
-      const statusSelect = page.locator('select, [role="combobox"]').filter({ hasText: /상태|Status/i });
+      const statusSelect = page
+        .locator('select, [role="combobox"]')
+        .filter({ hasText: /상태|Status/i });
 
       if (await statusChangeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         await statusChangeButton.click();
@@ -305,7 +331,12 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         if (await completedOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await completedOption.click();
           // 상태 변경 반영 대기 (배지 텍스트 확인)
-          await expect(page.locator('span.badge').filter({ hasText: /완료|COMPLETED/i }).first()).toBeVisible({ timeout: 10000 });
+          await expect(
+            page
+              .locator('span.badge')
+              .filter({ hasText: /완료|COMPLETED/i })
+              .first()
+          ).toBeVisible({ timeout: 10000 });
           console.log(`✅ ENGINEER가 상태를 완료로 변경`);
         }
       } else {
@@ -313,9 +344,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       }
 
       // 완료 댓글 작성
-      const commentTextarea = page.locator('textarea').filter({ hasText: /댓글|Comment/i }).or(
-        page.locator('textarea[placeholder*="댓글"]')
-      ).first();
+      const commentTextarea = page
+        .locator('textarea')
+        .filter({ hasText: /댓글|Comment/i })
+        .or(page.locator('textarea[placeholder*="댓글"]'))
+        .first();
 
       if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
         await commentTextarea.fill('작업이 완료되었습니다. 확인 부탁드립니다.');
@@ -357,7 +390,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 종료 처리 (CLOSED)
       const closeButton = page.getByRole('button', { name: /종료|Close/i });
-      const statusSelect = page.locator('select, [role="combobox"]').filter({ hasText: /상태|Status/i });
+      const statusSelect = page
+        .locator('select, [role="combobox"]')
+        .filter({ hasText: /상태|Status/i });
 
       if (await closeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         await closeButton.click();
@@ -369,7 +404,12 @@ test.describe('다중 사용자 협업 워크플로우', () => {
         if (await closedOption.isVisible({ timeout: 3000 }).catch(() => false)) {
           await closedOption.click();
           // 종료 상태 배지 확인
-          await expect(page.locator('span.badge').filter({ hasText: /종료|CLOSED/i }).first()).toBeVisible({ timeout: 10000 });
+          await expect(
+            page
+              .locator('span.badge')
+              .filter({ hasText: /종료|CLOSED/i })
+              .first()
+          ).toBeVisible({ timeout: 10000 });
           console.log(`✅ MANAGER가 상태를 종료로 변경`);
         }
       } else {
@@ -377,9 +417,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       }
 
       // 최종 검토 댓글 작성
-      const commentTextarea = page.locator('textarea').filter({ hasText: /댓글|Comment/i }).or(
-        page.locator('textarea[placeholder*="댓글"]')
-      ).first();
+      const commentTextarea = page
+        .locator('textarea')
+        .filter({ hasText: /댓글|Comment/i })
+        .or(page.locator('textarea[placeholder*="댓글"]'))
+        .first();
 
       if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
         await commentTextarea.fill('검토 완료하였습니다. SR을 종료합니다. 수고하셨습니다.');

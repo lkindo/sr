@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
 import { Button } from '../ui/button';
 
 describe('Button Component', () => {
@@ -14,7 +15,7 @@ describe('Button Component', () => {
     const user = userEvent.setup();
 
     render(<Button onClick={handleClick}>Click me</Button>);
-    
+
     const button = screen.getByText('Click me');
     await user.click(button);
 
@@ -25,8 +26,12 @@ describe('Button Component', () => {
     const handleClick = vi.fn();
     const user = userEvent.setup();
 
-    render(<Button onClick={handleClick} disabled>Click me</Button>);
-    
+    render(
+      <Button onClick={handleClick} disabled>
+        Click me
+      </Button>
+    );
+
     const button = screen.getByText('Click me');
     await user.click(button);
 
@@ -36,12 +41,12 @@ describe('Button Component', () => {
 
   it('variant prop에 따라 스타일이 적용되어야 함', () => {
     const { container: defaultContainer } = render(<Button>Default</Button>);
-    const { container: destructiveContainer } = render(<Button variant="destructive">Destructive</Button>);
-    
+    const { container: destructiveContainer } = render(
+      <Button variant="destructive">Destructive</Button>
+    );
+
     // 기본적으로 variant가 적용되는지 확인
     expect(defaultContainer.firstChild).toBeInTheDocument();
     expect(destructiveContainer.firstChild).toBeInTheDocument();
   });
 });
-
-

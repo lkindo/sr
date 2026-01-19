@@ -1,9 +1,10 @@
-import { SRService } from "@/services/sr.service";
-import { SRsDataTable } from "@/components/srs/SRsDataTable";
-import { Prisma } from "@prisma/client";
-import { getCachedClients, getCachedUsers } from "@/lib/cache";
-import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
+import { Prisma } from '@prisma/client';
+
+import { auth } from '@/auth';
+import { SRsDataTable } from '@/components/srs/SRsDataTable';
+import { getCachedClients, getCachedUsers } from '@/lib/cache';
+import prisma from '@/lib/prisma';
+import { SRService } from '@/services/sr.service';
 
 type Props = {
   params: Promise<Record<string, unknown>>;
@@ -17,10 +18,10 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
 
 export default async function SRsPage({ searchParams }: Props) {
   const resolvedSearchParams = await searchParams;
-  const page = parseInt(getSearchParam(resolvedSearchParams.page) ?? "1", 10);
-  const itemsPerPage = parseInt(getSearchParam(resolvedSearchParams.itemsPerPage) ?? "20", 10);
-  const sort = getSearchParam(resolvedSearchParams.sort) ?? "createdAt.desc";
-  const [sortField, sortOrder] = sort.split(".");
+  const page = parseInt(getSearchParam(resolvedSearchParams.page) ?? '1', 10);
+  const itemsPerPage = parseInt(getSearchParam(resolvedSearchParams.itemsPerPage) ?? '20', 10);
+  const sort = getSearchParam(resolvedSearchParams.sort) ?? 'createdAt.desc';
+  const [sortField, sortOrder] = sort.split('.');
 
   const status = getSearchParam(resolvedSearchParams.status);
   const priority = getSearchParam(resolvedSearchParams.priority);
@@ -36,7 +37,7 @@ export default async function SRsPage({ searchParams }: Props) {
 
   // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
   const isAdminManagerEngineer = userRoles.some((role) =>
-    ["ADMIN", "MANAGER", "ENGINEER"].includes(role)
+    ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
   );
 
   const srService = new SRService();
@@ -54,11 +55,20 @@ export default async function SRsPage({ searchParams }: Props) {
     userClientIds = userClients.map((uc) => uc.clientId);
   }
 
-  if (status && status !== "all") where.status = status as "REQUESTED" | "INTAKE" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "CONFIRMED" | "REJECTED";
-  if (priority && priority !== "all") where.priority = priority as "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  if (status && status !== 'all')
+    where.status = status as
+      | 'REQUESTED'
+      | 'INTAKE'
+      | 'IN_PROGRESS'
+      | 'ON_HOLD'
+      | 'COMPLETED'
+      | 'CONFIRMED'
+      | 'REJECTED';
+  if (priority && priority !== 'all')
+    where.priority = priority as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
   // clientId 필터 처리
-  if (clientId && clientId !== "all") {
+  if (clientId && clientId !== 'all') {
     if (!isAdminManagerEngineer) {
       // 고객사 사용자인 경우, 요청한 clientId가 사용자의 고객사 목록에 있는지 확인
       if (userClientIds.length > 0 && userClientIds.includes(clientId)) {
@@ -80,8 +90,8 @@ export default async function SRsPage({ searchParams }: Props) {
       where.clientId = { in: [] };
     }
   }
-  if (assigneeId && assigneeId !== "all") {
-    where.assigneeId = assigneeId === "unassigned" ? null : assigneeId;
+  if (assigneeId && assigneeId !== 'all') {
+    where.assigneeId = assigneeId === 'unassigned' ? null : assigneeId;
   }
   // Handle date filtering
   if (dateFrom || dateTo) {
@@ -107,16 +117,16 @@ export default async function SRsPage({ searchParams }: Props) {
 
   // 관계형 필드 정렬 처리
   const getOrderBy = (): Prisma.SROrderByWithRelationInput | undefined => {
-    const order = sortOrder === "asc" ? "asc" : "desc";
+    const order = sortOrder === 'asc' ? 'asc' : 'desc';
 
     // 관계형 필드인 경우 중첩 객체 형식 사용
-    if (sortField === "client") {
+    if (sortField === 'client') {
       return { client: { name: order } };
     }
-    if (sortField === "requester") {
+    if (sortField === 'requester') {
       return { requester: { name: order } };
     }
-    if (sortField === "assignee") {
+    if (sortField === 'assignee') {
       return { assignee: { name: order } };
     }
 
@@ -150,11 +160,6 @@ export default async function SRsPage({ searchParams }: Props) {
   };
 
   return (
-    <SRsDataTable
-      srs={srData}
-      paginationInfo={paginationInfo}
-      clients={clients}
-      users={users}
-    />
+    <SRsDataTable srs={srData} paginationInfo={paginationInfo} clients={clients} users={users} />
   );
 }

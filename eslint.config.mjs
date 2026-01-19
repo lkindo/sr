@@ -6,12 +6,15 @@ import js from "@eslint/js";
 import tseslint from 'typescript-eslint';
 import security from 'eslint-plugin-security';
 
+import simpleImportSort from "eslint-plugin-simple-import-sort";
+
 const eslintConfig = [{
-    ignores: [".next/", "node_modules/", "coverage/", "dist/", "**/*.config.js", "**/*.config.ts"]
+    ignores: [".next/", "node_modules/", "coverage/", "dist/", "**/*.config.js", "**/*.config.ts", "**/.stryker-tmp/**"]
 }, js.configs.recommended, ...tseslint.configs.recommended, {
     files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
     plugins: {
         security: security,
+        "simple-import-sort": simpleImportSort,
     },
     rules: {
         "no-console": "warn",
@@ -24,6 +27,9 @@ const eslintConfig = [{
         "no-undef": "off",
         "@typescript-eslint/no-explicit-any": "warn",
         "@typescript-eslint/no-require-imports": "off",
+        // Import sorting
+        "simple-import-sort/imports": "error",
+        "simple-import-sort/exports": "error",
         // Security rules
         "security/detect-object-injection": "warn",
         "security/detect-non-literal-regexp": "warn",

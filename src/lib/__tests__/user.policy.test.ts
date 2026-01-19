@@ -1,12 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { User } from '@prisma/client';
+import { describe, expect, it } from 'vitest';
+
 import {
   canCreateUser,
+  canDeleteUser,
   canReadUser,
   canUpdateUser,
-  canDeleteUser,
   ensureCanDeleteUser,
 } from '@/lib/policies';
-import { User } from '@prisma/client';
 import { AuthenticatedUser } from '@/types/session';
 
 describe('User Policy Functions', () => {
@@ -121,16 +122,22 @@ describe('User Policy Functions', () => {
   describe('ensureCanDeleteUser', () => {
     it('should throw specific error when trying to delete self', () => {
       const adminSelf = { ...mockUser, id: 'admin-1' };
-      expect(() => ensureCanDeleteUser(adminUser, adminSelf)).toThrow('자기 자신을 삭제할 수 없습니다');
+      expect(() => ensureCanDeleteUser(adminUser, adminSelf)).toThrow(
+        '자기 자신을 삭제할 수 없습니다'
+      );
     });
 
     it('should throw error when trying to delete self (takes precedence)', () => {
-      expect(() => ensureCanDeleteUser(regularUser, mockUser)).toThrow('자기 자신을 삭제할 수 없습니다');
+      expect(() => ensureCanDeleteUser(regularUser, mockUser)).toThrow(
+        '자기 자신을 삭제할 수 없습니다'
+      );
     });
 
     it('should throw permission error when deleting others without permission', () => {
       const otherUser = { ...mockUser, id: 'other-user' };
-      expect(() => ensureCanDeleteUser(regularUser, otherUser)).toThrow('사용자 삭제 권한이 없습니다');
+      expect(() => ensureCanDeleteUser(regularUser, otherUser)).toThrow(
+        '사용자 삭제 권한이 없습니다'
+      );
     });
   });
 });

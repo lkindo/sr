@@ -1,7 +1,8 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs';
+import { Activity, DollarSign, TrendingUp, Users } from 'lucide-react';
+
 import { StatsCard } from './StatsCard';
 import { StatsCardSkeleton } from './StatsCardSkeleton';
-import { Users, DollarSign, Activity, TrendingUp } from 'lucide-react';
 
 const meta: Meta<typeof StatsCard> = {
   title: 'Dashboard/StatsCard',

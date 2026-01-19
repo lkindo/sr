@@ -1,9 +1,13 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { DeleteRoleDialog } from '@/components/roles/DeleteRoleDialog';
+import { PermissionBoard } from '@/components/roles/PermissionBoard';
+import { RoleDialog } from '@/components/roles/RoleDialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -11,12 +15,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { RoleDialog } from "@/components/roles/RoleDialog";
-import { PermissionBoard } from "@/components/roles/PermissionBoard";
-import { DeleteRoleDialog } from "@/components/roles/DeleteRoleDialog";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 
 interface Permission {
   id: string;
@@ -52,8 +52,8 @@ export default function RolesPage() {
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/roles");
-      if (!response.ok) throw new Error("Failed to fetch roles");
+      const response = await fetch('/api/roles');
+      if (!response.ok) throw new Error('Failed to fetch roles');
       const data: Role[] = await response.json();
       // 권한 데이터가 없는 경우 빈 배열로 초기화
       const rolesWithPermissions = data.map((role) => ({
@@ -63,9 +63,9 @@ export default function RolesPage() {
       setRoles(rolesWithPermissions);
     } catch {
       toast({
-        title: "오류",
-        description: "역할 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '역할 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -137,7 +137,9 @@ export default function RolesPage() {
         {/* Total Count - 테이블 바로 위 */}
         <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
           <div className="text-sm text-muted-foreground">
-            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{roles.length}</span> items
+            Total{' '}
+            <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{roles.length}</span>{' '}
+            items
           </div>
         </div>
 
@@ -164,15 +166,11 @@ export default function RolesPage() {
                 roles.map((role) => (
                   <TableRow key={role.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium text-center">{role.name}</TableCell>
-                    <TableCell>{role.description || "-"}</TableCell>
+                    <TableCell>{role.description || '-'}</TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="secondary">
-                        {role.permissions.length}개
-                      </Badge>
+                      <Badge variant="secondary">{role.permissions.length}개</Badge>
                     </TableCell>
-                    <TableCell className="text-center">
-                      {role._count?.users || 0}명
-                    </TableCell>
+                    <TableCell className="text-center">{role._count?.users || 0}명</TableCell>
                     <TableCell className="text-center space-x-2">
                       <Button
                         variant="ghost"
