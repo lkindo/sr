@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+
 import { Input } from '../ui/input';
 
 describe('Input Component', () => {
@@ -13,7 +14,7 @@ describe('Input Component', () => {
   it('사용자 입력을 처리해야 함', async () => {
     const user = userEvent.setup();
     render(<Input />);
-    
+
     const input = screen.getByRole('textbox');
     await user.type(input, 'Hello World');
 
@@ -36,12 +37,10 @@ describe('Input Component', () => {
     const user = userEvent.setup();
 
     render(<Input onChange={handleChange} />);
-    
+
     const input = screen.getByRole('textbox');
     await user.type(input, 'test');
 
     expect(handleChange).toHaveBeenCalled();
   });
 });
-
-

@@ -1,6 +1,6 @@
-import nodemailer from "nodemailer";
-import { logger } from "@/lib/logger";
+import nodemailer from 'nodemailer';
 
+import { logger } from '@/lib/logger';
 
 interface EmailOptions {
   to: string | string[];
@@ -13,7 +13,7 @@ class EmailService {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_SERVER_HOST || "smtp.gmail.com",
+      host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
       port: Number(process.env.EMAIL_SERVER_PORT) || 587,
       secure: false, // true for 465, false for other ports
       auth: {
@@ -21,15 +21,15 @@ class EmailService {
         pass: process.env.EMAIL_SERVER_PASSWORD,
       },
       tls: {
-        rejectUnauthorized: false // 개발 환경에서 로컬 인증서 문제 방지
-      }
+        rejectUnauthorized: false, // 개발 환경에서 로컬 인증서 문제 방지
+      },
     });
   }
 
   async sendMail({ to, subject, html }: EmailOptions): Promise<void> {
     // 개발 환경이나 설정이 없는 경우 스킵
     if (!process.env.EMAIL_SERVER_USER || !process.env.EMAIL_SERVER_PASSWORD) {
-      logger.warn("[EmailService] Email credentials not found. Skipping email sending.");
+      logger.warn('[EmailService] Email credentials not found. Skipping email sending.');
       return;
     }
 
@@ -42,11 +42,17 @@ class EmailService {
       });
       logger.info(`[EmailService] Email sent: ${info.messageId}`);
     } catch (error) {
-      logger.error("[EmailService] Error sending email:", error as Error);
+      logger.error('[EmailService] Error sending email:', error as Error);
     }
   }
 
-  async sendSRCreated(to: string, srNumber: string, title: string, requesterName: string, link: string) {
+  async sendSRCreated(
+    to: string,
+    srNumber: string,
+    title: string,
+    requesterName: string,
+    link: string
+  ) {
     const subject = `[SR System] 새로운 SR이 생성되었습니다: ${srNumber}`;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -63,7 +69,13 @@ class EmailService {
     await this.sendMail({ to, subject, html });
   }
 
-  async sendSRAssigned(to: string, srNumber: string, title: string, assigneeName: string, link: string) {
+  async sendSRAssigned(
+    to: string,
+    srNumber: string,
+    title: string,
+    assigneeName: string,
+    link: string
+  ) {
     const subject = `[SR System] SR 담당자가 배정되었습니다: ${srNumber}`;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -78,16 +90,23 @@ class EmailService {
     await this.sendMail({ to, subject, html });
   }
 
-  async sendSRStatusChanged(to: string, srNumber: string, title: string, oldStatus: string, newStatus: string, link: string) {
+  async sendSRStatusChanged(
+    to: string,
+    srNumber: string,
+    title: string,
+    oldStatus: string,
+    newStatus: string,
+    link: string
+  ) {
     const subject = `[SR System] SR 상태가 변경되었습니다: ${srNumber}`;
     const statusMap: Record<string, string> = {
-      REQUESTED: "요청됨",
-      INTAKE: "접수",
-      IN_PROGRESS: "진행중",
-      ON_HOLD: "보류",
-      COMPLETED: "완료",
-      CONFIRMED: "확인완료",
-      REJECTED: "거절됨",
+      REQUESTED: '요청됨',
+      INTAKE: '접수',
+      IN_PROGRESS: '진행중',
+      ON_HOLD: '보류',
+      COMPLETED: '완료',
+      CONFIRMED: '확인완료',
+      REJECTED: '거절됨',
     };
 
     const html = `
@@ -102,7 +121,14 @@ class EmailService {
     await this.sendMail({ to, subject, html });
   }
 
-  async sendCommentAdded(to: string, srNumber: string, title: string, commenterName: string, commentContent: string, link: string) {
+  async sendCommentAdded(
+    to: string,
+    srNumber: string,
+    title: string,
+    commenterName: string,
+    commentContent: string,
+    link: string
+  ) {
     const subject = `[SR System] SR에 새 댓글이 달렸습니다: ${srNumber}`;
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

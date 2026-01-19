@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UserService } from '@/services/user.service';
-import { ValidationError, BusinessRuleError, NotFoundError } from '@/lib/errors';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { UserService } from '@/services/user.service';
 
 // Mock dependencies
 vi.mock('@/lib/redis-cache', () => ({
@@ -40,7 +41,7 @@ vi.mock('@/lib/prisma', () => ({
     sRComment: { count: vi.fn() },
     sRStatusHistory: { count: vi.fn() },
     $transaction: vi.fn((cb) => cb(prisma)),
-  }
+  },
 }));
 
 describe('UserService', () => {
@@ -58,11 +59,13 @@ describe('UserService', () => {
 
       await userService.getAllUsers({ search: 'test' });
 
-      expect(prisma.user.findMany).toHaveBeenCalledWith(expect.objectContaining({
-        where: expect.objectContaining({
-          OR: expect.any(Array)
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.any(Array),
+          }),
         })
-      }));
+      );
     });
 
     it('calls findMany with pagination when no filters are provided', async () => {
@@ -77,10 +80,11 @@ describe('UserService', () => {
 
   describe('deactivateUser', () => {
     it('throws ValidationError if user has active SRs', async () => {
-      vi.mocked(prisma.sR.findMany).mockResolvedValue([{ id: 'sr-1', srNumber: 'SR1', status: 'IN_PROGRESS' }] as any);
+      vi.mocked(prisma.sR.findMany).mockResolvedValue([
+        { id: 'sr-1', srNumber: 'SR1', status: 'IN_PROGRESS' },
+      ] as any);
 
-      await expect(userService.deactivateUser('u1'))
-        .rejects.toThrow(ValidationError);
+      await expect(userService.deactivateUser('u1')).rejects.toThrow(ValidationError);
     });
 
     it('deactivates user if no active SRs', async () => {
@@ -91,7 +95,7 @@ describe('UserService', () => {
       expect(result.id).toBe('u1');
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'u1' },
-        data: { isActive: false }
+        data: { isActive: false },
       });
     });
   });
@@ -129,21 +133,26 @@ describe('UserService', () => {
         user: {
           create: vi.fn().mockResolvedValue({ id: 'u1' }),
           findUnique: vi.fn().mockResolvedValue({ id: 'u1', email: 't@t.com' }),
-          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'u1', email: 't@t.com' })
+          findUniqueOrThrow: vi.fn().mockResolvedValue({ id: 'u1', email: 't@t.com' }),
         },
         role: { findFirst: vi.fn().mockResolvedValue({ id: 'r1', name: 'ENGINEER' }) },
         userRole: { createMany: vi.fn() },
-        userClient: { createMany: vi.fn() }
+        userClient: { createMany: vi.fn() },
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
 
       await userService.createUser({
-        email: 't@t.com', name: 'N', password: 'P', userType: 'ENGINEER'
+        email: 't@t.com',
+        name: 'N',
+        password: 'P',
+        userType: 'ENGINEER',
       });
 
-      expect(txMock.role.findFirst).toHaveBeenCalledWith(expect.objectContaining({
-        where: { name: 'ENGINEER' }
-      }));
+      expect(txMock.role.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { name: 'ENGINEER' },
+        })
+      );
     });
   });
 
@@ -154,11 +163,16 @@ describe('UserService', () => {
     });
 
     it('throws error if current password mismatch', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1', password: 'hashed-old' } as any);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'u1',
+        password: 'hashed-old',
+      } as any);
       const { compare } = await import('bcryptjs');
       vi.mocked(compare).mockResolvedValue(false as any);
 
-      await expect(userService.changePassword('u1', 'wrong', 'new')).rejects.toThrow(ValidationError);
+      await expect(userService.changePassword('u1', 'wrong', 'new')).rejects.toThrow(
+        ValidationError
+      );
     });
   });
 });

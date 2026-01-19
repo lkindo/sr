@@ -2,25 +2,28 @@
  * SR 접수 정보 카드 컴포넌트
  */
 
-import { Badge } from "@/components/ui/badge";
-import { priorityLabels } from "@/lib/constants/sr";
-import type { SRDetails } from "@/types/sr.types";
-import { Clock, AlertTriangle, User, FileText } from "lucide-react";
+import { AlertTriangle, Clock, FileText, User } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { priorityLabels } from '@/lib/constants/sr';
+import type { SRDetails } from '@/types/sr.types';
 
 interface IntakeInfoCardProps {
   sr: SRDetails;
 }
 
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "default",
-  LOW: "secondary",
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
 
 export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
   // 접수 정보가 있는 상태만 표시
-  const showIntakeInfo = ["INTAKE", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "CONFIRMED"].includes(sr.status);
+  const showIntakeInfo = ['INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED'].includes(
+    sr.status
+  );
 
   if (!showIntakeInfo || !sr.intakeAt) {
     return null;
@@ -44,9 +47,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
               <User className="h-4 w-4 text-muted-foreground" />
               <h4 className="text-sm font-medium text-muted-foreground">접수자</h4>
             </div>
-            <p className="mt-1 text-foreground">
-              {sr.intakeBy?.name || "N/A"}
-            </p>
+            <p className="mt-1 text-foreground">{sr.intakeBy?.name || 'N/A'}</p>
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -55,14 +56,14 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
             </div>
             <p className="mt-1 text-foreground">
               {sr.intakeAt
-                ? new Date(sr.intakeAt).toLocaleString("ko-KR", {
-                    year: "numeric",
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                ? new Date(sr.intakeAt).toLocaleString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
                   })
-                : "N/A"}
+                : 'N/A'}
             </p>
           </div>
         </div>
@@ -87,7 +88,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
                   <span className="text-sm text-muted-foreground">실제:</span>
                   <Badge
                     variant={priorityColors[sr.actualPriority]}
-                    className={priorityChanged ? "ring-2 ring-orange-500 ring-offset-2" : ""}
+                    className={priorityChanged ? 'ring-2 ring-orange-500 ring-offset-2' : ''}
                   >
                     {priorityLabels[sr.actualPriority]}
                   </Badge>
@@ -112,10 +113,10 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
             <div>
               <h4 className="text-sm font-medium text-muted-foreground">예상 완료일</h4>
               <p className="mt-1 text-foreground">
-                {new Date(sr.estimatedCompletionDate).toLocaleDateString("ko-KR", {
-                  year: "numeric",
-                  month: "2-digit",
-                  day: "2-digit",
+                {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
                 })}
               </p>
             </div>

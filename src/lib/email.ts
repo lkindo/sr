@@ -1,16 +1,16 @@
-import { Resend } from "resend";
-import { render } from "@react-email/render";
-import SRCreatedEmail from "@/emails/SRCreatedEmail";
-import SRStatusChangedEmail from "@/emails/SRStatusChangedEmail";
-import SRAssignedEmail from "@/emails/SRAssignedEmail";
-import { getAppUrl } from "@/lib/app-url";
-import { logger } from "@/lib/logger";
+import { render } from '@react-email/render';
+import { Resend } from 'resend';
+
+import SRAssignedEmail from '@/emails/SRAssignedEmail';
+import SRCreatedEmail from '@/emails/SRCreatedEmail';
+import SRStatusChangedEmail from '@/emails/SRStatusChangedEmail';
+import { getAppUrl } from '@/lib/app-url';
+import { logger } from '@/lib/logger';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
-const FROM_EMAIL =
-  process.env.EMAIL_FROM || "SR Management <noreply@sr-system.com>";
+const FROM_EMAIL = process.env.EMAIL_FROM || 'SR Management <noreply@sr-system.com>';
 const BASE_URL = getAppUrl();
 
 interface SendSRCreatedEmailParams {
@@ -37,7 +37,7 @@ export async function sendSRCreatedEmail({
   requesterEmail,
 }: SendSRCreatedEmailParams) {
   if (!resend) {
-    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn('[email] RESEND_API_KEY is not configured. Skipping email.');
     return null;
   }
 
@@ -65,14 +65,14 @@ export async function sendSRCreatedEmail({
     });
 
     if (error) {
-      logger.error("Failed to send SR created email:", error as Error);
+      logger.error('Failed to send SR created email:', error as Error);
       throw new Error(error.message);
     }
 
-    logger.info("SR created email sent:", { data });
+    logger.info('SR created email sent:', { data });
     return data;
   } catch (error) {
-    logger.error("Error sending SR created email:", error as Error);
+    logger.error('Error sending SR created email:', error as Error);
     throw error;
   }
 }
@@ -101,7 +101,7 @@ export async function sendSRStatusChangedEmail({
   clientName,
 }: SendSRStatusChangedEmailParams) {
   if (!resend) {
-    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn('[email] RESEND_API_KEY is not configured. Skipping email.');
     return null;
   }
 
@@ -129,14 +129,14 @@ export async function sendSRStatusChangedEmail({
     });
 
     if (error) {
-      logger.error("Failed to send SR status changed email:", error as Error);
+      logger.error('Failed to send SR status changed email:', error as Error);
       throw new Error(error.message);
     }
 
-    logger.info("SR status changed email sent:", { data });
+    logger.info('SR status changed email sent:', { data });
     return data;
   } catch (error) {
-    logger.error("Error sending SR status changed email:", error as Error);
+    logger.error('Error sending SR status changed email:', error as Error);
     throw error;
   }
 }
@@ -165,7 +165,7 @@ export async function sendSRAssignedEmail({
   assignedByName,
 }: SendSRAssignedEmailParams) {
   if (!resend) {
-    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn('[email] RESEND_API_KEY is not configured. Skipping email.');
     return null;
   }
 
@@ -193,14 +193,14 @@ export async function sendSRAssignedEmail({
     });
 
     if (error) {
-      logger.error("Failed to send SR assigned email:", error as Error);
+      logger.error('Failed to send SR assigned email:', error as Error);
       throw new Error(error.message);
     }
 
-    logger.info("SR assigned email sent:", { data });
+    logger.info('SR assigned email sent:', { data });
     return data;
   } catch (error) {
-    logger.error("Error sending SR assigned email:", error as Error);
+    logger.error('Error sending SR assigned email:', error as Error);
     throw error;
   }
 }
@@ -224,7 +224,7 @@ export async function sendCommentNotificationEmail({
   commentContent,
 }: SendCommentNotificationEmailParams) {
   if (!resend) {
-    logger.warn("[email] RESEND_API_KEY is not configured. Skipping email.");
+    logger.warn('[email] RESEND_API_KEY is not configured. Skipping email.');
     return null;
   }
 
@@ -251,14 +251,14 @@ export async function sendCommentNotificationEmail({
     });
 
     if (error) {
-      logger.error("Failed to send comment notification email:", error as Error);
+      logger.error('Failed to send comment notification email:', error as Error);
       throw new Error(error.message);
     }
 
-    logger.info("Comment notification email sent:", { data });
+    logger.info('Comment notification email sent:', { data });
     return data;
   } catch (error) {
-    logger.error("Error sending comment notification email:", error as Error);
+    logger.error('Error sending comment notification email:', error as Error);
     throw error;
   }
 }

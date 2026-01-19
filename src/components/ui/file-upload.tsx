@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
-import { Upload, X, File } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { File, Upload, X } from 'lucide-react';
+import { useCallback, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface FileUploadProps {
   onChange: (files: File[]) => void;
@@ -18,37 +19,46 @@ export function FileUpload({
   value,
   maxSize = 10,
   maxFiles = 5,
-  accept = "*/*",
+  accept = '*/*',
   disabled = false,
 }: FileUploadProps) {
   const [dragActive, setDragActive] = useState(false);
   const { toast } = useToast();
 
-  const handleFiles = useCallback((files: File[]) => {
-    // Check max files
-    if (value.length + files.length > maxFiles) {
-      toast({ title: "업로드 제한", description: `최대 ${maxFiles}개의 파일만 업로드할 수 있습니다.`, variant: "destructive" });
-      return;
-    }
+  const handleFiles = useCallback(
+    (files: File[]) => {
+      // Check max files
+      if (value.length + files.length > maxFiles) {
+        toast({
+          title: '업로드 제한',
+          description: `최대 ${maxFiles}개의 파일만 업로드할 수 있습니다.`,
+          variant: 'destructive',
+        });
+        return;
+      }
 
-    // Check file sizes
-    const oversizedFiles = files.filter(
-      (file) => file.size > maxSize * 1024 * 1024
-    );
-    if (oversizedFiles.length > 0) {
-      toast({ title: "파일 크기 초과", description: `파일 크기는 ${maxSize}MB를 초과할 수 없습니다.`, variant: "destructive" });
-      return;
-    }
+      // Check file sizes
+      const oversizedFiles = files.filter((file) => file.size > maxSize * 1024 * 1024);
+      if (oversizedFiles.length > 0) {
+        toast({
+          title: '파일 크기 초과',
+          description: `파일 크기는 ${maxSize}MB를 초과할 수 없습니다.`,
+          variant: 'destructive',
+        });
+        return;
+      }
 
-    onChange([...value, ...files]);
-  }, [onChange, value, maxFiles, maxSize, toast]);
+      onChange([...value, ...files]);
+    },
+    [onChange, value, maxFiles, maxSize, toast]
+  );
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   }, []);
@@ -84,22 +94,22 @@ export function FileUpload({
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
+    if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
     <div className="space-y-4">
       <div
         className={cn(
-          "relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+          'relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
           dragActive
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50",
-          disabled && "opacity-50 cursor-not-allowed"
+            ? 'border-primary bg-primary/5'
+            : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+          disabled && 'opacity-50 cursor-not-allowed'
         )}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -117,8 +127,7 @@ export function FileUpload({
         <div className="flex flex-col items-center gap-2">
           <Upload className="h-8 w-8 text-muted-foreground" />
           <div className="text-sm">
-            <span className="font-medium text-primary">클릭</span>하거나 파일을
-            드래그하여 업로드
+            <span className="font-medium text-primary">클릭</span>하거나 파일을 드래그하여 업로드
           </div>
           <div className="text-xs text-muted-foreground">
             최대 {maxFiles}개, 파일당 {maxSize}MB 이하
@@ -132,19 +141,12 @@ export function FileUpload({
             선택된 파일 ({value.length}/{maxFiles})
           </div>
           {value.map((file, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between p-3 bg-muted rounded-lg"
-            >
+            <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">
-                    {file.name}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatFileSize(file.size)}
-                  </div>
+                  <div className="text-sm font-medium truncate">{file.name}</div>
+                  <div className="text-xs text-muted-foreground">{formatFileSize(file.size)}</div>
                 </div>
               </div>
               <Button

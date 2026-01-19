@@ -1,14 +1,18 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { Calendar, Mail, Trash2, Users } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
+} from '@/components/ui/sheet';
 import {
   Table,
   TableBody,
@@ -16,12 +20,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { Users, Mail, Calendar, Trash2 } from "lucide-react";
-import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
+} from '@/components/ui/table';
+import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -68,7 +69,7 @@ export function ClientUsersSheet({
     setLoading(true);
     try {
       const response = await fetch(`/api/clients/${clientId}`);
-      if (!response.ok) throw new Error("Failed to fetch client users");
+      if (!response.ok) throw new Error('Failed to fetch client users');
       const data = await response.json();
 
       // UserClient 구조에서 user 정보 추출
@@ -76,9 +77,9 @@ export function ClientUsersSheet({
       setUsers(usersList);
     } catch {
       toast({
-        title: "오류",
-        description: "사용자 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '사용자 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -88,21 +89,21 @@ export function ClientUsersSheet({
   const handleDeleteUser = async (userId: string) => {
     try {
       const res = await fetch(`/api/users/${userId}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) throw new Error('Delete failed');
       toast({
-        title: "삭제 완료",
-        description: "사용자가 삭제되었습니다.",
-        variant: "default",
+        title: '삭제 완료',
+        description: '사용자가 삭제되었습니다.',
+        variant: 'default',
       });
       // Refresh list
       fetchUsers();
     } catch {
       toast({
-        title: "오류",
-        description: "사용자 삭제에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '사용자 삭제에 실패했습니다.',
+        variant: 'destructive',
       });
     }
   };
@@ -116,9 +117,7 @@ export function ClientUsersSheet({
               <Users className="h-5 w-5" />
               {clientName} - 소속 사용자
             </SheetTitle>
-            <SheetDescription>
-              이 고객사에 소속된 사용자 목록입니다.
-            </SheetDescription>
+            <SheetDescription>이 고객사에 소속된 사용자 목록입니다.</SheetDescription>
           </SheetHeader>
 
           <div className="mt-6">
@@ -138,9 +137,7 @@ export function ClientUsersSheet({
                     총 <span className="font-semibold text-foreground">{users.length}</span>명
                   </p>
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/clients/${clientId}`}>
-                      고객사 상세보기
-                    </Link>
+                    <Link href={`/clients/${clientId}`}>고객사 상세보기</Link>
                   </Button>
                 </div>
 
@@ -180,11 +177,7 @@ export function ClientUsersSheet({
                                 </Badge>
                               ) : (
                                 (user.roles || []).map((ur) => (
-                                  <Badge
-                                    key={ur.role.id}
-                                    variant="secondary"
-                                    className="text-xs"
-                                  >
+                                  <Badge key={ur.role.id} variant="secondary" className="text-xs">
                                     {ur.role.name}
                                   </Badge>
                                 ))
@@ -193,10 +186,10 @@ export function ClientUsersSheet({
                           </TableCell>
                           <TableCell>
                             <Badge
-                              variant={user.isActive ? "default" : "secondary"}
+                              variant={user.isActive ? 'default' : 'secondary'}
                               className="text-xs"
                             >
-                              {user.isActive ? "활성" : "비활성"}
+                              {user.isActive ? '활성' : '비활성'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">

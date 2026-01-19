@@ -1,4 +1,5 @@
 import NextAuth from 'next-auth';
+
 import { authConfig } from '@/auth.config';
 
 // Edge-safe한 auth 설정만 사용하여 Edge Function 크기 제한 준수
@@ -8,14 +9,14 @@ const { auth } = NextAuth(authConfig);
 export default auth;
 
 export const config = {
-    matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - api (API routes - handled by auth wrapper separately)
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
-        '/((?!api|_next/static|_next/image|favicon.ico).*)',
-    ],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes - handled by auth wrapper separately)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

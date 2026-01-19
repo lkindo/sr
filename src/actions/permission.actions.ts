@@ -1,10 +1,11 @@
-"use server";
+'use server';
 
-import { PermissionService } from "@/services/permission.service";
-import { Result, ok } from "@/lib/result";
-import { errorToResult } from "@/lib/errors";
-import { getAuthenticatedSession } from "@/lib/action-helpers";
-import type { Permission } from "@prisma/client";
+import type { Permission } from '@prisma/client';
+
+import { getAuthenticatedSession } from '@/lib/action-helpers';
+import { errorToResult } from '@/lib/errors';
+import { ok, Result } from '@/lib/result';
+import { PermissionService } from '@/services/permission.service';
 
 export async function getAllPermissionsAction(): Promise<Result<Permission[]>> {
   try {

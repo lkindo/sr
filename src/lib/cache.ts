@@ -1,58 +1,55 @@
-import { Redis } from '@upstash/redis'
-import { logger } from '@/lib/logger'
+import { Redis } from '@upstash/redis';
+
+import { logger } from '@/lib/logger';
 
 type CacheOptions = {
-  ttlSeconds?: number
-  namespace?: string
-}
+  ttlSeconds?: number;
+  namespace?: string;
+};
 
-const redisUrl = process.env.UPSTASH_REDIS_REST_URL
-const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-let redis: Redis | null = null
+let redis: Redis | null = null;
 const metrics = {
   hit: 0,
   miss: 0,
   set: 0,
   invalidate: 0,
-}
+};
 if (redisUrl && redisToken) {
   redis = new Redis({
     url: redisUrl,
     token: redisToken,
-  })
+  });
 }
 
 function buildKey(key: string, namespace?: string) {
-  return namespace ? `${namespace}:${key}` : key
+  return namespace ? `${namespace}:${key}` : key;
 }
 
 export async function cacheGet<T>(key: string, options?: CacheOptions): Promise<T | null> {
-  if (!redis) return null
-  const k = buildKey(key, options?.namespace)
-  const v = await redis.get<T>(k)
+  if (!redis) return null;
+  const k = buildKey(key, options?.namespace);
+  const v = await redis.get<T>(k);
   if (v === null) {
-    metrics.miss++
-    return null
+    metrics.miss++;
+    return null;
   }
-  metrics.hit++
-  return v
+  metrics.hit++;
+  return v;
 }
 
-export async function cacheSet<T>(
-  key: string,
-  value: T,
-  options?: CacheOptions
-): Promise<void> {
-  if (!redis) return
-  const k = buildKey(key, options?.namespace)
-  const ttl = options?.ttlSeconds
+export async function cacheSet<T>(key: string, value: T, options?: CacheOptions): Promise<void> {
+  if (!redis) return;
+  const k = buildKey(key, options?.namespace);
+  const ttl = options?.ttlSeconds;
   if (ttl && ttl > 0) {
-    await redis.set(k, value, { ex: ttl })
+    await redis.set(k, value, { ex: ttl });
   } else {
-    await redis.set(k, value)
+    await redis.set(k, value);
   }
-  metrics.set++
+  metrics.set++;
 }
 
 export async function withCache<T>(
@@ -60,26 +57,25 @@ export async function withCache<T>(
   compute: () => Promise<T>,
   options?: CacheOptions
 ): Promise<T> {
-  const hit = await cacheGet<T>(key, options)
-  if (hit !== null) return hit
-  const value = await compute()
-  await cacheSet(key, value, options)
-  return value
+  const hit = await cacheGet<T>(key, options);
+  if (hit !== null) return hit;
+  const value = await compute();
+  await cacheSet(key, value, options);
+  return value;
 }
 
 export function isCacheAvailable(): boolean {
-  return !!redis
+  return !!redis;
 }
 
 export function getCacheMetrics() {
-  return { ...metrics }
+  return { ...metrics };
 }
 
 // Development-only periodic metrics logger
 // Disabled in test environment to prevent unhandled timer errors
 if (process.env.NODE_ENV === 'development' && process.env.VITEST !== 'true') {
-  const intervalMs =
-    Number(process.env.CACHE_METRICS_LOG_INTERVAL_MS ?? 60000)
+  const intervalMs = Number(process.env.CACHE_METRICS_LOG_INTERVAL_MS ?? 60000);
 
   // Avoid multiple intervals in hot-reload by using globalThis flag
   interface GlobalWithCacheMetricsLogger {
@@ -88,20 +84,30 @@ if (process.env.NODE_ENV === 'development' && process.env.VITEST !== 'true') {
   const g = globalThis as GlobalWithCacheMetricsLogger & typeof globalThis;
   if (!g.__sr_cache_metrics_logger_started__) {
     try {
-      setInterval(() => {
-        try {
-          const m = getCacheMetrics()
-          logger.info(`[Cache][Metrics] hit=${m.hit} miss=${m.miss} set=${m.set} invalidate=${m.invalidate}`)
-        } catch { /* ignore */ }
-      }, Math.max(5000, intervalMs))
-      g.__sr_cache_metrics_logger_started__ = true
-    } catch { /* ignore */ }
+      setInterval(
+        () => {
+          try {
+            const m = getCacheMetrics();
+            logger.info(
+              `[Cache][Metrics] hit=${m.hit} miss=${m.miss} set=${m.set} invalidate=${m.invalidate}`
+            );
+          } catch {
+            /* ignore */
+          }
+        },
+        Math.max(5000, intervalMs)
+      );
+      g.__sr_cache_metrics_logger_started__ = true;
+    } catch {
+      /* ignore */
+    }
   }
 }
 
-import { unstable_cache as cache } from 'next/cache';
-import prisma from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import { unstable_cache as cache } from 'next/cache';
+
+import prisma from '@/lib/prisma';
 
 // SR 목록 캐싱
 export const getCachedSRs = cache(
@@ -123,29 +129,29 @@ export const getCachedSRs = cache(
             id: true,
             code: true,
             name: true,
-          }
+          },
         },
         requester: {
           select: {
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
         assignee: {
           select: {
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
         serviceCategory: {
           select: {
             id: true,
             categoryName: true,
-          }
+          },
         },
-      }
+      },
     });
   },
   ['srs'],
@@ -204,16 +210,16 @@ export const getCachedServiceCategories = cache(
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
         backupHandler: {
           select: {
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
-      }
+      },
     });
   },
   ['service-categories'],

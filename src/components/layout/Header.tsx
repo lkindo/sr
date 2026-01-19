@@ -1,17 +1,18 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import dynamic from "next/dynamic";
-import { cn } from "@/lib/utils";
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-const UserNav = dynamic(() => import("./UserNav").then((mod) => mod.UserNav), {
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+
+const UserNav = dynamic(() => import('./UserNav').then((mod) => mod.UserNav), {
   ssr: false,
   loading: () => <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />,
 });
-import { usePermissions } from "@/hooks/use-permissions";
-import type { AuthenticatedUser } from "@/types/session";
+import { usePermissions } from '@/hooks/use-permissions';
+import type { AuthenticatedUser } from '@/types/session';
 
 interface HeaderProps {
   user?: AuthenticatedUser;
@@ -23,26 +24,30 @@ export function Header({ user }: HeaderProps) {
 
   // 상단 메뉴 정의
   const topMenuItems = [
-    { title: "Dashboard", href: "/dashboard" },
-    { title: "SR 관리", href: "/srs" },
-    { title: "조직 관리", href: "/organization", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
-    { title: "권한 관리", href: "/roles", roles: ["ADMIN", "MANAGER", "ENGINEER"] },
-    { title: "설정", href: "/settings" },
+    { title: 'Dashboard', href: '/dashboard' },
+    { title: 'SR 관리', href: '/srs' },
+    { title: '조직 관리', href: '/organization', roles: ['ADMIN', 'MANAGER', 'ENGINEER'] },
+    { title: '권한 관리', href: '/roles', roles: ['ADMIN', 'MANAGER', 'ENGINEER'] },
+    { title: '설정', href: '/settings' },
   ];
 
   // 현재 활성 메뉴 판단
   const getActiveMenu = () => {
-    if (pathname?.startsWith("/srs") || pathname?.startsWith("/my-requests")) return "/srs";
-    if (pathname?.startsWith("/organization") || pathname?.startsWith("/clients") || pathname?.startsWith("/users")) return "/organization";
-    if (pathname?.startsWith("/roles")) return "/roles";
-    if (pathname?.startsWith("/settings")) return "/settings";
-    return "/dashboard";
+    if (pathname?.startsWith('/srs') || pathname?.startsWith('/my-requests')) return '/srs';
+    if (
+      pathname?.startsWith('/organization') ||
+      pathname?.startsWith('/clients') ||
+      pathname?.startsWith('/users')
+    )
+      return '/organization';
+    if (pathname?.startsWith('/roles')) return '/roles';
+    if (pathname?.startsWith('/settings')) return '/settings';
+    return '/dashboard';
   };
 
   const activeMenu = getActiveMenu();
 
   // Dashboard 여부 확인
-
 
   return (
     <header className="sticky top-0 z-50 w-full sr-header-accent bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 min-w-[1280px]">
@@ -74,10 +79,10 @@ export function Header({ user }: HeaderProps) {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "px-4 py-2 rounded text-sm transition-colors font-medium",
+                    'px-4 py-2 rounded text-sm transition-colors font-medium',
                     activeMenu === item.href
-                      ? "bg-[hsl(var(--sr-primary-dark))] text-white"
-                      : "text-[hsl(var(--sr-gray-medium))] hover:text-foreground hover:bg-accent"
+                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white'
+                      : 'text-[hsl(var(--sr-gray-medium))] hover:text-foreground hover:bg-accent'
                   )}
                 >
                   {item.title}
@@ -104,4 +109,3 @@ export function Header({ user }: HeaderProps) {
     </header>
   );
 }
-

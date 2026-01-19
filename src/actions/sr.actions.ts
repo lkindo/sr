@@ -1,21 +1,23 @@
-"use server";
+'use server';
 
+import type { SR } from '@prisma/client';
+import { revalidatePath } from 'next/cache';
 
-import { SRService } from "@/services/sr.service";
-import { srCreateSchema, srUpdateSchema } from "@/lib/schemas";
-import { Result, ok, fail } from "@/lib/result";
-import { errorToResult } from "@/lib/errors";
-import { authenticateAndAuthorize, validateWithSchema, getAuthenticatedSession } from "@/lib/action-helpers";
-import { PERMISSIONS } from "@/lib/permission-helpers";
-import type { SR } from "@prisma/client";
-import { buildSRCreateInput, buildSRUpdateInput } from "./sr-form.utils";
-import { SRCreateResult, SRUpdateResult, SRDetails } from "@/types/sr.types";
+import {
+  authenticateAndAuthorize,
+  getAuthenticatedSession,
+  validateWithSchema,
+} from '@/lib/action-helpers';
+import { errorToResult } from '@/lib/errors';
+import { PERMISSIONS } from '@/lib/permission-helpers';
+import { fail, ok, Result } from '@/lib/result';
+import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
+import { SRService } from '@/services/sr.service';
+import { SRCreateResult, SRDetails, SRUpdateResult } from '@/types/sr.types';
 
-import { revalidatePath } from "next/cache";
+import { buildSRCreateInput, buildSRUpdateInput } from './sr-form.utils';
 
-export async function createSRAction(
-  formData: FormData
-): Promise<Result<SRCreateResult>> {
+export async function createSRAction(formData: FormData): Promise<Result<SRCreateResult>> {
   try {
     const payload = buildSRCreateInput(formData);
     const validationResult = validateWithSchema(payload, srCreateSchema);
@@ -30,7 +32,7 @@ export async function createSRAction(
     const srService = new SRService();
     const sr = await srService.createSR(validated, session.user);
 
-    revalidatePath("/srs");
+    revalidatePath('/srs');
     return ok(sr);
   } catch (error) {
     return errorToResult(error);
@@ -55,7 +57,7 @@ export async function updateSRAction(
     const srService = new SRService();
     const sr = await srService.updateSR(id, validated, session.user);
 
-    revalidatePath("/srs");
+    revalidatePath('/srs');
     revalidatePath(`/srs/${id}`);
     return ok(sr);
   } catch (error) {
@@ -71,7 +73,7 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
     const srService = new SRService();
     await srService.deleteSR(id, session.user);
 
-    revalidatePath("/srs");
+    revalidatePath('/srs');
     return ok(undefined);
   } catch (error) {
     return errorToResult(error);
@@ -84,7 +86,7 @@ export async function getSRAction(id: string): Promise<Result<SR>> {
     const sr = await srService.getSRById(id);
 
     if (!sr) {
-      return fail("SR을 찾을 수 없습니다.", "NOT_FOUND");
+      return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
     }
 
     return ok(sr);
@@ -99,7 +101,7 @@ export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>>
     const sr = await srService.getSRDetailsById(id);
 
     if (!sr) {
-      return fail("SR을 찾을 수 없습니다.", "NOT_FOUND");
+      return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
     }
 
     return ok(sr);
@@ -111,18 +113,20 @@ export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>>
 export async function getSRActivitiesAction(
   srId: string,
   options?: { cursor?: string; limit?: number }
-): Promise<Result<{
-  activities: Array<{
-    id: string;
-    type: string;
-    description: string;
-    createdAt: Date;
-    user: { id: string; name: string; image: string | null };
-  }>;
-  nextCursor: string | null;
-}>> {
+): Promise<
+  Result<{
+    activities: Array<{
+      id: string;
+      type: string;
+      description: string;
+      createdAt: Date;
+      user: { id: string; name: string; image: string | null };
+    }>;
+    nextCursor: string | null;
+  }>
+> {
   try {
-    const prisma = (await import("@/lib/prisma")).default;
+    const prisma = (await import('@/lib/prisma')).default;
 
     const limit = options?.limit || 20;
     const cursor = options?.cursor;
@@ -134,7 +138,7 @@ export async function getSRActivitiesAction(
         skip: 1,
         cursor: { id: cursor },
       }),
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       include: {
         user: {
           select: { id: true, name: true, image: true },
@@ -155,18 +159,20 @@ export async function getSRActivitiesAction(
 export async function getSRCommentsAction(
   srId: string,
   options?: { cursor?: string; limit?: number }
-): Promise<Result<{
-  comments: Array<{
-    id: string;
-    content: string;
-    createdAt: Date;
-    updatedAt: Date;
-    user: { id: string; name: string; image: string | null };
-  }>;
-  nextCursor: string | null;
-}>> {
+): Promise<
+  Result<{
+    comments: Array<{
+      id: string;
+      content: string;
+      createdAt: Date;
+      updatedAt: Date;
+      user: { id: string; name: string; image: string | null };
+    }>;
+    nextCursor: string | null;
+  }>
+> {
   try {
-    const prisma = (await import("@/lib/prisma")).default;
+    const prisma = (await import('@/lib/prisma')).default;
 
     const limit = options?.limit || 20;
     const cursor = options?.cursor;
@@ -178,7 +184,7 @@ export async function getSRCommentsAction(
         skip: 1,
         cursor: { id: cursor },
       }),
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       include: {
         user: {
           select: { id: true, name: true, image: true },

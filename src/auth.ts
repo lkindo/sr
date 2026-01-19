@@ -1,13 +1,15 @@
-import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
-import prisma from "@/lib/prisma";
-import { authConfig } from "./auth.config";
+import { compare } from 'bcryptjs';
+import NextAuth from 'next-auth';
+import Credentials from 'next-auth/providers/credentials';
+
+import prisma from '@/lib/prisma';
+
+import { authConfig } from './auth.config';
 
 // Prisma 클라이언트가 초기화되었는지 확인하는 헬퍼 함수
 function ensurePrismaClient() {
   if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL is not configured");
+    throw new Error('DATABASE_URL is not configured');
   }
   return prisma;
 }
@@ -17,12 +19,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          console.warn("⚠️ [Auth] 이메일 또는 비밀번호 누락");
+          console.warn('⚠️ [Auth] 이메일 또는 비밀번호 누락');
           return null;
         }
 
@@ -57,23 +59,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           });
 
           if (!user) {
-            console.warn("❌ [Auth] 사용자 찾을 수 없음:", credentials.email);
+            console.warn('❌ [Auth] 사용자 찾을 수 없음:', credentials.email);
             return null;
           }
 
-          const isPasswordValid = await compare(
-            credentials.password as string,
-            user.password
-          );
+          const isPasswordValid = await compare(credentials.password as string, user.password);
 
           if (!isPasswordValid) {
-            console.warn("❌ [Auth] 비밀번호 불일치:", credentials.email);
+            console.warn('❌ [Auth] 비밀번호 불일치:', credentials.email);
             return null;
           }
 
           // 비활성 사용자 로그인 차단
           if (!user.isActive) {
-            console.warn("❌ [Auth] 비활성 사용자:", credentials.email);
+            console.warn('❌ [Auth] 비활성 사용자:', credentials.email);
             return null;
           }
 
@@ -84,7 +83,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             image: user.image,
           };
         } catch (error) {
-          console.error("❌ [Auth] 로그인 처리 중 에러:", error);
+          console.error('❌ [Auth] 로그인 처리 중 에러:', error);
           return null;
         }
       },
@@ -150,7 +149,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       // 세션 업데이트 시 roles와 permissions를 다시 조회
-      if (trigger === "update") {
+      if (trigger === 'update') {
         const db = ensurePrismaClient();
         const userWithRoles = await db.user.findUnique({
           where: { id: token.id as string },

@@ -1,15 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Building2, X, RefreshCw } from "lucide-react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Building2, RefreshCw, X } from 'lucide-react';
+import Link from 'next/link';
+import { useState } from 'react';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,8 +13,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useToast } from '@/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -53,16 +50,16 @@ export function ClientBadgeWithActions({
     try {
       // 고객사 제거는 UserClient 레코드 삭제
       const response = await fetch(`/api/users/${userId}/client`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Failed to remove client");
+        throw new Error(result.error || 'Failed to remove client');
       }
 
       toast({
-        title: "성공",
+        title: '성공',
         description: `${userName}님의 고객사 소속이 해제되었습니다.`,
       });
 
@@ -70,12 +67,9 @@ export function ClientBadgeWithActions({
       onChanged?.();
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error
-            ? error.message
-            : "고객사 소속 해제에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '고객사 소속 해제에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
@@ -86,27 +80,27 @@ export function ClientBadgeWithActions({
     setIsProcessing(true);
     try {
       const response = await fetch(`/api/users/${userId}/client`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientId: newClientId }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to change client");
+        throw new Error(result.error || 'Failed to change client');
       }
 
       if (result.warning) {
         const ongoingSRCount = result.data?.ongoingSRCount || 0;
         toast({
-          title: "진행 중인 SR 확인",
+          title: '진행 중인 SR 확인',
           description: `${userName}님에게 진행 중인 SR ${ongoingSRCount}건이 있습니다. 고객사가 변경되었지만, SR 재할당을 권장합니다.`,
-          variant: "default",
+          variant: 'default',
         });
       } else {
         toast({
-          title: "성공",
+          title: '성공',
           description: `${userName}님의 고객사가 ${newClientName}(으)로 변경되었습니다.`,
         });
       }
@@ -115,10 +109,9 @@ export function ClientBadgeWithActions({
       onChanged?.();
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error ? error.message : "고객사 변경에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '고객사 변경에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setIsProcessing(false);
@@ -128,10 +121,7 @@ export function ClientBadgeWithActions({
   return (
     <div className="flex items-center gap-2">
       <Link href={`/clients/${client.id}`}>
-        <Badge
-          variant="secondary"
-          className="cursor-pointer hover:bg-secondary/80 gap-1"
-        >
+        <Badge variant="secondary" className="cursor-pointer hover:bg-secondary/80 gap-1">
           <Building2 className="h-3 w-3" />
           {client.name}
         </Badge>
@@ -152,9 +142,7 @@ export function ClientBadgeWithActions({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="start">
             <div className="space-y-1">
-              <p className="text-xs font-medium text-muted-foreground px-2 py-1">
-                고객사 변경
-              </p>
+              <p className="text-xs font-medium text-muted-foreground px-2 py-1">고객사 변경</p>
               <div className="max-h-48 overflow-y-auto">
                 {allClients
                   .filter((c) => c.id !== client.id)
@@ -166,9 +154,7 @@ export function ClientBadgeWithActions({
                       className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors disabled:opacity-50"
                     >
                       <div className="font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {c.code}
-                      </div>
+                      <div className="text-xs text-muted-foreground">{c.code}</div>
                     </button>
                   ))}
               </div>
@@ -194,11 +180,10 @@ export function ClientBadgeWithActions({
           <AlertDialogHeader>
             <AlertDialogTitle>고객사 소속 해제</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{userName}</strong>님의 <strong>{client.name}</strong>{" "}
-              소속을 해제하시겠습니까?
+              <strong>{userName}</strong>님의 <strong>{client.name}</strong> 소속을
+              해제하시겠습니까?
               <span className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded block">
-                ⚠ 기존 SR은 그대로 유지되지만, 더 이상 해당 고객사의 SR을 처리할
-                수 없습니다.
+                ⚠ 기존 SR은 그대로 유지되지만, 더 이상 해당 고객사의 SR을 처리할 수 없습니다.
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -209,7 +194,7 @@ export function ClientBadgeWithActions({
               disabled={isProcessing}
               className="bg-red-600 hover:bg-red-700"
             >
-              {isProcessing ? "처리 중..." : "해제"}
+              {isProcessing ? '처리 중...' : '해제'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

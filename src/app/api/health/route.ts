@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { NextResponse } from 'next/server';
+
+import prisma from '@/lib/prisma';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -15,7 +16,7 @@ export async function GET() {
     const dbTime = await prisma.$queryRaw`SELECT NOW() as server_time`;
 
     return NextResponse.json({
-      status: "healthy",
+      status: 'healthy',
       database: {
         connected: true,
         result: result,
@@ -24,14 +25,14 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("Database health check failed:", error);
+    console.error('Database health check failed:', error);
 
     return NextResponse.json(
       {
-        status: "unhealthy",
+        status: 'unhealthy',
         database: {
           connected: false,
-          error: error instanceof Error ? error.message : "알 수 없는 오류",
+          error: error instanceof Error ? error.message : '알 수 없는 오류',
         },
         timestamp: new Date().toISOString(),
       },

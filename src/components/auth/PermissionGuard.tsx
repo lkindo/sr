@@ -1,7 +1,8 @@
-"use client";
+'use client';
 
-import { ReactNode } from "react";
-import { usePermissions } from "@/hooks/use-permissions";
+import { ReactNode } from 'react';
+
+import { usePermissions } from '@/hooks/use-permissions';
 
 interface PermissionGuardProps {
   children: ReactNode;
@@ -24,13 +25,8 @@ export function PermissionGuard({
   roles,
   fallback = null,
 }: PermissionGuardProps) {
-  const {
-    hasPermission,
-    hasAnyPermission,
-    hasAllPermissions,
-    hasRole,
-    hasAnyRole,
-  } = usePermissions();
+  const { hasPermission, hasAnyPermission, hasAllPermissions, hasRole, hasAnyRole } =
+    usePermissions();
 
   let hasAccess = false;
 
@@ -44,9 +40,7 @@ export function PermissionGuard({
   else if (resource && action) {
     hasAccess = hasPermission(resource, action);
   } else if (permissions && permissions.length > 0) {
-    hasAccess = requireAll
-      ? hasAllPermissions(permissions)
-      : hasAnyPermission(permissions);
+    hasAccess = requireAll ? hasAllPermissions(permissions) : hasAnyPermission(permissions);
   }
   // 아무 조건도 없으면 접근 허용
   else {
@@ -59,4 +53,3 @@ export function PermissionGuard({
 
   return <>{children}</>;
 }
-

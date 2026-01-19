@@ -1,25 +1,26 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useEffect } from "react";
-import { Search, Shield } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Search, Shield } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+
+import { getAllPermissionsAction } from '@/actions/permission.actions';
+import { updateRolePermissionsAction } from '@/actions/role.actions';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { getAllPermissionsAction } from "@/actions/permission.actions";
-import { updateRolePermissionsAction } from "@/actions/role.actions";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface Permission {
   id: string;
@@ -46,15 +47,10 @@ interface PermissionBoardProps {
   onSaved: () => void;
 }
 
-export function PermissionBoard({
-  open,
-  onOpenChange,
-  role,
-  onSaved,
-}: PermissionBoardProps) {
+export function PermissionBoard({ open, onOpenChange, role, onSaved }: PermissionBoardProps) {
   const [allPermissions, setAllPermissions] = useState<Permission[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -67,13 +63,13 @@ export function PermissionBoard({
           if (result.success) {
             setAllPermissions(result.data as Permission[]);
           } else {
-            throw new Error(result.error || "권한 목록 로딩 실패");
+            throw new Error(result.error || '권한 목록 로딩 실패');
           }
         } catch {
           toast({
-            title: "오류",
-            description: "권한 데이터를 불러오지 못했습니다.",
-            variant: "destructive",
+            title: '오류',
+            description: '권한 데이터를 불러오지 못했습니다.',
+            variant: 'destructive',
           });
         }
       };
@@ -97,7 +93,7 @@ export function PermissionBoard({
     try {
       const result = await updateRolePermissionsAction(role.id, Array.from(selectedIds));
       if (result.success) {
-        toast({ title: "성공", description: "권한 설정이 저장되었습니다." });
+        toast({ title: '성공', description: '권한 설정이 저장되었습니다.' });
         onSaved();
         onOpenChange(false);
       } else {
@@ -105,9 +101,9 @@ export function PermissionBoard({
       }
     } catch {
       toast({
-        title: "오류",
-        description: "권한 저장 중 문제가 발생했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '권한 저장 중 문제가 발생했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -119,9 +115,11 @@ export function PermissionBoard({
     const groups: Record<string, Permission[]> = {};
 
     allPermissions.forEach((p) => {
-      if (searchQuery &&
+      if (
+        searchQuery &&
         !p.resource.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !p.action.toLowerCase().includes(searchQuery.toLowerCase())) {
+        !p.action.toLowerCase().includes(searchQuery.toLowerCase())
+      ) {
         return;
       }
 
@@ -141,12 +139,12 @@ export function PermissionBoard({
 
   const toggleGroup = (permissions: Permission[]) => {
     const next = new Set(selectedIds);
-    const allSelected = permissions.every(p => next.has(p.id));
+    const allSelected = permissions.every((p) => next.has(p.id));
 
     if (allSelected) {
-      permissions.forEach(p => next.delete(p.id));
+      permissions.forEach((p) => next.delete(p.id));
     } else {
-      permissions.forEach(p => next.add(p.id));
+      permissions.forEach((p) => next.add(p.id));
     }
     setSelectedIds(next);
   };
@@ -181,11 +179,15 @@ export function PermissionBoard({
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
             {Object.entries(groupedPermissions).map(([resource, permissions]) => {
-              const isAllSelected = permissions.every(p => selectedIds.has(p.id));
-              const isPartiallySelected = permissions.some(p => selectedIds.has(p.id)) && !isAllSelected;
+              const isAllSelected = permissions.every((p) => selectedIds.has(p.id));
+              const isPartiallySelected =
+                permissions.some((p) => selectedIds.has(p.id)) && !isAllSelected;
 
               return (
-                <Card key={resource} className="shadow-sm hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary h-fit">
+                <Card
+                  key={resource}
+                  className="shadow-sm hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary h-fit"
+                >
                   <CardHeader className="pb-3 bg-white border-b px-4 py-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -198,8 +200,9 @@ export function PermissionBoard({
                         checked={isAllSelected}
                         onCheckedChange={() => toggleGroup(permissions)}
                         className={cn(
-                          "data-[state=checked]:bg-primary scale-90",
-                          isPartiallySelected && "data-[state=unchecked]:bg-primary/60 data-[state=unchecked]:border-primary/60"
+                          'data-[state=checked]:bg-primary scale-90',
+                          isPartiallySelected &&
+                            'data-[state=unchecked]:bg-primary/60 data-[state=unchecked]:border-primary/60'
                         )}
                       />
                     </div>
@@ -207,7 +210,10 @@ export function PermissionBoard({
 
                   <CardContent className="pt-3 pb-3 px-4 space-y-3 bg-white">
                     {permissions.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between group hover:bg-slate-50 -mx-2 px-2 py-1.5 rounded-md transition-colors">
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between group hover:bg-slate-50 -mx-2 px-2 py-1.5 rounded-md transition-colors"
+                      >
                         <div className="flex flex-col gap-0.5">
                           <Label
                             htmlFor={p.id}
@@ -216,7 +222,9 @@ export function PermissionBoard({
                             {p.action}
                           </Label>
                           {p.description && (
-                            <span className="text-[11px] text-muted-foreground leading-tight">{p.description}</span>
+                            <span className="text-[11px] text-muted-foreground leading-tight">
+                              {p.description}
+                            </span>
                           )}
                         </div>
                         <Switch
@@ -246,7 +254,7 @@ export function PermissionBoard({
             취소
           </Button>
           <Button onClick={handleSave} disabled={loading} className="min-w-[100px]">
-            {loading ? "저장 중..." : "변경사항 저장"}
+            {loading ? '저장 중...' : '변경사항 저장'}
           </Button>
         </DialogFooter>
       </DialogContent>

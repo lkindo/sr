@@ -1,28 +1,24 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Clock, Filter, AlertCircle, FileText } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { CreateSRDialog } from "@/components/srs/CreateSRDialog";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { formatDistanceToNow } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { AlertCircle, Clock, FileText, Filter } from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
+
+import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import { ko } from "date-fns/locale";
+} from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 interface MySR {
   id: string;
@@ -71,44 +67,44 @@ interface MySR {
 }
 
 const statusLabels: Record<string, string> = {
-  REQUESTED: "접수 대기",
-  IN_PROGRESS: "진행 중",
-  RESOLVED: "해결됨",
-  COMPLETED: "완료",
-  CONFIRMED: "확인됨",
-  CANCELLED: "취소됨",
-  ON_HOLD: "보류",
+  REQUESTED: '접수 대기',
+  IN_PROGRESS: '진행 중',
+  RESOLVED: '해결됨',
+  COMPLETED: '완료',
+  CONFIRMED: '확인됨',
+  CANCELLED: '취소됨',
+  ON_HOLD: '보류',
 };
 
-const statusColors: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  REQUESTED: "secondary",
-  IN_PROGRESS: "default",
-  RESOLVED: "default",
-  COMPLETED: "outline",
-  CONFIRMED: "outline",
-  CANCELLED: "destructive",
-  ON_HOLD: "secondary",
+const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+  REQUESTED: 'secondary',
+  IN_PROGRESS: 'default',
+  RESOLVED: 'default',
+  COMPLETED: 'outline',
+  CONFIRMED: 'outline',
+  CANCELLED: 'destructive',
+  ON_HOLD: 'secondary',
 };
 
 const priorityLabels: Record<string, string> = {
-  CRITICAL: "긴급",
-  HIGH: "높음",
-  MEDIUM: "보통",
-  LOW: "낮음",
+  CRITICAL: '긴급',
+  HIGH: '높음',
+  MEDIUM: '보통',
+  LOW: '낮음',
 };
 
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "default",
-  LOW: "secondary",
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
 
 export default function MyRequestsPage() {
   const [srs, setSrs] = useState<MySR[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<string>("createdAt");
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('createdAt');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -116,20 +112,20 @@ export default function MyRequestsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (statusFilter !== "all") params.append("status", statusFilter);
-      params.append("sortBy", sortBy);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      params.append('sortBy', sortBy);
 
       const response = await fetch(`/api/srs/my-requests?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch my requests");
+      if (!response.ok) throw new Error('Failed to fetch my requests');
 
       const data = await response.json();
       setSrs(data.srs || []);
     } catch {
       // 에러는 toast로 사용자에게 표시
       toast({
-        title: "오류",
-        description: "요청 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '요청 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -143,9 +139,9 @@ export default function MyRequestsPage() {
   // 상태별 통계
   const stats = {
     total: srs.length,
-    requested: srs.filter((sr) => sr.status === "REQUESTED").length,
-    inProgress: srs.filter((sr) => sr.status === "IN_PROGRESS").length,
-    completed: srs.filter((sr) => ["COMPLETED", "CONFIRMED"].includes(sr.status)).length,
+    requested: srs.filter((sr) => sr.status === 'REQUESTED').length,
+    inProgress: srs.filter((sr) => sr.status === 'IN_PROGRESS').length,
+    completed: srs.filter((sr) => ['COMPLETED', 'CONFIRMED'].includes(sr.status)).length,
   };
 
   if (loading) {
@@ -163,53 +159,54 @@ export default function MyRequestsPage() {
       <div className="sr-list-head">
         <div>
           <h1 className="sr-list-title text-3xl">내 요청 SR</h1>
-          <p className="text-muted-foreground mt-1">
-            내가 요청한 SR의 진행 상황을 확인하세요.
-          </p>
+          <p className="text-muted-foreground mt-1">내가 요청한 SR의 진행 상황을 확인하세요.</p>
         </div>
-        <Button onClick={() => setCreateDialogOpen(true)} className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]">새 SR 요청</Button>
+        <Button
+          onClick={() => setCreateDialogOpen(true)}
+          className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
+        >
+          새 SR 요청
+        </Button>
       </div>
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="sr-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              전체 요청
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">전체 요청</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">{stats.total}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">
+              {stats.total}
+            </div>
           </CardContent>
         </Card>
 
         <Card className="sr-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              접수 대기
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">접수 대기</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">{stats.requested}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
+              {stats.requested}
+            </div>
           </CardContent>
         </Card>
 
         <Card className="sr-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              진행 중
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">진행 중</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">{stats.inProgress}</div>
+            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
+              {stats.inProgress}
+            </div>
           </CardContent>
         </Card>
 
         <Card className="sr-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              완료
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
@@ -291,17 +288,13 @@ export default function MyRequestsPage() {
                       >
                         {sr.srNumber}
                       </Link>
-                      <Badge variant={statusColors[sr.status]}>
-                        {statusLabels[sr.status]}
-                      </Badge>
+                      <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
                       <Badge variant={priorityColors[sr.requestedPriority]}>
                         {priorityLabels[sr.requestedPriority]}
                       </Badge>
                     </div>
                     <p className="text-lg font-medium text-foreground">{sr.title}</p>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {sr.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{sr.description}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -312,7 +305,9 @@ export default function MyRequestsPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground font-medium">진행률</span>
-                      <span className="font-semibold text-[hsl(var(--sr-accent-blue))]">{sr.progressPercentage}%</span>
+                      <span className="font-semibold text-[hsl(var(--sr-accent-blue))]">
+                        {sr.progressPercentage}%
+                      </span>
                     </div>
                     <Progress value={sr.progressPercentage} className="h-2" />
                   </div>
@@ -365,7 +360,7 @@ export default function MyRequestsPage() {
                           })}
                         </span>
                       </div>
-                      {sr.status === "REQUESTED" && sr.waitingHours > 0 && (
+                      {sr.status === 'REQUESTED' && sr.waitingHours > 0 && (
                         <div className="flex items-center gap-2 text-sm text-orange-600">
                           <AlertCircle className="h-4 w-4" />
                           <span>대기 중: {sr.waitingHours.toFixed(1)}시간</span>
@@ -375,7 +370,7 @@ export default function MyRequestsPage() {
                         <div className="flex items-center gap-2 text-sm">
                           <span className="text-muted-foreground">예상 완료:</span>
                           <span className="font-medium">
-                            {new Date(sr.estimatedCompletionDate).toLocaleDateString("ko-KR")}
+                            {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
                           </span>
                         </div>
                       )}
@@ -388,9 +383,7 @@ export default function MyRequestsPage() {
                       {sr._count?.attachments > 0 && (
                         <span>📎 첨부파일 {sr._count.attachments}개</span>
                       )}
-                      {sr._count?.comments > 0 && (
-                        <span>💬 댓글 {sr._count.comments}개</span>
-                      )}
+                      {sr._count?.comments > 0 && <span>💬 댓글 {sr._count.comments}개</span>}
                     </div>
                     <Link href={`/srs/${sr.id}`}>
                       <Button variant="outline" size="sm">
@@ -417,4 +410,3 @@ export default function MyRequestsPage() {
     </div>
   );
 }
-

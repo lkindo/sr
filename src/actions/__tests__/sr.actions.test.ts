@@ -1,15 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { revalidatePath } from 'next/cache';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { SRService } from '@/services/sr.service';
+
 import {
   createSRAction,
-  updateSRAction,
   deleteSRAction,
   getSRAction,
-  getSRDetailsAction,
   getSRActivitiesAction,
   getSRCommentsAction,
+<<<<<<< HEAD
+=======
+  getSRDetailsAction,
+  updateSRAction,
+>>>>>>> dev
 } from '../sr.actions';
-import { SRService } from '@/services/sr.service';
-import { revalidatePath } from 'next/cache';
 
 // Mock dependencies
 vi.mock('next/cache', () => ({
@@ -118,7 +123,7 @@ describe('SR Server Actions', () => {
     });
 
     it('should return error if authentication fails', async () => {
-      vi.mocked(auth).mockResolvedValue(null);
+      vi.mocked(auth).mockResolvedValue(null as any);
 
       const result = await createSRAction(validFormData);
 
@@ -163,7 +168,7 @@ describe('SR Server Actions', () => {
     });
 
     it('should return error if session invalid', async () => {
-      vi.mocked(auth).mockResolvedValue(null);
+      vi.mocked(auth).mockResolvedValue(null as any);
       const result = await updateSRAction('id', new FormData());
       expect(result.success).toBe(false);
       if (!result.success) expect(result.code).toBe('UNAUTHORIZED');

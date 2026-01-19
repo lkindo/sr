@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SRService } from '@/services/sr.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from '@/lib/policies';
+import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { pushService } from '@/services/push.service';
 import { emailService } from '@/services/email.service';
+import { pushService } from '@/services/push.service';
+import { SRService } from '@/services/sr.service';
 
 // Mock dependencies with inline definition to avoid hoisting issues
 vi.mock('@/lib/prisma', () => {

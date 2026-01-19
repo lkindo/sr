@@ -1,9 +1,11 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SRStatusActions } from '../SRStatusActions';
-import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useRouter } from 'next/navigation';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { useToast } from '@/hooks/use-toast';
+
+import { SRStatusActions } from '../SRStatusActions';
 
 // Mock dependencies
 vi.mock('next/navigation', () => ({

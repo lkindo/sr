@@ -1,4 +1,4 @@
-﻿import { test, expect, Page } from '@playwright/test';
+﻿import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
 /**
@@ -18,7 +18,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
   test.describe.configure({ mode: 'serial' });
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async ({ }, testInfo) => {
+  test.beforeEach(async (_, testInfo) => {
     if (testInfo.title !== '1. 준비: SR 생성 (CLIENT)' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }
@@ -126,12 +126,15 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 10000 });
 
       // 접수 폼 확인
-      await expect(page.getByRole('heading', { name: /SR 접수 처리/i }).first()).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: /SR 접수 처리/i }).first()).toBeVisible({
+        timeout: 10000,
+      });
 
       console.log(`✅ 접수 페이지 진입`);
 
       // 1) 실제 우선순위 선택
-      const prioritySelect = page.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = page
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
@@ -153,7 +156,8 @@ test.describe('SR 접수 프로세스 테스트', () => {
       console.log(`✅ 예상 작업 시간: 8시간`);
 
       // 3) 담당자 선택 (ENGINEER)
-      const assigneeSelect = page.locator('label', { hasText: '담당자' })
+      const assigneeSelect = page
+        .locator('label', { hasText: '담당자' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
@@ -217,7 +221,10 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
       // 접수 페이지 접근 확인 (URL 기반 + heading 또는 폼 존재 여부)
       await expect(page).toHaveURL(/\/srs\/[^/]+\/intake/);
-      const headingOrLabel = page.locator('h1, h2, h3, label').filter({ hasText: /접수|Intake|우선순위/i }).first();
+      const headingOrLabel = page
+        .locator('h1, h2, h3, label')
+        .filter({ hasText: /접수|Intake|우선순위/i })
+        .first();
       await expect(headingOrLabel).toBeVisible({ timeout: 10000 });
 
       // 우선순위 확인 (HIGH)
@@ -247,21 +254,28 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
     try {
       await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
-      await expect(page.getByRole('heading', { name: /SR 접수/i }).first()).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('heading', { name: /SR 접수/i }).first()).toBeVisible({
+        timeout: 10000,
+      });
 
-      const prioritySelect = page.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = page
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
       await prioritySelect.click();
-      await page.getByRole('option', { name: /긴급|CRITICAL/i }).first().click();
+      await page
+        .getByRole('option', { name: /긴급|CRITICAL/i })
+        .first()
+        .click();
 
       const hoursInput = page.getByLabel(/예상 작업 시간/i);
       await hoursInput.clear();
       await hoursInput.fill('12');
 
       // 담당자 재배정
-      const assigneeSelect2 = page.locator('label', { hasText: '담당자' })
+      const assigneeSelect2 = page
+        .locator('label', { hasText: '담당자' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
@@ -287,7 +301,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.waitForTimeout(2000);
 
       // 상세 페이지로 복귀
-      await page.waitForURL(/\/srs\/[^/]+$/, { timeout: 10000 }).catch(() => { });
+      await page.waitForURL(/\/srs\/[^/]+$/, { timeout: 10000 }).catch(() => {});
       if (page.url().includes('/intake')) {
         await page.goto(`/srs/${srId}`);
         await page.waitForLoadState('domcontentloaded');
@@ -333,9 +347,14 @@ test.describe('SR 접수 프로세스 테스트', () => {
     try {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
-      const activitySection = page.locator('section, div').filter({ hasText: /활동|Activity|이력/i }).first();
+      const activitySection = page
+        .locator('section, div')
+        .filter({ hasText: /활동|Activity|이력/i })
+        .first();
       if (await activitySection.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const intakeActivity = activitySection.locator('div, li, tr').filter({ hasText: /접수|배정|ASSIGNED|INTAKE/i });
+        const intakeActivity = activitySection
+          .locator('div, li, tr')
+          .filter({ hasText: /접수|배정|ASSIGNED|INTAKE/i });
         const count = await intakeActivity.count();
         if (count >= 2) {
           console.log(`✅ Activity 로그가 정상적으로 기록됨`);
@@ -404,13 +423,14 @@ test.describe('SR 접수 권한 테스트', () => {
       const clientSrId = page.url().split('/').pop()!;
 
       const intakeButton = page.getByRole('button', { name: /접수|Intake/i });
-      if (!await intakeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (!(await intakeButton.isVisible({ timeout: 3000 }).catch(() => false))) {
         console.log(`✅ CLIENT에게 접수 버튼이 표시되지 않음 (정상)`);
       }
 
       await page.goto(`/srs/${clientSrId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
       const is403 = page.url().includes('/403') || page.url().includes('/unauthorized');
-      const isBackToDetail = page.url().includes(`/srs/${clientSrId}`) && !page.url().includes('/intake');
+      const isBackToDetail =
+        page.url().includes(`/srs/${clientSrId}`) && !page.url().includes('/intake');
 
       if (is403 || isBackToDetail) {
         console.log(`✅ CLIENT의 접수 페이지 직접 접근이 차단됨 (정상)`);
@@ -431,7 +451,10 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       const clientPage = await clientContext.newPage();
 
       await clientPage.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
-      await clientPage.getByRole('button', { name: /등록|새 SR|Create/i }).first().click();
+      await clientPage
+        .getByRole('button', { name: /등록|새 SR|Create/i })
+        .first()
+        .click();
 
       const timestamp = Date.now();
       const title = `SLA 테스트 SR ${timestamp}`;
@@ -458,18 +481,26 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       const slaSrId = clientPage.url().split('/').pop()!;
       await clientContext.close();
 
-      await managerPage.goto(`/srs/${slaSrId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${slaSrId}/intake`, {
+        waitUntil: 'networkidle',
+        timeout: 30000,
+      });
 
-      const prioritySelect = managerPage.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = managerPage
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
       await prioritySelect.click();
-      await managerPage.getByRole('option', { name: /높음|HIGH/i }).first().click();
+      await managerPage
+        .getByRole('option', { name: /높음|HIGH/i })
+        .first()
+        .click();
 
       await managerPage.getByLabel(/예상 작업 시간/i).fill('5');
 
-      const assigneeSelectSLA = managerPage.locator('label', { hasText: '담당자' })
+      const assigneeSelectSLA = managerPage
+        .locator('label', { hasText: '담당자' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');

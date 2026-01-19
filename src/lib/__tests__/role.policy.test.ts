@@ -1,15 +1,16 @@
-import { describe, it, expect } from 'vitest';
+import { Role } from '@prisma/client';
+import { describe, expect, it } from 'vitest';
+
 import {
+  canAssignRole,
   canCreateRole,
+  canDeleteRole,
   canReadRole,
   canUpdateRole,
-  canDeleteRole,
-  canAssignRole,
-  ensureCanUpdateRole,
-  ensureCanDeleteRole,
   ensureCanAssignRole,
+  ensureCanDeleteRole,
+  ensureCanUpdateRole,
 } from '@/lib/policies';
-import { Role } from '@prisma/client';
 import { AuthenticatedUser } from '@/types/session';
 
 describe('Role Policy Functions', () => {
@@ -137,7 +138,9 @@ describe('Role Policy Functions', () => {
 
   describe('ensureCanUpdateRole', () => {
     it('should throw specific error for ADMIN role', () => {
-      expect(() => ensureCanUpdateRole(adminUser, adminRole)).toThrow('ADMIN 역할은 수정할 수 없습니다');
+      expect(() => ensureCanUpdateRole(adminUser, adminRole)).toThrow(
+        'ADMIN 역할은 수정할 수 없습니다'
+      );
     });
 
     it('should not throw for custom roles with permission', () => {
@@ -147,7 +150,9 @@ describe('Role Policy Functions', () => {
 
   describe('ensureCanDeleteRole', () => {
     it('should throw specific error for system roles', () => {
-      expect(() => ensureCanDeleteRole(adminUser, adminRole)).toThrow('시스템 역할은 삭제할 수 없습니다');
+      expect(() => ensureCanDeleteRole(adminUser, adminRole)).toThrow(
+        '시스템 역할은 삭제할 수 없습니다'
+      );
     });
 
     it('should not throw for custom roles with permission', () => {
@@ -157,7 +162,9 @@ describe('Role Policy Functions', () => {
 
   describe('ensureCanAssignRole', () => {
     it('should throw specific error when non-admin tries to assign ADMIN role', () => {
-      expect(() => ensureCanAssignRole(managerUser, adminRole)).toThrow('ADMIN 역할 할당은 ADMIN만 가능합니다');
+      expect(() => ensureCanAssignRole(managerUser, adminRole)).toThrow(
+        'ADMIN 역할 할당은 ADMIN만 가능합니다'
+      );
     });
 
     it('should not throw for authorized assignments', () => {

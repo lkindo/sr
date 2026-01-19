@@ -1,7 +1,9 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+
+import { deleteClientAction } from '@/actions/client.actions';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,9 +11,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
-import { deleteClientAction } from "@/actions/client.actions";
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -35,7 +36,6 @@ export function DeleteClientDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-
   const handleDelete = async () => {
     if (!client) return;
 
@@ -45,12 +45,12 @@ export function DeleteClientDialog({
       const result = await deleteClientAction(client.id);
 
       if (!result.success) {
-        throw new Error(result.error || "고객사 삭제에 실패했습니다.");
+        throw new Error(result.error || '고객사 삭제에 실패했습니다.');
       }
 
       toast({
-        title: "성공",
-        description: "고객사가 삭제되었습니다.",
+        title: '성공',
+        description: '고객사가 삭제되었습니다.',
       });
 
       // 모달 즉시 닫고 → 후속 이동/갱신
@@ -58,12 +58,9 @@ export function DeleteClientDialog({
       onDeleted();
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error
-            ? error.message
-            : "고객사 삭제에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '고객사 삭제에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -76,8 +73,7 @@ export function DeleteClientDialog({
         <DialogHeader>
           <DialogTitle>고객사 삭제</DialogTitle>
           <DialogDescription>
-            정말로 <strong>{client?.name}</strong> ({client?.code}) 고객사를
-            삭제하시겠습니까?
+            정말로 <strong>{client?.name}</strong> ({client?.code}) 고객사를 삭제하시겠습니까?
             <br />이 작업은 되돌릴 수 없습니다.
           </DialogDescription>
         </DialogHeader>
@@ -90,13 +86,8 @@ export function DeleteClientDialog({
           >
             취소
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={loading}
-          >
-            {loading ? "삭제 중..." : "삭제"}
+          <Button type="button" variant="destructive" onClick={handleDelete} disabled={loading}>
+            {loading ? '삭제 중...' : '삭제'}
           </Button>
         </DialogFooter>
       </DialogContent>

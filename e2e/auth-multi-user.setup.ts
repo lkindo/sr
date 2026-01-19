@@ -1,6 +1,6 @@
-import { test as setup, expect } from '@playwright/test';
-import path from 'path';
+import { expect, test as setup } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
 
 /**
  * 다중 사용자 인증 설정
@@ -66,7 +66,9 @@ for (const user of users) {
       if (!currentUrl.includes('login')) {
         console.log(`⚠️ ${user.name} URL 변경 감지됨 (예상치 못한 URL): ${currentUrl}`);
       } else {
-        throw new Error(`${user.name} 로그인 실패: 여전히 로그인 페이지에 있음 (URL: ${currentUrl})`);
+        throw new Error(
+          `${user.name} 로그인 실패: 여전히 로그인 페이지에 있음 (URL: ${currentUrl})`
+        );
       }
     }
 

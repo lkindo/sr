@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
 /**
@@ -103,17 +103,22 @@ test.describe('SR 상태 전이 테스트', () => {
     try {
       await managerPage.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
 
-      const prioritySelect = managerPage.locator('label', { hasText: '실제 우선순위' })
+      const prioritySelect = managerPage
+        .locator('label', { hasText: '실제 우선순위' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
       await prioritySelect.click();
-      await managerPage.getByRole('option', { name: /보통|MEDIUM/i }).first().click();
+      await managerPage
+        .getByRole('option', { name: /보통|MEDIUM/i })
+        .first()
+        .click();
 
       const hoursInput = managerPage.getByLabel(/예상 작업 시간/i);
       await hoursInput.fill('4');
 
-      const assigneeSelect = managerPage.locator('label', { hasText: '담당자' })
+      const assigneeSelect = managerPage
+        .locator('label', { hasText: '담당자' })
         .first()
         .locator('..')
         .locator('[role="combobox"]');
@@ -288,8 +293,11 @@ test.describe('SR 상태 전이 테스트', () => {
       const confirmButton = page.getByRole('button', { name: /확인 완료|확인완료|Confirm/i });
       if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
         // API 응답 모니터링
-        const responsePromise = page.waitForResponse(response =>
-          response.url().includes('/api/srs/') && response.url().includes('/status') && response.request().method() === 'PATCH'
+        const responsePromise = page.waitForResponse(
+          (response) =>
+            response.url().includes('/api/srs/') &&
+            response.url().includes('/status') &&
+            response.request().method() === 'PATCH'
         );
 
         await confirmButton.click();
@@ -298,9 +306,13 @@ test.describe('SR 상태 전이 테스트', () => {
         const responseBody = await response.json();
 
         if (!response.ok()) {
-          console.log(`❌ API 에러 (${response.status()}): ${responseBody.error || 'Unknown error'}`);
+          console.log(
+            `❌ API 에러 (${response.status()}): ${responseBody.error || 'Unknown error'}`
+          );
           if (response.status() === 403) {
-            console.log(`⚠️ CLIENT 사용자가 신청자가 아닙니다. 이는 테스트 데이터 이슈일 수 있습니다.`);
+            console.log(
+              `⚠️ CLIENT 사용자가 신청자가 아닙니다. 이는 테스트 데이터 이슈일 수 있습니다.`
+            );
             // 403 에러는 예상 가능한 상황이므로 테스트를 통과시킴
             return;
           }
@@ -334,11 +346,17 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // CONFIRMED 상태에서는 완료 처리 버튼이 표시되지 않아야 함
-      const completedOrConfirmed = await page.locator('text=/완료|COMPLETED|확인완료|CONFIRMED/i').first().isVisible({ timeout: 3000 }).catch(() => false);
+      const completedOrConfirmed = await page
+        .locator('text=/완료|COMPLETED|확인완료|CONFIRMED/i')
+        .first()
+        .isVisible({ timeout: 3000 })
+        .catch(() => false);
 
       if (completedOrConfirmed) {
         const completeButton = page.getByRole('button', { name: /완료 처리|Complete/i });
-        const isCompleteVisible = await completeButton.isVisible({ timeout: 2000 }).catch(() => false);
+        const isCompleteVisible = await completeButton
+          .isVisible({ timeout: 2000 })
+          .catch(() => false);
 
         if (!isCompleteVisible) {
           console.log(`✅ 잘못된 상태 전이 버튼이 표시되지 않음 (정상)`);
@@ -359,12 +377,17 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 상태 이력 섹션 찾기
-      const historySection = page.locator('section, div').filter({ hasText: /이력|History|변경 내역/i }).first();
+      const historySection = page
+        .locator('section, div')
+        .filter({ hasText: /이력|History|변경 내역/i })
+        .first();
       if (await historySection.isVisible({ timeout: 5000 }).catch(() => false)) {
         await expect(historySection).toBeVisible();
 
         // 상태 이력 항목 확인 (최소 3개 이상: REQUESTED→INTAKE→IN_PROGRESS→COMPLETED)
-        const historyItems = historySection.locator('div, li, tr').filter({ hasText: /REQUESTED|INTAKE|IN_PROGRESS|COMPLETED/i });
+        const historyItems = historySection
+          .locator('div, li, tr')
+          .filter({ hasText: /REQUESTED|INTAKE|IN_PROGRESS|COMPLETED/i });
         const count = await historyItems.count();
         console.log(`✅ 상태 이력 개수: ${count}개`);
 
@@ -485,7 +508,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
 
     // Step 1: CLIENT로 SR 생성
     const clientContext = await browser.newContext({
-      storageState: path.join(__dirname, '../playwright/.auth/client.json')
+      storageState: path.join(__dirname, '../playwright/.auth/client.json'),
     });
     const clientPage = await clientContext.newPage();
 
@@ -524,7 +547,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
 
     // Step 2: MANAGER로 접수 → 진행 시작 → 완료 처리
     const managerContext = await browser.newContext({
-      storageState: path.join(__dirname, '../playwright/.auth/manager.json')
+      storageState: path.join(__dirname, '../playwright/.auth/manager.json'),
     });
     const managerPage = await managerContext.newPage();
 
@@ -532,7 +555,10 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
       // 접수 처리
       await managerPage.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
 
-      const assigneeSelect = managerPage.locator('[role="combobox"]').filter({ hasText: /담당자/i }).first();
+      const assigneeSelect = managerPage
+        .locator('[role="combobox"]')
+        .filter({ hasText: /담당자/i })
+        .first();
       if (await assigneeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
         await assigneeSelect.click();
         await managerPage.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
@@ -560,7 +586,10 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
         const dialog = managerPage.locator('[role="dialog"]').first();
         if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
           await dialog.locator('textarea').first().fill('테스트 문제 해결 완료');
-          await dialog.getByRole('button', { name: /완료|확인/i }).first().click();
+          await dialog
+            .getByRole('button', { name: /완료|확인/i })
+            .first()
+            .click();
         }
         await managerPage.waitForTimeout(2000);
         console.log(`✅ 완료 처리 완료`);
@@ -571,7 +600,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
 
     // Step 3: CLIENT로 확인 완료 → 재오픈
     const client2Context = await browser.newContext({
-      storageState: path.join(__dirname, '../playwright/.auth/client.json')
+      storageState: path.join(__dirname, '../playwright/.auth/client.json'),
     });
     const client2Page = await client2Context.newPage();
 
@@ -626,7 +655,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
   test('재오픈 7일 제한 안내 UI 확인', async ({ browser }) => {
     // 이 테스트는 시간 조작이 필요하므로 UI 안내 메시지만 확인
     const context = await browser.newContext({
-      storageState: path.join(__dirname, '../playwright/.auth/client.json')
+      storageState: path.join(__dirname, '../playwright/.auth/client.json'),
     });
     const page = await context.newPage();
 
@@ -635,7 +664,10 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
       await page.goto('/my-requests', { waitUntil: 'networkidle', timeout: 30000 });
 
       // COMPLETED 또는 CONFIRMED 상태의 SR 찾기
-      const completedSR = page.locator('tr').filter({ hasText: /완료|COMPLETED|확인완료|CONFIRMED/i }).first();
+      const completedSR = page
+        .locator('tr')
+        .filter({ hasText: /완료|COMPLETED|확인완료|CONFIRMED/i })
+        .first();
 
       if (await completedSR.isVisible({ timeout: 5000 }).catch(() => false)) {
         await completedSR.click();
@@ -661,4 +693,3 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
     }
   });
 });
-

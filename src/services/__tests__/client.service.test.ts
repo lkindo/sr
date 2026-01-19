@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClientService } from '../client.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import prisma from '@/lib/prisma';
+
+import { ClientService } from '../client.service';
 
 vi.mock('@/lib/prisma', () => ({
   default: {

@@ -1,5 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
-import { ServiceError, errorToResult, NotFoundError, ValidationError, ForbiddenError, UnauthorizedError, DuplicateError, BusinessRuleError } from '@/lib/errors';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  BusinessRuleError,
+  DuplicateError,
+  errorToResult,
+  ForbiddenError,
+  NotFoundError,
+  ServiceError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/errors';
 import { logger } from '@/lib/logger';
 
 // Mock logger

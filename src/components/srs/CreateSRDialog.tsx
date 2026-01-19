@@ -1,8 +1,13 @@
-﻿"use client";
+﻿'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { useSession } from "next-auth/react";
-import { Button } from "@/components/ui/button";
+import { useSession } from 'next-auth/react';
+import { useCallback, useEffect, useState } from 'react';
+
+import { getClientsForSelection } from '@/actions/client.actions';
+import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
+import { createSRAction } from '@/actions/sr.actions';
+import { getProfileAction } from '@/actions/user.actions';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -10,24 +15,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+} from '@/components/ui/dialog';
+import { FileUpload } from '@/components/ui/file-upload';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { FileUpload } from "@/components/ui/file-upload";
-import { getClientsForSelection } from "@/actions/client.actions";
-import { getServiceCategoriesForSelection } from "@/actions/service-category.actions";
-import { createSRAction } from "@/actions/sr.actions";
-import { getProfileAction } from "@/actions/user.actions";
-import { usePermissions } from "@/hooks/use-permissions";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { usePermissions } from '@/hooks/use-permissions';
+import { useToast } from '@/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -39,37 +40,30 @@ interface Client {
   }[];
 }
 
-
 interface CreateSRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: () => void;
 }
 
-export function CreateSRDialog({
-  open,
-  onOpenChange,
-  onCreated,
-}: CreateSRDialogProps) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [clientId, setClientId] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [requestedPriority, setRequestedPriority] = useState<string>("MEDIUM");
-  const [requestedCompletionDate, setRequestedCompletionDate] = useState("");
+export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialogProps) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
+  const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>(
-    []
-  );
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
-  const isClientUser = !hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
-  const canSelectClient = hasAnyRole(["ADMIN", "MANAGER", "ENGINEER"]);
+  const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
+  const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
 
   const fetchClients = useCallback(async () => {
     // 고객사 사용자인 경우 자신의 고객사만 가져오기
@@ -77,31 +71,41 @@ export function CreateSRDialog({
       const profileResult = await getProfileAction();
 
       if (profileResult.success && profileResult.data) {
-        const userClients = (profileResult.data as { clients?: Array<{ client: { id: string; code: string; name: string } }> }).clients || [];
+        const userClients =
+          (
+            profileResult.data as {
+              clients?: Array<{ client: { id: string; code: string; name: string } }>;
+            }
+          ).clients || [];
 
         if (userClients.length > 0) {
           // 첫 번째 고객사 사용 (일반적으로 사용자는 하나의 고객사에만 속함)
           const userClient = userClients[0].client;
-          setClients([{
-            id: userClient.id,
-            code: userClient.code,
-            name: userClient.name,
-          }]);
+          setClients([
+            {
+              id: userClient.id,
+              code: userClient.code,
+              name: userClient.name,
+            },
+          ]);
           // 자동으로 고객사 설정
           setClientId(userClient.id);
         } else {
           toast({
-            title: "오류",
-            description: "고객사 정보를 찾을 수 없습니다.",
-            variant: "destructive",
+            title: '오류',
+            description: '고객사 정보를 찾을 수 없습니다.',
+            variant: 'destructive',
           });
         }
       } else {
-        const errorMsg = profileResult.success === false ? profileResult.error : "사용자 정보를 불러오지 못했습니다.";
+        const errorMsg =
+          profileResult.success === false
+            ? profileResult.error
+            : '사용자 정보를 불러오지 못했습니다.';
         toast({
-          title: "오류",
+          title: '오류',
           description: errorMsg,
-          variant: "destructive",
+          variant: 'destructive',
         });
       }
     } else {
@@ -112,9 +116,9 @@ export function CreateSRDialog({
         setClients(result.data as Client[]);
       } else {
         toast({
-          title: "오류",
-          description: "고객사 목록을 불러오지 못했습니다.",
-          variant: "destructive",
+          title: '오류',
+          description: '고객사 목록을 불러오지 못했습니다.',
+          variant: 'destructive',
         });
       }
     }
@@ -126,9 +130,9 @@ export function CreateSRDialog({
       setCategories(result.data.map((cat) => ({ id: cat.id, name: cat.categoryName })));
     } else {
       toast({
-        title: "오류",
-        description: "서비스 카테고리 목록을 불러오지 못했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '서비스 카테고리 목록을 불러오지 못했습니다.',
+        variant: 'destructive',
       });
     }
   }, [toast]);
@@ -136,15 +140,15 @@ export function CreateSRDialog({
   // 다이얼로그가 열릴 때마다 폼 초기화 (고객사 제외)
   useEffect(() => {
     if (open) {
-      setTitle("");
-      setDescription("");
+      setTitle('');
+      setDescription('');
       // 고객사 사용자가 아닌 경우에만 clientId 초기화
       if (!isClientUser) {
-        setClientId("");
+        setClientId('');
       }
-      setCategoryId("");
-      setRequestedPriority("MEDIUM");
-      setRequestedCompletionDate("");
+      setCategoryId('');
+      setRequestedPriority('MEDIUM');
+      setRequestedCompletionDate('');
       setFiles([]);
     }
   }, [open, isClientUser]);
@@ -166,67 +170,65 @@ export function CreateSRDialog({
   const uploadAttachments = async (srId: string, files: File[]) => {
     const formData = new FormData();
     files.forEach((file) => {
-      formData.append("files", file);
+      formData.append('files', file);
     });
 
     try {
       const response = await fetch(`/api/srs/${srId}/attachments`, {
-        method: "POST",
+        method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
         await response.text();
-        throw new Error("Failed to upload attachments");
+        throw new Error('Failed to upload attachments');
       }
 
       await response.json();
-
     } catch {
       toast({
-        title: "경고",
-        description: "SR은 생성되었으나 첨부파일 업로드에 실패했습니다.",
-        variant: "destructive",
+        title: '경고',
+        description: 'SR은 생성되었으나 첨부파일 업로드에 실패했습니다.',
+        variant: 'destructive',
       });
     }
   };
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (title.length < 5) {
       toast({
-        title: "오류",
-        description: "제목은 최소 5자 이상이어야 합니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '제목은 최소 5자 이상이어야 합니다.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (description.length < 10) {
       toast({
-        title: "오류",
-        description: "설명은 최소 10자 이상이어야 합니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '설명은 최소 10자 이상이어야 합니다.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!clientId) {
       toast({
-        title: "오류",
-        description: "고객사를 선택해주세요.",
-        variant: "destructive",
+        title: '오류',
+        description: '고객사를 선택해주세요.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (!categoryId) {
       toast({
-        title: "오류",
-        description: "서비스 카테고리를 선택해주세요.",
-        variant: "destructive",
+        title: '오류',
+        description: '서비스 카테고리를 선택해주세요.',
+        variant: 'destructive',
       });
       return;
     }
@@ -234,20 +236,20 @@ export function CreateSRDialog({
     setLoading(true);
 
     const formData = new FormData();
-    formData.append("title", title);
-    formData.append("description", description);
-    formData.append("clientId", clientId);
-    formData.append("serviceCategoryId", categoryId);
-    formData.append("requestedPriority", requestedPriority);
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('clientId', clientId);
+    formData.append('serviceCategoryId', categoryId);
+    formData.append('requestedPriority', requestedPriority);
     if (requestedCompletionDate) {
-      formData.append("requestedCompletionDate", requestedCompletionDate);
+      formData.append('requestedCompletionDate', requestedCompletionDate);
     }
 
     try {
       const result = await createSRAction(formData);
 
       if (!result.success) {
-        throw new Error(result.error || "SR 생성에 실패했습니다.");
+        throw new Error(result.error || 'SR 생성에 실패했습니다.');
       }
 
       const createdSR = result.data;
@@ -258,33 +260,33 @@ export function CreateSRDialog({
       }
 
       toast({
-        title: "성공",
-        description: `SR이 생성되었습니다.${files.length > 0 ? ` (첨부파일 ${files.length}개 업로드)` : ""}`,
+        title: '성공',
+        description: `SR이 생성되었습니다.${files.length > 0 ? ` (첨부파일 ${files.length}개 업로드)` : ''}`,
       });
 
       // Reset form
-      setTitle("");
-      setDescription("");
-      setClientId("");
-      setCategoryId("");
-      setRequestedPriority("MEDIUM");
-      setRequestedCompletionDate("");
+      setTitle('');
+      setDescription('');
+      setClientId('');
+      setCategoryId('');
+      setRequestedPriority('MEDIUM');
+      setRequestedCompletionDate('');
       setFiles([]);
 
       onCreated();
     } catch (error) {
-      let errorMessage = "SR 생성에 실패했습니다.";
+      let errorMessage = 'SR 생성에 실패했습니다.';
 
       if (error instanceof Error) {
         errorMessage = error.message;
-      } else if (typeof error === "object" && error !== null && "message" in error) {
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
         errorMessage = String(error.message);
       }
 
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -347,9 +349,7 @@ export function CreateSRDialog({
                   </SelectContent>
                 </Select>
                 {!canSelectClient && (
-                  <p className="text-xs text-muted-foreground">
-                    고객사는 자동으로 설정됩니다.
-                  </p>
+                  <p className="text-xs text-muted-foreground">고객사는 자동으로 설정됩니다.</p>
                 )}
               </div>
 
@@ -363,9 +363,7 @@ export function CreateSRDialog({
                   <SelectTrigger id="category">
                     <SelectValue
                       placeholder={
-                        categories.length === 0
-                          ? "카테고리가 없습니다"
-                          : "카테고리를 선택"
+                        categories.length === 0 ? '카테고리가 없습니다' : '카테고리를 선택'
                       }
                     />
                   </SelectTrigger>
@@ -401,16 +399,12 @@ export function CreateSRDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="requestedCompletionDate">
-                  희망 완료일 (선택)
-                </Label>
+                <Label htmlFor="requestedCompletionDate">희망 완료일 (선택)</Label>
                 <Input
                   id="requestedCompletionDate"
                   type="date"
                   value={requestedCompletionDate}
-                  onChange={(e) =>
-                    setRequestedCompletionDate(e.target.value)
-                  }
+                  onChange={(e) => setRequestedCompletionDate(e.target.value)}
                   disabled={loading}
                   placeholder="언제까지 완료되길 원하시나요?"
                 />
@@ -438,7 +432,7 @@ export function CreateSRDialog({
               취소
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "요청 중..." : "저장"}
+              {loading ? '요청 중...' : '저장'}
             </Button>
           </DialogFooter>
         </form>

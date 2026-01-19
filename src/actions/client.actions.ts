@@ -1,28 +1,27 @@
-"use server";
+'use server';
 
-
-import { logger } from "@/lib/logger";
-import { ClientService } from "@/services/client.service";
-import { clientCreateSchema, clientUpdateSchema } from "@/lib/schemas";
-import { Result, ok } from "@/lib/result";
-import { errorToResult } from "@/lib/errors";
-import { getFormDataValue } from "@/lib/form-data-parser";
-import { authenticateAndAuthorize, validateWithSchema } from "@/lib/action-helpers";
+import { authenticateAndAuthorize, validateWithSchema } from '@/lib/action-helpers';
+import { errorToResult } from '@/lib/errors';
+import { getFormDataValue } from '@/lib/form-data-parser';
+import { logger } from '@/lib/logger';
+import { ok, Result } from '@/lib/result';
+import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
+import { ClientService } from '@/services/client.service';
 
 type ClientCreateResult = Awaited<ReturnType<ClientService['createClient']>>;
 
 export async function createClientAction(formData: FormData): Promise<Result<ClientCreateResult>> {
   try {
     const data = {
-      code: getFormDataValue(formData, "code") || "",
-      name: getFormDataValue(formData, "name") || "",
-      industry: getFormDataValue(formData, "industry") || undefined,
-      contactPerson: getFormDataValue(formData, "contactPerson") || undefined,
-      contactEmail: getFormDataValue(formData, "contactEmail") || undefined,
-      contactPhone: getFormDataValue(formData, "contactPhone") || undefined,
-      address: getFormDataValue(formData, "address") || undefined,
-      contractStartDate: getFormDataValue(formData, "contractStartDate") || undefined,
-      contractEndDate: getFormDataValue(formData, "contractEndDate") || undefined,
+      code: getFormDataValue(formData, 'code') || '',
+      name: getFormDataValue(formData, 'name') || '',
+      industry: getFormDataValue(formData, 'industry') || undefined,
+      contactPerson: getFormDataValue(formData, 'contactPerson') || undefined,
+      contactEmail: getFormDataValue(formData, 'contactEmail') || undefined,
+      contactPhone: getFormDataValue(formData, 'contactPhone') || undefined,
+      address: getFormDataValue(formData, 'address') || undefined,
+      contractStartDate: getFormDataValue(formData, 'contractStartDate') || undefined,
+      contractEndDate: getFormDataValue(formData, 'contractEndDate') || undefined,
     };
 
     const validationResult = validateWithSchema(data, clientCreateSchema);
@@ -49,14 +48,14 @@ export async function createClientAction(formData: FormData): Promise<Result<Cli
 export async function updateClientAction(id: string, formData: FormData) {
   try {
     const data = {
-      name: getFormDataValue(formData, "name") || undefined,
-      industry: getFormDataValue(formData, "industry") || undefined,
-      contactPerson: getFormDataValue(formData, "contactPerson") || undefined,
-      contactEmail: getFormDataValue(formData, "contactEmail") || undefined,
-      contactPhone: getFormDataValue(formData, "contactPhone") || undefined,
-      address: getFormDataValue(formData, "address") || undefined,
-      contractStartDate: getFormDataValue(formData, "contractStartDate") || undefined,
-      contractEndDate: getFormDataValue(formData, "contractEndDate") || undefined,
+      name: getFormDataValue(formData, 'name') || undefined,
+      industry: getFormDataValue(formData, 'industry') || undefined,
+      contactPerson: getFormDataValue(formData, 'contactPerson') || undefined,
+      contactEmail: getFormDataValue(formData, 'contactEmail') || undefined,
+      contactPhone: getFormDataValue(formData, 'contactPhone') || undefined,
+      address: getFormDataValue(formData, 'address') || undefined,
+      contractStartDate: getFormDataValue(formData, 'contractStartDate') || undefined,
+      contractEndDate: getFormDataValue(formData, 'contractEndDate') || undefined,
     };
 
     const validationResult = validateWithSchema(data, clientUpdateSchema);
@@ -80,12 +79,12 @@ export async function updateClientAction(id: string, formData: FormData) {
     return {
       success: true,
       data: client,
-      message: "고객사가 성공적으로 업데이트되었습니다.",
+      message: '고객사가 성공적으로 업데이트되었습니다.',
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "고객사 업데이트 중 오류가 발생했습니다.",
+      error: error instanceof Error ? error.message : '고객사 업데이트 중 오류가 발생했습니다.',
     };
   }
 }
@@ -103,12 +102,12 @@ export async function deleteClientAction(id: string) {
 
     return {
       success: true,
-      message: "고객사가 성공적으로 삭제되었습니다.",
+      message: '고객사가 성공적으로 삭제되었습니다.',
     };
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "고객사 삭제 중 오류가 발생했습니다.",
+      error: error instanceof Error ? error.message : '고객사 삭제 중 오류가 발생했습니다.',
     };
   }
 }
@@ -126,7 +125,7 @@ export async function getClientAction(id: string) {
     if (!client) {
       return {
         success: false,
-        error: "고객사를 찾을 수 없습니다.",
+        error: '고객사를 찾을 수 없습니다.',
       };
     }
 
@@ -137,31 +136,31 @@ export async function getClientAction(id: string) {
   } catch (error) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "고객사 정보 조회 중 오류가 발생했습니다.",
+      error: error instanceof Error ? error.message : '고객사 정보 조회 중 오류가 발생했습니다.',
     };
   }
 }
 
 export async function getClientsForSelection() {
   try {
-    logger.debug("🔍 [getClientsForSelection] 고객사 목록 조회 시작");
+    logger.debug('🔍 [getClientsForSelection] 고객사 목록 조회 시작');
 
     // No auth check needed for a simple selection list
     const clientService = new ClientService();
     const clients = await clientService.getAllClients();
 
-    logger.debug("✅ [getClientsForSelection] 고객사 조회 성공:", {
+    logger.debug('✅ [getClientsForSelection] 고객사 조회 성공:', {
       count: clients.length,
       firstClient: clients[0] ? { id: clients[0].id, name: clients[0].name } : null,
     });
 
     return { success: true, data: clients };
   } catch (error) {
-    logger.error("❌ [getClientsForSelection] 고객사 목록 조회 실패:", error as Error);
+    logger.error('❌ [getClientsForSelection] 고객사 목록 조회 실패:', error as Error);
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : "고객사 목록을 불러오는데 실패했습니다."
+      error: error instanceof Error ? error.message : '고객사 목록을 불러오는데 실패했습니다.',
     };
   }
 }

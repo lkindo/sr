@@ -1,5 +1,5 @@
-import { config } from "dotenv";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
+import { config } from 'dotenv';
 
 // 환경 변수 명시적 로드
 config({ override: true });
@@ -8,81 +8,81 @@ const prisma = new PrismaClient();
 
 const permissions = [
   // SR 관련 권한
-  { resource: "SR", action: "CREATE", description: "SR 생성" },
-  { resource: "SR", action: "READ", description: "SR 조회" },
-  { resource: "SR", action: "UPDATE", description: "SR 수정" },
-  { resource: "SR", action: "DELETE", description: "SR 삭제" },
-  { resource: "SR", action: "ASSIGN", description: "SR 담당자 할당" },
-  { resource: "SR", action: "STATUS_CHANGE", description: "SR 상태 변경" },
+  { resource: 'SR', action: 'CREATE', description: 'SR 생성' },
+  { resource: 'SR', action: 'READ', description: 'SR 조회' },
+  { resource: 'SR', action: 'UPDATE', description: 'SR 수정' },
+  { resource: 'SR', action: 'DELETE', description: 'SR 삭제' },
+  { resource: 'SR', action: 'ASSIGN', description: 'SR 담당자 할당' },
+  { resource: 'SR', action: 'STATUS_CHANGE', description: 'SR 상태 변경' },
 
   // 고객사 관련 권한
-  { resource: "CLIENT", action: "CREATE", description: "고객사 생성" },
-  { resource: "CLIENT", action: "READ", description: "고객사 조회" },
-  { resource: "CLIENT", action: "UPDATE", description: "고객사 수정" },
-  { resource: "CLIENT", action: "DELETE", description: "고객사 삭제" },
+  { resource: 'CLIENT', action: 'CREATE', description: '고객사 생성' },
+  { resource: 'CLIENT', action: 'READ', description: '고객사 조회' },
+  { resource: 'CLIENT', action: 'UPDATE', description: '고객사 수정' },
+  { resource: 'CLIENT', action: 'DELETE', description: '고객사 삭제' },
 
   // 사용자 관련 권한
-  { resource: "USER", action: "CREATE", description: "사용자 생성" },
-  { resource: "USER", action: "READ", description: "사용자 조회" },
-  { resource: "USER", action: "UPDATE", description: "사용자 수정" },
-  { resource: "USER", action: "DELETE", description: "사용자 삭제" },
-  { resource: "USER", action: "ASSIGN_ROLE", description: "역할 할당" },
+  { resource: 'USER', action: 'CREATE', description: '사용자 생성' },
+  { resource: 'USER', action: 'READ', description: '사용자 조회' },
+  { resource: 'USER', action: 'UPDATE', description: '사용자 수정' },
+  { resource: 'USER', action: 'DELETE', description: '사용자 삭제' },
+  { resource: 'USER', action: 'ASSIGN_ROLE', description: '역할 할당' },
 
   // 역할 관련 권한
-  { resource: "ROLE", action: "CREATE", description: "역할 생성" },
-  { resource: "ROLE", action: "READ", description: "역할 조회" },
-  { resource: "ROLE", action: "UPDATE", description: "역할 수정" },
-  { resource: "ROLE", action: "DELETE", description: "역할 삭제" },
-  { resource: "ROLE", action: "ASSIGN_PERMISSION", description: "권한 할당" },
+  { resource: 'ROLE', action: 'CREATE', description: '역할 생성' },
+  { resource: 'ROLE', action: 'READ', description: '역할 조회' },
+  { resource: 'ROLE', action: 'UPDATE', description: '역할 수정' },
+  { resource: 'ROLE', action: 'DELETE', description: '역할 삭제' },
+  { resource: 'ROLE', action: 'ASSIGN_PERMISSION', description: '권한 할당' },
 
   // 댓글 관련 권한
-  { resource: "COMMENT", action: "CREATE", description: "댓글 생성" },
-  { resource: "COMMENT", action: "READ", description: "댓글 조회" },
-  { resource: "COMMENT", action: "UPDATE", description: "댓글 수정" },
-  { resource: "COMMENT", action: "DELETE", description: "댓글 삭제" },
+  { resource: 'COMMENT', action: 'CREATE', description: '댓글 생성' },
+  { resource: 'COMMENT', action: 'READ', description: '댓글 조회' },
+  { resource: 'COMMENT', action: 'UPDATE', description: '댓글 수정' },
+  { resource: 'COMMENT', action: 'DELETE', description: '댓글 삭제' },
 
   // 첨부파일 관련 권한
-  { resource: "ATTACHMENT", action: "CREATE", description: "첨부파일 업로드" },
-  { resource: "ATTACHMENT", action: "READ", description: "첨부파일 조회" },
-  { resource: "ATTACHMENT", action: "DELETE", description: "첨부파일 삭제" },
+  { resource: 'ATTACHMENT', action: 'CREATE', description: '첨부파일 업로드' },
+  { resource: 'ATTACHMENT', action: 'READ', description: '첨부파일 조회' },
+  { resource: 'ATTACHMENT', action: 'DELETE', description: '첨부파일 삭제' },
 
   // 알림 관련 권한
-  { resource: "NOTIFICATION", action: "READ", description: "알림 조회" },
-  { resource: "NOTIFICATION", action: "UPDATE", description: "알림 상태 변경" },
+  { resource: 'NOTIFICATION', action: 'READ', description: '알림 조회' },
+  { resource: 'NOTIFICATION', action: 'UPDATE', description: '알림 상태 변경' },
 
   // 대시보드 관련 권한
-  { resource: "DASHBOARD", action: "READ", description: "대시보드 조회" },
-  { resource: "DASHBOARD", action: "ANALYTICS", description: "분석 데이터 조회" },
+  { resource: 'DASHBOARD', action: 'READ', description: '대시보드 조회' },
+  { resource: 'DASHBOARD', action: 'ANALYTICS', description: '분석 데이터 조회' },
 ];
 
 const roles = [
   {
-    name: "ADMIN",
-    description: "시스템 관리자 - 모든 권한",
+    name: 'ADMIN',
+    description: '시스템 관리자 - 모든 권한',
   },
   {
-    name: "MANAGER",
-    description: "매니저 - SR 관리 및 사용자 관리",
+    name: 'MANAGER',
+    description: '매니저 - SR 관리 및 사용자 관리',
   },
   {
-    name: "ENGINEER",
-    description: "엔지니어 - SR 처리",
+    name: 'ENGINEER',
+    description: '엔지니어 - SR 처리',
   },
   {
-    name: "CLIENT_ADMIN",
-    description: "고객사 관리자 - 자사 SR 관리",
+    name: 'CLIENT_ADMIN',
+    description: '고객사 관리자 - 자사 SR 관리',
   },
   {
-    name: "CLIENT_USER",
-    description: "고객사 사용자 - SR 생성 및 조회",
+    name: 'CLIENT_USER',
+    description: '고객사 사용자 - SR 생성 및 조회',
   },
 ];
 
 async function main() {
-  console.log("Starting seed...");
+  console.log('Starting seed...');
 
   // Create permissions
-  console.log("Creating permissions...");
+  console.log('Creating permissions...');
   for (const permission of permissions) {
     await prisma.permission.upsert({
       where: {
@@ -98,7 +98,7 @@ async function main() {
   console.log(`Created ${permissions.length} permissions`);
 
   // Create roles
-  console.log("Creating roles...");
+  console.log('Creating roles...');
   for (const role of roles) {
     await prisma.role.upsert({
       where: { name: role.name },
@@ -109,9 +109,9 @@ async function main() {
   console.log(`Created ${roles.length} roles`);
 
   // Assign all permissions to ADMIN role
-  console.log("Assigning permissions to ADMIN role...");
+  console.log('Assigning permissions to ADMIN role...');
   const adminRole = await prisma.role.findUnique({
-    where: { name: "ADMIN" },
+    where: { name: 'ADMIN' },
   });
 
   if (adminRole) {
@@ -133,22 +133,22 @@ async function main() {
   }
 
   // Assign permissions to MANAGER role
-  console.log("Assigning permissions to MANAGER role...");
+  console.log('Assigning permissions to MANAGER role...');
   const managerRole = await prisma.role.findUnique({
-    where: { name: "MANAGER" },
+    where: { name: 'MANAGER' },
   });
 
   if (managerRole) {
     const managerPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: "SR" },
-          { resource: "CLIENT", action: { in: ["READ", "UPDATE"] } },
-          { resource: "USER", action: { in: ["READ", "UPDATE", "ASSIGN_ROLE"] } },
-          { resource: "COMMENT" },
-          { resource: "ATTACHMENT" },
-          { resource: "DASHBOARD" },
-          { resource: "NOTIFICATION" },
+          { resource: 'SR' },
+          { resource: 'CLIENT', action: { in: ['READ', 'UPDATE'] } },
+          { resource: 'USER', action: { in: ['READ', 'UPDATE', 'ASSIGN_ROLE'] } },
+          { resource: 'COMMENT' },
+          { resource: 'ATTACHMENT' },
+          { resource: 'DASHBOARD' },
+          { resource: 'NOTIFICATION' },
         ],
       },
     });
@@ -167,21 +167,21 @@ async function main() {
   }
 
   // Assign permissions to ENGINEER role
-  console.log("Assigning permissions to ENGINEER role...");
+  console.log('Assigning permissions to ENGINEER role...');
   const engineerRole = await prisma.role.findUnique({
-    where: { name: "ENGINEER" },
+    where: { name: 'ENGINEER' },
   });
 
   if (engineerRole) {
     const engineerPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: "SR", action: { in: ["READ", "UPDATE", "STATUS_CHANGE"] } },
-          { resource: "CLIENT", action: "READ" },
-          { resource: "COMMENT" },
-          { resource: "ATTACHMENT" },
-          { resource: "NOTIFICATION", action: "READ" },
-          { resource: "DASHBOARD", action: "READ" },
+          { resource: 'SR', action: { in: ['READ', 'UPDATE', 'STATUS_CHANGE'] } },
+          { resource: 'CLIENT', action: 'READ' },
+          { resource: 'COMMENT' },
+          { resource: 'ATTACHMENT' },
+          { resource: 'NOTIFICATION', action: 'READ' },
+          { resource: 'DASHBOARD', action: 'READ' },
         ],
       },
     });
@@ -200,22 +200,22 @@ async function main() {
   }
 
   // Assign permissions to CLIENT_ADMIN role
-  console.log("Assigning permissions to CLIENT_ADMIN role...");
+  console.log('Assigning permissions to CLIENT_ADMIN role...');
   const clientAdminRole = await prisma.role.findUnique({
-    where: { name: "CLIENT_ADMIN" },
+    where: { name: 'CLIENT_ADMIN' },
   });
 
   if (clientAdminRole) {
     const clientAdminPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: "SR", action: { in: ["CREATE", "READ", "UPDATE", "STATUS_CHANGE"] } },
-          { resource: "CLIENT", action: "READ" },
-          { resource: "USER", action: { in: ["READ", "UPDATE"] } },
-          { resource: "COMMENT" },
-          { resource: "ATTACHMENT" },
-          { resource: "NOTIFICATION" },
-          { resource: "DASHBOARD", action: "READ" },
+          { resource: 'SR', action: { in: ['CREATE', 'READ', 'UPDATE', 'STATUS_CHANGE'] } },
+          { resource: 'CLIENT', action: 'READ' },
+          { resource: 'USER', action: { in: ['READ', 'UPDATE'] } },
+          { resource: 'COMMENT' },
+          { resource: 'ATTACHMENT' },
+          { resource: 'NOTIFICATION' },
+          { resource: 'DASHBOARD', action: 'READ' },
         ],
       },
     });
@@ -234,19 +234,19 @@ async function main() {
   }
 
   // Assign permissions to CLIENT_USER role
-  console.log("Assigning permissions to CLIENT_USER role...");
+  console.log('Assigning permissions to CLIENT_USER role...');
   const clientUserRole = await prisma.role.findUnique({
-    where: { name: "CLIENT_USER" },
+    where: { name: 'CLIENT_USER' },
   });
 
   if (clientUserRole) {
     const clientUserPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: "SR", action: { in: ["CREATE", "READ", "UPDATE_SELF"] } },
-          { resource: "COMMENT", action: { in: ["CREATE", "READ"] } },
-          { resource: "ATTACHMENT", action: { in: ["CREATE", "READ"] } },
-          { resource: "NOTIFICATION", action: "READ" },
+          { resource: 'SR', action: { in: ['CREATE', 'READ', 'UPDATE_SELF'] } },
+          { resource: 'COMMENT', action: { in: ['CREATE', 'READ'] } },
+          { resource: 'ATTACHMENT', action: { in: ['CREATE', 'READ'] } },
+          { resource: 'NOTIFICATION', action: 'READ' },
         ],
       },
     });
@@ -265,23 +265,23 @@ async function main() {
   }
 
   // Create test users
-  console.log("Creating test users...");
+  console.log('Creating test users...');
 
   // Check if admin user already exists
   const existingAdmin = await prisma.user.findUnique({
-    where: { email: "admin@example.com" },
+    where: { email: 'admin@example.com' },
   });
 
   let adminUser;
   if (!existingAdmin) {
     // Use bcrypt to hash password
-    const bcrypt = require("bcryptjs");
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash('admin123', 10);
 
     adminUser = await prisma.user.create({
       data: {
-        email: "admin@example.com",
-        name: "Admin User",
+        email: 'admin@example.com',
+        name: 'Admin User',
         password: hashedPassword,
         notificationPreference: { create: {} }, // Add default preferences
       },
@@ -289,7 +289,7 @@ async function main() {
 
     // Assign ADMIN role to user
     const adminRoleForUser = await prisma.role.findUnique({
-      where: { name: "ADMIN" },
+      where: { name: 'ADMIN' },
     });
 
     if (adminRoleForUser) {
@@ -301,20 +301,20 @@ async function main() {
       });
     }
 
-    console.log("Created admin user: admin@example.com / admin123");
+    console.log('Created admin user: admin@example.com / admin123');
   } else {
     // Admin user already exists, update password and ensure preferences
-    const bcrypt = require("bcryptjs");
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash('admin123', 10);
 
     adminUser = await prisma.user.update({
-      where: { email: "admin@example.com" },
+      where: { email: 'admin@example.com' },
       data: {
         password: hashedPassword,
-        notificationPreference: { upsert: { create: {}, update: {} } }
+        notificationPreference: { upsert: { create: {}, update: {} } },
       },
     });
-    console.log("Admin user already exists, updated password and preferences");
+    console.log('Admin user already exists, updated password and preferences');
   }
 
   // Ensure Client User exists (Move outside if/else to ensure creation on first run)
@@ -339,7 +339,7 @@ async function main() {
       await prisma.userRole.create({ data: { userId: clientUser.id, roleId: clientRole.id } });
     }
     // TEST001 클라이언트와 연결 (Before clients are created? No, we need clients first. But clients are created AFTER users in this script order...)
-    // Wait, in original script clients are created AFTER users. 
+    // Wait, in original script clients are created AFTER users.
     // And users-clients link is created?
     // In original script:
     // create adminUser
@@ -350,7 +350,7 @@ async function main() {
     // But TEST001 is created at line 352.
     // So clientUser creation will fail or linking will fail if TEST001 doesn't exist.
 
-    // I will just correct the NotificationPreference part and keep the flow as requested, 
+    // I will just correct the NotificationPreference part and keep the flow as requested,
     // but I'll move clientUser creation to AFTER client creation if I can, OR just leave it as is but fix the preference.
     // Given the constraints and risk of breaking seed flow, I will just Init preferences.
     // And I will fix the "clientUser in else block" issue if it's safe.
@@ -363,15 +363,15 @@ async function main() {
     await prisma.notificationPreference.upsert({
       where: { userId: clientUser.id },
       create: { userId: clientUser.id },
-      update: {}
+      update: {},
     });
   }
 
   // Create test clients
-  console.log("Creating test clients...");
+  console.log('Creating test clients...');
 
   const existingClient = await prisma.client.findUnique({
-    where: { code: "TEST001" },
+    where: { code: 'TEST001' },
   });
 
   let testClient1, testClient2;
@@ -379,12 +379,12 @@ async function main() {
   if (!existingClient) {
     testClient1 = await prisma.client.create({
       data: {
-        code: "TEST001",
-        name: "테스트 고객사 A",
-        industry: "IT 서비스",
-        contactPerson: "김철수",
-        contactEmail: "contact@test-client-a.com",
-        contactPhone: "02-1234-5678",
+        code: 'TEST001',
+        name: '테스트 고객사 A',
+        industry: 'IT 서비스',
+        contactPerson: '김철수',
+        contactEmail: 'contact@test-client-a.com',
+        contactPhone: '02-1234-5678',
         isActive: true,
         users: {
           create: {
@@ -396,12 +396,12 @@ async function main() {
 
     testClient2 = await prisma.client.create({
       data: {
-        code: "TEST002",
-        name: "테스트 고객사 B",
-        industry: "제조업",
-        contactPerson: "이영희",
-        contactEmail: "contact@test-client-b.com",
-        contactPhone: "02-2345-6789",
+        code: 'TEST002',
+        name: '테스트 고객사 B',
+        industry: '제조업',
+        contactPerson: '이영희',
+        contactEmail: 'contact@test-client-b.com',
+        contactPhone: '02-2345-6789',
         isActive: true,
         users: {
           create: {
@@ -411,17 +411,17 @@ async function main() {
       },
     });
 
-    console.log("Created 2 test clients");
+    console.log('Created 2 test clients');
   } else {
-    console.log("Test clients already exist");
+    console.log('Test clients already exist');
     testClient1 = existingClient;
     testClient2 = await prisma.client.findUnique({
-      where: { code: "TEST002" },
+      where: { code: 'TEST002' },
     });
   }
 
   // Create service categories for test clients (always check)
-  console.log("Creating service categories...");
+  console.log('Creating service categories...');
 
   const existingCategories = await prisma.serviceCategory.count({
     where: {
@@ -436,49 +436,49 @@ async function main() {
       data: [
         {
           clientId: testClient1!.id,
-          categoryName: "기술 지원",
-          description: "기술적 문제 해결 및 지원",
+          categoryName: '기술 지원',
+          description: '기술적 문제 해결 및 지원',
           slaHours: 24,
-          priority: "HIGH",
+          priority: 'HIGH',
         },
         {
           clientId: testClient1!.id,
-          categoryName: "버그 수정",
-          description: "소프트웨어 버그 수정 요청",
+          categoryName: '버그 수정',
+          description: '소프트웨어 버그 수정 요청',
           slaHours: 48,
-          priority: "MEDIUM",
+          priority: 'MEDIUM',
         },
         {
           clientId: testClient1!.id,
-          categoryName: "기능 개선",
-          description: "기존 기능 개선 및 최적화",
+          categoryName: '기능 개선',
+          description: '기존 기능 개선 및 최적화',
           slaHours: 72,
-          priority: "LOW",
+          priority: 'LOW',
         },
         {
           clientId: testClient2!.id,
-          categoryName: "시스템 문의",
-          description: "시스템 관련 문의사항",
+          categoryName: '시스템 문의',
+          description: '시스템 관련 문의사항',
           slaHours: 24,
-          priority: "MEDIUM",
+          priority: 'MEDIUM',
         },
         {
           clientId: testClient2!.id,
-          categoryName: "데이터 처리",
-          description: "데이터 처리 및 분석 요청",
+          categoryName: '데이터 처리',
+          description: '데이터 처리 및 분석 요청',
           slaHours: 48,
-          priority: "MEDIUM",
+          priority: 'MEDIUM',
         },
       ],
     });
 
-    console.log("Created 5 service categories");
+    console.log('Created 5 service categories');
   } else {
     console.log(`Service categories already exist (${existingCategories} found)`);
   }
 
   // Create sample SRs with activities and status history
-  console.log("Creating sample SRs with activities...");
+  console.log('Creating sample SRs with activities...');
 
   const existingSRs = await prisma.sR.count();
 
@@ -491,12 +491,12 @@ async function main() {
       // SR 1: IN_PROGRESS
       const sr1 = await prisma.sR.create({
         data: {
-          srNumber: "SR-2024-001",
-          title: "시스템 로그인 오류 해결 요청",
-          description: "특정 사용자 계정에서 로그인 시 오류가 발생합니다. 빠른 확인 부탁드립니다.",
-          status: "IN_PROGRESS",
-          requestedPriority: "HIGH",
-          actualPriority: "HIGH",
+          srNumber: 'SR-2024-001',
+          title: '시스템 로그인 오류 해결 요청',
+          description: '특정 사용자 계정에서 로그인 시 오류가 발생합니다. 빠른 확인 부탁드립니다.',
+          status: 'IN_PROGRESS',
+          requestedPriority: 'HIGH',
+          actualPriority: 'HIGH',
           clientId: testClient1.id,
           serviceCategoryId: category.id,
           requesterId: adminUser.id,
@@ -512,22 +512,22 @@ async function main() {
           {
             srId: sr1.id,
             userId: adminUser.id,
-            type: "CREATED",
-            description: "SR이 생성되었습니다",
+            type: 'CREATED',
+            description: 'SR이 생성되었습니다',
             createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr1.id,
             userId: adminUser.id,
-            type: "ASSIGNED",
-            description: "담당자가 할당되었습니다",
+            type: 'ASSIGNED',
+            description: '담당자가 할당되었습니다',
             createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 1000),
           },
           {
             srId: sr1.id,
             userId: adminUser.id,
-            type: "STATUS_CHANGED",
-            description: "상태가 IN_PROGRESS로 변경되었습니다",
+            type: 'STATUS_CHANGED',
+            description: '상태가 IN_PROGRESS로 변경되었습니다',
             createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
           },
         ],
@@ -538,17 +538,17 @@ async function main() {
         data: [
           {
             srId: sr1.id,
-            currentStatus: "REQUESTED",
+            currentStatus: 'REQUESTED',
             changedBy: adminUser.id,
-            changeReason: "초기 생성",
+            changeReason: '초기 생성',
             changedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr1.id,
-            previousStatus: "REQUESTED",
-            currentStatus: "IN_PROGRESS",
+            previousStatus: 'REQUESTED',
+            currentStatus: 'IN_PROGRESS',
             changedBy: adminUser.id,
-            changeReason: "작업 시작",
+            changeReason: '작업 시작',
             changedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
           },
         ],
@@ -557,12 +557,12 @@ async function main() {
       // SR 2: COMPLETED
       const sr2 = await prisma.sR.create({
         data: {
-          srNumber: "SR-2024-002",
-          title: "데이터 백업 요청",
-          description: "월말 정기 데이터 백업을 요청합니다.",
-          status: "COMPLETED",
-          requestedPriority: "MEDIUM",
-          actualPriority: "MEDIUM",
+          srNumber: 'SR-2024-002',
+          title: '데이터 백업 요청',
+          description: '월말 정기 데이터 백업을 요청합니다.',
+          status: 'COMPLETED',
+          requestedPriority: 'MEDIUM',
+          actualPriority: 'MEDIUM',
           clientId: testClient1.id,
           serviceCategoryId: category.id,
           requesterId: adminUser.id,
@@ -578,15 +578,15 @@ async function main() {
           {
             srId: sr2.id,
             userId: adminUser.id,
-            type: "CREATED",
-            description: "SR이 생성되었습니다",
+            type: 'CREATED',
+            description: 'SR이 생성되었습니다',
             createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr2.id,
             userId: adminUser.id,
-            type: "STATUS_CHANGED",
-            description: "상태가 COMPLETED로 변경되었습니다",
+            type: 'STATUS_CHANGED',
+            description: '상태가 COMPLETED로 변경되었습니다',
             createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
           },
         ],
@@ -596,25 +596,25 @@ async function main() {
         data: [
           {
             srId: sr2.id,
-            currentStatus: "REQUESTED",
+            currentStatus: 'REQUESTED',
             changedBy: adminUser.id,
-            changeReason: "초기 생성",
+            changeReason: '초기 생성',
             changedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr2.id,
-            previousStatus: "REQUESTED",
-            currentStatus: "IN_PROGRESS",
+            previousStatus: 'REQUESTED',
+            currentStatus: 'IN_PROGRESS',
             changedBy: adminUser.id,
-            changeReason: "작업 시작",
+            changeReason: '작업 시작',
             changedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr2.id,
-            previousStatus: "IN_PROGRESS",
-            currentStatus: "COMPLETED",
+            previousStatus: 'IN_PROGRESS',
+            currentStatus: 'COMPLETED',
             changedBy: adminUser.id,
-            changeReason: "작업 완료",
+            changeReason: '작업 완료',
             changedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
           },
         ],
@@ -623,11 +623,11 @@ async function main() {
       // SR 3: REQUESTED (대기 중)
       const sr3 = await prisma.sR.create({
         data: {
-          srNumber: "SR-2024-003",
-          title: "신규 기능 개발 문의",
-          description: "대시보드에 차트 기능 추가를 요청합니다.",
-          status: "REQUESTED",
-          requestedPriority: "LOW",
+          srNumber: 'SR-2024-003',
+          title: '신규 기능 개발 문의',
+          description: '대시보드에 차트 기능 추가를 요청합니다.',
+          status: 'REQUESTED',
+          requestedPriority: 'LOW',
           clientId: testClient1.id,
           serviceCategoryId: category.id,
           requesterId: adminUser.id,
@@ -638,32 +638,32 @@ async function main() {
         data: {
           srId: sr3.id,
           userId: adminUser.id,
-          type: "CREATED",
-          description: "SR이 생성되었습니다",
+          type: 'CREATED',
+          description: 'SR이 생성되었습니다',
         },
       });
 
       await prisma.sRStatusHistory.create({
         data: {
           srId: sr3.id,
-          currentStatus: "REQUESTED",
+          currentStatus: 'REQUESTED',
           changedBy: adminUser.id,
-          changeReason: "초기 생성",
+          changeReason: '초기 생성',
         },
       });
 
-      console.log("Created 3 sample SRs with activities and status history");
+      console.log('Created 3 sample SRs with activities and status history');
     }
   } else {
     console.log(`Sample SRs already exist (${existingSRs} found)`);
   }
 
-  console.log("Seed completed successfully!");
+  console.log('Seed completed successfully!');
 }
 
 main()
   .catch((e) => {
-    console.error("Error during seed:", e);
+    console.error('Error during seed:', e);
     process.exit(1);
   })
   .finally(async () => {

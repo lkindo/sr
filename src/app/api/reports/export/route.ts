@@ -1,6 +1,7 @@
+import { NextResponse } from 'next/server';
+
 import { auth } from '@/auth';
 import { SRService } from '@/services/sr.service';
-import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   try {

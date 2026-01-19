@@ -1,42 +1,34 @@
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { useSRActivitiesInfinite } from "@/hooks/use-sr-infinite";
+import { Loader2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSRActivitiesInfinite } from '@/hooks/use-sr-infinite';
 
 interface SRActivitiesProps {
   srId: string;
 }
 
 const activityTypeLabels: Record<string, string> = {
-  CREATED: "생성",
-  UPDATED: "수정",
-  STATUS_CHANGE: "상태 변경",
-  ASSIGNED: "담당자 지정",
-  COMMENT: "댓글",
-  ATTACHMENT: "첨부파일",
+  CREATED: '생성',
+  UPDATED: '수정',
+  STATUS_CHANGE: '상태 변경',
+  ASSIGNED: '담당자 지정',
+  COMMENT: '댓글',
+  ATTACHMENT: '첨부파일',
 };
 
-const activityTypeColors: Record<
-  string,
-  "default" | "secondary" | "destructive"
-> = {
-  CREATED: "default",
-  UPDATED: "secondary",
-  STATUS_CHANGE: "default",
-  ASSIGNED: "default",
-  COMMENT: "secondary",
-  ATTACHMENT: "secondary",
+const activityTypeColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CREATED: 'default',
+  UPDATED: 'secondary',
+  STATUS_CHANGE: 'default',
+  ASSIGNED: 'default',
+  COMMENT: 'secondary',
+  ATTACHMENT: 'secondary',
 };
 
 export function SRActivities({ srId }: SRActivitiesProps) {
@@ -65,9 +57,9 @@ export function SRActivities({ srId }: SRActivitiesProps) {
 
   const getInitials = (name: string) => {
     return name
-      .split(" ")
+      .split(' ')
       .map((n) => n[0])
-      .join("")
+      .join('')
       .toUpperCase()
       .slice(0, 2);
   };
@@ -91,9 +83,7 @@ export function SRActivities({ srId }: SRActivitiesProps) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-destructive py-8">
-            활동 이력을 불러오는데 실패했습니다.
-          </p>
+          <p className="text-center text-destructive py-8">활동 이력을 불러오는데 실패했습니다.</p>
         </CardContent>
       </Card>
     );
@@ -103,15 +93,11 @@ export function SRActivities({ srId }: SRActivitiesProps) {
     <Card>
       <CardHeader>
         <CardTitle>활동 이력 ({totalCount})</CardTitle>
-        <CardDescription>
-          이 SR의 모든 활동 이력을 시간순으로 확인할 수 있습니다.
-        </CardDescription>
+        <CardDescription>이 SR의 모든 활동 이력을 시간순으로 확인할 수 있습니다.</CardDescription>
       </CardHeader>
       <CardContent>
         {allActivities.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
-            활동 이력이 없습니다.
-          </p>
+          <p className="text-center text-muted-foreground py-8">활동 이력이 없습니다.</p>
         ) : (
           <>
             <div className="relative space-y-4">
@@ -119,31 +105,23 @@ export function SRActivities({ srId }: SRActivitiesProps) {
               {allActivities.map((activity) => (
                 <div key={activity.id} className="relative flex gap-4">
                   <Avatar className="relative z-10">
-                    <AvatarImage src={activity.user.image || ""} alt={activity.user.name} />
-                    <AvatarFallback>
-                      {getInitials(activity.user.name)}
-                    </AvatarFallback>
+                    <AvatarImage src={activity.user.image || ''} alt={activity.user.name} />
+                    <AvatarFallback>{getInitials(activity.user.name)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1 pt-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {activity.user.name}
-                      </span>
+                      <span className="text-sm font-medium">{activity.user.name}</span>
                       <Badge
-                        variant={
-                          activityTypeColors[activity.type] || "secondary"
-                        }
+                        variant={activityTypeColors[activity.type] || 'secondary'}
                         className="text-xs"
                       >
                         {activityTypeLabels[activity.type] || activity.type}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
-                        {new Date(activity.createdAt).toLocaleString("ko-KR")}
+                        {new Date(activity.createdAt).toLocaleString('ko-KR')}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {activity.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{activity.description}</p>
                   </div>
                 </div>
               ))}

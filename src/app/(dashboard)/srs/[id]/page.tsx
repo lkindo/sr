@@ -1,63 +1,60 @@
 // src/app/(dashboard)/srs/[id]/page.tsx
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import {
-  ArrowLeft,
-  Pencil,
-  Trash2,
-  Clock,
   AlertCircle,
+  ArrowLeft,
+  Clock,
   MessageSquare,
   Paperclip,
-} from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SRComments } from "@/components/srs/SRComments";
-import { SRActivities } from "@/components/srs/SRActivities";
-import { SRAttachments } from "@/components/srs/SRAttachments";
-import { EditSRDialog } from "@/components/srs/EditSRDialog";
-import { DeleteSRDialog } from "@/components/srs/DeleteSRDialog";
-import { SRStatusActions } from "@/components/srs/SRStatusActions";
-import { IntakeInfoCard } from "@/components/srs/IntakeInfoCard";
-import { SRStatusTimeline } from "@/components/srs/SRStatusTimeline";
-import { useToast } from "@/hooks/use-toast";
-import { TableSkeleton } from "@/components/loading/TableSkeleton";
-import { usePermissions } from "@/hooks/use-permissions";
-import { useSRDetails, useDeleteSR } from "@/hooks/use-sr";
-import {
-  statusLabels,
-  priorityLabels,
-} from "@/lib/constants/sr";
+  Pencil,
+  Trash2,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useState } from 'react';
 
-const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
-  REQUESTED: "secondary",
-  INTAKE: "default",
-  IN_PROGRESS: "default",
-  ON_HOLD: "secondary",
-  COMPLETED: "default",
-  CONFIRMED: "default",
-  REJECTED: "destructive",
+import { TableSkeleton } from '@/components/loading/TableSkeleton';
+import { DeleteSRDialog } from '@/components/srs/DeleteSRDialog';
+import { EditSRDialog } from '@/components/srs/EditSRDialog';
+import { IntakeInfoCard } from '@/components/srs/IntakeInfoCard';
+import { SRActivities } from '@/components/srs/SRActivities';
+import { SRAttachments } from '@/components/srs/SRAttachments';
+import { SRComments } from '@/components/srs/SRComments';
+import { SRStatusActions } from '@/components/srs/SRStatusActions';
+import { SRStatusTimeline } from '@/components/srs/SRStatusTimeline';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePermissions } from '@/hooks/use-permissions';
+import { useDeleteSR, useSRDetails } from '@/hooks/use-sr';
+import { useToast } from '@/hooks/use-toast';
+import { priorityLabels, statusLabels } from '@/lib/constants/sr';
+
+const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  REQUESTED: 'secondary',
+  INTAKE: 'default',
+  IN_PROGRESS: 'default',
+  ON_HOLD: 'secondary',
+  COMPLETED: 'default',
+  CONFIRMED: 'default',
+  REJECTED: 'destructive',
 };
 
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "default",
-  LOW: "secondary",
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
-
 
 export default function SRDetailPage() {
   const params = useParams();
   const router = useRouter();
   const srId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState("comments");
+  const [activeTab, setActiveTab] = useState('comments');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
@@ -76,8 +73,6 @@ export default function SRDetailPage() {
     // React Query가 자동으로 최신 데이터를 가져옴
   };
 
-
-
   if (isLoading) {
     return <TableSkeleton columns={5} />;
   }
@@ -88,7 +83,9 @@ export default function SRDetailPage() {
         <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
         <h2 className="mt-4 text-xl font-semibold">SR을 불러올 수 없습니다</h2>
         <p className="mt-2 text-muted-foreground">
-          {error instanceof Error ? error.message : "요청한 SR을 찾을 수 없거나 오류가 발생했습니다."}
+          {error instanceof Error
+            ? error.message
+            : '요청한 SR을 찾을 수 없거나 오류가 발생했습니다.'}
         </p>
         <div className="mt-6 flex gap-3 justify-center">
           <Button onClick={() => refetch()} variant="outline">
@@ -115,17 +112,20 @@ export default function SRDetailPage() {
             <div className="flex items-center gap-3">
               <h2 className="text-3xl font-bold tracking-tight">{sr.srNumber}</h2>
               <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
-              <Badge variant={priorityColors[sr.requestedPriority]}>{priorityLabels[sr.requestedPriority]}</Badge>
+              <Badge variant={priorityColors[sr.requestedPriority]}>
+                {priorityLabels[sr.requestedPriority]}
+              </Badge>
             </div>
             <p className="text-2xl font-semibold mt-2">{sr.title}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          {(sr.status === "INTAKE" || sr.status === "IN_PROGRESS") && hasAnyRole(["MANAGER", "ADMIN"]) && (
-            <Button variant="outline" onClick={() => router.push(`/srs/${srId}/intake`)}>
-              <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
-            </Button>
-          )}
+          {(sr.status === 'INTAKE' || sr.status === 'IN_PROGRESS') &&
+            hasAnyRole(['MANAGER', 'ADMIN']) && (
+              <Button variant="outline" onClick={() => router.push(`/srs/${srId}/intake`)}>
+                <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
+              </Button>
+            )}
           {session?.user && (
             <SRStatusActions
               srId={srId}
@@ -138,21 +138,21 @@ export default function SRDetailPage() {
           )}
           <Button
             onClick={() => {
-              if (sr.status === "REQUESTED" || hasAnyRole(["ADMIN"])) {
+              if (sr.status === 'REQUESTED' || hasAnyRole(['ADMIN'])) {
                 setIsEditDialogOpen(true);
               } else {
                 toast({
-                  title: "알림",
+                  title: '알림',
                   description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
-                  variant: "default",
+                  variant: 'default',
                 });
               }
             }}
-            disabled={sr.status !== "REQUESTED" && !hasAnyRole(["ADMIN"])}
+            disabled={sr.status !== 'REQUESTED' && !hasAnyRole(['ADMIN'])}
           >
             <Pencil className="mr-2 h-4 w-4" /> 수정
           </Button>
-          {hasAnyRole(["ADMIN", "MANAGER", "CLIENT_ADMIN"]) && (
+          {hasAnyRole(['ADMIN', 'MANAGER', 'CLIENT_ADMIN']) && (
             <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive">
               <Trash2 className="mr-2 h-4 w-4" /> 삭제
             </Button>
@@ -173,19 +173,19 @@ export default function SRDetailPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">고객사</h4>
-                  <p className="mt-1">{sr.client?.name || "N/A"}</p>
+                  <p className="mt-1">{sr.client?.name || 'N/A'}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">서비스 카테고리</h4>
-                  <p className="mt-1">{sr.serviceCategory?.categoryName || "N/A"}</p>
+                  <p className="mt-1">{sr.serviceCategory?.categoryName || 'N/A'}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">요청자</h4>
-                  <p className="mt-1">{sr.requester?.name || "N/A"}</p>
+                  <p className="mt-1">{sr.requester?.name || 'N/A'}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">담당자</h4>
-                  <p className="mt-1">{sr.assignee?.name || "미지정"}</p>
+                  <p className="mt-1">{sr.assignee?.name || '미지정'}</p>
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">요청 우선순위</h4>
@@ -193,23 +193,37 @@ export default function SRDetailPage() {
                 </div>
                 <div>
                   <h4 className="text-sm font-medium text-muted-foreground">실제 우선순위</h4>
-                  <p className="mt-1">{sr.actualPriority ? priorityLabels[sr.actualPriority] : "N/A"}</p>
+                  <p className="mt-1">
+                    {sr.actualPriority ? priorityLabels[sr.actualPriority] : 'N/A'}
+                  </p>
                 </div>
-                {sr.status === "REQUESTED" && sr.estimatedCompletionDate && (
+                {sr.status === 'REQUESTED' && sr.estimatedCompletionDate && (
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground">예상 완료일</h4>
-                    <p className="mt-1">{new Date(sr.estimatedCompletionDate).toLocaleDateString("ko-KR")}</p>
+                    <p className="mt-1">
+                      {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
+                    </p>
                   </div>
                 )}
-                {["INTAKE", "IN_PROGRESS", "ON_HOLD"].includes(sr.status) && sr.dueDate && (
+                {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status) && sr.dueDate && (
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground">SLA 마감일</h4>
                     <div className="mt-1 flex items-center gap-2">
-                      <span>{new Date(sr.dueDate).toLocaleDateString("ko-KR")}</span>
+                      <span>{new Date(sr.dueDate).toLocaleDateString('ko-KR')}</span>
                       {(() => {
-                        const days = Math.ceil((new Date(sr.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                        const variant = days < 0 ? "destructive" : days <= 1 ? "destructive" : days <= 3 ? "secondary" : "default";
-                        const label = days <= 0 ? "지연" : `${days}일 남음`;
+                        const days = Math.ceil(
+                          (new Date(sr.dueDate).getTime() - new Date().getTime()) /
+                            (1000 * 60 * 60 * 24)
+                        );
+                        const variant =
+                          days < 0
+                            ? 'destructive'
+                            : days <= 1
+                              ? 'destructive'
+                              : days <= 3
+                                ? 'secondary'
+                                : 'default';
+                        const label = days <= 0 ? '지연' : `${days}일 남음`;
                         return <Badge variant={variant}>{label}</Badge>;
                       })()}
                     </div>
@@ -222,12 +236,10 @@ export default function SRDetailPage() {
                 <h4 className="text-sm font-medium text-muted-foreground">첨부파일</h4>
                 <div
                   className="mt-1 flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
-                  onClick={() => setActiveTab("attachments")}
+                  onClick={() => setActiveTab('attachments')}
                 >
                   <Paperclip className="h-4 w-4" />
-                  <span className="font-medium">
-                    {sr._count?.attachments || 0}개
-                  </span>
+                  <span className="font-medium">{sr._count?.attachments || 0}개</span>
                   <span className="text-xs text-muted-foreground">(클릭하여 확인)</span>
                 </div>
               </div>
@@ -239,10 +251,7 @@ export default function SRDetailPage() {
 
           {/* Status History Timeline */}
           {sr.statusHistory && sr.statusHistory.length > 0 && (
-            <SRStatusTimeline
-              statusHistory={sr.statusHistory}
-              currentStatus={sr.status}
-            />
+            <SRStatusTimeline statusHistory={sr.statusHistory} currentStatus={sr.status} />
           )}
         </div>
 
@@ -251,13 +260,15 @@ export default function SRDetailPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList>
               <TabsTrigger value="comments" className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" /> 댓글 {sr._count?.comments > 0 && `(${sr._count.comments})`}
+                <MessageSquare className="h-4 w-4" /> 댓글{' '}
+                {sr._count?.comments > 0 && `(${sr._count.comments})`}
               </TabsTrigger>
               <TabsTrigger value="activities" className="flex items-center gap-2">
                 <Clock className="h-4 w-4" /> 활동 이력
               </TabsTrigger>
               <TabsTrigger value="attachments" className="flex items-center gap-2">
-                <Paperclip className="h-4 w-4" /> 첨부파일 {sr._count?.attachments > 0 && `(${sr._count.attachments})`}
+                <Paperclip className="h-4 w-4" /> 첨부파일{' '}
+                {sr._count?.attachments > 0 && `(${sr._count.attachments})`}
               </TabsTrigger>
             </TabsList>
             <TabsContent value="comments" className="mt-6">
@@ -270,8 +281,8 @@ export default function SRDetailPage() {
               <SRAttachments
                 srId={sr.id}
                 canDelete={
-                  hasAnyRole(["ADMIN", "MANAGER"]) ||
-                  (session?.user?.id === sr.requesterId && sr.status === "REQUESTED")
+                  hasAnyRole(['ADMIN', 'MANAGER']) ||
+                  (session?.user?.id === sr.requesterId && sr.status === 'REQUESTED')
                 }
               />
             </TabsContent>

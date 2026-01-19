@@ -1,13 +1,11 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -15,20 +13,23 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // 컴포넌트 마운트 시 저장된 로그인 정보 불러오기
   useEffect(() => {
-    const savedEmail = localStorage.getItem("sr-remembered-email");
-    const savedPassword = localStorage.getItem("sr-remembered-password");
+    const savedEmail = localStorage.getItem('sr-remembered-email');
+    const savedPassword = localStorage.getItem('sr-remembered-password');
 
     if (savedEmail) {
       setEmail(savedEmail);
@@ -42,33 +43,33 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError('');
     setIsLoading(true);
 
     try {
-      const result = await signIn("credentials", {
+      const result = await signIn('credentials', {
         email,
         password,
         redirect: false,
       });
 
       if (result?.error) {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       } else {
         // 로그인 성공 시 로그인 정보 저장 또는 삭제
         if (rememberMe) {
-          localStorage.setItem("sr-remembered-email", email);
-          localStorage.setItem("sr-remembered-password", password);
+          localStorage.setItem('sr-remembered-email', email);
+          localStorage.setItem('sr-remembered-password', password);
         } else {
-          localStorage.removeItem("sr-remembered-email");
-          localStorage.removeItem("sr-remembered-password");
+          localStorage.removeItem('sr-remembered-email');
+          localStorage.removeItem('sr-remembered-password');
         }
 
-        router.push("/dashboard");
+        router.push('/dashboard');
         router.refresh();
       }
     } catch {
-      setError("로그인 중 오류가 발생했습니다.");
+      setError('로그인 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -78,16 +79,12 @@ export default function LoginPage() {
     <Card>
       <CardHeader className="space-y-1">
         <CardTitle className="text-2xl font-bold">로그인</CardTitle>
-        <CardDescription>
-          SR 관리 시스템에 로그인하세요
-        </CardDescription>
+        <CardDescription>SR 관리 시스템에 로그인하세요</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">
-              {error}
-            </div>
+            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">{error}</div>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">이메일</Label>
@@ -128,19 +125,12 @@ export default function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading}
-          >
-            {isLoading ? "로그인 중..." : "로그인"}
+          <Button type="submit" className="w-full" disabled={isLoading}>
+            {isLoading ? '로그인 중...' : '로그인'}
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            계정이 없으신가요?{" "}
-            <Link
-              href="/register"
-              className="text-primary hover:underline"
-            >
+            계정이 없으신가요?{' '}
+            <Link href="/register" className="text-primary hover:underline">
               회원가입
             </Link>
           </p>

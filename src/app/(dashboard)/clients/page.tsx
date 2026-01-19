@@ -1,10 +1,21 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect, useCallback } from "react";
-import { Plus, ChevronDown, ChevronRight, Search } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react';
+import Link from 'next/link';
+import React, { useCallback, useEffect, useState } from 'react';
 
+import { ClientDialog } from '@/components/clients/ClientDialog';
+import { ClientUsersSheet } from '@/components/clients/ClientUsersSheet';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -12,19 +23,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { ClientDialog } from "@/components/clients/ClientDialog";
-import { ClientUsersSheet } from "@/components/clients/ClientUsersSheet";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 
 interface Client {
   id: string;
@@ -61,9 +61,9 @@ export default function ClientsPage() {
   const [clientUsers, setClientUsers] = useState<Record<string, any[]>>({});
 
   // Pagination & Filters
-  const [searchQuery, setSearchQuery] = useState("");
-  const [industryFilter, setIndustryFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [industryFilter, setIndustryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [pagination, setPagination] = useState<PaginationMeta>({
     page: 1,
     pageSize: 10,
@@ -77,27 +77,27 @@ export default function ClientsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append("page", pagination.page.toString());
-      params.append("pageSize", pagination.pageSize.toString());
-      if (searchQuery) params.append("search", searchQuery);
-      if (industryFilter !== "all") params.append("industry", industryFilter);
-      if (statusFilter !== "all") params.append("isActive", statusFilter);
+      params.append('page', pagination.page.toString());
+      params.append('pageSize', pagination.pageSize.toString());
+      if (searchQuery) params.append('search', searchQuery);
+      if (industryFilter !== 'all') params.append('industry', industryFilter);
+      if (statusFilter !== 'all') params.append('isActive', statusFilter);
 
       const response = await fetch(`/api/clients?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch clients");
+      if (!response.ok) throw new Error('Failed to fetch clients');
       const result = await response.json();
 
       setClients(result.data);
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         total: result.meta.total,
         totalPages: result.meta.totalPages,
       }));
     } catch {
       toast({
-        title: "오류",
-        description: "고객사 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '고객사 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -153,7 +153,7 @@ export default function ClientsPage() {
   };
 
   const handlePageChange = (newPage: number) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   return (
@@ -163,7 +163,9 @@ export default function ClientsPage() {
         {/* 리스트 헤더 */}
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">고객사 목록</h3>
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+              고객사 목록
+            </h3>
             <Button onClick={handleCreateClient} className="sr-btn-template-primary">
               <Plus className="mr-2 h-4 w-4" />
               등록
@@ -180,7 +182,7 @@ export default function ClientsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    setPagination(prev => ({ ...prev, page: 1 })); // 검색 시 1페이지로 리셋
+                    setPagination((prev) => ({ ...prev, page: 1 })); // 검색 시 1페이지로 리셋
                   }
                 }}
                 className="pl-10 sr-input-template"
@@ -188,10 +190,13 @@ export default function ClientsPage() {
             </div>
 
             <div className="flex gap-2 flex-wrap md:flex-nowrap">
-              <Select value={industryFilter} onValueChange={(val) => {
-                setIndustryFilter(val);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}>
+              <Select
+                value={industryFilter}
+                onValueChange={(val) => {
+                  setIndustryFilter(val);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
                 <SelectTrigger className="w-[150px] sr-dropdown-template">
                   <SelectValue placeholder="산업군 전체" />
                 </SelectTrigger>
@@ -205,10 +210,13 @@ export default function ClientsPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={statusFilter} onValueChange={(val) => {
-                setStatusFilter(val);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}>
+              <Select
+                value={statusFilter}
+                onValueChange={(val) => {
+                  setStatusFilter(val);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
                 <SelectTrigger className="w-[150px] sr-dropdown-template">
                   <SelectValue placeholder="상태 전체" />
                 </SelectTrigger>
@@ -225,7 +233,11 @@ export default function ClientsPage() {
         {/* Total Count - 테이블 바로 위 */}
         <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
           <div className="text-sm text-muted-foreground">
-            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{pagination.total}</span> items
+            Total{' '}
+            <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">
+              {pagination.total}
+            </span>{' '}
+            items
           </div>
         </div>
 
@@ -261,8 +273,7 @@ export default function ClientsPage() {
                     <div className="flex flex-col items-center gap-3">
                       <p className="text-muted-foreground">등록된 고객사가 없습니다.</p>
                       <Button variant="outline" size="sm" onClick={handleCreateClient}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        첫 고객사 등록하기
+                        <Plus className="mr-2 h-4 w-4" />첫 고객사 등록하기
                       </Button>
                     </div>
                   </TableCell>
@@ -297,9 +308,9 @@ export default function ClientsPage() {
                             {client.name}
                           </Link>
                         </TableCell>
-                        <TableCell className="text-center">{client.industry || "-"}</TableCell>
-                        <TableCell className="text-center">{client.contactPerson || "-"}</TableCell>
-                        <TableCell>{client.contactEmail || "-"}</TableCell>
+                        <TableCell className="text-center">{client.industry || '-'}</TableCell>
+                        <TableCell className="text-center">{client.contactPerson || '-'}</TableCell>
+                        <TableCell>{client.contactEmail || '-'}</TableCell>
                         <TableCell className="text-center">
                           <Badge
                             variant="secondary"
@@ -310,15 +321,11 @@ export default function ClientsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="secondary">
-                            {client._count?.srs || 0}건
-                          </Badge>
+                          <Badge variant="secondary">{client._count?.srs || 0}건</Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge
-                            variant={client.isActive ? "default" : "secondary"}
-                          >
-                            {client.isActive ? "활성" : "비활성"}
+                          <Badge variant={client.isActive ? 'default' : 'secondary'}>
+                            {client.isActive ? '활성' : '비활성'}
                           </Badge>
                         </TableCell>
                       </TableRow>
@@ -404,7 +411,7 @@ export default function ClientsPage() {
         open={isUsersSheetOpen}
         onOpenChange={setIsUsersSheetOpen}
         clientId={selectedClientForUsers?.id || null}
-        clientName={selectedClientForUsers?.name || ""}
+        clientName={selectedClientForUsers?.name || ''}
       />
     </div>
   );

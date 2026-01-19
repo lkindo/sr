@@ -1,17 +1,18 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
 import {
-  validateEnv,
   ENV_VARIABLES,
   EnvValidationError,
   printEnvSummary,
   validateAndPrintEnv,
+  validateEnv,
 } from '../env-validation';
 
 describe('EnvValidation', () => {
   const originalEnv = process.env;
   const consoleSpy = {
-    log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-    error: vi.spyOn(console, 'error').mockImplementation(() => {}),
+    log: vi.spyOn(console, 'log').mockImplementation(() => { }),
+    error: vi.spyOn(console, 'error').mockImplementation(() => { }),
   };
 
   beforeEach(() => {
@@ -134,13 +135,17 @@ describe('EnvValidation', () => {
 
   describe('printEnvSummary', () => {
     it('should not print in production environment', () => {
-      process.env.NODE_ENV = 'production';
+      vi.stubEnv('NODE_ENV', 'production');
       printEnvSummary();
       expect(consoleSpy.log).not.toHaveBeenCalled();
     });
 
     it('should print in development environment', () => {
+<<<<<<< HEAD
       process.env.NODE_ENV = 'development';
+=======
+      vi.stubEnv('NODE_ENV', 'development');
+>>>>>>> dev
       printEnvSummary();
       expect(consoleSpy.log).toHaveBeenCalled();
     });
@@ -148,7 +153,11 @@ describe('EnvValidation', () => {
 
   describe('validateAndPrintEnv', () => {
     it('should log success when validation passes', () => {
+<<<<<<< HEAD
       process.env.NODE_ENV = 'development';
+=======
+      vi.stubEnv('NODE_ENV', 'development');
+>>>>>>> dev
       process.env.DATABASE_URL = 'postgresql://localhost';
       process.env.DIRECT_URL = 'postgresql://localhost';
       process.env.NEXTAUTH_SECRET = 'valid_secret_32_chars_longggggggggg';

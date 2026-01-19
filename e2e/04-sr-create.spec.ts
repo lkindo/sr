@@ -1,9 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+
 import { createTestSR, findSRInList } from './helpers/test-helpers';
 
 /**
  * SR 생성 플로우 테스트
- * 
+ *
  * 헬퍼 함수를 사용하여 간소화됨
  */
 

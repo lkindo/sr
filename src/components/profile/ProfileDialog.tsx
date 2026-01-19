@@ -1,23 +1,24 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Save, Lock, User as UserIcon } from "lucide-react";
+import { Lock, Save, User as UserIcon } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
+import { changePasswordAction, getProfileAction, updateUserAction } from '@/actions/user.actions';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getProfileAction, updateUserAction, changePasswordAction } from "@/actions/user.actions";
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 
 interface Role {
   role: {
@@ -59,34 +60,38 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const [saving, setSaving] = useState(false);
 
   // 프로필 정보
-  const [name, setName] = useState("");
-  const [image, setImage] = useState("");
+  const [name, setName] = useState('');
+  const [image, setImage] = useState('');
 
   // 비밀번호 변경
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     try {
       const result = await getProfileAction();
       if (!result.success) {
-        throw new Error(result.error || "프로필 정보를 불러오는데 실패했습니다.");
+        throw new Error(result.error || '프로필 정보를 불러오는데 실패했습니다.');
       }
       setProfile({
         ...result.data,
-        createdAt: result.data.createdAt instanceof Date ? result.data.createdAt.toISOString() : result.data.createdAt,
-        roles: ('roles' in result.data && Array.isArray(result.data.roles)) ? result.data.roles : [],
-        clients: ('clients' in result.data && Array.isArray(result.data.clients)) ? result.data.clients : [],
+        createdAt:
+          result.data.createdAt instanceof Date
+            ? result.data.createdAt.toISOString()
+            : result.data.createdAt,
+        roles: 'roles' in result.data && Array.isArray(result.data.roles) ? result.data.roles : [],
+        clients:
+          'clients' in result.data && Array.isArray(result.data.clients) ? result.data.clients : [],
       } as UserProfile);
       setName(result.data.name);
-      setImage(result.data.image || "");
+      setImage(result.data.image || '');
     } catch {
       toast({
-        title: "오류",
-        description: "프로필 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '프로필 정보를 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -104,27 +109,28 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     setSaving(true);
     try {
       const formData = new FormData();
-      formData.append("name", name);
-      formData.append("image", image);
+      formData.append('name', name);
+      formData.append('image', image);
 
       const result = await updateUserAction(formData);
 
       if (!result.success) {
-        throw new Error(result.error || "프로필 업데이트에 실패했습니다.");
+        throw new Error(result.error || '프로필 업데이트에 실패했습니다.');
       }
 
       toast({
-        title: "성공",
-        description: "프로필이 업데이트되었습니다.",
+        title: '성공',
+        description: '프로필이 업데이트되었습니다.',
       });
 
       fetchProfile();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "프로필 업데이트에 실패했습니다.";
+      const errorMessage =
+        error instanceof Error ? error.message : '프로필 업데이트에 실패했습니다.';
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setSaving(false);
@@ -134,9 +140,9 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
       toast({
-        title: "오류",
-        description: "새 비밀번호가 일치하지 않습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '새 비밀번호가 일치하지 않습니다.',
+        variant: 'destructive',
       });
       return;
     }
@@ -144,31 +150,31 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     setChangingPassword(true);
     try {
       const formData = new FormData();
-      formData.append("currentPassword", currentPassword);
-      formData.append("newPassword", newPassword);
-      formData.append("confirmPassword", confirmPassword);
+      formData.append('currentPassword', currentPassword);
+      formData.append('newPassword', newPassword);
+      formData.append('confirmPassword', confirmPassword);
 
       const result = await changePasswordAction(formData);
 
       if (!result.success) {
-        throw new Error(result.error || "비밀번호 변경에 실패했습니다.");
+        throw new Error(result.error || '비밀번호 변경에 실패했습니다.');
       }
 
       toast({
-        title: "성공",
-        description: "비밀번호가 변경되었습니다.",
+        title: '성공',
+        description: '비밀번호가 변경되었습니다.',
       });
 
       // 비밀번호 필드 초기화
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "비밀번호 변경에 실패했습니다.";
+      const errorMessage = error instanceof Error ? error.message : '비밀번호 변경에 실패했습니다.';
       toast({
-        title: "오류",
+        title: '오류',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setChangingPassword(false);
@@ -190,20 +196,19 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
     );
   }
 
-  const initials = profile.name
-    ?.split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase() || profile.email[0].toUpperCase();
+  const initials =
+    profile.name
+      ?.split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase() || profile.email[0].toUpperCase();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>프로필 설정</DialogTitle>
-          <DialogDescription>
-            개인 정보 및 보안 설정을 관리합니다.
-          </DialogDescription>
+          <DialogDescription>개인 정보 및 보안 설정을 관리합니다.</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -218,8 +223,8 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                 <p className="text-lg font-semibold">{profile.name}</p>
                 <p className="text-sm text-muted-foreground">{profile.email}</p>
               </div>
-              <Badge variant={profile.isActive ? "default" : "secondary"}>
-                {profile.isActive ? "활성" : "비활성"}
+              <Badge variant={profile.isActive ? 'default' : 'secondary'}>
+                {profile.isActive ? '활성' : '비활성'}
               </Badge>
             </div>
 
@@ -240,7 +245,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
               </div>
             </div>
 
-            {profile.clients.length > 0 && !profile.roles.some(r => r.role.name === "ADMIN") && (
+            {profile.clients.length > 0 && !profile.roles.some((r) => r.role.name === 'ADMIN') && (
               <>
                 <Separator />
                 <div>
@@ -262,7 +267,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
             <Separator />
 
             <div className="text-xs text-muted-foreground">
-              <p>가입일: {new Date(profile.createdAt).toLocaleDateString("ko-KR")}</p>
+              <p>가입일: {new Date(profile.createdAt).toLocaleDateString('ko-KR')}</p>
             </div>
           </div>
 
@@ -294,15 +299,8 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
 
                   <div className="space-y-2">
                     <Label htmlFor="email">이메일</Label>
-                    <Input
-                      id="email"
-                      value={profile.email}
-                      disabled
-                      className="bg-muted"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      이메일은 변경할 수 없습니다.
-                    </p>
+                    <Input id="email" value={profile.email} disabled className="bg-muted" />
+                    <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
                   </div>
 
                   <div className="space-y-2">
@@ -321,7 +319,7 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                   <div className="flex justify-end pt-4">
                     <Button onClick={handleUpdateProfile} disabled={saving}>
                       <Save className="mr-2 h-4 w-4" />
-                      {saving ? "저장 중..." : "저장"}
+                      {saving ? '저장 중...' : '저장'}
                     </Button>
                   </div>
                 </div>
@@ -373,14 +371,11 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                     <Button
                       onClick={handleChangePassword}
                       disabled={
-                        changingPassword ||
-                        !currentPassword ||
-                        !newPassword ||
-                        !confirmPassword
+                        changingPassword || !currentPassword || !newPassword || !confirmPassword
                       }
                     >
                       <Lock className="mr-2 h-4 w-4" />
-                      {changingPassword ? "변경 중..." : "비밀번호 변경"}
+                      {changingPassword ? '변경 중...' : '비밀번호 변경'}
                     </Button>
                   </div>
                 </div>

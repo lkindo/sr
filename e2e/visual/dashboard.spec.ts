@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 test.describe('Dashboard Visual Regression', () => {
   test('StatsCard Default should look correct', async ({ page }) => {

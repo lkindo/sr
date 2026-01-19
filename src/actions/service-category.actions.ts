@@ -1,9 +1,8 @@
-"use server";
+'use server';
 
-import { ServiceCategoryService } from "@/services/service-category.service";
-import { Result, ok } from "@/lib/result";
-import { errorToResult } from "@/lib/errors";
-
+import { errorToResult } from '@/lib/errors';
+import { ok, Result } from '@/lib/result';
+import { ServiceCategoryService } from '@/services/service-category.service';
 
 type ServiceCategoryList = Awaited<ReturnType<ServiceCategoryService['getAll']>>;
 

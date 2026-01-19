@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
+import { Prisma } from '@prisma/client';
+import { NextRequest, NextResponse } from 'next/server';
+
+import { auth } from '@/auth';
+import prisma from '@/lib/prisma';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -13,15 +14,12 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: "인증이 필요합니다" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const status = searchParams.get('status');
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
 
     // 조회 조건 구성
     const where: Prisma.SRWhereInput = {
@@ -29,22 +27,22 @@ export async function GET(request: NextRequest) {
     };
 
     // 상태 필터링
-    if (status && status !== "all") {
+    if (status && status !== 'all') {
       where.status = status as any;
     }
 
     // 정렬 조건 구성
     let orderBy: Prisma.SROrderByWithRelationInput;
     switch (sortBy) {
-      case "updatedAt":
-        orderBy = { updatedAt: "desc" };
+      case 'updatedAt':
+        orderBy = { updatedAt: 'desc' };
         break;
-      case "status":
-        orderBy = { status: "asc" };
+      case 'status':
+        orderBy = { status: 'asc' };
         break;
-      case "createdAt":
+      case 'createdAt':
       default:
-        orderBy = { createdAt: "desc" };
+        orderBy = { createdAt: 'desc' };
         break;
     }
 
@@ -71,7 +69,7 @@ export async function GET(request: NextRequest) {
             id: true,
             code: true,
             name: true,
-          }
+          },
         },
         serviceCategory: {
           select: {
@@ -79,36 +77,36 @@ export async function GET(request: NextRequest) {
             categoryName: true,
             slaHours: true,
             priority: true,
-          }
+          },
         },
         assignee: {
           select: {
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
         intakeBy: {
           select: {
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
         _count: {
           select: {
             comments: true,
             attachments: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     // 각 SR에 대해 추가 정보 계산
     const srsWithExtras = srs.map((sr) => {
       let waitingMinutes = 0;
       let waitingHours = 0;
-      if (sr.status === "REQUESTED") {
+      if (sr.status === 'REQUESTED') {
         const now = new Date();
         const requestedAt = new Date(sr.createdAt);
         waitingMinutes = Math.floor((now.getTime() - requestedAt.getTime()) / (1000 * 60));
@@ -117,20 +115,20 @@ export async function GET(request: NextRequest) {
 
       let progressPercentage = 0;
       switch (sr.status) {
-        case "REQUESTED":
+        case 'REQUESTED':
           progressPercentage = 10;
           break;
-        case "INTAKE":
+        case 'INTAKE':
           progressPercentage = 25;
           break;
-        case "IN_PROGRESS":
+        case 'IN_PROGRESS':
           progressPercentage = 50;
           break;
-        case "COMPLETED":
-        case "CONFIRMED":
+        case 'COMPLETED':
+        case 'CONFIRMED':
           progressPercentage = 100;
           break;
-        case "REJECTED":
+        case 'REJECTED':
           progressPercentage = 0;
           break;
         default:
@@ -145,18 +143,25 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({
-      srs: srsWithExtras,
-      total: srsWithExtras.length,
-    }, { status: 200 });
-
-  } catch (error) {
-    console.error("[ERROR] [GET /api/srs/my-requests] 오류:", error);
-    console.error("[ERROR] Stack:", error instanceof Error ? error.stack : "No stack");
     return NextResponse.json(
       {
-        error: "요청 목록 조회 중 오류가 발생했습니다",
-        details: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.message : String(error)) : undefined
+        srs: srsWithExtras,
+        total: srsWithExtras.length,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('[ERROR] [GET /api/srs/my-requests] 오류:', error);
+    console.error('[ERROR] Stack:', error instanceof Error ? error.stack : 'No stack');
+    return NextResponse.json(
+      {
+        error: '요청 목록 조회 중 오류가 발생했습니다',
+        details:
+          process.env.NODE_ENV === 'development'
+            ? error instanceof Error
+              ? error.message
+              : String(error)
+            : undefined,
       },
       { status: 500 }
     );

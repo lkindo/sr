@@ -1,6 +1,6 @@
-import { test, expect, Page } from '@playwright/test';
-import path from 'path';
+import { expect, Page, test } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
 
 /**
  * 파일 업로드/다운로드 전체 플로우 E2E 테스트
@@ -44,21 +44,20 @@ if (!fs.existsSync(testFile1)) {
 if (!fs.existsSync(testFile2)) {
   // 간단한 1x1 PNG 생성
   const pngData = Buffer.from([
-    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-    0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
-    0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41,
-    0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
-    0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00,
-    0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+    0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
     0x42, 0x60, 0x82,
   ]);
   fs.writeFileSync(testFile2, pngData);
 }
 
 if (!fs.existsSync(testFile3)) {
-  fs.writeFileSync(testFile3, '[2024-01-01 10:00:00] INFO: Test log entry\n[2024-01-01 10:01:00] ERROR: Test error');
+  fs.writeFileSync(
+    testFile3,
+    '[2024-01-01 10:00:00] INFO: Test log entry\n[2024-01-01 10:01:00] ERROR: Test error'
+  );
 }
 
 // 대용량 파일 (11MB, 제한이 10MB라고 가정)
@@ -91,7 +90,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await createButton.click();
 
       // 다이얼로그 확인
-      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({ timeout: 5000 });
+      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({
+        timeout: 5000,
+      });
 
       // SR 정보 입력
       const timestamp = Date.now();
@@ -170,7 +171,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 첨부파일 섹션 확인
-      const attachmentSection = page.locator('section, div').filter({ hasText: /첨부|Attachment/i });
+      const attachmentSection = page
+        .locator('section, div')
+        .filter({ hasText: /첨부|Attachment/i });
       if (await attachmentSection.isVisible({ timeout: 5000 }).catch(() => false)) {
         await expect(attachmentSection).toBeVisible();
         console.log(`✅ 첨부파일 섹션 확인 완료`);
@@ -207,7 +210,8 @@ test.describe('파일 업로드/다운로드 플로우', () => {
         await managerPage.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 10000 });
 
         // 간단히 접수 처리
-        const prioritySelect = managerPage.locator('label', { hasText: '실제 우선순위' })
+        const prioritySelect = managerPage
+          .locator('label', { hasText: '실제 우선순위' })
           .first()
           .locator('..')
           .locator('[role="combobox"]');
@@ -217,7 +221,8 @@ test.describe('파일 업로드/다운로드 플로우', () => {
         const hoursInput = managerPage.getByLabel(/예상 작업 시간/i);
         await hoursInput.fill('4');
 
-        const assigneeSelect = managerPage.locator('label', { hasText: '담당자' })
+        const assigneeSelect = managerPage
+          .locator('label', { hasText: '담당자' })
           .first()
           .locator('..')
           .locator('[role="combobox"]');
@@ -252,10 +257,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
 
       // 댓글 작성 - 여러 셀렉터 시도
       let commentTextarea = engineerPage.locator('textarea[placeholder*="댓글"]').first();
-      if (!await commentTextarea.isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (!(await commentTextarea.isVisible({ timeout: 2000 }).catch(() => false))) {
         commentTextarea = engineerPage.locator('textarea[placeholder*="입력"]').first();
       }
-      if (!await commentTextarea.isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (!(await commentTextarea.isVisible({ timeout: 2000 }).catch(() => false))) {
         commentTextarea = engineerPage.locator('textarea').first();
       }
 
@@ -298,9 +303,16 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
 
       // 첨부파일 링크 찾기
-      const downloadLink = page.locator('a[href*="/attachments/"], a[download], button').filter({ hasText: /다운로드|Download|test-log.log/i });
+      const downloadLink = page
+        .locator('a[href*="/attachments/"], a[download], button')
+        .filter({ hasText: /다운로드|Download|test-log.log/i });
 
-      if (await downloadLink.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (
+        await downloadLink
+          .first()
+          .isVisible({ timeout: 5000 })
+          .catch(() => false)
+      ) {
         // 다운로드 이벤트 대기
         const downloadPromise = page.waitForEvent('download', { timeout: 10000 });
 
@@ -311,14 +323,19 @@ test.describe('파일 업로드/다운로드 플로우', () => {
           console.log(`✅ 파일 다운로드 시작: ${download.suggestedFilename()}`);
 
           // 다운로드 파일 저장 (검증용)
-          const downloadPath = path.join(testFilesDir, `downloaded-${download.suggestedFilename()}`);
+          const downloadPath = path.join(
+            testFilesDir,
+            `downloaded-${download.suggestedFilename()}`
+          );
           await download.saveAs(downloadPath);
           console.log(`✅ 파일 다운로드 완료: ${downloadPath}`);
 
           // 파일 존재 확인
           expect(fs.existsSync(downloadPath)).toBeTruthy();
         } catch {
-          console.log(`⚠️ 다운로드 이벤트를 캐치하지 못했습니다. 링크가 새 탭으로 열릴 수 있습니다.`);
+          console.log(
+            `⚠️ 다운로드 이벤트를 캐치하지 못했습니다. 링크가 새 탭으로 열릴 수 있습니다.`
+          );
         }
       } else {
         console.log(`⚠️ 다운로드 링크를 찾을 수 없습니다.`);
@@ -338,7 +355,12 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       // 삭제 버튼 찾기
       const deleteButton = page.locator('button').filter({ hasText: /삭제|Delete|Remove/i });
 
-      if (await deleteButton.first().isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (
+        await deleteButton
+          .first()
+          .isVisible({ timeout: 5000 })
+          .catch(() => false)
+      ) {
         const deleteCount = await deleteButton.count();
         console.log(`✅ 삭제 버튼 발견: ${deleteCount}개`);
 
@@ -412,12 +434,16 @@ test.describe('파일 업로드/다운로드 플로우', () => {
         await page.waitForTimeout(2000);
 
         // 에러 메시지 확인
-        const errorMessage = page.locator('text=/허용되지 않은|지원되지 않는|invalid|not allowed/i');
+        const errorMessage = page.locator(
+          'text=/허용되지 않은|지원되지 않는|invalid|not allowed/i'
+        );
         if (await errorMessage.isVisible({ timeout: 5000 }).catch(() => false)) {
           await expect(errorMessage).toBeVisible();
           console.log(`✅ 허용되지 않은 파일 형식 에러 메시지 확인 완료`);
         } else {
-          console.log(`⚠️ 허용되지 않은 파일 형식 에러 메시지를 찾을 수 없습니다. (제한 없거나 브라우저 차단)`);
+          console.log(
+            `⚠️ 허용되지 않은 파일 형식 에러 메시지를 찾을 수 없습니다. (제한 없거나 브라우저 차단)`
+          );
         }
       } else {
         console.log(`⚠️ 파일 업로드 필드를 찾을 수 없습니다.`);
@@ -463,7 +489,9 @@ test.describe('파일 업로드 추가 시나리오', () => {
           await page.waitForTimeout(500);
 
           // 파일 목록에 2개 파일이 표시되는지 확인
-          const fileItems = page.locator('[class*="file"], [class*="attachment"]').filter({ hasText: /multi-test/i });
+          const fileItems = page
+            .locator('[class*="file"], [class*="attachment"]')
+            .filter({ hasText: /multi-test/i });
           const count = await fileItems.count();
 
           if (count >= 2) {
@@ -490,4 +518,3 @@ test.describe('파일 업로드 추가 시나리오', () => {
 
   // 미구현 기능: 이미지 미리보기, 업로드 취소는 현재 지원하지 않음
 });
-

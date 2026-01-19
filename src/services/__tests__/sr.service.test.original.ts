@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SRService } from '@/services/sr.service';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanCreateSR, ensureCanUpdateSR, ensureCanDeleteSR } from '@/lib/policies';
+import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
 // Define mock structure using vi.hoisted to ensure availability in vi.mock factory
@@ -154,9 +155,9 @@ describe('SRService', () => {
 
       // Mock dependencies for validation
       const stateMachine = await import('@/lib/sr-state-machine');
-      // @ts-ignore
+      // @ts-expect-error: Mocking read-only property for testing
       stateMachine.validateTransition = vi.fn().mockReturnValue({ valid: true });
-      // @ts-ignore
+      // @ts-expect-error: Mocking read-only property for testing
       stateMachine.getRequiredFields = vi.fn().mockReturnValue([]);
 
       // removed internal prisma import

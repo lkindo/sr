@@ -1,12 +1,23 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  ClipboardList,
+  Info,
+  Loader2,
+  Users,
+  Wrench,
+  X,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -14,17 +25,19 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { registerUser } from "./actions";
-import { AlertCircle, CheckCircle2, Info, Users, Wrench, ArrowLeft, ClipboardList, Loader2, Check, X } from "lucide-react";
+} from '@/components/ui/select';
+
+import { registerUser } from './actions';
 
 interface Client {
   id: string;
@@ -55,21 +68,21 @@ function calculatePasswordStrength(password: string): {
 
   const score = Object.values(checks).filter(Boolean).length;
 
-  let label = "매우 약함";
-  let color = "bg-red-500";
+  let label = '매우 약함';
+  let color = 'bg-red-500';
 
   if (score === 5) {
-    label = "매우 강함";
-    color = "bg-green-500";
+    label = '매우 강함';
+    color = 'bg-green-500';
   } else if (score === 4) {
-    label = "강함";
-    color = "bg-blue-500";
+    label = '강함';
+    color = 'bg-blue-500';
   } else if (score === 3) {
-    label = "보통";
-    color = "bg-yellow-500";
+    label = '보통';
+    color = 'bg-yellow-500';
   } else if (score >= 1) {
-    label = "약함";
-    color = "bg-orange-500";
+    label = '약함';
+    color = 'bg-orange-500';
   }
 
   return { score: (score / 5) * 100, label, color, checks };
@@ -77,19 +90,19 @@ function calculatePasswordStrength(password: string): {
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // 새로운 상태
-  const [accountType, setAccountType] = useState<"ENGINEER" | "CLIENT">("CLIENT");
+  const [accountType, setAccountType] = useState<'ENGINEER' | 'CLIENT'>('CLIENT');
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
 
   // 비밀번호 강도 상태
-  const [password, setPassword] = useState("");
-  const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(""));
+  const [password, setPassword] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(''));
 
   // 고객사 목록 로드 (CLIENT 선택 시)
   const fetchClients = async () => {
@@ -97,8 +110,8 @@ export default function RegisterPage() {
 
     setLoadingClients(true);
     try {
-      const response = await fetch("/api/clients/public");
-      if (!response.ok) throw new Error("Failed to fetch clients");
+      const response = await fetch('/api/clients/public');
+      if (!response.ok) throw new Error('Failed to fetch clients');
       const result = await response.json();
       setClients(Array.isArray(result) ? result : result.data || []);
     } catch {
@@ -114,12 +127,12 @@ export default function RegisterPage() {
     fetchClients();
   }, []);
 
-  const handleAccountTypeChange = (value: "ENGINEER" | "CLIENT") => {
+  const handleAccountTypeChange = (value: 'ENGINEER' | 'CLIENT') => {
     setAccountType(value);
-    if (value === "CLIENT") {
+    if (value === 'CLIENT') {
       fetchClients();
     } else {
-      setSelectedClientId(""); // ENGINEER로 변경 시 선택 초기화
+      setSelectedClientId(''); // ENGINEER로 변경 시 선택 초기화
     }
   };
 
@@ -131,12 +144,12 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+    setError('');
+    setSuccess('');
 
     // 고객사 담당자인데 고객사 미선택 시 에러
-    if (accountType === "CLIENT" && !selectedClientId) {
-      setError("소속 고객사를 선택해주세요.");
+    if (accountType === 'CLIENT' && !selectedClientId) {
+      setError('소속 고객사를 선택해주세요.');
       return;
     }
 
@@ -146,23 +159,23 @@ export default function RegisterPage() {
       const formData = new FormData(e.currentTarget);
 
       // 계정 유형 및 고객사 정보 추가
-      formData.append("accountType", accountType);
-      if (accountType === "CLIENT" && selectedClientId) {
-        formData.append("clientId", selectedClientId);
+      formData.append('accountType', accountType);
+      if (accountType === 'CLIENT' && selectedClientId) {
+        formData.append('clientId', selectedClientId);
       }
 
       const result = await registerUser(formData);
 
       if (result.success) {
-        setSuccess(result.message || "");
+        setSuccess(result.message || '');
         setTimeout(() => {
-          router.push("/login");
+          router.push('/login');
         }, 2000);
       } else {
-        setError(result.error || "");
+        setError(result.error || '');
       }
     } catch {
-      setError("회원가입 중 오류가 발생했습니다.");
+      setError('회원가입 중 오류가 발생했습니다.');
     } finally {
       setIsLoading(false);
     }
@@ -188,9 +201,7 @@ export default function RegisterPage() {
       <Card className="w-full">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">회원가입</CardTitle>
-          <CardDescription>
-            새 계정을 만들어 SR 관리 시스템을 사용하세요
-          </CardDescription>
+          <CardDescription>새 계정을 만들어 SR 관리 시스템을 사용하세요</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
@@ -253,11 +264,17 @@ export default function RegisterPage() {
                   <div className="space-y-2 mt-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">비밀번호 강도:</span>
-                      <span className={`font-medium ${passwordStrength.score === 100 ? 'text-green-600' :
-                        passwordStrength.score >= 60 ? 'text-blue-600' :
-                          passwordStrength.score >= 40 ? 'text-yellow-600' :
-                            'text-red-600'
-                        }`}>
+                      <span
+                        className={`font-medium ${
+                          passwordStrength.score === 100
+                            ? 'text-green-600'
+                            : passwordStrength.score >= 60
+                              ? 'text-blue-600'
+                              : passwordStrength.score >= 40
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
+                        }`}
+                      >
                         {passwordStrength.label}
                       </span>
                     </div>
@@ -276,7 +293,13 @@ export default function RegisterPage() {
                         ) : (
                           <X className="h-3 w-3 text-gray-400" />
                         )}
-                        <span className={passwordStrength.checks.length ? 'text-green-600' : 'text-muted-foreground'}>
+                        <span
+                          className={
+                            passwordStrength.checks.length
+                              ? 'text-green-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
                           최소 8자 이상
                         </span>
                       </div>
@@ -286,7 +309,13 @@ export default function RegisterPage() {
                         ) : (
                           <X className="h-3 w-3 text-gray-400" />
                         )}
-                        <span className={passwordStrength.checks.uppercase ? 'text-green-600' : 'text-muted-foreground'}>
+                        <span
+                          className={
+                            passwordStrength.checks.uppercase
+                              ? 'text-green-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
                           대문자 포함
                         </span>
                       </div>
@@ -296,7 +325,13 @@ export default function RegisterPage() {
                         ) : (
                           <X className="h-3 w-3 text-gray-400" />
                         )}
-                        <span className={passwordStrength.checks.lowercase ? 'text-green-600' : 'text-muted-foreground'}>
+                        <span
+                          className={
+                            passwordStrength.checks.lowercase
+                              ? 'text-green-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
                           소문자 포함
                         </span>
                       </div>
@@ -306,7 +341,13 @@ export default function RegisterPage() {
                         ) : (
                           <X className="h-3 w-3 text-gray-400" />
                         )}
-                        <span className={passwordStrength.checks.number ? 'text-green-600' : 'text-muted-foreground'}>
+                        <span
+                          className={
+                            passwordStrength.checks.number
+                              ? 'text-green-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
                           숫자 포함
                         </span>
                       </div>
@@ -316,7 +357,13 @@ export default function RegisterPage() {
                         ) : (
                           <X className="h-3 w-3 text-gray-400" />
                         )}
-                        <span className={passwordStrength.checks.special ? 'text-green-600' : 'text-muted-foreground'}>
+                        <span
+                          className={
+                            passwordStrength.checks.special
+                              ? 'text-green-600'
+                              : 'text-muted-foreground'
+                          }
+                        >
                           특수문자 포함 (@$!%*?&#)
                         </span>
                       </div>
@@ -358,11 +405,7 @@ export default function RegisterPage() {
                 disabled={isLoading}
               >
                 <div>
-                  <RadioGroupItem
-                    value="CLIENT"
-                    id="client"
-                    className="peer sr-only"
-                  />
+                  <RadioGroupItem value="CLIENT" id="client" className="peer sr-only" />
                   <Label
                     htmlFor="client"
                     className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-5 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
@@ -375,11 +418,7 @@ export default function RegisterPage() {
                   </Label>
                 </div>
                 <div>
-                  <RadioGroupItem
-                    value="ENGINEER"
-                    id="engineer"
-                    className="peer sr-only"
-                  />
+                  <RadioGroupItem value="ENGINEER" id="engineer" className="peer sr-only" />
                   <Label
                     htmlFor="engineer"
                     className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-5 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
@@ -395,7 +434,7 @@ export default function RegisterPage() {
             </div>
 
             {/* 고객사 선택 (CLIENT 유형일 때만 표시) */}
-            {accountType === "CLIENT" && (
+            {accountType === 'CLIENT' && (
               <div className="space-y-2">
                 <Label htmlFor="client-select">
                   소속 고객사 <span className="text-destructive">*</span>
@@ -437,7 +476,7 @@ export default function RegisterPage() {
             )}
 
             {/* 기술 지원팀 안내 (ENGINEER 유형일 때만 표시) */}
-            {accountType === "ENGINEER" && (
+            {accountType === 'ENGINEER' && (
               <Alert>
                 <Info className="h-4 w-4" />
                 <AlertDescription className="text-sm">
@@ -447,13 +486,12 @@ export default function RegisterPage() {
                 </AlertDescription>
               </Alert>
             )}
-
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || (accountType === "CLIENT" && !selectedClientId)}
+              disabled={isLoading || (accountType === 'CLIENT' && !selectedClientId)}
             >
               {isLoading ? (
                 <>
@@ -461,11 +499,11 @@ export default function RegisterPage() {
                   회원가입 중...
                 </>
               ) : (
-                "회원가입"
+                '회원가입'
               )}
             </Button>
             <p className="text-sm text-muted-foreground text-center">
-              이미 계정이 있으신가요?{" "}
+              이미 계정이 있으신가요?{' '}
               <Link href="/login" className="text-primary hover:underline font-medium">
                 로그인
               </Link>

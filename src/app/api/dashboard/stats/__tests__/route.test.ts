@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { GET } from '@/app/api/dashboard/stats/route';
 import { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { GET } from '@/app/api/dashboard/stats/route';
 import prisma from '@/lib/prisma';
 
 // Force node runtime for testing

@@ -1,13 +1,24 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2, Users, FileText, FolderTree, UserMinus, UserPlus } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowLeft,
+  FileText,
+  FolderTree,
+  Pencil,
+  Trash2,
+  UserMinus,
+  UserPlus,
+  Users,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+
+import { ClientDialog } from '@/components/clients/ClientDialog';
+import { DeleteClientDialog } from '@/components/clients/DeleteClientDialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import {
   Table,
   TableBody,
@@ -15,11 +26,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { ClientDialog } from "@/components/clients/ClientDialog";
-import { DeleteClientDialog } from "@/components/clients/DeleteClientDialog";
-import { UserDialog } from "@/components/users/UserDialog";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { UserDialog } from '@/components/users/UserDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface ServiceCategory {
   id: string;
@@ -73,37 +83,37 @@ interface Client {
 }
 
 const statusLabels: Record<string, string> = {
-  REQUESTED: "요청됨",
-  INTAKE: "접수",
-  IN_PROGRESS: "진행중",
-  ON_HOLD: "대기",
-  COMPLETED: "완료",
-  CONFIRMED: "확인완료",
-  REJECTED: "거부",
+  REQUESTED: '요청됨',
+  INTAKE: '접수',
+  IN_PROGRESS: '진행중',
+  ON_HOLD: '대기',
+  COMPLETED: '완료',
+  CONFIRMED: '확인완료',
+  REJECTED: '거부',
 };
 
 const priorityLabels: Record<string, string> = {
-  CRITICAL: "긴급",
-  HIGH: "높음",
-  MEDIUM: "보통",
-  LOW: "낮음",
+  CRITICAL: '긴급',
+  HIGH: '높음',
+  MEDIUM: '보통',
+  LOW: '낮음',
 };
 
-const statusColors: Record<string, "default" | "secondary" | "destructive"> = {
-  REQUESTED: "secondary",
-  INTAKE: "default",
-  IN_PROGRESS: "default",
-  ON_HOLD: "secondary",
-  COMPLETED: "default",
-  CONFIRMED: "default",
-  REJECTED: "destructive",
+const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  REQUESTED: 'secondary',
+  INTAKE: 'default',
+  IN_PROGRESS: 'default',
+  ON_HOLD: 'secondary',
+  COMPLETED: 'default',
+  CONFIRMED: 'default',
+  REJECTED: 'destructive',
 };
 
-const priorityColors: Record<string, "default" | "secondary" | "destructive"> = {
-  CRITICAL: "destructive",
-  HIGH: "destructive",
-  MEDIUM: "default",
-  LOW: "secondary",
+const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+  CRITICAL: 'destructive',
+  HIGH: 'destructive',
+  MEDIUM: 'default',
+  LOW: 'secondary',
 };
 
 export default function ClientDetailPage() {
@@ -122,22 +132,22 @@ export default function ClientDetailPage() {
       if (!response.ok) {
         if (response.status === 404) {
           toast({
-            title: "오류",
-            description: "고객사를 찾을 수 없습니다.",
-            variant: "destructive",
+            title: '오류',
+            description: '고객사를 찾을 수 없습니다.',
+            variant: 'destructive',
           });
-          router.push("/clients");
+          router.push('/clients');
           return;
         }
-        throw new Error("Failed to fetch client");
+        throw new Error('Failed to fetch client');
       }
       const data = await response.json();
       setClient(data);
     } catch {
       toast({
-        title: "오류",
-        description: "고객사 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '고객사 정보를 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -157,10 +167,10 @@ export default function ClientDetailPage() {
 
   const handleClientDeleted = () => {
     toast({
-      title: "성공",
-      description: "고객사가 삭제되었습니다.",
+      title: '성공',
+      description: '고객사가 삭제되었습니다.',
     });
-    router.push("/clients");
+    router.push('/clients');
   };
 
   const handleUserSaved = () => {
@@ -169,12 +179,12 @@ export default function ClientDetailPage() {
   };
 
   const handleRemoveUser = async (userId: string) => {
-    if (!confirm("정말 이 사용자를 고객사에서 제외하시겠습니까?")) return;
+    if (!confirm('정말 이 사용자를 고객사에서 제외하시겠습니까?')) return;
 
     try {
       // 1. Get current user details to find other clients
       const userRes = await fetch(`/api/users/${userId}`);
-      if (!userRes.ok) throw new Error("Failed to fetch user details");
+      if (!userRes.ok) throw new Error('Failed to fetch user details');
       const userData = await userRes.json();
 
       // 2. Filter out this client
@@ -183,23 +193,23 @@ export default function ClientDetailPage() {
 
       // 3. Update user
       const updateRes = await fetch(`/api/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ clientIds: newClientIds }),
       });
 
-      if (!updateRes.ok) throw new Error("Failed to unlink user");
+      if (!updateRes.ok) throw new Error('Failed to unlink user');
 
       toast({
-        title: "성공",
-        description: "사용자가 고객사에서 제외되었습니다.",
+        title: '성공',
+        description: '사용자가 고객사에서 제외되었습니다.',
       });
       fetchClient();
     } catch {
       toast({
-        title: "오류",
-        description: "사용자 제외에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '사용자 제외에 실패했습니다.',
+        variant: 'destructive',
       });
     }
   };
@@ -264,15 +274,11 @@ export default function ClientDetailPage() {
           <div className="px-6 py-5 space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  고객사 코드
-                </h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">고객사 코드</h3>
                 <p className="text-sm">{client.code}</p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  고객사명
-                </h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">고객사명</h3>
                 <p className="text-sm">{client.name}</p>
               </div>
             </div>
@@ -281,17 +287,13 @@ export default function ClientDetailPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  산업
-                </h3>
-                <p className="text-sm">{client.industry || "-"}</p>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">산업</h3>
+                <p className="text-sm">{client.industry || '-'}</p>
               </div>
               <div>
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                  상태
-                </h3>
-                <Badge variant={client.isActive ? "default" : "secondary"}>
-                  {client.isActive ? "활성" : "비활성"}
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">상태</h3>
+                <Badge variant={client.isActive ? 'default' : 'secondary'}>
+                  {client.isActive ? '활성' : '비활성'}
                 </Badge>
               </div>
             </div>
@@ -299,17 +301,15 @@ export default function ClientDetailPage() {
             <Separator />
 
             <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                연락처 정보
-              </h3>
+              <h3 className="text-sm font-medium text-muted-foreground mb-2">연락처 정보</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">담당자</p>
-                  <p className="text-sm">{client.contactPerson || "-"}</p>
+                  <p className="text-sm">{client.contactPerson || '-'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">이메일</p>
-                  <p className="text-sm">{client.contactEmail || "-"}</p>
+                  <p className="text-sm">{client.contactEmail || '-'}</p>
                 </div>
               </div>
               {client.contactPhone && (
@@ -324,9 +324,7 @@ export default function ClientDetailPage() {
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-1">
-                    주소
-                  </h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-1">주소</h3>
                   <p className="text-sm">{client.address}</p>
                 </div>
               </>
@@ -336,15 +334,13 @@ export default function ClientDetailPage() {
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                    계약 정보
-                  </h3>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">계약 정보</h3>
                   <div className="grid grid-cols-2 gap-4">
                     {client.contractStartDate && (
                       <div>
                         <p className="text-xs text-muted-foreground">계약 시작일</p>
                         <p className="text-sm">
-                          {new Date(client.contractStartDate).toLocaleDateString("ko-KR")}
+                          {new Date(client.contractStartDate).toLocaleDateString('ko-KR')}
                         </p>
                       </div>
                     )}
@@ -352,7 +348,7 @@ export default function ClientDetailPage() {
                       <div>
                         <p className="text-xs text-muted-foreground">계약 종료일</p>
                         <p className="text-sm">
-                          {new Date(client.contractEndDate).toLocaleDateString("ko-KR")}
+                          {new Date(client.contractEndDate).toLocaleDateString('ko-KR')}
                         </p>
                       </div>
                     )}
@@ -376,9 +372,7 @@ export default function ClientDetailPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">사용자</span>
               </div>
-              <span className="text-2xl font-bold">
-                {client.users.length}
-              </span>
+              <span className="text-2xl font-bold">{client.users.length}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -386,9 +380,7 @@ export default function ClientDetailPage() {
                 <FileText className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">SR</span>
               </div>
-              <span className="text-2xl font-bold">
-                {client.srs.length}
-              </span>
+              <span className="text-2xl font-bold">{client.srs.length}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -396,9 +388,7 @@ export default function ClientDetailPage() {
                 <FolderTree className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">서비스 카테고리</span>
               </div>
-              <span className="text-2xl font-bold">
-                {client.serviceCategories.length}
-              </span>
+              <span className="text-2xl font-bold">{client.serviceCategories.length}</span>
             </div>
           </div>
         </div>
@@ -409,19 +399,17 @@ export default function ClientDetailPage() {
           <TabsTrigger value="categories">
             서비스 카테고리 ({client.serviceCategories.length})
           </TabsTrigger>
-          <TabsTrigger value="users">
-            사용자 ({client.users.length})
-          </TabsTrigger>
-          <TabsTrigger value="srs">
-            최근 SR ({client.srs.length})
-          </TabsTrigger>
+          <TabsTrigger value="users">사용자 ({client.users.length})</TabsTrigger>
+          <TabsTrigger value="srs">최근 SR ({client.srs.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="categories" className="mt-6">
           <div className="sr-card-template bg-white">
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">서비스 카테고리</h3>
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+                서비스 카테고리
+              </h3>
               <p className="text-sm text-muted-foreground mt-0.5">
                 이 고객사에 등록된 서비스 카테고리 목록입니다.
               </p>
@@ -447,12 +435,8 @@ export default function ClientDetailPage() {
                   <TableBody>
                     {client.serviceCategories.map((category) => (
                       <TableRow key={category.id}>
-                        <TableCell className="font-medium">
-                          {category.categoryName}
-                        </TableCell>
-                        <TableCell>
-                          {category.description || "-"}
-                        </TableCell>
+                        <TableCell className="font-medium">{category.categoryName}</TableCell>
+                        <TableCell>{category.description || '-'}</TableCell>
                         <TableCell>{category.slaHours}시간</TableCell>
                         <TableCell>
                           <Badge variant={priorityColors[category.priority]}>
@@ -468,7 +452,7 @@ export default function ClientDetailPage() {
                               </p>
                             </div>
                           ) : (
-                            "-"
+                            '-'
                           )}
                         </TableCell>
                       </TableRow>
@@ -490,7 +474,11 @@ export default function ClientDetailPage() {
                   이 고객사에 속한 사용자 목록입니다.
                 </p>
               </div>
-              <Button onClick={() => setIsUserDialogOpen(true)} size="sm" className="sr-btn-template-primary">
+              <Button
+                onClick={() => setIsUserDialogOpen(true)}
+                size="sm"
+                className="sr-btn-template-primary"
+              >
                 <UserPlus className="mr-2 h-4 w-4" />
                 사용자 추가
               </Button>
@@ -499,9 +487,7 @@ export default function ClientDetailPage() {
             {/* 카드 내용 */}
             <div className="px-6 py-5">
               {client.users.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  등록된 사용자가 없습니다.
-                </p>
+                <p className="text-center py-8 text-muted-foreground">등록된 사용자가 없습니다.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -514,9 +500,7 @@ export default function ClientDetailPage() {
                   <TableBody>
                     {client.users.map((userClient) => (
                       <TableRow key={userClient.user.id}>
-                        <TableCell className="font-medium">
-                          {userClient.user.name}
-                        </TableCell>
+                        <TableCell className="font-medium">{userClient.user.name}</TableCell>
                         <TableCell>{userClient.user.email}</TableCell>
                         <TableCell className="text-right">
                           <Button
@@ -550,9 +534,7 @@ export default function ClientDetailPage() {
             {/* 카드 내용 */}
             <div className="px-6 py-5">
               {client.srs.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  등록된 SR이 없습니다.
-                </p>
+                <p className="text-center py-8 text-muted-foreground">등록된 SR이 없습니다.</p>
               ) : (
                 <Table>
                   <TableHeader>
@@ -567,31 +549,19 @@ export default function ClientDetailPage() {
                   <TableBody>
                     {client.srs.map((sr) => (
                       <TableRow key={sr.id}>
-                        <TableCell className="font-medium">
-                          {sr.title}
-                        </TableCell>
+                        <TableCell className="font-medium">{sr.title}</TableCell>
                         <TableCell>
-                          <Badge variant={statusColors[sr.status]}>
-                            {statusLabels[sr.status]}
-                          </Badge>
+                          <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={priorityColors[sr.priority]}>
                             {priorityLabels[sr.priority]}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {new Date(sr.createdAt).toLocaleDateString("ko-KR")}
-                        </TableCell>
+                        <TableCell>{new Date(sr.createdAt).toLocaleDateString('ko-KR')}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            asChild
-                          >
-                            <Link href={`/srs/${sr.id}`}>
-                              상세보기
-                            </Link>
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/srs/${sr.id}`}>상세보기</Link>
                           </Button>
                         </TableCell>
                       </TableRow>

@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { UnauthorizedError, ForbiddenError } from '@/lib/errors';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+
+import { ForbiddenError, UnauthorizedError } from '@/lib/errors';
 
 // Mock auth before importing helpers
 vi.mock('@/auth', () => ({
@@ -29,7 +30,7 @@ describe('Action Helpers', () => {
   describe('getAuthenticatedSession', () => {
     it('throws UnauthorizedError if no session', async () => {
       const { auth } = await import('@/auth');
-      vi.mocked(auth).mockResolvedValue(null);
+      vi.mocked(auth).mockResolvedValue(null as any);
       await expect(helpers.getAuthenticatedSession()).rejects.toThrow(UnauthorizedError);
     });
 
@@ -92,7 +93,7 @@ describe('Action Helpers', () => {
 
     it('throws UnauthorizedError when not authenticated', async () => {
       const { auth } = await import('@/auth');
-      vi.mocked(auth).mockResolvedValue(null);
+      vi.mocked(auth).mockResolvedValue(null as any);
 
       await expect(helpers.authenticateAndAuthorize('sr:read')).rejects.toThrow(UnauthorizedError);
     });

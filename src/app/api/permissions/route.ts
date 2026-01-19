@@ -1,6 +1,7 @@
-﻿import { NextRequest, NextResponse } from "next/server";
-import { PermissionService } from "@/services/permission.service";
-import { withAuth } from "@/lib/auth-wrapper";
+﻿import { NextRequest, NextResponse } from 'next/server';
+
+import { withAuth } from '@/lib/auth-wrapper';
+import { PermissionService } from '@/services/permission.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';

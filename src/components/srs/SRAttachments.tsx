@@ -1,15 +1,8 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Upload, Download, Trash2, FileIcon, RefreshCw, Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Download, Eye, FileIcon, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,8 +12,10 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 interface Attachment {
   id: string;
@@ -47,17 +42,15 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
       setLoading(true);
       // SR 전체 정보가 아니라 첨부파일 목록만 조회하는 전용 API 사용
       const response = await fetch(`/api/srs/${srId}/attachments`);
-      if (!response.ok) throw new Error("Failed to fetch attachments");
+      if (!response.ok) throw new Error('Failed to fetch attachments');
       const data = await response.json();
-
 
       setAttachments(data || []);
     } catch {
-
       toast({
-        title: "오류",
-        description: "첨부파일을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '첨부파일을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
@@ -77,9 +70,9 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
     // 파일 크기 검증 (10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast({
-        title: "오류",
-        description: "파일 크기는 10MB를 초과할 수 없습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '파일 크기는 10MB를 초과할 수 없습니다.',
+        variant: 'destructive',
       });
       return;
     }
@@ -88,35 +81,34 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append("srId", srId);
+      formData.append('file', file);
+      formData.append('srId', srId);
 
-      const response = await fetch("/api/attachments", {
-        method: "POST",
+      const response = await fetch('/api/attachments', {
+        method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "파일 업로드 실패");
+        throw new Error(error.error || '파일 업로드 실패');
       }
 
       const newAttachment = await response.json();
       setAttachments([newAttachment, ...attachments]);
 
       toast({
-        title: "성공",
-        description: "파일이 업로드되었습니다.",
+        title: '성공',
+        description: '파일이 업로드되었습니다.',
       });
 
       // 입력 필드 초기화
-      event.target.value = "";
+      event.target.value = '';
     } catch (error) {
       toast({
-        title: "오류",
-        description:
-          error instanceof Error ? error.message : "파일 업로드에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '파일 업로드에 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setUploading(false);
@@ -137,34 +129,34 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
 
     try {
       const response = await fetch(`/api/attachments/${attachmentId}`, {
-        method: "DELETE",
+        method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error("파일 삭제 실패");
+        throw new Error('파일 삭제 실패');
       }
 
       setAttachments(attachments.filter((a) => a.id !== attachmentId));
 
       toast({
-        title: "성공",
-        description: "파일이 삭제되었습니다.",
+        title: '성공',
+        description: '파일이 삭제되었습니다.',
       });
     } catch {
       toast({
-        title: "오류",
-        description: "파일 삭제에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '파일 삭제에 실패했습니다.',
+        variant: 'destructive',
       });
     }
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
+    if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ["Bytes", "KB", "MB"];
+    const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   if (loading) {
@@ -184,9 +176,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>첨부파일</CardTitle>
-            <CardDescription>
-              {attachments.length}개의 파일
-            </CardDescription>
+            <CardDescription>{attachments.length}개의 파일</CardDescription>
           </div>
           <div>
             <input
@@ -204,16 +194,16 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                 disabled={loading || uploading}
                 title="새로고침"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => document.getElementById("file-upload")?.click()}
+                onClick={() => document.getElementById('file-upload')?.click()}
                 disabled={uploading}
               >
                 <Upload className="mr-2 h-4 w-4" />
-                {uploading ? "업로드 중..." : "파일 업로드"}
+                {uploading ? '업로드 중...' : '파일 업로드'}
               </Button>
             </div>
           </div>
@@ -221,9 +211,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
       </CardHeader>
       <CardContent>
         {attachments.length === 0 ? (
-          <p className="text-center py-8 text-muted-foreground">
-            첨부파일이 없습니다.
-          </p>
+          <p className="text-center py-8 text-muted-foreground">첨부파일이 없습니다.</p>
         ) : (
           <div className="space-y-2">
             {attachments.map((attachment) => (
@@ -236,8 +224,8 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{attachment.fileName}</p>
                     <p className="text-sm text-muted-foreground">
-                      {formatFileSize(attachment.fileSize)} •{" "}
-                      {new Date(attachment.createdAt).toLocaleDateString("ko-KR")}
+                      {formatFileSize(attachment.fileSize)} •{' '}
+                      {new Date(attachment.createdAt).toLocaleDateString('ko-KR')}
                     </p>
                   </div>
                 </div>
@@ -245,7 +233,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => window.open(attachment.fileUrl, "_blank")}
+                    onClick={() => window.open(attachment.fileUrl, '_blank')}
                     title="미리보기"
                   >
                     <Eye className="h-4 w-4" />
@@ -267,7 +255,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                         document.body.removeChild(a);
                       } catch {
                         // 다운로드 실패 시 새 탭에서 열기
-                        window.open(attachment.fileUrl, "_blank");
+                        window.open(attachment.fileUrl, '_blank');
                       }
                     }}
                     title="다운로드"
@@ -291,7 +279,6 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
         )}
       </CardContent>
 
-
       <AlertDialog open={!!fileToDelete} onOpenChange={(open) => !open && setFileToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -302,14 +289,15 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={executeDelete} className="bg-destructive hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={executeDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
               삭제
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card >
+    </Card>
   );
 }
-
-

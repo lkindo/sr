@@ -1,20 +1,21 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { SRStatus, SRPriority } from "@prisma/client";
-import { getSRDetailsAction, updateSRAction, deleteSRAction } from "@/actions/sr.actions";
-import type { SRDetails } from "@/types/sr.types";
-import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
+import { SRPriority, SRStatus } from '@prisma/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+
+import { deleteSRAction, getSRDetailsAction, updateSRAction } from '@/actions/sr.actions';
+import { useToast } from '@/hooks/use-toast';
+import type { SRDetails } from '@/types/sr.types';
 
 /**
  * SR 상세 조회 훅
  */
 export function useSRDetails(srId: string) {
   return useQuery({
-    queryKey: ["sr", srId],
+    queryKey: ['sr', srId],
     queryFn: async () => {
       const result = await getSRDetailsAction(srId);
       if (!result.success) {
-        throw new Error(result.error || "SR을 불러올 수 없습니다.");
+        throw new Error(result.error || 'SR을 불러올 수 없습니다.');
       }
       return result.data;
     },
@@ -35,25 +36,25 @@ export function useUpdateSR(srId: string) {
     mutationFn: async (formData: FormData) => {
       const result = await updateSRAction(srId, formData);
       if (!result.success) {
-        throw new Error(result.error || "SR 수정에 실패했습니다.");
+        throw new Error(result.error || 'SR 수정에 실패했습니다.');
       }
       return result.data;
     },
     onMutate: async (formData) => {
       // 진행 중인 쿼리 취소
-      await queryClient.cancelQueries({ queryKey: ["sr", srId] });
+      await queryClient.cancelQueries({ queryKey: ['sr', srId] });
 
       // 이전 데이터 백업
-      const previousSR = queryClient.getQueryData<SRDetails>(["sr", srId]);
+      const previousSR = queryClient.getQueryData<SRDetails>(['sr', srId]);
 
       // Optimistic Update: 즉시 UI 업데이트
       if (previousSR) {
-        const title = formData.get("title") as string | null;
-        const description = formData.get("description") as string | null;
-        const status = formData.get("status") as string | null;
-        const priority = formData.get("priority") as string | null;
+        const title = formData.get('title') as string | null;
+        const description = formData.get('description') as string | null;
+        const status = formData.get('status') as string | null;
+        const priority = formData.get('priority') as string | null;
 
-        queryClient.setQueryData<SRDetails>(["sr", srId], {
+        queryClient.setQueryData<SRDetails>(['sr', srId], {
           ...previousSR,
           ...(title && { title }),
           ...(description && { description }),
@@ -67,23 +68,23 @@ export function useUpdateSR(srId: string) {
     onError: (error, variables, context) => {
       // 에러 발생 시 이전 데이터로 롤백
       if (context?.previousSR) {
-        queryClient.setQueryData(["sr", srId], context.previousSR);
+        queryClient.setQueryData(['sr', srId], context.previousSR);
       }
       toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "SR 수정에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : 'SR 수정에 실패했습니다.',
+        variant: 'destructive',
       });
     },
     onSuccess: () => {
       toast({
-        title: "성공",
-        description: "SR이 수정되었습니다.",
+        title: '성공',
+        description: 'SR이 수정되었습니다.',
       });
     },
     onSettled: () => {
       // 쿼리 무효화하여 최신 데이터 가져오기
-      queryClient.invalidateQueries({ queryKey: ["sr", srId] });
+      queryClient.invalidateQueries({ queryKey: ['sr', srId] });
     },
   });
 }
@@ -100,46 +101,46 @@ export function useDeleteSR() {
     mutationFn: async (srId: string) => {
       const result = await deleteSRAction(srId);
       if (!result.success) {
-        throw new Error(result.error || "SR 삭제에 실패했습니다.");
+        throw new Error(result.error || 'SR 삭제에 실패했습니다.');
       }
       return srId;
     },
     onMutate: async (srId) => {
       // 진행 중인 쿼리 취소
-      await queryClient.cancelQueries({ queryKey: ["sr", srId] });
+      await queryClient.cancelQueries({ queryKey: ['sr', srId] });
 
       // 이전 데이터 백업
-      const previousSR = queryClient.getQueryData<SRDetails>(["sr", srId]);
+      const previousSR = queryClient.getQueryData<SRDetails>(['sr', srId]);
 
       return { previousSR, srId };
     },
     onError: (error, srId, context) => {
       // 에러 발생 시 이전 데이터로 복구
       if (context?.previousSR) {
-        queryClient.setQueryData(["sr", context.srId], context.previousSR);
+        queryClient.setQueryData(['sr', context.srId], context.previousSR);
       }
       toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "SR 삭제에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : 'SR 삭제에 실패했습니다.',
+        variant: 'destructive',
       });
     },
     onSuccess: (srId) => {
       // 1. 쿼리 즉시 제거 (refetch 방지)
-      queryClient.setQueryData(["sr", srId], null);
-      queryClient.removeQueries({ queryKey: ["sr", srId], exact: true });
+      queryClient.setQueryData(['sr', srId], null);
+      queryClient.removeQueries({ queryKey: ['sr', srId], exact: true });
 
       // 2. 목록 무효화 (목록 갱신)
-      queryClient.invalidateQueries({ queryKey: ["srs"] });
+      queryClient.invalidateQueries({ queryKey: ['srs'] });
 
       // 3. 토스트 표시
       toast({
-        title: "성공",
-        description: "SR이 삭제되었습니다.",
+        title: '성공',
+        description: 'SR이 삭제되었습니다.',
       });
 
       // 4. 캐시 정리 완료 후 페이지 이동
-      router.push("/srs");
+      router.push('/srs');
     },
   });
 }

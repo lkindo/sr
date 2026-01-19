@@ -3,12 +3,13 @@
  * 인증, 권한, 검증 로직의 중복을 제거
  */
 
-import { auth } from "@/auth";
-import { PermissionService } from "@/services/permission.service";
-import { isAuthenticatedSession } from "@/types/session";
-import { UnauthorizedError } from "@/lib/errors";
-import { z } from "zod";
-import { Result, fail } from "@/lib/result";
+import { z } from 'zod';
+
+import { auth } from '@/auth';
+import { UnauthorizedError } from '@/lib/errors';
+import { fail, Result } from '@/lib/result';
+import { PermissionService } from '@/services/permission.service';
+import { isAuthenticatedSession } from '@/types/session';
 
 const permissionService = new PermissionService();
 
@@ -43,19 +44,13 @@ export async function authenticateAndAuthorize(permission: string) {
 /**
  * Zod 스키마로 검증하고, 실패 시 Result를 반환합니다
  */
-export function validateWithSchema<T>(
-  data: unknown,
-  schema: z.ZodSchema<T>
-): Result<T> {
+export function validateWithSchema<T>(data: unknown, schema: z.ZodSchema<T>): Result<T> {
   try {
     const validated = schema.parse(data);
     return { success: true, data: validated };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return fail(
-        error.issues?.[0].message || "입력값 검증에 실패했습니다.",
-        "VALIDATION_ERROR"
-      );
+      return fail(error.issues?.[0].message || '입력값 검증에 실패했습니다.', 'VALIDATION_ERROR');
     }
     throw error;
   }
@@ -64,18 +59,11 @@ export function validateWithSchema<T>(
 /**
  * Server Action의 공통 에러 처리 래퍼
  */
-export function withActionErrorHandling<T>(
-  action: () => Promise<Result<T>>
-): Promise<Result<T>> {
+export function withActionErrorHandling<T>(action: () => Promise<Result<T>>): Promise<Result<T>> {
   return action().catch((error) => {
     if (error instanceof z.ZodError) {
-      return fail(
-        error.issues?.[0].message || "입력값 검증에 실패했습니다.",
-        "VALIDATION_ERROR"
-      );
+      return fail(error.issues?.[0].message || '입력값 검증에 실패했습니다.', 'VALIDATION_ERROR');
     }
     throw error;
   });
 }
-
-

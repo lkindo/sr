@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
-import { withRateLimit, rateLimit } from '../api-rate-limit';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { rateLimit, withRateLimit } from '../api-rate-limit';
 import { MemoryRateLimiter } from '../rate-limiter';
 
 // Mock rate limiter
@@ -22,12 +23,16 @@ const createMockRateLimiter = () => {
 };
 
 describe('withRateLimit', () => {
-  let mockHandler: (req: NextRequest, context: { params: Record<string, string> }) => Promise<NextResponse>;
+  let mockHandler: (
+    req: NextRequest,
+    context: { params: Record<string, string> }
+  ) => Promise<NextResponse>;
 
   beforeEach(() => {
-    mockHandler = vi.fn().mockResolvedValue(
-      NextResponse.json({ success: true })
-    ) as unknown as (req: NextRequest, context: { params: Record<string, string> }) => Promise<NextResponse>;
+    mockHandler = vi.fn().mockResolvedValue(NextResponse.json({ success: true })) as unknown as (
+      req: NextRequest,
+      context: { params: Record<string, string> }
+    ) => Promise<NextResponse>;
 
     // Test environment bypass disable
     vi.stubEnv('NODE_ENV', 'development');
@@ -170,9 +175,9 @@ describe('withRateLimit', () => {
       remaining: 0,
     });
 
-    const customOnRateLimitExceeded = vi.fn().mockResolvedValue(
-      NextResponse.json({ error: 'Custom error' }, { status: 429 })
-    );
+    const customOnRateLimitExceeded = vi
+      .fn()
+      .mockResolvedValue(NextResponse.json({ error: 'Custom error' }, { status: 429 }));
 
     const wrappedHandler = withRateLimit(mockHandler, {
       limiter,
@@ -218,9 +223,12 @@ describe('withRateLimit', () => {
 
 describe('rateLimit', () => {
   it('프리셋 이름으로 Rate limiter를 생성해야 함', async () => {
-    const mockHandler = vi.fn().mockResolvedValue(
-      NextResponse.json({ success: true })
-    ) as unknown as (req: NextRequest, context: { params: Record<string, string> }) => Promise<NextResponse>;
+    const mockHandler = vi
+      .fn()
+      .mockResolvedValue(NextResponse.json({ success: true })) as unknown as (
+      req: NextRequest,
+      context: { params: Record<string, string> }
+    ) => Promise<NextResponse>;
 
     // 실제 rate limiter를 사용하지만 바로 체크
     const wrappedHandler = rateLimit(mockHandler, 'standard');
@@ -235,9 +243,12 @@ describe('rateLimit', () => {
   });
 
   it('기본값으로 standard 프리셋을 사용해야 함', async () => {
-    const mockHandler = vi.fn().mockResolvedValue(
-      NextResponse.json({ success: true })
-    ) as unknown as (req: NextRequest, context: { params: Record<string, string> }) => Promise<NextResponse>;
+    const mockHandler = vi
+      .fn()
+      .mockResolvedValue(NextResponse.json({ success: true })) as unknown as (
+      req: NextRequest,
+      context: { params: Record<string, string> }
+    ) => Promise<NextResponse>;
 
     const wrappedHandler = rateLimit(mockHandler); // preset 생략
 

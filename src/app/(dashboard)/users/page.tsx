@@ -1,11 +1,32 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Search, UserCheck, UserX, Shield, List, Grid, CheckSquare, Square, Building2 } from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Building2,
+  CheckSquare,
+  Grid,
+  List,
+  Plus,
+  Search,
+  Shield,
+  Square,
+  UserCheck,
+  UserX,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useSession } from 'next-auth/react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { PermissionGuard } from '@/components/auth/PermissionGuard';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -13,24 +34,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { AssignRolesDialog } from "@/components/users/AssignRolesDialog";
-import { UserDialog } from "@/components/users/UserDialog";
-import { PermissionGuard } from "@/components/auth/PermissionGuard";
-import { usePermissions } from "@/hooks/use-permissions";
-import { useSession } from "next-auth/react";
-import { ClientAssignDropdown } from "@/components/users/ClientAssignDropdown";
-import { ClientBadgeWithActions } from "@/components/users/ClientBadgeWithActions";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/table';
+import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
+import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
+import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
+import { UserDialog } from '@/components/users/UserDialog';
+import { usePermissions } from '@/hooks/use-permissions';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface User {
   id: string;
@@ -38,7 +49,7 @@ interface User {
   email: string;
   isActive: boolean;
   createdAt: string;
-  userType: "ENGINEER" | "CLIENT";
+  userType: 'ENGINEER' | 'CLIENT';
   roles: Array<{
     role: {
       id: string;
@@ -76,36 +87,36 @@ interface PaginationMeta {
 // 사용자 유형 판별 함수
 const getUserTypeLabel = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
-  const hasAdminRole = user.roles.some((ur) => ur.role.name === "ADMIN");
+  const hasAdminRole = user.roles.some((ur) => ur.role.name === 'ADMIN');
   if (hasAdminRole) {
-    return "시스템 운영팀";
+    return '시스템 운영팀';
   }
 
   // 2. 엔지니어 타입이면 SR 처리자
-  if (user.userType === "ENGINEER") {
-    return "기술 지원팀";
+  if (user.userType === 'ENGINEER') {
+    return '기술 지원팀';
   }
 
   // 3. 고객사 타입이거나 고객사에 소속되어 있으면 SR 요청자
-  if (user.userType === "CLIENT" || user.clients.length > 0) {
-    return "고객사 담당자";
+  if (user.userType === 'CLIENT' || user.clients.length > 0) {
+    return '고객사 담당자';
   }
 
   // 기본값
-  return "미분류";
+  return '미분류';
 };
 
 // 유형별 배지 색상 결정
 const getUserTypeBadgeVariant = (typeLabel: string) => {
   switch (typeLabel) {
-    case "시스템 운영팀":
-      return "destructive" as const;
-    case "기술 지원팀":
-      return "default" as const;
-    case "고객사 담당자":
-      return "outline" as const;
+    case '시스템 운영팀':
+      return 'destructive' as const;
+    case '기술 지원팀':
+      return 'default' as const;
+    case '고객사 담당자':
+      return 'outline' as const;
     default:
-      return "secondary" as const;
+      return 'secondary' as const;
   }
 };
 
@@ -114,23 +125,23 @@ export default function UsersPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "grouped">("list");
+  const [clientSearchQuery, setClientSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('list');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [assignRolesDialogOpen, setAssignRolesDialogOpen] = useState(false);
   const [userDialogOpen, setUserDialogOpen] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
   const [showBulkAssign, setShowBulkAssign] = useState(false);
-  const [bulkAssignClientId, setBulkAssignClientId] = useState("");
+  const [bulkAssignClientId, setBulkAssignClientId] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Pagination & Filters
-  const [searchQuery, setSearchQuery] = useState("");
-  const [userTypeFilter, setUserTypeFilter] = useState<string>("all");
-  const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userTypeFilter, setUserTypeFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [clientFilter, setClientFilter] = useState<string>('all');
   const [pagination, setPagination] = useState<PaginationMeta>({
     page: 1,
     pageSize: 10,
@@ -147,56 +158,65 @@ export default function UsersPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append("page", pagination.page.toString());
-      params.append("pageSize", pagination.pageSize.toString());
-      if (searchQuery) params.append("search", searchQuery);
-      if (userTypeFilter !== "all") params.append("userType", userTypeFilter);
-      if (roleFilter !== "all") params.append("roleId", roleFilter);
-      if (statusFilter !== "all") params.append("isActive", statusFilter);
-      if (clientFilter !== "all") params.append("clientId", clientFilter);
+      params.append('page', pagination.page.toString());
+      params.append('pageSize', pagination.pageSize.toString());
+      if (searchQuery) params.append('search', searchQuery);
+      if (userTypeFilter !== 'all') params.append('userType', userTypeFilter);
+      if (roleFilter !== 'all') params.append('roleId', roleFilter);
+      if (statusFilter !== 'all') params.append('isActive', statusFilter);
+      if (clientFilter !== 'all') params.append('clientId', clientFilter);
 
       const response = await fetch(`/api/users?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch users");
+      if (!response.ok) throw new Error('Failed to fetch users');
       const result = await response.json();
 
       setUsers(result.data);
-      setPagination(prev => ({
+      setPagination((prev) => ({
         ...prev,
         total: result.meta.total,
         totalPages: result.meta.totalPages,
       }));
     } catch (error) {
       toast({
-        title: "오류",
-        description: "사용자 목록을 불러오는데 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '사용자 목록을 불러오는데 실패했습니다.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.pageSize, searchQuery, userTypeFilter, roleFilter, statusFilter, clientFilter, toast]);
+  }, [
+    pagination.page,
+    pagination.pageSize,
+    searchQuery,
+    userTypeFilter,
+    roleFilter,
+    statusFilter,
+    clientFilter,
+    toast,
+  ]);
 
   useEffect(() => {
     const fetchRoles = async () => {
       try {
-        const response = await fetch("/api/roles");
-        if (!response.ok) throw new Error("Failed to fetch roles");
+        const response = await fetch('/api/roles');
+        if (!response.ok) throw new Error('Failed to fetch roles');
         const data = await response.json();
         setRoles(data);
       } catch (error) {
-        console.error("역할 목록 조회 실패:", error);
+        console.error('역할 목록 조회 실패:', error);
       }
     };
 
     const fetchClients = async () => {
       try {
-        const response = await fetch("/api/clients?pageSize=100");
-        if (!response.ok) throw new Error("Failed to fetch clients");
+        const response = await fetch('/api/clients?pageSize=100');
+        if (!response.ok) throw new Error('Failed to fetch clients');
         const result = await response.json();
-        const clientData = Array.isArray(result) ? result : (result.data || []);
+        const clientData = Array.isArray(result) ? result : result.data || [];
         setClients(clientData);
       } catch (error) {
-        console.error("고객사 목록 조회 실패:", error);
+        console.error('고객사 목록 조회 실패:', error);
       }
     };
 
@@ -205,18 +225,18 @@ export default function UsersPage() {
     fetchUsers();
   }, [fetchUsers]);
 
-
   const handleToggleActive = async (userId: string, isActive: boolean) => {
     try {
       const response = await fetch(`/api/users/${userId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !isActive }),
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.message || "사용자 상태 변경에 실패했습니다.";
+        const errorMessage =
+          errorData.error || errorData.message || '사용자 상태 변경에 실패했습니다.';
         throw new Error(errorMessage);
       }
 
@@ -230,18 +250,18 @@ export default function UsersPage() {
       );
 
       toast({
-        title: "성공",
-        description: `사용자가 ${!isActive ? "활성화" : "비활성화"}되었습니다.`,
+        title: '성공',
+        description: `사용자가 ${!isActive ? '활성화' : '비활성화'}되었습니다.`,
       });
 
       // 백그라운드에서 최신 데이터 가져오기
       fetchUsers();
     } catch (error) {
-      console.error("사용자 상태 변경 오류:", error);
+      console.error('사용자 상태 변경 오류:', error);
       toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "사용자 상태 변경에 실패했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: error instanceof Error ? error.message : '사용자 상태 변경에 실패했습니다.',
+        variant: 'destructive',
       });
     }
   };
@@ -260,42 +280,45 @@ export default function UsersPage() {
     try {
       const url = isHardDelete ? `/api/users/${userId}?hard=true` : `/api/users/${userId}`;
       const res = await fetch(url, {
-        method: "DELETE",
+        method: 'DELETE',
       });
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.message || "삭제 실패";
+        const errorMessage = errorData.error || errorData.message || '삭제 실패';
 
         // Provide more specific error messages based on the error content
         let detailedMessage = errorMessage;
 
-        if (errorMessage.includes("본인 계정은 삭제할 수 없습니다")) {
-          detailedMessage = "자신의 계정은 삭제할 수 없습니다.";
-        } else if (errorMessage.includes("진행 중인 SR이 할당되어 있습니다")) {
+        if (errorMessage.includes('본인 계정은 삭제할 수 없습니다')) {
+          detailedMessage = '자신의 계정은 삭제할 수 없습니다.';
+        } else if (errorMessage.includes('진행 중인 SR이 할당되어 있습니다')) {
           // 서버에서 보낸 상세 메시지(SR 번호 포함)를 그대로 사용
           detailedMessage = errorMessage;
-        } else if (errorMessage.includes("시스템 운영팀")) {
-          detailedMessage = "시스템 운영팀 사용자는 삭제할 수 없습니다.";
-        } else if (errorMessage.includes("SR 요청 또는 처리 이력")) {
-          detailedMessage = "SR 요청/처리 이력이 있는 사용자는 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.";
+        } else if (errorMessage.includes('시스템 운영팀')) {
+          detailedMessage = '시스템 운영팀 사용자는 삭제할 수 없습니다.';
+        } else if (errorMessage.includes('SR 요청 또는 처리 이력')) {
+          detailedMessage =
+            'SR 요청/처리 이력이 있는 사용자는 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.';
         }
 
         throw new Error(detailedMessage);
       }
 
       toast({
-        title: isHardDelete ? "완전 삭제 완료" : "비활성화 완료",
-        description: isHardDelete ? "사용자가 영구적으로 삭제되었습니다." : "사용자가 성공적으로 비활성화되었습니다.",
+        title: isHardDelete ? '완전 삭제 완료' : '비활성화 완료',
+        description: isHardDelete
+          ? '사용자가 영구적으로 삭제되었습니다.'
+          : '사용자가 성공적으로 비활성화되었습니다.',
       });
 
       await fetchUsers();
     } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : "사용자 삭제에 실패했습니다.";
+      const errorMessage = e instanceof Error ? e.message : '사용자 삭제에 실패했습니다.';
       toast({
-        title: "삭제 실패",
+        title: '삭제 실패',
         description: errorMessage,
-        variant: "destructive",
+        variant: 'destructive',
       });
       throw e;
     }
@@ -308,7 +331,7 @@ export default function UsersPage() {
   };
 
   const handlePageChange = (newPage: number) => {
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPagination((prev) => ({ ...prev, page: newPage }));
   };
 
   // 체크박스 토글
@@ -343,15 +366,19 @@ export default function UsersPage() {
     try {
       const promises = Array.from(selectedUserIds).map(async (userId) => {
         const response = await fetch(`/api/users/${userId}/client`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ clientId: bulkAssignClientId }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-          return { status: 'rejected', userId, error: data.error || data.details || '알 수 없는 오류' };
+          return {
+            status: 'rejected',
+            userId,
+            error: data.error || data.details || '알 수 없는 오류',
+          };
         }
 
         return { status: 'fulfilled', userId };
@@ -363,29 +390,30 @@ export default function UsersPage() {
 
       if (successResults.length > 0) {
         toast({
-          title: "완료",
-          description: `${successResults.length}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${failResults.length > 0 ? ` (${failResults.length}명 실패)` : ""
-            }`,
+          title: '완료',
+          description: `${successResults.length}명의 사용자가 ${selectedClient.name}에 할당되었습니다.${
+            failResults.length > 0 ? ` (${failResults.length}명 실패)` : ''
+          }`,
         });
       }
 
       if (failResults.length > 0) {
         // 시스템 운영팀 할당 오류 메시지 확인
-        const systemTeamErrors = failResults.filter((r) =>
-          r.error && (r.error as string).includes('시스템 운영팀')
+        const systemTeamErrors = failResults.filter(
+          (r) => r.error && (r.error as string).includes('시스템 운영팀')
         );
 
         if (systemTeamErrors.length > 0) {
           toast({
-            title: "할당 제한",
+            title: '할당 제한',
             description: `${systemTeamErrors.length}명은 시스템 운영팀(ADMIN, MANAGER, ENGINEER)이므로 고객사를 할당할 수 없습니다.`,
-            variant: "destructive",
+            variant: 'destructive',
           });
         } else {
           toast({
-            title: "일부 실패",
+            title: '일부 실패',
             description: `${failResults.length}명의 사용자 할당에 실패했습니다.`,
-            variant: "destructive",
+            variant: 'destructive',
           });
         }
       }
@@ -393,12 +421,12 @@ export default function UsersPage() {
       fetchUsers();
       setSelectedUserIds(new Set());
       setShowBulkAssign(false);
-      setBulkAssignClientId("");
+      setBulkAssignClientId('');
     } catch (error) {
       toast({
-        title: "오류",
-        description: "일괄 할당 중 오류가 발생했습니다.",
-        variant: "destructive",
+        title: '오류',
+        description: '일괄 할당 중 오류가 발생했습니다.',
+        variant: 'destructive',
       });
     }
   };
@@ -406,12 +434,12 @@ export default function UsersPage() {
   // 고객사별로 사용자 그룹핑
   const groupedUsers = useCallback(() => {
     const groups: Record<string, User[]> = {
-      "고객사 없음": [],
+      '고객사 없음': [],
     };
 
     users.forEach((user) => {
       if (user.clients.length === 0) {
-        groups["고객사 없음"].push(user);
+        groups['고객사 없음'].push(user);
       } else {
         user.clients.forEach((uc) => {
           const clientName = uc.client.name;
@@ -426,7 +454,6 @@ export default function UsersPage() {
     return groups;
   }, [users]);
 
-
   return (
     <div className="space-y-6">
       {/* 메인 컨텐츠 카드 */}
@@ -435,21 +462,23 @@ export default function UsersPage() {
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자 목록</h3>
+              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+                사용자 목록
+              </h3>
               <div className="flex items-center gap-1 border rounded-md p-1">
                 <Button
-                  variant={viewMode === "list" ? "default" : "ghost"}
+                  variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode("list")}
+                  onClick={() => setViewMode('list')}
                   className="h-7 px-2"
                 >
                   <List className="h-4 w-4 mr-1" />
                   목록
                 </Button>
                 <Button
-                  variant={viewMode === "grouped" ? "default" : "ghost"}
+                  variant={viewMode === 'grouped' ? 'default' : 'ghost'}
                   size="sm"
-                  onClick={() => setViewMode("grouped")}
+                  onClick={() => setViewMode('grouped')}
                   className="h-7 px-2"
                 >
                   <Grid className="h-4 w-4 mr-1" />
@@ -457,7 +486,7 @@ export default function UsersPage() {
                 </Button>
               </div>
             </div>
-            <PermissionGuard roles={["ADMIN"]}>
+            <PermissionGuard roles={['ADMIN']}>
               <Button onClick={handleCreateUser} className="sr-btn-template-primary">
                 <Plus className="mr-2 h-4 w-4" />
                 등록
@@ -476,7 +505,7 @@ export default function UsersPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    setPagination(prev => ({ ...prev, page: 1 }));
+                    setPagination((prev) => ({ ...prev, page: 1 }));
                   }
                 }}
                 className="pl-10 sr-input-template"
@@ -486,11 +515,14 @@ export default function UsersPage() {
             {/* 필터들 */}
             <div className="flex gap-2 flex-wrap md:flex-nowrap">
               {/* 고객사 필터 (검색 가능) */}
-              <Select value={clientFilter} onValueChange={(value) => {
-                setClientFilter(value);
-                setClientSearchQuery("");
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}>
+              <Select
+                value={clientFilter}
+                onValueChange={(value) => {
+                  setClientFilter(value);
+                  setClientSearchQuery('');
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
                 <SelectTrigger className="w-[180px] sr-dropdown-template">
                   <SelectValue placeholder="고객사 전체" />
                 </SelectTrigger>
@@ -510,7 +542,7 @@ export default function UsersPage() {
                     .filter((client) =>
                       clientSearchQuery
                         ? client.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
-                        client.code.toLowerCase().includes(clientSearchQuery.toLowerCase())
+                          client.code.toLowerCase().includes(clientSearchQuery.toLowerCase())
                         : true
                     )
                     .map((client) => (
@@ -522,10 +554,13 @@ export default function UsersPage() {
               </Select>
 
               {/* 유형 필터 */}
-              <Select value={userTypeFilter} onValueChange={(value) => {
-                setUserTypeFilter(value);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}>
+              <Select
+                value={userTypeFilter}
+                onValueChange={(value) => {
+                  setUserTypeFilter(value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="유형 전체" />
                 </SelectTrigger>
@@ -537,10 +572,13 @@ export default function UsersPage() {
               </Select>
 
               {/* 역할 필터 */}
-              <Select value={roleFilter} onValueChange={(value) => {
-                setRoleFilter(value);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}>
+              <Select
+                value={roleFilter}
+                onValueChange={(value) => {
+                  setRoleFilter(value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="역할 전체" />
                 </SelectTrigger>
@@ -556,10 +594,13 @@ export default function UsersPage() {
               </Select>
 
               {/* 상태 필터 */}
-              <Select value={statusFilter} onValueChange={(value) => {
-                setStatusFilter(value);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
+              >
                 <SelectTrigger className="w-[160px] sr-dropdown-template">
                   <SelectValue placeholder="상태 전체" />
                 </SelectTrigger>
@@ -571,79 +612,83 @@ export default function UsersPage() {
               </Select>
             </div>
           </div>
-
         </div>
 
         {/* Total Count & Bulk Actions - 테이블 바로 위 */}
         <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
           <div className="flex items-center gap-3">
-            {selectedUserIds.size > 0 && (() => {
-              // 선택된 사용자 중 시스템 운영팀 체크
-              const selectedUsers = users.filter((u) => selectedUserIds.has(u.id));
-              const systemTeamCount = selectedUsers.filter((u) =>
-                u.roles.some((ur) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
-              ).length;
-              const clientUserCount = selectedUsers.length - systemTeamCount;
+            {selectedUserIds.size > 0 &&
+              (() => {
+                // 선택된 사용자 중 시스템 운영팀 체크
+                const selectedUsers = users.filter((u) => selectedUserIds.has(u.id));
+                const systemTeamCount = selectedUsers.filter((u) =>
+                  u.roles.some((ur) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+                ).length;
+                const clientUserCount = selectedUsers.length - systemTeamCount;
 
-              return (
-                <>
-                  <Badge variant="secondary" className="text-sm">
-                    {selectedUserIds.size}명 선택됨
-                  </Badge>
-                  {systemTeamCount > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      ⚠️ 시스템 운영팀 {systemTeamCount}명 포함 (할당 불가)
+                return (
+                  <>
+                    <Badge variant="secondary" className="text-sm">
+                      {selectedUserIds.size}명 선택됨
                     </Badge>
-                  )}
-                  {showBulkAssign ? (
-                    <div className="flex items-center gap-2">
-                      <Select value={bulkAssignClientId} onValueChange={setBulkAssignClientId}>
-                        <SelectTrigger className="w-[200px] h-8">
-                          <SelectValue placeholder="고객사 선택..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name} ({client.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    {systemTeamCount > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        ⚠️ 시스템 운영팀 {systemTeamCount}명 포함 (할당 불가)
+                      </Badge>
+                    )}
+                    {showBulkAssign ? (
+                      <div className="flex items-center gap-2">
+                        <Select value={bulkAssignClientId} onValueChange={setBulkAssignClientId}>
+                          <SelectTrigger className="w-[200px] h-8">
+                            <SelectValue placeholder="고객사 선택..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clients.map((client) => (
+                              <SelectItem key={client.id} value={client.id}>
+                                {client.name} ({client.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          onClick={handleBulkAssign}
+                          disabled={!bulkAssignClientId || clientUserCount === 0}
+                          title={clientUserCount === 0 ? '할당 가능한 사용자가 없습니다' : ''}
+                        >
+                          할당 ({clientUserCount}명)
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setShowBulkAssign(false)}>
+                          취소
+                        </Button>
+                      </div>
+                    ) : (
                       <Button
                         size="sm"
-                        onClick={handleBulkAssign}
-                        disabled={!bulkAssignClientId || clientUserCount === 0}
+                        variant="outline"
+                        onClick={() => setShowBulkAssign(true)}
+                        disabled={clientUserCount === 0}
                         title={clientUserCount === 0 ? '할당 가능한 사용자가 없습니다' : ''}
                       >
-                        할당 ({clientUserCount}명)
+                        <Building2 className="mr-2 h-4 w-4" />
+                        일괄 할당
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setShowBulkAssign(false)}>
-                        취소
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowBulkAssign(true)}
-                      disabled={clientUserCount === 0}
-                      title={clientUserCount === 0 ? '할당 가능한 사용자가 없습니다' : ''}
-                    >
-                      <Building2 className="mr-2 h-4 w-4" />
-                      일괄 할당
-                    </Button>
-                  )}
-                </>
-              );
-            })()}
+                    )}
+                  </>
+                );
+              })()}
           </div>
           <div className="text-sm text-muted-foreground">
-            Total <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{pagination.total}</span> items
+            Total{' '}
+            <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">
+              {pagination.total}
+            </span>{' '}
+            items
           </div>
         </div>
 
         {/* 테이블 영역 */}
-        {viewMode === "list" ? (
+        {viewMode === 'list' ? (
           <div className="overflow-x-auto">
             <Table className="sr-table-template">
               <TableHeader>
@@ -674,18 +719,18 @@ export default function UsersPage() {
               </TableHeader>
               <TableBody>
                 {loading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center py-8">
-                    <div className="flex justify-center items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                      <span className="text-muted-foreground">로딩 중...</span>
-                    </div>
-                  </TableCell></TableRow>
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="flex justify-center items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <span className="text-muted-foreground">로딩 중...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                 ) : users.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8">
-                      {searchQuery
-                        ? "검색 결과가 없습니다."
-                        : "등록된 사용자가 없습니다."}
+                      {searchQuery ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -709,10 +754,7 @@ export default function UsersPage() {
                         </Button>
                       </TableCell>
                       <TableCell className="font-medium text-center">
-                        <Link
-                          href={`/users/${user.id}`}
-                          className="text-primary hover:underline"
-                        >
+                        <Link href={`/users/${user.id}`} className="text-primary hover:underline">
                           {user.name}
                         </Link>
                       </TableCell>
@@ -721,9 +763,7 @@ export default function UsersPage() {
                         {(() => {
                           const typeLabel = getUserTypeLabel(user);
                           return (
-                            <Badge variant={getUserTypeBadgeVariant(typeLabel)}>
-                              {typeLabel}
-                            </Badge>
+                            <Badge variant={getUserTypeBadgeVariant(typeLabel)}>{typeLabel}</Badge>
                           );
                         })()}
                       </TableCell>
@@ -737,7 +777,10 @@ export default function UsersPage() {
 
                             if (isSystemTeam) {
                               return (
-                                <Badge variant="secondary" className="text-xs text-muted-foreground">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs text-muted-foreground"
+                                >
                                   할당 불가
                                 </Badge>
                               );
@@ -779,10 +822,8 @@ export default function UsersPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge
-                          variant={user.isActive ? "default" : "secondary"}
-                        >
-                          {user.isActive ? "활성" : "비활성"}
+                        <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                          {user.isActive ? '활성' : '비활성'}
                         </Badge>
                       </TableCell>
 
@@ -796,13 +837,13 @@ export default function UsersPage() {
                               // 세션 업데이트 시도
                               await update();
                               const currentRoles = session?.user?.roles || [];
-                              const isAdmin = currentRoles.includes("ADMIN");
+                              const isAdmin = currentRoles.includes('ADMIN');
 
                               if (!isAdmin) {
                                 toast({
-                                  title: "권한 없음",
-                                  description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
-                                  variant: "destructive",
+                                  title: '권한 없음',
+                                  description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
+                                  variant: 'destructive',
                                 });
                                 return;
                               }
@@ -821,13 +862,14 @@ export default function UsersPage() {
                               // 세션 업데이트 시도
                               await update();
                               const currentRoles = session?.user?.roles || [];
-                              const hasPermission = currentRoles.includes("ADMIN") || currentRoles.includes("MANAGER");
+                              const hasPermission =
+                                currentRoles.includes('ADMIN') || currentRoles.includes('MANAGER');
 
                               if (!hasPermission) {
                                 toast({
-                                  title: "권한 없음",
-                                  description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
-                                  variant: "destructive",
+                                  title: '권한 없음',
+                                  description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
+                                  variant: 'destructive',
                                 });
                                 return;
                               }
@@ -835,10 +877,14 @@ export default function UsersPage() {
                             }}
                             className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
                           >
-                            {user.isActive ? <UserX className="mr-1 h-4 w-4" /> : <UserCheck className="mr-1 h-4 w-4" />}
-                            {user.isActive ? "비활성화" : "활성화"}
+                            {user.isActive ? (
+                              <UserX className="mr-1 h-4 w-4" />
+                            ) : (
+                              <UserCheck className="mr-1 h-4 w-4" />
+                            )}
+                            {user.isActive ? '비활성화' : '활성화'}
                           </Button>
-                          <PermissionGuard roles={["ADMIN"]}>
+                          <PermissionGuard roles={['ADMIN']}>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -847,13 +893,13 @@ export default function UsersPage() {
                                 // 세션 업데이트 시도
                                 await update();
                                 const currentRoles = session?.user?.roles || [];
-                                const isAdmin = currentRoles.includes("ADMIN");
+                                const isAdmin = currentRoles.includes('ADMIN');
 
                                 if (!isAdmin) {
                                   toast({
-                                    title: "권한 없음",
-                                    description: `사용자 삭제 권한이 없습니다. 현재 역할: ${currentRoles.join(", ") || "없음"}`,
-                                    variant: "destructive",
+                                    title: '권한 없음',
+                                    description: `사용자 삭제 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
+                                    variant: 'destructive',
                                   });
                                   return;
                                 }
@@ -861,9 +907,9 @@ export default function UsersPage() {
                                 // Check if user is trying to delete themselves
                                 if (session?.user?.id === user.id) {
                                   toast({
-                                    title: "삭제 불가",
-                                    description: "자신의 계정은 삭제할 수 없습니다.",
-                                    variant: "destructive",
+                                    title: '삭제 불가',
+                                    description: '자신의 계정은 삭제할 수 없습니다.',
+                                    variant: 'destructive',
                                   });
                                   return;
                                 }
@@ -875,9 +921,10 @@ export default function UsersPage() {
 
                                 if (hasSystemRole) {
                                   toast({
-                                    title: "삭제 제한",
-                                    description: "시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.",
-                                    variant: "destructive",
+                                    title: '삭제 제한',
+                                    description:
+                                      '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.',
+                                    variant: 'destructive',
                                   });
                                   return;
                                 }
@@ -902,15 +949,15 @@ export default function UsersPage() {
         ) : (
           <div className="px-6 py-5 space-y-6">
             {Object.entries(groupedUsers()).map(([clientName, users]) => {
-              const isUnassigned = clientName === "고객사 없음";
+              const isUnassigned = clientName === '고객사 없음';
               return (
                 <div
                   key={clientName}
                   className={cn(
-                    "space-y-3 p-4 rounded-lg border-2 transition-all",
+                    'space-y-3 p-4 rounded-lg border-2 transition-all',
                     isUnassigned
-                      ? "border-amber-300 bg-amber-50/50 dark:bg-amber-950/20"
-                      : "border-transparent"
+                      ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
+                      : 'border-transparent'
                   )}
                 >
                   <div className="flex items-center gap-2 pb-2 border-b">
@@ -938,15 +985,13 @@ export default function UsersPage() {
                             <p className="text-sm font-semibold truncate group-hover:text-primary">
                               {user.name}
                             </p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {user.email}
-                            </p>
+                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                           </div>
                           <Badge
-                            variant={user.isActive ? "default" : "secondary"}
+                            variant={user.isActive ? 'default' : 'secondary'}
                             className="ml-2 shrink-0 text-xs"
                           >
-                            {user.isActive ? "활성" : "비활성"}
+                            {user.isActive ? '활성' : '비활성'}
                           </Badge>
                         </div>
                         <div className="flex gap-1 flex-wrap mt-2">
@@ -956,11 +1001,7 @@ export default function UsersPage() {
                             </Badge>
                           ) : (
                             user.roles.slice(0, 2).map((ur) => (
-                              <Badge
-                                key={ur.role.id}
-                                variant="secondary"
-                                className="text-xs"
-                              >
+                              <Badge key={ur.role.id} variant="secondary" className="text-xs">
                                 {ur.role.name}
                               </Badge>
                             ))
@@ -979,7 +1020,6 @@ export default function UsersPage() {
             })}
           </div>
         )}
-
 
         {/* Pagination Controls */}
         {pagination.totalPages > 1 && (
@@ -1024,61 +1064,68 @@ export default function UsersPage() {
       />
 
       {/* Delete Confirmation Dialog */}
-      {
-        deleteDialogOpen && userToDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md border border-[hsl(var(--sr-border))] shadow-lg">
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold text-[hsl(var(--sr-primary-dark))]">
-                  {userToDelete.isActive ? "사용자 비활성화 확인" : "사용자 완전 삭제 확인"}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  사용자 <span className="font-medium text-[hsl(var(--sr-primary-dark))]">{userToDelete.name}</span> (이메일: {userToDelete.email}) 을
-                  {userToDelete.isActive ? " 비활성화하시겠습니까?" : " 완전히 삭제하시겠습니까?"}
-                </p>
-                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
-                  <p className="font-medium">경고: 이 작업은 되돌릴 수 없습니다.</p>
-                  {userToDelete.isActive ? (
-                    <p>사용자는 비활성화되며, 관련된 SR이 있다면 다른 담당자에게 재할당되어야 합니다.</p>
-                  ) : (
-                    <p className="text-red-600 font-bold">주의: 이 작업은 영구적이며 모든 데이터가 삭제됩니다. SR 이력이 있는 사용자는 삭제할 수 없습니다.</p>
-                  )}
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setDeleteDialogOpen(false);
-                    setUserToDelete(null);
-                  }}
-                >
-                  취소
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={async () => {
-                    if (userToDelete) {
-                      try {
-                        // 이미 비활성화된 상태라면 완전 삭제 시도
-                        const isHardDelete = !userToDelete.isActive;
-                        await handleDeleteUser(userToDelete.id, isHardDelete);
-                        setDeleteDialogOpen(false);
-                        setUserToDelete(null);
-                      } catch (error) {
-                        console.error("Error deleting user:", error);
-                        // Error handling is already in handleDeleteUser
-                      }
-                    }
-                  }}
-                >
-                  {userToDelete.isActive ? "예, 비활성화합니다" : "예, 완전히 삭제합니다"}
-                </Button>
+      {deleteDialogOpen && userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md border border-[hsl(var(--sr-border))] shadow-lg">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-[hsl(var(--sr-primary-dark))]">
+                {userToDelete.isActive ? '사용자 비활성화 확인' : '사용자 완전 삭제 확인'}
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                사용자{' '}
+                <span className="font-medium text-[hsl(var(--sr-primary-dark))]">
+                  {userToDelete.name}
+                </span>{' '}
+                (이메일: {userToDelete.email}) 을
+                {userToDelete.isActive ? ' 비활성화하시겠습니까?' : ' 완전히 삭제하시겠습니까?'}
+              </p>
+              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700">
+                <p className="font-medium">경고: 이 작업은 되돌릴 수 없습니다.</p>
+                {userToDelete.isActive ? (
+                  <p>
+                    사용자는 비활성화되며, 관련된 SR이 있다면 다른 담당자에게 재할당되어야 합니다.
+                  </p>
+                ) : (
+                  <p className="text-red-600 font-bold">
+                    주의: 이 작업은 영구적이며 모든 데이터가 삭제됩니다. SR 이력이 있는 사용자는
+                    삭제할 수 없습니다.
+                  </p>
+                )}
               </div>
             </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDeleteDialogOpen(false);
+                  setUserToDelete(null);
+                }}
+              >
+                취소
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (userToDelete) {
+                    try {
+                      // 이미 비활성화된 상태라면 완전 삭제 시도
+                      const isHardDelete = !userToDelete.isActive;
+                      await handleDeleteUser(userToDelete.id, isHardDelete);
+                      setDeleteDialogOpen(false);
+                      setUserToDelete(null);
+                    } catch (error) {
+                      console.error('Error deleting user:', error);
+                      // Error handling is already in handleDeleteUser
+                    }
+                  }
+                }}
+              >
+                {userToDelete.isActive ? '예, 비활성화합니다' : '예, 완전히 삭제합니다'}
+              </Button>
+            </div>
           </div>
-        )
-      }
-    </div >
+        </div>
+      )}
+    </div>
   );
 }
