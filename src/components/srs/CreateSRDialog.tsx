@@ -1,7 +1,7 @@
 ﻿'use client';
 
-import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';

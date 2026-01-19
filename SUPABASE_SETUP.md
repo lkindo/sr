@@ -17,17 +17,20 @@
 #### 1단계: 개발 서버 종료
 
 실행 중인 개발 서버가 있다면 종료합니다:
+
 - PowerShell에서 `Ctrl+C` 또는 터미널 종료
 - VSCode 터미널에서 실행 중인 `pnpm dev` 종료
 
 #### 2단계: Prisma Client 폴더 수동 삭제
 
 **파일 탐색기**에서 다음 폴더를 삭제합니다:
+
 ```
 C:\Users\sanle\OneDrive\문서\GitHub\sr\src\generated\prisma
 ```
 
 또는 PowerShell에서:
+
 ```powershell
 Remove-Item -Path "src\generated\prisma" -Recurse -Force
 ```
@@ -90,6 +93,7 @@ npm run db:seed
 ```
 
 **Seed 데이터**:
+
 - 역할 5개: ADMIN, MANAGER, ENGINEER, CLIENT_ADMIN, CLIENT_USER
 - 권한 32개: SR, CLIENT, USER, ROLE, COMMENT, ATTACHMENT, NOTIFICATION, DASHBOARD 관련
 
@@ -130,6 +134,7 @@ npx prisma studio
 **원인**: 다른 프로세스가 Prisma Client 파일을 사용 중
 
 **해결**:
+
 1. 모든 개발 서버 종료
 2. VSCode 재시작
 3. `src\generated\prisma` 폴더 수동 삭제
@@ -140,6 +145,7 @@ npx prisma studio
 **문제**: `Can't reach database server`
 
 **확인 사항**:
+
 1. `.env` 파일의 `DATABASE_URL`과 `DIRECT_URL` 확인
 2. Supabase 프로젝트가 활성화되어 있는지 확인
 3. 비밀번호가 정확한지 확인 (현재: sr1234)
@@ -183,5 +189,3 @@ EMAIL_FROM="SR Management <noreply@sr-system.com>"
 **설정일**: 2025-11-08  
 **데이터베이스**: Supabase PostgreSQL  
 **Prisma 버전**: 6.19.0
-
-

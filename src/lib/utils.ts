@@ -1,9 +1,9 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { type ClassValue, clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 /**
  * Tailwind CSS 클래스 문자열을 병합하는 유틸리티 함수
- * 
+ *
  * @param inputs - 병합할 클래스 값들
  * @returns 병합된 클래스 문자열
  */
@@ -14,20 +14,20 @@ export function cn(...inputs: ClassValue[]) {
 export type PlainObject<T> = T extends Date
   ? string
   : T extends (infer U)[]
-  ? PlainObject<U>[]
-  : T extends object
-  ? { [K in keyof T]: PlainObject<T[K]> }
-  : T;
+    ? PlainObject<U>[]
+    : T extends object
+      ? { [K in keyof T]: PlainObject<T[K]> }
+      : T;
 
 /**
  * 객체를 순수한 JavaScript 객체로 변환하는 헬퍼 함수
  * Next.js 15의 Server Components에서 Client Components로 객체 전달 시 필요
- * 
+ *
  * @param obj - 변환할 객체
  * @returns 순수한 JavaScript 객체
  */
 export function toPlainObject<T>(obj: T): PlainObject<T> {
-  if (obj === null || typeof obj !== "object") {
+  if (obj === null || typeof obj !== 'object') {
     return obj as PlainObject<T>;
   }
 
@@ -51,11 +51,22 @@ export function toPlainObject<T>(obj: T): PlainObject<T> {
 
 /**
  * 세션 사용자 정보를 클라이언트 컴포넌트로 전달 가능한 순수 객체로 변환
- * 
+ *
  * @param session - NextAuth 세션 객체
  * @returns 클라이언트로 전달 가능한 순수 객체
  */
-export function convertSessionToPlainObject(session: { user?: { id?: string; name?: string | null; email?: string | null; image?: string | null; roles?: string[]; permissions?: string[] } } | null) {
+export function convertSessionToPlainObject(
+  session: {
+    user?: {
+      id?: string;
+      name?: string | null;
+      email?: string | null;
+      image?: string | null;
+      roles?: string[];
+      permissions?: string[];
+    };
+  } | null
+) {
   if (!session?.user) {
     return undefined;
   }

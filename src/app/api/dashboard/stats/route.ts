@@ -1,5 +1,5 @@
-﻿import { Prisma } from '@prisma/client';
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { getDashboardTtlSeconds } from '@/lib/cache-config';

@@ -13,8 +13,6 @@
   }
 }
 
-
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -102,8 +100,6 @@
     --sr-accent-blue: 228 50% 60%;
   }
 }
-
-
 
 @layer base {
   * {
@@ -395,7 +391,6 @@
   }
 
   @keyframes pulse {
-
     0%,
     100% {
       opacity: 1;
@@ -500,7 +495,7 @@
   }
 
   .sr-label-required::after {
-    content: " *";
+    content: ' *';
     @apply text-destructive;
   }
 

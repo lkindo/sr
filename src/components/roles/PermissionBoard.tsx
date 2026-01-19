@@ -1,7 +1,7 @@
 'use client';
 
-import { Search, Shield } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { Search, Shield } from 'lucide-react';
 
 import { getAllPermissionsAction } from '@/actions/permission.actions';
 import { updateRolePermissionsAction } from '@/actions/role.actions';

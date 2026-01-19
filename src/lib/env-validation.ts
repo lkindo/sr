@@ -32,7 +32,15 @@ export interface EnvVariable {
   /**
    * 카테고리
    */
-  category: 'database' | 'auth' | 'storage' | 'cache' | 'email' | 'queue' | 'webhook' | 'rate-limit';
+  category:
+    | 'database'
+    | 'auth'
+    | 'storage'
+    | 'cache'
+    | 'email'
+    | 'queue'
+    | 'webhook'
+    | 'rate-limit';
 
   /**
    * 검증 함수 (선택사항)
@@ -133,8 +141,6 @@ export const ENV_VARIABLES: EnvVariable[] = [
     category: 'queue',
   },
 
-
-
   // Rate Limiting (선택사항)
   {
     name: 'RATE_LIMIT_STRICT_WINDOW_MS',
@@ -208,7 +214,7 @@ export const ENV_VARIABLES: EnvVariable[] = [
 export class EnvValidationError extends Error {
   constructor(
     public missingVariables: EnvVariable[],
-    public invalidVariables: Array<{ variable: EnvVariable; error: string }>,
+    public invalidVariables: Array<{ variable: EnvVariable; error: string }>
   ) {
     const missingCount = missingVariables.length;
     const invalidCount = invalidVariables.length;
@@ -267,9 +273,10 @@ export function validateEnv(): void {
         const isValid = envVar.validate(value);
         if (!isValid) {
           // 디버깅: 실제 값 정보 출력
-          const debugInfo = envVar.name === 'NEXTAUTH_SECRET'
-            ? ` (실제 길이: ${value.length}, 첫 20자: "${value.substring(0, 20)}")`
-            : '';
+          const debugInfo =
+            envVar.name === 'NEXTAUTH_SECRET'
+              ? ` (실제 길이: ${value.length}, 첫 20자: "${value.substring(0, 20)}")`
+              : '';
           invalidVariables.push({
             variable: envVar,
             error: (envVar.validationError || '유효하지 않은 값입니다.') + debugInfo,
@@ -300,20 +307,21 @@ export function printEnvSummary(): void {
 
   console.log('\n📋 환경 변수 설정 현황:\n');
 
-  const categories = Array.from(new Set(ENV_VARIABLES.map(v => v.category)));
+  const categories = Array.from(new Set(ENV_VARIABLES.map((v) => v.category)));
 
   categories.forEach((category) => {
-    const vars = ENV_VARIABLES.filter(v => v.category === category);
-    const categoryName = {
-      database: '데이터베이스',
-      auth: '인증',
-      storage: '스토리지',
-      cache: '캐시',
-      email: '이메일',
-      queue: '큐',
-      webhook: '웹훅',
-      'rate-limit': 'Rate Limiting',
-    }[category] || category;
+    const vars = ENV_VARIABLES.filter((v) => v.category === category);
+    const categoryName =
+      {
+        database: '데이터베이스',
+        auth: '인증',
+        storage: '스토리지',
+        cache: '캐시',
+        email: '이메일',
+        queue: '큐',
+        webhook: '웹훅',
+        'rate-limit': 'Rate Limiting',
+      }[category] || category;
 
     console.log(`\n${categoryName}:`);
     vars.forEach((v) => {

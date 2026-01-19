@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: "테스트 대상 BASE_URL (미지정 시 로컬 dev)"
+        description: '테스트 대상 BASE_URL (미지정 시 로컬 dev)'
         required: false
-        default: ""
+        default: ''
   pull_request:
     types: [labeled]
 
@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: "pnpm"
+          cache: 'pnpm'
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:

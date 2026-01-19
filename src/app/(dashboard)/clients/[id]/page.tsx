@@ -1,5 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   FileText,
@@ -10,9 +13,6 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import { DeleteClientDialog } from '@/components/clients/DeleteClientDialog';

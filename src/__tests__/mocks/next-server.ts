@@ -1,6 +1,6 @@
 export class NextRequest extends Request {
   constructor(input: RequestInfo | URL, init?: RequestInit) {
-    super(input, init)
+    super(input, init);
   }
 }
 
@@ -12,8 +12,6 @@ export class NextResponse extends Response {
         'content-type': 'application/json',
         ...init?.headers,
       },
-    }) as NextResponse
+    }) as NextResponse;
   }
 }
-
-

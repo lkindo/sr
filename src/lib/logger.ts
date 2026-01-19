@@ -4,9 +4,9 @@
  * 프로덕션 환경에서 에러 트래킹 서비스(Sentry 등) 연동 가능
  */
 
-import { ServiceError } from "./errors";
+import { ServiceError } from './errors';
 
-export type LogLevel = "debug" | "info" | "warn" | "error";
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export interface LogContext {
   [key: string]: unknown;
@@ -32,8 +32,8 @@ interface LogEntry {
 }
 
 class Logger {
-  private isProduction = process.env.NODE_ENV === "production";
-  private isDevelopment = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  private isProduction = process.env.NODE_ENV === 'production';
+  private isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 
   /**
    * 로그 레벨에 따라 출력 여부 결정
@@ -44,7 +44,7 @@ class Logger {
     }
 
     // 프로덕션 환경에서는 error와 warn만 출력
-    return level === "error" || level === "warn";
+    return level === 'error' || level === 'warn';
   }
 
   /**
@@ -100,19 +100,17 @@ class Logger {
       const time = new Date(entry.timestamp).toLocaleTimeString();
 
       if (entry.error) {
-        console.error(
-          `${prefix} [${time}] ${entry.message}`,
-          entry.error,
-          entry.context || {}
-        );
+        console.error(`${prefix} [${time}] ${entry.message}`, entry.error, entry.context || {});
       } else {
-        const logMethod = entry.level === "error" ? console.error :
-          entry.level === "warn" ? console.warn :
-            entry.level === "info" ? console.info : console.log;
-        logMethod(
-          `${prefix} [${time}] ${entry.message}`,
-          entry.context || {}
-        );
+        const logMethod =
+          entry.level === 'error'
+            ? console.error
+            : entry.level === 'warn'
+              ? console.warn
+              : entry.level === 'info'
+                ? console.info
+                : console.log;
+        logMethod(`${prefix} [${time}] ${entry.message}`, entry.context || {});
       }
     }
   }
@@ -122,7 +120,7 @@ class Logger {
    */
   debug(message: string, context?: LogContext): void {
     if (this.isDevelopment) {
-      this.output(this.createLogEntry("debug", message, context));
+      this.output(this.createLogEntry('debug', message, context));
     }
   }
 
@@ -130,25 +128,21 @@ class Logger {
    * Info 레벨 로그
    */
   info(message: string, context?: LogContext): void {
-    this.output(this.createLogEntry("info", message, context));
+    this.output(this.createLogEntry('info', message, context));
   }
 
   /**
    * Warning 레벨 로그
    */
   warn(message: string, context?: LogContext): void {
-    this.output(this.createLogEntry("warn", message, context));
+    this.output(this.createLogEntry('warn', message, context));
   }
 
   /**
    * Error 레벨 로그
    */
-  error(
-    message: string,
-    error?: Error | ServiceError,
-    context?: LogContext
-  ): void {
-    this.output(this.createLogEntry("error", message, context, error));
+  error(message: string, error?: Error | ServiceError, context?: LogContext): void {
+    this.output(this.createLogEntry('error', message, context, error));
   }
 
   /**
@@ -168,8 +162,8 @@ class Logger {
     duration?: number,
     context?: LogContext
   ): void {
-    const message = `${method} ${path} - ${statusCode}${duration ? ` (${duration}ms)` : ""}`;
-    const level = statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
+    const message = `${method} ${path} - ${statusCode}${duration ? ` (${duration}ms)` : ''}`;
+    const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
 
     this.output(
       this.createLogEntry(level, message, {
@@ -185,5 +179,3 @@ class Logger {
 
 // 싱글톤 인스턴스
 export const logger = new Logger();
-
-

@@ -1,10 +1,10 @@
 'use client';
 
-import { ArrowLeft, Pencil, Shield, UserX } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useCallback, useEffect, useState } from 'react';
+import { ArrowLeft, Pencil, Shield, UserX } from 'lucide-react';
 
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { Badge } from '@/components/ui/badge';

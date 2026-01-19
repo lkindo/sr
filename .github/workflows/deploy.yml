@@ -3,8 +3,8 @@ name: Deploy to Vercel
 on:
   push:
     branches:
-      - main  # Production 배포
-      - dev   # Preview 배포
+      - main # Production 배포
+      - dev # Preview 배포
 
 jobs:
   deploy:

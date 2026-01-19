@@ -1,7 +1,7 @@
 'use client';
 
-import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
 
 import { DeleteRoleDialog } from '@/components/roles/DeleteRoleDialog';
 import { PermissionBoard } from '@/components/roles/PermissionBoard';

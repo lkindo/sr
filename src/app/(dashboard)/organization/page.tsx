@@ -1,8 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import { Building2, Plus, Search, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import {

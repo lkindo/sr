@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi } from 'vitest';
 
 // Mock NextAuth
 vi.mock('@/auth', () => ({
@@ -11,7 +11,7 @@ vi.mock('@/auth', () => ({
       },
     })
   ),
-}))
+}));
 
 // Mock Prisma
 vi.mock('@/lib/prisma', () => ({
@@ -54,7 +54,7 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
     },
   },
-}))
+}));
 
 // Mock Email service
 vi.mock('@/lib/email', () => ({
@@ -62,6 +62,4 @@ vi.mock('@/lib/email', () => ({
   sendSRAssignedNotification: vi.fn(() => Promise.resolve()),
   sendSRStatusChangedNotification: vi.fn(() => Promise.resolve()),
   sendSRCommentNotification: vi.fn(() => Promise.resolve()),
-}))
-
-
+}));

@@ -1,5 +1,4 @@
-
-import { PermissionService } from "@/services/permission.service";
+import { PermissionService } from '@/services/permission.service';
 
 // Singleton instance for permission service
 const permissionService = new PermissionService();
@@ -19,7 +18,6 @@ export async function hasPermission(
   try {
     return await permissionService.checkPermission(userId, `${resource}:${action}`);
   } catch (error) {
-
     return false;
   }
 }
@@ -89,7 +87,6 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
   try {
     return await permissionService.checkRole(userId, roleName);
   } catch (error) {
-
     return false;
   }
 }
@@ -101,7 +98,7 @@ export async function hasRole(userId: string, roleName: string): Promise<boolean
  */
 export async function getUserPermissions(userId: string) {
   const permissions = await permissionService.getUserPermissions(userId);
-  return permissions.map(p => ({
+  return permissions.map((p) => ({
     resource: p.resource,
     action: p.action,
     description: p.description || undefined,
@@ -116,5 +113,3 @@ export async function getUserPermissions(userId: string) {
 export async function getUserRoles(userId: string) {
   return await permissionService.getUserRoles(userId);
 }
-
-

@@ -19,12 +19,12 @@
 
 ## 📚 문서 간 참조 가이드
 
-| 문서 | 역할 | 주요 내용 |
-|------|------|-----------|
-| **[PRD.md](SR_Management_System_PRD.md)** | 비즈니스 요구사항 | 기능 정의, 사용자 역할, SR 프로세스 |
-| **[DB.md](DB.md)** | 데이터베이스 설계 | **Prisma 스키마, ERD, 테이블 명세** ⭐ |
-| **[TRD.md](TRD.md)** | 기술 명세 | 아키텍처, 기술 스택, 배포 전략 |
-| **[LLD.md](LLD.md)** | 구현 상세 | 코드, 컴포넌트, 테스트 전략 |
+| 문서                                      | 역할              | 주요 내용                              |
+| ----------------------------------------- | ----------------- | -------------------------------------- |
+| **[PRD.md](SR_Management_System_PRD.md)** | 비즈니스 요구사항 | 기능 정의, 사용자 역할, SR 프로세스    |
+| **[DB.md](DB.md)**                        | 데이터베이스 설계 | **Prisma 스키마, ERD, 테이블 명세** ⭐ |
+| **[TRD.md](TRD.md)**                      | 기술 명세         | 아키텍처, 기술 스택, 배포 전략         |
+| **[LLD.md](LLD.md)**                      | 구현 상세         | 코드, 컴포넌트, 테스트 전략            |
 
 **권장 읽는 순서**: PRD → DB → TRD → LLD
 
@@ -32,12 +32,12 @@
 
 ## 문서 개정 이력
 
-| 버전 | 작성자 | 변경 사항 | 작성일 | 검수자 |
-|------|--------|-----------|--------|--------|
-| 1.0 | Development Team | DB 설계 초안 작성 | 2025-11-06 | [검수자] |
-| 1.1 | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가 | 2025-11-06 | [검수자] |
-| 1.2 | Development Team | Single Source of Truth 명시, 문서 간 참조 가이드 추가 | 2025-11-07 | [검수자] |
-| 1.3 | Development Team | SR 요청/접수 프로세스 분리를 위한 필드 추가 (요청자/접수자 역할 분리) | 2025-01-12 | [검수자] |
+| 버전 | 작성자           | 변경 사항                                                             | 작성일     | 검수자   |
+| ---- | ---------------- | --------------------------------------------------------------------- | ---------- | -------- |
+| 1.0  | Development Team | DB 설계 초안 작성                                                     | 2025-11-06 | [검수자] |
+| 1.1  | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가                    | 2025-11-06 | [검수자] |
+| 1.2  | Development Team | Single Source of Truth 명시, 문서 간 참조 가이드 추가                 | 2025-11-07 | [검수자] |
+| 1.3  | Development Team | SR 요청/접수 프로세스 분리를 위한 필드 추가 (요청자/접수자 역할 분리) | 2025-01-12 | [검수자] |
 
 ---
 
@@ -353,24 +353,26 @@ erDiagram
 
 사용자 계정 정보를 저장하는 핵심 테이블
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 사용자 고유 ID (PK) |
-| email | VARCHAR(255) | NO | - | 이메일 주소 (UK) |
-| name | VARCHAR(100) | NO | - | 사용자 이름 |
-| password | VARCHAR(255) | NO | - | 해시된 비밀번호 |
-| email_verified | TIMESTAMP | YES | NULL | 이메일 인증 시간 |
-| image | TEXT | YES | NULL | 프로필 이미지 URL |
-| is_active | BOOLEAN | NO | true | 활성화 상태 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명         | 데이터 타입  | NULL | 기본값 | 설명                |
+| -------------- | ------------ | ---- | ------ | ------------------- |
+| id             | VARCHAR(30)  | NO   | cuid() | 사용자 고유 ID (PK) |
+| email          | VARCHAR(255) | NO   | -      | 이메일 주소 (UK)    |
+| name           | VARCHAR(100) | NO   | -      | 사용자 이름         |
+| password       | VARCHAR(255) | NO   | -      | 해시된 비밀번호     |
+| email_verified | TIMESTAMP    | YES  | NULL   | 이메일 인증 시간    |
+| image          | TEXT         | YES  | NULL   | 프로필 이미지 URL   |
+| is_active      | BOOLEAN      | NO   | true   | 활성화 상태         |
+| created_at     | TIMESTAMP    | NO   | now()  | 생성 시간           |
+| updated_at     | TIMESTAMP    | NO   | now()  | 수정 시간           |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `email`
 - INDEX: `is_active`
 
 **제약 조건:**
+
 - `email`: 이메일 형식 검증
 - `password`: 최소 60자 (bcrypt hash)
 
@@ -380,27 +382,29 @@ erDiagram
 
 OAuth 등 외부 인증 제공자 계정 정보
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 계정 고유 ID (PK) |
-| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK) |
-| type | VARCHAR(50) | NO | - | 계정 타입 (oauth, email) |
-| provider | VARCHAR(50) | NO | - | 제공자 (google, github 등) |
-| provider_account_id | VARCHAR(255) | NO | - | 제공자의 계정 ID |
-| refresh_token | TEXT | YES | NULL | 리프레시 토큰 |
-| access_token | TEXT | YES | NULL | 액세스 토큰 |
-| expires_at | INTEGER | YES | NULL | 토큰 만료 시간 |
-| token_type | VARCHAR(50) | YES | NULL | 토큰 타입 |
-| scope | VARCHAR(255) | YES | NULL | OAuth 스코프 |
-| id_token | TEXT | YES | NULL | ID 토큰 |
-| session_state | VARCHAR(255) | YES | NULL | 세션 상태 |
+| 컬럼명              | 데이터 타입  | NULL | 기본값 | 설명                       |
+| ------------------- | ------------ | ---- | ------ | -------------------------- |
+| id                  | VARCHAR(30)  | NO   | cuid() | 계정 고유 ID (PK)          |
+| user_id             | VARCHAR(30)  | NO   | -      | 사용자 ID (FK)             |
+| type                | VARCHAR(50)  | NO   | -      | 계정 타입 (oauth, email)   |
+| provider            | VARCHAR(50)  | NO   | -      | 제공자 (google, github 등) |
+| provider_account_id | VARCHAR(255) | NO   | -      | 제공자의 계정 ID           |
+| refresh_token       | TEXT         | YES  | NULL   | 리프레시 토큰              |
+| access_token        | TEXT         | YES  | NULL   | 액세스 토큰                |
+| expires_at          | INTEGER      | YES  | NULL   | 토큰 만료 시간             |
+| token_type          | VARCHAR(50)  | YES  | NULL   | 토큰 타입                  |
+| scope               | VARCHAR(255) | YES  | NULL   | OAuth 스코프               |
+| id_token            | TEXT         | YES  | NULL   | ID 토큰                    |
+| session_state       | VARCHAR(255) | YES  | NULL   | 세션 상태                  |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `(provider, provider_account_id)`
 - INDEX: `user_id`
 
 **외래 키:**
+
 - `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 
 ---
@@ -409,19 +413,21 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 사용자 세션 정보
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 세션 고유 ID (PK) |
-| session_token | VARCHAR(255) | NO | - | 세션 토큰 (UK) |
-| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK) |
-| expires | TIMESTAMP | NO | - | 만료 시간 |
+| 컬럼명        | 데이터 타입  | NULL | 기본값 | 설명              |
+| ------------- | ------------ | ---- | ------ | ----------------- |
+| id            | VARCHAR(30)  | NO   | cuid() | 세션 고유 ID (PK) |
+| session_token | VARCHAR(255) | NO   | -      | 세션 토큰 (UK)    |
+| user_id       | VARCHAR(30)  | NO   | -      | 사용자 ID (FK)    |
+| expires       | TIMESTAMP    | NO   | -      | 만료 시간         |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `session_token`
 - INDEX: `user_id`
 
 **외래 키:**
+
 - `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 
 ---
@@ -430,13 +436,14 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 이메일 인증 등에 사용되는 일회성 토큰
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| identifier | VARCHAR(255) | NO | - | 식별자 (이메일 등) |
-| token | VARCHAR(255) | NO | - | 인증 토큰 (UK) |
-| expires | TIMESTAMP | NO | - | 만료 시간 |
+| 컬럼명     | 데이터 타입  | NULL | 기본값 | 설명               |
+| ---------- | ------------ | ---- | ------ | ------------------ |
+| identifier | VARCHAR(255) | NO   | -      | 식별자 (이메일 등) |
+| token      | VARCHAR(255) | NO   | -      | 인증 토큰 (UK)     |
+| expires    | TIMESTAMP    | NO   | -      | 만료 시간          |
 
 **인덱스:**
+
 - UNIQUE: `(identifier, token)`
 - UNIQUE: `token`
 
@@ -446,19 +453,21 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 사용자 역할 정의
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 역할 고유 ID (PK) |
-| name | VARCHAR(50) | NO | - | 역할 이름 (UK) |
-| description | TEXT | YES | NULL | 역할 설명 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명      | 데이터 타입 | NULL | 기본값 | 설명              |
+| ----------- | ----------- | ---- | ------ | ----------------- |
+| id          | VARCHAR(30) | NO   | cuid() | 역할 고유 ID (PK) |
+| name        | VARCHAR(50) | NO   | -      | 역할 이름 (UK)    |
+| description | TEXT        | YES  | NULL   | 역할 설명         |
+| created_at  | TIMESTAMP   | NO   | now()  | 생성 시간         |
+| updated_at  | TIMESTAMP   | NO   | now()  | 수정 시간         |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `name`
 
 **미리 정의된 역할:**
+
 - `SYSTEM_ADMIN`: 시스템 관리자
 - `CLIENT_ADMIN`: 고객사 관리자
 - `DEVELOPER`: 개발자
@@ -470,20 +479,22 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 사용자와 역할의 다대다 관계
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 매핑 고유 ID (PK) |
-| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK) |
-| role_id | VARCHAR(30) | NO | - | 역할 ID (FK) |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| 컬럼명     | 데이터 타입 | NULL | 기본값 | 설명              |
+| ---------- | ----------- | ---- | ------ | ----------------- |
+| id         | VARCHAR(30) | NO   | cuid() | 매핑 고유 ID (PK) |
+| user_id    | VARCHAR(30) | NO   | -      | 사용자 ID (FK)    |
+| role_id    | VARCHAR(30) | NO   | -      | 역할 ID (FK)      |
+| created_at | TIMESTAMP   | NO   | now()  | 생성 시간         |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `(user_id, role_id)`
 - INDEX: `user_id`
 - INDEX: `role_id`
 
 **외래 키:**
+
 - `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 - `role_id` REFERENCES `roles(id)` ON DELETE CASCADE
 
@@ -493,19 +504,21 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 역할별 권한 정의
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 권한 고유 ID (PK) |
-| role_id | VARCHAR(30) | NO | - | 역할 ID (FK) |
-| resource | VARCHAR(50) | NO | - | 리소스 (sr, client, user 등) |
-| action | VARCHAR(50) | NO | - | 액션 (create, read, update 등) |
+| 컬럼명   | 데이터 타입 | NULL | 기본값 | 설명                           |
+| -------- | ----------- | ---- | ------ | ------------------------------ |
+| id       | VARCHAR(30) | NO   | cuid() | 권한 고유 ID (PK)              |
+| role_id  | VARCHAR(30) | NO   | -      | 역할 ID (FK)                   |
+| resource | VARCHAR(50) | NO   | -      | 리소스 (sr, client, user 등)   |
+| action   | VARCHAR(50) | NO   | -      | 액션 (create, read, update 등) |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `(role_id, resource, action)`
 - INDEX: `role_id`
 
 **외래 키:**
+
 - `role_id` REFERENCES `roles(id)` ON DELETE CASCADE
 
 **권한 형식:** `{resource}:{action}` (예: `sr:create`, `client:read`)
@@ -516,22 +529,23 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 고객사 정보
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 고객사 고유 ID (PK) |
-| name | VARCHAR(200) | NO | - | 고객사 이름 |
-| industry | VARCHAR(100) | YES | NULL | 업종 |
-| contact_person | VARCHAR(100) | YES | NULL | 담당자 이름 |
-| contact_email | VARCHAR(255) | YES | NULL | 담당자 이메일 |
-| contact_phone | VARCHAR(20) | YES | NULL | 담당자 전화번호 |
-| address | TEXT | YES | NULL | 주소 |
-| contract_start_date | DATE | YES | NULL | 계약 시작일 |
-| contract_end_date | DATE | YES | NULL | 계약 종료일 |
-| is_active | BOOLEAN | NO | true | 활성화 상태 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명              | 데이터 타입  | NULL | 기본값 | 설명                |
+| ------------------- | ------------ | ---- | ------ | ------------------- |
+| id                  | VARCHAR(30)  | NO   | cuid() | 고객사 고유 ID (PK) |
+| name                | VARCHAR(200) | NO   | -      | 고객사 이름         |
+| industry            | VARCHAR(100) | YES  | NULL   | 업종                |
+| contact_person      | VARCHAR(100) | YES  | NULL   | 담당자 이름         |
+| contact_email       | VARCHAR(255) | YES  | NULL   | 담당자 이메일       |
+| contact_phone       | VARCHAR(20)  | YES  | NULL   | 담당자 전화번호     |
+| address             | TEXT         | YES  | NULL   | 주소                |
+| contract_start_date | DATE         | YES  | NULL   | 계약 시작일         |
+| contract_end_date   | DATE         | YES  | NULL   | 계약 종료일         |
+| is_active           | BOOLEAN      | NO   | true   | 활성화 상태         |
+| created_at          | TIMESTAMP    | NO   | now()  | 생성 시간           |
+| updated_at          | TIMESTAMP    | NO   | now()  | 수정 시간           |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - INDEX: `name`
 - INDEX: `is_active`
@@ -542,20 +556,22 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 사용자와 고객사의 다대다 관계
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 매핑 고유 ID (PK) |
-| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK) |
-| client_id | VARCHAR(30) | NO | - | 고객사 ID (FK) |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| 컬럼명     | 데이터 타입 | NULL | 기본값 | 설명              |
+| ---------- | ----------- | ---- | ------ | ----------------- |
+| id         | VARCHAR(30) | NO   | cuid() | 매핑 고유 ID (PK) |
+| user_id    | VARCHAR(30) | NO   | -      | 사용자 ID (FK)    |
+| client_id  | VARCHAR(30) | NO   | -      | 고객사 ID (FK)    |
+| created_at | TIMESTAMP   | NO   | now()  | 생성 시간         |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `(user_id, client_id)`
 - INDEX: `user_id`
 - INDEX: `client_id`
 
 **외래 키:**
+
 - `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 - `client_id` REFERENCES `clients(id)` ON DELETE CASCADE
 
@@ -565,46 +581,48 @@ OAuth 등 외부 인증 제공자 계정 정보
 
 SR(서비스 요청) 정보
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | SR 고유 ID (PK) |
-| sr_number | VARCHAR(50) | NO | - | SR 번호 (UK, 형식: SR-20251106-0001) |
-| title | VARCHAR(200) | NO | - | SR 제목 |
-| description | TEXT | NO | - | SR 상세 설명 |
-| status | VARCHAR(20) | NO | 'REQUESTED' | 상태 (ENUM) |
-| priority | VARCHAR(20) | NO | 'MEDIUM' | 우선순위 (ENUM) |
-| **requested_priority** | VARCHAR(20) | NO | 'MEDIUM' | **[신규] 요청자 희망 우선순위 (ENUM)** |
-| **requested_completion_date** | TIMESTAMP | YES | NULL | **[신규] 요청자 희망 완료일** |
-| client_id | VARCHAR(30) | NO | - | 고객사 ID (FK) |
-| requester_id | VARCHAR(30) | NO | - | 요청자 ID (FK) |
-| assignee_id | VARCHAR(30) | YES | NULL | 담당자 ID (FK) |
-| service_category_id | VARCHAR(30) | NO | - | 서비스 카테고리 ID (FK) |
-| **intake_by_id** | VARCHAR(30) | YES | NULL | **[신규] 접수 처리자 ID (FK)** |
-| **actual_priority** | VARCHAR(20) | YES | NULL | **[신규] 실제 우선순위 (접수자 결정, ENUM)** |
-| **intake_notes** | TEXT | YES | NULL | **[신규] 접수 메모/분석 내용** |
-| **estimated_hours** | FLOAT | YES | NULL | **[신규] 예상 작업 시간** |
-| **estimated_completion_date** | TIMESTAMP | YES | NULL | **[신규] 접수자가 설정한 예상 완료일** |
-| requested_at | TIMESTAMP | NO | now() | 요청 시간 |
-| intake_at | TIMESTAMP | YES | NULL | 접수 시간 |
-| due_date | TIMESTAMP | YES | NULL | 완료 목표 시간 (SLA 기준) |
-| expected_completion_date | TIMESTAMP | YES | NULL | 예상 완료일 |
-| actual_completion_date | TIMESTAMP | YES | NULL | 실제 완료일 |
-| completed_at | TIMESTAMP | YES | NULL | 완료 시간 |
-| confirmed_at | TIMESTAMP | YES | NULL | 확인 완료 시간 |
-| resolution_description | TEXT | YES | NULL | 처리 결과 설명 |
-| rejection_reason | TEXT | YES | NULL | 거부 사유 |
-| satisfaction_rating | INT | YES | NULL | 만족도 평가 (1-5) |
-| additional_feedback | TEXT | YES | NULL | 추가 피드백 |
-| attachment_count | INT | NO | 0 | 첨부파일 수 |
-| comment_count | INT | NO | 0 | 댓글 수 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명                        | 데이터 타입  | NULL | 기본값      | 설명                                         |
+| ----------------------------- | ------------ | ---- | ----------- | -------------------------------------------- |
+| id                            | VARCHAR(30)  | NO   | cuid()      | SR 고유 ID (PK)                              |
+| sr_number                     | VARCHAR(50)  | NO   | -           | SR 번호 (UK, 형식: SR-20251106-0001)         |
+| title                         | VARCHAR(200) | NO   | -           | SR 제목                                      |
+| description                   | TEXT         | NO   | -           | SR 상세 설명                                 |
+| status                        | VARCHAR(20)  | NO   | 'REQUESTED' | 상태 (ENUM)                                  |
+| priority                      | VARCHAR(20)  | NO   | 'MEDIUM'    | 우선순위 (ENUM)                              |
+| **requested_priority**        | VARCHAR(20)  | NO   | 'MEDIUM'    | **[신규] 요청자 희망 우선순위 (ENUM)**       |
+| **requested_completion_date** | TIMESTAMP    | YES  | NULL        | **[신규] 요청자 희망 완료일**                |
+| client_id                     | VARCHAR(30)  | NO   | -           | 고객사 ID (FK)                               |
+| requester_id                  | VARCHAR(30)  | NO   | -           | 요청자 ID (FK)                               |
+| assignee_id                   | VARCHAR(30)  | YES  | NULL        | 담당자 ID (FK)                               |
+| service_category_id           | VARCHAR(30)  | NO   | -           | 서비스 카테고리 ID (FK)                      |
+| **intake_by_id**              | VARCHAR(30)  | YES  | NULL        | **[신규] 접수 처리자 ID (FK)**               |
+| **actual_priority**           | VARCHAR(20)  | YES  | NULL        | **[신규] 실제 우선순위 (접수자 결정, ENUM)** |
+| **intake_notes**              | TEXT         | YES  | NULL        | **[신규] 접수 메모/분석 내용**               |
+| **estimated_hours**           | FLOAT        | YES  | NULL        | **[신규] 예상 작업 시간**                    |
+| **estimated_completion_date** | TIMESTAMP    | YES  | NULL        | **[신규] 접수자가 설정한 예상 완료일**       |
+| requested_at                  | TIMESTAMP    | NO   | now()       | 요청 시간                                    |
+| intake_at                     | TIMESTAMP    | YES  | NULL        | 접수 시간                                    |
+| due_date                      | TIMESTAMP    | YES  | NULL        | 완료 목표 시간 (SLA 기준)                    |
+| expected_completion_date      | TIMESTAMP    | YES  | NULL        | 예상 완료일                                  |
+| actual_completion_date        | TIMESTAMP    | YES  | NULL        | 실제 완료일                                  |
+| completed_at                  | TIMESTAMP    | YES  | NULL        | 완료 시간                                    |
+| confirmed_at                  | TIMESTAMP    | YES  | NULL        | 확인 완료 시간                               |
+| resolution_description        | TEXT         | YES  | NULL        | 처리 결과 설명                               |
+| rejection_reason              | TEXT         | YES  | NULL        | 거부 사유                                    |
+| satisfaction_rating           | INT          | YES  | NULL        | 만족도 평가 (1-5)                            |
+| additional_feedback           | TEXT         | YES  | NULL        | 추가 피드백                                  |
+| attachment_count              | INT          | NO   | 0           | 첨부파일 수                                  |
+| comment_count                 | INT          | NO   | 0           | 댓글 수                                      |
+| created_at                    | TIMESTAMP    | NO   | now()       | 생성 시간                                    |
+| updated_at                    | TIMESTAMP    | NO   | now()       | 수정 시간                                    |
 
 **ENUM 타입:**
+
 - **status**: `REQUESTED`, `INTAKE`, `IN_PROGRESS`, `ON_HOLD`, `COMPLETED`, `CONFIRMED`, `REJECTED`
 - **priority**: `CRITICAL` (4h), `HIGH` (24h), `MEDIUM` (72h), `LOW` (168h)
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `sr_number`
 - INDEX: `(client_id, status)`
@@ -613,6 +631,7 @@ SR(서비스 요청) 정보
 - INDEX: `(status, priority, created_at)`
 
 **외래 키:**
+
 - `client_id` REFERENCES `clients(id)`
 - `requester_id` REFERENCES `users(id)`
 - `assignee_id` REFERENCES `users(id)` ON DELETE SET NULL
@@ -625,17 +644,18 @@ SR(서비스 요청) 정보
 
 SR의 모든 변경 이력
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 활동 고유 ID (PK) |
-| sr_id | VARCHAR(30) | NO | - | SR ID (FK) |
-| user_id | VARCHAR(30) | NO | - | 수행자 ID (FK) |
-| type | VARCHAR(50) | NO | - | 활동 유형 (ENUM) |
-| description | TEXT | NO | - | 활동 설명 |
-| metadata | JSONB | YES | NULL | 추가 정보 (이전 값, 새 값 등) |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| 컬럼명      | 데이터 타입 | NULL | 기본값 | 설명                          |
+| ----------- | ----------- | ---- | ------ | ----------------------------- |
+| id          | VARCHAR(30) | NO   | cuid() | 활동 고유 ID (PK)             |
+| sr_id       | VARCHAR(30) | NO   | -      | SR ID (FK)                    |
+| user_id     | VARCHAR(30) | NO   | -      | 수행자 ID (FK)                |
+| type        | VARCHAR(50) | NO   | -      | 활동 유형 (ENUM)              |
+| description | TEXT        | NO   | -      | 활동 설명                     |
+| metadata    | JSONB       | YES  | NULL   | 추가 정보 (이전 값, 새 값 등) |
+| created_at  | TIMESTAMP   | NO   | now()  | 생성 시간                     |
 
 **ENUM 타입 (type):**
+
 - `CREATED`: SR 생성
 - `STATUS_CHANGED`: 상태 변경
 - `PRIORITY_CHANGED`: 우선순위 변경
@@ -649,11 +669,13 @@ SR의 모든 변경 이력
 - `REJECTED`: 거절
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - INDEX: `(sr_id, created_at)`
 - INDEX: `user_id`
 
 **외래 키:**
+
 - `sr_id` REFERENCES `srs(id)` ON DELETE CASCADE
 - `user_id` REFERENCES `users(id)`
 
@@ -663,22 +685,24 @@ SR의 모든 변경 이력
 
 SR에 대한 댓글
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 댓글 고유 ID (PK) |
-| sr_id | VARCHAR(30) | NO | - | SR ID (FK) |
-| user_id | VARCHAR(30) | NO | - | 작성자 ID (FK) |
-| content | TEXT | NO | - | 댓글 내용 |
-| is_internal | BOOLEAN | NO | false | 내부 메모 여부 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명      | 데이터 타입 | NULL | 기본값 | 설명              |
+| ----------- | ----------- | ---- | ------ | ----------------- |
+| id          | VARCHAR(30) | NO   | cuid() | 댓글 고유 ID (PK) |
+| sr_id       | VARCHAR(30) | NO   | -      | SR ID (FK)        |
+| user_id     | VARCHAR(30) | NO   | -      | 작성자 ID (FK)    |
+| content     | TEXT        | NO   | -      | 댓글 내용         |
+| is_internal | BOOLEAN     | NO   | false  | 내부 메모 여부    |
+| created_at  | TIMESTAMP   | NO   | now()  | 생성 시간         |
+| updated_at  | TIMESTAMP   | NO   | now()  | 수정 시간         |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - INDEX: `(sr_id, created_at)`
 - INDEX: `user_id`
 
 **외래 키:**
+
 - `sr_id` REFERENCES `srs(id)` ON DELETE CASCADE
 - `user_id` REFERENCES `users(id)`
 
@@ -688,22 +712,24 @@ SR에 대한 댓글
 
 SR의 첨부파일 메타데이터
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 첨부파일 고유 ID (PK) |
-| sr_id | VARCHAR(30) | NO | - | SR ID (FK) |
-| file_name | VARCHAR(255) | NO | - | 파일명 |
-| file_size | INTEGER | NO | - | 파일 크기 (bytes) |
-| file_type | VARCHAR(100) | NO | - | MIME 타입 |
-| file_url | TEXT | NO | - | Vercel Blob URL |
-| uploaded_by | VARCHAR(30) | NO | - | 업로드한 사용자 ID |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| 컬럼명      | 데이터 타입  | NULL | 기본값 | 설명                  |
+| ----------- | ------------ | ---- | ------ | --------------------- |
+| id          | VARCHAR(30)  | NO   | cuid() | 첨부파일 고유 ID (PK) |
+| sr_id       | VARCHAR(30)  | NO   | -      | SR ID (FK)            |
+| file_name   | VARCHAR(255) | NO   | -      | 파일명                |
+| file_size   | INTEGER      | NO   | -      | 파일 크기 (bytes)     |
+| file_type   | VARCHAR(100) | NO   | -      | MIME 타입             |
+| file_url    | TEXT         | NO   | -      | Vercel Blob URL       |
+| uploaded_by | VARCHAR(30)  | NO   | -      | 업로드한 사용자 ID    |
+| created_at  | TIMESTAMP    | NO   | now()  | 생성 시간             |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - INDEX: `sr_id`
 
 **외래 키:**
+
 - `sr_id` REFERENCES `srs(id)` ON DELETE CASCADE
 
 **저장 위치:** Vercel Blob - `sr-attachments` 경로
@@ -714,28 +740,29 @@ SR의 첨부파일 메타데이터
 
 시스템 알림 이력
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 알림 고유 ID (PK) |
-| type | VARCHAR(20) | NO | - | 알림 유형 (ENUM) |
-| status | VARCHAR(20) | NO | 'PENDING' | 발송 상태 (ENUM) |
-| recipient | VARCHAR(255) | NO | - | 수신자 (이메일 또는 사용자 ID) |
-| subject | VARCHAR(255) | YES | NULL | 제목 |
-| content | TEXT | NO | - | 내용 |
-| metadata | JSONB | YES | NULL | 추가 정보 |
-| sent_at | TIMESTAMP | YES | NULL | 발송 시간 |
-| fail_reason | TEXT | YES | NULL | 실패 사유 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
+| 컬럼명      | 데이터 타입  | NULL | 기본값    | 설명                           |
+| ----------- | ------------ | ---- | --------- | ------------------------------ |
+| id          | VARCHAR(30)  | NO   | cuid()    | 알림 고유 ID (PK)              |
+| type        | VARCHAR(20)  | NO   | -         | 알림 유형 (ENUM)               |
+| status      | VARCHAR(20)  | NO   | 'PENDING' | 발송 상태 (ENUM)               |
+| recipient   | VARCHAR(255) | NO   | -         | 수신자 (이메일 또는 사용자 ID) |
+| subject     | VARCHAR(255) | YES  | NULL      | 제목                           |
+| content     | TEXT         | NO   | -         | 내용                           |
+| metadata    | JSONB        | YES  | NULL      | 추가 정보                      |
+| sent_at     | TIMESTAMP    | YES  | NULL      | 발송 시간                      |
+| fail_reason | TEXT         | YES  | NULL      | 실패 사유                      |
+| created_at  | TIMESTAMP    | NO   | now()     | 생성 시간                      |
 
 **ENUM 타입:**
+
 - **type**: `EMAIL`, `MATTERMOST`, `IN_APP`, `PUSH`
 - **status**: `PENDING`, `SENT`, `FAILED`
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - INDEX: `(status, created_at)`
 - INDEX: `recipient`
-
 
 ---
 
@@ -743,23 +770,25 @@ SR의 첨부파일 메타데이터
 
 웹 푸시 알림을 위한 브라우저 구독 정보
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 구독 고유 ID (PK) |
-| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK) |
-| endpoint | TEXT | NO | - | 푸시 서비스 엔드포인트 URL (UK) |
-| p256dh | TEXT | NO | - | 암호화 키 (P256DH) |
-| auth | TEXT | NO | - | 인증 키 (Auth) |
-| user_agent | TEXT | YES | NULL | 구독한 브라우저/기기 정보 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명     | 데이터 타입 | NULL | 기본값 | 설명                            |
+| ---------- | ----------- | ---- | ------ | ------------------------------- |
+| id         | VARCHAR(30) | NO   | cuid() | 구독 고유 ID (PK)               |
+| user_id    | VARCHAR(30) | NO   | -      | 사용자 ID (FK)                  |
+| endpoint   | TEXT        | NO   | -      | 푸시 서비스 엔드포인트 URL (UK) |
+| p256dh     | TEXT        | NO   | -      | 암호화 키 (P256DH)              |
+| auth       | TEXT        | NO   | -      | 인증 키 (Auth)                  |
+| user_agent | TEXT        | YES  | NULL   | 구독한 브라우저/기기 정보       |
+| created_at | TIMESTAMP   | NO   | now()  | 생성 시간                       |
+| updated_at | TIMESTAMP   | NO   | now()  | 수정 시간                       |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `endpoint`
 - INDEX: `user_id`
 
 **외래 키:**
+
 - `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 
 ---
@@ -768,26 +797,28 @@ SR의 첨부파일 메타데이터
 
 사용자별 이메일 및 푸시 알림 수신 설정
 
-| 컬럼명 | 데이터 타입 | NULL | 기본값 | 설명 |
-|--------|-------------|------|--------|------|
-| id | VARCHAR(30) | NO | cuid() | 설정 고유 ID (PK) |
-| user_id | VARCHAR(30) | NO | - | 사용자 ID (FK, UK) |
-| **email_sr_created** | BOOLEAN | NO | true | [이메일] 신규 SR 생성 알림 |
-| **email_sr_assigned** | BOOLEAN | NO | true | [이메일] SR 담당 배정 알림 |
-| **email_sr_status_changed** | BOOLEAN | NO | false | [이메일] SR 상태 변경 알림 |
-| **email_comment_added** | BOOLEAN | NO | false | [이메일] 새 댓글 알림 |
-| **push_sr_created** | BOOLEAN | NO | true | [푸시] 신규 SR 생성 알림 |
-| **push_sr_assigned** | BOOLEAN | NO | true | [푸시] SR 담당 배정 알림 |
-| **push_sr_status_changed** | BOOLEAN | NO | false | [푸시] SR 상태 변경 알림 |
-| **push_comment_added** | BOOLEAN | NO | false | [푸시] 새 댓글 알림 |
-| created_at | TIMESTAMP | NO | now() | 생성 시간 |
-| updated_at | TIMESTAMP | NO | now() | 수정 시간 |
+| 컬럼명                      | 데이터 타입 | NULL | 기본값 | 설명                       |
+| --------------------------- | ----------- | ---- | ------ | -------------------------- |
+| id                          | VARCHAR(30) | NO   | cuid() | 설정 고유 ID (PK)          |
+| user_id                     | VARCHAR(30) | NO   | -      | 사용자 ID (FK, UK)         |
+| **email_sr_created**        | BOOLEAN     | NO   | true   | [이메일] 신규 SR 생성 알림 |
+| **email_sr_assigned**       | BOOLEAN     | NO   | true   | [이메일] SR 담당 배정 알림 |
+| **email_sr_status_changed** | BOOLEAN     | NO   | false  | [이메일] SR 상태 변경 알림 |
+| **email_comment_added**     | BOOLEAN     | NO   | false  | [이메일] 새 댓글 알림      |
+| **push_sr_created**         | BOOLEAN     | NO   | true   | [푸시] 신규 SR 생성 알림   |
+| **push_sr_assigned**        | BOOLEAN     | NO   | true   | [푸시] SR 담당 배정 알림   |
+| **push_sr_status_changed**  | BOOLEAN     | NO   | false  | [푸시] SR 상태 변경 알림   |
+| **push_comment_added**      | BOOLEAN     | NO   | false  | [푸시] 새 댓글 알림        |
+| created_at                  | TIMESTAMP   | NO   | now()  | 생성 시간                  |
+| updated_at                  | TIMESTAMP   | NO   | now()  | 수정 시간                  |
 
 **인덱스:**
+
 - PRIMARY KEY: `id`
 - UNIQUE: `user_id`
 
 **외래 키:**
+
 - `user_id` REFERENCES `users(id)` ON DELETE CASCADE
 
 ---
@@ -1263,17 +1294,17 @@ npx prisma migrate deploy
 
 ### 주요 인덱스 목록
 
-| 테이블 | 인덱스 컬럼 | 타입 | 목적 |
-|--------|-------------|------|------|
-| users | email | UNIQUE | 중복 방지 및 로그인 조회 |
-| users | is_active | INDEX | 활성 사용자 필터링 |
-| srs | sr_number | UNIQUE | 중복 방지 및 검색 |
-| srs | (client_id, status) | INDEX | 고객사별 SR 상태 조회 |
-| srs | (requester_id, created_at) | INDEX | 사용자별 SR 목록 (최신순) |
-| srs | (assignee_id, status) | INDEX | 담당자별 SR 상태 조회 |
-| srs | (status, priority, created_at) | INDEX | SR 목록 필터링 및 정렬 |
-| sr_activities | (sr_id, created_at) | INDEX | SR별 활동 내역 조회 |
-| sr_comments | (sr_id, created_at) | INDEX | SR별 댓글 조회 |
+| 테이블        | 인덱스 컬럼                    | 타입   | 목적                      |
+| ------------- | ------------------------------ | ------ | ------------------------- |
+| users         | email                          | UNIQUE | 중복 방지 및 로그인 조회  |
+| users         | is_active                      | INDEX  | 활성 사용자 필터링        |
+| srs           | sr_number                      | UNIQUE | 중복 방지 및 검색         |
+| srs           | (client_id, status)            | INDEX  | 고객사별 SR 상태 조회     |
+| srs           | (requester_id, created_at)     | INDEX  | 사용자별 SR 목록 (최신순) |
+| srs           | (assignee_id, status)          | INDEX  | 담당자별 SR 상태 조회     |
+| srs           | (status, priority, created_at) | INDEX  | SR 목록 필터링 및 정렬    |
+| sr_activities | (sr_id, created_at)            | INDEX  | SR별 활동 내역 조회       |
+| sr_comments   | (sr_id, created_at)            | INDEX  | SR별 댓글 조회            |
 
 ### 인덱스 생성 SQL
 
@@ -1303,6 +1334,7 @@ CREATE INDEX idx_sr_comments_sr_created ON sr_comments(sr_id, created_at DESC);
 ### Primary Key
 
 모든 테이블은 `id` 컬럼을 Primary Key로 사용:
+
 - 타입: `VARCHAR(30)` (cuid 형식)
 - 자동 생성: Prisma의 `@default(cuid())`
 
@@ -1392,9 +1424,9 @@ ALTER TABLE sr_attachments
 **prisma/seeds/roles.ts**:
 
 ```typescript
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 const ROLES = [
   {
@@ -1413,7 +1445,7 @@ const ROLES = [
     name: 'CLIENT_USER',
     description: '고객사 사용자 - SR 요청 및 조회 권한',
   },
-]
+];
 
 async function seedRoles() {
   for (const role of ROLES) {
@@ -1421,12 +1453,12 @@ async function seedRoles() {
       where: { name: role.name },
       update: {},
       create: role,
-    })
+    });
   }
-  console.log('✅ Roles seeded')
+  console.log('✅ Roles seeded');
 }
 
-export default seedRoles
+export default seedRoles;
 ```
 
 ### Permission 초기 데이터
@@ -1434,9 +1466,9 @@ export default seedRoles
 **prisma/seeds/permissions.ts**:
 
 ```typescript
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 const ROLE_PERMISSIONS = {
   SYSTEM_ADMIN: [
@@ -1476,12 +1508,12 @@ const ROLE_PERMISSIONS = {
     { resource: 'sr', action: 'read' },
     { resource: 'sr', action: 'update' },
   ],
-}
+};
 
 async function seedPermissions() {
   for (const [roleName, permissions] of Object.entries(ROLE_PERMISSIONS)) {
-    const role = await prisma.role.findUnique({ where: { name: roleName } })
-    if (!role) continue
+    const role = await prisma.role.findUnique({ where: { name: roleName } });
+    if (!role) continue;
 
     for (const perm of permissions) {
       await prisma.permission.upsert({
@@ -1498,13 +1530,13 @@ async function seedPermissions() {
           resource: perm.resource,
           action: perm.action,
         },
-      })
+      });
     }
   }
-  console.log('✅ Permissions seeded')
+  console.log('✅ Permissions seeded');
 }
 
-export default seedPermissions
+export default seedPermissions;
 ```
 
 ### Seed 실행
@@ -1512,29 +1544,29 @@ export default seedPermissions
 **prisma/seed.ts**:
 
 ```typescript
-import { PrismaClient } from '@prisma/client'
-import seedRoles from './seeds/roles'
-import seedPermissions from './seeds/permissions'
+import { PrismaClient } from '@prisma/client';
+import seedRoles from './seeds/roles';
+import seedPermissions from './seeds/permissions';
 
-const prisma = new PrismaClient()
+const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting seed...')
+  console.log('🌱 Starting seed...');
 
-  await seedRoles()
-  await seedPermissions()
+  await seedRoles();
+  await seedPermissions();
 
-  console.log('✅ Seed completed!')
+  console.log('✅ Seed completed!');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seed failed:', e)
-    process.exit(1)
+    console.error('❌ Seed failed:', e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });
 ```
 
 **실행 명령:**
@@ -1600,10 +1632,10 @@ npx prisma migrate resolve --rolled-back [migration_name]
 
 **문서 버전 관리:**
 
-| 버전 | 작성자 | 변경 사항 | 작성일 |
-|------|--------|-----------|--------|
-| 1.0 | Development Team | 초안 작성 | 2025-11-06 |
+| 버전 | 작성자           | 변경 사항 | 작성일     |
+| ---- | ---------------- | --------- | ---------- |
+| 1.0  | Development Team | 초안 작성 | 2025-11-06 |
 
 ---
 
-*이 문서는 SR 관리 시스템의 데이터베이스 설계를 정의하는 핵심 문서입니다. 스키마 변경 시 마이그레이션을 생성하고 이 문서를 업데이트해야 합니다.*
+_이 문서는 SR 관리 시스템의 데이터베이스 설계를 정의하는 핵심 문서입니다. 스키마 변경 시 마이그레이션을 생성하고 이 문서를 업데이트해야 합니다._

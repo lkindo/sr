@@ -4,7 +4,7 @@
  * API 응답과 데이터베이스 쿼리에서 사용할 수 있는 페이지네이션 헬퍼 함수들을 제공합니다.
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 /**
  * 페이지네이션 파라미터 스키마
@@ -42,7 +42,7 @@ export const paginationSchema = z.object({
    * 정렬 방향
    * @default "desc"
    */
-  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+  sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });
 
 /**
@@ -207,10 +207,10 @@ export function extractPaginationParams(request: Request): PaginationParams {
   const { searchParams } = new URL(request.url);
 
   return paginationSchema.parse({
-    page: searchParams.get("page") || undefined,
-    pageSize: searchParams.get("pageSize") || undefined,
-    sortBy: searchParams.get("sortBy") || undefined,
-    sortOrder: searchParams.get("sortOrder") || undefined,
+    page: searchParams.get('page') || undefined,
+    pageSize: searchParams.get('pageSize') || undefined,
+    sortBy: searchParams.get('sortBy') || undefined,
+    sortOrder: searchParams.get('sortOrder') || undefined,
   });
 }
 
@@ -233,8 +233,8 @@ export function extractPaginationParams(request: Request): PaginationParams {
  */
 export function getPrismaOrderBy(
   sortBy?: string,
-  sortOrder: "asc" | "desc" = "desc"
-): Record<string, "asc" | "desc"> | undefined {
+  sortOrder: 'asc' | 'desc' = 'desc'
+): Record<string, 'asc' | 'desc'> | undefined {
   if (!sortBy) {
     return undefined;
   }

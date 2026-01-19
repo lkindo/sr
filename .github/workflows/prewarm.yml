@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       base_url:
-        description: "대상 BASE_URL (예: https://preview.example.com)"
+        description: '대상 BASE_URL (예: https://preview.example.com)'
         required: true
         type: string
       session_cookie:
-        description: "세션 쿠키 (선택)"
+        description: '세션 쿠키 (선택)'
         required: false
         type: string
       warm_paths:
-        description: "워밍 경로(콤마 구분). 미지정 시 기본값 사용"
+        description: '워밍 경로(콤마 구분). 미지정 시 기본값 사용'
         required: false
         type: string
 
@@ -43,4 +43,3 @@ jobs:
           SESSION_COOKIE: ${{ github.event.inputs.session_cookie }}
           WARM_PATHS: ${{ github.event.inputs.warm_paths }}
         run: pnpm run warm:dashboard
-

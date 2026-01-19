@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useSession } from "next-auth/react";
+import { useSession } from 'next-auth/react';
 
 export function usePermissions() {
   const { data: session } = useSession();
@@ -32,7 +32,7 @@ export function usePermissions() {
   };
 
   const isAdmin = (): boolean => {
-    return hasRole("ADMIN");
+    return hasRole('ADMIN');
   };
 
   return {
@@ -46,4 +46,3 @@ export function usePermissions() {
     isAdmin,
   };
 }
-

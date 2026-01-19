@@ -141,24 +141,27 @@ export class MemoryRateLimiter {
    */
   private startCleanup(): void {
     // 5분마다 윈도우가 지난 버킷 삭제
-    setInterval(() => {
-      const now = Date.now();
-      const keysToDelete: string[] = [];
+    setInterval(
+      () => {
+        const now = Date.now();
+        const keysToDelete: string[] = [];
 
-      this.buckets.forEach((bucket, key) => {
-        if (now - bucket.lastRefill >= this.config.windowMs * 2) {
-          keysToDelete.push(key);
+        this.buckets.forEach((bucket, key) => {
+          if (now - bucket.lastRefill >= this.config.windowMs * 2) {
+            keysToDelete.push(key);
+          }
+        });
+
+        keysToDelete.forEach((key) => this.buckets.delete(key));
+
+        if (keysToDelete.length > 0 && process.env.NODE_ENV === 'development') {
+          // 개발 환경에서만 정리 로그 출력
+          // eslint-disable-next-line no-console
+          console.log(`[RateLimiter] Cleaned up ${keysToDelete.length} expired buckets`);
         }
-      });
-
-      keysToDelete.forEach((key) => this.buckets.delete(key));
-
-      if (keysToDelete.length > 0 && process.env.NODE_ENV === 'development') {
-        // 개발 환경에서만 정리 로그 출력
-        // eslint-disable-next-line no-console
-        console.log(`[RateLimiter] Cleaned up ${keysToDelete.length} expired buckets`);
-      }
-    }, 5 * 60 * 1000); // 5분
+      },
+      5 * 60 * 1000
+    ); // 5분
   }
 }
 

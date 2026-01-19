@@ -99,13 +99,15 @@ gh secret set VERCEL_PROJECT_ID
 ## 환경 변수 vs Secrets
 
 ### Secrets에 저장해야 할 것
+
 - 데이터베이스 URL (비밀번호 포함)
 - API 키, 토큰
 - 암호화 키 (NEXTAUTH_SECRET)
 - 민감한 설정 값
 
 ### 환경 변수로 저장해도 되는 것
-- 공개 URL (NEXT_PUBLIC_* 변수)
+
+- 공개 URL (NEXT*PUBLIC*\* 변수)
 - 기능 플래그
 - Node 버전, pnpm 버전
 
@@ -130,12 +132,14 @@ Secrets가 올바르게 설정되었는지 확인하려면:
 ## 보안 주의사항
 
 ⚠️ **절대 하지 말 것**:
+
 - Secrets를 코드에 하드코딩
 - Secrets를 Git에 커밋
 - Secrets를 로그에 출력
 - Secrets를 공개 Gist나 Pastebin에 업로드
 
 ✅ **권장 사항**:
+
 - 각 환경(dev, staging, prod)별로 별도의 Secrets 사용
 - 정기적으로 토큰 및 키 교체 (3-6개월)
 - 팀원 퇴사 시 관련 Secrets 즉시 교체
@@ -146,16 +150,19 @@ Secrets가 올바르게 설정되었는지 확인하려면:
 ## 문제 해결
 
 ### "Secret not found" 에러
+
 - Secret 이름 철자 확인
 - Secret이 실제로 저장되었는지 Settings에서 확인
 - 대소문자 구분 확인
 
 ### 데이터베이스 연결 실패
+
 - DATABASE_URL 형식 확인
 - Supabase에서 IP 허용 목록 확인 (0.0.0.0/0 허용 필요)
 - SSL 모드 확인 (`?sslmode=require` 추가 필요할 수 있음)
 
 ### Vercel 배포 실패
+
 - VERCEL_TOKEN이 유효한지 확인
 - Token 권한이 충분한지 확인
 - VERCEL_ORG_ID와 VERCEL_PROJECT_ID가 정확한지 확인
