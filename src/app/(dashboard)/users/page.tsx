@@ -689,202 +689,150 @@ export default function UsersPage() {
 
         {/* 테이블 영역 */}
         {viewMode === 'list' ? (
-          <div className="overflow-x-auto">
-            <Table className="sr-table-template">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleToggleAll}
-                      className="h-8 w-8 p-0"
-                    >
-                      {selectedUserIds.size === users.length && users.length > 0 ? (
-                        <CheckSquare className="h-4 w-4" />
-                      ) : (
-                        <Square className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </TableHead>
-                  <TableHead>이름</TableHead>
-                  <TableHead>이메일</TableHead>
-                  <TableHead>유형</TableHead>
-                  <TableHead>고객사</TableHead>
-                  <TableHead>역할</TableHead>
-                  <TableHead>상태</TableHead>
-
-                  <TableHead>작업</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <Table className="sr-table-template">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      <div className="flex justify-center items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        <span className="text-muted-foreground">로딩 중...</span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : users.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      {searchQuery ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users.map((user) => (
-                    <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell className="text-center">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleUser(user.id);
-                          }}
-                          className="h-8 w-8 p-0"
-                        >
-                          {selectedUserIds.has(user.id) ? (
-                            <CheckSquare className="h-4 w-4 text-primary" />
-                          ) : (
-                            <Square className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="font-medium text-center">
-                        <Link href={`/users/${user.id}`} className="text-primary hover:underline">
-                          {user.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell className="text-center">
-                        {(() => {
-                          const typeLabel = getUserTypeLabel(user);
-                          return (
-                            <Badge variant={getUserTypeBadgeVariant(typeLabel)}>{typeLabel}</Badge>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex gap-1 flex-wrap justify-center">
-                          {(() => {
-                            // 시스템 운영팀(ADMIN, MANAGER, ENGINEER)은 고객사 할당 불가
-                            const isSystemTeam = user.roles.some((ur) =>
-                              ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
-                            );
+                    <TableHead className="w-12">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleToggleAll}
+                        className="h-8 w-8 p-0"
+                      >
+                        {selectedUserIds.size === users.length && users.length > 0 ? (
+                          <CheckSquare className="h-4 w-4" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TableHead>
+                    <TableHead>이름</TableHead>
+                    <TableHead>이메일</TableHead>
+                    <TableHead>유형</TableHead>
+                    <TableHead>고객사</TableHead>
+                    <TableHead>역할</TableHead>
+                    <TableHead>상태</TableHead>
 
-                            if (isSystemTeam) {
-                              return (
-                                <Badge
-                                  variant="secondary"
-                                  className="text-xs text-muted-foreground"
-                                >
-                                  할당 불가
-                                </Badge>
-                              );
-                            }
-
-                            return user.clients.length === 0 ? (
-                              <ClientAssignDropdown
-                                userId={user.id}
-                                userName={user.name}
-                                clients={clients}
-                                onAssigned={fetchUsers}
-                              />
+                    <TableHead>작업</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <div className="flex justify-center items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          <span className="text-muted-foreground">로딩 중...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : users.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        {searchQuery ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    users.map((user) => (
+                      <TableRow key={user.id} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleUser(user.id);
+                            }}
+                            className="h-8 w-8 p-0"
+                          >
+                            {selectedUserIds.has(user.id) ? (
+                              <CheckSquare className="h-4 w-4 text-primary" />
                             ) : (
-                              user.clients.map((uc) => (
-                                <ClientBadgeWithActions
-                                  key={uc.client.id}
-                                  userId={user.id}
-                                  userName={user.name}
-                                  client={uc.client}
-                                  allClients={clients}
-                                  onChanged={fetchUsers}
-                                />
-                              ))
+                              <Square className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="font-medium text-center">
+                          <Link href={`/users/${user.id}`} className="text-primary hover:underline">
+                            {user.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell className="text-center">
+                          {(() => {
+                            const typeLabel = getUserTypeLabel(user);
+                            return (
+                              <Badge variant={getUserTypeBadgeVariant(typeLabel)}>
+                                {typeLabel}
+                              </Badge>
                             );
                           })()}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex gap-1 flex-wrap justify-center">
-                          {user.roles.length === 0 ? (
-                            <Badge variant="outline">역할 없음</Badge>
-                          ) : (
-                            user.roles.map((ur) => (
-                              <Badge key={ur.role.id} variant="secondary">
-                                {ur.role.name}
-                              </Badge>
-                            ))
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                          {user.isActive ? '활성' : '비활성'}
-                        </Badge>
-                      </TableCell>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex gap-1 flex-wrap justify-center">
+                            {(() => {
+                              // 시스템 운영팀(ADMIN, MANAGER, ENGINEER)은 고객사 할당 불가
+                              const isSystemTeam = user.roles.some((ur) =>
+                                ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+                              );
 
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              // 세션 업데이트 시도
-                              await update();
-                              const currentRoles = session?.user?.roles || [];
-                              const isAdmin = currentRoles.includes('ADMIN');
-
-                              if (!isAdmin) {
-                                toast({
-                                  title: '권한 없음',
-                                  description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
-                                  variant: 'destructive',
-                                });
-                                return;
+                              if (isSystemTeam) {
+                                return (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-xs text-muted-foreground"
+                                  >
+                                    할당 불가
+                                  </Badge>
+                                );
                               }
-                              handleAssignRoles(user);
-                            }}
-                            className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
-                          >
-                            <Shield className="mr-1 h-4 w-4" />
-                            역할 관리
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              // 세션 업데이트 시도
-                              await update();
-                              const currentRoles = session?.user?.roles || [];
-                              const hasPermission =
-                                currentRoles.includes('ADMIN') || currentRoles.includes('MANAGER');
 
-                              if (!hasPermission) {
-                                toast({
-                                  title: '권한 없음',
-                                  description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
-                                  variant: 'destructive',
-                                });
-                                return;
-                              }
-                              handleToggleActive(user.id, user.isActive);
-                            }}
-                            className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
-                          >
-                            {user.isActive ? (
-                              <UserX className="mr-1 h-4 w-4" />
+                              return user.clients.length === 0 ? (
+                                <ClientAssignDropdown
+                                  userId={user.id}
+                                  userName={user.name}
+                                  clients={clients}
+                                  onAssigned={fetchUsers}
+                                />
+                              ) : (
+                                user.clients.map((uc) => (
+                                  <ClientBadgeWithActions
+                                    key={uc.client.id}
+                                    userId={user.id}
+                                    userName={user.name}
+                                    client={uc.client}
+                                    allClients={clients}
+                                    onChanged={fetchUsers}
+                                  />
+                                ))
+                              );
+                            })()}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex gap-1 flex-wrap justify-center">
+                            {user.roles.length === 0 ? (
+                              <Badge variant="outline">역할 없음</Badge>
                             ) : (
-                              <UserCheck className="mr-1 h-4 w-4" />
+                              user.roles.map((ur) => (
+                                <Badge key={ur.role.id} variant="secondary">
+                                  {ur.role.name}
+                                </Badge>
+                              ))
                             )}
-                            {user.isActive ? '비활성화' : '활성화'}
-                          </Button>
-                          <PermissionGuard roles={['ADMIN']}>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                            {user.isActive ? '활성' : '비활성'}
+                          </Badge>
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -898,54 +846,346 @@ export default function UsersPage() {
                                 if (!isAdmin) {
                                   toast({
                                     title: '권한 없음',
-                                    description: `사용자 삭제 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
+                                    description: `역할 관리 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
                                     variant: 'destructive',
                                   });
                                   return;
                                 }
-
-                                // Check if user is trying to delete themselves
-                                if (session?.user?.id === user.id) {
-                                  toast({
-                                    title: '삭제 불가',
-                                    description: '자신의 계정은 삭제할 수 없습니다.',
-                                    variant: 'destructive',
-                                  });
-                                  return;
-                                }
-
-                                // Check if user has system roles
-                                const hasSystemRole = user.roles.some((ur) =>
-                                  ['ADMIN', 'MANAGER'].includes(ur.role.name)
-                                );
-
-                                if (hasSystemRole) {
-                                  toast({
-                                    title: '삭제 제한',
-                                    description:
-                                      '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.',
-                                    variant: 'destructive',
-                                  });
-                                  return;
-                                }
-
-                                setUserToDelete(user);
-                                setDeleteDialogOpen(true);
+                                handleAssignRoles(user);
                               }}
-                              className="text-[hsl(var(--sr-gray-medium))] hover:text-destructive hover:bg-transparent"
+                              className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
                             >
-                              <UserX className="mr-1 h-4 w-4" />
-                              삭제
+                              <Shield className="mr-1 h-4 w-4" />
+                              역할 관리
                             </Button>
-                          </PermissionGuard>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                // 세션 업데이트 시도
+                                await update();
+                                const currentRoles = session?.user?.roles || [];
+                                const hasPermission =
+                                  currentRoles.includes('ADMIN') ||
+                                  currentRoles.includes('MANAGER');
+
+                                if (!hasPermission) {
+                                  toast({
+                                    title: '권한 없음',
+                                    description: `사용자 활성화/비활성화 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
+                                    variant: 'destructive',
+                                  });
+                                  return;
+                                }
+                                handleToggleActive(user.id, user.isActive);
+                              }}
+                              className="text-[hsl(var(--sr-gray-medium))] hover:text-[hsl(var(--sr-primary-dark))] hover:bg-transparent"
+                            >
+                              {user.isActive ? (
+                                <UserX className="mr-1 h-4 w-4" />
+                              ) : (
+                                <UserCheck className="mr-1 h-4 w-4" />
+                              )}
+                              {user.isActive ? '비활성화' : '활성화'}
+                            </Button>
+                            <PermissionGuard roles={['ADMIN']}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  // 세션 업데이트 시도
+                                  await update();
+                                  const currentRoles = session?.user?.roles || [];
+                                  const isAdmin = currentRoles.includes('ADMIN');
+
+                                  if (!isAdmin) {
+                                    toast({
+                                      title: '권한 없음',
+                                      description: `사용자 삭제 권한이 없습니다. 현재 역할: ${currentRoles.join(', ') || '없음'}`,
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+
+                                  // Check if user is trying to delete themselves
+                                  if (session?.user?.id === user.id) {
+                                    toast({
+                                      title: '삭제 불가',
+                                      description: '자신의 계정은 삭제할 수 없습니다.',
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+
+                                  // Check if user has system roles
+                                  const hasSystemRole = user.roles.some((ur) =>
+                                    ['ADMIN', 'MANAGER'].includes(ur.role.name)
+                                  );
+
+                                  if (hasSystemRole) {
+                                    toast({
+                                      title: '삭제 제한',
+                                      description:
+                                        '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.',
+                                      variant: 'destructive',
+                                    });
+                                    return;
+                                  }
+
+                                  setUserToDelete(user);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                className="text-[hsl(var(--sr-gray-medium))] hover:text-destructive hover:bg-transparent"
+                              >
+                                <UserX className="mr-1 h-4 w-4" />
+                                삭제
+                              </Button>
+                            </PermissionGuard>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4 px-4 pb-4">
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="flex justify-center items-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span className="text-muted-foreground">로딩 중...</span>
+                  </div>
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-12 border rounded-md border-dashed">
+                  <p className="text-muted-foreground">
+                    {searchQuery ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}
+                  </p>
+                </div>
+              ) : (
+                users.map((user) => (
+                  <div
+                    key={user.id}
+                    className={cn(
+                      'border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden',
+                      selectedUserIds.has(user.id) && 'ring-2 ring-primary border-primary'
+                    )}
+                  >
+                    <div className="p-4 space-y-3">
+                      {/* Header: Checkbox, Name, Status */}
+                      <div className="flex items-start gap-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleUser(user.id);
+                          }}
+                          className="h-8 w-8 p-0 shrink-0 mt-0.5"
+                        >
+                          {selectedUserIds.has(user.id) ? (
+                            <CheckSquare className="h-4 w-4 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4" />
+                          )}
+                        </Button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <Link
+                                href={`/users/${user.id}`}
+                                className="font-semibold text-base hover:underline text-primary block truncate"
+                              >
+                                {user.name}
+                              </Link>
+                              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                            </div>
+                            <Badge
+                              variant={user.isActive ? 'default' : 'secondary'}
+                              className="shrink-0 ml-2"
+                            >
+                              {user.isActive ? '활성' : '비활성'}
+                            </Badge>
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                      </div>
+
+                      {/* Info Chips */}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {/* User Type Badge */}
+                        {(() => {
+                          const typeLabel = getUserTypeLabel(user);
+                          return (
+                            <Badge variant={getUserTypeBadgeVariant(typeLabel)} className="text-xs">
+                              {typeLabel}
+                            </Badge>
+                          );
+                        })()}
+
+                        {/* Roles */}
+                        {user.roles.length > 0 &&
+                          user.roles.map((ur) => (
+                            <Badge key={ur.role.id} variant="secondary" className="text-xs">
+                              {ur.role.name}
+                            </Badge>
+                          ))}
+                      </div>
+
+                      {/* Client Info */}
+                      <div className="pt-2 border-t border-border/50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground w-12 shrink-0">
+                            고객사:
+                          </span>
+                          <div className="flex-1">
+                            {(() => {
+                              const isSystemTeam = user.roles.some((ur) =>
+                                ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+                              );
+
+                              if (isSystemTeam) {
+                                return (
+                                  <span className="text-xs text-muted-foreground">
+                                    할당 불가 (시스템 운영팀)
+                                  </span>
+                                );
+                              }
+
+                              return user.clients.length === 0 ? (
+                                <ClientAssignDropdown
+                                  userId={user.id}
+                                  userName={user.name}
+                                  clients={clients}
+                                  onAssigned={fetchUsers}
+                                />
+                              ) : (
+                                <div className="flex flex-wrap gap-1">
+                                  {user.clients.map((uc) => (
+                                    <ClientBadgeWithActions
+                                      key={uc.client.id}
+                                      userId={user.id}
+                                      userName={user.name}
+                                      client={uc.client}
+                                      allClients={clients}
+                                      onChanged={fetchUsers}
+                                    />
+                                  ))}
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="grid grid-cols-3 gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await update();
+                            const currentRoles = session?.user?.roles || [];
+                            if (!currentRoles.includes('ADMIN')) {
+                              toast({
+                                title: '권한 없음',
+                                description: '역할 관리 권한이 없습니다.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            handleAssignRoles(user);
+                          }}
+                        >
+                          <Shield className="mr-1 h-3 w-3" /> 역할
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await update();
+                            const currentRoles = session?.user?.roles || [];
+                            const hasPermission =
+                              currentRoles.includes('ADMIN') || currentRoles.includes('MANAGER');
+
+                            if (!hasPermission) {
+                              toast({
+                                title: '권한 없음',
+                                description: '활성/비활성 권한이 없습니다.',
+                                variant: 'destructive',
+                              });
+                              return;
+                            }
+                            handleToggleActive(user.id, user.isActive);
+                          }}
+                        >
+                          {user.isActive ? (
+                            <UserX className="mr-1 h-3 w-3" />
+                          ) : (
+                            <UserCheck className="mr-1 h-3 w-3" />
+                          )}
+                          {user.isActive ? '비활성' : '활성'}
+                        </Button>
+
+                        <PermissionGuard roles={['ADMIN']}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs w-full hover:text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await update();
+                              const currentRoles = session?.user?.roles || [];
+                              if (!currentRoles.includes('ADMIN')) {
+                                toast({
+                                  title: '권한 없음',
+                                  description: '삭제 권한이 없습니다.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+                              if (session?.user?.id === user.id) {
+                                toast({
+                                  title: '삭제 불가',
+                                  description: '본인은 삭제할 수 없습니다.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+                              const hasSystemRole = user.roles.some((ur) =>
+                                ['ADMIN', 'MANAGER'].includes(ur.role.name)
+                              );
+                              if (hasSystemRole) {
+                                toast({
+                                  title: '삭제 제한',
+                                  description: '관리자는 삭제할 수 없습니다.',
+                                  variant: 'destructive',
+                                });
+                                return;
+                              }
+                              setUserToDelete(user);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <UserX className="mr-1 h-3 w-3" /> 삭제
+                          </Button>
+                        </PermissionGuard>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </>
         ) : (
           <div className="px-6 py-5 space-y-6">
             {Object.entries(groupedUsers()).map(([clientName, users]) => {
