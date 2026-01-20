@@ -281,6 +281,24 @@ export async function createSRViaAPI(
 }
 
 /**
+ * API를 통해 SR을 삭제합니다.
+ * @param request - Playwright APIRequestContext
+ * @param srId - 삭제할 SR ID
+ */
+export async function deleteSRViaAPI(request: APIRequestContext, srId: string): Promise<void> {
+  const response = await request.delete(`/api/srs/${srId}`);
+
+  if (response.status() !== 200) {
+    const errorBody = await response.text();
+    console.error(
+      `❌ Failed to delete SR ${srId} via API. Status: ${response.status()}, Body: ${errorBody}`
+    );
+  } else {
+    console.log(`🗑️ SR ${srId} deleted via API`);
+  }
+}
+
+/**
  * 폼 제출 후 API 응답 대기
  *
  * 폼을 제출하고 관련 API 호출이 완료될 때까지 대기합니다.

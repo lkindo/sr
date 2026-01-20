@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createSRViaAPI, createTestSR } from './helpers/test-helpers';
+import { createSRViaAPI, createTestSR, deleteSRViaAPI } from './helpers/test-helpers';
 
 /**
  * SR 상세 페이지 테스트
@@ -12,6 +12,22 @@ import { createSRViaAPI, createTestSR } from './helpers/test-helpers';
 
 test.describe('SR 상세 페이지', () => {
   let testSRId: string | null = null;
+  const createdSRIds: string[] = [];
+
+  test.afterAll(async ({ browser }) => {
+    // 생성된 모든 SR 삭제 (클린업)
+    if (createdSRIds.length > 0) {
+      const context = await browser.newContext({
+        storageState: './playwright/.auth/user.json',
+      });
+      const request = context.request;
+      console.log(`🧹 Cleaning up ${createdSRIds.length} SRs...`);
+      for (const id of createdSRIds) {
+        await deleteSRViaAPI(request, id);
+      }
+      await context.close();
+    }
+  });
 
   test.beforeAll(async ({ browser }) => {
     // 테스트용 SR을 API로 빠르게 생성
@@ -40,6 +56,7 @@ test.describe('SR 상세 페이지', () => {
           requestedPriority: 'MEDIUM',
         });
         testSRId = sr.id;
+        createdSRIds.push(sr.id); // 클린업 대상에 추가
         console.log(`✅ API를 통해 테스트 SR 생성 완료: ${testSRId}`);
       } else {
         console.warn('⚠️ 테스트 데이터가 부족하여 UI 생성 시도를 고려하거나 스킵합니다.');
