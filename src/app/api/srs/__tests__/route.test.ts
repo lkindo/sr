@@ -56,11 +56,12 @@ vi.mock('@/lib/auth-wrapper', () => ({
   }),
 }));
 
-// Mock services using classes
+// Mock services
 vi.mock('@/services/sr.service', () => ({
-  SRService: class {
-    getAllSRs = mockGetAllSRs;
-    createSR = mockCreateSR;
+  SRService: vi.fn(),
+  srService: {
+    getAllSRs: mockGetAllSRs,
+    createSR: mockCreateSR,
   },
 }));
 
@@ -78,21 +79,9 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-// Mock cache
-vi.mock('@/lib/cache', () => ({
-  withCache: vi.fn((key, fn) => fn()),
-  isCacheAvailable: vi.fn(() => false),
-}));
-
 // Mock serialization
 vi.mock('@/lib/serialization', () => ({
   serializeResponse: vi.fn((data) => data),
-}));
-
-// Mock cache-config
-vi.mock('@/lib/cache-config', () => ({
-  shouldWideInvalidate: vi.fn(() => false),
-  getSrsListTtlSeconds: vi.fn(() => 3600),
 }));
 
 import prisma from '@/lib/prisma';

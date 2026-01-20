@@ -44,19 +44,21 @@ vi.mock('@/lib/prisma', () => ({
   default: mockPrisma,
 }));
 
-vi.mock('@/services/sr.service', () => {
-  return {
-    SRService: vi.fn().mockImplementation(function () {
-      return {
-        createSR: vi.fn(),
-        updateSR: vi.fn(),
-        deleteSR: vi.fn(),
-        getSRById: vi.fn(),
-        getSRDetailsById: vi.fn(),
-      };
-    }),
-  };
-});
+// Mock SRService
+const { mockSRService } = vi.hoisted(() => ({
+  mockSRService: {
+    createSR: vi.fn(),
+    updateSR: vi.fn(),
+    deleteSR: vi.fn(),
+    getSRById: vi.fn(),
+    getSRDetailsById: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/sr.service', () => ({
+  SRService: vi.fn(),
+  srService: mockSRService,
+}));
 
 // Import auth to setup mocks
 import { auth } from '@/auth';
@@ -64,7 +66,6 @@ import { auth } from '@/auth';
 describe('SR Server Actions', () => {
   const mockUser = { id: 'user-1', name: 'User', roles: ['ADMIN'], permissions: [], clientIds: [] };
   const mockSession = { user: mockUser, expires: '2099-01-01' };
-  let mockSRService: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,19 +73,6 @@ describe('SR Server Actions', () => {
     // Setup generic mock implementations
     vi.mocked(auth).mockResolvedValue(mockSession as any);
     mockRequirePermission.mockResolvedValue(undefined); // Permission granted by default
-
-    // Setup SRService mock instance
-    mockSRService = {
-      createSR: vi.fn(),
-      updateSR: vi.fn(),
-      deleteSR: vi.fn(),
-      getSRById: vi.fn(),
-      getSRDetailsById: vi.fn(),
-    };
-    // Fix: Use non-arrow function for constructor mock
-    vi.mocked(SRService).mockImplementation(function () {
-      return mockSRService;
-    } as any);
   });
 
   describe('createSRAction', () => {
