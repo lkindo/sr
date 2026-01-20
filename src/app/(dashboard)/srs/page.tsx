@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedClients, getCachedUsers } from '@/lib/cache';
 import prisma from '@/lib/prisma';
-import { SRService } from '@/services/sr.service';
+import { srService } from '@/services/sr.service';
 
 type Props = {
   params: Promise<Record<string, unknown>>;
@@ -39,8 +39,6 @@ export default async function SRsPage({ searchParams }: Props) {
   const isAdminManagerEngineer = userRoles.some((role) =>
     ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
   );
-
-  const srService = new SRService();
 
   const where: Prisma.SRWhereInput = {};
 

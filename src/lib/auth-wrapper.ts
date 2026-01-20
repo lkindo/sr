@@ -10,6 +10,7 @@ import { auth } from '@/auth';
 import type { AuthenticatedSession } from '@/types/session';
 
 import { handleApiError } from './api-error-handler';
+import { rateLimit } from './api-rate-limit';
 import { UnauthorizedError } from './errors';
 
 /**
@@ -131,7 +132,5 @@ export function withAuthAndRateLimit<
   } = { preset: 'standard' }
 ) {
   // Rate limiting을 먼저 적용하고, 그 다음 인증 체크
-  const { rateLimit } = require('./api-rate-limit');
-
-  return rateLimit(withAuth(handler), rateLimitOptions.preset);
+  return rateLimit(withAuth(handler) as any, rateLimitOptions.preset);
 }

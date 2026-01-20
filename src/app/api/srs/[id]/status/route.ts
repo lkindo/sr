@@ -3,7 +3,7 @@ import { SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
-import { SRService } from '@/services/sr.service';
+import { srService } from '@/services/sr.service';
 
 const statusActionSchema = z.object({
   action: z.enum(['complete', 'hold', 'reject', 'reopen', 'start', 'resume', 'confirm']),
@@ -31,8 +31,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const { action, reason, resolutionDescription } = validationResult.data;
-
-    const srService = new SRService();
 
     // 현재 SR 조회
     const currentSR = await srService.getSRById(srId);

@@ -1,6 +1,8 @@
 import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
+import { deleteSRViaAPI } from './helpers/test-helpers';
+
 /**
  * 다중 사용자 협업 시나리오 E2E 테스트
  *
@@ -22,6 +24,17 @@ const authFiles = {
 test.describe('다중 사용자 협업 워크플로우', () => {
   let srId: string;
   let srTitle: string;
+
+  test.afterAll(async ({ browser }) => {
+    // 생성된 SR 삭제
+    if (srId) {
+      const context = await browser.newContext({ storageState: authFiles.manager });
+      const request = context.request;
+      console.log(`🧹 Cleaning up project SR: ${srId}`);
+      await deleteSRViaAPI(request, srId);
+      await context.close();
+    }
+  });
 
   test.describe.configure({ mode: 'serial' });
   // 다중 사용자 시나리오는 시간이 오래 걸리므로 타임아웃을 넉넉히 설정

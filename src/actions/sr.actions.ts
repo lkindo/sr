@@ -12,7 +12,7 @@ import { errorToResult } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
-import { SRService } from '@/services/sr.service';
+import { srService } from '@/services/sr.service';
 import { SRCreateResult, SRDetails, SRUpdateResult } from '@/types/sr.types';
 
 import { buildSRCreateInput, buildSRUpdateInput } from './sr-form.utils';
@@ -29,7 +29,6 @@ export async function createSRAction(formData: FormData): Promise<Result<SRCreat
     // SR 등록 권한 체크: SR:CREATE 권한 필요
     const session = await authenticateAndAuthorize(PERMISSIONS.SR.CREATE);
 
-    const srService = new SRService();
     const sr = await srService.createSR(validated, session.user);
 
     revalidatePath('/srs');
@@ -54,7 +53,6 @@ export async function updateSRAction(
     // SR 수정 권한 체크는 서비스 레이어에서 처리
     const session = await getAuthenticatedSession();
 
-    const srService = new SRService();
     const sr = await srService.updateSR(id, validated, session.user);
 
     revalidatePath('/srs');
@@ -70,7 +68,6 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
     // SR 삭제 권한 체크는 서비스 레이어에서 처리
     const session = await getAuthenticatedSession();
 
-    const srService = new SRService();
     await srService.deleteSR(id, session.user);
 
     revalidatePath('/srs');
@@ -82,7 +79,6 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
 
 export async function getSRAction(id: string): Promise<Result<SR>> {
   try {
-    const srService = new SRService();
     const sr = await srService.getSRById(id);
 
     if (!sr) {
@@ -97,7 +93,6 @@ export async function getSRAction(id: string): Promise<Result<SR>> {
 
 export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>> {
   try {
-    const srService = new SRService();
     const sr = await srService.getSRDetailsById(id);
 
     if (!sr) {

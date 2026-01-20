@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
-import { invalidateCachePattern } from '@/lib/redis-cache';
 import { userUpdateSchema } from '@/lib/schemas';
 
 import { PermissionService } from './permission.service';
@@ -211,9 +210,7 @@ export class UserService {
       where: { id: userId },
       data: { isActive: true },
     });
-    // 캐시 무효화
-    await invalidateCachePattern(`user:*:${userId}`);
-    await invalidateCachePattern('user:list*');
+
     return user;
   }
 
@@ -248,9 +245,6 @@ export class UserService {
       data: { isActive: false },
     });
 
-    // 캐시 무효화
-    await invalidateCachePattern(`user:*:${userId}`);
-    await invalidateCachePattern('user:list*');
     return user;
   }
 
@@ -305,10 +299,6 @@ export class UserService {
 
     // 5. 완전 삭제 수행
     const deletedUser = await prisma.user.delete({ where: { id: userId } });
-
-    // 캐시 무효화
-    await invalidateCachePattern(`user:*:${userId}`);
-    await invalidateCachePattern('user:list*');
 
     return deletedUser;
   }

@@ -5,9 +5,6 @@ import prisma from '@/lib/prisma';
 import { UserService } from '@/services/user.service';
 
 // Mock dependencies
-vi.mock('@/lib/redis-cache', () => ({
-  invalidateCachePattern: vi.fn(),
-}));
 
 vi.mock('@/lib/prisma', () => ({
   default: {

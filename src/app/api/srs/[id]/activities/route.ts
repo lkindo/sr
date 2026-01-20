@@ -30,7 +30,7 @@ export const GET = withAuthAndRateLimit(
     });
 
     if (!activities) {
-      throw new NotFoundError('활동 이력을 찾을 수 없습니다.');
+      throw new NotFoundError('활동 이력');
     }
 
     return NextResponse.json(activities);

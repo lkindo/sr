@@ -5,6 +5,7 @@ import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
+import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
 import { Toaster } from '@/components/ui/toaster';
 
 interface ClientLayoutProps {
@@ -33,8 +34,10 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        {children}
-        <Toaster />
+        <RealtimeProvider>
+          {children}
+          <Toaster />
+        </RealtimeProvider>
       </SessionProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

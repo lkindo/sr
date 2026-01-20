@@ -35,7 +35,7 @@ export const POST = withAuthAndRateLimit(
     });
 
     if (!role) {
-      throw new NotFoundError('역할을 찾을 수 없습니다.');
+      throw new NotFoundError('역할');
     }
 
     // Delete existing permissions

@@ -2,7 +2,6 @@
  * Rate Limiter Utility
  *
  * 메모리 기반의 토큰 버킷 알고리즘을 사용한 Rate Limiting 구현
- * 추후 Redis로 확장 가능하도록 인터페이스 설계
  */
 
 export interface RateLimitConfig {
@@ -65,7 +64,6 @@ interface TokenBucket {
 
 /**
  * 메모리 기반 Rate Limiter
- * 프로덕션 환경에서는 Redis 기반으로 교체 권장
  */
 export class MemoryRateLimiter {
   private buckets: Map<string, TokenBucket> = new Map();

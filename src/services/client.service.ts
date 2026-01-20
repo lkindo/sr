@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
-import { CacheKeys, getCachedData, invalidateCache } from '@/lib/redis-cache';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 
 import { UserService } from './user.service';
@@ -67,7 +66,7 @@ export class ClientService {
   }
 
   async getAllClients() {
-    return getCachedData(CacheKeys.clientList(), () => prisma.client.findMany());
+    return prisma.client.findMany();
   }
 
   /**
@@ -129,7 +128,6 @@ export class ClientService {
       },
     });
 
-    await invalidateCache(CacheKeys.clientList());
     return result;
   }
 
@@ -158,7 +156,6 @@ export class ClientService {
       },
     });
 
-    await invalidateCache(CacheKeys.clientList());
     return result;
   }
 
@@ -196,7 +193,7 @@ export class ClientService {
 
     // 관련 데이터가 없으면 삭제 진행
     const result = await prisma.client.delete({ where: { id } });
-    await invalidateCache(CacheKeys.clientList());
+
     return result;
   }
 
@@ -205,7 +202,7 @@ export class ClientService {
       where: { id: clientId },
       data: { isActive: true },
     });
-    await invalidateCache(CacheKeys.clientList());
+
     return result;
   }
 
@@ -214,7 +211,7 @@ export class ClientService {
       where: { id: clientId },
       data: { isActive: false },
     });
-    await invalidateCache(CacheKeys.clientList());
+
     return result;
   }
 

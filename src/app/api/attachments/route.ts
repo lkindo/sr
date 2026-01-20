@@ -33,7 +33,7 @@ export const POST = withAuthAndRateLimit(
     });
 
     if (!sr) {
-      throw new NotFoundError('SR을 찾을 수 없습니다.');
+      throw new NotFoundError('SR');
     }
 
     // 파일 저장 (Vercel Blob)

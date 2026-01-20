@@ -7,6 +7,7 @@ import { NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
 import { backgroundTask } from '@/lib/wait-until';
@@ -217,6 +218,14 @@ export class SRService {
         }),
       `Email notifications for ${result.srNumber}`
     );
+
+    // 실시간 이벤트 발행
+    emitRealtimeEvent(REALTIME_EVENTS.SR_CREATED, {
+      id: result.id,
+      srNumber: result.srNumber,
+      title: result.title,
+      status: result.status,
+    });
 
     return result;
   }
@@ -528,6 +537,14 @@ export class SRService {
           }
         }
 
+        // 실시간 이벤트 발행
+        emitRealtimeEvent(REALTIME_EVENTS.SR_UPDATED, {
+          id: updatedSR.id,
+          srNumber: updatedSR.srNumber,
+          title: updatedSR.title,
+          status: updatedSR.status,
+        });
+
         return updatedSR;
       });
     } catch (error) {
@@ -664,6 +681,12 @@ export class SRService {
       // 2. SR 삭제
       await tx.sR.delete({ where: { id } });
     });
+
+    // 실시간 이벤트 발행
+    emitRealtimeEvent(REALTIME_EVENTS.SR_DELETED, {
+      id,
+      srNumber: existingSR.srNumber,
+    });
   }
 
   /**
@@ -716,3 +739,9 @@ export class SRService {
     return { items, total };
   }
 }
+
+/**
+ * SRService 싱글톤 인스턴스
+ * 모든 API 라우트에서 이 인스턴스를 재사용합니다.
+ */
+export const srService = new SRService();

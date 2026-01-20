@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createTestSR, findSRInList } from './helpers/test-helpers';
+import { createTestSR, deleteSRViaAPI, findSRInList } from './helpers/test-helpers';
 
 /**
  * SR 생성 플로우 테스트
@@ -9,6 +9,21 @@ import { createTestSR, findSRInList } from './helpers/test-helpers';
  */
 
 test.describe('SR 생성', () => {
+  const createdSRIds: string[] = [];
+
+  test.afterAll(async ({ browser }) => {
+    // 생성된 모든 SR 삭제
+    if (createdSRIds.length > 0) {
+      const context = await browser.newContext({ storageState: './playwright/.auth/user.json' });
+      const request = context.request;
+      console.log(`🧹 Cleaning up ${createdSRIds.length} SRs...`);
+      for (const id of createdSRIds) {
+        await deleteSRViaAPI(request, id);
+      }
+      await context.close();
+    }
+  });
+
   test('SR 생성 다이얼로그 열기', async ({ page }) => {
     await page.goto('/srs');
 
@@ -30,6 +45,7 @@ test.describe('SR 생성', () => {
     });
 
     expect(srId).toBeDefined();
+    if (srId) createdSRIds.push(srId);
 
     // SR이 목록에 있는지 확인
     await page.goto('/srs');

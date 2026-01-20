@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
-import { SRService } from '@/services/sr.service';
+import { srService } from '@/services/sr.service';
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +17,6 @@ export async function GET(request: Request) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const srService = new SRService();
     // For export, we might want to apply filters from query params in the future.
     // For now, export all SRs sorted by creation date descending.
     const srs = await srService.getAllSRs({
