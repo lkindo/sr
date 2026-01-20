@@ -52,6 +52,8 @@ interface UserDialogProps {
   user: User | null;
   onSaved: () => void;
   defaultClientId?: string;
+  clients?: Client[];
+  roles?: any[];
 }
 
 export function UserDialog({
@@ -60,7 +62,10 @@ export function UserDialog({
   user,
   onSaved,
   defaultClientId,
+  clients: propClients,
+  roles,
 }: UserDialogProps) {
+  // ... (state definitions)
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,14 +76,26 @@ export function UserDialog({
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   // 고객사 담당자(CLIENT): 단일 선택(소속 고객사)
   const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [clients, setClients] = useState<Client[]>([]);
+
+  // Use passed clients or empty array initially
+  const [clients, setClients] = useState<Client[]>(propClients || []);
   const [loading, setLoading] = useState(false);
-  const [loadingClients, setLoadingClients] = useState(true);
+  const [loadingClients, setLoadingClients] = useState(!propClients);
   const { toast } = useToast();
 
   const isEditMode = !!user;
 
+  // Update clients if prop changes
+  useEffect(() => {
+    if (propClients) {
+      setClients(propClients);
+      setLoadingClients(false);
+    }
+  }, [propClients]);
+
   const fetchClients = useCallback(async () => {
+    if (propClients) return; // Skip if provided via props
+
     try {
       const response = await fetch('/api/clients?pageSize=100'); // 충분한 수의 고객사를 가져오기 위해 pageSize 증가
       if (!response.ok) throw new Error('Failed to fetch clients');
@@ -113,13 +130,13 @@ export function UserDialog({
     } finally {
       setLoadingClients(false);
     }
-  }, [toast]);
+  }, [toast, propClients]);
 
   useEffect(() => {
-    if (open) {
+    if (open && !propClients) {
       fetchClients();
     }
-  }, [open, fetchClients]);
+  }, [open, fetchClients, propClients]);
 
   const toggleClient = (clientId: string) => {
     setSelectedClientIds((prev) =>

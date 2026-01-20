@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import Link from 'next/link';
-import { ChevronDown, ChevronRight, Plus, Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
+import { ClientMobileList } from '@/components/clients/ClientMobileList';
+import { ClientTable } from '@/components/clients/ClientTable';
 import { ClientUsersSheet } from '@/components/clients/ClientUsersSheet';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -16,14 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
 interface Client {
@@ -242,255 +234,26 @@ export default function ClientsPage() {
         </div>
 
         {/* Desktop View (Table) */}
-        <div className="hidden md:block overflow-x-auto">
-          <Table className="sr-table-template">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12"></TableHead>
-                <TableHead>코드</TableHead>
-                <TableHead>고객사명</TableHead>
-                <TableHead>산업</TableHead>
-                <TableHead>담당자</TableHead>
-                <TableHead>이메일</TableHead>
-                <TableHead>사용자</TableHead>
-                <TableHead>SR</TableHead>
-                <TableHead>상태</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8">
-                    <div className="flex justify-center items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                      <span className="text-muted-foreground">로딩 중...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : clients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-12">
-                    <div className="flex flex-col items-center gap-3">
-                      <p className="text-muted-foreground">등록된 고객사가 없습니다.</p>
-                      <Button variant="outline" size="sm" onClick={handleCreateClient}>
-                        <Plus className="mr-2 h-4 w-4" />첫 고객사 등록하기
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                clients.map((client) => {
-                  const isExpanded = expandedRows.has(client.id);
-                  const users = clientUsers[client.id] || [];
-                  return (
-                    <React.Fragment key={client.id}>
-                      <TableRow className="hover:bg-muted/50">
-                        <TableCell className="text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleRowExpansion(client.id)}
-                            className="h-8 w-8 p-0"
-                          >
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="font-medium text-center">{client.code}</TableCell>
-                        <TableCell>
-                          <Link
-                            href={`/clients/${client.id}`}
-                            className="text-primary hover:underline font-medium"
-                          >
-                            {client.name}
-                          </Link>
-                        </TableCell>
-                        <TableCell className="text-center">{client.industry || '-'}</TableCell>
-                        <TableCell className="text-center">{client.contactPerson || '-'}</TableCell>
-                        <TableCell>{client.contactEmail || '-'}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant="secondary"
-                            className="cursor-pointer hover:bg-secondary/80 transition-colors"
-                            onClick={(e) => handleUsersClick(client, e)}
-                          >
-                            {client._count?.users || 0}명
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">{client._count?.srs || 0}건</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant={client.isActive ? 'default' : 'secondary'}>
-                            {client.isActive ? '활성' : '비활성'}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                      {isExpanded && (
-                        <TableRow key={`${client.id}-expanded`} className="bg-muted/20">
-                          <TableCell colSpan={9} className="p-0">
-                            <div className="p-4 pl-16">
-                              <h4 className="text-sm font-semibold mb-3 text-[hsl(var(--sr-primary-dark))]">
-                                소속 사용자 ({users.length}명)
-                              </h4>
-                              {users.length === 0 ? (
-                                <p className="text-sm text-muted-foreground py-2">
-                                  등록된 사용자가 없습니다.
-                                </p>
-                              ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                  {users.map((uc: any) => (
-                                    <Link
-                                      key={uc.user.id}
-                                      href={`/users/${uc.user.id}`}
-                                      className="flex items-center gap-2 p-3 rounded-md border bg-background hover:bg-accent transition-colors"
-                                    >
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">
-                                          {uc.user.name}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground truncate">
-                                          {uc.user.email}
-                                        </p>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <ClientTable
+          clients={clients}
+          loading={loading}
+          expandedRows={expandedRows}
+          clientUsers={clientUsers}
+          onToggleRowExpansion={toggleRowExpansion}
+          onUsersClick={handleUsersClick}
+          onCreateClient={handleCreateClient}
+        />
 
         {/* Mobile View (Card List) */}
-        <div className="md:hidden space-y-4 px-4 pb-4">
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="flex justify-center items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                <span className="text-muted-foreground">로딩 중...</span>
-              </div>
-            </div>
-          ) : clients.length === 0 ? (
-            <div className="text-center py-12 border rounded-md border-dashed">
-              <div className="flex flex-col items-center gap-3">
-                <p className="text-muted-foreground">등록된 고객사가 없습니다.</p>
-                <Button variant="outline" size="sm" onClick={handleCreateClient}>
-                  <Plus className="mr-2 h-4 w-4" />첫 고객사 등록하기
-                </Button>
-              </div>
-            </div>
-          ) : (
-            clients.map((client) => {
-              const isExpanded = expandedRows.has(client.id);
-              const users = clientUsers[client.id] || [];
-              return (
-                <div
-                  key={client.id}
-                  className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
-                >
-                  <div className="p-4 space-y-3">
-                    {/* Header: Name & Status */}
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={`/clients/${client.id}`}
-                            className="font-semibold text-lg hover:underline text-primary"
-                          >
-                            {client.name}
-                          </Link>
-                          <span className="text-xs text-muted-foreground">({client.code})</span>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {client.industry || '산업군 미지정'}
-                        </div>
-                      </div>
-                      <Badge variant={client.isActive ? 'default' : 'secondary'}>
-                        {client.isActive ? '활성' : '비활성'}
-                      </Badge>
-                    </div>
-
-                    {/* Contact Info */}
-                    <div className="text-sm space-y-1 pt-2 border-t border-border/50">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">담당자:</span>
-                        <span>{client.contactPerson || '-'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">이메일:</span>
-                        <span className="truncate max-w-[200px]">{client.contactEmail || '-'}</span>
-                      </div>
-                    </div>
-
-                    {/* Stats & Actions */}
-                    <div className="flex items-center justify-between pt-2">
-                      <div className="flex gap-2">
-                        <Badge
-                          variant="secondary"
-                          className="cursor-pointer hover:bg-secondary/80"
-                          onClick={(e) => handleUsersClick(client, e)}
-                        >
-                          사용자 {client._count?.users || 0}
-                        </Badge>
-                        <Badge variant="outline">SR {client._count?.srs || 0}</Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleRowExpansion(client.id)}
-                        className="h-8 w-8 p-0"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Expanded Section (Users) */}
-                  {isExpanded && (
-                    <div className="bg-muted/30 px-4 pb-4 pt-2 border-t">
-                      <h4 className="text-xs font-semibold mb-2 text-muted-foreground">
-                        소속 사용자 ({users.length})
-                      </h4>
-                      {users.length === 0 ? (
-                        <p className="text-xs text-muted-foreground text-center py-2">
-                          등록된 사용자가 없습니다.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {users.map((uc: any) => (
-                            <Link
-                              key={uc.user.id}
-                              href={`/users/${uc.user.id}`}
-                              className="flex items-center justify-between p-2 rounded border bg-background text-sm"
-                            >
-                              <span className="font-medium">{uc.user.name}</span>
-                              <span className="text-xs text-muted-foreground">{uc.user.email}</span>
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+        <ClientMobileList
+          clients={clients}
+          loading={loading}
+          expandedRows={expandedRows}
+          clientUsers={clientUsers}
+          onToggleRowExpansion={toggleRowExpansion}
+          onUsersClick={handleUsersClick}
+          onCreateClient={handleCreateClient}
+        />
 
         {/* Pagination Controls */}
         {pagination.totalPages > 1 && (

@@ -40,17 +40,32 @@ interface AssignRolesDialogProps {
   onOpenChange: (open: boolean) => void;
   user: User | null;
   onSaved: () => void;
+  availableRoles?: Role[];
 }
 
-export function AssignRolesDialog({ open, onOpenChange, user, onSaved }: AssignRolesDialogProps) {
-  const [roles, setRoles] = useState<Role[]>([]);
+export function AssignRolesDialog({
+  open,
+  onOpenChange,
+  user,
+  onSaved,
+  availableRoles,
+}: AssignRolesDialogProps) {
+  const [roles, setRoles] = useState<Role[]>(availableRoles || []);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (availableRoles) {
+      setRoles(availableRoles);
+    }
+  }, [availableRoles]);
+
   const fetchRoles = useCallback(async () => {
+    if (availableRoles) return;
+
     setLoading(true);
     try {
       const response = await fetch('/api/roles');
@@ -66,7 +81,7 @@ export function AssignRolesDialog({ open, onOpenChange, user, onSaved }: AssignR
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, availableRoles]);
 
   useEffect(() => {
     if (open) {

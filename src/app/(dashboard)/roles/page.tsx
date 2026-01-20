@@ -6,16 +6,9 @@ import { Plus } from 'lucide-react';
 import { DeleteRoleDialog } from '@/components/roles/DeleteRoleDialog';
 import { PermissionBoard } from '@/components/roles/PermissionBoard';
 import { RoleDialog } from '@/components/roles/RoleDialog';
-import { Badge } from '@/components/ui/badge';
+import { RoleMobileList } from '@/components/roles/RoleMobileList';
+import { RoleTable } from '@/components/roles/RoleTable';
 import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 
 interface Permission {
@@ -144,134 +137,20 @@ export default function RolesPage() {
         </div>
 
         {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <Table className="sr-table-template">
-            <TableHeader>
-              <TableRow>
-                <TableHead>역할 이름</TableHead>
-                <TableHead>설명</TableHead>
-                <TableHead>권한 수</TableHead>
-                <TableHead>사용자 수</TableHead>
-                <TableHead>작업</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {roles.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    등록된 역할이 없습니다.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                roles.map((role) => (
-                  <TableRow key={role.id} className="cursor-pointer hover:bg-muted/50">
-                    <TableCell className="font-medium text-center">{role.name}</TableCell>
-                    <TableCell>{role.description || '-'}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="secondary">{role.permissions.length}개</Badge>
-                    </TableCell>
-                    <TableCell className="text-center">{role._count?.users || 0}명</TableCell>
-                    <TableCell className="text-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditRole(role)}
-                        className="sr-btn-template"
-                      >
-                        수정
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleManagePermissions(role)}
-                        className="sr-btn-template"
-                      >
-                        권한 관리
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteRole(role)}
-                        disabled={role._count && role._count.users > 0}
-                        className="sr-btn-template"
-                      >
-                        삭제
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <RoleTable
+          roles={roles}
+          onEdit={handleEditRole}
+          onManagePermissions={handleManagePermissions}
+          onDelete={handleDeleteRole}
+        />
 
         {/* Mobile Card View */}
-        <div className="md:hidden space-y-4 px-4 pb-4">
-          {roles.length === 0 ? (
-            <div className="text-center py-12 border rounded-md border-dashed">
-              <p className="text-muted-foreground">등록된 역할이 없습니다.</p>
-            </div>
-          ) : (
-            roles.map((role) => (
-              <div
-                key={role.id}
-                className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
-              >
-                <div className="p-4 space-y-3">
-                  {/* Header: Name & User Count */}
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-semibold text-lg text-[hsl(var(--sr-primary-dark))]">
-                        {role.name}
-                      </h4>
-                      <p className="text-sm text-muted-foreground mt-1 text-xs">
-                        {role.description || '설명 없음'}
-                      </p>
-                    </div>
-                    <Badge variant="secondary" className="shrink-0">
-                      사용자 {role._count?.users || 0}명
-                    </Badge>
-                  </div>
-
-                  {/* Permission Stat */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="text-sm text-muted-foreground">보유 권한:</span>
-                    <Badge variant="outline">{role.permissions.length}개</Badge>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="grid grid-cols-3 gap-2 pt-2 mt-2 border-t border-border/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 text-xs"
-                      onClick={() => handleEditRole(role)}
-                    >
-                      수정
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 text-xs"
-                      onClick={() => handleManagePermissions(role)}
-                    >
-                      권한 관리
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-9 text-xs hover:text-destructive hover:bg-destructive/10 hover:border-destructive/50"
-                      onClick={() => handleDeleteRole(role)}
-                      disabled={role._count && role._count.users > 0}
-                    >
-                      삭제
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <RoleMobileList
+          roles={roles}
+          onEdit={handleEditRole}
+          onManagePermissions={handleManagePermissions}
+          onDelete={handleDeleteRole}
+        />
       </div>
 
       <RoleDialog

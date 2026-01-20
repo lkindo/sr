@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface User {
   id: string;
@@ -19,24 +20,42 @@ interface DeleteUserDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: User | null;
-  onDelete: (userId: string) => Promise<void>;
+  onDeleted: () => void;
 }
 
-export function DeleteUserDialog({ open, onOpenChange, user, onDelete }: DeleteUserDialogProps) {
+export function DeleteUserDialog({ open, onOpenChange, user, onDeleted }: DeleteUserDialogProps) {
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleDelete = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      await onDelete(user.id);
-      // 성공 시에만 다이얼로그 닫기 (부모에서 토스트 표시 후)
-      setTimeout(() => {
-        onOpenChange(false);
-      }, 100);
-    } catch {
-      // 에러를 다시 throw하지 않고, 부모에서 이미 처리됨
-      // 에러 발생 시 다이얼로그는 열린 상태 유지
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete user');
+      }
+
+      toast({
+        title: '성공',
+        description: '사용자가 삭제되었습니다.',
+      });
+
+      onDeleted();
+      // Dialog closing is handled by parent or onDeleted usually triggers refresh which might close it,
+      // but here we should explicitly close or rely on parent.
+      // UserDialog closes onSaved. Let's close here or let parent do it?
+      // page.tsx handles onDeleted by refreshing and closing.
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: '오류',
+        description: '사용자 삭제에 실패했습니다.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

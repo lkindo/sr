@@ -86,26 +86,9 @@ export function ClientUsersSheet({
     }
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    try {
-      const res = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
-      });
-      if (!res.ok) throw new Error('Delete failed');
-      toast({
-        title: '삭제 완료',
-        description: '사용자가 삭제되었습니다.',
-        variant: 'default',
-      });
-      // Refresh list
-      fetchUsers();
-    } catch {
-      toast({
-        title: '오류',
-        description: '사용자 삭제에 실패했습니다.',
-        variant: 'destructive',
-      });
-    }
+  const handleUserDeleted = () => {
+    fetchUsers();
+    // Dialog closes itself via onOpenChange(false) inside DeleteUserDialog upon success
   };
 
   return (
@@ -231,7 +214,7 @@ export function ClientUsersSheet({
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         user={selectedUser}
-        onDelete={handleDeleteUser}
+        onDeleted={handleUserDeleted}
       />
     </>
   );
