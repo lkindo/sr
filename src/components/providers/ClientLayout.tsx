@@ -5,6 +5,7 @@ import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
+import { PWARegistration } from '@/components/providers/PWARegistration';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
 import { Toaster } from '@/components/ui/toaster';
 
@@ -37,6 +38,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
         <RealtimeProvider>
           {children}
           <Toaster />
+          <PWARegistration />
         </RealtimeProvider>
       </SessionProvider>
       <ReactQueryDevtools initialIsOpen={false} />

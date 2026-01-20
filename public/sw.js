@@ -1,18 +1,78 @@
 // Service Worker for Web Push Notifications
 // This file must be placed in the public directory to be accessible at /sw.js
 
-const SW_VERSION = '1.0.1';
+const SW_VERSION = '1.0.2';
+const CACHE_NAME = 'sr-mgt-cache-v1';
+
+// Assets to cache immediately on install
+const PRECACHE_ASSETS = [
+  '/manifest.json',
+  '/dashboard',
+  '/login',
+  // Note: Next.js has complex hashed assets, so we usually rely on dynamic caching for them
+];
 
 // Install event - cache assets if needed
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing Service Worker version:', SW_VERSION);
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(PRECACHE_ASSETS);
+    })
+  );
   self.skipWaiting();
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating Service Worker version:', SW_VERSION);
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
+});
+
+// Fetch event - serving cached content
+self.addEventListener('fetch', (event) => {
+  // Only handle GET requests for now
+  if (event.request.method !== 'GET') return;
+
+  // Skip API requests and external resources for basic precaching
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) return;
+
+  event.respondWith(
+    caches.match(event.request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(event.request).then((response) => {
+        // Only cache successful dynamic requests
+        if (!response || response.status !== 200 || response.type !== 'basic') {
+          return response;
+        }
+
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache);
+        });
+
+        return response;
+      }).catch(() => {
+        // Generic offline fallback could be added here
+        return caches.match('/dashboard');
+      });
+    })
+  );
 });
 
 // Push event - receive push notifications

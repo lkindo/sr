@@ -185,16 +185,18 @@ export default function DashboardPage() {
 
   return (
     <div className="sr-content-area space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
             대시보드
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             SR 현황을 한눈에 확인하고 관리합니다.
           </p>
         </div>
-        <ExportButton />
+        <div className="flex justify-end">
+          <ExportButton />
+        </div>
       </div>
       {/* 접수 대기 SR 강조 카드 (ADMIN/MANAGER/ENGINEER만) */}
       {isAdminManagerEngineer && stats.summary.requested > 0 && (

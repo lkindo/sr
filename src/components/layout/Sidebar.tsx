@@ -2,128 +2,19 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Bell,
-  Building2,
-  ChevronRight,
-  ClipboardList,
-  ListChecks,
-  type LucideIcon,
-  Network,
-  Settings as SettingsIcon,
-  Shield,
-  User,
-  Users,
-} from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { NAVIGATION_CONFIG, type NavSection, type NavSubItem } from '@/config/navigation';
 import { usePermissions } from '@/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
-interface SubMenuItem {
-  title: string;
-  href: string;
-  icon?: LucideIcon;
-  permission?: { resource: string; action: string };
-  role?: string;
-  roles?: string[];
+interface SidebarProps {
+  isMobile?: boolean;
+  showAllSections?: boolean;
 }
 
-interface MenuSection {
-  title: string;
-  items: SubMenuItem[];
-}
-
-// 각 상단 메뉴별 하위 메뉴 정의
-const menuStructure: Record<string, MenuSection[]> = {
-  '/dashboard': [],
-  '/srs': [
-    {
-      title: 'SR 관리',
-      items: [
-        {
-          title: '내 요청 SR',
-          href: '/my-requests',
-          icon: ClipboardList,
-        },
-        {
-          title: 'SR 전체 목록',
-          href: '/srs',
-          icon: ListChecks,
-        },
-      ],
-    },
-  ],
-  '/organization': [
-    {
-      title: '조직 관리',
-      items: [
-        {
-          title: '조직 구조',
-          href: '/organization',
-          icon: Network,
-          roles: ['ADMIN', 'MANAGER', 'ENGINEER'],
-        },
-        {
-          title: '고객사 목록',
-          href: '/clients',
-          icon: Building2,
-          roles: ['ADMIN', 'MANAGER', 'ENGINEER'],
-        },
-        {
-          title: '사용자 목록',
-          href: '/users',
-          icon: Users,
-          roles: ['ADMIN', 'MANAGER', 'ENGINEER'],
-        },
-      ],
-    },
-  ],
-
-  '/roles': [
-    {
-      title: '권한 관리',
-      items: [
-        {
-          title: '역할 관리',
-          href: '/roles',
-          icon: Shield,
-          roles: ['ADMIN', 'MANAGER', 'ENGINEER'],
-        },
-      ],
-    },
-  ],
-  '/settings': [
-    {
-      title: '개인 설정',
-      items: [
-        {
-          title: '프로필',
-          href: '/settings/profile',
-          icon: User,
-        },
-        {
-          title: '알림 설정',
-          href: '/settings/notifications',
-          icon: Bell,
-        },
-      ],
-    },
-    {
-      title: '일반 설정',
-      items: [
-        {
-          title: '시스템 설정',
-          href: '/settings/system',
-          icon: SettingsIcon,
-          role: 'ADMIN',
-        },
-      ],
-    },
-  ],
-};
-
-export function Sidebar() {
+export function Sidebar({ isMobile = false, showAllSections = false }: SidebarProps) {
   const pathname = usePathname();
   const { hasPermission, hasRole, hasAnyRole } = usePermissions();
 
@@ -139,9 +30,8 @@ export function Sidebar() {
   };
 
   const activeTopMenu = getActiveTopMenu();
-  const sections = menuStructure[activeTopMenu] || [];
 
-  const canAccessItem = (item: SubMenuItem): boolean => {
+  const canAccessItem = (item: NavSubItem): boolean => {
     if (item.role) {
       return hasRole(item.role);
     }
@@ -154,61 +44,111 @@ export function Sidebar() {
     return true;
   };
 
+  const canAccessTopItem = (item: (typeof NAVIGATION_CONFIG)[0]): boolean => {
+    if (item.roles && item.roles.length > 0) {
+      return hasAnyRole(item.roles);
+    }
+    return true;
+  };
+
   // 섹션별 기본 열림 상태 (활성 메뉴가 있는 섹션은 열림)
-  const getDefaultOpen = (section: MenuSection) => {
+  const getDefaultOpen = (section: NavSection) => {
     return section.items.some((item) => pathname?.startsWith(item.href));
   };
 
-  // Dashboard는 하위 메뉴가 없으므로 사이드바를 표시하지 않음
-  if (activeTopMenu === '/dashboard') {
+  // Dashboard는 하위 메뉴가 없으므로 사이드바를 표시하지 않음 (단, 전체 메뉴 보기 모드에서는 표시)
+  if (activeTopMenu === '/dashboard' && !showAllSections) {
     return null;
   }
 
-  return (
-    <aside className="fixed left-0 top-[104px] z-30 h-[calc(100vh-104px)] w-64 sr-sidebar-bg text-white overflow-y-auto border-r border-[#3f4564]">
-      <nav className="flex flex-col pt-5">
-        {/* Menu Sections */}
-        <div>
-          {sections
-            .filter((section) => {
-              // 섹션 내에 접근 가능한 항목이 하나라도 있으면 섹션 표시
-              return section.items.some((item) => canAccessItem(item));
-            })
-            .map((section, idx) => (
-              <Collapsible key={idx} defaultOpen={getDefaultOpen(section)}>
-                <CollapsibleTrigger className="flex items-center justify-between w-full h-[55px] px-8 text-sm font-medium sr-sidebar-item group">
-                  <span>{section.title}</span>
-                  <ChevronRight className="h-4 w-4 sr-chevron transition-transform duration-200 data-[state=open]:rotate-90" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="sr-sidebar-submenu">
-                  {section.items
-                    .filter((item) => canAccessItem(item))
-                    .map((item) => {
-                      const Icon = item.icon;
-                      const isActive =
-                        pathname === item.href || pathname?.startsWith(item.href + '/');
+  const renderSections = (sections: NavSection[]) => {
+    return sections
+      .filter((section) => {
+        return section.items.some((item) => canAccessItem(item));
+      })
+      .map((section, idx) => (
+        <Collapsible key={idx} defaultOpen={getDefaultOpen(section)} className="mb-2">
+          <CollapsibleTrigger className="flex items-center justify-between w-full h-[50px] px-8 text-sm font-medium sr-sidebar-item group text-gray-300 hover:text-white">
+            <span>{section.title}</span>
+            <ChevronRight className="h-4 w-4 sr-chevron transition-transform duration-200 data-[state=open]:rotate-90" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="sr-sidebar-submenu bg-black/20 pb-2">
+            {section.items
+              .filter((item) => canAccessItem(item))
+              .map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
 
-                      return (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          className={cn(
-                            'flex items-center h-12 px-8 text-sm sr-sidebar-submenu-item relative',
-                            isActive && 'text-white font-medium'
-                          )}
-                        >
-                          {isActive && (
-                            <span className="absolute left-[49px] w-1 h-1 rounded-full bg-gray-400" />
-                          )}
-                          {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
-                          {item.title}
-                        </Link>
-                      );
-                    })}
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-        </div>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center h-10 px-8 pl-12 text-sm sr-sidebar-submenu-item relative text-gray-400 hover:text-white',
+                      isActive && 'text-white font-medium bg-white/5'
+                    )}
+                  >
+                    {isActive && (
+                      <span className="absolute left-[35px] w-1 h-1 rounded-full bg-sr-accent" />
+                    )}
+                    {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
+                    {item.title}
+                  </Link>
+                );
+              })}
+          </CollapsibleContent>
+        </Collapsible>
+      ));
+  };
+
+  return (
+    <aside
+      className={cn(
+        'z-30 h-full w-full sr-sidebar-bg text-white overflow-y-auto',
+        !isMobile &&
+          'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-[#3f4564] hidden md:block'
+      )}
+    >
+      <nav className="flex flex-col pt-5 pb-20">
+        {showAllSections ? (
+          /* Mobile / Full Mode: Render Top Level Items with Subsections */
+          <div className="space-y-1">
+            {NAVIGATION_CONFIG.filter(canAccessTopItem).map((topItem) => {
+              const isActiveTop = activeTopMenu === topItem.href;
+              const hasSubSections = topItem.sections && topItem.sections.length > 0;
+
+              return (
+                <div key={topItem.href}>
+                  {/* Top Level Link (acts as header) */}
+                  <Link
+                    href={topItem.href}
+                    className={cn(
+                      'flex items-center px-6 py-3 text-base font-semibold transition-colors',
+                      isActiveTop
+                        ? 'text-white bg-white/10 border-l-4 border-sr-accent'
+                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                    )}
+                  >
+                    {topItem.icon && <topItem.icon className="mr-3 h-5 w-5" />}
+                    {topItem.title}
+                  </Link>
+
+                  {/* Render Subsections if any */}
+                  {hasSubSections && (
+                    <div className="mt-1">{renderSections(topItem.sections!)}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Desktop / Partial Mode: Render only active sections */
+          <div>
+            {renderSections(
+              NAVIGATION_CONFIG.find((item) => item.href === activeTopMenu)?.sections || []
+            )}
+          </div>
+        )}
       </nav>
     </aside>
   );

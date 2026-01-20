@@ -241,8 +241,8 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        {/* 테이블 영역 */}
-        <div className="overflow-x-auto">
+        {/* Desktop View (Table) */}
+        <div className="hidden md:block overflow-x-auto">
           <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
@@ -370,6 +370,126 @@ export default function ClientsPage() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Mobile View (Card List) */}
+        <div className="md:hidden space-y-4 px-4 pb-4">
+          {loading ? (
+            <div className="text-center py-8">
+              <div className="flex justify-center items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                <span className="text-muted-foreground">로딩 중...</span>
+              </div>
+            </div>
+          ) : clients.length === 0 ? (
+            <div className="text-center py-12 border rounded-md border-dashed">
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-muted-foreground">등록된 고객사가 없습니다.</p>
+                <Button variant="outline" size="sm" onClick={handleCreateClient}>
+                  <Plus className="mr-2 h-4 w-4" />첫 고객사 등록하기
+                </Button>
+              </div>
+            </div>
+          ) : (
+            clients.map((client) => {
+              const isExpanded = expandedRows.has(client.id);
+              const users = clientUsers[client.id] || [];
+              return (
+                <div
+                  key={client.id}
+                  className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
+                >
+                  <div className="p-4 space-y-3">
+                    {/* Header: Name & Status */}
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/clients/${client.id}`}
+                            className="font-semibold text-lg hover:underline text-primary"
+                          >
+                            {client.name}
+                          </Link>
+                          <span className="text-xs text-muted-foreground">({client.code})</span>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {client.industry || '산업군 미지정'}
+                        </div>
+                      </div>
+                      <Badge variant={client.isActive ? 'default' : 'secondary'}>
+                        {client.isActive ? '활성' : '비활성'}
+                      </Badge>
+                    </div>
+
+                    {/* Contact Info */}
+                    <div className="text-sm space-y-1 pt-2 border-t border-border/50">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">담당자:</span>
+                        <span>{client.contactPerson || '-'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">이메일:</span>
+                        <span className="truncate max-w-[200px]">{client.contactEmail || '-'}</span>
+                      </div>
+                    </div>
+
+                    {/* Stats & Actions */}
+                    <div className="flex items-center justify-between pt-2">
+                      <div className="flex gap-2">
+                        <Badge
+                          variant="secondary"
+                          className="cursor-pointer hover:bg-secondary/80"
+                          onClick={(e) => handleUsersClick(client, e)}
+                        >
+                          사용자 {client._count?.users || 0}
+                        </Badge>
+                        <Badge variant="outline">SR {client._count?.srs || 0}</Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleRowExpansion(client.id)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Section (Users) */}
+                  {isExpanded && (
+                    <div className="bg-muted/30 px-4 pb-4 pt-2 border-t">
+                      <h4 className="text-xs font-semibold mb-2 text-muted-foreground">
+                        소속 사용자 ({users.length})
+                      </h4>
+                      {users.length === 0 ? (
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          등록된 사용자가 없습니다.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {users.map((uc: any) => (
+                            <Link
+                              key={uc.user.id}
+                              href={`/users/${uc.user.id}`}
+                              className="flex items-center justify-between p-2 rounded border bg-background text-sm"
+                            >
+                              <span className="font-medium">{uc.user.name}</span>
+                              <span className="text-xs text-muted-foreground">{uc.user.email}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
 
         {/* Pagination Controls */}

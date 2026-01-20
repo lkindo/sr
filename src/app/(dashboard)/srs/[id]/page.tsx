@@ -109,14 +109,16 @@ export default function SRDetailPage() {
             </Link>
           </Button>
           <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-3xl font-bold tracking-tight">{sr.srNumber}</h2>
-              <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
-              <Badge variant={priorityColors[sr.requestedPriority]}>
-                {priorityLabels[sr.requestedPriority]}
-              </Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{sr.srNumber}</h2>
+              <div className="flex gap-2">
+                <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+                <Badge variant={priorityColors[sr.requestedPriority]}>
+                  {priorityLabels[sr.requestedPriority]}
+                </Badge>
+              </div>
             </div>
-            <p className="text-2xl font-semibold mt-2">{sr.title}</p>
+            <p className="text-xl md:text-2xl font-semibold mt-2">{sr.title}</p>
           </div>
         </div>
         <div className="flex gap-2">

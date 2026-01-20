@@ -11,7 +11,13 @@ export default function MainContent({ children }: { children: React.ReactNode })
   return (
     <div className="flex-1 flex">
       <Sidebar />
-      <main className={isDashboard ? 'flex-1 p-8 sr-content-bg' : 'flex-1 ml-64 p-8 sr-content-bg'}>
+      <main
+        className={
+          isDashboard
+            ? 'flex-1 p-4 md:p-8 sr-content-bg'
+            : 'flex-1 md:ml-64 p-4 md:p-8 sr-content-bg'
+        }
+      >
         <div className="w-full mx-auto">{children}</div>
       </main>
     </div>
