@@ -1,10 +1,65 @@
-import { expect, Locator, Page, Response } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import {
+  APIRequestContext,
+  Browser,
+  BrowserContext,
+  expect,
+  Locator,
+  Page,
+  Response,
+} from '@playwright/test';
 
 /**
  * E2E 테스트 헬퍼 함수
  *
  * 재사용 가능한 테스트 유틸리티를 제공하여 안정적이고 유지보수하기 쉬운 테스트 작성을 지원합니다.
  */
+
+/**
+ * 페이지의 접근성을 검사합니다.
+ * @param page - Playwright Page 객체
+ * @param name - 테스트 단계 이름 (로그용)
+ */
+export async function checkA11y(page: Page, name: string): Promise<void> {
+  console.log(`♿ Accessibility Check: ${name}`);
+  // 타임아웃을 넉넉히 주어 복잡한 페이지 로드 대기
+  await page.waitForLoadState('networkidle');
+  const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
+
+  if (accessibilityScanResults.violations.length > 0) {
+    console.log(
+      `❌ Accessibility violations found in ${name}:`,
+      JSON.stringify(accessibilityScanResults.violations, null, 2)
+    );
+  }
+
+  expect(accessibilityScanResults.violations).toEqual([]);
+}
+
+/**
+ * 페이지 로드 성능을 측정하고 검증합니다.
+ * @param page - Playwright Page 객체
+ * @param thresholdMs - 허용되는 최대 로딩 시간 (ms), 기본 3000ms
+ */
+export async function checkPerformance(page: Page, thresholdMs: number = 3000): Promise<void> {
+  const duration = await page.evaluate(() => {
+    const entries = performance.getEntriesByType('navigation');
+    if (entries.length > 0) {
+      return (entries[0] as PerformanceNavigationTiming).duration;
+    }
+    return 0;
+  });
+
+  console.log(
+    `⏱️ Performance Check: ${page.url()} loaded in ${duration.toFixed(2)}ms (Threshold: ${thresholdMs}ms)`
+  );
+
+  if (duration > thresholdMs) {
+    console.warn(`⚠️ Performance threshold exceeded! ${duration.toFixed(2)}ms > ${thresholdMs}ms`);
+  }
+
+  expect(duration).toBeLessThan(thresholdMs);
+}
 
 /**
  * SR을 목록에서 찾기 (재시도 로직 포함)
@@ -193,6 +248,39 @@ export async function createTestSR(
 }
 
 /**
+ * API를 통해 테스트 SR을 생성합니다 (UI를 거치지 않아 빠름)
+ * @param request - Playwright APIRequestContext 객체
+ * @param data - SR 데이터
+ * @returns 생성된 SR 정보
+ */
+export async function createSRViaAPI(
+  request: APIRequestContext,
+  data: {
+    title: string;
+    description: string;
+    clientId: string;
+    serviceCategoryId: string;
+    requestedPriority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  }
+) {
+  console.log(`🚀 Creating SR via API: "${data.title}"`);
+  const response = await request.post('/api/srs', {
+    data,
+  });
+
+  if (response.status() !== 201) {
+    const errorBody = await response.text();
+    throw new Error(
+      `Failed to create SR via API. Status: ${response.status()}, Body: ${errorBody}`
+    );
+  }
+
+  const result = await response.json();
+  console.log(`✅ SR created via API: ${result.id}`);
+  return result;
+}
+
+/**
  * 폼 제출 후 API 응답 대기
  *
  * 폼을 제출하고 관련 API 호출이 완료될 때까지 대기합니다.
@@ -245,7 +333,6 @@ export async function gotoAndWaitForData(
 // 인증 컨텍스트 헬퍼
 // ============================================================================
 
-import { Browser, BrowserContext } from '@playwright/test';
 import path from 'path';
 
 /**

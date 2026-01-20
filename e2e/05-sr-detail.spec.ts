@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createTestSR } from './helpers/test-helpers';
+import { createSRViaAPI, createTestSR } from './helpers/test-helpers';
 
 /**
  * SR 상세 페이지 테스트
@@ -14,31 +14,38 @@ test.describe('SR 상세 페이지', () => {
   let testSRId: string | null = null;
 
   test.beforeAll(async ({ browser }) => {
-    // 테스트용 SR이 있는지 확인하고 없으면 생성
+    // 테스트용 SR을 API로 빠르게 생성
     const context = await browser.newContext({
       storageState: './playwright/.auth/user.json',
     });
-    const page = await context.newPage();
+    const request = context.request;
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      // 1. 필요한 데이터(고객사, 카테코리) 조회
+      const [clientResp, categoryResp] = await Promise.all([
+        request.get('/api/clients'),
+        request.get('/api/service-categories'),
+      ]);
 
-      // 기존 SR 확인
-      const firstSRLink = page.locator('table tbody tr a').first();
-      if (await firstSRLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const href = await firstSRLink.getAttribute('href');
-        testSRId = href?.split('/').pop() || null;
-        console.log(`✅ 기존 SR 발견: ${testSRId}`);
-      } else {
-        // SR 생성
-        console.log('⚠️ SR이 없어 테스트용 SR 생성...');
+      const clients = await clientResp.json();
+      const categories = await categoryResp.json();
+
+      if (clients.data?.length > 0 && categories.data?.length > 0) {
         const timestamp = Date.now();
-        testSRId = await createTestSR(page, {
+        const sr = await createSRViaAPI(request, {
           title: `상세 페이지 테스트 SR ${timestamp}`,
-          description: '상세 페이지 테스트용 SR입니다.',
+          description: '상세 페이지 테스트용 SR입니다 (API로 생성됨).',
+          clientId: clients.data[0].id,
+          serviceCategoryId: categories.data[0].id,
+          requestedPriority: 'MEDIUM',
         });
-        console.log(`✅ 테스트 SR 생성 완료: ${testSRId}`);
+        testSRId = sr.id;
+        console.log(`✅ API를 통해 테스트 SR 생성 완료: ${testSRId}`);
+      } else {
+        console.warn('⚠️ 테스트 데이터가 부족하여 UI 생성 시도를 고려하거나 스킵합니다.');
       }
+    } catch (e) {
+      console.error('❌ beforeAll (API Setup) 실패:', e);
     } finally {
       await context.close();
     }
