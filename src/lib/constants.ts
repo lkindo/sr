@@ -84,3 +84,22 @@ export const TIME_MS = {
   HOUR: 60 * 60 * 1000,
   DAY: 24 * 60 * 60 * 1000,
 } as const;
+
+/**
+ * SLA 관련 상수
+ */
+export const SLA = {
+  /**
+   * 우선순위별 SLA 시간 배율
+   * - CRITICAL: 기본 SLA의 50% (긴급)
+   * - HIGH: 기본 SLA의 75%
+   * - MEDIUM: 기본 SLA의 100% (기준)
+   * - LOW: 기본 SLA의 150%
+   */
+  PRIORITY_MULTIPLIER: {
+    CRITICAL: 0.5,
+    HIGH: 0.75,
+    MEDIUM: 1.0,
+    LOW: 1.5,
+  } as Record<string, number>,
+} as const;

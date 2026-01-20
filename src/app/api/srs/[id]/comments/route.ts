@@ -4,10 +4,8 @@ import { z } from 'zod';
 import { RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { MY_REQUESTS_PREFIX, srDetailKey } from '@/lib/cache-keys';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
-import { invalidateCache, invalidateCachePattern } from '@/lib/redis-cache';
 
 const commentSchema = z.object({
   content: z.string().min(1, '댓글 내용을 입력해주세요.'),
@@ -86,7 +84,7 @@ export const POST = withAuthAndRateLimit(
     });
 
     if (!sr) {
-      throw new NotFoundError('SR을 찾을 수 없습니다.');
+      throw new NotFoundError('SR');
     }
 
     const comment = await prisma.sRComment.create({
@@ -115,14 +113,6 @@ export const POST = withAuthAndRateLimit(
         description: '댓글이 추가되었습니다.',
       },
     });
-
-    // Invalidate caches: detail and my-requests (댓글 카운트 등 반영)
-    try {
-      await invalidateCache(srDetailKey(id));
-      await invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`);
-    } catch (e) {
-      console.warn('Cache invalidation failed after comment create:', e);
-    }
 
     // Send email notifications to requester and assignee (non-blocking)
     const { emailService } = await import('@/services/email.service');

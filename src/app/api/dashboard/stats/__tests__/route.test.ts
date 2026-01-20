@@ -15,11 +15,6 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-vi.mock('@/lib/redis-cache', () => ({
-  CacheKeys: { dashboardStats: () => 'dashboard:stats' },
-  getCachedData: vi.fn((key, fetcher) => fetcher()), // Bypass cache
-}));
-
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: (handler: any) => async (req: any) => {
     // Mock session injection
@@ -54,7 +49,7 @@ describe('Dashboard Stats API', () => {
     ] as any);
 
     const req = new NextRequest('http://localhost/api/dashboard/stats');
-    const response = await GET(req);
+    const response = await GET(req, { params: Promise.resolve({}) });
     const json = await response.json();
 
     expect(response.status).toBe(200);

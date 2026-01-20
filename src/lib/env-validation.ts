@@ -93,40 +93,6 @@ export const ENV_VARIABLES: EnvVariable[] = [
     validationError: 'NEXTAUTH_URL은 http:// 또는 https:// 로 시작해야 합니다.',
   },
 
-  // Vercel Blob
-  {
-    name: 'BLOB_READ_WRITE_TOKEN',
-    required: true,
-    description: 'Vercel Blob 스토리지 토큰 (파일 업로드용)',
-    category: 'storage',
-  },
-
-  // Upstash Redis
-  {
-    name: 'UPSTASH_REDIS_REST_URL',
-    required: false, // Redis Rate Limiter 사용 시 필요
-    description: 'Upstash Redis REST API URL',
-    category: 'cache',
-    validate: (value) => value.startsWith('https://'),
-    validationError: 'UPSTASH_REDIS_REST_URL은 https:// 로 시작해야 합니다.',
-  },
-  {
-    name: 'UPSTASH_REDIS_REST_TOKEN',
-    required: false,
-    description: 'Upstash Redis REST API 토큰',
-    category: 'cache',
-  },
-
-  // Resend
-  {
-    name: 'RESEND_API_KEY',
-    required: false, // 이메일 알림 사용 시 필요
-    description: 'Resend 이메일 발송 API 키 (이메일 알림 사용 시 필요)',
-    category: 'email',
-    validate: (value) => value.startsWith('re_'),
-    validationError: 'RESEND_API_KEY는 re_ 로 시작해야 합니다.',
-  },
-
   // Inngest
   {
     name: 'INNGEST_EVENT_KEY',

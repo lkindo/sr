@@ -23,7 +23,7 @@ export const GET = withAuthAndRateLimit(
     const role = await roleService.getRoleById(id);
 
     if (!role) {
-      throw new NotFoundError('역할을 찾을 수 없습니다.');
+      throw new NotFoundError('역할');
     }
 
     return NextResponse.json(role);

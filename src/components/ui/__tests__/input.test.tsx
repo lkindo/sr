@@ -1,6 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 import { Input } from '../input';
 
@@ -18,9 +18,13 @@ describe('Input', () => {
   });
 
   it('should handle different types', () => {
-    render(<Input type="password" placeholder="Password" />);
-    const input = screen.getByPlaceholderText('Password');
-    expect(input).toHaveAttribute('type', 'password');
+    const types = ['text', 'password', 'email', 'number'] as const;
+    types.forEach((type) => {
+      const { unmount } = render(<Input type={type} placeholder={type} />);
+      const input = screen.getByPlaceholderText(type);
+      expect(input).toHaveAttribute('type', type);
+      unmount();
+    });
   });
 
   it('should forward ref', () => {
@@ -33,5 +37,16 @@ describe('Input', () => {
     render(<Input disabled />);
     const input = screen.getByRole('textbox');
     expect(input).toBeDisabled();
+    expect(input).toHaveAttribute('disabled');
+  });
+
+  it('should call onChange handler when typed', () => {
+    const handleChange = vi.fn();
+    render(<Input onChange={handleChange} />);
+    const input = screen.getByRole('textbox');
+
+    fireEvent.change(input, { target: { value: 'searched' } });
+    expect(handleChange).toHaveBeenCalledTimes(1);
+    expect(input).toHaveValue('searched');
   });
 });

@@ -2,21 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SRPriority, SRStatus } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { isCacheAvailable, withCache } from '@/lib/cache';
-import { getSrsListTtlSeconds, shouldWideInvalidate } from '@/lib/cache-config';
-import {
-  DASHBOARD_STATS_PREFIX,
-  srListKey,
-  srListPatternForClient,
-  srListPatternForPriority,
-} from '@/lib/cache-keys';
 import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
 import prisma from '@/lib/prisma';
-import { invalidateCachePattern } from '@/lib/redis-cache';
 import { serializeResponse } from '@/lib/serialization';
 import { PermissionService } from '@/services/permission.service';
-import { SRService } from '@/services/sr.service';
+import { srService } from '@/services/sr.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -39,31 +30,17 @@ export const GET = withAuthAndRateLimit(
     // 페이지네이션 파라미터
     const { skip, take, orderBy, createResponse } = usePagination(request);
 
-    const srService = new SRService();
+    const [srs, totalCount] = await Promise.all([
+      srService.getAllSRs({
+        where: filters,
+        skip,
+        take,
+        orderBy: orderBy as import('@prisma/client').Prisma.SROrderByWithRelationInput,
+      }),
+      prisma.sR.count({ where: filters }),
+    ]);
 
-    // 캐시 키: 필터 기반 (페이지네이션은 캐시 키에서 제외)
-    const cacheKey = srListKey(filters);
-
-    const fetchData = async () => {
-      const [srs, totalCount] = await Promise.all([
-        srService.getAllSRs({
-          where: filters,
-          skip,
-          take,
-          orderBy: orderBy as import('@prisma/client').Prisma.SROrderByWithRelationInput,
-        }),
-        prisma.sR.count({ where: filters }),
-      ]);
-
-      return createResponse(srs, totalCount);
-    };
-
-    const result = isCacheAvailable()
-      ? await withCache(cacheKey, fetchData, {
-          ttlSeconds: getSrsListTtlSeconds(),
-          namespace: 'sr',
-        })
-      : await fetchData();
+    const result = createResponse(srs, totalCount);
 
     // Date 객체를 문자열로 변환 (직렬화 문제 해결)
     return NextResponse.json(serializeResponse(result));
@@ -84,24 +61,7 @@ export const POST = withAuthAndRateLimit(
     }
 
     const body = await request.json();
-    const srService = new SRService();
     const sr = await srService.createSR(body, session.user);
-
-    // Send email notification to MANAGER role users (non-blocking)
-
-    // 캐시 무효화: 목록/대시보드 관련 키
-    try {
-      const wide = shouldWideInvalidate();
-      // 클라이언트/우선순위 조건부 무효화 (wide 모드면 전체)
-      if (!wide && sr.client?.id)
-        await invalidateCachePattern(srListPatternForClient(sr.client.id));
-      if (!wide && sr.priority)
-        await invalidateCachePattern(srListPatternForPriority(sr.priority as string));
-      if (wide || !sr.client?.id) await invalidateCachePattern('sr:list:*');
-      await invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`);
-    } catch (e) {
-      console.warn('Cache invalidation failed after SR create:', e);
-    }
 
     return NextResponse.json(serializeResponse(sr), { status: 201 });
   },

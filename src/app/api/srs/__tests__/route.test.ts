@@ -89,11 +89,6 @@ vi.mock('@/lib/serialization', () => ({
   serializeResponse: vi.fn((data) => data),
 }));
 
-// Mock redis-cache for invalidation
-vi.mock('@/lib/redis-cache', () => ({
-  invalidateCachePattern: vi.fn(),
-}));
-
 // Mock cache-config
 vi.mock('@/lib/cache-config', () => ({
   shouldWideInvalidate: vi.fn(() => false),

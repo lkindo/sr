@@ -32,7 +32,6 @@ describe('EnvValidation', () => {
       process.env.DIRECT_URL = 'postgresql://localhost:5432/mydb_direct';
       process.env.NEXTAUTH_SECRET = 'a_very_long_secret_that_is_at_least_32_characters_long';
       process.env.NEXTAUTH_URL = 'http://localhost:3000';
-      process.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_token';
 
       expect(() => validateEnv()).not.toThrow();
     });
@@ -41,7 +40,7 @@ describe('EnvValidation', () => {
       process.env.DIRECT_URL = 'postgresql://localhost:5432/mydb_direct';
       process.env.NEXTAUTH_SECRET = 'a_very_long_secret_that_is_at_least_32_characters_long';
       process.env.NEXTAUTH_URL = 'http://localhost:3000';
-      process.env.BLOB_READ_WRITE_TOKEN = 'vercel_blob_rw_token';
+
       process.env.DATABASE_URL = '';
 
       try {
@@ -58,7 +57,6 @@ describe('EnvValidation', () => {
       process.env.DIRECT_URL = 'postgresql://localhost';
       process.env.NEXTAUTH_SECRET = 'short'; // Too short, invalid
       process.env.NEXTAUTH_URL = 'http://localhost';
-      process.env.BLOB_READ_WRITE_TOKEN = 'token';
 
       try {
         validateEnv();
@@ -75,7 +73,7 @@ describe('EnvValidation', () => {
       process.env.DIRECT_URL = 'postgresql://localhost';
       process.env.NEXTAUTH_SECRET = 'valid_secret_32_chars_longggggggggg';
       process.env.NEXTAUTH_URL = 'http://localhost';
-      process.env.BLOB_READ_WRITE_TOKEN = 'token';
+
       process.env.RATE_LIMIT_STRICT_WINDOW_MS = 'not-a-number';
 
       try {
@@ -92,44 +90,10 @@ describe('EnvValidation', () => {
       process.env.DIRECT_URL = 'postgresql://localhost';
       process.env.NEXTAUTH_SECRET = 'valid_secret_32_chars_longggggggggg';
       process.env.NEXTAUTH_URL = 'http://localhost';
-      process.env.BLOB_READ_WRITE_TOKEN = 'token';
+
       // No optional variables set - should pass
 
       expect(() => validateEnv()).not.toThrow();
-    });
-
-    it('should validate UPSTASH_REDIS_REST_URL format', () => {
-      process.env.DATABASE_URL = 'postgresql://localhost';
-      process.env.DIRECT_URL = 'postgresql://localhost';
-      process.env.NEXTAUTH_SECRET = 'valid_secret_32_chars_longggggggggg';
-      process.env.NEXTAUTH_URL = 'http://localhost';
-      process.env.BLOB_READ_WRITE_TOKEN = 'token';
-      process.env.UPSTASH_REDIS_REST_URL = 'http://invalid'; // Should be https
-
-      try {
-        validateEnv();
-        expect(true).toBe(false);
-      } catch (error: any) {
-        expect(error).toBeInstanceOf(EnvValidationError);
-        expect(error.invalidVariables[0].variable.name).toBe('UPSTASH_REDIS_REST_URL');
-      }
-    });
-
-    it('should validate RESEND_API_KEY format', () => {
-      process.env.DATABASE_URL = 'postgresql://localhost';
-      process.env.DIRECT_URL = 'postgresql://localhost';
-      process.env.NEXTAUTH_SECRET = 'valid_secret_32_chars_longggggggggg';
-      process.env.NEXTAUTH_URL = 'http://localhost';
-      process.env.BLOB_READ_WRITE_TOKEN = 'token';
-      process.env.RESEND_API_KEY = 'invalid_key'; // Should start with re_
-
-      try {
-        validateEnv();
-        expect(true).toBe(false);
-      } catch (error: any) {
-        expect(error).toBeInstanceOf(EnvValidationError);
-        expect(error.invalidVariables[0].variable.name).toBe('RESEND_API_KEY');
-      }
     });
   });
 
@@ -154,7 +118,6 @@ describe('EnvValidation', () => {
       process.env.DIRECT_URL = 'postgresql://localhost';
       process.env.NEXTAUTH_SECRET = 'valid_secret_32_chars_longggggggggg';
       process.env.NEXTAUTH_URL = 'http://localhost';
-      process.env.BLOB_READ_WRITE_TOKEN = 'token';
 
       validateAndPrintEnv();
 

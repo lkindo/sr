@@ -3,16 +3,10 @@ import { $Enums, Prisma } from '@prisma/client';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import {
-  DASHBOARD_STATS_PREFIX,
-  MY_REQUESTS_PREFIX,
-  SR_LIST_PREFIX,
-  srDetailKey,
-} from '@/lib/cache-keys';
+import { SLA } from '@/lib/constants';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
-import { invalidateCache, invalidateCachePattern } from '@/lib/redis-cache';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 
 // Force Node.js runtime
@@ -89,14 +83,7 @@ export const POST = withAuthAndRateLimit(
 
     // 4. SLA 기반 마감일 자동 계산
     const slaHours = sr.serviceCategory.slaHours;
-    const priorityMultiplier: Record<string, number> = {
-      CRITICAL: 0.5,
-      HIGH: 0.75,
-      MEDIUM: 1.0,
-      LOW: 1.5,
-    };
-
-    const adjustedHours = slaHours * priorityMultiplier[validated.actualPriority];
+    const adjustedHours = slaHours * SLA.PRIORITY_MULTIPLIER[validated.actualPriority];
     const dueDate = new Date();
     dueDate.setHours(dueDate.getHours() + adjustedHours);
 
@@ -158,18 +145,6 @@ export const POST = withAuthAndRateLimit(
         },
       },
     });
-
-    // 캐시 무효화 (병렬 처리)
-    try {
-      await Promise.all([
-        invalidateCache(srDetailKey(id)),
-        invalidateCachePattern(`${SR_LIST_PREFIX}*`),
-        invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`),
-        invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
-      ]);
-    } catch (e) {
-      logger.warn('Cache invalidation failed after SR intake create', { custom_error: String(e) });
-    }
 
     // 6. Activity 로그 생성
     await prisma.sRActivity.create({
@@ -376,15 +351,8 @@ export const PATCH = withAuthAndRateLimit(
     // 5. SLA 재계산 (우선순위 변경 시)
     let dueDate = sr.dueDate;
     if (validated.actualPriority && validated.actualPriority !== sr.actualPriority) {
-      const priorityMultiplier: Record<string, number> = {
-        CRITICAL: 0.5,
-        HIGH: 0.75,
-        MEDIUM: 1.0,
-        LOW: 1.5,
-      };
-
       const adjustedHours =
-        sr.serviceCategory.slaHours * priorityMultiplier[validated.actualPriority];
+        sr.serviceCategory.slaHours * SLA.PRIORITY_MULTIPLIER[validated.actualPriority];
       dueDate = new Date(sr.intakeAt || new Date());
       dueDate.setHours(dueDate.getHours() + adjustedHours);
     }
@@ -465,18 +433,6 @@ export const PATCH = withAuthAndRateLimit(
         },
       },
     });
-
-    // 캐시 무효화 (병렬 처리)
-    try {
-      await Promise.all([
-        invalidateCache(srDetailKey(id)),
-        invalidateCachePattern(`${SR_LIST_PREFIX}*`),
-        invalidateCachePattern(`${DASHBOARD_STATS_PREFIX}*`),
-        invalidateCachePattern(`${MY_REQUESTS_PREFIX}*`),
-      ]);
-    } catch (e) {
-      logger.warn('Cache invalidation failed after SR intake update', { custom_error: String(e) });
-    }
 
     // 8. 변경 사항 추적 및 이력 생성
     const changes: string[] = [];

@@ -716,3 +716,9 @@ export class SRService {
     return { items, total };
   }
 }
+
+/**
+ * SRService 싱글톤 인스턴스
+ * 모든 API 라우트에서 이 인스턴스를 재사용합니다.
+ */
+export const srService = new SRService();

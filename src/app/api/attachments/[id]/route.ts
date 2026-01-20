@@ -23,7 +23,7 @@ export const GET = withAuthAndRateLimit(
     });
 
     if (!attachment) {
-      throw new NotFoundError('첨부파일을 찾을 수 없습니다.');
+      throw new NotFoundError('첨부파일');
     }
 
     return NextResponse.json(attachment);
@@ -44,7 +44,7 @@ export const DELETE = withAuthAndRateLimit(
     });
 
     if (!attachment) {
-      throw new NotFoundError('첨부파일을 찾을 수 없습니다.');
+      throw new NotFoundError('첨부파일');
     }
 
     // SR 접근 권한 체크
@@ -53,7 +53,7 @@ export const DELETE = withAuthAndRateLimit(
     });
 
     if (!sr) {
-      throw new NotFoundError('SR을 찾을 수 없습니다.');
+      throw new NotFoundError('SR');
     }
 
     // 권한 체크: SR을 수정할 수 있는 권한이 있어야 첨부파일도 삭제 가능

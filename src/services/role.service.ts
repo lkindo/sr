@@ -3,7 +3,6 @@ import { z } from 'zod';
 
 import { NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
-import { invalidateCache, invalidateCachePattern } from '@/lib/redis-cache';
 import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
 
 type RoleCreateData = z.infer<typeof roleCreateSchema>;
@@ -92,12 +91,6 @@ export class RoleService {
         });
       }
     });
-
-    // 캐시 무효화 (역할 권한 변경 시 모든 사용자 권한 캐시 무효화)
-    await invalidateCachePattern('user:permissions:*');
-    await invalidateCachePattern('user:roles:*');
-    await invalidateCachePattern('user:full:*');
-    await invalidateCachePattern('role:list*');
 
     // 업데이트된 역할 정보 반환
     return this.getRoleById(roleId);
