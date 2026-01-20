@@ -1,25 +1,31 @@
 name: Deploy to Vercel
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types:
+      - completed
     branches:
-      - main # Production 배포
-      - dev # Preview 배포
+      - main
+      - dev
 
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'pnpm'
+          node-version: "22"
+          cache: "pnpm"
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -35,22 +41,22 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run database migrations (Production only)
-        if: github.ref == 'refs/heads/main'
+        if: github.event.workflow_run.head_branch == 'main'
         run: pnpm prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
 
       - name: Deploy to Vercel (Production)
-        if: github.ref == 'refs/heads/main'
+        if: github.event.workflow_run.head_branch == 'main'
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
+          vercel-args: "--prod"
 
       - name: Deploy to Vercel (Preview)
-        if: github.ref == 'refs/heads/dev'
+        if: github.event.workflow_run.head_branch == 'dev'
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
