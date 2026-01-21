@@ -63,7 +63,7 @@ interface SR {
   title: string;
   description: string;
   status: string;
-  priority: string;
+  actualPriority: string | null;
   requestedPriority?: string | null;
   requestedCompletionDate?: Date | null | string;
   estimatedCompletionDate?: Date | null | string;
@@ -209,8 +209,8 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
     setClientId(sr.clientId || sr.client?.id || '');
     // serviceCategory 또는 category 중 하나를 사용
     setCategoryId(sr.serviceCategory?.id || sr.category?.id || '');
-    setRequestedPriority(sr.requestedPriority || sr.priority || 'MEDIUM');
-    setPriority(sr.priority);
+    setRequestedPriority(sr.requestedPriority || 'MEDIUM');
+    setPriority(sr.actualPriority || 'MEDIUM');
     setStatus(sr.status);
     setRequestedCompletionDate(
       sr.requestedCompletionDate
