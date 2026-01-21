@@ -118,19 +118,19 @@ export function SRsDataTable({
 
   // Read state from URL search params, with defaults
 
-  const itemsPerPage = searchParams.get('itemsPerPage') ?? '20';
-  const sort = searchParams.get('sort') ?? 'createdAt.desc';
+  const itemsPerPage = searchParams?.get('itemsPerPage') ?? '20';
+  const sort = searchParams?.get('sort') ?? 'createdAt.desc';
   const [sortField, sortOrder] = sort.split('.') as [SortField, SortOrder];
 
   const filters = useMemo(
     () => ({
-      status: searchParams.get('status') ?? 'all',
-      priority: searchParams.get('priority') ?? 'all',
-      clientId: searchParams.get('clientId') ?? 'all',
-      assigneeId: searchParams.get('assigneeId') ?? 'all',
-      search: searchParams.get('search') ?? '',
-      dateFrom: searchParams.get('dateFrom') ?? '',
-      dateTo: searchParams.get('dateTo') ?? '',
+      status: searchParams?.get('status') ?? 'all',
+      priority: searchParams?.get('priority') ?? 'all',
+      clientId: searchParams?.get('clientId') ?? 'all',
+      assigneeId: searchParams?.get('assigneeId') ?? 'all',
+      search: searchParams?.get('search') ?? '',
+      dateFrom: searchParams?.get('dateFrom') ?? '',
+      dateTo: searchParams?.get('dateTo') ?? '',
     }),
     [searchParams]
   );

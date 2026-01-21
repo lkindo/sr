@@ -17,7 +17,7 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
 };
 
 export default async function SRsPage({ searchParams }: Props) {
-  const resolvedSearchParams = await searchParams;
+  const resolvedSearchParams = (await searchParams) || {};
   const page = parseInt(getSearchParam(resolvedSearchParams.page) ?? '1', 10);
   const itemsPerPage = parseInt(getSearchParam(resolvedSearchParams.itemsPerPage) ?? '20', 10);
   const sort = getSearchParam(resolvedSearchParams.sort) ?? 'createdAt.desc';
