@@ -1,0 +1,70 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Next.js build output
+.next
+out
+build
+
+# Environment variables (Secrets)
+.env
+.env.local
+.env.production
+.env.test
+.env*.local
+
+# Version control
+.git
+.gitignore
+
+# IDE and Editor files
+.vscode
+.idea
+*.swp
+*.swo
+
+# Temporary and Log files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+test_results.txt
+test-results
+playwright-report
+playwright-report
+blob-report
+coverage
+
+# Project specific configs (not needed in production runner)
+.vercel
+.github
+.husky
+.storybook
+.stryker-tmp
+docs
+e2e
+playwright
+playwright.config.ts
+playwright.debug.config.ts
+vitest.config.ts
+vitest.mutation.config.ts
+vitest.setup.ts
+vitest.shims.d.ts
+stryker.config.mjs
+eslint.config.mjs
+.eslintrc.*
+.prettierignore
+.prettierrc
+README.md
+*.md
+vercel.json
+components.json
+vapid.json
+vapid_final.json
+
+# Docker files
+docker-compose.yml
+Dockerfile
+.dockerignore

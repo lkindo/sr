@@ -17,9 +17,9 @@ import { useToast } from '@/hooks/use-toast';
 import { User } from '@/types/user';
 
 interface PaginationData {
-  page: number;
-  limit: number;
-  total: number;
+  currentPage: number;
+  pageSize: number;
+  totalItems: number;
   totalPages: number;
 }
 
@@ -39,9 +39,9 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationData>({
-    page: initialPage,
-    limit: 10,
-    total: 0,
+    currentPage: initialPage,
+    pageSize: 10,
+    totalItems: 0,
     totalPages: 1,
   });
   const [searchQuery, setSearchQuery] = useState(initialSearch);
@@ -69,17 +69,17 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        q: searchQuery,
+        page: pagination.currentPage.toString(),
+        pageSize: pagination.pageSize.toString(),
+        search: searchQuery,
       });
 
       const response = await fetch(`/api/users?${params}`);
       if (!response.ok) throw new Error('Failed to fetch users');
 
-      const data = await response.json();
-      setUsers(data.users);
-      setPagination(data.pagination);
+      const result = await response.json();
+      setUsers(result.data);
+      setPagination(result.meta);
       setError(null);
     } catch (err) {
       setError('사용자 목록을 불러오는데 실패했습니다.');
@@ -87,7 +87,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchQuery]);
+  }, [pagination.currentPage, pagination.pageSize, searchQuery]);
 
   // Clients & Roles fetching (for dropdowns)
   const fetchMetadata = useCallback(async () => {
@@ -120,12 +120,12 @@ export default function UsersPage() {
   // 검색어 변경 핸들러 (디바운스 적용 권장하지만 여기선 간단히)
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination((prev) => ({ ...prev, page: 1 }));
+    setPagination((prev) => ({ ...prev, currentPage: 1 }));
     updateUrl(1, searchQuery);
   };
 
   const handlePageChange = (newPage: number) => {
-    setPagination((prev) => ({ ...prev, page: newPage }));
+    setPagination((prev) => ({ ...prev, currentPage: newPage }));
     updateUrl(newPage, searchQuery);
   };
 
@@ -238,7 +238,7 @@ export default function UsersPage() {
           <div className="text-sm text-muted-foreground">
             Total{' '}
             <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">
-              {pagination.total}
+              {pagination.totalItems}
             </span>{' '}
             items
           </div>
@@ -280,19 +280,19 @@ export default function UsersPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
+                onClick={() => handlePageChange(pagination.currentPage - 1)}
+                disabled={pagination.currentPage === 1}
               >
                 이전
               </Button>
               <span className="text-sm text-muted-foreground">
-                {pagination.page} / {pagination.totalPages}
+                {pagination.currentPage} / {pagination.totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.totalPages}
+                onClick={() => handlePageChange(pagination.currentPage + 1)}
+                disabled={pagination.currentPage === pagination.totalPages}
               >
                 다음
               </Button>

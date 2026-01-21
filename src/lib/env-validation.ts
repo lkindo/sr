@@ -150,6 +150,22 @@ export const ENV_VARIABLES: EnvVariable[] = [
     validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
     validationError: 'RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS는 양의 정수여야 합니다.',
   },
+  {
+    name: 'RATE_LIMIT_MIDDLEWARE_WINDOW_MS',
+    required: false,
+    description: 'Middleware Rate Limit 윈도우 (밀리초)',
+    category: 'rate-limit',
+    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
+    validationError: 'RATE_LIMIT_MIDDLEWARE_WINDOW_MS는 양의 정수여야 합니다.',
+  },
+  {
+    name: 'RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS',
+    required: false,
+    description: 'Middleware Rate Limit 최대 요청 수',
+    category: 'rate-limit',
+    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
+    validationError: 'RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS는 양의 정수여야 합니다.',
+  },
 ];
 
 /**

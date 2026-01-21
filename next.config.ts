@@ -59,6 +59,9 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '2mb',
     },
   },
+
+  // Docker 빌드 최적화
+  output: 'standalone',
 };
 
 export default withBundleAnalyzer(nextConfig);

@@ -10,11 +10,8 @@ import { MemoryRateLimiter } from '@/lib/rate-limiter';
 const { auth } = NextAuth(authConfig);
 
 // Rate Limiter 인스턴스 (메모리 유지 - 람다/엣지에서는 인스턴스마다 별도일 수 있음)
-// 1분(60초) 동안 20회 요청 제한
-const ratelimit = new MemoryRateLimiter({
-  windowMs: 60000,
-  maxRequests: 20,
-});
+import { rateLimiters } from '@/lib/rate-limiter';
+const ratelimit = rateLimiters.middleware;
 
 export default auth(async (req) => {
   // 1. API 라우트 Rate Limiting

@@ -212,6 +212,13 @@ export const RateLimitPresets = {
    * 환경 변수: RATE_LIMIT_FILE_UPLOAD_WINDOW_MS, RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS
    */
   FILE_UPLOAD: getEnvRateLimitConfig('FILE_UPLOAD', 60 * 60 * 1000, 20),
+
+  /**
+   * 미들웨어 (API 전체) 제한
+   * 기본: 1분당 20회
+   * 환경 변수: RATE_LIMIT_MIDDLEWARE_WINDOW_MS, RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS
+   */
+  MIDDLEWARE: getEnvRateLimitConfig('MIDDLEWARE', 60 * 1000, 20),
 };
 
 /**
@@ -222,6 +229,7 @@ export const rateLimiters = {
   standard: new MemoryRateLimiter(RateLimitPresets.STANDARD),
   relaxed: new MemoryRateLimiter(RateLimitPresets.RELAXED),
   fileUpload: new MemoryRateLimiter(RateLimitPresets.FILE_UPLOAD),
+  middleware: new MemoryRateLimiter(RateLimitPresets.MIDDLEWARE),
 };
 
 /**

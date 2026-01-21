@@ -33,9 +33,9 @@ interface Client {
 }
 
 interface PaginationMeta {
-  page: number;
+  currentPage: number;
   pageSize: number;
-  total: number;
+  totalItems: number;
   totalPages: number;
 }
 
@@ -57,9 +57,9 @@ export default function ClientsPage() {
   const [industryFilter, setIndustryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [pagination, setPagination] = useState<PaginationMeta>({
-    page: 1,
+    currentPage: 1,
     pageSize: 10,
-    total: 0,
+    totalItems: 0,
     totalPages: 0,
   });
 
@@ -69,7 +69,7 @@ export default function ClientsPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      params.append('page', pagination.page.toString());
+      params.append('page', pagination.currentPage.toString());
       params.append('pageSize', pagination.pageSize.toString());
       if (searchQuery) params.append('search', searchQuery);
       if (industryFilter !== 'all') params.append('industry', industryFilter);
@@ -82,7 +82,7 @@ export default function ClientsPage() {
       setClients(result.data);
       setPagination((prev) => ({
         ...prev,
-        total: result.meta.total,
+        totalItems: result.meta.totalItems,
         totalPages: result.meta.totalPages,
       }));
     } catch {
@@ -94,7 +94,14 @@ export default function ClientsPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.pageSize, searchQuery, industryFilter, statusFilter, toast]);
+  }, [
+    pagination.currentPage,
+    pagination.pageSize,
+    searchQuery,
+    industryFilter,
+    statusFilter,
+    toast,
+  ]);
 
   useEffect(() => {
     fetchClients();
@@ -145,7 +152,7 @@ export default function ClientsPage() {
   };
 
   const handlePageChange = (newPage: number) => {
-    setPagination((prev) => ({ ...prev, page: newPage }));
+    setPagination((prev) => ({ ...prev, currentPage: newPage }));
   };
 
   return (
@@ -174,7 +181,7 @@ export default function ClientsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
-                    setPagination((prev) => ({ ...prev, page: 1 })); // 검색 시 1페이지로 리셋
+                    setPagination((prev) => ({ ...prev, currentPage: 1 })); // 검색 시 1페이지로 리셋
                   }
                 }}
                 className="pl-10 sr-input-template"
@@ -186,7 +193,7 @@ export default function ClientsPage() {
                 value={industryFilter}
                 onValueChange={(val) => {
                   setIndustryFilter(val);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
                 }}
               >
                 <SelectTrigger className="w-[150px] sr-dropdown-template">
@@ -206,7 +213,7 @@ export default function ClientsPage() {
                 value={statusFilter}
                 onValueChange={(val) => {
                   setStatusFilter(val);
-                  setPagination((prev) => ({ ...prev, page: 1 }));
+                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
                 }}
               >
                 <SelectTrigger className="w-[150px] sr-dropdown-template">
@@ -227,7 +234,7 @@ export default function ClientsPage() {
           <div className="text-sm text-muted-foreground">
             Total{' '}
             <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">
-              {pagination.total}
+              {pagination.totalItems}
             </span>{' '}
             items
           </div>
@@ -262,19 +269,19 @@ export default function ClientsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handlePageChange(pagination.page - 1)}
-                disabled={pagination.page === 1}
+                onClick={() => handlePageChange(pagination.currentPage - 1)}
+                disabled={pagination.currentPage === 1}
               >
                 이전
               </Button>
               <span className="text-sm text-muted-foreground">
-                {pagination.page} / {pagination.totalPages}
+                {pagination.currentPage} / {pagination.totalPages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handlePageChange(pagination.page + 1)}
-                disabled={pagination.page === pagination.totalPages}
+                onClick={() => handlePageChange(pagination.currentPage + 1)}
+                disabled={pagination.currentPage === pagination.totalPages}
               >
                 다음
               </Button>

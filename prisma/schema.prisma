@@ -3,9 +3,7 @@
 
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-1.1.x", "windows"]
-  // Vercel 배포 호환성을 위해 기본 경로 사용
-  // output = "../src/generated/prisma" // 커스텀 경로는 Vercel에서 문제 발생
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "windows"]
 }
 
 datasource db {
@@ -66,12 +64,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -101,10 +99,6 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-// ============================================================================
-// 권한 관리 (RBAC)
-// ============================================================================
-
 model Role {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -112,6 +106,7 @@ model Role {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Relations
   users       UserRole[]
   permissions RolePermission[]
 
@@ -119,26 +114,26 @@ model Role {
 }
 
 model UserRole {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  roleId    String   @map("role_id")
-  createdAt DateTime @default(now()) @map("created_at")
+  userId String @map("user_id")
+  roleId String @map("role_id")
 
+  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
+  @@id([userId, roleId])
   @@map("user_roles")
 }
 
 model Permission {
-  id          String  @id @default(cuid())
-  resource    String
-  action      String
+  id          String   @id @default(cuid())
+  resource    String // 예: 'SR', 'USER', 'CLIENT'
+  action      String // 예: 'CREATE', 'READ', 'UPDATE', 'DELETE'
   description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Relations
   roles RolePermission[]
 
   @@unique([resource, action])
@@ -146,318 +141,210 @@ model Permission {
 }
 
 model RolePermission {
-  id           String   @id @default(cuid())
-  roleId       String   @map("role_id")
-  permissionId String   @map("permission_id")
-  createdAt    DateTime @default(now()) @map("created_at")
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
 
+  // Relations
   role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
-  @@unique([roleId, permissionId])
-  @@index([roleId])
-  @@index([permissionId])
+  @@id([roleId, permissionId])
   @@map("role_permissions")
 }
 
 // ============================================================================
-// 고객사 관리
+// 고객사 및 서비스 요청 관리
 // ============================================================================
 
 model Client {
-  id                String    @id @default(cuid())
-  code              String    @unique
-  name              String
-  industry          String?
-  contactPerson     String?   @map("contact_person")
-  contactEmail      String?   @map("contact_email")
-  contactPhone      String?   @map("contact_phone")
-  address           String?
-  contractStartDate DateTime? @map("contract_start_date")
-  contractEndDate   DateTime? @map("contract_end_date")
-  isActive          Boolean   @default(true) @map("is_active")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id           String   @id @default(cuid())
+  code         String   @unique // 고객사 코드 (예: CLI001)
+  name         String
+  industry     String?
+  contactPerson String?  @map("contact_person")
+  contactEmail  String?  @map("contact_email")
+  contactPhone  String?  @map("contact_phone")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  users             UserClient[]
-  srs               SR[]
+  // Relations
+  users            UserClient[]
   serviceCategories ServiceCategory[]
-  clientHandlers    ClientHandler[]
+  srs              SR[]
+  clientHandlers   ClientHandler[]
 
-  @@index([name])
-  @@index([code])
-  @@index([isActive])
   @@map("clients")
 }
 
 model UserClient {
-  id        String   @id @default(cuid())
-  userId    String   @map("user_id")
-  clientId  String   @map("client_id")
-  createdAt DateTime @default(now()) @map("created_at")
+  userId   String @map("user_id")
+  clientId String @map("client_id")
 
+  // Relations
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, clientId])
-  @@index([userId])
-  @@index([clientId])
+  @@id([userId, clientId])
   @@map("user_clients")
 }
 
 model ServiceCategory {
-  id              String     @id @default(cuid())
-  clientId        String?    @map("client_id")
-  categoryName    String     @map("category_name")
+  id              String   @id @default(cuid())
+  clientId        String   @map("client_id")
+  categoryName     String   @map("category_name")
   description     String?
-  slaHours        Int        @map("sla_hours")
+  slaHours        Int      @default(24) @map("sla_hours")
   priority        SRPriority @default(MEDIUM)
-  handlerId       String?    @map("handler_id")
-  backupHandlerId String?    @map("backup_handler_id")
-  isActive        Boolean    @default(true) @map("is_active")
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @updatedAt @map("updated_at")
+  handlerId       String?  @map("handler_id") // 전담 담당자
+  backupHandlerId String?  @map("backup_handler_id") // 백업 담당자
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  client        Client? @relation(fields: [clientId], references: [id])
-  handler       User?   @relation("CategoryHandler", fields: [handlerId], references: [id])
-  backupHandler User?   @relation("CategoryBackupHandler", fields: [backupHandlerId], references: [id])
+  // Relations
+  client        Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  handler       User?  @relation("CategoryHandler", fields: [handlerId], references: [id])
+  backupHandler User?  @relation("CategoryBackupHandler", fields: [backupHandlerId], references: [id])
   srs           SR[]
 
-  @@index([clientId])
-  @@index([handlerId])
+  @@unique([clientId, categoryName])
   @@map("service_categories")
 }
 
 model ClientHandler {
-  id              String    @id @default(cuid())
-  clientId        String    @map("client_id")
-  userId          String    @map("user_id")
-  mattermostId    String?   @map("mattermost_id")
-  backupHandlerId String?   @map("backup_handler_id")
-  assignedDate    DateTime  @default(now()) @map("assigned_date")
-  unassignedDate  DateTime? @map("unassigned_date")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id              String   @id @default(cuid())
+  clientId        String   @map("client_id")
+  userId          String   @map("user_id")
+  backupUserId    String?  @map("backup_user_id")
+  isPrimary       Boolean  @default(true) @map("is_primary")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  client        Client @relation(fields: [clientId], references: [id])
-  user          User   @relation("ClientHandlerUser", fields: [userId], references: [id])
-  backupHandler User?  @relation("ClientHandlerBackup", fields: [backupHandlerId], references: [id])
+  // Relations
+  client       Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user         User   @relation("ClientHandlerUser", fields: [userId], references: [id], onDelete: Cascade)
+  backupUser   User?  @relation("ClientHandlerBackup", fields: [backupUserId], references: [id])
 
   @@unique([clientId, userId])
-  @@index([clientId])
-  @@index([userId])
   @@map("client_handlers")
 }
 
-// ============================================================================
-// SR 관리
-// ============================================================================
-
-enum SRStatus {
-  REQUESTED
-  INTAKE
-  IN_PROGRESS
-  ON_HOLD
-  COMPLETED
-  CONFIRMED
-  REJECTED
-}
-
-enum SRPriority {
-  CRITICAL
-  HIGH
-  MEDIUM
-  LOW
-}
-
 model SR {
-  id          String     @id @default(cuid())
-  srNumber    String     @unique @map("sr_number")
-  title       String
-  description String
-  status      SRStatus   @default(REQUESTED)
-  priority    SRPriority @default(MEDIUM)
+  id                 String     @id @default(cuid())
+  srNumber           String     @unique @map("sr_number") // SR 관리 번호
+  title              String
+  description        String     @db.Text
+  status             SRStatus   @default(REQUESTED)
+  requestedPriority  SRPriority @default(MEDIUM) @map("requested_priority")
+  actualPriority     SRPriority @default(MEDIUM) @map("actual_priority")
+  
+  // 외래키
+  clientId          String @map("client_id")
+  serviceCategoryId String @map("service_category_id")
+  requesterId       String @map("requester_id") // 요청자 (고객사 사용자)
+  assigneeId        String? @map("assignee_id") // 담당자 (시스템 운영팀)
+  intakeById        String? @map("intake_by_id") // 접수자
 
-  // ===== 요청자 입력 필드 =====
-  requestedPriority       SRPriority @default(MEDIUM) @map("requested_priority")
-  requestedCompletionDate DateTime?  @map("requested_completion_date")
+  // 일시
+  requestedAt        DateTime  @default(now()) @map("requested_at")
+  intakeAt           DateTime? @map("intake_at")
+  estimatedCompletionDate DateTime? @map("estimated_completion_date")
+  actualCompletionDate    DateTime? @map("actual_completion_date")
+  completedAt        DateTime? @map("completed_at")
+  unassignedDate     DateTime? @map("unassigned_date")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  clientId          String  @map("client_id")
-  requesterId       String  @map("requester_id")
-  assigneeId        String? @map("assignee_id")
-  serviceCategoryId String  @map("service_category_id")
+  // 추가 정보 (Vercel 배포에 맞춰 Snake Case로 컬럼명 통일)
+  requestedCompletionDate DateTime? @map("requested_completion_date")
+  satisfactionRating     Int?      @map("satisfaction_rating")
+  satisfactionComment    String?   @db.Text @map("satisfaction_comment")
 
-  // ===== 접수자 분석 필드 =====
-  intakeById              String?     @map("intake_by_id")
-  actualPriority          SRPriority? @map("actual_priority")
-  intakeNotes             String?     @map("intake_notes")
-  estimatedHours          Float?      @map("estimated_hours")
-  estimatedCompletionDate DateTime?   @map("estimated_completion_date")
-
-  requestedAt            DateTime  @default(now()) @map("requested_at")
-  intakeAt               DateTime? @map("intake_at")
-  completedAt            DateTime? @map("completed_at")
-  confirmedAt            DateTime? @map("confirmed_at")
-  dueDate                DateTime? @map("due_date")
-  expectedCompletionDate DateTime? @map("expected_completion_date")
-  actualCompletionDate   DateTime? @map("actual_completion_date")
-
-  resolutionDescription String? @map("resolution_description")
-  rejectionReason       String? @map("rejection_reason")
-
-  satisfactionRating Int?    @map("satisfaction_rating")
-  additionalFeedback String? @map("additional_feedback")
-
-  attachmentCount Int @default(0) @map("attachment_count")
-  commentCount    Int @default(0) @map("comment_count")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  client          Client            @relation(fields: [clientId], references: [id])
-  requester       User              @relation("SRRequester", fields: [requesterId], references: [id])
-  assignee        User?             @relation("SRAssignee", fields: [assigneeId], references: [id])
-  intakeBy        User?             @relation("SRIntakeBy", fields: [intakeById], references: [id])
-  serviceCategory ServiceCategory   @relation(fields: [serviceCategoryId], references: [id])
+  // Relations
+  client          Client          @relation(fields: [clientId], references: [id])
+  serviceCategory ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
+  requester       User            @relation("SRRequester", fields: [requesterId], references: [id])
+  assignee        User?           @relation("SRAssignee", fields: [assigneeId], references: [id])
+  intakeBy        User?           @relation("SRIntakeBy", fields: [intakeById], references: [id])
+  
   activities      SRActivity[]
   comments        SRComment[]
   attachments     SRAttachment[]
   statusHistory   SRStatusHistory[]
 
-  @@index([clientId, status])
-  @@index([requesterId, createdAt])
-  @@index([assigneeId, status])
-  @@index([serviceCategoryId])
   @@index([srNumber])
-  @@index([status, priority, createdAt])
-  @@index([intakeById])
+  @@index([clientId])
+  @@index([requesterId])
+  @@index([assigneeId])
+  @@index([status])
   @@map("srs")
 }
 
-enum SRActivityType {
-  CREATED
-  STATUS_CHANGED
-  PRIORITY_CHANGED
-  ASSIGNED
-  REASSIGNED
-  COMMENTED
-  ATTACHMENT_ADDED
-  ATTACHMENT_REMOVED
-  REOPENED
-  COMPLETED
-  REJECTED
-  INTAKE_UPDATED
-}
-
 model SRActivity {
-  id          String         @id @default(cuid())
-  srId        String         @map("sr_id")
-  userId      String         @map("user_id")
-  type        SRActivityType
-  description String
-  metadata    Json?
-  createdAt   DateTime       @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  srId        String   @map("sr_id")
+  userId      String   @map("user_id")
+  type        String // 예: 'STATUS_CHANGED', 'COMMENT_ADDED', 'ASSIGNED'
+  description String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
 
+  // Relations
   sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([srId, createdAt])
-  @@index([userId])
+  @@index([srId])
   @@map("sr_activities")
 }
 
 model SRComment {
-  id         String   @id @default(cuid())
-  srId       String   @map("sr_id")
-  userId     String   @map("user_id")
-  content    String
-  isInternal Boolean  @default(false) @map("is_internal")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  srId      String   @map("sr_id")
+  userId    String   @map("user_id")
+  content   String   @db.Text
+  isPublic  Boolean  @default(true) @map("is_public") // 고객 노출 여부
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Relations
   sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([srId, createdAt])
-  @@index([userId])
+  @@index([srId])
   @@map("sr_comments")
 }
 
 model SRAttachment {
-  id          String   @id @default(cuid())
-  srId        String   @map("sr_id")
-  fileName    String   @map("file_name")
-  fileSize    Int      @map("file_size")
-  fileType    String   @map("file_type")
-  fileUrl     String   @map("file_url")
-  storagePath String?  @map("storage_path")
-  uploadedBy  String   @map("uploaded_by")
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        String   @id @default(cuid())
+  srId      String   @map("sr_id")
+  fileName  String   @map("file_name")
+  fileUrl   String   @map("file_url")
+  fileSize  Int      @map("file_size")
+  fileType  String   @map("file_type")
+  createdAt DateTime @default(now()) @map("created_at")
 
+  // Relations
   sr SR @relation(fields: [srId], references: [id], onDelete: Cascade)
 
   @@index([srId])
   @@map("sr_attachments")
 }
 
-// ============================================================================
-// 알림 관리
-// ============================================================================
-
-enum NotificationType {
-  EMAIL
-  MATTERMOST
-  IN_APP
-  PUSH
-}
-
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-}
-
-model Notification {
-  id         String             @id @default(cuid())
-  type       NotificationType
-  status     NotificationStatus @default(PENDING)
-  recipient  String
-  subject    String?
-  content    String
-  metadata   Json?
-  sentAt     DateTime?          @map("sent_at")
-  failReason String?            @map("fail_reason")
-  createdAt  DateTime           @default(now()) @map("created_at")
-
-  @@index([status, createdAt])
-  @@index([recipient])
-  @@map("notifications")
-}
-
-// ============================================================================
-// SR 상태 이력
-// ============================================================================
-
 model SRStatusHistory {
-  id             String    @id @default(cuid())
-  srId           String    @map("sr_id")
+  id             String   @id @default(cuid())
+  srId           String   @map("sr_id")
   previousStatus SRStatus? @map("previous_status")
   currentStatus  SRStatus  @map("current_status")
-  changedBy      String    @map("changed_by")
-  changeReason   String?   @map("change_reason")
-  changedAt      DateTime  @default(now()) @map("changed_at")
+  changedBy      String   @map("changed_by")
+  changeReason   String?  @db.Text @map("change_reason")
+  changedAt      DateTime @default(now()) @map("changed_at")
 
+  // Relations
   sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
   user User @relation("StatusChangeUser", fields: [changedBy], references: [id])
 
-  @@index([srId, changedAt])
-  @@index([changedBy])
+  @@index([srId])
   @@map("sr_status_history")
 }
-
-// ============================================================================
-// 푸시 알림
-// ============================================================================
 
 model PushSubscription {
   id        String   @id @default(cuid())
@@ -469,6 +356,7 @@ model PushSubscription {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -476,22 +364,67 @@ model PushSubscription {
 }
 
 model NotificationPreference {
-  id                   String  @id @default(cuid())
-  userId               String  @unique @map("user_id")
+  id                   String   @id @default(cuid())
+  userId               String   @unique @map("user_id")
+  
   // Email preferences
-  emailSRCreated       Boolean @default(true) @map("email_sr_created")
-  emailSRAssigned      Boolean @default(true) @map("email_sr_assigned")
-  emailSRStatusChanged Boolean @default(false) @map("email_sr_status_changed")
-  emailCommentAdded    Boolean @default(false) @map("email_comment_added")
+  emailSRCreated       Boolean  @default(true) @map("email_sr_created")
+  emailSRAssigned      Boolean  @default(true) @map("email_sr_assigned")
+  emailSRStatusChanged Boolean  @default(false) @map("email_sr_status_changed")
+  emailCommentAdded    Boolean  @default(false) @map("email_comment_added")
+  
   // Push preferences
-  pushSRCreated        Boolean @default(true) @map("push_sr_created")
-  pushSRAssigned       Boolean @default(true) @map("push_sr_assigned")
-  pushSRStatusChanged  Boolean @default(false) @map("push_sr_status_changed")
-  pushCommentAdded     Boolean @default(false) @map("push_comment_added")
+  pushSRCreated        Boolean  @default(true) @map("push_sr_created")
+  pushSRAssigned       Boolean  @default(true) @map("push_sr_assigned")
+  pushSRStatusChanged  Boolean  @default(false) @map("push_sr_status_changed")
+  pushCommentAdded     Boolean  @default(false) @map("push_comment_added")
+  
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
+  // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  content   String           @db.Text
+  link      String?
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+enum SRStatus {
+  REQUESTED // 요청됨
+  IN_PROGRESS // 진행 중
+  COMPLETED // 완료됨
+  CANCELLED // 취소됨
+  REJECTED // 반려됨
+}
+
+enum SRPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationType {
+  SR_CREATED
+  SR_ASSIGNED
+  SR_STATUS_CHANGED
+  COMMENT_ADDED
+  SYSTEM
 }
