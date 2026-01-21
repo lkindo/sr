@@ -94,15 +94,14 @@ async function main() {
   } else {
     console.log('4️⃣  UserClient 관계 삭제 중...');
 
-    const userClientIdsToDelete = usersWithClients.flatMap((user) =>
-      user.clients.map((uc) => uc.id)
-    );
-
     const deleteResult = await prisma.userClient.deleteMany({
       where: {
-        id: {
-          in: userClientIdsToDelete,
-        },
+        OR: usersWithClients.flatMap((user) =>
+          user.clients.map((uc) => ({
+            userId: user.id,
+            clientId: uc.clientId,
+          }))
+        ),
       },
     });
 
