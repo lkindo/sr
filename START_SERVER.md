@@ -30,9 +30,7 @@ cd "C:\Users\sanle\OneDrive\문서\GitHub\sr"; $env:PORT=3001; pnpm dev
 
 포트 3000으로 실행하려면 `.env` 파일 수정 필요:
 
-1. `.env` 파일에서 다음 줄 수정:
-
-```env
+```bash
 NEXTAUTH_URL="http://localhost:3000"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
