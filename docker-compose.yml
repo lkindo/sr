@@ -6,7 +6,7 @@ services:
     container_name: sr-app
     restart: always
     ports:
-      - "3000:3000"
+      - "3001:3000"
     env_file:
       - .env.docker
     depends_on:

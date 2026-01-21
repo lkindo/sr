@@ -2,74 +2,58 @@
 
 Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 처리, 추적하는 엔터프라이즈급 웹 애플리케이션
 
+![SR System Overview](docs/images/overview.png) _(이미지 경로 예시)_
+
 ---
 
 ## 📋 주요 기능
 
-- **SR 요청 관리**: 고객 서비스 요청 생성, 조회, 수정, 삭제
-- **상태 추적**: 요청됨 → 접수 → 진행중 → 완료/취소 워크플로우
-- **우선순위 관리**: 긴급, 높음, 보통, 낮음 우선순위 지정
-- **사용자 역할**: ADMIN, MANAGER, ENGINEER, CLIENT_ADMIN, CLIENT_USER
-- **실시간 알림**: 이메일 및 푸시 알림 지원
-- **파일 첨부**: SR에 문서/이미지 첨부 가능
-- **대시보드**: 통계 및 차트로 SR 현황 파악
+- **SR 요청 관리**: 고객 서비스 요청 생성, 조회, 수정, 삭제 및 이력 추적
+- **상태 워크플로우**: 요청됨 → 접수 → 진행중 → 완료/취소/반려의 체계적인 상태 관리
+- **SLA & 우선순위**: 긴급도에 따른 우선순위(CRITICAL~LOW) 관리 및 SLA 마감일 추적
+- **사용자 역할**:
+  - **운영팀**: ADMIN (전체 권한), MANAGER (관리), ENGINEER (실무)
+  - **고객사**: CLIENT_ADMIN (고객사 관리), CLIENT_USER (요청 전용)
+- **보안 및 제한**:
+  - 역할 기반 권한 제어 (RBAC)
+  - **환경 변수 기반 Rate Limiting (API/미들웨어 보호)**
+- **커뮤니케이션**: 댓글 시스템, 파일 첨부, 실시간 알림(이메일/웹푸시)
+- **대시보드**: 실시간 처리 현황 및 통계 시각화
 
 ---
 
-## 🏗️ 아키텍처
+## 🏗️ 아키텍처 및 배포 전략
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         Client                               │
-│                   (Next.js React 19)                         │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                    Server Actions                            │
-│              (src/actions/*.ts)                              │
-│         - 인증/권한 검증 (Policy)                             │
-│         - Result 타입 반환                                    │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                   Service Layer                              │
-│              (src/services/*.ts)                             │
-│         - 비즈니스 로직                                       │
-│         - Prisma DB 접근                                      │
-│         - 트랜잭션 관리                                       │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                    Database                                  │
-│               (PostgreSQL + Prisma)                          │
-└─────────────────────────────────────────────────────────────┘
-```
+이 프로젝트는 **하이브리드 배포 환경**을 지원하도록 설계되었습니다.
 
-### 핵심 설계 패턴
+### 1. Docker 배포 (권장 - 온프레미스/AWS)
 
-- **Service Layer Pattern**: 비즈니스 로직 캡슐화
-- **Policy Pattern**: 권한 검증 분리 (`canCreateSR`, `ensureCanUpdate`)
-- **Result Type**: 에러 처리 표준화 (`{ success, data, error }`)
+- **환경 격리**: `.env.docker`를 통해 로컬 환경과 완전히 분리된 설정 사용
+- **최적화**: 멀티 스테이지 빌드(Standalone Output)로 이미지 크기 최소화
+- **DB 포함**: PostgreSQL 컨테이너와 함께 `docker-compose`로 즉시 실행 가능
+
+### 2. Vercel 배포 (Cloud)
+
+- Edge Function 및 Serverless 환경 호환
+- Vercel Blob / Postgres / Redis 통합 지원
 
 ---
 
-## 🛠️ 기술 스택
+## 🛠️ 기술 스택 (Latest)
 
-| 분류           | 기술               | 버전     |
-| -------------- | ------------------ | -------- |
-| **Frontend**   | Next.js            | 16.x     |
-| **UI**         | React              | 19.x     |
-| **Language**   | TypeScript         | 5.x      |
-| **Styling**    | Tailwind CSS       | 3.x      |
-| **Database**   | PostgreSQL         | -        |
-| **ORM**        | Prisma             | 6.x      |
-| **Auth**       | NextAuth.js        | 5.0-beta |
-| **Validation** | Zod                | 4.x      |
-| **Cache**      | Upstash Redis      | -        |
-| **Storage**    | Vercel Blob        | -        |
-| **Email**      | Resend             | -        |
-| **Testing**    | Vitest, Playwright | -        |
-| **Deploy**     | Vercel             | -        |
+| 분류           | 기술               | 버전          | 비고                       |
+| -------------- | ------------------ | ------------- | -------------------------- |
+| **Framework**  | Next.js            | **16.0.7**    | App Router, Server Actions |
+| **Runtime**    | Node.js            | 24.x          |                            |
+| **UI Library** | React              | **19.2.1**    | Server Components          |
+| **Styling**    | Tailwind CSS       | 3.x           | Shadcn/ui Components       |
+| **Database**   | PostgreSQL         | 15+           |                            |
+| **ORM**        | Prisma             | **6.19.0**    | Typed SQL Support          |
+| **Email**      | Nodemailer         | 7.x           | SMTP Service               |
+| **Auth**       | NextAuth.js        | 5.0.0-beta.30 |                            |
+| **Validation** | Zod                | 4.x           | Server-side Validation     |
+| **Testing**    | Vitest, Playwright | Latest        | Unit & E2E Testing         |
+| **Container**  | Docker             | Compose V2    | Production Ready           |
 
 ---
 
@@ -77,126 +61,130 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 
 ```
 src/
-├── actions/           # Server Actions (클라이언트-서버 통신)
+├── actions/           # Server Actions (보안 로직 포함)
 ├── app/
-│   ├── (auth)/        # 인증 페이지 (로그인)
-│   ├── (dashboard)/   # 대시보드 페이지
-│   └── api/           # REST API Routes
-├── components/        # React UI 컴포넌트
-│   ├── srs/           # SR 관련 컴포넌트
-│   ├── users/         # 사용자 관리 컴포넌트
-│   └── ui/            # 공통 UI (Button, Input, Dialog 등)
-├── hooks/             # 커스텀 React 훅
-├── lib/               # 유틸리티 및 헬퍼
-│   ├── policies.ts    # 권한 검증 함수
-│   ├── errors.ts      # 커스텀 에러 클래스
-│   └── schemas.ts     # Zod 검증 스키마
-├── services/          # 비즈니스 로직 서비스
-│   ├── sr.service.ts
-│   ├── user.service.ts
-│   └── client.service.ts
-└── types/             # TypeScript 타입 정의
+│   ├── (auth)/        # 인증 라우트 group
+│   ├── (dashboard)/   # 대시보드 레이아웃 group
+│   └── api/           # REST API Endpoints (External Integrations)
+├── components/        # React Components
+│   ├── ui/            # Shadcn UI (Atomic)
+│   ├── srs/           # SR 관련 비즈니스 컴포넌트
+│   └── ...
+├── hooks/             # Custom React Hooks
+├── lib/               # Shared Utilities
+│   ├── env-validation.ts # 환경 변수 검증 모듈
+│   ├── rate-limiter.ts   # Rate Limiting 로직 (Middleware/API)
+│   ├── pagination.ts     # 페이지네이션 표준화
+│   └── ...
+└── services/          # Business Logic Layer (Prisma 의존성 격리)
+    ├── sr.service.ts
+    ├── user.service.ts
+    └── ...
 ```
 
 ---
 
 ## 🚀 시작하기
 
-### 1. 의존성 설치
+### 1. 로컬 개발 환경 (Localhost)
 
 ```bash
+# 의존성 설치
 pnpm install
-```
 
-### 2. 환경 변수 설정
+# 환경 변수 설정
+cp .env.example .env.local
 
-```bash
-cp .env.example .env
-```
+# 데이터베이스 설정
+pnpm prisma migrate dev
+pnpm db:seed
 
-**필수 환경 변수**:
-
-- `DATABASE_URL` - PostgreSQL 연결 URL
-- `NEXTAUTH_SECRET` - 세션 암호화 키 (32자 이상)
-- `NEXTAUTH_URL` - 애플리케이션 URL
-- `BLOB_READ_WRITE_TOKEN` - Vercel Blob 토큰
-
-### 3. 데이터베이스 설정
-
-```bash
-pnpm prisma migrate dev   # 마이그레이션
-pnpm db:seed              # 초기 데이터 시드
-```
-
-### 4. 개발 서버 실행
-
-```bash
+# 개발 서버 실행
 pnpm dev
+# http://localhost:3000 접속 (환경변수: .env 사용)
 ```
 
-[http://localhost:3000](http://localhost:3000) 에서 확인
+### 2. Docker 환경 (Production-like)
+
+별도의 설정 변경 없이 바로 실행 가능합니다. (도커 전용 `.env.docker` 자동 로드)
+
+```bash
+# 컨테이너 빌드 및 실행
+docker-compose up --build
+
+# 실행 확인
+# http://localhost:3001 접속 (환경변수: .env.docker 자동 사용)
+```
+
+---
+
+## ⚙️ 환경 변수 및 Rate Limiting
+
+`.env.docker` 또는 `.env` 파일에서 시스템의 보안 정책을 유연하게 조정할 수 있습니다.
+
+| 변수명                                | 설명                   | 기본값      |
+| :------------------------------------ | :--------------------- | :---------- |
+| `RATE_LIMIT_MIDDLEWARE_WINDOW_MS`     | 미들웨어 제한 시간(ms) | 60000 (1분) |
+| `RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS`  | 시간당 최대 요청 수    | 20          |
+| `RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS` | 파일 업로드 제한       | 20 (시간당) |
+
+---
+
+## 🔧 데이터베이스 유지보수
+
+시스템 운영 중 발생하는 데이터 불일치를 해결하기 위한 유틸리티 스크립트입니다.
+
+### 시스템 운영팀 고객사 할당 정리
+
+운영팀(Admin/Manager) 계정이 실수로 특정 고객사에 매핑된 경우 이를 정리합니다.
+
+```bash
+# 1. 대상 확인 (Dry Run)
+npm run cleanup:system-team-clients:dry-run
+
+# 2. 실제 삭제
+npm run cleanup:system-team-clients
+```
 
 ---
 
 ## 🧪 테스트
 
-### 단위 테스트 (Vitest)
-
 ```bash
-pnpm test              # 테스트 실행
-pnpm test:coverage     # 커버리지 리포트
+pnpm test              # 단위 테스트 (Vitest)
+pnpm test:ui           # 단위 테스트 UI 모드
+pnpm test:coverage     # 커버리지 리포트 확인
 ```
 
 ### E2E 테스트 (Playwright)
 
 ```bash
-pnpm test:e2e          # 전체 E2E 테스트
+pnpm test:e2e          # 전체 E2E 테스트 (Headless)
 pnpm test:e2e:ui       # UI 모드 (디버깅)
+pnpm test:e2e:debug    # 디버깅 모드
 ```
 
-**현재 커버리지**: ~78% (핵심 서비스 90%+)
+### 뮤테이션 테스트 (Stryker)
+
+코드의 견고성을 검증하기 위해 결함 주입 테스트를 수행합니다.
+
+```bash
+pnpm test:mutation
+```
+
+### UI 컴포넌트 테스트 (Storybook)
+
+```bash
+pnpm storybook         # 스토리북 실행 (6006 포트)
+```
+
+```
 
 ---
 
-## 📡 API 엔드포인트
+## 📖 문서
 
-| 메서드   | 경로                   | 설명                        |
-| -------- | ---------------------- | --------------------------- |
-| `GET`    | `/api/srs`             | SR 목록 조회 (페이징, 필터) |
-| `POST`   | `/api/srs`             | SR 생성                     |
-| `GET`    | `/api/srs/[id]`        | SR 상세 조회                |
-| `PATCH`  | `/api/srs/[id]`        | SR 수정                     |
-| `DELETE` | `/api/srs/[id]`        | SR 삭제                     |
-| `GET`    | `/api/users`           | 사용자 목록                 |
-| `POST`   | `/api/users`           | 사용자 생성                 |
-| `GET`    | `/api/clients`         | 고객사 목록                 |
-| `GET`    | `/api/dashboard/stats` | 대시보드 통계               |
-
----
-
-## 📜 스크립트
-
-| 명령어            | 설명                 |
-| ----------------- | -------------------- |
-| `pnpm dev`        | 개발 서버 실행       |
-| `pnpm build`      | 프로덕션 빌드        |
-| `pnpm start`      | 프로덕션 서버        |
-| `pnpm lint`       | ESLint 검사          |
-| `pnpm type-check` | TypeScript 타입 체크 |
-| `pnpm test`       | 단위 테스트          |
-| `pnpm test:e2e`   | E2E 테스트           |
-
----
-
-## 📖 관련 문서
-
-- [PRD](./docs/SR_Management_System_PRD.md) - 요구사항 정의
-- [TRD](./docs/TRD.md) - 기술 명세
-- [LLD](./docs/LLD.md) - 상세 설계
-- [DB](./docs/DB.md) - 데이터베이스 스키마
-
----
-
-## 📄 라이선스
-
-Private
+- [PRD](./docs/SR_Management_System_PRD.md): 요구사항 정의서
+- [DB Schema](./prisma/schema.prisma): 데이터베이스 구조
+- [Changes & Logs](./docs/CHANGELOG.md): 변경 이력
+```

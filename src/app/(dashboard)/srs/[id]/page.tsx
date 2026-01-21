@@ -122,7 +122,7 @@ export default function SRDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {(sr.status === 'INTAKE' || sr.status === 'IN_PROGRESS') &&
+          {((sr.status as string) === 'INTAKE' || (sr.status as string) === 'IN_PROGRESS') &&
             hasAnyRole(['MANAGER', 'ADMIN']) && (
               <Button variant="outline" onClick={() => router.push(`/srs/${srId}/intake`)}>
                 <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
