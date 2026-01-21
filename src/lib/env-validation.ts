@@ -32,15 +32,7 @@ export interface EnvVariable {
   /**
    * 카테고리
    */
-  category:
-    | 'database'
-    | 'auth'
-    | 'storage'
-    | 'cache'
-    | 'email'
-    | 'queue'
-    | 'webhook'
-    | 'rate-limit';
+  category: 'database' | 'auth' | 'storage' | 'cache' | 'email' | 'webhook' | 'rate-limit';
 
   /**
    * 검증 함수 (선택사항)
@@ -91,20 +83,6 @@ export const ENV_VARIABLES: EnvVariable[] = [
     category: 'auth',
     validate: (value) => value.startsWith('http://') || value.startsWith('https://'),
     validationError: 'NEXTAUTH_URL은 http:// 또는 https:// 로 시작해야 합니다.',
-  },
-
-  // Inngest
-  {
-    name: 'INNGEST_EVENT_KEY',
-    required: false, // 백그라운드 작업 사용 시 필요
-    description: 'Inngest 이벤트 전송 키 (백그라운드 작업 사용 시 필요)',
-    category: 'queue',
-  },
-  {
-    name: 'INNGEST_SIGNING_KEY',
-    required: false, // 백그라운드 작업 사용 시 필요
-    description: 'Inngest 요청 서명 검증 키 (백그라운드 작업 사용 시 필요)',
-    category: 'queue',
   },
 
   // Rate Limiting (선택사항)
@@ -284,7 +262,6 @@ export function printEnvSummary(): void {
         storage: '스토리지',
         cache: '캐시',
         email: '이메일',
-        queue: '큐',
         webhook: '웹훅',
         'rate-limit': 'Rate Limiting',
       }[category] || category;
