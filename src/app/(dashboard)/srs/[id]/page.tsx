@@ -207,30 +207,34 @@ export default function SRDetailPage() {
                     </p>
                   </div>
                 )}
-                {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status) && sr.dueDate && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">SLA 마감일</h4>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span>{new Date(sr.dueDate).toLocaleDateString('ko-KR')}</span>
-                      {(() => {
-                        const days = Math.ceil(
-                          (new Date(sr.dueDate).getTime() - new Date().getTime()) /
-                            (1000 * 60 * 60 * 24)
-                        );
-                        const variant =
-                          days < 0
-                            ? 'destructive'
-                            : days <= 1
+                {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) &&
+                  sr.estimatedCompletionDate && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground">SLA 마감일</h4>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span>
+                          {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
+                        </span>
+                        {(() => {
+                          const days = Math.ceil(
+                            (new Date(sr.estimatedCompletionDate).getTime() -
+                              new Date().getTime()) /
+                              (1000 * 60 * 60 * 24)
+                          );
+                          const variant =
+                            days < 0
                               ? 'destructive'
-                              : days <= 3
-                                ? 'secondary'
-                                : 'default';
-                        const label = days <= 0 ? '지연' : `${days}일 남음`;
-                        return <Badge variant={variant}>{label}</Badge>;
-                      })()}
+                              : days <= 1
+                                ? 'destructive'
+                                : days <= 3
+                                  ? 'secondary'
+                                  : 'default';
+                          const label = days <= 0 ? '지연' : `${days}일 남음`;
+                          return <Badge variant={variant}>{label}</Badge>;
+                        })()}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
 
               {/* Add Attachment Summary */}
