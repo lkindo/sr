@@ -236,6 +236,7 @@ model SR {
   title              String
   description        String     @db.Text
   status             SRStatus   @default(REQUESTED)
+  priority           SRPriority @default(MEDIUM) // 레거시 필드 (삭제 예정이나 아직 사용중)
   requestedPriority  SRPriority @default(MEDIUM) @map("requested_priority")
   actualPriority     SRPriority @default(MEDIUM) @map("actual_priority")
   
@@ -408,18 +409,21 @@ model Notification {
 }
 
 enum SRStatus {
-  REQUESTED // 요청됨
+  REQUESTED   // 요청됨
+  INTAKE      // 접수
   IN_PROGRESS // 진행 중
-  COMPLETED // 완료됨
-  CANCELLED // 취소됨
-  REJECTED // 반려됨
+  ON_HOLD     // 보류
+  COMPLETED   // 완료됨
+  CONFIRMED   // 확인됨
+  REJECTED    // 반려됨
+  CANCELLED   // 취소됨 (DB에는 없으나 코드 호환성을 위해 유지)
 }
 
 enum SRPriority {
   LOW
   MEDIUM
   HIGH
-  URGENT
+  CRITICAL    // 긴급 (기존 URGENT 대체)
 }
 
 enum NotificationType {

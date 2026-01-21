@@ -79,6 +79,10 @@ export default function ClientsPage() {
       if (!response.ok) throw new Error('Failed to fetch clients');
       const result = await response.json();
 
+      if (!result || !result.data || !result.meta) {
+        throw new Error('Invalid response format');
+      }
+
       setClients(result.data);
       setPagination((prev) => ({
         ...prev,
