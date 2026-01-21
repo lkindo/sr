@@ -8,6 +8,13 @@ import { Plus, Search } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { UserDialog } from '@/components/users/UserDialog';
@@ -45,6 +52,7 @@ export default function UsersPage() {
     totalPages: 1,
   });
   const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [statusFilter, setStatusFilter] = useState<string>('true');
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
   // Dialog states
@@ -72,14 +80,29 @@ export default function UsersPage() {
         page: pagination.currentPage.toString(),
         pageSize: pagination.pageSize.toString(),
         search: searchQuery,
+        isActive: statusFilter,
       });
 
       const response = await fetch(`/api/users?${params}`);
       if (!response.ok) throw new Error('Failed to fetch users');
 
       const result = await response.json();
-      setUsers(result.data);
-      setPagination(result.meta);
+
+      // Ensure result and result.data exist
+      if (result && Array.isArray(result.data)) {
+        setUsers(result.data);
+
+        // Ensure result.meta exists before setting pagination
+        if (result.meta) {
+          setPagination(result.meta);
+        } else {
+          console.warn('Pagination metadata missing from API response');
+        }
+      } else if (Array.isArray(result)) {
+        // Fallback for non-paginated response
+        setUsers(result);
+      }
+
       setError(null);
     } catch (err) {
       setError('사용자 목록을 불러오는데 실패했습니다.');
@@ -87,7 +110,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.pageSize, searchQuery]);
+  }, [pagination.currentPage, pagination.pageSize, searchQuery, statusFilter]);
 
   // Clients & Roles fetching (for dropdowns)
   const fetchMetadata = useCallback(async () => {
@@ -98,11 +121,19 @@ export default function UsersPage() {
       ]);
 
       if (clientsRes.ok) {
-        setClients(await clientsRes.json());
+        const clientsResult = await clientsRes.json();
+        // Handle both paginated ({ data, meta }) and plain array ([]) responses
+        const clientsData =
+          clientsResult && Array.isArray(clientsResult.data)
+            ? clientsResult.data
+            : Array.isArray(clientsResult)
+              ? clientsResult
+              : [];
+        setClients(clientsData);
       }
       if (rolesRes.ok) {
         const rolesData = await rolesRes.json();
-        setRoles(rolesData);
+        setRoles(Array.isArray(rolesData) ? rolesData : []);
       }
     } catch (error) {
       console.error('Failed to fetch metadata', error);
@@ -146,7 +177,7 @@ export default function UsersPage() {
 
   const handleToggleActive = async (userId: string, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/users/${userId}/status`, {
+      const response = await fetch(`/api/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !currentStatus }),
@@ -221,6 +252,24 @@ export default function UsersPage() {
           </div>
 
           <div className="flex flex-col md:flex-row gap-4">
+            <div className="w-full md:w-[150px]">
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="상태" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">활성 사용자</SelectItem>
+                  <SelectItem value="false">비활성 사용자</SelectItem>
+                  <SelectItem value="all">전체 사용자</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <form onSubmit={handleSearch} className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input

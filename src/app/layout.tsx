@@ -4,10 +4,6 @@ import ClientLayout from '@/components/providers/ClientLayout';
 
 import './globals.css';
 
-export const viewport: Viewport = {
-  themeColor: '#2a3053',
-};
-
 export const metadata: Metadata = {
   title: 'SR Management System',
   description: 'Service Request Management System',
@@ -17,6 +13,12 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'SR Management',
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#2a3053',
+  width: 'device-width',
+  initialScale: 1,
 };
 
 export default function RootLayout({

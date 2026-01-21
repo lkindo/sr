@@ -36,24 +36,21 @@ export function DeleteUserDialog({ open, onOpenChange, user, onDeleted }: Delete
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete user');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Failed to delete user');
       }
 
       toast({
         title: '성공',
-        description: '사용자가 삭제되었습니다.',
+        description: '사용자가 삭제(비활성화)되었습니다.',
       });
 
       onDeleted();
-      // Dialog closing is handled by parent or onDeleted usually triggers refresh which might close it,
-      // but here we should explicitly close or rely on parent.
-      // UserDialog closes onSaved. Let's close here or let parent do it?
-      // page.tsx handles onDeleted by refreshing and closing.
       onOpenChange(false);
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: '오류',
-        description: '사용자 삭제에 실패했습니다.',
+        title: '삭제 실패',
+        description: error.message || '사용자 삭제 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
     } finally {
