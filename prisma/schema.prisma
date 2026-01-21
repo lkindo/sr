@@ -52,6 +52,7 @@ model User {
   // Push Notification Relations
   pushSubscriptions      PushSubscription[]
   notificationPreference NotificationPreference?
+  notifications          Notification[]
 
   @@index([email])
   @@index([isActive])
