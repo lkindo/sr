@@ -1,8 +1,8 @@
 // Service Worker for Web Push Notifications
 // This file must be placed in the public directory to be accessible at /sw.js
 
-const SW_VERSION = '1.0.2';
-const CACHE_NAME = 'sr-mgt-cache-v1';
+const SW_VERSION = '1.0.3';
+const CACHE_NAME = 'sr-mgt-cache-v3';
 
 // Assets to cache immediately on install
 const PRECACHE_ASSETS = [
@@ -49,6 +49,31 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) return;
 
+  // Document (HTML) requests: Network First
+  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Only cache successful requests
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Offline: try to return cached version
+          return caches.match(event.request).then((cachedResponse) => {
+            return cachedResponse || caches.match('/dashboard');
+          });
+        })
+    );
+    return;
+  }
+
+  // Other assets (static files): Cache First
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -57,7 +82,7 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request).then((response) => {
         // Only cache successful dynamic requests
-        if (!response || response.status !== 200 || response.type !== 'basic') {
+        if (!response || response.status !== 200 || response.type === 'error' || response.type === 'opaque') {
           return response;
         }
 
@@ -67,9 +92,6 @@ self.addEventListener('fetch', (event) => {
         });
 
         return response;
-      }).catch(() => {
-        // Generic offline fallback could be added here
-        return caches.match('/dashboard');
       });
     })
   );

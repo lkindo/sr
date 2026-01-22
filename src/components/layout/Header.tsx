@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Menu } from 'lucide-react';
 
 // Removed unused SheetPrimitive import
@@ -30,9 +31,15 @@ interface HeaderProps {
   user?: AuthenticatedUser;
 }
 
-export function Header({ user }: HeaderProps) {
+export function Header({ user: initialUser }: HeaderProps) {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
   const { hasAnyRole } = usePermissions();
+
+  // 서버 props로 받은 유저 정보와 클라이언트 세션 정보 병합
+  // PWA 등에서 서버 props가 stale할 경우 클라이언트 세션이 우선임
+  const user = status === 'authenticated' ? (session.user as AuthenticatedUser) : initialUser;
+  const isLoading = status === 'loading';
 
   // 현재 활성 메뉴 판단
   const getActiveMenu = () => {
@@ -124,7 +131,9 @@ export function Header({ user }: HeaderProps) {
           </nav>
 
           <nav className="flex items-center gap-3">
-            {user ? (
+            {isLoading ? (
+              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+            ) : user ? (
               <UserNav user={user} />
             ) : (
               <div className="flex items-center gap-2">

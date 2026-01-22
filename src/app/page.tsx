@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { BarChart3, CheckCircle2, ClipboardList, Loader2, Shield, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // 이미 로그인된 사용자는 대시보드로 리다이렉트
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard');
+    }
+  }, [status, router]);
+
+  // 세션 로딩 중이거나 이미 인증된 경우 배경만 보여줌 (깜빡임 방지)
+  if (status === 'loading' || status === 'authenticated') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Header */}
