@@ -128,11 +128,10 @@ export default function RolesPage() {
         </div>
 
         {/* Total Count - 테이블 바로 위 */}
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
-          <div className="text-sm text-muted-foreground">
-            Total{' '}
-            <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">{roles.length}</span>{' '}
-            items
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-slate-50/50">
+          <div className="text-xs text-muted-foreground font-medium">
+            전체{' '}
+            <span className="text-[hsl(var(--sr-primary-dark))] font-bold">{roles.length}</span>개
           </div>
         </div>
 

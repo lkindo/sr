@@ -78,14 +78,18 @@ export function ClientMobileList({
                 </div>
 
                 {/* 2-Column Grid Info */}
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs border-t border-border/50 pt-2">
-                  <div className="flex">
-                    <span className="text-muted-foreground w-12 shrink-0">담당자</span>
-                    <span className="truncate">{client.contactPerson || '-'}</span>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] leading-relaxed border-t border-border/50 pt-2 pb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-muted-foreground font-medium shrink-0">담당자</span>
+                    <span className="truncate text-foreground font-medium">
+                      {client.contactPerson || '-'}
+                    </span>
                   </div>
-                  <div className="flex">
-                    <span className="text-muted-foreground w-12 shrink-0">이메일</span>
-                    <span className="truncate">{client.contactEmail || '-'}</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-muted-foreground font-medium shrink-0">이메일</span>
+                    <span className="truncate text-foreground font-medium">
+                      {client.contactEmail || '-'}
+                    </span>
                   </div>
                 </div>
 

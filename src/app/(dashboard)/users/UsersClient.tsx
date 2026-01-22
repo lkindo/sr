@@ -276,47 +276,59 @@ export default function UsersClient() {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-2 items-stretch">
-            <div className="w-full md:w-[110px]">
-              <Select value={statusFilter} onValueChange={handleStatusChange}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="상태" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true">활성</SelectItem>
-                  <SelectItem value="false">비활성</SelectItem>
-                  <SelectItem value="all">전체</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* 필터 영역 - 데스크톱/모바일 최적화 */}
+          <div className="flex flex-col gap-3">
+            {/* Status Tabs (Mobile: Scrollable / Desktop: Flex) */}
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+              {[
+                { label: '활성', value: 'true' },
+                { label: '비활성', value: 'false' },
+                { label: '전체', value: 'all' },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => handleStatusChange(tab.value)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all border ${
+                    statusFilter === tab.value
+                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                      : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-            <form onSubmit={handleSearch} className="flex flex-1 gap-1">
+
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="flex gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   placeholder="이름, 이메일 검색..."
-                  className="pl-9 h-10 bg-background"
+                  className="pl-9 h-9 text-sm bg-background rounded-full border-muted-foreground/20 focus-visible:ring-primary/20"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
               <Button
                 type="submit"
+                size="sm"
                 variant="secondary"
-                className="h-10 px-3 bg-slate-100 hover:bg-slate-200 border"
+                className="h-9 px-4 rounded-full bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-primary-dark))/90] shrink-0"
               >
-                <Search className="h-4 w-4 text-slate-600" />
+                검색
               </Button>
             </form>
           </div>
         </div>
 
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
-          <div className="text-sm text-muted-foreground">
-            Total{' '}
-            <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-slate-50/50">
+          <div className="text-xs text-muted-foreground font-medium">
+            전체{' '}
+            <span className="text-[hsl(var(--sr-primary-dark))] font-bold">
               {pagination.totalItems}
-            </span>{' '}
-            items
+            </span>
+            명
           </div>
         </div>
 

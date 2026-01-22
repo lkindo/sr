@@ -55,11 +55,9 @@ export function RoleMobileList({
               </div>
 
               {/* Permission Stat */}
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground">보유 권한:</span>
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                  {role.permissions.length}개
-                </Badge>
+              <div className="flex items-center gap-1.5 text-[11px] leading-relaxed">
+                <span className="text-muted-foreground font-medium shrink-0">보유 권한</span>
+                <span className="text-foreground font-bold">{role.permissions.length}개</span>
               </div>
 
               {/* Actions */}

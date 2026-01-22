@@ -112,7 +112,7 @@ function DraggableUserCard({
       >
         <Link
           href={user.id ? `/users/${user.id}` : '#'}
-          className="flex items-center gap-1.5 p-2 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
+          className="flex items-center gap-2 p-1.5 md:p-2 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
         >
           {/* 드래그 핸들 */}
           <div
@@ -121,47 +121,47 @@ function DraggableUserCard({
             className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded transition-colors"
             onClick={(e) => e.stopPropagation()}
           >
-            <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
           </div>
-          <div className="p-1.5 rounded-full bg-muted group-hover:bg-background shrink-0">
-            <Users className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
+          <div className="p-1 rounded-full bg-muted group-hover:bg-background shrink-0 hidden xs:block">
+            <Users className="h-3 w-3 text-muted-foreground group-hover:text-primary" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium truncate group-hover:text-primary">
+            <div className="flex items-center gap-1.5">
+              <p className="text-[13px] font-semibold truncate group-hover:text-primary">
                 {highlightText(user.name || '이름 없음', searchQuery)}
               </p>
               <Badge
                 variant={user.isActive ? 'default' : 'secondary'}
-                className="text-[9px] h-4 px-1"
+                className="text-[8px] h-3.5 px-1 font-bold shrink-0"
               >
                 {user.isActive ? '활성' : '비활성'}
               </Badge>
             </div>
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-[10px] text-muted-foreground truncate -mt-0.5">
               {user.email ? highlightText(user.email, searchQuery) : '-'}
             </p>
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {user.roles?.slice(0, 2).map((ur) => (
+            {user.roles?.slice(0, 1).map((ur) => (
               <Badge
                 key={ur.role?.name || Math.random()}
                 variant="secondary"
-                className="text-[10px] h-5 px-1.5"
+                className="text-[9px] h-4 px-1 font-medium max-w-[50px] truncate"
               >
                 {ur.role?.name}
               </Badge>
             ))}
-            {user.roles?.length > 2 && (
-              <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                +{user.roles.length - 2}
-              </Badge>
+            {user.roles && user.roles.length > 1 && (
+              <span className="text-[9px] text-muted-foreground font-bold">
+                +{user.roles.length - 1}
+              </span>
             )}
           </div>
 
-          <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block" />
         </Link>
       </UserCardContextMenu>
     </div>
@@ -227,33 +227,38 @@ function DroppableClientHeader({
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
 
-        <div className="p-1.5 rounded-md bg-primary/10 shrink-0">
-          <Building2 className="h-4 w-4 text-primary" />
+        <div className="p-1 rounded-md bg-primary/10 shrink-0 hidden xs:block">
+          <Building2 className="h-3.5 w-3.5 text-primary" />
         </div>
 
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <Link
               href={`/clients/${client.id}`}
-              className="font-semibold text-[hsl(var(--sr-primary-dark))] hover:underline truncate text-base"
+              className="font-bold text-[hsl(var(--sr-primary-dark))] hover:underline truncate text-sm md:text-base leading-none"
               onClick={(e) => e.stopPropagation()}
             >
               {highlightText(client.name, searchQuery)}
             </Link>
-            <Badge variant="outline" className="shrink-0 text-[10px] h-5">
-              {highlightText(client.code, searchQuery)}
-            </Badge>
-            {client.industry && (
-              <Badge variant="secondary" className="shrink-0 text-[10px] h-5">
-                {client.industry}
+            <div className="flex items-center gap-1">
+              <Badge variant="outline" className="shrink-0 text-[8px] h-3.5 px-1 font-bold">
+                {highlightText(client.code, searchQuery)}
               </Badge>
-            )}
-            <Badge
-              variant={client.isActive ? 'default' : 'secondary'}
-              className="shrink-0 text-[10px] h-5"
-            >
-              {client.isActive ? '활성' : '비활성'}
-            </Badge>
+              {client.industry && (
+                <Badge
+                  variant="secondary"
+                  className="shrink-0 text-[8px] h-3.5 px-1 hidden sm:inline-flex"
+                >
+                  {client.industry}
+                </Badge>
+              )}
+              <Badge
+                variant={client.isActive ? 'default' : 'secondary'}
+                className="shrink-0 text-[8px] h-3.5 px-1 font-bold"
+              >
+                {client.isActive ? '활성' : '비활성'}
+              </Badge>
+            </div>
           </div>
         </div>
 

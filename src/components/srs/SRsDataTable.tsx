@@ -249,8 +249,8 @@ export function SRsDataTable({
             </Button>
           </div>
 
-          {/* 통계 배지 */}
-          <div className="flex gap-2 mb-4 flex-wrap">
+          {/* 통계 배지 - 데스크톱에서만 노출 (모바일에서는 퀵 필터 버튼에 통합) */}
+          <div className="hidden md:flex gap-2 mb-4 flex-wrap">
             <Badge variant="secondary" className="text-sm px-3 py-1">
               <Clock className="mr-1 h-3 w-3" />
               접수 대기 ({waitingCount})
@@ -273,67 +273,89 @@ export function SRsDataTable({
           {/* Quick Filter Buttons and Advanced Filter Button - 고객사 사용자는 숨김 */}
           {!isClientUser && (
             <>
-              <div className="flex items-center justify-between gap-2 mb-4 overflow-hidden">
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
                   <button
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
                     }
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all ${
                       activeQuickFilter === 'waiting'
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                        : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <Clock className="h-4 w-4" />
+                    <Clock className="h-3.5 w-3.5" />
                     <span>접수 대기</span>
-                    {waitingCount > 0 && (
-                      <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                        {waitingCount}
-                      </Badge>
-                    )}
+                    <span
+                      className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+                        activeQuickFilter === 'waiting'
+                          ? 'bg-white text-primary font-bold'
+                          : 'bg-destructive text-white'
+                      }`}
+                    >
+                      {waitingCount}
+                    </span>
                   </button>
                   <button
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
                     }
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all ${
                       activeQuickFilter === 'myAssigned'
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                        : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <User className="h-4 w-4" />
+                    <User className="h-3.5 w-3.5" />
                     <span>내 담당</span>
+                    <span
+                      className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+                        activeQuickFilter === 'myAssigned'
+                          ? 'bg-white text-primary font-bold'
+                          : 'bg-muted-foreground text-white'
+                      }`}
+                    >
+                      {srs.filter((sr) => sr.assigneeId === session?.user?.id).length}
+                    </span>
                   </button>
                   <button
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
                     }
-                    className={`flex items-center gap-2 px-4 py-2 rounded border transition-colors ${
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all ${
                       activeQuickFilter === 'urgent'
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                        : 'bg-[hsl(var(--sr-bg-lighter))] text-[hsl(var(--sr-gray-medium))] border-[hsl(var(--sr-border))] hover:bg-gray-200'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                        : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTriangle className="h-3.5 w-3.5" />
                     <span>긴급</span>
-                    {urgentCount > 0 && (
-                      <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
-                        {urgentCount}
-                      </Badge>
-                    )}
+                    <span
+                      className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+                        activeQuickFilter === 'urgent'
+                          ? 'bg-white text-primary font-bold'
+                          : 'bg-destructive text-white'
+                      }`}
+                    >
+                      {urgentCount}
+                    </span>
                   </button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  className="sr-input-template"
-                >
-                  <Filter className="mr-2 h-4 w-4" />
-                  고급 필터
-                </Button>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="md:hidden text-xs text-muted-foreground font-medium">
+                    전체 {paginationInfo.totalCount}건
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    className="h-8 text-xs shrink-0 rounded-full md:rounded-md border-primary/20 text-primary hover:bg-primary/5"
+                  >
+                    <Filter className="mr-1.5 h-3.5 w-3.5" />
+                    상세 필터
+                  </Button>
+                </div>
               </div>
 
               {/* Advanced Filters (Collapsible) */}
@@ -467,8 +489,8 @@ export function SRsDataTable({
           </div>
         </div>
 
-        {/* 전체 개수 - 테이블 바로 위 */}
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
+        {/* 전체 개수 - 데스크톱에서만 노출 (모바일은 필터바에 통합) */}
+        <div className="hidden md:flex px-6 py-2 border-b border-[hsl(var(--sr-border))] justify-end">
           <span className="text-sm text-[hsl(var(--sr-gray-medium))] whitespace-nowrap">
             전체 {paginationInfo.totalCount}건
           </span>
@@ -677,28 +699,37 @@ export function SRsDataTable({
                   <h4 className="font-medium text-sm truncate mb-2">{sr.title}</h4>
 
                   {/* 2-Column Grid Info */}
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                    <div className="flex">
-                      <span className="text-muted-foreground w-12 shrink-0">고객사</span>
-                      <span className="truncate">{sr.client.name}</span>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] leading-relaxed">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-muted-foreground font-medium shrink-0">고객사</span>
+                      <span className="truncate text-foreground font-medium">{sr.client.name}</span>
                     </div>
-                    <div className="flex">
-                      <span className="text-muted-foreground w-12 shrink-0">담당자</span>
-                      <span className="truncate">{sr.assignee?.name || '-'}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-muted-foreground font-medium shrink-0">담당자</span>
+                      <span className="truncate text-foreground font-medium">
+                        {sr.assignee?.name || '-'}
+                      </span>
                     </div>
-                    <div className="flex">
-                      <span className="text-muted-foreground w-12 shrink-0">마감일</span>
-                      {dueDateStatus ? (
-                        <Badge variant={dueDateStatus.variant} className="text-[10px] h-4 px-1">
-                          {dueDateStatus.label}
-                        </Badge>
-                      ) : (
-                        <span>-</span>
-                      )}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-muted-foreground font-medium shrink-0">마감일</span>
+                      <div className="flex-1 min-w-0">
+                        {dueDateStatus ? (
+                          <Badge
+                            variant={dueDateStatus.variant}
+                            className="text-[9px] h-3.5 px-1 font-bold"
+                          >
+                            {dueDateStatus.label}
+                          </Badge>
+                        ) : (
+                          <span className="text-foreground">-</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex">
-                      <span className="text-muted-foreground w-12 shrink-0">등록일</span>
-                      <span>{new Date(sr.createdAt).toLocaleDateString('ko-KR')}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="text-muted-foreground font-medium shrink-0">등록일</span>
+                      <span className="text-foreground">
+                        {new Date(sr.createdAt).toLocaleDateString('ko-KR').slice(2)}
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -175,72 +175,81 @@ export default function ClientsPage() {
             </Button>
           </div>
 
-          {/* 검색 및 필터 영역 */}
-          <div className="flex flex-col gap-4 md:flex-row md:items-end">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="고객사명 또는 코드로 검색..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    setPagination((prev) => ({ ...prev, currentPage: 1 })); // 검색 시 1페이지로 리셋
-                  }
-                }}
-                className="pl-10 sr-input-template"
-              />
+          {/* 검색 및 필터 영역 - 데스크톱/모바일 최적화 */}
+          <div className="flex flex-col gap-3 mt-2">
+            {/* Industry Tabs */}
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+              {[
+                { label: '전체 산업군', value: 'all' },
+                { label: 'IT', value: 'IT' },
+                { label: '제조', value: 'MANUFACTURING' },
+                { label: '금융', value: 'FINANCE' },
+                { label: '서비스', value: 'SERVICE' },
+                { label: '공공', value: 'PUBLIC' },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => {
+                    setIndustryFilter(tab.value);
+                    setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                  }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                    industryFilter === tab.value
+                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                      : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
 
-            <div className="flex gap-2 flex-wrap md:flex-nowrap">
-              <Select
-                value={industryFilter}
-                onValueChange={(val) => {
-                  setIndustryFilter(val);
-                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                }}
-              >
-                <SelectTrigger className="w-[150px] sr-dropdown-template">
-                  <SelectValue placeholder="산업군 전체" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">산업군 전체</SelectItem>
-                  <SelectItem value="IT">IT</SelectItem>
-                  <SelectItem value="MANUFACTURING">제조</SelectItem>
-                  <SelectItem value="FINANCE">금융</SelectItem>
-                  <SelectItem value="SERVICE">서비스</SelectItem>
-                  <SelectItem value="PUBLIC">공공</SelectItem>
-                </SelectContent>
-              </Select>
+            {/* Status Tabs & Search Bar */}
+            <div className="flex flex-col md:flex-row gap-3">
+              <div className="flex gap-2">
+                {[
+                  { label: '전체 상태', value: 'all' },
+                  { label: '활성', value: 'true' },
+                  { label: '비활성', value: 'false' },
+                ].map((tab) => (
+                  <button
+                    key={tab.value}
+                    onClick={() => {
+                      setStatusFilter(tab.value);
+                      setPagination((prev) => ({ ...prev, currentPage: 1 }));
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                      statusFilter === tab.value
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                        : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-              <Select
-                value={statusFilter}
-                onValueChange={(val) => {
-                  setStatusFilter(val);
-                  setPagination((prev) => ({ ...prev, currentPage: 1 }));
-                }}
-              >
-                <SelectTrigger className="w-[150px] sr-dropdown-template">
-                  <SelectValue placeholder="상태 전체" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">상태 전체</SelectItem>
-                  <SelectItem value="true">활성</SelectItem>
-                  <SelectItem value="false">비활성</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="고객사명, 코드로 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 text-xs bg-background rounded-full border-muted-foreground/20 focus-visible:ring-primary/20"
+                />
+              </div>
             </div>
           </div>
         </div>
 
         {/* Total Count - 테이블 바로 위 */}
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end">
-          <div className="text-sm text-muted-foreground">
-            Total{' '}
-            <span className="font-semibold text-[hsl(var(--sr-primary-dark))]">
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-slate-50/50">
+          <div className="text-xs text-muted-foreground font-medium">
+            전체{' '}
+            <span className="text-[hsl(var(--sr-primary-dark))] font-bold">
               {pagination.totalItems}
-            </span>{' '}
-            items
+            </span>
+            개
           </div>
         </div>
 
