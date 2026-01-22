@@ -1,5 +1,7 @@
 'use client';
 
+// 모바일 역할 목록 컴포넌트 (정상 파일 재생성)
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 

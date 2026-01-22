@@ -1,8 +1,8 @@
 // Service Worker for Web Push Notifications
 // This file must be placed in the public directory to be accessible at /sw.js
 
-const SW_VERSION = '1.0.3';
-const CACHE_NAME = 'sr-mgt-cache-v3';
+const SW_VERSION = '1.0.4';
+const CACHE_NAME = 'sr-mgt-cache-v4';
 
 // Assets to cache immediately on install
 const PRECACHE_ASSETS = [

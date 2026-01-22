@@ -107,17 +107,24 @@ export function SRStatusActions({
         if (!canAccept) return null;
         return (
           <>
-            <Button onClick={handleIntake} disabled={loading}>
-              <Clock className="mr-2 h-4 w-4" />
-              접수하기
+            <Button
+              onClick={handleIntake}
+              disabled={loading}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="접수하기"
+            >
+              <Clock className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">접수하기</span>
             </Button>
             <Button
               variant="destructive"
               onClick={() => setRejectDialogOpen(true)}
               disabled={loading}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="거절"
             >
-              <XCircle className="mr-2 h-4 w-4" />
-              거절
+              <XCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">거절</span>
             </Button>
           </>
         );
@@ -126,9 +133,14 @@ export function SRStatusActions({
         // 접수됨 상태: 진행 시작, 보류(접수단계에선 보류불가?), 거절
         if (!canManage) return null;
         return (
-          <Button onClick={() => handleSimpleStatusChange('start')} disabled={loading}>
-            <Play className="mr-2 h-4 w-4" />
-            진행 시작
+          <Button
+            onClick={() => handleSimpleStatusChange('start')}
+            disabled={loading}
+            className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+            title="진행 시작"
+          >
+            <Play className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">진행 시작</span>
           </Button>
         );
       case 'IN_PROGRESS':
@@ -136,13 +148,24 @@ export function SRStatusActions({
         if (!canManage) return null;
         return (
           <>
-            <Button onClick={() => setCompleteDialogOpen(true)} disabled={loading}>
-              <CheckCircle className="mr-2 h-4 w-4" />
-              완료 처리
+            <Button
+              onClick={() => setCompleteDialogOpen(true)}
+              disabled={loading}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="완료 처리"
+            >
+              <CheckCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">완료 처리</span>
             </Button>
-            <Button variant="secondary" onClick={() => setHoldDialogOpen(true)} disabled={loading}>
-              <PauseCircle className="mr-2 h-4 w-4" />
-              보류
+            <Button
+              variant="secondary"
+              onClick={() => setHoldDialogOpen(true)}
+              disabled={loading}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="보류"
+            >
+              <PauseCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">보류</span>
             </Button>
           </>
         );
@@ -152,17 +175,24 @@ export function SRStatusActions({
         if (!canManage) return null;
         return (
           <>
-            <Button onClick={() => handleSimpleStatusChange('resume')} disabled={loading}>
-              <Play className="mr-2 h-4 w-4" />
-              진행 재개
+            <Button
+              onClick={() => handleSimpleStatusChange('resume')}
+              disabled={loading}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="진행 재개"
+            >
+              <Play className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">진행 재개</span>
             </Button>
             <Button
               variant="destructive"
               onClick={() => setRejectDialogOpen(true)}
               disabled={loading}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="거절"
             >
-              <XCircle className="mr-2 h-4 w-4" />
-              거절
+              <XCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">거절</span>
             </Button>
           </>
         );
@@ -172,9 +202,14 @@ export function SRStatusActions({
         return (
           <>
             {isRequestor && (
-              <Button onClick={() => handleSimpleStatusChange('confirm')} disabled={loading}>
-                <CheckCircle className="mr-2 h-4 w-4" />
-                확인 완료
+              <Button
+                onClick={() => handleSimpleStatusChange('confirm')}
+                disabled={loading}
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+                title="확인 완료"
+              >
+                <CheckCircle className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">확인 완료</span>
               </Button>
             )}
             {(isRequestor || isManager) && (
@@ -182,9 +217,11 @@ export function SRStatusActions({
                 variant="outline"
                 onClick={() => setReopenDialogOpen(true)}
                 disabled={loading}
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+                title="재오픈"
               >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                재오픈
+                <RotateCcw className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">재오픈</span>
               </Button>
             )}
           </>
@@ -194,9 +231,15 @@ export function SRStatusActions({
         // 확인완료 상태: 재오픈 (7일 이내, 관리자/신청자)
         if (!isRequestor && !isManager) return null;
         return (
-          <Button variant="outline" onClick={() => setReopenDialogOpen(true)} disabled={loading}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            재오픈
+          <Button
+            variant="outline"
+            onClick={() => setReopenDialogOpen(true)}
+            disabled={loading}
+            className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+            title="재오픈"
+          >
+            <RotateCcw className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">재오픈</span>
           </Button>
         );
 
@@ -211,7 +254,7 @@ export function SRStatusActions({
 
   return (
     <>
-      <div className="flex gap-2">{renderActions()}</div>
+      <div className="flex gap-1 shrink-0">{renderActions()}</div>
 
       {/* 다이얼로그들 */}
       <CompleteSRDialog

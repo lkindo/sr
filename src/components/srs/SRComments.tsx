@@ -136,21 +136,22 @@ export function SRComments({ srId }: SRCommentsProps) {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>새 댓글 작성</CardTitle>
+      <Card className="w-full max-w-full overflow-hidden">
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="text-lg">새 댓글 작성</CardTitle>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
+          <form onSubmit={handleSubmit} className="space-y-4 w-full">
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="댓글을 입력하세요..."
               rows={3}
               disabled={submitting}
+              className="resize-none w-full"
             />
             <div className="flex justify-end">
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting} size="sm">
                 <Send className="mr-2 h-4 w-4" />
                 {submitting ? '추가 중...' : '댓글 추가'}
               </Button>

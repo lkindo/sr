@@ -17,7 +17,7 @@ export const GET = withAuthAndRateLimit(
     // 실제 설정 정보는 데이터베이스나 환경변수에서 가져와야 합니다.
     // 현재는 더미 데이터로 표시
     const settings: SystemSettings = {
-      siteName: process.env.SITE_NAME || 'SR Management System',
+      siteName: process.env.SITE_NAME || 'SR Management System v1.0',
       siteDescription: process.env.SITE_DESCRIPTION || '서비스 요청 관리 시스템',
       adminEmail: process.env.ADMIN_EMAIL || 'admin@example.com',
       smtpHost: process.env.SMTP_HOST || 'smtp.example.com',

@@ -14,11 +14,13 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 - **사용자 역할**:
   - **운영팀**: ADMIN (전체 권한), MANAGER (관리), ENGINEER (실무)
   - **고객사**: CLIENT_ADMIN (고객사 관리), CLIENT_USER (요청 전용)
-- **보안 및 제한**:
-  - 역할 기반 권한 제어 (RBAC)
-  - **환경 변수 기반 Rate Limiting (API/미들웨어 보호)**
-- **커뮤니케이션**: 댓글 시스템, 파일 첨부, 실시간 알림(이메일/웹푸시)
-- **대시보드**: 실시간 처리 현황 및 통계 시각화
+- **모바일 최적화 (Mobile-First)**:
+  - **통합 디자인 시스템**: 모든 모바일 카드에 일관된 디자인 토큰(2열 그리드 정보 배치, p-3.5 패딩) 적용
+  - **콤팩트 필터**: 모바일 화면 활용도를 높이기 위한 탭/칩 스타일 필터 시스템
+- **PWA & 성능**:
+  - **오프라인 지원**: 서비스 워커를 통한 리소스 캐싱 및 오프라인 모드 지원
+  - **속도 최적화**: `navigationPreload` 활성화 및 미들웨어 리다이렉트 서버화로 렌더링 지연 최소화
+- **보안**: 역할 기반 권한 제어(RBAC), 환경 변수 기반 Rate Limiting
 
 ---
 
@@ -46,12 +48,12 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 | **Framework**  | Next.js            | **16.0.7**    | App Router, Server Actions |
 | **Runtime**    | Node.js            | 24.x          |                            |
 | **UI Library** | React              | **19.2.1**    | Server Components          |
-| **Styling**    | Tailwind CSS       | 3.x           | Shadcn/ui Components       |
+| **Styling**    | Tailwind CSS       | 3.4.1         | Shadcn/ui (Radix UI)       |
 | **Database**   | PostgreSQL         | 15+           |                            |
 | **ORM**        | Prisma             | **6.19.0**    | Typed SQL Support          |
-| **Email**      | Nodemailer         | 7.x           | SMTP Service               |
+| **Email**      | Nodemailer         | 7.0.11        | SMTP Service               |
 | **Auth**       | NextAuth.js        | 5.0.0-beta.30 |                            |
-| **Validation** | Zod                | 4.x           | Server-side Validation     |
+| **Validation** | Zod                | 4.1.12        | Server-side Validation     |
 | **Testing**    | Vitest, Playwright | Latest        | Unit & E2E Testing         |
 | **Container**  | Docker             | Compose V2    | Production Ready           |
 

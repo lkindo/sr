@@ -268,7 +268,95 @@ export default function UsersClient() {
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
               사용자 목록
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* 일괄 작업 버튼 - 선택 시에만 표시 */}
+              {selectedUserIds.size > 0 &&
+                (() => {
+                  // 선택된 사용자들의 상태 분석
+                  const selectedUsers = users.filter((u) => selectedUserIds.has(u.id));
+                  const hasActiveUsers = selectedUsers.some((u) => u.isActive);
+                  const hasInactiveUsers = selectedUsers.some((u) => !u.isActive);
+                  const allInactive = selectedUsers.every((u) => !u.isActive);
+
+                  return (
+                    <div className="flex items-center gap-2 mr-2 px-3 py-1.5 bg-muted/50 rounded-lg">
+                      <span className="text-sm text-muted-foreground font-medium">
+                        {selectedUserIds.size}명 선택
+                      </span>
+
+                      {/* 역할 관리 - 1명 선택 시에만 활성화 */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={selectedUserIds.size !== 1}
+                        title={selectedUserIds.size !== 1 ? '1명만 선택해주세요' : '역할 관리'}
+                        onClick={() => {
+                          const firstUserId = Array.from(selectedUserIds)[0];
+                          const user = users.find((u) => u.id === firstUserId);
+                          if (user) handleAssignRoles(user);
+                        }}
+                      >
+                        역할 관리
+                      </Button>
+
+                      {/* 일괄 활성화 - 비활성 사용자가 있을 때만 표시 */}
+                      {hasInactiveUsers && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-green-600 hover:bg-green-50"
+                          onClick={() => {
+                            selectedUsers
+                              .filter((u) => !u.isActive)
+                              .forEach((u) => handleToggleActive(u.id, true));
+                          }}
+                        >
+                          일괄 활성화
+                        </Button>
+                      )}
+
+                      {/* 일괄 비활성화 - 활성 사용자가 있을 때만 표시 */}
+                      {hasActiveUsers && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs text-orange-600 hover:bg-orange-50"
+                          onClick={() => {
+                            selectedUsers
+                              .filter((u) => u.isActive)
+                              .forEach((u) => handleToggleActive(u.id, false));
+                          }}
+                        >
+                          일괄 비활성화
+                        </Button>
+                      )}
+
+                      {/* 삭제 - 비활성 사용자만 선택 시 활성화 */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs text-destructive hover:bg-destructive/10"
+                        disabled={!allInactive}
+                        title={
+                          !allInactive
+                            ? '비활성 사용자만 삭제 가능합니다. 먼저 비활성화하세요.'
+                            : '선택한 사용자 삭제'
+                        }
+                        onClick={() => {
+                          const firstUserId = Array.from(selectedUserIds)[0];
+                          const user = users.find((u) => u.id === firstUserId);
+                          if (user) {
+                            setUserToDelete(user);
+                            setIsDeleteDialogOpen(true);
+                          }
+                        }}
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                  );
+                })()}
               <Button onClick={handleCreateUser} className="sr-btn-template-primary">
                 <Plus className="mr-2 h-4 w-4" />
                 사용자 등록

@@ -101,118 +101,178 @@ export default function SRDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/srs">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-2xl md:text-3xl font-bold tracking-tight">{sr.srNumber}</h2>
-              <div className="flex gap-2">
-                <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
-                <Badge variant={priorityColors[sr.requestedPriority]}>
-                  {priorityLabels[sr.requestedPriority]}
-                </Badge>
+      <div className="flex flex-col gap-4">
+        {/* Header Section */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2 md:gap-4 min-w-0 flex-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              asChild
+              className="shrink-0 -ml-2 md:ml-0 h-8 w-8 md:h-9 md:w-9"
+            >
+              <Link href="/srs">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg md:text-3xl font-bold tracking-tight leading-none">
+                  {sr.srNumber}
+                </h2>
+                <div className="flex gap-1.5 shrink-0">
+                  <Badge
+                    variant={statusColors[sr.status]}
+                    className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
+                  >
+                    {statusLabels[sr.status]}
+                  </Badge>
+                  <Badge
+                    variant={priorityColors[sr.requestedPriority]}
+                    className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
+                  >
+                    {priorityLabels[sr.requestedPriority]}
+                  </Badge>
+                </div>
               </div>
+              <p className="text-base md:text-2xl font-semibold truncate leading-tight">
+                {sr.title}
+              </p>
             </div>
-            <p className="text-xl md:text-2xl font-semibold mt-2">{sr.title}</p>
           </div>
-        </div>
-        <div className="flex gap-2">
-          {((sr.status as string) === 'INTAKE' || (sr.status as string) === 'IN_PROGRESS') &&
-            hasAnyRole(['MANAGER', 'ADMIN']) && (
-              <Button variant="outline" onClick={() => router.push(`/srs/${srId}/intake`)}>
-                <Clock className="mr-2 h-4 w-4" /> 접수 정보 수정
+
+          {/* Action Buttons - Mobile: Icon only */}
+          <div className="flex gap-1 shrink-0">
+            {((sr.status as string) === 'INTAKE' || (sr.status as string) === 'IN_PROGRESS') &&
+              hasAnyRole(['MANAGER', 'ADMIN']) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push(`/srs/${srId}/intake`)}
+                  className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+                  title="접수 정보 수정"
+                >
+                  <Clock className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">접수 정보 수정</span>
+                </Button>
+              )}
+            {session?.user && (
+              <div className="flex">
+                {/* SRStatusActions returns buttons, assume it handles responsive or is just one button. 
+                     If it returns multiple buttons, this might need deeper dive. 
+                     For now, wrapping standard buttons. */}
+                <SRStatusActions
+                  srId={srId}
+                  srNumber={sr.srNumber}
+                  status={sr.status as any}
+                  completedAt={sr.completedAt}
+                  userRoles={roles || []}
+                  isRequestor={session.user.id === sr.requesterId}
+                />
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (sr.status === 'REQUESTED' || hasAnyRole(['ADMIN'])) {
+                  setIsEditDialogOpen(true);
+                } else {
+                  toast({
+                    title: '알림',
+                    description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
+                    variant: 'default',
+                  });
+                }
+              }}
+              disabled={sr.status !== 'REQUESTED' && !hasAnyRole(['ADMIN'])}
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="수정"
+            >
+              <Pencil className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">수정</span>
+            </Button>
+            {hasAnyRole(['ADMIN', 'MANAGER', 'CLIENT_ADMIN']) && (
+              <Button
+                onClick={() => setIsDeleteDialogOpen(true)}
+                variant="destructive"
+                size="sm"
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+                title="삭제"
+              >
+                <Trash2 className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">삭제</span>
               </Button>
             )}
-          {session?.user && (
-            <SRStatusActions
-              srId={srId}
-              srNumber={sr.srNumber}
-              status={sr.status as any}
-              completedAt={sr.completedAt}
-              userRoles={roles || []}
-              isRequestor={session.user.id === sr.requesterId}
-            />
-          )}
-          <Button
-            onClick={() => {
-              if (sr.status === 'REQUESTED' || hasAnyRole(['ADMIN'])) {
-                setIsEditDialogOpen(true);
-              } else {
-                toast({
-                  title: '알림',
-                  description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
-                  variant: 'default',
-                });
-              }
-            }}
-            disabled={sr.status !== 'REQUESTED' && !hasAnyRole(['ADMIN'])}
-          >
-            <Pencil className="mr-2 h-4 w-4" /> 수정
-          </Button>
-          {hasAnyRole(['ADMIN', 'MANAGER', 'CLIENT_ADMIN']) && (
-            <Button onClick={() => setIsDeleteDialogOpen(true)} variant="destructive">
-              <Trash2 className="mr-2 h-4 w-4" /> 삭제
-            </Button>
-          )}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
+      <div className="grid gap-4 md:gap-6 md:grid-cols-3 md:items-stretch">
         {/* Details Card */}
-        <div className="md:col-span-2 space-y-6 flex flex-col">
-          <div className="p-6 bg-white rounded-lg shadow border flex-1">
-            <h3 className="text-lg font-semibold mb-4">상세 정보</h3>
-            <div className="space-y-4">
+        <div className="md:col-span-2 space-y-4 md:space-y-6 flex flex-col">
+          <div className="p-4 md:p-6 bg-white rounded-lg shadow border flex-1">
+            <h3 className="text-base md:text-lg font-semibold mb-3">상세 정보</h3>
+            <div className="space-y-3 md:space-y-4">
               <div>
-                <h4 className="text-sm font-medium text-muted-foreground">요청 내용</h4>
-                <p className="mt-1 text-foreground whitespace-pre-line">{sr.description}</p>
+                <h4 className="text-xs md:text-sm font-medium text-muted-foreground mb-1">
+                  요청 내용
+                </h4>
+                <p className="text-sm md:text-base text-foreground whitespace-pre-line leading-relaxed">
+                  {sr.description}
+                </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Mobile: Use 2 columns for better density */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-3 md:gap-4">
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">고객사</h4>
-                  <p className="mt-1">{sr.client?.name || 'N/A'}</p>
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">고객사</h4>
+                  <p className="text-sm mt-0.5">{sr.client?.name || 'N/A'}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">서비스 카테고리</h4>
-                  <p className="mt-1">{sr.serviceCategory?.categoryName || 'N/A'}</p>
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">카테고리</h4>
+                  <p className="text-sm mt-0.5">{sr.serviceCategory?.categoryName || 'N/A'}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">요청자</h4>
-                  <p className="mt-1">{sr.requester?.name || 'N/A'}</p>
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">요청자</h4>
+                  <p className="text-sm mt-0.5">{sr.requester?.name || 'N/A'}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">담당자</h4>
-                  <p className="mt-1">{sr.assignee?.name || '미지정'}</p>
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">담당자</h4>
+                  <p className="text-sm mt-0.5">{sr.assignee?.name || '미지정'}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">요청 우선순위</h4>
-                  <p className="mt-1">{priorityLabels[sr.requestedPriority]}</p>
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                    요청 우선순위
+                  </h4>
+                  <p className="text-sm mt-0.5">{priorityLabels[sr.requestedPriority]}</p>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">실제 우선순위</h4>
-                  <p className="mt-1">
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                    실제 우선순위
+                  </h4>
+                  <p className="text-sm mt-0.5">
                     {sr.actualPriority ? priorityLabels[sr.actualPriority] : 'N/A'}
                   </p>
                 </div>
                 {sr.status === 'REQUESTED' && sr.estimatedCompletionDate && (
                   <div>
-                    <h4 className="text-sm font-medium text-muted-foreground">예상 완료일</h4>
-                    <p className="mt-1">
+                    <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                      예상 완료일
+                    </h4>
+                    <p className="text-sm mt-0.5">
                       {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
                     </p>
                   </div>
                 )}
                 {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) &&
                   sr.estimatedCompletionDate && (
-                    <div>
-                      <h4 className="text-sm font-medium text-muted-foreground">SLA 마감일</h4>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span>
+                    <div className="col-span-2 md:col-span-1">
+                      <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                        SLA 마감일
+                      </h4>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="text-sm">
                           {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
                         </span>
                         {(() => {
@@ -230,23 +290,29 @@ export default function SRDetailPage() {
                                   ? 'secondary'
                                   : 'default';
                           const label = days <= 0 ? '지연' : `${days}일 남음`;
-                          return <Badge variant={variant}>{label}</Badge>;
+                          return (
+                            <Badge
+                              variant={variant}
+                              className="h-4 px-1 text-[10px] md:h-5 md:px-2"
+                            >
+                              {label}
+                            </Badge>
+                          );
                         })()}
                       </div>
                     </div>
                   )}
-              </div>
 
-              {/* Add Attachment Summary */}
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">첨부파일</h4>
-                <div
-                  className="mt-1 flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
-                  onClick={() => setActiveTab('attachments')}
-                >
-                  <Paperclip className="h-4 w-4" />
-                  <span className="font-medium">{sr._count?.attachments || 0}개</span>
-                  <span className="text-xs text-muted-foreground">(클릭하여 확인)</span>
+                {/* Attachment Summary Inline for Mobile */}
+                <div>
+                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">첨부파일</h4>
+                  <div
+                    className="mt-0.5 flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-sm"
+                    onClick={() => setActiveTab('attachments')}
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    <span className="font-medium">{sr._count?.attachments || 0}개</span>
+                  </div>
                 </div>
               </div>
             </div>

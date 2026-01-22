@@ -5,7 +5,7 @@ import ClientLayout from '@/components/providers/ClientLayout';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SR Management System',
+  title: 'SR Management System v1.0',
   description: 'Service Request Management System',
   manifest: '/manifest.json',
   appleWebApp: {

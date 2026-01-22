@@ -150,8 +150,8 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t py-8 mt-16">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>SR Management System v1.0.0 (Docker Build)</p>
-          <p className="mt-2">© 2024. All rights reserved.</p>
+          <p suppressHydrationWarning>SR Management System v1.0</p>
+          <p className="mt-2">© 2026. All rights reserved.</p>
         </div>
       </footer>
     </div>

@@ -65,13 +65,12 @@ export function UserTable({
             <TableHead>고객사</TableHead>
             <TableHead>역할</TableHead>
             <TableHead>상태</TableHead>
-            <TableHead>작업</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8">
+              <TableCell colSpan={7} className="text-center py-8">
                 <div className="flex justify-center items-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                   <span className="text-muted-foreground">로딩 중...</span>
@@ -80,7 +79,7 @@ export function UserTable({
             </TableRow>
           ) : users.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8">
+              <TableCell colSpan={7} className="text-center py-8">
                 {searchQuery ? '검색 결과가 없습니다.' : '등록된 사용자가 없습니다.'}
               </TableCell>
             </TableRow>
@@ -171,16 +170,6 @@ export function UserTable({
                   <Badge variant={user.isActive ? 'default' : 'secondary'}>
                     {user.isActive ? '활성' : '비활성'}
                   </Badge>
-                </TableCell>
-
-                <TableCell className="text-center">
-                  <UserActions
-                    user={user}
-                    onAssignRoles={onAssignRoles}
-                    onToggleActive={onToggleActive}
-                    onDelete={onDelete}
-                    variant="table"
-                  />
                 </TableCell>
               </TableRow>
             ))

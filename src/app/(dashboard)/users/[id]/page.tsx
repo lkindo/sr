@@ -164,31 +164,89 @@ export default function UserDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
             <Link href="/users">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">{user.name}</h1>
-            <p className="text-muted-foreground">{user.email}</p>
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-3xl font-bold tracking-tight truncate">{user.name}</h1>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">{user.email}</p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1 md:gap-2">
           <PermissionGuard roles={['ADMIN']}>
-            <Button variant="outline" onClick={() => setIsAssignRolesDialogOpen(true)}>
-              <Shield className="mr-2 h-4 w-4" />
-              역할 관리
+            <Button
+              variant="outline"
+              onClick={() => setIsAssignRolesDialogOpen(true)}
+              className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4"
+              title="역할 관리"
+            >
+              <Shield className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">역할 관리</span>
             </Button>
           </PermissionGuard>
           <PermissionGuard roles={['ADMIN']}>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              수정
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(true)}
+              className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4"
+              title="수정"
+            >
+              <Pencil className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">수정</span>
             </Button>
           </PermissionGuard>
+          {/* 비활성 사용자 활성화 버튼 */}
+          {!user.isActive && (
+            <PermissionGuard roles={['ADMIN']}>
+              <Button
+                variant="outline"
+                className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4 text-green-600 border-green-600 hover:bg-green-50"
+                title="활성화"
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/users/${user.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ isActive: true }),
+                    });
+
+                    if (!response.ok) throw new Error('Failed to activate user');
+
+                    toast({
+                      title: '활성화 완료',
+                      description: `사용자 ${user.name}이(가) 활성화되었습니다.`,
+                    });
+                    fetchUser();
+                  } catch {
+                    toast({
+                      title: '오류 발생',
+                      description: '사용자 활성화에 실패했습니다.',
+                      variant: 'destructive',
+                    });
+                  }
+                }}
+              >
+                <svg
+                  className="h-4 w-4 md:mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+                <span className="hidden md:inline">활성화</span>
+              </Button>
+            </PermissionGuard>
+          )}
           <PermissionGuard roles={['ADMIN']}>
             <Button
               variant="outline"
@@ -287,10 +345,11 @@ export default function UserDetailPage() {
                   }
                 }
               }}
-              className="text-destructive border-destructive hover:bg-destructive hover:text-white"
+              className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4 text-destructive border-destructive hover:bg-destructive hover:text-white"
+              title={user.isActive ? '비활성화' : '완전 삭제'}
             >
-              <UserX className="mr-2 h-4 w-4" />
-              {user.isActive ? '비활성화' : '완전 삭제'}
+              <UserX className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">{user.isActive ? '비활성화' : '완전 삭제'}</span>
             </Button>
           </PermissionGuard>
         </div>

@@ -229,14 +229,23 @@ export default function ClientsPage() {
                 ))}
               </div>
 
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="고객사명, 코드로 검색..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 h-9 text-xs bg-background rounded-full border-muted-foreground/20 focus-visible:ring-primary/20"
-                />
+              <div className="flex gap-2 flex-1">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="고객사명, 코드로 검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-9 text-xs bg-background rounded-full border-muted-foreground/20 focus-visible:ring-primary/20"
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  className="sr-btn-template-primary shrink-0 h-9 px-4 rounded-full"
+                  onClick={() => setPagination((prev) => ({ ...prev, currentPage: 1 }))}
+                >
+                  검색
+                </Button>
               </div>
             </div>
           </div>

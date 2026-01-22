@@ -132,10 +132,7 @@ function DraggableUserCard({
               <p className="text-[13px] font-semibold truncate group-hover:text-primary">
                 {highlightText(user.name || '이름 없음', searchQuery)}
               </p>
-              <Badge
-                variant={user.isActive ? 'default' : 'secondary'}
-                className="text-[8px] h-3.5 px-1 font-bold shrink-0"
-              >
+              <Badge variant={user.isActive ? 'default' : 'secondary'} className="text-xs shrink-0">
                 {user.isActive ? '활성' : '비활성'}
               </Badge>
             </div>
@@ -241,20 +238,20 @@ function DroppableClientHeader({
               {highlightText(client.name, searchQuery)}
             </Link>
             <div className="flex items-center gap-1">
-              <Badge variant="outline" className="shrink-0 text-[8px] h-3.5 px-1 font-bold">
+              <Badge variant="outline" className="shrink-0 text-[10px] px-1 font-bold">
                 {highlightText(client.code, searchQuery)}
               </Badge>
               {client.industry && (
                 <Badge
                   variant="secondary"
-                  className="shrink-0 text-[8px] h-3.5 px-1 hidden sm:inline-flex"
+                  className="shrink-0 text-[10px] px-1 hidden sm:inline-flex"
                 >
                   {client.industry}
                 </Badge>
               )}
               <Badge
                 variant={client.isActive ? 'default' : 'secondary'}
-                className="shrink-0 text-[8px] h-3.5 px-1 font-bold"
+                className="shrink-0 text-xs font-bold"
               >
                 {client.isActive ? '활성' : '비활성'}
               </Badge>
