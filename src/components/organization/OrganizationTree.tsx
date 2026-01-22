@@ -101,8 +101,8 @@ function DraggableUserCard({
 
   return (
     <div ref={setNodeRef} className={cn('relative', isDragging && 'opacity-30')}>
-      {/* 수평 연결선 */}
-      <div className="absolute left-[-16px] top-1/2 w-4 h-px bg-border"></div>
+      {/* 수평 연결선 - 모바일에서 숨김 */}
+      <div className="absolute left-[-8px] md:left-[-16px] top-1/2 w-2 md:w-4 h-px bg-border hidden md:block"></div>
 
       <UserCardContextMenu
         userId={user.id}
@@ -112,7 +112,7 @@ function DraggableUserCard({
       >
         <Link
           href={user.id ? `/users/${user.id}` : '#'}
-          className="flex items-center gap-2 p-2.5 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
+          className="flex items-center gap-1.5 p-2 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
         >
           {/* 드래그 핸들 */}
           <div
@@ -123,8 +123,8 @@ function DraggableUserCard({
           >
             <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
           </div>
-          <div className="p-2 rounded-full bg-muted group-hover:bg-background shrink-0">
-            <Users className="h-4 w-4 text-muted-foreground group-hover:text-primary" />
+          <div className="p-1.5 rounded-full bg-muted group-hover:bg-background shrink-0">
+            <Users className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary" />
           </div>
 
           <div className="flex-1 min-w-0">
@@ -394,9 +394,9 @@ export function OrganizationTree({
                       등록된 사용자가 없습니다.
                     </p>
                   ) : (
-                    <div className="p-3 pl-6 md:pl-12 space-y-2 relative">
-                      {/* 수직 연결선 */}
-                      <div className="absolute left-4 md:left-8 top-0 bottom-0 w-px bg-border"></div>
+                    <div className="p-2 pl-2 md:pl-6 space-y-1.5 relative">
+                      {/* 수직 연결선 - 모바일에서 숨김 */}
+                      <div className="absolute left-2 md:left-4 top-0 bottom-0 w-px bg-border hidden md:block"></div>
 
                       {users.map((uc: User | { user: User }) => {
                         const user = 'user' in uc ? uc.user : uc;

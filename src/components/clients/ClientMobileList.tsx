@@ -26,7 +26,7 @@ export function ClientMobileList({
   onCreateClient,
 }: ClientMobileListProps) {
   return (
-    <div className="md:hidden space-y-4 px-4 pb-4">
+    <div className="md:hidden space-y-3 px-3 pb-4">
       {loading ? (
         <div className="text-center py-8">
           <div className="flex justify-center items-center gap-2">
@@ -52,57 +52,62 @@ export function ClientMobileList({
               key={client.id}
               className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
             >
-              <div className="p-4 space-y-3">
+              <div className="p-3.5 space-y-2">
                 {/* Header: Name & Status */}
                 <div className="flex justify-between items-start">
-                  <div className="space-y-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <Link
                         href={`/clients/${client.id}`}
-                        className="font-semibold text-lg hover:underline text-primary"
+                        className="font-semibold text-base hover:underline text-primary truncate"
                       >
                         {client.name}
                       </Link>
                       <span className="text-xs text-muted-foreground">({client.code})</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {client.industry || '산업군 미지정'}
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {client.industry || '미지정'}
                     </div>
                   </div>
-                  <Badge variant={client.isActive ? 'default' : 'secondary'}>
+                  <Badge
+                    variant={client.isActive ? 'default' : 'secondary'}
+                    className="text-[10px] h-5 px-1.5 shrink-0"
+                  >
                     {client.isActive ? '활성' : '비활성'}
                   </Badge>
                 </div>
 
-                {/* Contact Info */}
-                <div className="text-sm space-y-1 pt-2 border-t border-border/50">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">담당자:</span>
-                    <span>{client.contactPerson || '-'}</span>
+                {/* 2-Column Grid Info */}
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs border-t border-border/50 pt-2">
+                  <div className="flex">
+                    <span className="text-muted-foreground w-12 shrink-0">담당자</span>
+                    <span className="truncate">{client.contactPerson || '-'}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">이메일:</span>
-                    <span className="truncate max-w-[200px]">{client.contactEmail || '-'}</span>
+                  <div className="flex">
+                    <span className="text-muted-foreground w-12 shrink-0">이메일</span>
+                    <span className="truncate">{client.contactEmail || '-'}</span>
                   </div>
                 </div>
 
                 {/* Stats & Actions */}
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex gap-2">
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex gap-1.5">
                     <Badge
                       variant="secondary"
-                      className="cursor-pointer hover:bg-secondary/80"
+                      className="text-[10px] h-5 px-1.5 cursor-pointer hover:bg-secondary/80"
                       onClick={(e) => onUsersClick(client, e)}
                     >
                       사용자 {client._count?.users || 0}
                     </Badge>
-                    <Badge variant="outline">SR {client._count?.srs || 0}</Badge>
+                    <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                      SR {client._count?.srs || 0}
+                    </Badge>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => onToggleRowExpansion(client.id)}
-                    className="h-8 w-8 p-0"
+                    className="h-7 w-7 p-0"
                   >
                     {isExpanded ? (
                       <ChevronDown className="h-4 w-4" />

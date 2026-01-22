@@ -37,7 +37,7 @@ export function UserMobileList({
   onRefresh,
 }: UserMobileListProps) {
   return (
-    <div className="md:hidden space-y-4 px-4 pb-4">
+    <div className="md:hidden space-y-3 px-3 pb-4">
       {loading ? (
         <div className="text-center py-8">
           <div className="flex justify-center items-center gap-2">
@@ -60,9 +60,9 @@ export function UserMobileList({
               selectedUserIds.has(user.id) && 'ring-2 ring-primary border-primary'
             )}
           >
-            <div className="p-3.5 space-y-2.5">
+            <div className="p-3.5 space-y-2">
               {/* Header: Checkbox, Name, Status */}
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -70,7 +70,7 @@ export function UserMobileList({
                     e.stopPropagation();
                     onToggleUser(user.id);
                   }}
-                  className="h-8 w-8 p-0 shrink-0 mt-0.5"
+                  className="h-7 w-7 p-0 shrink-0 mt-0.5"
                 >
                   {selectedUserIds.has(user.id) ? (
                     <CheckSquare className="h-4 w-4 text-primary" />
@@ -83,7 +83,7 @@ export function UserMobileList({
                     <div>
                       <Link
                         href={`/users/${user.id}`}
-                        className="font-semibold text-sm hover:underline text-primary block truncate"
+                        className="font-semibold text-base hover:underline text-primary block truncate"
                       >
                         {user.name}
                       </Link>
@@ -99,71 +99,82 @@ export function UserMobileList({
                 </div>
               </div>
 
-              {/* Info Chips */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                {/* User Type Badge */}
+              {/* 2-Column Grid Info */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
                 {(() => {
                   const typeLabel = getUserTypeLabel(user);
                   return (
-                    <Badge
-                      variant={getUserTypeBadgeVariant(typeLabel)}
-                      className="text-[10px] h-5 px-1.5"
-                    >
-                      {typeLabel}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <span className="text-muted-foreground">유형:</span>
+                      <Badge
+                        variant={getUserTypeBadgeVariant(typeLabel)}
+                        className="text-[10px] h-4 px-1"
+                      >
+                        {typeLabel}
+                      </Badge>
+                    </div>
                   );
                 })()}
-
-                {/* Roles */}
-                {user.roles.length > 0 &&
-                  user.roles.map((ur: any) => (
-                    <Badge key={ur.role.id} variant="secondary" className="text-[10px] h-5 px-1.5">
-                      {ur.role.name}
-                    </Badge>
-                  ))}
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground">역할:</span>
+                  {user.roles.length > 0 ? (
+                    <div className="flex gap-0.5 overflow-hidden">
+                      {user.roles.slice(0, 1).map((ur: any) => (
+                        <Badge
+                          key={ur.role.id}
+                          variant="secondary"
+                          className="text-[10px] h-4 px-1 truncate max-w-[60px]"
+                        >
+                          {ur.role.name}
+                        </Badge>
+                      ))}
+                      {user.roles.length > 1 && (
+                        <span className="text-muted-foreground">+{user.roles.length - 1}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <span>-</span>
+                  )}
+                </div>
               </div>
 
-              {/* Client Info */}
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground w-10 shrink-0">고객사</span>
-                  <div className="flex-1 min-w-0">
-                    {(() => {
-                      const isSystemTeam = user.roles.some((ur: any) =>
-                        ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
-                      );
-
-                      if (isSystemTeam) {
-                        return (
-                          <span className="text-xs text-muted-foreground">
-                            할당 불가 (시스템 운영팀)
-                          </span>
-                        );
-                      }
-
-                      return user.clients.length === 0 ? (
+              {/* Client Info - Simplified */}
+              <div className="text-xs flex items-center gap-1 pt-1 border-t border-border/50">
+                <span className="text-muted-foreground shrink-0">고객사:</span>
+                <div className="flex-1 min-w-0 truncate">
+                  {(() => {
+                    const isSystemTeam = user.roles.some((ur: any) =>
+                      ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+                    );
+                    if (isSystemTeam)
+                      return <span className="text-muted-foreground">시스템 운영팀</span>;
+                    if (user.clients.length === 0)
+                      return (
                         <ClientAssignDropdown
                           userId={user.id}
                           userName={user.name}
                           clients={clients}
                           onAssigned={onRefresh}
                         />
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {user.clients.map((uc: any) => (
-                            <ClientBadgeWithActions
-                              key={uc.client.id}
-                              userId={user.id}
-                              userName={user.name}
-                              client={uc.client}
-                              allClients={clients}
-                              onChanged={onRefresh}
-                            />
-                          ))}
-                        </div>
                       );
-                    })()}
-                  </div>
+                    return (
+                      <div className="flex gap-1 overflow-hidden">
+                        {user.clients.slice(0, 1).map((uc: any) => (
+                          <ClientBadgeWithActions
+                            key={uc.client.id}
+                            userId={user.id}
+                            userName={user.name}
+                            client={uc.client}
+                            allClients={clients}
+                            onChanged={onRefresh}
+                          />
+                        ))}
+                        {user.clients.length > 1 && (
+                          <span className="text-muted-foreground">+{user.clients.length - 1}</span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 

@@ -27,7 +27,7 @@ export function RoleMobileList({
   onDelete,
 }: RoleMobileListProps) {
   return (
-    <div className="md:hidden space-y-4 px-4 pb-4">
+    <div className="md:hidden space-y-3 px-3 pb-4">
       {roles.length === 0 ? (
         <div className="text-center py-12 border rounded-md border-dashed">
           <p className="text-muted-foreground">등록된 역할이 없습니다.</p>
@@ -38,34 +38,36 @@ export function RoleMobileList({
             key={role.id}
             className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
           >
-            <div className="p-4 space-y-3">
+            <div className="p-3.5 space-y-2">
               {/* Header: Name & User Count */}
               <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="font-semibold text-lg text-[hsl(var(--sr-primary-dark))]">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-base text-[hsl(var(--sr-primary-dark))] truncate">
                     {role.name}
                   </h4>
-                  <p className="text-sm text-muted-foreground mt-1 text-xs">
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
                     {role.description || '설명 없음'}
                   </p>
                 </div>
-                <Badge variant="secondary" className="shrink-0">
+                <Badge variant="secondary" className="shrink-0 text-[10px] h-5 px-1.5">
                   사용자 {role._count?.users || 0}명
                 </Badge>
               </div>
 
               {/* Permission Stat */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="text-sm text-muted-foreground">보유 권한:</span>
-                <Badge variant="outline">{role.permissions.length}개</Badge>
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground">보유 권한:</span>
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5">
+                  {role.permissions.length}개
+                </Badge>
               </div>
 
               {/* Actions */}
-              <div className="grid grid-cols-3 gap-2 pt-2 mt-2 border-t border-border/50">
+              <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-border/50">
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs"
                   onClick={() => onEdit(role)}
                 >
                   수정
@@ -73,15 +75,15 @@ export function RoleMobileList({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs"
                   onClick={() => onManagePermissions(role)}
                 >
-                  권한 관리
+                  권한
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-9 text-xs hover:text-destructive hover:bg-destructive/10 hover:border-destructive/50"
+                  className="h-8 text-xs hover:text-destructive hover:bg-destructive/10"
                   onClick={() => onDelete(role)}
                   disabled={role._count && role._count.users > 0}
                 >
