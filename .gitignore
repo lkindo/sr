@@ -61,3 +61,37 @@ storybook-static
 # Local uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Test results and logs
+*.test-result.json
+test-results/
+e2e_test_results.txt
+e2e_debug*.txt
+e2e_users_result.json
+e2e_debug.json
+absolute_final_test_results.txt
+final_test_results.txt
+system_test_result.txt
+test_results.txt
+failing_test_detail*.txt
+lint_results*.txt
+lint_output.txt
+eslint_results.txt
+build_output.txt
+typecheck_output.txt
+rate_limiter_fail_detail.txt
+
+# Debug and temporary files
+debug*.log
+*.tmp
+*.temp
+
+# Playwright auth (contains sensitive data)
+playwright/.auth/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
