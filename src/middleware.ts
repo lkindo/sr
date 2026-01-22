@@ -56,11 +56,10 @@ export const config = {
   matcher: [
     /*
      * Match all request paths except for the ones starting with:
-     * - api (API routes - handled by auth wrapper separately)
      * - _next/static (static files)
      * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * - favicon.ico, manifest.json, sw.js (root static files)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)', // api 경로도 미들웨어 타도록 수정
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp)$).*)',
   ],
 };
