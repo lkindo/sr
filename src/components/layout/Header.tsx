@@ -139,7 +139,10 @@ export function Header({ user: initialUser }: HeaderProps) {
 
           <nav className="flex items-center gap-3">
             {isLoading ? (
-              <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+              <div className="flex gap-2">
+                <div className="h-9 w-16 rounded bg-muted animate-pulse" />
+                <div className="h-9 w-20 rounded bg-muted animate-pulse" />
+              </div>
             ) : user ? (
               <UserNav user={user} />
             ) : (

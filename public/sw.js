@@ -27,16 +27,20 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating Service Worker version:', SW_VERSION);
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    Promise.all([
+      // 기존 캐시 정리
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      }),
+      // Navigation Preload 활성화
+      self.registration.navigationPreload ? self.registration.navigationPreload.enable() : Promise.resolve(),
+    ]).then(() => self.clients.claim())
   );
 });
 
@@ -49,26 +53,32 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) return;
 
-  // Document (HTML) requests: Network First
+  // Document (HTML) requests: Network First + Navigation Preload
   if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Only cache successful requests
-          if (response && response.status === 200 && response.type === 'basic') {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+      (async () => {
+        try {
+          // Preload된 응답 사용 시도
+          const preloadResponse = await event.preloadResponse;
+          if (preloadResponse) return preloadResponse;
+
+          // 네트워크 요청
+          const networkResponse = await fetch(event.request);
+
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, responseToCache);
           }
-          return response;
-        })
-        .catch(() => {
-          // Offline: try to return cached version
-          return caches.match(event.request).then((cachedResponse) => {
-            return cachedResponse || caches.match('/dashboard');
-          });
-        })
+
+          return networkResponse;
+        } catch (error) {
+          // 오프라인 시 캐시 확인
+          const cache = await caches.open(CACHE_NAME);
+          const cachedResponse = await cache.match(event.request);
+          return cachedResponse || cache.match('/dashboard') || cache.match('/login');
+        }
+      })()
     );
     return;
   }
