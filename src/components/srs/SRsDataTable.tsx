@@ -273,8 +273,8 @@ export function SRsDataTable({
           {/* Quick Filter Buttons and Advanced Filter Button - 고객사 사용자는 숨김 */}
           {!isClientUser && (
             <>
-              <div className="flex items-center justify-between gap-2 mb-4">
-                <div className="flex gap-2">
+              <div className="flex items-center justify-between gap-2 mb-4 overflow-hidden">
+                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2">
                   <button
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
@@ -622,7 +622,7 @@ export function SRsDataTable({
         </div>
 
         {/* Mobile Card View */}
-        <div className="md:hidden space-y-4 p-4">
+        <div className="md:hidden space-y-4 p-3">
           {srs && srs.length > 0 ? (
             srs.map((sr) => {
               const dueDateStatus = getDueDateStatus(
@@ -635,49 +635,62 @@ export function SRsDataTable({
                   className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/srs/${sr.id}`)}
                 >
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <Link
                           href={`/srs/${sr.id}`}
                           className="font-medium text-primary hover:underline"
                         >
                           {sr.srNumber}
                         </Link>
-                        <Badge variant={statusColors[sr.status]} className="flex-shrink-0">
+                        <Badge
+                          variant={statusColors[sr.status]}
+                          className="flex-shrink-0 text-[10px] h-5 px-1.5"
+                        >
                           {statusLabels[sr.status]}
                         </Badge>
-                        <Badge variant={priorityColors[sr.priority]} className="flex-shrink-0">
+                        <Badge
+                          variant={priorityColors[sr.priority]}
+                          className="flex-shrink-0 text-[10px] h-5 px-1.5"
+                        >
                           {priorityLabels[sr.priority]}
                         </Badge>
                       </div>
                       <h4 className="font-semibold mt-1 truncate">{sr.title}</h4>
                       <div className="mt-2 space-y-1 text-sm">
                         <div className="flex">
-                          <span className="text-muted-foreground w-20">고객사</span>
-                          <span>{sr.client.name}</span>
+                          <span className="text-muted-foreground w-16 shrink-0">고객사</span>
+                          <span className="truncate">{sr.client.name}</span>
                         </div>
                         <div className="flex">
-                          <span className="text-muted-foreground w-20">요청자</span>
-                          <span>{sr.requester.name}</span>
+                          <span className="text-muted-foreground w-16 shrink-0">요청자</span>
+                          <span className="truncate">{sr.requester.name}</span>
                         </div>
                         <div className="flex">
-                          <span className="text-muted-foreground w-20">담당자</span>
-                          <span>{sr.assignee?.name || '-'}</span>
+                          <span className="text-muted-foreground w-16 shrink-0">담당자</span>
+                          <span className="truncate">{sr.assignee?.name || '-'}</span>
                         </div>
-                        <div className="flex">
-                          <span className="text-muted-foreground w-20">마감일</span>
-                          <span>
+                        <div className="flex items-center">
+                          <span className="text-muted-foreground w-16 shrink-0">마감일</span>
+                          <div className="flex-1 min-w-0">
                             {dueDateStatus ? (
-                              <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge>
+                              <Badge
+                                variant={dueDateStatus.variant}
+                                className="text-[10px] px-1.5 h-5"
+                              >
+                                {dueDateStatus.label}
+                              </Badge>
                             ) : (
                               '-'
                             )}
-                          </span>
+                          </div>
                         </div>
                         <div className="flex">
-                          <span className="text-muted-foreground w-20">등록일</span>
-                          <span>{new Date(sr.createdAt).toLocaleDateString('ko-KR')}</span>
+                          <span className="text-muted-foreground w-16 shrink-0">등록일</span>
+                          <span className="truncate">
+                            {new Date(sr.createdAt).toLocaleDateString('ko-KR')}
+                          </span>
                         </div>
                         <div className="flex">
                           <span className="text-muted-foreground w-20">댓글/첨부</span>

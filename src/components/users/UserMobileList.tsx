@@ -60,7 +60,7 @@ export function UserMobileList({
               selectedUserIds.has(user.id) && 'ring-2 ring-primary border-primary'
             )}
           >
-            <div className="p-4 space-y-3">
+            <div className="p-3.5 space-y-2.5">
               {/* Header: Checkbox, Name, Status */}
               <div className="flex items-start gap-3">
                 <Button
@@ -83,7 +83,7 @@ export function UserMobileList({
                     <div>
                       <Link
                         href={`/users/${user.id}`}
-                        className="font-semibold text-base hover:underline text-primary block truncate"
+                        className="font-semibold text-sm hover:underline text-primary block truncate"
                       >
                         {user.name}
                       </Link>
@@ -91,7 +91,7 @@ export function UserMobileList({
                     </div>
                     <Badge
                       variant={user.isActive ? 'default' : 'secondary'}
-                      className="shrink-0 ml-2"
+                      className="shrink-0 ml-2 text-[10px] h-5 px-1.5"
                     >
                       {user.isActive ? '활성' : '비활성'}
                     </Badge>
@@ -105,7 +105,10 @@ export function UserMobileList({
                 {(() => {
                   const typeLabel = getUserTypeLabel(user);
                   return (
-                    <Badge variant={getUserTypeBadgeVariant(typeLabel)} className="text-xs">
+                    <Badge
+                      variant={getUserTypeBadgeVariant(typeLabel)}
+                      className="text-[10px] h-5 px-1.5"
+                    >
                       {typeLabel}
                     </Badge>
                   );
@@ -114,7 +117,7 @@ export function UserMobileList({
                 {/* Roles */}
                 {user.roles.length > 0 &&
                   user.roles.map((ur: any) => (
-                    <Badge key={ur.role.id} variant="secondary" className="text-xs">
+                    <Badge key={ur.role.id} variant="secondary" className="text-[10px] h-5 px-1.5">
                       {ur.role.name}
                     </Badge>
                   ))}
@@ -123,8 +126,8 @@ export function UserMobileList({
               {/* Client Info */}
               <div className="pt-2 border-t border-border/50">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground w-12 shrink-0">고객사:</span>
-                  <div className="flex-1">
+                  <span className="text-[11px] text-muted-foreground w-10 shrink-0">고객사</span>
+                  <div className="flex-1 min-w-0">
                     {(() => {
                       const isSystemTeam = user.roles.some((ur: any) =>
                         ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -33,8 +34,14 @@ interface HeaderProps {
 
 export function Header({ user: initialUser }: HeaderProps) {
   const pathname = usePathname();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { data: session, status } = useSession();
   const { hasAnyRole } = usePermissions();
+
+  // 경로 변경 시 모바일 메뉴 자동 닫기
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   // 서버 props로 받은 유저 정보와 클라이언트 세션 정보 병합
   // PWA 등에서 서버 props가 stale할 경우 클라이언트 세션이 우선임
@@ -62,7 +69,7 @@ export function Header({ user: initialUser }: HeaderProps) {
       <div className="flex h-16 md:h-[104px] items-center">
         {/* 모바일 햄버거 메뉴 (md 미만 표시) */}
         <div className="flex md:hidden items-center px-4">
-          <Sheet>
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="h-6 w-6" />

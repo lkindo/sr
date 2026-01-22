@@ -14,8 +14,8 @@ export default function MainContent({ children }: { children: React.ReactNode })
       <main
         className={
           isDashboard
-            ? 'flex-1 p-4 md:p-8 sr-content-bg'
-            : 'flex-1 md:ml-64 p-4 md:p-8 sr-content-bg'
+            ? 'flex-1 px-3 py-4 md:p-8 sr-content-bg'
+            : 'flex-1 md:ml-64 px-3 py-4 md:p-8 sr-content-bg'
         }
       >
         <div className="w-full mx-auto">{children}</div>

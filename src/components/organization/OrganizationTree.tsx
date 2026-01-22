@@ -112,7 +112,7 @@ function DraggableUserCard({
       >
         <Link
           href={user.id ? `/users/${user.id}` : '#'}
-          className="flex items-center gap-3 p-3 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
+          className="flex items-center gap-2 p-2.5 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
         >
           {/* 드래그 핸들 */}
           <div
@@ -134,7 +134,7 @@ function DraggableUserCard({
               </p>
               <Badge
                 variant={user.isActive ? 'default' : 'secondary'}
-                className="text-[10px] h-5 px-1.5"
+                className="text-[9px] h-4 px-1"
               >
                 {user.isActive ? '활성' : '비활성'}
               </Badge>
@@ -206,7 +206,7 @@ function DroppableClientHeader({
       <div
         ref={setNodeRef}
         className={cn(
-          'flex items-center gap-3 p-4 transition-all cursor-pointer border-l-4',
+          'flex items-center gap-2 p-3 transition-all cursor-pointer border-l-4',
           isExpanded
             ? 'bg-gradient-to-r from-primary/5 to-transparent border-l-primary'
             : 'hover:bg-muted/20 border-l-transparent hover:border-l-primary/30',
@@ -227,28 +227,31 @@ function DroppableClientHeader({
           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </Button>
 
-        <div className="p-2 rounded-md bg-primary/10 shrink-0">
-          <Building2 className="h-5 w-5 text-primary" />
+        <div className="p-1.5 rounded-md bg-primary/10 shrink-0">
+          <Building2 className="h-4 w-4 text-primary" />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Link
               href={`/clients/${client.id}`}
-              className="font-semibold text-[hsl(var(--sr-primary-dark))] hover:underline truncate text-lg"
+              className="font-semibold text-[hsl(var(--sr-primary-dark))] hover:underline truncate text-base"
               onClick={(e) => e.stopPropagation()}
             >
               {highlightText(client.name, searchQuery)}
             </Link>
-            <Badge variant="outline" className="shrink-0">
+            <Badge variant="outline" className="shrink-0 text-[10px] h-5">
               {highlightText(client.code, searchQuery)}
             </Badge>
             {client.industry && (
-              <Badge variant="secondary" className="shrink-0">
+              <Badge variant="secondary" className="shrink-0 text-[10px] h-5">
                 {client.industry}
               </Badge>
             )}
-            <Badge variant={client.isActive ? 'default' : 'secondary'} className="shrink-0">
+            <Badge
+              variant={client.isActive ? 'default' : 'secondary'}
+              className="shrink-0 text-[10px] h-5"
+            >
               {client.isActive ? '활성' : '비활성'}
             </Badge>
           </div>
@@ -391,9 +394,9 @@ export function OrganizationTree({
                       등록된 사용자가 없습니다.
                     </p>
                   ) : (
-                    <div className="p-4 pl-12 space-y-2 relative">
+                    <div className="p-3 pl-6 md:pl-12 space-y-2 relative">
                       {/* 수직 연결선 */}
-                      <div className="absolute left-8 top-0 bottom-0 w-px bg-border"></div>
+                      <div className="absolute left-4 md:left-8 top-0 bottom-0 w-px bg-border"></div>
 
                       {users.map((uc: User | { user: User }) => {
                         const user = 'user' in uc ? uc.user : uc;
