@@ -4,6 +4,10 @@ import { expect, test } from '@playwright/test';
  * 기본 페이지 접근 테스트
  */
 test.describe('기본 페이지 접근', () => {
+  // 기본 global-setup에서 이미 로그인된 상태(storageState)이므로,
+  // 로그인/회원가입 페이지 자체를 테스트하기 위해 세션 정보를 초기화합니다.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('로그인 페이지 접근', async ({ page }) => {
     await page.goto('/login');
 
@@ -37,13 +41,11 @@ test.describe('기본 페이지 접근', () => {
   });
 
   test('인증되지 않은 사용자는 대시보드 접근 불가', async ({ page }) => {
-    // 새로운 컨텍스트에서 세션 없이 테스트
-    const context = await page.context();
-    await context.clearCookies();
-
+    // 세션이 없는 상태에서 보호된 페이지 접근
     await page.goto('/dashboard');
 
-    // 로그인 페이지로 리디렉션 확인
-    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+    // 로그인 페이지로 리디렉션되어야 함
+    await expect(page).toHaveURL(/\/login/);
+    console.log('✅ 미인증 사용자 리디렉션 확인');
   });
 });

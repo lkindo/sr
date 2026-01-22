@@ -31,8 +31,25 @@ export default auth(async (req) => {
     }
   }
 
-  // 2. 인증 처리 (기본 auth 미들웨어 동작)
-  // return NextResponse.next(); // auth wrapper가 자동으로 처리함
+  // 2. 인증 처리
+  const isLoggedIn = !!req.auth?.user;
+  const isAuthPage =
+    req.nextUrl.pathname.startsWith('/login') || req.nextUrl.pathname.startsWith('/register');
+  const isRootPath = req.nextUrl.pathname === '/';
+
+  // 보호된 경로(API 제외)에 대해 명시적 리다이렉트 처리 (Edge-safe)
+  const isProtectedPath = !isAuthPage && !isRootPath && !req.nextUrl.pathname.startsWith('/api/');
+
+  if (!isLoggedIn && isProtectedPath) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl));
+  }
+
+  // 로그인하지 않은 상태에서 루트(/) 접근 시도 시 로그인 페이지로 안내 (선택적 정책)
+  if (!isLoggedIn && isRootPath) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl));
+  }
+
+  return NextResponse.next();
 });
 
 export const config = {

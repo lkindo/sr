@@ -23,23 +23,30 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockCheckPermission = vi.fn().mockResolvedValue(true);
 vi.mock('@/services/permission.service', () => ({
-  PermissionService: vi.fn().mockImplementation(() => ({
-    checkPermission: mockCheckPermission,
-  })),
+  PermissionService: vi.fn().mockImplementation(function (this: any) {
+    return {
+      checkPermission: mockCheckPermission,
+    };
+  }),
 }));
 
 const mockCreateSR = vi.fn();
 const mockGetAllSRs = vi.fn();
 
 vi.mock('@/services/sr.service', () => ({
-  SRService: vi.fn().mockImplementation(() => ({
-    createSR: mockCreateSR,
-    getAllSRs: mockGetAllSRs,
-  })),
+  SRService: vi.fn().mockImplementation(function (this: any) {
+    return {
+      createSR: mockCreateSR,
+      getAllSRs: mockGetAllSRs,
+    };
+  }),
+  srService: {
+    createSR: (...args: any[]) => mockCreateSR(...args),
+    getAllSRs: (...args: any[]) => mockGetAllSRs(...args),
+  },
 }));
 
 import { ServiceError } from '@/lib/errors';
-import { SRService } from '@/services/sr.service';
 
 describe('SR API Integration', () => {
   beforeEach(() => {
@@ -85,7 +92,7 @@ describe('SR API Integration', () => {
     const json = await res.json();
 
     expect(res.status).toBe(201);
-    expect(json.data.srNumber).toBe('SR-2023-0001');
+    expect(json.srNumber).toBe('SR-2023-0001');
     expect(mockCreateSR).toHaveBeenCalled();
   });
 

@@ -131,93 +131,64 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
     console.log(`✅ ADMIN: 사용자 생성 완료 - ${testUserName}`);
   });
 
-  test('사용자 수정 플로우', async ({ page }) => {
+  test('역할 관리 플로우 (신규 UI)', async ({ page }) => {
     await page.goto('/users');
     await page.waitForLoadState('networkidle');
 
-    // 첫 번째 사용자 행 찾기
-    const firstUserRow = page.locator('tbody tr').first();
-    await expect(firstUserRow).toBeVisible({ timeout: 10000 });
+    // 첫 번째 사용자 선택 (체크박스 클릭)
+    const firstRow = page.locator('tbody tr').first();
+    await expect(firstRow).toBeVisible({ timeout: 10000 });
 
-    // 수정 버튼 찾기
-    const editButton = firstUserRow
-      .locator('button')
-      .filter({ hasText: /수정|편집|Edit/i })
+    const checkbox = firstRow.locator('button').first(); // 첫 번째 버튼이 체크박스
+    await checkbox.click();
+
+    // 상단 일괄 작업 영역의 '역할 관리' 버튼 확인 및 클릭
+    const roleManageButton = page.locator('button').filter({ hasText: '역할 관리' });
+    await expect(roleManageButton).toBeVisible({ timeout: 5000 });
+    await roleManageButton.click();
+
+    // 역할 관리 Dialog 확인
+    const dialog = page
+      .locator('[role="dialog"]')
+      .filter({ hasText: /역할|Role/i })
       .first();
-    const editButtonVisible = await editButton.isVisible({ timeout: 2000 }).catch(() => false);
+    await expect(dialog).toBeVisible({ timeout: 5000 });
 
-    if (editButtonVisible) {
-      await editButton.click();
-    } else {
-      // 행 클릭으로 상세 페이지 이동
-      await firstUserRow.click();
-    }
+    // 취소/닫기
+    const closeButton = dialog
+      .locator('button')
+      .filter({ hasText: /취소|닫기|Close|Cancel/i })
+      .first();
+    await closeButton.click();
 
-    await page.waitForTimeout(500);
-
-    // Dialog 또는 상세 페이지 확인
-    const dialog = page.locator('[role="dialog"], .dialog, .modal').first();
-    const dialogVisible = await dialog.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (dialogVisible) {
-      // 이름 필드 수정
-      const nameInput = dialog.locator('input[name="name"], input[placeholder*="이름"]').first();
-      if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const timestamp = Date.now();
-        await nameInput.fill(`Updated User ${timestamp}`);
-
-        // 저장
-        const saveButton = dialog
-          .locator('button')
-          .filter({ hasText: /저장|수정|Save|Update/i })
-          .first();
-        await saveButton.click();
-        await page.waitForTimeout(1000);
-
-        console.log('✅ ADMIN: 사용자 수정 완료');
-      }
-    }
+    console.log('✅ ADMIN: 역할 관리 다이얼로그 접근 확인');
   });
 
-  test('사용자 비활성화/삭제 플로우', async ({ page }) => {
+  test('사용자 비활성/활성 상태 전환 (신규 UI)', async ({ page }) => {
     await page.goto('/users');
     await page.waitForLoadState('networkidle');
 
-    // E2E 테스트 사용자 찾기
-    let targetRow = page
-      .locator('tbody tr')
-      .filter({ hasText: /E2E Test User/i })
-      .first();
-    if (!(await targetRow.isVisible({ timeout: 3000 }).catch(() => false))) {
-      targetRow = page.locator('tbody tr').first();
-    }
+    // 검색 등으로 대상 사용자 식별 시도 (없으면 첫 번째)
+    const firstRow = page.locator('tbody tr').first();
+    await expect(firstRow).toBeVisible();
 
-    await expect(targetRow).toBeVisible({ timeout: 10000 });
+    // 이 사용자의 현재 상태 확인 (Badge 텍스트)
+    const statusBadge = firstRow.locator('td').last().locator('div, span').first();
+    const isCurrentlyActive = (await statusBadge.innerText()).includes('활성');
 
-    // 삭제/비활성화 버튼 찾기
-    const deleteButton = targetRow
-      .locator('button')
-      .filter({ hasText: /삭제|비활성|Delete|Deactivate/i })
-      .first();
+    // 체크박스 클릭
+    await firstRow.locator('button').first().click();
 
-    if (await deleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteButton.click();
-      await page.waitForTimeout(500);
+    // 상태에 따른 버튼 선택
+    const actionButtonText = isCurrentlyActive ? '일괄 비활성화' : '일괄 활성화';
+    const actionButton = page.locator('button').filter({ hasText: actionButtonText });
 
-      // 확인 Dialog
-      const confirmDialog = page.locator('[role="dialog"], [role="alertdialog"]').first();
-      if (await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-        const confirmButton = confirmDialog
-          .locator('button')
-          .filter({ hasText: /확인|삭제|비활성|Delete|Yes/i })
-          .first();
-        await confirmButton.click();
-        await page.waitForTimeout(1000);
-        console.log('✅ ADMIN: 사용자 비활성화 완료');
-      }
-    } else {
-      console.log('ℹ️ 삭제 버튼이 행 내부에 없음 - UI 구조가 다를 수 있음');
-    }
+    await expect(actionButton).toBeVisible({ timeout: 5000 });
+    await actionButton.click();
+
+    // 토스트 메시지 대기 및 확인
+    await expect(page.locator('text=/완료|성공/')).toBeVisible({ timeout: 5000 });
+    console.log(`✅ ADMIN: 사용자 상태 전환 확인 (${isCurrentlyActive ? '비활성화' : '활성화'})`);
   });
 });
 

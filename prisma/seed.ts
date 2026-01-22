@@ -367,6 +367,38 @@ async function main() {
     });
   }
 
+  // Create Engineer User for E2E tests
+  const engineerEmail = 'engineeruser@example.com';
+  let engineerUser = await prisma.user.findUnique({ where: { email: engineerEmail } });
+
+  if (!engineerUser) {
+    const bcrypt = require('bcryptjs');
+    const engineerPassword = 'engineer123';
+    const hashed = await bcrypt.hash(engineerPassword, 10);
+    engineerUser = await prisma.user.create({
+      data: {
+        email: engineerEmail,
+        name: 'Engineer User',
+        password: hashed,
+        notificationPreference: { create: {} },
+      },
+    });
+    // ENGINEER 역할 부여
+    const engRole = await prisma.role.findUnique({ where: { name: 'ENGINEER' } });
+    if (engRole) {
+      await prisma.userRole.create({ data: { userId: engineerUser.id, roleId: engRole.id } });
+    }
+    console.log(`Created engineer user: ${engineerEmail} / ${engineerPassword}`);
+  } else {
+    // Ensure preference for existing engineer user
+    await prisma.notificationPreference.upsert({
+      where: { userId: engineerUser.id },
+      create: { userId: engineerUser.id },
+      update: {},
+    });
+    console.log('Engineer user already exists');
+  }
+
   // Create test clients
   console.log('Creating test clients...');
 

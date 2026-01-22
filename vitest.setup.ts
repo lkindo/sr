@@ -22,3 +22,6 @@ process.env.VITEST = 'true';
 process.env.NEXTAUTH_URL = 'http://localhost:3000';
 process.env.NEXTAUTH_SECRET = 'test-secret-key';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+process.env.RATE_LIMIT_STRICT_MAX_REQUESTS = '5';
+process.env.RATE_LIMIT_STANDARD_MAX_REQUESTS = '100';
+process.env.RATE_LIMIT_RELAXED_MAX_REQUESTS = '300';
