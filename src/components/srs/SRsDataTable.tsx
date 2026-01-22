@@ -274,21 +274,21 @@ export function SRsDataTable({
           {!isClientUser && (
             <>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-                <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+                <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
                   <button
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
                     }
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'waiting'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
                         : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>접수 대기</span>
+                    <Clock className="h-2.5 w-2.5" />
+                    <span>접수</span>
                     <span
-                      className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'waiting'
                           ? 'bg-white text-primary font-bold'
                           : 'bg-destructive text-white'
@@ -301,16 +301,16 @@ export function SRsDataTable({
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
                     }
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'myAssigned'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
                         : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <User className="h-3.5 w-3.5" />
-                    <span>내 담당</span>
+                    <User className="h-2.5 w-2.5" />
+                    <span>담당</span>
                     <span
-                      className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'myAssigned'
                           ? 'bg-white text-primary font-bold'
                           : 'bg-muted-foreground text-white'
@@ -323,16 +323,16 @@ export function SRsDataTable({
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
                     }
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-all ${
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'urgent'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
                         : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <AlertTriangle className="h-2.5 w-2.5" />
                     <span>긴급</span>
                     <span
-                      className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] ${
+                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'urgent'
                           ? 'bg-white text-primary font-bold'
                           : 'bg-destructive text-white'
@@ -475,7 +475,7 @@ export function SRsDataTable({
           )}
 
           {/* Search Bar and Total Count */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -486,6 +486,10 @@ export function SRsDataTable({
                 className="pl-10 sr-input-template w-full"
               />
             </div>
+            <Button onClick={handleSearch} className="sr-btn-template-primary shrink-0 h-10">
+              <Search className="h-4 w-4 mr-2" />
+              검색
+            </Button>
           </div>
         </div>
 

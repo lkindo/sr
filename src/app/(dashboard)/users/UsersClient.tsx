@@ -277,9 +277,9 @@ export default function UsersClient() {
           </div>
 
           {/* 필터 영역 - 데스크톱/모바일 최적화 */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             {/* Status Tabs (Mobile: Scrollable / Desktop: Flex) */}
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+            <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
               {[
                 { label: '활성', value: 'true' },
                 { label: '비활성', value: 'false' },
@@ -288,7 +288,7 @@ export default function UsersClient() {
                 <button
                   key={tab.value}
                   onClick={() => handleStatusChange(tab.value)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all border ${
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
                     statusFilter === tab.value
                       ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
                       : 'bg-white text-muted-foreground border-border hover:bg-muted'

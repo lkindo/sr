@@ -134,6 +134,7 @@ export const NAVIGATION_CONFIG: TopNavItem[] = [
           },
         ],
       },
+      /*
       {
         title: '일반 설정',
         items: [
@@ -145,6 +146,7 @@ export const NAVIGATION_CONFIG: TopNavItem[] = [
           },
         ],
       },
+      */
     ],
   },
 ];

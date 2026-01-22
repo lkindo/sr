@@ -176,11 +176,11 @@ export default function ClientsPage() {
           </div>
 
           {/* 검색 및 필터 영역 - 데스크톱/모바일 최적화 */}
-          <div className="flex flex-col gap-3 mt-2">
+          <div className="flex flex-col gap-2 mt-2">
             {/* Industry Tabs */}
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+            <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
               {[
-                { label: '전체 산업군', value: 'all' },
+                { label: '전체', value: 'all' },
                 { label: 'IT', value: 'IT' },
                 { label: '제조', value: 'MANUFACTURING' },
                 { label: '금융', value: 'FINANCE' },
@@ -193,7 +193,7 @@ export default function ClientsPage() {
                     setIndustryFilter(tab.value);
                     setPagination((prev) => ({ ...prev, currentPage: 1 }));
                   }}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
                     industryFilter === tab.value
                       ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
                       : 'bg-white text-muted-foreground border-border hover:bg-muted'
@@ -205,10 +205,10 @@ export default function ClientsPage() {
             </div>
 
             {/* Status Tabs & Search Bar */}
-            <div className="flex flex-col md:flex-row gap-3">
-              <div className="flex gap-2">
+            <div className="flex flex-col md:flex-row gap-2">
+              <div className="flex gap-1">
                 {[
-                  { label: '전체 상태', value: 'all' },
+                  { label: '전체', value: 'all' },
                   { label: '활성', value: 'true' },
                   { label: '비활성', value: 'false' },
                 ].map((tab) => (
@@ -218,7 +218,7 @@ export default function ClientsPage() {
                       setStatusFilter(tab.value);
                       setPagination((prev) => ({ ...prev, currentPage: 1 }));
                     }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
                       statusFilter === tab.value
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
                         : 'bg-white text-muted-foreground border-border hover:bg-muted'
