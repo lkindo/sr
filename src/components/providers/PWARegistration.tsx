@@ -12,9 +12,9 @@ export function PWARegistration() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // 1. Service Worker 등록 (유예 기간과 관계없이 상시 등록)
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-      const registerSW = () => {
+    // 1. Service Worker 등록 (상시 실행)
+    const registerSW = () => {
+      if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
         navigator.serviceWorker
           .register('/sw.js')
           .then((registration) => {
@@ -23,21 +23,20 @@ export function PWARegistration() {
           .catch((error) => {
             console.error('[PWA] Service Worker registration failed:', error);
           });
-      };
-
-      if (document.readyState === 'complete') {
-        registerSW();
-      } else {
-        window.addEventListener('load', registerSW);
-        return () => window.removeEventListener('load', registerSW);
       }
+    };
+
+    if (document.readyState === 'complete') {
+      registerSW();
+    } else {
+      window.addEventListener('load', registerSW);
     }
 
-    // 2. 설치 프로모션 이벤트 캡처
+    // 2. 설치 프로모션 이벤트 캡처 (상시 실행)
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
 
-      // 배너 유예 기간 확인 (7일 유예) - 이벤트가 발생했을 때만 체크
+      // 배너 유예 기간 확인 (7일 유예)
       const dismissedAt = localStorage.getItem('pwa-banner-dismissed-at');
       if (dismissedAt) {
         const lastDismissed = new Date(parseInt(dismissedAt, 10));
@@ -46,7 +45,7 @@ export function PWARegistration() {
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         if (diffDays <= 7) {
-          return; // 7일 이내라면 배너를 띄우지 않음
+          return;
         }
       }
 
@@ -57,6 +56,7 @@ export function PWARegistration() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
     return () => {
+      window.removeEventListener('load', registerSW);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
