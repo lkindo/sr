@@ -37,16 +37,21 @@ export function PWARegistration() {
       e.preventDefault();
 
       // 배너 유예 기간 확인 (7일 유예)
-      const dismissedAt = localStorage.getItem('pwa-banner-dismissed-at');
-      if (dismissedAt) {
-        const lastDismissed = new Date(parseInt(dismissedAt, 10));
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - lastDismissed.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      try {
+        const dismissedAt = localStorage.getItem('pwa-banner-dismissed-at');
+        if (dismissedAt) {
+          const lastDismissed = parseInt(dismissedAt, 10);
+          if (!isNaN(lastDismissed)) {
+            const now = Date.now();
+            const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
 
-        if (diffDays <= 7) {
-          return;
+            if (now - lastDismissed <= sevenDaysInMs) {
+              return; // 7일 이내라면 배너를 띄우지 않음
+            }
+          }
         }
+      } catch (err) {
+        console.error('[PWA] Error checking dismissed status:', err);
       }
 
       setInstallPrompt(e);
@@ -86,31 +91,30 @@ export function PWARegistration() {
   if (!showInstallBanner) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[100] md:left-auto md:right-8 md:bottom-8 md:w-80">
-      <div className="bg-[hsl(var(--sr-primary-dark))] p-4 rounded-lg shadow-2xl border border-[#3f4564] text-white flex items-center justify-between gap-4 animate-in slide-in-from-bottom-5 duration-500">
+    <div className="fixed bottom-4 right-4 z-[100] w-auto max-w-xs">
+      <div className="bg-[hsl(var(--sr-primary-dark))] p-3 rounded-lg shadow-2xl border border-[#3f4564] text-white animate-in slide-in-from-bottom-5 duration-500">
         <div className="flex items-center gap-3">
-          <div className="bg-[hsl(var(--sr-accent-orange))] p-2 rounded-md">
-            <Download className="h-5 w-5" />
+          <div className="bg-[hsl(var(--sr-accent-orange))] p-2 rounded-md shrink-0">
+            <Download className="h-4 w-4" />
           </div>
-          <div>
-            <p className="text-sm font-bold">홈 화면에 추가</p>
-            <p className="text-xs text-gray-400">앱으로 설치하여 더 편하게 관리하세요.</p>
+          <div className="min-w-0">
+            <p className="text-sm font-bold">앱으로 설치</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            className="bg-white text-[hsl(var(--sr-primary-dark))] hover:bg-gray-100 h-8 px-3"
-            onClick={handleInstallClick}
-          >
-            설치
-          </Button>
-          <button
-            onClick={handleDismiss}
-            className="text-gray-400 hover:text-white transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              size="sm"
+              className="bg-white text-[hsl(var(--sr-primary-dark))] hover:bg-gray-100 h-7 px-2 text-xs"
+              onClick={handleInstallClick}
+            >
+              설치
+            </Button>
+            <button
+              onClick={handleDismiss}
+              className="text-gray-400 hover:text-white transition-colors p-1"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

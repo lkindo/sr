@@ -17,7 +17,15 @@ self.addEventListener('install', (event) => {
   console.log('[SW] Installing Service Worker version:', SW_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS);
+      // Use individual adds to prevent a single failure from blocking the entire install
+      return Promise.allSettled(
+        PRECACHE_ASSETS.map(asset => cache.add(asset))
+      ).then(results => {
+        const failed = results.filter(r => r.status === 'rejected');
+        if (failed.length > 0) {
+          console.warn(`[SW] Some assets failed to precache:`, failed);
+        }
+      });
     })
   );
   self.skipWaiting();
