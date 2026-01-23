@@ -65,13 +65,13 @@ export function Header({ user: initialUser }: HeaderProps) {
   const activeMenu = getActiveMenu();
 
   return (
-    <header className="sticky top-0 z-50 w-full sr-header-accent bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-[60] w-full sr-header-accent bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 md:h-[104px] items-center">
         {/* 모바일 햄버거 메뉴 (md 미만 표시) */}
         <div className="flex md:hidden items-center px-4">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" suppressHydrationWarning>
+              <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">메뉴 열기</span>
               </Button>

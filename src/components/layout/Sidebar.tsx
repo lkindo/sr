@@ -104,7 +104,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
   return (
     <aside
       className={cn(
-        'z-30 h-full w-full sr-sidebar-bg text-white overflow-y-auto',
+        'z-40 h-full w-full sr-sidebar-bg text-white overflow-y-auto',
         !isMobile &&
           'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-[#3f4564] hidden md:block'
       )}

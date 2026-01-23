@@ -200,7 +200,7 @@
 
   /* Header Styles */
   .sr-header {
-    @apply sticky top-0 z-50;
+    @apply sticky top-0 z-[60];
     @apply w-full h-[72px];
     @apply bg-background/95 backdrop-blur;
     @apply border-b-2 border-primary;
