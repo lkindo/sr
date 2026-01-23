@@ -12,7 +12,20 @@ export function PWARegistration() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // 1. Service Worker 등록
+    // 1. 배너를 이전에 닫았는지 확인 (7일 유예)
+    const dismissedAt = localStorage.getItem('pwa-banner-dismissed-at');
+    if (dismissedAt) {
+      const lastDismissed = new Date(parseInt(dismissedAt, 10));
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - lastDismissed.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 7) {
+        return;
+      }
+    }
+
+    // 2. Service Worker 등록
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker
@@ -26,13 +39,10 @@ export function PWARegistration() {
       });
     }
 
-    // 2. 설치 프로모션 이벤트 캡처
+    // 3. 설치 프로모션 이벤트 캡처
     const handleBeforeInstallPrompt = (e: any) => {
-      // 브라우저 기본 설치 안내 방지
       e.preventDefault();
-      // 이벤트를 저장해두었다가 나중에 실행
       setInstallPrompt(e);
-      // 설치 안내 UI 표시
       setShowInstallBanner(true);
     };
 
@@ -46,14 +56,9 @@ export function PWARegistration() {
   const handleInstallClick = async () => {
     if (!installPrompt) return;
 
-    // 설치 프롬프트 표시
     installPrompt.prompt();
-
-    // 사용자의 응답 대기
     const { outcome } = await installPrompt.userChoice;
-    console.log(`[PWA] User choice: ${outcome}`);
 
-    // 프롬프트는 한 번만 사용 가능하므로 초기화
     setInstallPrompt(null);
     setShowInstallBanner(false);
 
@@ -63,6 +68,11 @@ export function PWARegistration() {
         description: '잠시 후 앱 목록에서 확인하실 수 있습니다.',
       });
     }
+  };
+
+  const handleDismiss = () => {
+    localStorage.setItem('pwa-banner-dismissed-at', Date.now().toString());
+    setShowInstallBanner(false);
   };
 
   if (!showInstallBanner) return null;
@@ -88,7 +98,7 @@ export function PWARegistration() {
             설치
           </Button>
           <button
-            onClick={() => setShowInstallBanner(false)}
+            onClick={handleDismiss}
             className="text-gray-400 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
