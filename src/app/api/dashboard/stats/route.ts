@@ -247,6 +247,9 @@ export const GET = withAuthAndRateLimit(
           status: { in: ['COMPLETED', 'CONFIRMED'] },
           intakeAt: { not: null },
           completedAt: { not: null },
+          createdAt: {
+            gte: thirtyDaysAgo,
+          },
         },
         select: {
           intakeAt: true,
