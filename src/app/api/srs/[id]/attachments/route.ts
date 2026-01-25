@@ -64,52 +64,70 @@ export const POST = withAuthAndRateLimit(
       await mkdir(uploadDir, { recursive: true });
     }
 
-    const uploadedAttachments = [];
-    const validationErrors: { fileName: string; error: string }[] = [];
+    // 모든 파일에 대해 동일한 타임스탬프 사용 (배치 처리)
+    const timestamp = Date.now();
 
-    for (const file of files) {
-      try {
-        // 파일 검증 (확장자, 내용, 크기)
-        const { mimeType, size } = await validateFile(file);
+    const results = await Promise.all(
+      files.map(async (file, index) => {
+        try {
+          // 파일 검증 (확장자, 내용, 크기)
+          const { mimeType, size } = await validateFile(file);
 
-        // 파일명 생성 (타임스탬프 + 원본 파일명)
-        const timestamp = Date.now();
-        const safeFileName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
-        const fileName = `${timestamp}_${safeFileName}`;
-        const filePath = join(uploadDir, fileName);
+          // 파일명 생성 (타임스탬프 + 인덱스 + 원본 파일명) - 병렬 처리 시 타임스탬프 충돌 방지
+          const safeFileName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
+          const fileName = `${timestamp}_${index}_${safeFileName}`;
+          const filePath = join(uploadDir, fileName);
 
-        // 파일 저장
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await writeFile(filePath, buffer);
+          // 파일 저장
+          const buffer = Buffer.from(await file.arrayBuffer());
+          await writeFile(filePath, buffer);
 
-        // DB에 첨부파일 정보 저장
-        const attachment = await prisma.sRAttachment.create({
-          data: {
-            srId,
-            fileName: file.name,
-            fileUrl: `/uploads/attachments/${fileName}`,
-            fileSize: size,
-            fileType: mimeType, // 검증된 MIME 타입 사용
-            storagePath: filePath,
-            uploadedBy: session.user.id,
-          },
-        });
-
-        uploadedAttachments.push({
-          ...attachment,
-          createdAt: attachment.createdAt.toISOString(),
-        });
-      } catch (error) {
-        if (error instanceof FileValidationError) {
-          validationErrors.push({
-            fileName: file.name,
-            error: error.message,
+          // DB에 첨부파일 정보 저장
+          const attachment = await prisma.sRAttachment.create({
+            data: {
+              srId,
+              fileName: file.name,
+              fileUrl: `/uploads/attachments/${fileName}`,
+              fileSize: size,
+              fileType: mimeType, // 검증된 MIME 타입 사용
+              storagePath: filePath,
+              uploadedBy: session.user.id,
+            },
           });
-        } else {
-          throw error; // 예상하지 못한 에러는 상위로 전파
+
+          return {
+            status: 'fulfilled' as const,
+            value: {
+              ...attachment,
+              createdAt: attachment.createdAt.toISOString(),
+            },
+          };
+        } catch (error) {
+          if (error instanceof FileValidationError) {
+            return {
+              status: 'rejected' as const,
+              reason: error,
+              fileName: file.name,
+            };
+          }
+          throw error; // 예상하지 못한 에러는 상위로 전파 (Promise.all 중단)
         }
-      }
-    }
+      })
+    );
+
+    const uploadedAttachments = results
+      .filter((r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled')
+      .map((r) => r.value);
+
+    const validationErrors = results
+      .filter(
+        (r): r is { status: 'rejected'; reason: FileValidationError; fileName: string } =>
+          r.status === 'rejected'
+      )
+      .map((r) => ({
+        fileName: r.fileName,
+        error: r.reason.message,
+      }));
 
     // 모든 파일이 검증 실패한 경우
     if (uploadedAttachments.length === 0 && validationErrors.length > 0) {
