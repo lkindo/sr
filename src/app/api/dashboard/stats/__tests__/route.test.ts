@@ -12,6 +12,7 @@ vi.mock('@/lib/prisma', () => ({
     client: { findMany: vi.fn() },
     serviceCategory: { findMany: vi.fn() },
     $disconnect: vi.fn(),
+    $queryRaw: vi.fn(),
   },
 }));
 
@@ -38,9 +39,12 @@ describe('Dashboard Stats API', () => {
       // 2. By Priority
       .mockResolvedValueOnce([{ priority: 'HIGH', _count: { id: 5 } }] as any)
       // 3. By Client
-      .mockResolvedValueOnce([{ clientId: 'c-1', _count: { id: 5 } }] as any)
-      // 4. Trend (By Date)
-      .mockResolvedValueOnce([{ createdAt: new Date(), _count: { id: 5 } }] as any);
+      .mockResolvedValueOnce([{ clientId: 'c-1', _count: { id: 5 } }] as any);
+
+    // 4. Trend (By Date) - Raw Query
+    vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
+      { date: new Date().toISOString().split('T')[0], count: BigInt(5) },
+    ] as any);
 
     vi.mocked(prisma.sR.count).mockResolvedValue(8);
     vi.mocked(prisma.sR.findMany).mockResolvedValue([]); // For recent/waiting lists
