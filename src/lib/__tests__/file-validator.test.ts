@@ -40,16 +40,17 @@ describe('FileValidator', () => {
 
   describe('validateFile', () => {
     it('should pass for valid image file', async () => {
+      const buffer = new ArrayBuffer(8);
       const mockFile = {
         name: 'test.png',
         size: 1024,
-        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        arrayBuffer: vi.fn().mockResolvedValue(buffer),
       } as unknown as File;
 
       (fileTypeFromBuffer as any).mockResolvedValue({ mime: 'image/png' });
 
       const result = await validateFile(mockFile);
-      expect(result).toEqual({ mimeType: 'image/png', size: 1024 });
+      expect(result).toEqual({ mimeType: 'image/png', size: 1024, buffer });
     });
 
     it('should throw if MIME type is not allowed', async () => {
@@ -80,17 +81,18 @@ describe('FileValidator', () => {
     });
 
     it('should handle text files correctly', async () => {
+      const buffer = new ArrayBuffer(8);
       const mockFile = {
         name: 'test.txt',
         size: 1024,
-        arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        arrayBuffer: vi.fn().mockResolvedValue(buffer),
       } as unknown as File;
 
       // file-type returns undefined for text files
       (fileTypeFromBuffer as any).mockResolvedValue(undefined);
 
       const result = await validateFile(mockFile);
-      expect(result).toEqual({ mimeType: 'text/plain', size: 1024 });
+      expect(result).toEqual({ mimeType: 'text/plain', size: 1024, buffer });
     });
   });
 });

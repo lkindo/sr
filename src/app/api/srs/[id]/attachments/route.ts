@@ -70,7 +70,7 @@ export const POST = withAuthAndRateLimit(
     for (const file of files) {
       try {
         // 파일 검증 (확장자, 내용, 크기)
-        const { mimeType, size } = await validateFile(file);
+        const { mimeType, size, buffer: fileBuffer } = await validateFile(file);
 
         // 파일명 생성 (타임스탬프 + 원본 파일명)
         const timestamp = Date.now();
@@ -79,7 +79,7 @@ export const POST = withAuthAndRateLimit(
         const filePath = join(uploadDir, fileName);
 
         // 파일 저장
-        const buffer = Buffer.from(await file.arrayBuffer());
+        const buffer = Buffer.from(fileBuffer);
         await writeFile(filePath, buffer);
 
         // DB에 첨부파일 정보 저장

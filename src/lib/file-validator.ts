@@ -183,6 +183,7 @@ export async function validateFileContent(buffer: ArrayBuffer, fileName: string)
 export async function validateFile(file: File): Promise<{
   mimeType: string;
   size: number;
+  buffer: ArrayBuffer;
 }> {
   // 1. 파일 확장자 검증 (위험한 확장자)
   validateFileExtension(file.name);
@@ -198,6 +199,7 @@ export async function validateFile(file: File): Promise<{
   return {
     mimeType,
     size: file.size,
+    buffer,
   };
 }
 
