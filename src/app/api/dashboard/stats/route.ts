@@ -30,13 +30,15 @@ export const GET = withAuthAndRateLimit(
     const stats = await (async () => {
       // 역할별 필터링 조건 설정
       const baseWhere: Prisma.SRWhereInput = {};
+      let userClientIds: string[] = [];
+
       if (!isAdminManagerEngineer) {
         // 고객사 사용자는 자신의 고객사 SR만 조회
         const userClients = await prisma.userClient.findMany({
           where: { userId },
           select: { clientId: true },
         });
-        const userClientIds = userClients.map((uc) => uc.clientId);
+        userClientIds = userClients.map((uc) => uc.clientId);
         if (userClientIds.length > 0) {
           baseWhere.clientId = { in: userClientIds };
         } else {
@@ -227,18 +229,20 @@ export const GET = withAuthAndRateLimit(
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - STATS.TREND_DAYS);
 
-      const srTrend = await prisma.sR.groupBy({
-        by: ['createdAt'],
-        where: {
-          ...baseWhere,
-          createdAt: {
-            gte: thirtyDaysAgo,
-          },
-        },
-        _count: {
-          id: true,
-        },
-      });
+      // Optimize: Group by date in DB using raw SQL instead of fetching all timestamps
+      const srTrendRaw = await prisma.$queryRaw<Array<{ date: Date | string; count: bigint }>>`
+        SELECT DATE(created_at) as date, COUNT(id) as count
+        FROM srs
+        WHERE created_at >= ${thirtyDaysAgo}
+        ${
+          !isAdminManagerEngineer
+            ? userClientIds.length > 0
+              ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
+              : Prisma.sql`AND 1=0`
+            : Prisma.empty
+        }
+        GROUP BY DATE(created_at)
+      `;
 
       // 성능 지표 계산
       const completedSRsWithDates = await prisma.sR.findMany({
@@ -295,10 +299,14 @@ export const GET = withAuthAndRateLimit(
           : 0;
 
       // Group by date (YYYY-MM-DD)
-      const trendByDate = srTrend.reduce(
+      const trendByDate = srTrendRaw.reduce(
         (acc, item) => {
-          const date = item.createdAt.toISOString().split('T')[0];
-          acc[date] = (acc[date] || 0) + item._count.id;
+          // item.date can be Date object (Postgres) or string (other drivers)
+          const dateStr =
+            item.date instanceof Date
+              ? item.date.toISOString().split('T')[0]
+              : String(item.date);
+          acc[dateStr] = Number(item.count);
           return acc;
         },
         {} as Record<string, number>
