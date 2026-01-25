@@ -317,56 +317,6 @@ async function main() {
     console.log('Admin user already exists, updated password and preferences');
   }
 
-  // Ensure Client User exists (Move outside if/else to ensure creation on first run)
-  const clientEmail = 'clientuser@example.com';
-  let clientUser = await prisma.user.findUnique({ where: { email: clientEmail } });
-
-  if (!clientUser) {
-    const bcrypt = require('bcryptjs');
-    const clientPassword = 'client123';
-    const hashed = await bcrypt.hash(clientPassword, 10);
-    clientUser = await prisma.user.create({
-      data: {
-        email: clientEmail,
-        name: 'Client User',
-        password: hashed,
-        notificationPreference: { create: {} }, // Add default preferences
-      },
-    });
-    // CLIENT_USER 역할 부여
-    const clientRole = await prisma.role.findUnique({ where: { name: 'CLIENT_USER' } });
-    if (clientRole) {
-      await prisma.userRole.create({ data: { userId: clientUser.id, roleId: clientRole.id } });
-    }
-    // TEST001 클라이언트와 연결 (Before clients are created? No, we need clients first. But clients are created AFTER users in this script order...)
-    // Wait, in original script clients are created AFTER users.
-    // And users-clients link is created?
-    // In original script:
-    // create adminUser
-    // create clientUser (only in else block) -> link to TEST001 (which doesn't exist yet if first run!)
-
-    // The original seed logic for clientUser seems broken for first run if it depends on TEST001 which is created at line 352.
-    // The original code tried to link clientUser to TEST001 at line 337.
-    // But TEST001 is created at line 352.
-    // So clientUser creation will fail or linking will fail if TEST001 doesn't exist.
-
-    // I will just correct the NotificationPreference part and keep the flow as requested,
-    // but I'll move clientUser creation to AFTER client creation if I can, OR just leave it as is but fix the preference.
-    // Given the constraints and risk of breaking seed flow, I will just Init preferences.
-    // And I will fix the "clientUser in else block" issue if it's safe.
-
-    // Actually, looking at line 335: `const testClient = await prisma.client.findUnique({ where: { code: 'TEST001' } });`
-    // If it returns null, linking is skipped.
-    // Valid.
-  } else {
-    // Ensure preference for existing client user
-    await prisma.notificationPreference.upsert({
-      where: { userId: clientUser.id },
-      create: { userId: clientUser.id },
-      update: {},
-    });
-  }
-
   // Create Engineer User for E2E tests
   const engineerEmail = 'engineeruser@example.com';
   let engineerUser = await prisma.user.findUnique({ where: { email: engineerEmail } });
@@ -450,6 +400,59 @@ async function main() {
     testClient2 = await prisma.client.findUnique({
       where: { code: 'TEST002' },
     });
+  }
+
+  // Ensure Client User exists (Moved after test clients to ensure linking)
+  const clientEmail = 'clientuser@example.com';
+  let clientUser = await prisma.user.findUnique({ where: { email: clientEmail } });
+
+  if (!clientUser) {
+    const bcrypt = require('bcryptjs');
+    const clientPassword = 'client123';
+    const hashed = await bcrypt.hash(clientPassword, 10);
+    clientUser = await prisma.user.create({
+      data: {
+        email: clientEmail,
+        name: 'Client User',
+        password: hashed,
+        notificationPreference: { create: {} }, // Add default preferences
+      },
+    });
+    // CLIENT_USER 역할 부여
+    const clientRole = await prisma.role.findUnique({ where: { name: 'CLIENT_USER' } });
+    if (clientRole) {
+      await prisma.userRole.create({ data: { userId: clientUser.id, roleId: clientRole.id } });
+    }
+    console.log(`Created client user: ${clientEmail}`);
+  } else {
+    // Ensure preference for existing client user
+    await prisma.notificationPreference.upsert({
+      where: { userId: clientUser.id },
+      create: { userId: clientUser.id },
+      update: {},
+    });
+  }
+
+  // Ensure client user is linked to TEST001
+  if (clientUser && testClient1) {
+    const existingLink = await prisma.userClient.findUnique({
+      where: {
+        userId_clientId: {
+          userId: clientUser.id,
+          clientId: testClient1.id,
+        },
+      },
+    });
+
+    if (!existingLink) {
+      await prisma.userClient.create({
+        data: {
+          userId: clientUser.id,
+          clientId: testClient1.id,
+        },
+      });
+      console.log('Linked client user to TEST001');
+    }
   }
 
   // Create service categories for test clients (always check)
