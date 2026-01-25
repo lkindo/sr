@@ -130,8 +130,16 @@ export const GET = withAuthAndRateLimit(
         select: { id: true, name: true, code: true },
       });
 
+      const clientMap = clients.reduce(
+        (acc, client) => {
+          acc[client.id] = client;
+          return acc;
+        },
+        {} as Record<string, (typeof clients)[number]>
+      );
+
       const clientCounts = srByClient.map((item) => {
-        const client = clients.find((c) => c.id === item.clientId);
+        const client = clientMap[item.clientId];
         return {
           clientId: item.clientId,
           clientName: client?.name || 'Unknown',
