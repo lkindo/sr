@@ -7,8 +7,7 @@
 echo "Running prisma migrate deploy..."
 # 운영 환경에서는 migrate deploy가 권장됩니다.
 # 마이그레이션 파일이 없는 초기 구축 단계라면 db push를 사용하세요.
-# Prisma 7과의 호환성 문제 방지를 위해 버전을 6으로 고정합니다.
-npx prisma@6 migrate deploy || npx prisma@6 db push --accept-data-loss
+npx prisma migrate deploy || npx prisma db push --accept-data-loss
 
 # 메인 프로세스 실행
 exec "$@"

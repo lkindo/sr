@@ -35,6 +35,9 @@ describe('PushService', () => {
     // Default VAPID config
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key';
     process.env.VAPID_PRIVATE_KEY = 'test-private-key';
+
+    // Mock isConfigured to return true since env vars are set above but module constants might be already captured
+    vi.spyOn(PushService, 'isConfigured').mockReturnValue(true);
   });
 
   afterEach(() => {
