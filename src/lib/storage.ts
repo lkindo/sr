@@ -25,9 +25,7 @@ export async function uploadAttachmentBlob(srId: string, file: File): Promise<Up
 
   // SR ID별로 하위 디렉토리 생성
   const srDir = path.join(UPLOAD_DIR, 'attachments', srId);
-  if (!fs.existsSync(srDir)) {
-    fs.mkdirSync(srDir, { recursive: true });
-  }
+  await fs.promises.mkdir(srDir, { recursive: true });
 
   const filename = `${timestamp}-${safeName}`;
   const filepath = path.join(srDir, filename);
