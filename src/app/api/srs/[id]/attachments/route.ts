@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { existsSync } from 'fs';
 import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -60,9 +59,7 @@ export const POST = withAuthAndRateLimit(
 
     // 업로드 디렉토리 생성
     const uploadDir = join(process.cwd(), 'public', 'uploads', 'attachments');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
-    }
+    await mkdir(uploadDir, { recursive: true });
 
     // 모든 파일에 대해 동일한 타임스탬프 사용 (배치 처리)
     const timestamp = Date.now();
