@@ -314,9 +314,7 @@ export const GET = withAuthAndRateLimit(
         (acc, item) => {
           // item.date can be Date object (Postgres) or string (other drivers)
           const dateStr =
-            item.date instanceof Date
-              ? item.date.toISOString().split('T')[0]
-              : String(item.date);
+            item.date instanceof Date ? item.date.toISOString().split('T')[0] : String(item.date);
           acc[dateStr] = Number(item.count);
           return acc;
         },
