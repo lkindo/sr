@@ -188,7 +188,9 @@ export async function validateFile(file: File): Promise<{
   validateFileExtension(file.name);
 
   // 2. 파일 내용 기반 MIME 타입 검증
-  const buffer = await file.arrayBuffer();
+  // file-type 라이브러리는 파일의 앞부분(4100 bytes)만 확인하면 타입을 식별할 수 있습니다.
+  // 전체 파일을 메모리에 올리는 것을 방지하기 위해 slice를 사용합니다.
+  const buffer = await file.slice(0, 4100).arrayBuffer();
   const mimeType = await validateFileContent(buffer, file.name);
 
   // 3. 파일 크기 검증
