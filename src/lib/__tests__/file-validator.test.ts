@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  ALLOWED_FILE_TYPES,
   FileValidationError,
   validateFile,
   validateFileExtension,
@@ -44,6 +43,7 @@ describe('FileValidator', () => {
         name: 'test.png',
         size: 1024,
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        slice: vi.fn().mockReturnThis(),
       } as unknown as File;
 
       (fileTypeFromBuffer as any).mockResolvedValue({ mime: 'image/png' });
@@ -57,6 +57,7 @@ describe('FileValidator', () => {
         name: 'unknown.xyz',
         size: 1024,
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        slice: vi.fn().mockReturnThis(),
       } as unknown as File;
 
       (fileTypeFromBuffer as any).mockResolvedValue({ mime: 'application/unknown' });
@@ -69,6 +70,7 @@ describe('FileValidator', () => {
         name: 'test.jpg', // Extension says jpg
         size: 1024,
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        slice: vi.fn().mockReturnThis(),
       } as unknown as File;
 
       // Content says png
@@ -84,6 +86,7 @@ describe('FileValidator', () => {
         name: 'test.txt',
         size: 1024,
         arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        slice: vi.fn().mockReturnThis(),
       } as unknown as File;
 
       // file-type returns undefined for text files
