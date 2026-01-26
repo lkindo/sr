@@ -247,6 +247,7 @@ async function main() {
           { resource: 'COMMENT', action: { in: ['CREATE', 'READ'] } },
           { resource: 'ATTACHMENT', action: { in: ['CREATE', 'READ'] } },
           { resource: 'NOTIFICATION', action: 'READ' },
+          { resource: 'DASHBOARD', action: 'READ' },
         ],
       },
     });
@@ -340,13 +341,22 @@ async function main() {
     }
     console.log(`Created engineer user: ${engineerEmail} / ${engineerPassword}`);
   } else {
-    // Ensure preference for existing engineer user
+    // Ensure preference AND PASSWORD for existing engineer user
+    const bcrypt = require('bcryptjs');
+    const engineerPassword = 'engineer123';
+    const hashed = await bcrypt.hash(engineerPassword, 10);
+
+    await prisma.user.update({
+      where: { id: engineerUser.id },
+      data: { password: hashed },
+    });
+
     await prisma.notificationPreference.upsert({
       where: { userId: engineerUser.id },
       create: { userId: engineerUser.id },
       update: {},
     });
-    console.log('Engineer user already exists');
+    console.log('Engineer user exists, password reset to engineer123');
   }
 
   // Create test clients
@@ -425,12 +435,22 @@ async function main() {
     }
     console.log(`Created client user: ${clientEmail}`);
   } else {
-    // Ensure preference for existing client user
+    // Ensure preference AND PASSWORD for existing client user
+    const bcrypt = require('bcryptjs');
+    const clientPassword = 'client123';
+    const hashed = await bcrypt.hash(clientPassword, 10);
+
+    await prisma.user.update({
+      where: { id: clientUser.id },
+      data: { password: hashed },
+    });
+
     await prisma.notificationPreference.upsert({
       where: { userId: clientUser.id },
       create: { userId: clientUser.id },
       update: {},
     });
+    console.log('Client user exists, password reset to client123');
   }
 
   // Ensure client user is linked to TEST001

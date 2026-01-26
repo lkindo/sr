@@ -48,7 +48,7 @@ for (const user of users) {
     await page.fill('#password', user.password);
 
     // 로그인 버튼 클릭
-    await page.getByRole('button', { name: /로그인|sign in/i }).click();
+    await page.locator('button[type="submit"]').click();
 
     // 로그인 성공 대기 (dashboard, srs, 또는 기타 인증된 페이지로 리디렉션)
     // URL 변경 대기에 더 유연하게 대응
