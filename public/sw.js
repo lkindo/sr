@@ -18,14 +18,14 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       // Use individual adds to prevent a single failure from blocking the entire install
-      return Promise.allSettled(
-        PRECACHE_ASSETS.map(asset => cache.add(asset))
-      ).then(results => {
-        const failed = results.filter(r => r.status === 'rejected');
-        if (failed.length > 0) {
-          console.warn(`[SW] Some assets failed to precache:`, failed);
+      return Promise.allSettled(PRECACHE_ASSETS.map((asset) => cache.add(asset))).then(
+        (results) => {
+          const failed = results.filter((r) => r.status === 'rejected');
+          if (failed.length > 0) {
+            console.warn(`[SW] Some assets failed to precache:`, failed);
+          }
         }
-      });
+      );
     })
   );
   self.skipWaiting();
@@ -47,7 +47,9 @@ self.addEventListener('activate', (event) => {
         );
       }),
       // Navigation Preload 활성화
-      self.registration.navigationPreload ? self.registration.navigationPreload.enable() : Promise.resolve(),
+      self.registration.navigationPreload
+        ? self.registration.navigationPreload.enable()
+        : Promise.resolve(),
     ]).then(() => self.clients.claim())
   );
 });
@@ -62,7 +64,10 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) return;
 
   // Document (HTML) requests: Network First + Navigation Preload
-  if (event.request.mode === 'navigate' || event.request.headers.get('accept')?.includes('text/html')) {
+  if (
+    event.request.mode === 'navigate' ||
+    event.request.headers.get('accept')?.includes('text/html')
+  ) {
     event.respondWith(
       (async () => {
         try {
@@ -73,7 +78,11 @@ self.addEventListener('fetch', (event) => {
           // 네트워크 요청
           const networkResponse = await fetch(event.request);
 
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          if (
+            networkResponse &&
+            networkResponse.status === 200 &&
+            networkResponse.type === 'basic'
+          ) {
             const responseToCache = networkResponse.clone();
             const cache = await caches.open(CACHE_NAME);
             cache.put(event.request, responseToCache);
@@ -100,7 +109,12 @@ self.addEventListener('fetch', (event) => {
 
       return fetch(event.request).then((response) => {
         // Only cache successful dynamic requests
-        if (!response || response.status !== 200 || response.type === 'error' || response.type === 'opaque') {
+        if (
+          !response ||
+          response.status !== 200 ||
+          response.type === 'error' ||
+          response.type === 'opaque'
+        ) {
           return response;
         }
 

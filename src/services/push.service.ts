@@ -153,6 +153,38 @@ export class PushService {
   }
 
   /**
+   * Helper to send to a single subscription
+   */
+  private async sendToSubscription(
+    webPush: any,
+    sub: DBPushSubscription,
+    payload: PushPayload
+  ): Promise<{ statusCode: number; body: string } | null> {
+    try {
+      const webPushSub: WebPushSubscription = {
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: sub.p256dh,
+          auth: sub.auth,
+        },
+      };
+
+      const result = await webPush.sendNotification(webPushSub, JSON.stringify(payload));
+      return result;
+    } catch (error: unknown) {
+      const webPushError = error as { statusCode?: number };
+      logger.error(`[PushService] Failed to send to ${sub.endpoint}:`, error as Error);
+
+      // Remove invalid subscriptions (410 Gone or 404 Not Found)
+      if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
+        await this.removeSubscription(sub.endpoint);
+        logger.info(`[PushService] Removed invalid subscription: ${sub.endpoint}`);
+      }
+      return null;
+    }
+  }
+
+  /**
    * Send push notification to a specific user
    */
   async sendToUser(
@@ -174,26 +206,9 @@ export class PushService {
     const results: { statusCode: number; body: string }[] = [];
 
     for (const sub of subscriptions) {
-      try {
-        const webPushSub: WebPushSubscription = {
-          endpoint: sub.endpoint,
-          keys: {
-            p256dh: sub.p256dh,
-            auth: sub.auth,
-          },
-        };
-
-        const result = await webPush.sendNotification(webPushSub, JSON.stringify(payload));
+      const result = await this.sendToSubscription(webPush, sub, payload);
+      if (result) {
         results.push(result);
-      } catch (error: unknown) {
-        const webPushError = error as { statusCode?: number };
-        logger.error(`[PushService] Failed to send to ${sub.endpoint}:`, error as Error);
-
-        // Remove invalid subscriptions (410 Gone or 404 Not Found)
-        if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
-          await this.removeSubscription(sub.endpoint);
-          logger.info(`[PushService] Removed invalid subscription: ${sub.endpoint}`);
-        }
       }
     }
 
@@ -209,9 +224,42 @@ export class PushService {
   ): Promise<Map<string, { statusCode: number; body: string }[]>> {
     const results = new Map<string, { statusCode: number; body: string }[]>();
 
+    if (!PushService.isConfigured()) {
+      logger.warn('[PushService] VAPID not configured, skipping push notification');
+      return results;
+    }
+
+    // 테스트 환경에서는 발송 건너뛰기
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_MODE === 'true') {
+      return results;
+    }
+
+    const webPush = await getWebPush();
+
+    // Batch fetch subscriptions
+    const allSubscriptions = await prisma.pushSubscription.findMany({
+      where: { userId: { in: userIds } },
+    });
+
+    // Group by userId
+    const subsByUser = new Map<string, DBPushSubscription[]>();
+    for (const sub of allSubscriptions) {
+      const userSubs = subsByUser.get(sub.userId) ?? [];
+      userSubs.push(sub);
+      subsByUser.set(sub.userId, userSubs);
+    }
+
     await Promise.all(
       userIds.map(async (userId) => {
-        const userResults = await this.sendToUser(userId, payload);
+        const subscriptions = subsByUser.get(userId) ?? [];
+        const userResults: { statusCode: number; body: string }[] = [];
+
+        for (const sub of subscriptions) {
+          const result = await this.sendToSubscription(webPush, sub, payload);
+          if (result) {
+            userResults.push(result);
+          }
+        }
         results.set(userId, userResults);
       })
     );

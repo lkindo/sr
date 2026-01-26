@@ -6,7 +6,7 @@ services:
     container_name: sr-app
     restart: always
     ports:
-      - "3001:3000"
+      - '3001:3000'
     env_file:
       - .env.docker
     depends_on:
@@ -22,11 +22,11 @@ services:
       - POSTGRES_PASSWORD=sr1234
       - POSTGRES_DB=sr_db
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - sr_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U lkind -d sr_db" ]
+      test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db']
       interval: 10s
       timeout: 5s
       retries: 5
