@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import prisma from '@/lib/prisma';
 import { PushService } from '@/services/push.service';
 
@@ -32,7 +33,7 @@ describe('PushService Performance', () => {
     const userIds = ['user1', 'user2', 'user3'];
 
     // Mock response for findMany to simulate subscriptions for each user
-    vi.mocked(prisma.pushSubscription.findMany).mockImplementation(async (args: any) => {
+    vi.mocked(prisma.pushSubscription.findMany).mockImplementation((async (args: any) => {
       // Optimized batch query
       if (args?.where?.userId?.in) {
         const ids = args.where.userId.in as string[];
@@ -41,7 +42,11 @@ describe('PushService Performance', () => {
           p256dh: '65-byte-key-placeholder-which-is-long-enough-for-mocking-purposes-here',
           auth: 'auth',
           userId: id,
-        })) as any;
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          id: 'id',
+          userAgent: null,
+        }));
       }
       // Single query fallback
       if (typeof args?.where?.userId === 'string') {
@@ -51,11 +56,15 @@ describe('PushService Performance', () => {
             p256dh: '65-byte-key-placeholder-which-is-long-enough-for-mocking-purposes-here',
             auth: 'auth',
             userId: args.where.userId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            id: 'id',
+            userAgent: null,
           },
-        ] as any;
+        ];
       }
       return [];
-    });
+    }) as any);
 
     const { sendNotification } = await import('web-push');
     vi.mocked(sendNotification).mockResolvedValue({ statusCode: 201, body: 'ok', headers: {} });
