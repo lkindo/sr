@@ -156,6 +156,7 @@ export function FileUpload({
                 onClick={() => removeFile(index)}
                 disabled={disabled}
                 className="flex-shrink-0"
+                aria-label={`${file.name} 삭제`}
               >
                 <X className="h-4 w-4" />
               </Button>
