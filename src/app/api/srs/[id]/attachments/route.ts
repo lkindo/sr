@@ -79,25 +79,20 @@ export const POST = withAuthAndRateLimit(
           const buffer = Buffer.from(await file.arrayBuffer());
           await writeFile(filePath, buffer);
 
-          // DB에 첨부파일 정보 저장
-          const attachment = await prisma.sRAttachment.create({
-            data: {
-              srId,
-              fileName: file.name,
-              fileUrl: `/uploads/attachments/${fileName}`,
-              fileSize: size,
-              fileType: mimeType, // 검증된 MIME 타입 사용
-              storagePath: filePath,
-              uploadedBy: session.user.id,
-            },
-          });
+          // DB 저장 데이터 준비
+          const attachmentData = {
+            srId,
+            fileName: file.name,
+            fileUrl: `/uploads/attachments/${fileName}`,
+            fileSize: size,
+            fileType: mimeType, // 검증된 MIME 타입 사용
+            storagePath: filePath,
+            uploadedBy: session.user.id,
+          };
 
           return {
             status: 'fulfilled' as const,
-            value: {
-              ...attachment,
-              createdAt: attachment.createdAt.toISOString(),
-            },
+            value: attachmentData,
           };
         } catch (error) {
           if (error instanceof FileValidationError) {
@@ -112,9 +107,23 @@ export const POST = withAuthAndRateLimit(
       })
     );
 
-    const uploadedAttachments = results
-      .filter((r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled')
+    const attachmentsToInsert = results
+      .filter(
+        (r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled'
+      )
       .map((r) => r.value);
+
+    let createdAttachments: any[] = [];
+    if (attachmentsToInsert.length > 0) {
+      createdAttachments = await prisma.sRAttachment.createManyAndReturn({
+        data: attachmentsToInsert,
+      });
+    }
+
+    const uploadedAttachments = createdAttachments.map((attachment) => ({
+      ...attachment,
+      createdAt: attachment.createdAt.toISOString(),
+    }));
 
     const validationErrors = results
       .filter(
