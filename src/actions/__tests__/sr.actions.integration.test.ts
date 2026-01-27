@@ -11,7 +11,7 @@ vi.mock('@/lib/action-helpers', () => ({
   })),
   validateWithSchema: vi.fn((data) => ({ success: true, data })),
   getAuthenticatedSession: vi.fn(async () => ({
-    user: { id: 'user-2', permissions: ['SR:UPDATE'], roles: ['ENGINEER'] },
+    user: { id: 'user-2', permissions: ['SR:UPDATE', 'SR:READ'], roles: ['ENGINEER'] },
   })),
 }));
 

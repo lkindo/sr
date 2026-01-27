@@ -10,6 +10,7 @@ import {
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
+import { ensureCanReadSR } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { srService } from '@/services/sr.service';
@@ -79,11 +80,14 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
 
 export async function getSRAction(id: string): Promise<Result<SR>> {
   try {
+    const session = await getAuthenticatedSession();
     const sr = await srService.getSRById(id);
 
     if (!sr) {
       return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
     }
+
+    ensureCanReadSR(session.user, sr);
 
     return ok(sr);
   } catch (error) {
@@ -93,11 +97,14 @@ export async function getSRAction(id: string): Promise<Result<SR>> {
 
 export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>> {
   try {
+    const session = await getAuthenticatedSession();
     const sr = await srService.getSRDetailsById(id);
 
     if (!sr) {
       return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
     }
+
+    ensureCanReadSR(session.user, sr);
 
     return ok(sr);
   } catch (error) {
@@ -121,6 +128,15 @@ export async function getSRActivitiesAction(
   }>
 > {
   try {
+    const session = await getAuthenticatedSession();
+    const sr = await srService.getSRById(srId);
+
+    if (!sr) {
+      return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
+    }
+
+    ensureCanReadSR(session.user, sr);
+
     const prisma = (await import('@/lib/prisma')).default;
 
     const limit = options?.limit || 20;
@@ -167,6 +183,15 @@ export async function getSRCommentsAction(
   }>
 > {
   try {
+    const session = await getAuthenticatedSession();
+    const sr = await srService.getSRById(srId);
+
+    if (!sr) {
+      return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
+    }
+
+    ensureCanReadSR(session.user, sr);
+
     const prisma = (await import('@/lib/prisma')).default;
 
     const limit = options?.limit || 20;

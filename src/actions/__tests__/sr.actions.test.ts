@@ -211,6 +211,7 @@ describe('SR Server Actions', () => {
   describe('getSRActivitiesAction', () => {
     it('returns activities', async () => {
       const mockActivities = [{ id: 'act-1' }];
+      mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
       mockPrisma.sRActivity.findMany.mockResolvedValue(mockActivities);
 
       const result = await getSRActivitiesAction('sr-1', { limit: 10 });
@@ -225,6 +226,7 @@ describe('SR Server Actions', () => {
   describe('getSRCommentsAction', () => {
     it('returns comments', async () => {
       const mockComments = [{ id: 'c1' }];
+      mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
       mockPrisma.sRComment.findMany.mockResolvedValue(mockComments);
 
       const result = await getSRCommentsAction('sr-1', { limit: 10 });

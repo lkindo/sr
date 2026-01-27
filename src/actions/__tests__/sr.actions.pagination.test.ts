@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as actions from '@/actions/sr.actions';
-import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
-vi.mock('@/services/sr.service');
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
@@ -13,10 +11,38 @@ vi.mock('@/auth', () => ({
   auth: vi.fn(),
 }));
 
-vi.mock('@/lib/action-helpers', () => ({
-  authenticateAndAuthorize: vi.fn(),
-  validateWithSchema: vi.fn(),
-  getAuthenticatedSession: vi.fn(),
+// Mock action helpers
+vi.mock('@/lib/action-helpers', async () => {
+  const actual = await vi.importActual('@/lib/action-helpers');
+  const mockSession = {
+    user: {
+      id: 'user-1',
+      roles: ['ADMIN'], // Admin can read everything
+      permissions: [],
+      clientIds: []
+    },
+    expires: '2099-01-01'
+  };
+  return {
+    ...actual,
+    authenticateAndAuthorize: vi.fn().mockResolvedValue(mockSession),
+    getAuthenticatedSession: vi.fn().mockResolvedValue(mockSession),
+  };
+});
+
+// Mock SRService
+const { mockSRService } = vi.hoisted(() => {
+  return {
+    mockSRService: {
+      getSRDetailsById: vi.fn(),
+      getSRById: vi.fn(),
+    }
+  };
+});
+
+vi.mock('@/services/sr.service', () => ({
+  SRService: vi.fn(),
+  srService: mockSRService,
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -34,7 +60,7 @@ describe('SR Actions - Details and Pagination', () => {
   describe('getSRDetailsAction', () => {
     it('returns success when SR is found', async () => {
       const mockSR = { id: 'sr-1', title: 'Test SR' };
-      vi.mocked(SRService.prototype.getSRDetailsById).mockResolvedValue(mockSR as any);
+      mockSRService.getSRDetailsById.mockResolvedValue(mockSR);
 
       const result = await actions.getSRDetailsAction('sr-1');
       expect(result.success).toBe(true);
@@ -44,7 +70,7 @@ describe('SR Actions - Details and Pagination', () => {
     });
 
     it('returns fail when SR is not found', async () => {
-      vi.mocked(SRService.prototype.getSRDetailsById).mockResolvedValue(null);
+      mockSRService.getSRDetailsById.mockResolvedValue(null);
 
       const result = await actions.getSRDetailsAction('non-existent');
       expect(result.success).toBe(false);
@@ -73,6 +99,8 @@ describe('SR Actions - Details and Pagination', () => {
           user: { id: 'u1', name: 'N', image: null },
         },
       ];
+      // Mock SR existence
+      mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
       vi.mocked(prisma.sRActivity.findMany).mockResolvedValue(mockActivities as any);
 
       const result = await actions.getSRActivitiesAction('sr-1', { limit: 1 });
@@ -103,6 +131,8 @@ describe('SR Actions - Details and Pagination', () => {
           user: { id: 'u1', name: 'N', image: null },
         },
       ];
+      // Mock SR existence
+      mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
       vi.mocked(prisma.sRComment.findMany).mockResolvedValue(mockComments as any);
 
       const result = await actions.getSRCommentsAction('sr-1', { limit: 1 });
