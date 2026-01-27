@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import prisma from '@/lib/prisma';
 import { PushService } from '@/services/push.service';
 
