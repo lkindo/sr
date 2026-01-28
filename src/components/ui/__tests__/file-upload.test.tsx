@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
+import { describe, expect,it, vi } from 'vitest';
+
 import { FileUpload } from '../file-upload';
-import { vi, describe, it, expect } from 'vitest';
 
 describe('FileUpload', () => {
   it('renders with accessible remove buttons', () => {

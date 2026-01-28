@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle, Clock, PauseCircle, Play, RotateCcw, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, Loader2, PauseCircle, Play, RotateCcw, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -43,7 +43,7 @@ export function SRStatusActions({
   const [holdDialogOpen, setHoldDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -56,7 +56,7 @@ export function SRStatusActions({
 
   // 간단한 상태 변경 (다이얼로그 없음)
   const handleSimpleStatusChange = async (action: string) => {
-    setLoading(true);
+    setLoadingAction(action);
 
     try {
       const response = await fetch(`/api/srs/${srId}/status`, {
@@ -90,12 +90,13 @@ export function SRStatusActions({
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
   // 접수 페이지로 이동
   const handleIntake = () => {
+    setLoadingAction('intake');
     router.push(`/srs/${srId}/intake`);
   };
 
@@ -109,17 +110,23 @@ export function SRStatusActions({
           <>
             <Button
               onClick={handleIntake}
-              disabled={loading}
+              disabled={!!loadingAction}
+              aria-label="접수하기"
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="접수하기"
             >
-              <Clock className="h-4 w-4 md:mr-2" />
+              {loadingAction === 'intake' ? (
+                <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+              ) : (
+                <Clock className="h-4 w-4 md:mr-2" />
+              )}
               <span className="hidden md:inline">접수하기</span>
             </Button>
             <Button
               variant="destructive"
               onClick={() => setRejectDialogOpen(true)}
-              disabled={loading}
+              disabled={!!loadingAction}
+              aria-label="거절"
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="거절"
             >
@@ -135,11 +142,16 @@ export function SRStatusActions({
         return (
           <Button
             onClick={() => handleSimpleStatusChange('start')}
-            disabled={loading}
+            disabled={!!loadingAction}
+            aria-label="진행 시작"
             className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
             title="진행 시작"
           >
-            <Play className="h-4 w-4 md:mr-2" />
+            {loadingAction === 'start' ? (
+              <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 md:mr-2" />
+            )}
             <span className="hidden md:inline">진행 시작</span>
           </Button>
         );
@@ -150,7 +162,8 @@ export function SRStatusActions({
           <>
             <Button
               onClick={() => setCompleteDialogOpen(true)}
-              disabled={loading}
+              disabled={!!loadingAction}
+              aria-label="완료 처리"
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="완료 처리"
             >
@@ -160,7 +173,8 @@ export function SRStatusActions({
             <Button
               variant="secondary"
               onClick={() => setHoldDialogOpen(true)}
-              disabled={loading}
+              disabled={!!loadingAction}
+              aria-label="보류"
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="보류"
             >
@@ -177,17 +191,23 @@ export function SRStatusActions({
           <>
             <Button
               onClick={() => handleSimpleStatusChange('resume')}
-              disabled={loading}
+              disabled={!!loadingAction}
+              aria-label="진행 재개"
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="진행 재개"
             >
-              <Play className="h-4 w-4 md:mr-2" />
+              {loadingAction === 'resume' ? (
+                <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 md:mr-2" />
+              )}
               <span className="hidden md:inline">진행 재개</span>
             </Button>
             <Button
               variant="destructive"
               onClick={() => setRejectDialogOpen(true)}
-              disabled={loading}
+              disabled={!!loadingAction}
+              aria-label="거절"
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="거절"
             >
@@ -204,11 +224,16 @@ export function SRStatusActions({
             {isRequestor && (
               <Button
                 onClick={() => handleSimpleStatusChange('confirm')}
-                disabled={loading}
+                disabled={!!loadingAction}
+                aria-label="확인 완료"
                 className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
                 title="확인 완료"
               >
-                <CheckCircle className="h-4 w-4 md:mr-2" />
+                {loadingAction === 'confirm' ? (
+                  <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 md:mr-2" />
+                )}
                 <span className="hidden md:inline">확인 완료</span>
               </Button>
             )}
@@ -216,7 +241,8 @@ export function SRStatusActions({
               <Button
                 variant="outline"
                 onClick={() => setReopenDialogOpen(true)}
-                disabled={loading}
+                disabled={!!loadingAction}
+                aria-label="재오픈"
                 className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
                 title="재오픈"
               >
@@ -234,7 +260,8 @@ export function SRStatusActions({
           <Button
             variant="outline"
             onClick={() => setReopenDialogOpen(true)}
-            disabled={loading}
+            disabled={!!loadingAction}
+            aria-label="재오픈"
             className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
             title="재오픈"
           >
