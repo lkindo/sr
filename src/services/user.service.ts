@@ -29,7 +29,7 @@ export class UserService {
   constructor() {}
 
   async getUserById(id: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id },
       include: {
         roles: {
@@ -38,6 +38,14 @@ export class UserService {
         clients: { include: { client: true } },
       },
     });
+
+    if (!user) {
+      return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
   async getUserByEmail(email: string) {
