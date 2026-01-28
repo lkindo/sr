@@ -9,6 +9,7 @@ import {
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
+import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
 import { userUpdateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
@@ -67,6 +68,12 @@ type UserWithDetails = NonNullable<Awaited<ReturnType<UserService['getUserById']
 
 export async function getUserAction(id: string): Promise<Result<UserWithDetails>> {
   try {
+    const session = await getAuthenticatedSession();
+
+    if (session.user.id !== id && !hasPermissionFlag(session.user, PERMISSIONS.USER.READ)) {
+      return fail('권한이 없습니다.', 'FORBIDDEN');
+    }
+
     const userService = new UserService();
     const user = await userService.getUserById(id);
     if (!user) {
