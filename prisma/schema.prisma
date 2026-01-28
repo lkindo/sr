@@ -55,7 +55,6 @@ model User {
   pushSubscriptions      PushSubscription[]
   notificationPreference NotificationPreference?
 
-  @@index([email])
   @@index([isActive])
   @@map("users")
 }
@@ -328,7 +327,8 @@ model SR {
   @@index([requesterId, createdAt])
   @@index([assigneeId, status])
   @@index([serviceCategoryId])
-  @@index([srNumber])
+  // Index for default sorting of SR lists
+  @@index([createdAt])
   @@index([status, priority, createdAt])
   @@index([intakeById])
   @@map("srs")
@@ -396,7 +396,8 @@ model SRAttachment {
 
   sr SR @relation(fields: [srId], references: [id], onDelete: Cascade)
 
-  @@index([srId])
+  // Composite index to optimize fetching attachments sorted by creation date
+  @@index([srId, createdAt])
   @@map("sr_attachments")
 }
 

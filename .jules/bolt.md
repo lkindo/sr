@@ -1,0 +1,3 @@
+## 2024-05-22 - Redundant Database Indexes
+**Learning:** Prisma's `@unique` attribute automatically creates a unique index in the underlying database (e.g., PostgreSQL). Explicitly defining `@@index` on a unique field is redundant and adds unnecessary overhead to write operations and storage. Also, composite indexes (e.g., `[srId, createdAt]`) are more efficient for queries that filter by the first field and sort by the second, compared to a single index on the filtering field.
+**Action:** Always check for redundant indexes when reviewing `schema.prisma`. Replace single-column indexes with composite indexes when `orderBy` is frequently used with a foreign key filter.
