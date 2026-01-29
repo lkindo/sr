@@ -105,7 +105,7 @@ export function FileUpload({
     <div className="space-y-4">
       <div
         className={cn(
-          'relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+          'relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2',
           dragActive
             ? 'border-primary bg-primary/5'
             : 'border-muted-foreground/25 hover:border-muted-foreground/50',
