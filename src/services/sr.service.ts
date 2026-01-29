@@ -643,12 +643,7 @@ export class SRService {
             priority: true,
             slaHours: true,
             handlerId: true,
-            handler: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            // handler relation fetch removed for performance optimization (unused in list view)
           },
         },
         _count: {
