@@ -103,6 +103,8 @@ export async function getSRHandlersForSelection(): Promise<
   Result<Array<{ id: string; name: string; email: string }>>
 > {
   try {
+    await authenticateAndAuthorize(PERMISSIONS.SR.UPDATE);
+
     const userService = new UserService();
     const srHandlers = await userService.getUsersWithSRHandlingPermission();
     return ok(srHandlers);

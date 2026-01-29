@@ -17,16 +17,16 @@ async function runBenchmark() {
 
   const client = await prisma.client.create({
     data: {
-        code: `BENCH_${Date.now()}`,
-        name: 'Benchmark Client',
-    }
+      code: `BENCH_${Date.now()}`,
+      name: 'Benchmark Client',
+    },
   });
 
   const category = await prisma.serviceCategory.create({
     data: {
-        categoryName: 'Benchmark Category',
-        slaHours: 24,
-    }
+      categoryName: 'Benchmark Category',
+      slaHours: 24,
+    },
   });
 
   const sr = await prisma.sR.create({
@@ -44,19 +44,21 @@ async function runBenchmark() {
   const BATCH_SIZE = 10;
 
   // 2. Benchmark Baseline (N+1 inserts)
-  console.log(`\nBenchmarking Baseline (N+1 inserts) - ${ITERATIONS} batches of ${BATCH_SIZE} files...`);
+  console.log(
+    `\nBenchmarking Baseline (N+1 inserts) - ${ITERATIONS} batches of ${BATCH_SIZE} files...`
+  );
   const startBaseline = performance.now();
   for (let i = 0; i < ITERATIONS; i++) {
     const batch = Array.from({ length: BATCH_SIZE }, (_, j) => ({
-        srId: sr.id,
-        fileName: `base_file_${i}_${j}.txt`,
-        fileSize: 1024,
-        fileType: 'text/plain',
-        fileUrl: `/uploads/attachments/base_${i}_${j}.txt`,
-        storagePath: `/tmp/base_${i}_${j}.txt`,
-        uploadedBy: user.id,
+      srId: sr.id,
+      fileName: `base_file_${i}_${j}.txt`,
+      fileSize: 1024,
+      fileType: 'text/plain',
+      fileUrl: `/uploads/attachments/base_${i}_${j}.txt`,
+      storagePath: `/tmp/base_${i}_${j}.txt`,
+      uploadedBy: user.id,
     }));
-    await Promise.all(batch.map(d => prisma.sRAttachment.create({ data: d })));
+    await Promise.all(batch.map((d) => prisma.sRAttachment.create({ data: d })));
   }
   const endBaseline = performance.now();
   const baselineDuration = endBaseline - startBaseline;
@@ -65,17 +67,19 @@ async function runBenchmark() {
   await prisma.sRAttachment.deleteMany({ where: { srId: sr.id } });
 
   // 3. Benchmark Optimized (createManyAndReturn)
-  console.log(`\nBenchmarking Optimized (createManyAndReturn) - ${ITERATIONS} batches of ${BATCH_SIZE} files...`);
+  console.log(
+    `\nBenchmarking Optimized (createManyAndReturn) - ${ITERATIONS} batches of ${BATCH_SIZE} files...`
+  );
   const startOptimized = performance.now();
   for (let i = 0; i < ITERATIONS; i++) {
     const batch = Array.from({ length: BATCH_SIZE }, (_, j) => ({
-        srId: sr.id,
-        fileName: `opt_file_${i}_${j}.txt`,
-        fileSize: 1024,
-        fileType: 'text/plain',
-        fileUrl: `/uploads/attachments/opt_${i}_${j}.txt`,
-        storagePath: `/tmp/opt_${i}_${j}.txt`,
-        uploadedBy: user.id,
+      srId: sr.id,
+      fileName: `opt_file_${i}_${j}.txt`,
+      fileSize: 1024,
+      fileType: 'text/plain',
+      fileUrl: `/uploads/attachments/opt_${i}_${j}.txt`,
+      storagePath: `/tmp/opt_${i}_${j}.txt`,
+      uploadedBy: user.id,
     }));
     await prisma.sRAttachment.createManyAndReturn({ data: batch });
   }
@@ -88,7 +92,9 @@ async function runBenchmark() {
   console.log(`Baseline (Avg/Batch): ${(baselineDuration / ITERATIONS).toFixed(2)}ms`);
   console.log(`Optimized (Total): ${optimizedDuration.toFixed(2)}ms`);
   console.log(`Optimized (Avg/Batch): ${(optimizedDuration / ITERATIONS).toFixed(2)}ms`);
-  console.log(`Improvement: ${((baselineDuration - optimizedDuration) / baselineDuration * 100).toFixed(2)}%`);
+  console.log(
+    `Improvement: ${(((baselineDuration - optimizedDuration) / baselineDuration) * 100).toFixed(2)}%`
+  );
 
   // 5. Cleanup
   await prisma.sRAttachment.deleteMany({ where: { srId: sr.id } });
