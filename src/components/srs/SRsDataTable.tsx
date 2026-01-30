@@ -38,6 +38,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { usePermissions } from '@/hooks/use-permissions';
 import { getDueDateStatus } from '@/lib/date-utils';
 import { SRService } from '@/services/sr.service';
@@ -236,6 +245,86 @@ export function SRsDataTable({
     } else {
       resetFilters();
     }
+  };
+
+  const renderPaginationItems = () => {
+    const { currentPage, totalPages } = paginationInfo;
+    if (totalPages <= 1) return null;
+
+    const items = [];
+    const maxVisible = 7;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        items.push(i);
+      }
+    } else {
+      items.push(1);
+      if (currentPage > 3) items.push('...');
+
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = start; i <= end; i++) {
+        items.push(i);
+      }
+
+      if (currentPage < totalPages - 2) items.push('...');
+      items.push(totalPages);
+    }
+
+    return (
+      <Pagination className="mx-0 w-auto">
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              href={`${pathname}?${createQueryString({ page: Math.max(1, currentPage - 1) })}`}
+              onClick={(e) => {
+                e.preventDefault();
+                if (paginationInfo.hasPrevPage) {
+                  router.push(`${pathname}?${createQueryString({ page: currentPage - 1 })}`);
+                }
+              }}
+              aria-disabled={!paginationInfo.hasPrevPage}
+              className={!paginationInfo.hasPrevPage ? 'pointer-events-none opacity-50' : ''}
+            />
+          </PaginationItem>
+
+          {items.map((item, index) => (
+            <PaginationItem key={index}>
+              {item === '...' ? (
+                <PaginationEllipsis />
+              ) : (
+                <PaginationLink
+                  href={`${pathname}?${createQueryString({ page: item })}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    router.push(`${pathname}?${createQueryString({ page: item })}`);
+                  }}
+                  isActive={currentPage === item}
+                >
+                  {item}
+                </PaginationLink>
+              )}
+            </PaginationItem>
+          ))}
+
+          <PaginationItem>
+            <PaginationNext
+              href={`${pathname}?${createQueryString({ page: Math.min(totalPages, currentPage + 1) })}`}
+              onClick={(e) => {
+                e.preventDefault();
+                if (paginationInfo.hasNextPage) {
+                  router.push(`${pathname}?${createQueryString({ page: currentPage + 1 })}`);
+                }
+              }}
+              aria-disabled={!paginationInfo.hasNextPage}
+              className={!paginationInfo.hasNextPage ? 'pointer-events-none opacity-50' : ''}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
+    );
   };
 
   return (
@@ -622,6 +711,7 @@ export function SRsDataTable({
                                   router.push(`/srs/${sr.id}/intake`);
                                 }}
                                 title="접수 정보 수정"
+                                aria-label="접수 정보 수정"
                               >
                                 <Clock className="h-4 w-4" />
                               </Button>
@@ -744,8 +834,8 @@ export function SRsDataTable({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 order-2 md:order-1">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
               <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
                 <SelectValue />
@@ -760,6 +850,8 @@ export function SRsDataTable({
             </Select>
             <span className="text-sm text-[hsl(var(--sr-gray-medium))]">페이지당 항목 수</span>
           </div>
+
+          <div className="order-1 md:order-2">{renderPaginationItems()}</div>
         </div>
       </div>
 

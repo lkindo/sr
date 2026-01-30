@@ -7,3 +7,7 @@
 ## 2025-05-23 - Context-Aware Accessibility
 **Learning:** Even in an English-codebase (variable names, comments), if the UI text is in another language (Korean in this case), accessibility attributes like `aria-label` must match the UI language to ensure a consistent experience for screen reader users.
 **Action:** Always check the surrounding UI text before deciding on the language for `aria-label` or `alt` text.
+
+## 2025-05-23 - Pagination Visibility
+**Learning:** Passing pagination data (props) to a component doesn't guarantee the UI controls exist. Developers might implement the "items per page" selector but forget the page navigation itself.
+**Action:** Always verify that `paginationInfo` props are actually used to render navigation controls (Prev/Next/Numbers), not just meta-info.
