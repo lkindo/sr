@@ -55,3 +55,14 @@ export const getUserTypeBadgeVariant = (typeLabel: string) => {
       return 'secondary' as const;
   }
 };
+
+/**
+ * 사용자 객체에서 비밀번호 필드를 제외합니다.
+ * @param user 비밀번호가 포함된 사용자 객체
+ * @returns 비밀번호가 제외된 사용자 객체
+ */
+export function excludePassword<T extends { password: string }>(user: T): Omit<T, 'password'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
