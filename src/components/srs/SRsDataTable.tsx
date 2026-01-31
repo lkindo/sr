@@ -16,6 +16,7 @@ import {
   Search,
   TrendingUp,
   User,
+  X,
 } from 'lucide-react';
 
 import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
@@ -483,8 +484,23 @@ export function SRsDataTable({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10 sr-input-template w-full"
+                className="pl-10 pr-10 sr-input-template w-full"
+                aria-label="SR 검색"
               />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-8 w-8 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setSearchQuery('');
+                    handleFilterChange('search', '');
+                  }}
+                  aria-label="검색어 지우기"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             <Button onClick={handleSearch} className="sr-btn-template-primary shrink-0 h-10">
               <Search className="h-4 w-4 mr-2" />
@@ -622,6 +638,7 @@ export function SRsDataTable({
                                   router.push(`/srs/${sr.id}/intake`);
                                 }}
                                 title="접수 정보 수정"
+                                aria-label="접수 정보 수정"
                               >
                                 <Clock className="h-4 w-4" />
                               </Button>
