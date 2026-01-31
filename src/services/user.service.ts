@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import { userUpdateSchema } from '@/lib/schemas';
+import { excludePassword } from '@/lib/user-helpers';
 
 import { PermissionService } from './permission.service';
 
@@ -43,23 +44,27 @@ export class UserService {
       return null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return excludePassword(user);
   }
 
   async getUserByEmail(email: string) {
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { email },
       include: {
         roles: { include: { role: true } },
         clients: { include: { client: true } },
       },
     });
+
+    if (!user) {
+      return null;
+    }
+
+    return excludePassword(user);
   }
 
-  async getUserByClientId(clientId: string): Promise<User[]> {
-    return prisma.user.findMany({
+  async getUserByClientId(clientId: string) {
+    const users = await prisma.user.findMany({
       where: {
         clients: { some: { clientId } },
       },
@@ -68,6 +73,8 @@ export class UserService {
         clients: { include: { client: true } },
       },
     });
+
+    return users.map((user) => excludePassword(user));
   }
 
   async getAllUsers(
@@ -84,7 +91,7 @@ export class UserService {
       take?: number;
       orderBy?: Prisma.UserOrderByWithRelationInput;
     }
-  ): Promise<{ data: User[]; total: number }> {
+  ): Promise<{ data: Omit<User, 'password'>[]; total: number }> {
     const where: Prisma.UserWhereInput = {};
 
     if (filters?.search) {
@@ -144,15 +151,15 @@ export class UserService {
       userType: user.clients.length > 0 ? ('CLIENT' as const) : ('ENGINEER' as const),
     }));
 
+    let filtered = usersWithType;
     if (filters?.userType && filters.userType !== 'all') {
-      const filtered = usersWithType.filter((user) => user.userType === filters.userType);
-      return { data: filtered as any, total };
+      filtered = usersWithType.filter((user) => user.userType === filters.userType);
     }
 
-    return { data: usersWithType as any, total };
+    return { data: filtered.map((user) => excludePassword(user)) as any, total };
   }
 
-  async updateUser(id: string, data: UserUpdateData): Promise<User> {
+  async updateUser(id: string, data: UserUpdateData) {
     const validated = userUpdateSchema.parse(data);
     const { clientIds, ...updateData } = validated;
 
@@ -187,16 +194,20 @@ export class UserService {
           },
         },
       });
+      // Fetch user again to get latest state including clients?
+      // The original code didn't do this, but for consistency it might be better.
+      // However, sticking to original behavior of returning 'user' which is the result of first update.
     }
 
-    return user;
+    return excludePassword(user);
   }
 
-  async updatePassword(userId: string, hashedPassword: string): Promise<User> {
-    return prisma.user.update({
+  async updatePassword(userId: string, hashedPassword: string) {
+    const user = await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
+    return excludePassword(user);
   }
 
   async updateProfile(
@@ -206,23 +217,24 @@ export class UserService {
       email?: string;
       image?: string;
     }
-  ): Promise<User> {
-    return prisma.user.update({
+  ) {
+    const user = await prisma.user.update({
       where: { id: userId },
       data: profileData,
     });
+    return excludePassword(user);
   }
 
-  async activateUser(userId: string): Promise<User> {
+  async activateUser(userId: string) {
     const user = await prisma.user.update({
       where: { id: userId },
       data: { isActive: true },
     });
 
-    return user;
+    return excludePassword(user);
   }
 
-  async deactivateUser(userId: string): Promise<User> {
+  async deactivateUser(userId: string) {
     // 1. 진행 중인 SR 확인
     const prisma = (await import('@/lib/prisma')).default;
     const activeSRs = await prisma.sR.findMany({
@@ -253,10 +265,10 @@ export class UserService {
       data: { isActive: false },
     });
 
-    return user;
+    return excludePassword(user);
   }
 
-  async hardDeleteUser(userId: string): Promise<User> {
+  async hardDeleteUser(userId: string) {
     const prisma = (await import('@/lib/prisma')).default;
 
     // 1. 연관 데이터 확인 (SR 관련)
@@ -308,7 +320,7 @@ export class UserService {
     // 5. 완전 삭제 수행
     const deletedUser = await prisma.user.delete({ where: { id: userId } });
 
-    return deletedUser;
+    return excludePassword(deletedUser);
   }
 
   async createUser(userData: {
@@ -319,7 +331,7 @@ export class UserService {
     clientId?: string;
     clientIds?: string[];
     roleIds?: string[];
-  }): Promise<User> {
+  }) {
     const hashedPassword = await hash(userData.password, 10);
 
     // 클라이언트 연결 (clientIds 우선, 없으면 clientId 호환성 지원)
@@ -375,7 +387,7 @@ export class UserService {
       }
 
       // 4. 전체 정보와 함께 반환
-      return await tx.user.findUniqueOrThrow({
+      const createdUser = await tx.user.findUniqueOrThrow({
         where: { id: user.id },
         include: {
           roles: {
@@ -390,6 +402,8 @@ export class UserService {
           },
         },
       });
+
+      return excludePassword(createdUser);
     });
   }
 
@@ -414,7 +428,7 @@ export class UserService {
     userId: string,
     currentPassword: string,
     newPassword: string
-  ): Promise<User> {
+  ) {
     // 사용자 조회
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
@@ -433,10 +447,11 @@ export class UserService {
     const hashedPassword = await hash(newPassword, 10);
 
     // 비밀번호 업데이트
-    return prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
+
+    return excludePassword(updatedUser);
   }
 }
-// Force rebuild

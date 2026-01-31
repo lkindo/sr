@@ -7,3 +7,8 @@
 **Vulnerability:** `UserService.getUserById` returned the user object including the password hash, which was then exposed via `getUserAction` and `getProfileAction` server actions.
 **Learning:** Service methods often return full database objects by default. If these methods are directly exposed via Server Actions or API routes, sensitive fields (like password hashes) leak.
 **Prevention:** Explicitly exclude sensitive fields (password, secrets) in the Service layer before returning data, or use DTOs/Select to fetch only safe fields.
+
+## 2026-01-31 - Standardized Password Exclusion
+**Pattern:** `excludePassword` helper in `src/lib/user-helpers.ts`.
+**Learning:** Manual destructuring to remove passwords in Service layer proved inconsistent, leading to leaks in `getAllUsers` and others.
+**Prevention:** Use the standardized `excludePassword` helper for any Service method returning User objects.
