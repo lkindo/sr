@@ -7,3 +7,8 @@
 **Vulnerability:** `UserService.getUserById` returned the user object including the password hash, which was then exposed via `getUserAction` and `getProfileAction` server actions.
 **Learning:** Service methods often return full database objects by default. If these methods are directly exposed via Server Actions or API routes, sensitive fields (like password hashes) leak.
 **Prevention:** Explicitly exclude sensitive fields (password, secrets) in the Service layer before returning data, or use DTOs/Select to fetch only safe fields.
+
+## 2026-02-20 - Inconsistent Password Sanitization in UserService
+**Vulnerability:** While `getUserById` was sanitized, other methods like `getAllUsers`, `createUser`, and `updateUser` in `UserService` were still returning full User objects including password hashes.
+**Learning:** Fixing a vulnerability in one method doesn't guarantee it's fixed everywhere. Inconsistent application of security patterns leaves gaps.
+**Prevention:** Use a shared helper function (like `excludePassword`) across all methods in a service to ensure consistent sanitization. Enforce return types (e.g. `Omit<User, 'password'>`) to catch leaks at compile time.
