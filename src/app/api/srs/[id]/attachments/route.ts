@@ -108,9 +108,7 @@ export const POST = withAuthAndRateLimit(
     );
 
     const attachmentsToInsert = results
-      .filter(
-        (r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled'
-      )
+      .filter((r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled')
       .map((r) => r.value);
 
     let createdAttachments: any[] = [];

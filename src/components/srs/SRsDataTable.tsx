@@ -484,6 +484,7 @@ export function SRsDataTable({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="pl-10 sr-input-template w-full"
+                aria-label="검색"
               />
             </div>
             <Button onClick={handleSearch} className="sr-btn-template-primary shrink-0 h-10">
@@ -622,6 +623,7 @@ export function SRsDataTable({
                                   router.push(`/srs/${sr.id}/intake`);
                                 }}
                                 title="접수 정보 수정"
+                                aria-label="접수 정보 수정"
                               >
                                 <Clock className="h-4 w-4" />
                               </Button>
@@ -747,7 +749,10 @@ export function SRsDataTable({
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
+              <SelectTrigger
+                className="w-[80px] h-9 sr-dropdown-template"
+                aria-label="페이지당 항목 수"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
