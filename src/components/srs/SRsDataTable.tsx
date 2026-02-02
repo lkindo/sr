@@ -477,8 +477,12 @@ export function SRsDataTable({
           {/* Search Bar and Total Count */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               <Input
+                aria-label="검색어 입력"
                 placeholder="SR 번호, 제목, 고객사, 요청자, 담당자로 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -622,6 +626,7 @@ export function SRsDataTable({
                                   router.push(`/srs/${sr.id}/intake`);
                                 }}
                                 title="접수 정보 수정"
+                                aria-label="접수 정보 수정"
                               >
                                 <Clock className="h-4 w-4" />
                               </Button>
@@ -747,7 +752,7 @@ export function SRsDataTable({
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
+              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template" aria-label="페이지당 항목 수">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
