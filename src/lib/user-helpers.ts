@@ -20,6 +20,15 @@ interface User {
   clients: UserClient[];
 }
 
+// 비밀번호 제외 헬퍼 함수
+export function excludePassword<T extends { password: string }>(
+  user: T
+): Omit<T, 'password'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
+
 // 사용자 유형 판별 함수
 export const getUserTypeLabel = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
