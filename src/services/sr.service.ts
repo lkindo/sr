@@ -643,12 +643,7 @@ export class SRService {
             priority: true,
             slaHours: true,
             handlerId: true,
-            handler: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            // Optimization: Handler user details are unused in list view, so we skip the join.
           },
         },
         _count: {
