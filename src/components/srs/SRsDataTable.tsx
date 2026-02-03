@@ -11,6 +11,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   Clock,
+  FileQuestion,
   Filter,
   Plus,
   Search,
@@ -237,6 +238,16 @@ export function SRsDataTable({
       resetFilters();
     }
   };
+
+  const hasActiveFilters =
+    filters.status !== 'all' ||
+    filters.priority !== 'all' ||
+    filters.clientId !== 'all' ||
+    filters.assigneeId !== 'all' ||
+    filters.search !== '' ||
+    filters.dateFrom !== '' ||
+    filters.dateTo !== '' ||
+    searchQuery !== '';
 
   return (
     <div className="space-y-6">
@@ -638,8 +649,23 @@ export function SRsDataTable({
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
-                    데이터가 없습니다.
+                  <TableCell colSpan={11} className="h-[300px] text-center">
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <FileQuestion className="h-10 w-10 text-muted-foreground/50 mb-4" />
+                      <h3 className="text-lg font-medium text-foreground mb-1">
+                        데이터가 없습니다
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        {hasActiveFilters
+                          ? '검색 조건에 맞는 SR을 찾을 수 없습니다.'
+                          : '등록된 SR이 없습니다.'}
+                      </p>
+                      {hasActiveFilters && (
+                        <Button variant="outline" onClick={resetFilters}>
+                          필터 초기화
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -740,14 +766,28 @@ export function SRsDataTable({
               );
             })
           ) : (
-            <div className="text-center py-8 text-muted-foreground">데이터가 없습니다.</div>
+            <div className="flex flex-col items-center justify-center py-12 border rounded-lg bg-muted/5">
+              <FileQuestion className="h-10 w-10 text-muted-foreground/50 mb-3" />
+              <h3 className="text-base font-medium text-foreground mb-1">데이터가 없습니다</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                {hasActiveFilters ? '검색 조건에 맞는 SR이 없습니다.' : '등록된 SR이 없습니다.'}
+              </p>
+              {hasActiveFilters && (
+                <Button variant="outline" size="sm" onClick={resetFilters}>
+                  필터 초기화
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
+              <SelectTrigger
+                className="w-[80px] h-9 sr-dropdown-template"
+                aria-label="페이지당 항목 수"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

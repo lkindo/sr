@@ -19,9 +19,9 @@ vi.mock('@/lib/action-helpers', async () => {
       id: 'user-1',
       roles: ['ADMIN'], // Admin can read everything
       permissions: [],
-      clientIds: []
+      clientIds: [],
     },
-    expires: '2099-01-01'
+    expires: '2099-01-01',
   };
   return {
     ...actual,
@@ -36,7 +36,7 @@ const { mockSRService } = vi.hoisted(() => {
     mockSRService: {
       getSRDetailsById: vi.fn(),
       getSRById: vi.fn(),
-    }
+    },
   };
 });
 
