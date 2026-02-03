@@ -4,7 +4,6 @@ import { z } from 'zod';
 
 import { getSRUrl } from '@/lib/app-url';
 import { NotFoundError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
@@ -640,15 +639,8 @@ export class SRService {
           select: {
             id: true,
             categoryName: true,
-            priority: true,
-            slaHours: true,
-            handlerId: true,
-            handler: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+            // Optimization: Exclude handler relation (N+1) and unused fields (priority, slaHours)
+            // as they are not used in the list view.
           },
         },
         _count: {

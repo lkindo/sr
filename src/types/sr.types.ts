@@ -91,10 +91,6 @@ export type SRListItem = SR & {
   serviceCategory: {
     id: string;
     categoryName: string;
-    priority: string;
-    slaHours: number;
-    handlerId: string | null;
-    handler: { id: string; name: string } | null;
   };
   _count: { comments: number; attachments: number };
 };
