@@ -14,7 +14,9 @@ import { fail, ok, Result } from '@/lib/result';
 import { userUpdateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
-export async function updateUserAction(formData: FormData): Promise<Result<Omit<User, 'password'>>> {
+export async function updateUserAction(
+  formData: FormData
+): Promise<Result<Omit<User, 'password'>>> {
   try {
     const data = {
       name: getFormDataValue(formData, 'name') || undefined,

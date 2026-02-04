@@ -165,31 +165,7 @@ export class SRService {
       throw new Error('SR 생성 후 조회에 실패했습니다.');
     }
 
-    // 푸시 알림 전송 (ADMIN, MANAGER)
-    backgroundTask(
-      prisma.user
-        .findMany({
-          where: {
-            roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
-            isActive: true,
-          },
-          select: { id: true },
-        })
-        .then((users) => {
-          const adminIds = users.map((u) => u.id);
-          if (adminIds.length > 0) {
-            return pushService.sendToUsers(adminIds, {
-              title: '새로운 SR 등록',
-              body: `${result.srNumber}: ${result.title}`,
-              url: `/srs/${result.id}`,
-              tag: 'sr-created',
-            });
-          }
-        }),
-      `Push notification for ${result.srNumber}`
-    );
-
-    // 이메일 알림 전송 (ADMIN, MANAGER)
+    // 알림 전송 (ADMIN, MANAGER) - 푸시 및 이메일 통합 처리
     backgroundTask(
       prisma.user
         .findMany({
@@ -200,23 +176,40 @@ export class SRService {
           include: { notificationPreference: true },
         })
         .then((admins) => {
-          const emailPromises = admins
-            .filter((admin) => {
-              const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
-              return admin.email && shouldSend;
-            })
-            .map((admin) =>
-              emailService.sendSRCreated(
-                admin.email!,
-                result.srNumber,
-                result.title,
-                result.requester.name,
-                getSRUrl(result.id)
-              )
+          const promises: Promise<unknown>[] = [];
+
+          // 1. 푸시 알림
+          const adminIds = admins.map((u) => u.id);
+          if (adminIds.length > 0) {
+            promises.push(
+              pushService.sendToUsers(adminIds, {
+                title: '새로운 SR 등록',
+                body: `${result.srNumber}: ${result.title}`,
+                url: `/srs/${result.id}`,
+                tag: 'sr-created',
+              })
             );
-          return Promise.all(emailPromises);
+          }
+
+          // 2. 이메일 알림
+          admins.forEach((admin) => {
+            const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
+            if (admin.email && shouldSend) {
+              promises.push(
+                emailService.sendSRCreated(
+                  admin.email,
+                  result.srNumber,
+                  result.title,
+                  result.requester.name,
+                  getSRUrl(result.id)
+                )
+              );
+            }
+          });
+
+          return Promise.all(promises);
         }),
-      `Email notifications for ${result.srNumber}`
+      `Notifications for ${result.srNumber}`
     );
 
     // 실시간 이벤트 발행
