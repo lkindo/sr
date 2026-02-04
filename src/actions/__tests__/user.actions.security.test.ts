@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach,describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies BEFORE imports
 vi.mock('next/server', () => ({
@@ -28,9 +28,10 @@ vi.mock('@/lib/action-helpers');
 vi.mock('@/lib/permission-helpers'); // Mock permission helpers
 
 // Now import the module under test
-import { getUserAction, getProfileAction, getSRHandlersForSelection } from '../user.actions';
-import { getAuthenticatedSession, authenticateAndAuthorize } from '@/lib/action-helpers';
+import { authenticateAndAuthorize,getAuthenticatedSession } from '@/lib/action-helpers';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+
+import { getProfileAction, getSRHandlersForSelection,getUserAction } from '../user.actions';
 
 describe('User Actions Security', () => {
   const mockUser = {
