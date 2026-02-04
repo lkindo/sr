@@ -15,4 +15,15 @@ describe('FileUpload', () => {
     const removeButton = screen.getByLabelText('hello.png 삭제');
     expect(removeButton).toBeInTheDocument();
   });
+
+  it('renders a hidden file input', () => {
+    const onChange = vi.fn();
+    render(<FileUpload value={[]} onChange={onChange} />);
+
+    // The input should be present but hidden
+    // We can find it by its type attribute or by querying the container
+    const input = document.querySelector('input[type="file"]');
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveClass('opacity-0');
+  });
 });
