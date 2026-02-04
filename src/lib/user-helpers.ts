@@ -55,3 +55,10 @@ export const getUserTypeBadgeVariant = (typeLabel: string) => {
       return 'secondary' as const;
   }
 };
+
+// 비밀번호 제외 헬퍼 함수
+export function excludePassword<T extends { password: string }>(user: T): Omit<T, 'password'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password, ...userWithoutPassword } = user;
+  return userWithoutPassword;
+}
