@@ -4,6 +4,8 @@
  * 프로덕션 환경에서 에러 트래킹 서비스(Sentry 등) 연동 가능
  */
 
+import pino from 'pino';
+
 import { ServiceError } from './errors';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -34,6 +36,20 @@ interface LogEntry {
 class Logger {
   private isProduction = process.env.NODE_ENV === 'production';
   private isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+
+  private pinoLogger = this.isProduction
+    ? pino(
+        {
+          timestamp: false,
+          messageKey: 'message',
+          formatters: {
+            level: (label) => ({ level: label }),
+          },
+          base: undefined,
+        },
+        pino.destination({ sync: false, minLength: 4096 })
+      )
+    : null;
 
   /**
    * 로그 레벨에 따라 출력 여부 결정
@@ -91,9 +107,10 @@ class Logger {
       return;
     }
 
-    if (this.isProduction) {
-      // 프로덕션: JSON 형식으로 출력 (로그 수집 도구에서 파싱 가능)
-      console.log(JSON.stringify(entry));
+    if (this.isProduction && this.pinoLogger) {
+      // 프로덕션: Pino 사용 (비동기 로깅으로 이벤트 루프 블로킹 방지)
+      const { level, ...logData } = entry;
+      this.pinoLogger[level](logData);
     } else {
       // 개발 환경: 가독성 좋은 형식으로 출력
       const prefix = `[${entry.level.toUpperCase()}]`;
