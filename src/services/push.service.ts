@@ -203,14 +203,10 @@ export class PushService {
 
     const webPush = await getWebPush();
     const subscriptions = await this.getUserSubscriptions(userId);
-    const results: { statusCode: number; body: string }[] = [];
 
-    for (const sub of subscriptions) {
-      const result = await this.sendToSubscription(webPush, sub, payload);
-      if (result) {
-        results.push(result);
-      }
-    }
+    const results = (
+      await Promise.all(subscriptions.map((sub) => this.sendToSubscription(webPush, sub, payload)))
+    ).filter((r): r is { statusCode: number; body: string } => r !== null);
 
     return results;
   }
@@ -252,14 +248,12 @@ export class PushService {
     await Promise.all(
       userIds.map(async (userId) => {
         const subscriptions = subsByUser.get(userId) ?? [];
-        const userResults: { statusCode: number; body: string }[] = [];
+        const userResults = (
+          await Promise.all(
+            subscriptions.map((sub) => this.sendToSubscription(webPush, sub, payload))
+          )
+        ).filter((r): r is { statusCode: number; body: string } => r !== null);
 
-        for (const sub of subscriptions) {
-          const result = await this.sendToSubscription(webPush, sub, payload);
-          if (result) {
-            userResults.push(result);
-          }
-        }
         results.set(userId, userResults);
       })
     );
