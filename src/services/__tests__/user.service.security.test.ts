@@ -50,7 +50,7 @@ describe('UserService Security', () => {
         name: 'Test',
         password: 'hashed_password', // This shouldn't be returned
         roles: [],
-        clients: []
+        clients: [],
       };
 
       const txMock = {
@@ -79,17 +79,17 @@ describe('UserService Security', () => {
 
   describe('updateUser', () => {
     it('returns user object WITHOUT password', async () => {
-        const mockUserWithPassword = {
-            id: 'u1',
-            email: 't@t.com',
-            name: 'Test',
-            password: 'hashed_password',
-        };
-        vi.mocked(prisma.user.update).mockResolvedValue(mockUserWithPassword as any);
+      const mockUserWithPassword = {
+        id: 'u1',
+        email: 't@t.com',
+        name: 'Test',
+        password: 'hashed_password',
+      };
+      vi.mocked(prisma.user.update).mockResolvedValue(mockUserWithPassword as any);
 
-        const result = await userService.updateUser('u1', { name: 'New Name' });
+      const result = await userService.updateUser('u1', { name: 'New Name' });
 
-        expect(result).not.toHaveProperty('password');
+      expect(result).not.toHaveProperty('password');
     });
   });
 });

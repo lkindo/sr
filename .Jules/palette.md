@@ -11,5 +11,6 @@
 **Action:** Always check the surrounding UI text before deciding on the language for `aria-label` or `alt` text.
 
 ## 2025-05-23 - Focus for Hidden Inputs
+
 **Learning:** File inputs that are visually hidden with `opacity: 0` can cause "Focus Indicator Failure" accessibility issues.
 **Action:** Use `focus-within` on the parent container to provide a visual cue when the hidden input receives focus.
