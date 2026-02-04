@@ -135,6 +135,18 @@ export function SRsDataTable({
     [searchParams]
   );
 
+  const isFiltered = useMemo(() => {
+    return (
+      filters.status !== 'all' ||
+      filters.priority !== 'all' ||
+      filters.clientId !== 'all' ||
+      filters.assigneeId !== 'all' ||
+      filters.search !== '' ||
+      filters.dateFrom !== '' ||
+      filters.dateTo !== ''
+    );
+  }, [filters]);
+
   const [searchQuery, setSearchQuery] = useState(filters.search);
 
   const createQueryString = useCallback(
@@ -622,6 +634,7 @@ export function SRsDataTable({
                                   router.push(`/srs/${sr.id}/intake`);
                                 }}
                                 title="접수 정보 수정"
+                                aria-label="접수 정보 수정"
                               >
                                 <Clock className="h-4 w-4" />
                               </Button>
@@ -639,7 +652,16 @@ export function SRsDataTable({
               ) : (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center py-8">
-                    데이터가 없습니다.
+                    {isFiltered ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-muted-foreground">검색 결과가 없습니다.</span>
+                        <Button variant="outline" size="sm" onClick={resetFilters}>
+                          필터 초기화
+                        </Button>
+                      </div>
+                    ) : (
+                      '데이터가 없습니다.'
+                    )}
                   </TableCell>
                 </TableRow>
               )}
@@ -740,14 +762,28 @@ export function SRsDataTable({
               );
             })
           ) : (
-            <div className="text-center py-8 text-muted-foreground">데이터가 없습니다.</div>
+            <div className="text-center py-8 text-muted-foreground">
+              {isFiltered ? (
+                <div className="flex flex-col items-center gap-2">
+                  <span>검색 결과가 없습니다.</span>
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    필터 초기화
+                  </Button>
+                </div>
+              ) : (
+                '데이터가 없습니다.'
+              )}
+            </div>
           )}
         </div>
 
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
+              <SelectTrigger
+                className="w-[80px] h-9 sr-dropdown-template"
+                aria-label="페이지당 항목 수"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
