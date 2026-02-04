@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect,it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { FileUpload } from '../file-upload';
 
@@ -8,12 +8,7 @@ describe('FileUpload', () => {
     const file = new File(['hello'], 'hello.png', { type: 'image/png' });
     const onChange = vi.fn();
 
-    render(
-      <FileUpload
-        value={[file]}
-        onChange={onChange}
-      />
-    );
+    render(<FileUpload value={[file]} onChange={onChange} />);
 
     // This checks if there is a button with the specific aria-label
     // The label text follows the Korean format "filename 삭제"

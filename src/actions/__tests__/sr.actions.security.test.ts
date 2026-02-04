@@ -1,4 +1,4 @@
-import { beforeEach,describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
 
@@ -6,7 +6,8 @@ import {
   getSRAction,
   getSRActivitiesAction,
   getSRCommentsAction,
-  getSRDetailsAction} from '../sr.actions';
+  getSRDetailsAction,
+} from '../sr.actions';
 
 // Mock dependencies
 vi.mock('next/cache', () => ({
@@ -23,7 +24,7 @@ const { mockSRService } = vi.hoisted(() => {
     mockSRService: {
       getSRById: vi.fn(),
       getSRDetailsById: vi.fn(),
-    }
+    },
   };
 });
 
@@ -37,7 +38,7 @@ const { mockPrisma } = vi.hoisted(() => {
     mockPrisma: {
       sRActivity: { findMany: vi.fn() },
       sRComment: { findMany: vi.fn() },
-    }
+    },
   };
 });
 
@@ -45,14 +46,13 @@ vi.mock('@/lib/prisma', () => ({
   default: mockPrisma,
 }));
 
-
 describe('SR Server Actions Security', () => {
   const unauthorizedUser = {
     id: 'user-2',
     name: 'Bad User',
     roles: ['USER'],
     permissions: [],
-    clientIds: ['client-2'] // Different client
+    clientIds: ['client-2'], // Different client
   };
 
   const authorizedUser = {
@@ -60,7 +60,7 @@ describe('SR Server Actions Security', () => {
     name: 'Good User',
     roles: ['USER'],
     permissions: ['SR:UPDATE_SELF'], // Needed for isRequester check
-    clientIds: ['client-1'] // Same client
+    clientIds: ['client-1'], // Same client
   };
 
   const targetSR = {
@@ -68,7 +68,7 @@ describe('SR Server Actions Security', () => {
     clientId: 'client-1',
     requesterId: 'user-1',
     title: 'Secret SR',
-    status: 'REQUESTED'
+    status: 'REQUESTED',
   };
 
   beforeEach(() => {
