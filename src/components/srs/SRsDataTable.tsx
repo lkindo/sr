@@ -135,6 +135,18 @@ export function SRsDataTable({
     [searchParams]
   );
 
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.status !== 'all' ||
+      filters.priority !== 'all' ||
+      filters.clientId !== 'all' ||
+      filters.assigneeId !== 'all' ||
+      filters.search !== '' ||
+      filters.dateFrom !== '' ||
+      filters.dateTo !== ''
+    );
+  }, [filters]);
+
   const [searchQuery, setSearchQuery] = useState(filters.search);
 
   const createQueryString = useCallback(
@@ -484,6 +496,7 @@ export function SRsDataTable({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="pl-10 sr-input-template w-full"
+                aria-label="검색어 입력"
               />
             </div>
             <Button onClick={handleSearch} className="sr-btn-template-primary shrink-0 h-10">
@@ -622,6 +635,7 @@ export function SRsDataTable({
                                   router.push(`/srs/${sr.id}/intake`);
                                 }}
                                 title="접수 정보 수정"
+                                aria-label="접수 정보 수정"
                               >
                                 <Clock className="h-4 w-4" />
                               </Button>
@@ -639,7 +653,16 @@ export function SRsDataTable({
               ) : (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center py-8">
-                    데이터가 없습니다.
+                    {hasActiveFilters ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <span>검색 결과가 없습니다.</span>
+                        <Button variant="outline" size="sm" onClick={resetFilters}>
+                          필터 초기화
+                        </Button>
+                      </div>
+                    ) : (
+                      '데이터가 없습니다.'
+                    )}
                   </TableCell>
                 </TableRow>
               )}
@@ -740,7 +763,18 @@ export function SRsDataTable({
               );
             })
           ) : (
-            <div className="text-center py-8 text-muted-foreground">데이터가 없습니다.</div>
+            <div className="text-center py-8 text-muted-foreground">
+              {hasActiveFilters ? (
+                <div className="flex flex-col items-center gap-2">
+                  <span>검색 결과가 없습니다.</span>
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    필터 초기화
+                  </Button>
+                </div>
+              ) : (
+                '데이터가 없습니다.'
+              )}
+            </div>
           )}
         </div>
 
