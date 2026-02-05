@@ -4,6 +4,7 @@ import { authenticateAndAuthorize, validateWithSchema } from '@/lib/action-helpe
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
 import { logger } from '@/lib/logger';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ok, Result } from '@/lib/result';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
@@ -145,9 +146,12 @@ export async function getClientsForSelection() {
   try {
     logger.debug('🔍 [getClientsForSelection] 고객사 목록 조회 시작');
 
-    // No auth check needed for a simple selection list
+    // 인증 및 권한 확인 (고객사 조회 권한 필요)
+    await authenticateAndAuthorize(PERMISSIONS.CLIENT.READ);
+
     const clientService = new ClientService();
-    const clients = await clientService.getAllClients();
+    // 필요한 정보만 선택적으로 조회 (보안 강화)
+    const clients = await clientService.getClientsForSelection();
 
     logger.debug('✅ [getClientsForSelection] 고객사 조회 성공:', {
       count: clients.length,

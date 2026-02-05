@@ -69,6 +69,19 @@ export class ClientService {
     return prisma.client.findMany();
   }
 
+  async getClientsForSelection() {
+    return prisma.client.findMany({
+      select: {
+        id: true,
+        code: true,
+        name: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+
   /**
    * 고객사를 생성합니다.
    *
