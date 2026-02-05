@@ -173,7 +173,12 @@ export class SRService {
             roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
             isActive: true,
           },
-          include: { notificationPreference: true },
+          // Select only necessary fields to optimize query
+          select: {
+            id: true,
+            email: true,
+            notificationPreference: true,
+          },
         })
         .then((admins) => {
           const promises: Promise<unknown>[] = [];
