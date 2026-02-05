@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { ensureCanCreateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { SRService } from '@/services/sr.service';
 import { backgroundTask } from '@/lib/wait-until';
+import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
 const { mockPrisma } = vi.hoisted(() => {
