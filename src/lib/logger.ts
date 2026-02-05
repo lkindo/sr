@@ -43,7 +43,7 @@ class Logger {
           timestamp: false,
           messageKey: 'message',
           formatters: {
-            level: (label) => ({ level: label }),
+            level: (label: string) => ({ level: label }),
           },
           base: undefined,
         },

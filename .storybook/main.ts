@@ -10,7 +10,7 @@ const config: StorybookConfig = {
     '@storybook/addon-onboarding',
   ],
   framework: '@storybook/nextjs-vite',
-  staticDirs: ['..\\public'],
+  staticDirs: ['../public'],
   viteFinal: async (config) => {
     const { mergeConfig } = await import('vite');
     const path = await import('path');

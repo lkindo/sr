@@ -78,20 +78,25 @@ vi.mock('@/components/ui/alert-dialog', () => ({
 
 vi.mock('@/components/ui/select', () => ({
   Select: ({ children, onValueChange, value, disabled }: any) => (
-    <select
-      data-testid="mock-select"
-      value={value || ''}
-      onChange={(e) => onValueChange(e.target.value)}
-      disabled={disabled}
-    >
-      <option value="">Select option</option>
+    <div data-testid="mock-select-root">
+      <select
+        data-testid="mock-select"
+        value={value || ''}
+        onChange={(e) => onValueChange(e.target.value)}
+        disabled={disabled}
+      >
+        <option value="">Select option</option>
+        <option value="client-1">Client 1</option>
+        <option value="cat-1">Category 1</option>
+        <option value="MEDIUM">MEDIUM</option>
+      </select>
       {children}
-    </select>
+    </div>
   ),
-  SelectTrigger: ({ children, id }: any) => <span data-testid={`trigger-${id}`}>{children}</span>,
+  SelectTrigger: ({ children, id }: any) => <div data-testid={`trigger-${id}`}>{children}</div>,
   SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
-  SelectContent: ({ children }: any) => <>{children}</>,
-  SelectItem: ({ children, value }: any) => <option value={value}>{children}</option>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children, value }: any) => <div data-testid={`item-${value}`}>{children}</div>,
 }));
 
 // Mock Lucide icons

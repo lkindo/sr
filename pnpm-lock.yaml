@@ -116,9 +116,6 @@ importers:
       nodemailer:
         specifier: ^7.0.11
         version: 7.0.11
-      pino:
-        specifier: ^10.3.0
-        version: 10.3.0
       react:
         specifier: ^19.2.1
         version: 19.2.1
@@ -204,6 +201,9 @@ importers:
       '@types/nodemailer':
         specifier: ^7.0.4
         version: 7.0.4
+      '@types/pino':
+        specifier: ^7.0.5
+        version: 7.0.5
       '@types/web-push':
         specifier: ^3.6.4
         version: 3.6.4
@@ -252,6 +252,9 @@ importers:
       msw:
         specifier: ^2.12.0
         version: 2.12.3(@types/node@25.1.0)(typescript@5.9.3)
+      pino:
+        specifier: ^10.3.0
+        version: 10.3.0
       playwright:
         specifier: ^1.56.1
         version: 1.57.0
@@ -3265,6 +3268,10 @@ packages:
 
   '@types/nodemailer@7.0.4':
     resolution: {integrity: sha512-ee8fxWqOchH+Hv6MDDNNy028kwvVnLplrStm4Zf/3uHWw5zzo8FoYYeffpJtGs2wWysEumMH0ZIdMGMY1eMAow==}
+
+  '@types/pino@7.0.5':
+    resolution: {integrity: sha512-wKoab31pknvILkxAF8ss+v9iNyhw5Iu/0jLtRkUD74cNfOOLJNnqfFKAv0r7wVaTQxRZtWrMpGfShwwBjOcgcg==}
+    deprecated: This is a stub types definition. pino provides its own type definitions, so you do not need this installed.
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -10853,6 +10860,10 @@ snapshots:
       '@types/node': 25.1.0
     transitivePeerDependencies:
       - aws-crt
+
+  '@types/pino@7.0.5':
+    dependencies:
+      pino: 10.3.0
 
   '@types/react-dom@19.2.3(@types/react@19.2.7)':
     dependencies:

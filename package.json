@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "24.x"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "next dev",
     "dev:test": "cross-env SKIP_ENV_VALIDATION=true next dev --turbopack",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format:check": "prettier . --check",
     "format:fix": "prettier . --write",
@@ -76,7 +76,6 @@
     "next": "16.0.7",
     "next-auth": "5.0.0-beta.30",
     "nodemailer": "^7.0.11",
-    "pino": "^10.3.0",
     "react": "^19.2.1",
     "react-day-picker": "^9.11.1",
     "react-dom": "^19.2.1",
@@ -107,6 +106,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25",
     "@types/nodemailer": "^7.0.4",
+    "@types/pino": "^7.0.5",
     "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^5.1.0",
     "@vitest/browser-playwright": "^4.0.18",
@@ -123,6 +123,7 @@
     "jsdom": "^27.1.0",
     "lint-staged": "^16.2.7",
     "msw": "^2.12.0",
+    "pino": "^10.3.0",
     "playwright": "^1.56.1",
     "postcss": "^8",
     "prisma": "^6.19.0",

@@ -7,7 +7,17 @@ import { PushService, pushService } from '../push.service';
 
 // Mock Prisma
 vi.mock('../../lib/prisma', () => ({
-  default: mockDeep(),
+  default: {
+    ...mockDeep(),
+    pushSubscription: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn(),
+      upsert: vi.fn(),
+    },
+    notificationPreference: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+  },
 }));
 
 // Mock web-push
@@ -79,17 +89,20 @@ describe('PushService', () => {
       mockWebPush.sendNotification.mockResolvedValue({ statusCode: 201 });
 
       // Force test environment check bypass for logic verification or spy internal method if possible
-      // Since sendToUser checks NODE_ENV===test, we need to bypass it or mock sendToUser
-      const sendToUserSpy = vi.spyOn(pushService, 'sendToUser');
-      sendToUserSpy.mockImplementation(async (uid, _) => {
-        if (uid === 'user-2') return [{ statusCode: 201, body: 'OK' }];
-        return [];
+      // Since sendForEvent checks NODE_ENV===test, we need to bypass it or mock sendToUsers
+      const sendToUsersSpy = vi.spyOn(pushService, 'sendToUsers');
+      sendToUsersSpy.mockImplementation(async (uids, _) => {
+        const res = new Map();
+        if (uids.includes('user-2')) res.set('user-2', [{ statusCode: 201, body: 'OK' }]);
+        return res;
       });
 
       await pushService.sendForEvent('SR_CREATED', userIds, payload);
 
-      expect(sendToUserSpy).toHaveBeenCalledWith('user-2', payload);
-      expect(sendToUserSpy).not.toHaveBeenCalledWith('user-1', payload);
+      expect(sendToUsersSpy).toHaveBeenCalled();
+      const calledUids = sendToUsersSpy.mock.calls[0][0];
+      expect(calledUids).toContain('user-2');
+      expect(calledUids).not.toContain('user-1');
     });
 
     it('should use default preferences if none exist', async () => {
@@ -99,16 +112,17 @@ describe('PushService', () => {
       // No preferences found
       (prisma.notificationPreference.findMany as any).mockResolvedValue([]);
 
-      const sendToUserSpy = vi.spyOn(pushService, 'sendToUser').mockResolvedValue([]);
+      const sendToUsersSpy = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
 
       // SR_CREATED default is true
       await pushService.sendForEvent('SR_CREATED', userIds, payload);
-      expect(sendToUserSpy).toHaveBeenCalledWith('user-3', payload);
+      expect(sendToUsersSpy).toHaveBeenCalled();
+      expect(sendToUsersSpy.mock.calls[0][0]).toContain('user-3');
 
       // SR_STATUS_CHANGED default is false
-      sendToUserSpy.mockClear();
+      sendToUsersSpy.mockClear();
       await pushService.sendForEvent('SR_STATUS_CHANGED', userIds, payload);
-      expect(sendToUserSpy).not.toHaveBeenCalled();
+      expect(sendToUsersSpy).not.toHaveBeenCalled();
     });
   });
 
