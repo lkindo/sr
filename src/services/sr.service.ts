@@ -630,7 +630,22 @@ export class SRService {
       take,
       where,
       orderBy,
-      include: {
+      select: {
+        // Scalar fields (Optimized to exclude large text fields like description)
+        id: true,
+        srNumber: true,
+        title: true,
+        status: true,
+        priority: true,
+        dueDate: true,
+        createdAt: true,
+        completedAt: true,
+        clientId: true,
+        requesterId: true,
+        assigneeId: true,
+        serviceCategoryId: true,
+
+        // Relations
         client: { select: { id: true, name: true } },
         requester: { select: { id: true, name: true, email: true } },
         assignee: { select: { id: true, name: true, email: true } },
@@ -651,7 +666,7 @@ export class SRService {
           },
         },
       },
-    }) as Promise<SRListItem[]>;
+    }) as unknown as Promise<SRListItem[]>;
   }
 
   async countSRs(params?: { where?: Prisma.SRWhereInput }): Promise<number> {

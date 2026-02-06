@@ -84,7 +84,21 @@ export type SRUpdateResult = SR & {
 /**
  * SR 목록 조회 시 항목 타입
  */
-export type SRListItem = SR & {
+export type SRListItem = Pick<
+  SR,
+  | 'id'
+  | 'srNumber'
+  | 'title'
+  | 'status'
+  | 'priority'
+  | 'dueDate'
+  | 'createdAt'
+  | 'completedAt'
+  | 'clientId'
+  | 'requesterId'
+  | 'assigneeId'
+  | 'serviceCategoryId'
+> & {
   client: { id: string; name: string };
   requester: { id: string; name: string; email: string };
   assignee: { id: string; name: string; email: string } | null;
