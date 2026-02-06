@@ -34,13 +34,30 @@ interface LogEntry {
 }
 
 class Logger {
+  private isBrowser = typeof window !== 'undefined';
   private isEdge = process.env.NEXT_RUNTIME === 'edge';
   private isProduction = process.env.NODE_ENV === 'production';
   private isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 
-  private pinoLogger =
-    this.isProduction && !this.isEdge
-      ? pino(
+  private pinoLogger: ReturnType<typeof pino> | null = null;
+
+  constructor() {
+    this.initPino();
+  }
+
+  /**
+   * 런타임 환경에 맞게 Pino 로거 초기화
+   * 브라우저나 Edge 환경에서 Node.js 전용 API 호출로 인한 크래시 방지
+   */
+  private initPino(): void {
+    if (!this.isProduction || this.isEdge || this.isBrowser) {
+      return;
+    }
+
+    try {
+      // pino.destination이 존재하고 함수인지 확인 (Node.js 환경 검증)
+      if (typeof pino.destination === 'function') {
+        this.pinoLogger = pino(
           {
             timestamp: false,
             messageKey: 'message',
@@ -50,8 +67,21 @@ class Logger {
             base: undefined,
           },
           pino.destination({ sync: false, minLength: 4096 })
-        )
-      : null;
+        );
+      } else {
+        // pino.destination이 없는 경우 기본 출력 사용
+        this.pinoLogger = pino({
+          timestamp: false,
+          messageKey: 'message',
+          base: undefined,
+        });
+      }
+    } catch (error) {
+      // 초기화 실패 시 null 유지 (output 메서드에서 console로 fallback 처리됨)
+      console.error('[Logger] Failed to initialize Pino, falling back to console:', error);
+      this.pinoLogger = null;
+    }
+  }
 
   /**
    * 로그 레벨에 따라 출력 여부 결정

@@ -300,9 +300,7 @@ export default function ProfilePage() {
               <TabsContent value="profile" className="space-y-4 mt-4">
                 <div>
                   <h3 className="text-lg font-medium mb-2">기본 정보 수정</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    이름과 프로필 이미지를 변경할 수 있습니다.
-                  </p>
+                  <p className="text-sm text-muted-foreground mb-4">이름을 변경할 수 있습니다.</p>
                 </div>
 
                 <div className="space-y-4">
@@ -320,19 +318,6 @@ export default function ProfilePage() {
                     <Label htmlFor="email">이메일</Label>
                     <Input id="email" value={profile.email} disabled className="bg-muted" />
                     <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="image">프로필 이미지 URL</Label>
-                    <Input
-                      id="image"
-                      value={image}
-                      onChange={(e) => setImage(e.target.value)}
-                      placeholder="https://example.com/avatar.jpg"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      프로필 이미지 URL을 입력하세요 (선택사항)
-                    </p>
                   </div>
 
                   <div className="flex justify-end pt-4">

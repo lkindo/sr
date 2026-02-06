@@ -303,19 +303,6 @@ export function ProfileDialog({ open, onOpenChange }: ProfileDialogProps) {
                     <p className="text-xs text-muted-foreground">이메일은 변경할 수 없습니다.</p>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="image">프로필 이미지 URL</Label>
-                    <Input
-                      id="image"
-                      value={image}
-                      onChange={(e) => setImage(e.target.value)}
-                      placeholder="https://example.com/avatar.jpg"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      프로필 이미지 URL을 입력하세요 (선택사항)
-                    </p>
-                  </div>
-
                   <div className="flex justify-end pt-4">
                     <Button onClick={handleUpdateProfile} disabled={saving}>
                       <Save className="mr-2 h-4 w-4" />
