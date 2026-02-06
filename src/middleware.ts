@@ -1,9 +1,7 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 
 import { authConfig } from '@/auth.config';
-import { MemoryRateLimiter } from '@/lib/rate-limiter';
 
 // Edge-safe한 auth 설정만 사용하여 Edge Function 크기 제한 준수
 // bcryptjs, Prisma 등 Node.js 전용 의존성을 번들에서 제외

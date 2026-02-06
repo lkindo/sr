@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { CheckSquare, Square } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
 import { UserActions } from '@/components/users/UserActions';

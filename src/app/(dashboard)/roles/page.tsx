@@ -8,7 +8,7 @@ import { PermissionBoard } from '@/components/roles/PermissionBoard';
 import { RoleDialog } from '@/components/roles/RoleDialog';
 import { RoleMobileList } from '@/components/roles/RoleMobileList';
 import { RoleTable } from '@/components/roles/RoleTable';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
 interface Permission {

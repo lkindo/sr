@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export function PWARegistration() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -18,10 +19,13 @@ export function PWARegistration() {
         navigator.serviceWorker
           .register('/sw.js')
           .then((registration) => {
-            console.log('[PWA] Service Worker registered with scope:', registration.scope);
+            logger.info(`[PWA] Service Worker registered with scope: ${registration.scope}`);
           })
           .catch((error) => {
-            console.error('[PWA] Service Worker registration failed:', error);
+            logger.error(
+              '[PWA] Service Worker registration failed',
+              error instanceof Error ? error : new Error(String(error))
+            );
           });
       }
     };
@@ -51,7 +55,10 @@ export function PWARegistration() {
           }
         }
       } catch (err) {
-        console.error('[PWA] Error checking dismissed status:', err);
+        logger.error(
+          '[PWA] Error checking dismissed status',
+          err instanceof Error ? err : new Error(String(err))
+        );
       }
 
       setInstallPrompt(e);

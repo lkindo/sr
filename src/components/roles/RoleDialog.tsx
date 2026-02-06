@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { createRoleAction, updateRoleAction } from '@/actions/role.actions';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import {
   Dialog,
   DialogContent,
@@ -11,9 +11,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@/components/ui';
+import { Input } from '@/components/ui';
+import { Label } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
 interface Role {

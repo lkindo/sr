@@ -7,7 +7,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 import { PWARegistration } from '@/components/providers/PWARegistration';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
-import { Toaster } from '@/components/ui/toaster';
+import { Toaster } from '@/components/ui';
 
 interface ClientLayoutProps {
   children: ReactNode;

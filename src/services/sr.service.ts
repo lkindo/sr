@@ -3,7 +3,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
 import { getSRUrl } from '@/lib/app-url';
-import { NotFoundError } from '@/lib/errors';
+import { BusinessRuleError, NotFoundError, ServiceError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
@@ -13,6 +13,7 @@ import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
 import { backgroundTask } from '@/lib/wait-until';
 import { emailService } from '@/services/email.service';
 import { pushService } from '@/services/push.service';
+import { serviceCategoryService } from '@/services/service-category.service';
 import { AuthenticatedUser } from '@/types/session';
 import { SRCreateResult, SRDetails, SRListItem, SRUpdateResult } from '@/types/sr.types';
 
@@ -44,7 +45,7 @@ export class SRService {
       throw new NotFoundError('고객사');
     }
     if (!client.isActive) {
-      throw new Error(
+      throw new BusinessRuleError(
         `비활성 상태의 고객사(${client.name})에는 SR을 생성할 수 없습니다. ` +
           `고객사 관리자에게 문의하세요.`
       );
@@ -126,7 +127,10 @@ export class SRService {
         }
 
         if (attempts >= maxAttempts) {
-          throw new Error('SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.');
+          throw new ServiceError(
+            'SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.',
+            'SR_NUMBER_GENERATION_FAILED'
+          );
         }
 
         throw error;
@@ -134,7 +138,7 @@ export class SRService {
     }
 
     if (!sr) {
-      throw new Error('SR 생성에 실패했습니다.');
+      throw new ServiceError('SR 생성에 실패했습니다.', 'SR_CREATION_FAILED');
     }
 
     await prisma.sRActivity.create({
@@ -162,7 +166,7 @@ export class SRService {
 
     const result = await this.getSRDetailsById(sr.id);
     if (!result) {
-      throw new Error('SR 생성 후 조회에 실패했습니다.');
+      throw new ServiceError('SR 생성 후 조회에 실패했습니다.', 'SR_RETRIEVAL_FAILED');
     }
 
     // 알림 전송 (ADMIN, MANAGER) - 푸시 및 이메일 통합 처리
@@ -243,7 +247,7 @@ export class SRService {
       // 고객사 변경 검증 (REQUESTED 상태에서만 허용)
       if (validated.clientId && validated.clientId !== existingSR.clientId) {
         if (existingSR.status !== 'REQUESTED') {
-          throw new Error(
+          throw new BusinessRuleError(
             `SR이 이미 접수된 상태(${existingSR.status})입니다. ` +
               `접수 후에는 고객사를 변경할 수 없습니다. ` +
               `잘못된 고객사로 생성된 경우 SR을 삭제하고 다시 생성하세요.`
@@ -256,7 +260,9 @@ export class SRService {
           throw new NotFoundError('변경하려는 고객사');
         }
         if (!newClient.isActive) {
-          throw new Error(`비활성 상태의 고객사(${newClient.name})로는 변경할 수 없습니다.`);
+          throw new BusinessRuleError(
+            `비활성 상태의 고객사(${newClient.name})로는 변경할 수 없습니다.`
+          );
         }
       }
 
@@ -269,7 +275,7 @@ export class SRService {
         );
 
         if (!transitionResult.valid) {
-          throw new Error(transitionResult.message);
+          throw new BusinessRuleError(transitionResult.message);
         }
 
         // 필수 필드 검증
@@ -294,7 +300,7 @@ export class SRService {
         }
 
         if (missingFields.length > 0) {
-          throw new Error(
+          throw new BusinessRuleError(
             `${validated.status} 상태로 전환하려면 다음 필드가 필요합니다: ${missingFields.join(', ')}`
           );
         }
@@ -307,7 +313,7 @@ export class SRService {
         assigneeId !== undefined &&
         assigneeId !== existingSR.assigneeId
       ) {
-        throw new Error(
+        throw new BusinessRuleError(
           '완료되거나 확정된 SR의 담당자는 변경할 수 없습니다. ' +
             '변경이 필요한 경우 SR을 다시 열어주세요.'
         );
@@ -362,22 +368,18 @@ export class SRService {
 
       if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
 
-      // priority SLA adjustment
+      // priority SLA adjustment - ServiceCategoryService 활용
       if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
-        const serviceCategory = await prisma.serviceCategory.findUnique({
-          where: { id: existingSR.serviceCategoryId },
-        });
-        if (serviceCategory) {
-          const multiplier: Record<string, number> = {
-            CRITICAL: 0.5,
-            HIGH: 0.75,
-            MEDIUM: 1.0,
-            LOW: 1.5,
-          };
-          const adjustedHours = serviceCategory.slaHours * multiplier[validated.actualPriority];
-          const due = new Date(existingSR.intakeAt || new Date());
-          due.setHours(due.getHours() + adjustedHours);
-          updateData.dueDate = due;
+        try {
+          const dueDate = await serviceCategoryService.calculateDueDate(
+            existingSR.serviceCategoryId,
+            validated.actualPriority,
+            existingSR.intakeAt || new Date()
+          );
+          updateData.dueDate = dueDate;
+        } catch (error) {
+          // 카테고리를 찾지 못해도 SR 업데이트는 계속 진행
+          logger.warn('SLA 기한 계산 실패', { categoryId: existingSR.serviceCategoryId });
         }
       }
 

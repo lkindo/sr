@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { IntakeFormCard } from '@/components/srs/intake/IntakeFormCard';
 import { SRReviewCard } from '@/components/srs/intake/SRReviewCard';
 import { useIntakeForm } from '@/components/srs/intake/useIntakeForm';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 
 export default function SRIntakePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

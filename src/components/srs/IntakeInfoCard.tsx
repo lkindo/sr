@@ -4,7 +4,7 @@
 
 import { AlertTriangle, Clock, FileText, User } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui';
 import { priorityLabels } from '@/lib/constants/sr';
 import type { SRDetails } from '@/types/sr.types';
 

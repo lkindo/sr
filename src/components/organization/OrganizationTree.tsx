@@ -17,8 +17,8 @@ import {
 } from '@dnd-kit/core';
 import { Building2, ChevronDown, ChevronRight, GripVertical, Plus, Users } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { cn } from '@/lib/utils';
 
 import { ClientCardContextMenu } from './ClientCardContextMenu';

@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { Building2, Loader2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui';
+import { Input } from '@/components/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 

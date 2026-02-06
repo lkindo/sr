@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui';
 import { NAVIGATION_CONFIG, type NavSection, type NavSubItem } from '@/config/navigation';
 import { usePermissions } from '@/hooks/use-permissions';
 import { cn } from '@/lib/utils';

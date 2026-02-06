@@ -16,18 +16,11 @@ import {
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import { DeleteClientDialog } from '@/components/clients/DeleteClientDialog';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { Separator } from '@/components/ui';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 

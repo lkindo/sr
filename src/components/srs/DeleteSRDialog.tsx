@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui';
+import { logger } from '@/lib/logger';
 
 interface SR {
   id: string;
@@ -36,7 +37,10 @@ export function DeleteSRDialog({ open, onOpenChange, sr, onDelete }: DeleteSRDia
       await onDelete(sr.id);
       onOpenChange(false);
     } catch (error) {
-      console.error('Failed to delete SR:', error);
+      logger.error(
+        'Failed to delete SR',
+        error instanceof Error ? error : new Error(String(error))
+      );
       // 에러 처리는 부모 컴포넌트나 훅에서 담당 (토스트 등)
     } finally {
       setLoading(false);

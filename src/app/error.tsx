@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 
 export default function Error({
   error,

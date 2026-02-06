@@ -11,8 +11,8 @@ import {
   type User,
 } from '@/components/organization/OrganizationTree';
 import { UserReassignDialog } from '@/components/organization/UserReassignDialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useToast } from '@/hooks/use-toast';

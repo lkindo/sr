@@ -5,6 +5,7 @@ import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/
 import prisma from '@/lib/prisma';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 
+import { serviceCategoryService } from './service-category.service';
 import { UserService } from './user.service';
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
@@ -242,11 +243,8 @@ export class ClientService {
       return null;
     }
 
-    // 모든 활성화된 서비스 카테고리 조회
-    const serviceCategories = await prisma.serviceCategory.findMany({
-      where: { isActive: true },
-      orderBy: { categoryName: 'asc' },
-    });
+    // 모든 활성화된 서비스 카테고리 조회 - ServiceCategoryService 활용
+    const serviceCategories = await serviceCategoryService.getActiveCategories();
 
     // ADMIN 역할을 가진 사용자 제외
     const filteredUsers =

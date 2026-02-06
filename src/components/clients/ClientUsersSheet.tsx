@@ -4,23 +4,10 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Mail, Trash2, Users } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { useToast } from '@/hooks/use-toast';
 

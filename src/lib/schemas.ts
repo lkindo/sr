@@ -180,3 +180,16 @@ export const intakeUpdateSchema = z.object({
   intakeNotes: z.string().optional().nullable(),
   assigneeId: z.string().min(1, '담당자를 선택해주세요').optional(),
 });
+
+// ServiceCategory Schemas
+export const serviceCategoryCreateSchema = z.object({
+  categoryName: z.string().min(1, '카테고리 이름을 입력해주세요.'),
+  description: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  slaHours: z.number().int().positive('SLA 시간은 0보다 커야 합니다.'),
+  priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
+  clientId: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+  handlerId: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+  backupHandlerId: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+});
+
+export const serviceCategoryUpdateSchema = serviceCategoryCreateSchema.partial();

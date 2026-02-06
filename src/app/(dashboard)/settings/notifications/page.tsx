@@ -3,11 +3,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, Bell, CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
+import { Label } from '@/components/ui';
+import { Separator } from '@/components/ui';
+import { Switch } from '@/components/ui';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { useToast } from '@/hooks/use-toast';
 

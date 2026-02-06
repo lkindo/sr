@@ -2,8 +2,8 @@
 
 import { AlertCircle, CheckCircle, Clock, Pause, User, XCircle } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { statusLabels } from '@/lib/constants/sr';
 import { cn } from '@/lib/utils';
 

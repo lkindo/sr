@@ -1,4 +1,4 @@
-/* eslint-disable no-console */
+import { logger } from '@/lib/logger';
 /**
  * 환경 변수 검증 모듈
  *
@@ -265,7 +265,7 @@ export function printEnvSummary(): void {
     return;
   }
 
-  console.log('\n📋 환경 변수 설정 현황:\n');
+  logger.info('\n📋 환경 변수 설정 현황:\n');
 
   const categories = Array.from(new Set(ENV_VARIABLES.map((v) => v.category)));
 
@@ -282,16 +282,16 @@ export function printEnvSummary(): void {
         'rate-limit': 'Rate Limiting',
       }[category] || category;
 
-    console.log(`\n${categoryName}:`);
+    logger.info(`\n${categoryName}:`);
     vars.forEach((v) => {
       const value = process.env[v.name];
       const status = value ? '✅' : v.required ? '❌' : '⚪';
       const requiredText = v.required ? '(필수)' : '(선택)';
-      console.log(`  ${status} ${v.name} ${requiredText}`);
+      logger.info(`  ${status} ${v.name} ${requiredText}`);
     });
   });
 
-  console.log('\n');
+  logger.info('\n');
 }
 
 /**
@@ -310,10 +310,10 @@ export function validateAndPrintEnv(): void {
   try {
     validateEnv();
     printEnvSummary();
-    console.log('✅ 환경 변수 검증 완료\n');
+    logger.info('✅ 환경 변수 검증 완료\n');
   } catch (error) {
     if (error instanceof EnvValidationError) {
-      console.error(error.message);
+      logger.error(error.message, error);
       process.exit(1);
     }
     throw error;

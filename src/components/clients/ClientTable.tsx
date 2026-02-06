@@ -4,16 +4,9 @@ import React from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 
 interface ClientTableProps {
   clients: any[];

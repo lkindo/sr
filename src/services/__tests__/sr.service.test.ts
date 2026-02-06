@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NotFoundError } from '@/lib/errors';
+import { BusinessRuleError, NotFoundError } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
@@ -113,7 +113,7 @@ describe('SRService', () => {
         requestedPriority: 'MEDIUM' as const,
       };
 
-      await expect(srService.createSR(data, mockUser)).rejects.toThrow('비활성 상태의 고객사');
+      await expect(srService.createSR(data, mockUser)).rejects.toThrow(BusinessRuleError);
     });
   });
 
@@ -602,7 +602,7 @@ describe('SRService', () => {
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { clientId: 'c-2' }, mockUser)).rejects.toThrow(
-          '접수 후에는 고객사를 변경할 수 없습니다'
+          BusinessRuleError
         );
       });
 
@@ -617,7 +617,7 @@ describe('SRService', () => {
         } as any);
 
         await expect(srService.updateSR('sr-1', { clientId: 'c-2' }, mockUser)).rejects.toThrow(
-          '비활성 상태의 고객사'
+          BusinessRuleError
         );
       });
 
@@ -627,7 +627,7 @@ describe('SRService', () => {
         vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
         await expect(srService.updateSR('sr-1', { assigneeId: 'u-2' }, mockUser)).rejects.toThrow(
-          '완료되거나 확정된 SR의 담당자는 변경할 수 없습니다'
+          BusinessRuleError
         );
       });
     });

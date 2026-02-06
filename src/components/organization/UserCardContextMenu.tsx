@@ -9,7 +9,7 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from '@/components/ui/context-menu';
+} from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
 interface UserCardContextMenuProps {

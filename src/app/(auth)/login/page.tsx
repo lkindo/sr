@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import {
   Card,
   CardContent,
@@ -13,10 +13,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@/components/ui';
+import { Checkbox } from '@/components/ui';
+import { Input } from '@/components/ui';
+import { Label } from '@/components/ui';
 
 export default function LoginPage() {
   const router = useRouter();

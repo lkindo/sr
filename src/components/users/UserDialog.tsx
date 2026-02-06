@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui';
+import { Checkbox } from '@/components/ui';
 import {
   Dialog,
   DialogContent,
@@ -11,17 +11,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+} from '@/components/ui';
+import { Input } from '@/components/ui';
+import { Label } from '@/components/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface Client {
   id: string;
@@ -111,7 +106,8 @@ export function UserDialog({
       if (Array.isArray(clientData)) {
         setClients(clientData);
       } else {
-        console.error('Unexpected API response format:', result);
+        const msg = `Unexpected API response format: ${JSON.stringify(result)}`;
+        logger.error(msg, new Error(msg));
         setClients([]);
         toast({
           title: '데이터 오류',
@@ -120,7 +116,10 @@ export function UserDialog({
         });
       }
     } catch (error) {
-      console.error('Error fetching clients:', error);
+      logger.error(
+        'Error fetching clients',
+        error instanceof Error ? error : new Error(String(error))
+      );
       setClients([]);
       toast({
         title: '오류',

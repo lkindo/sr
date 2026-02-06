@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 import { deleteClientAction } from '@/actions/client.actions';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
 interface Client {

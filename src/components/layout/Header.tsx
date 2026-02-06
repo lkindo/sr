@@ -9,7 +9,7 @@ import { Menu } from 'lucide-react';
 
 // Removed unused SheetPrimitive import
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui';
 import {
   Sheet,
   SheetContent,
@@ -17,7 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '@/components/ui/sheet';
+} from '@/components/ui';
 import { NAVIGATION_CONFIG } from '@/config/navigation';
 import { cn } from '@/lib/utils';
 

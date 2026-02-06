@@ -7,10 +7,10 @@ import { useSession } from 'next-auth/react';
 import { ArrowLeft, Pencil, Shield, UserX } from 'lucide-react';
 
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
+import { Separator } from '@/components/ui';
 import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';

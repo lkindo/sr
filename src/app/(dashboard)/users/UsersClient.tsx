@@ -5,15 +5,9 @@ import { useRouter } from 'next/navigation'; // useSearchParams 제거
 import { useSession } from 'next-auth/react';
 import { Plus, Search } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Button } from '@/components/ui';
+import { Input } from '@/components/ui';
+// Select 관련 import 제거됨
 import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { UserDialog } from '@/components/users/UserDialog';
@@ -32,14 +26,15 @@ interface PaginationData {
 export default function UsersClient() {
   const router = useRouter();
   // useSearchParams를 사용하지 않고 window.location을 직접 사용 (새로고침 에러 방지)
-  const { data: session, update } = useSession();
+  // useSession 호출은 유지하되 미사용 리턴값 제거
+  useSession();
   const { toast } = useToast();
 
   const [users, setUsers] = useState<User[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // error 상태 제거 (사용되지 않음)
 
   // 초기 상태값 설정 (URL 파라미터는 useEffect에서 로드)
   const [pagination, setPagination] = useState<PaginationData>({
@@ -117,11 +112,8 @@ export default function UsersClient() {
       } else if (Array.isArray(result)) {
         setUsers(result);
       }
-
-      setError(null);
     } catch (err) {
-      setError('사용자 목록을 불러오는데 실패했습니다.');
-      console.error(err);
+      console.error('사용자 목록을 불러오는데 실패했습니다.', err);
     } finally {
       setLoading(false);
     }

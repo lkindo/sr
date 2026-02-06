@@ -8,8 +8,8 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, CalendarIcon, CheckCircle, Clock, User } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui';
+import { Calendar } from '@/components/ui';
 import {
   Form,
   FormControl,
@@ -18,17 +18,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+} from '@/components/ui';
+import { Input } from '@/components/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import { Textarea } from '@/components/ui';
 import { priorityLabels } from '@/lib/constants/sr';
 import { cn } from '@/lib/utils';
 import type { SRDetails } from '@/types/sr.types';

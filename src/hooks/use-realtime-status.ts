@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 export function useRealtimeStatus() {
   const { status } = useSession();
@@ -16,7 +17,7 @@ export function useRealtimeStatus() {
     // 인증되지 않았거나 이미 연결되어 있다면 패스
     if (status !== 'authenticated' || eventSourceRef.current) return;
 
-    console.log('[Realtime] Connecting to SSE...');
+    logger.info('[Realtime] Connecting to SSE...');
     const eventSource = new EventSource('/api/realtime');
     eventSourceRef.current = eventSource;
 
@@ -24,7 +25,7 @@ export function useRealtimeStatus() {
     eventSource.addEventListener('sr:updated', (event: any) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[Realtime] SR updated:', data);
+        logger.info('[Realtime] SR updated', { data });
 
         // React Query 캐시 초기화/갱신
         queryClient.invalidateQueries({ queryKey: ['srs'] });
@@ -37,7 +38,10 @@ export function useRealtimeStatus() {
           description: `SR #${data.srNumber}의 상태가 ${data.status}로 변경되었습니다.`,
         });
       } catch (err) {
-        console.error('[Realtime] Error parsing SR update event:', err);
+        logger.error(
+          '[Realtime] Error parsing SR update event',
+          err instanceof Error ? err : new Error(String(err))
+        );
       }
     });
 
@@ -45,7 +49,7 @@ export function useRealtimeStatus() {
     eventSource.addEventListener('sr:created', (event: any) => {
       try {
         const data = JSON.parse(event.data);
-        console.log('[Realtime] SR created:', data);
+        logger.info('[Realtime] SR created', { data });
 
         queryClient.invalidateQueries({ queryKey: ['srs'] });
         queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
@@ -55,21 +59,25 @@ export function useRealtimeStatus() {
           description: `새로운 SR #${data.srNumber}가 등록되었습니다.`,
         });
       } catch (err) {
-        console.error('[Realtime] Error parsing SR create event:', err);
+        logger.error(
+          '[Realtime] Error parsing SR create event',
+          err instanceof Error ? err : new Error(String(err))
+        );
       }
     });
 
     eventSource.onopen = () => {
-      console.log('[Realtime] SSE connection opened');
+      logger.info('[Realtime] SSE connection opened');
     };
 
     eventSource.onerror = (err) => {
-      console.error('[Realtime] SSE error:', err);
+      // Event 클래스는 Error가 아닐 수 있으므로 처리
+      logger.error('[Realtime] SSE error', new Error('SSE connection error'));
       // 에러 발생 시 연결 닫기 (useEffect의 cleanup이 처리하도록 함)
     };
 
     return () => {
-      console.log('[Realtime] Closing SSE connection');
+      logger.info('[Realtime] Closing SSE connection');
       eventSource.close();
       eventSourceRef.current = null;
     };

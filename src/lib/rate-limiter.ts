@@ -4,6 +4,8 @@
  * 메모리 기반의 토큰 버킷 알고리즘을 사용한 Rate Limiting 구현
  */
 
+import { logger } from '@/lib/logger';
+
 export interface RateLimitConfig {
   /**
    * 시간 윈도우 (밀리초)
@@ -154,8 +156,7 @@ export class MemoryRateLimiter {
 
         if (keysToDelete.length > 0 && process.env.NODE_ENV === 'development') {
           // 개발 환경에서만 정리 로그 출력
-          // eslint-disable-next-line no-console
-          console.log(`[RateLimiter] Cleaned up ${keysToDelete.length} expired buckets`);
+          logger.info(`[RateLimiter] Cleaned up ${keysToDelete.length} expired buckets`);
         }
       },
       5 * 60 * 1000

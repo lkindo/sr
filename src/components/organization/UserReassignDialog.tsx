@@ -11,9 +11,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+} from '@/components/ui';
+import { Badge } from '@/components/ui';
+import { ScrollArea } from '@/components/ui';
 
 export interface OngoingSR {
   id: string;

@@ -5,8 +5,8 @@
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui';
+import { Separator } from '@/components/ui';
 import { priorityLabels } from '@/lib/constants/sr';
 import type { SRDetails } from '@/types/sr.types';
 
