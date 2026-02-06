@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BusinessRuleError, NotFoundError } from '@/lib/errors';
+import { BusinessRuleError, NotFoundError, ServiceError } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';

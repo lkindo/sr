@@ -275,7 +275,7 @@ export class SRService {
         );
 
         if (!transitionResult.valid) {
-          throw new BusinessRuleError(transitionResult.message);
+          throw new BusinessRuleError(transitionResult.message || '유효하지 않은 상태 전환입니다.');
         }
 
         // 필수 필드 검증

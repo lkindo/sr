@@ -150,7 +150,7 @@
     "*.{ts,tsx}": [
       "eslint --fix",
       "prettier --write",
-      "vitest related --run"
+      "vitest related --run --project=unit"
     ],
     "*.{json,md,css}": [
       "prettier --write"

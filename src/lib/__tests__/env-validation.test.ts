@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '@/lib/logger';
+
 import {
   ENV_VARIABLES,
   EnvValidationError,
@@ -10,16 +12,16 @@ import {
 
 describe('EnvValidation', () => {
   const originalEnv = process.env;
-  const consoleSpy = {
-    log: vi.spyOn(console, 'log').mockImplementation(() => {}),
-    error: vi.spyOn(console, 'error').mockImplementation(() => {}),
+  const loggerSpy = {
+    info: vi.spyOn(logger, 'info').mockImplementation(() => {}),
+    error: vi.spyOn(logger, 'error').mockImplementation(() => {}),
   };
 
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...originalEnv };
-    consoleSpy.log.mockClear();
-    consoleSpy.error.mockClear();
+    loggerSpy.info.mockClear();
+    loggerSpy.error.mockClear();
   });
 
   afterEach(() => {
@@ -101,13 +103,13 @@ describe('EnvValidation', () => {
     it('should not print in production environment', () => {
       vi.stubEnv('NODE_ENV', 'production');
       printEnvSummary();
-      expect(consoleSpy.log).not.toHaveBeenCalled();
+      expect(loggerSpy.info).not.toHaveBeenCalled();
     });
 
     it('should print in development environment', () => {
       vi.stubEnv('NODE_ENV', 'development');
       printEnvSummary();
-      expect(consoleSpy.log).toHaveBeenCalled();
+      expect(loggerSpy.info).toHaveBeenCalled();
     });
   });
 
@@ -121,7 +123,7 @@ describe('EnvValidation', () => {
 
       validateAndPrintEnv();
 
-      expect(consoleSpy.log).toHaveBeenCalledWith('✅ 환경 변수 검증 완료\n');
+      expect(loggerSpy.info).toHaveBeenCalledWith('✅ 환경 변수 검증 완료\n');
     });
   });
 

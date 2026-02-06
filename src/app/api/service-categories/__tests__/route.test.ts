@@ -11,6 +11,7 @@ const { mockGetAll, ServiceCategoryServiceMock } = vi.hoisted(() => {
 
 vi.mock('@/services/service-category.service', () => ({
   ServiceCategoryService: ServiceCategoryServiceMock,
+  serviceCategoryService: new ServiceCategoryServiceMock(),
 }));
 
 // Mock auth-wrapper
