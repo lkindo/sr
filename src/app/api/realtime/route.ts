@@ -39,10 +39,20 @@ export async function GET(request: NextRequest) {
         );
       };
 
+      const onSRCommented = (data: any) => {
+        logger.debug('[SSE] SR Commented event sent', { srId: data.srId });
+        controller.enqueue(
+          encoder.encode(
+            `event: ${REALTIME_EVENTS.SR_COMMENTED}\ndata: ${JSON.stringify(data)}\n\n`
+          )
+        );
+      };
+
       // 리스너 등록
       realtimeEmitter.on(REALTIME_EVENTS.SR_UPDATED, onSRUpdated);
       realtimeEmitter.on(REALTIME_EVENTS.SR_CREATED, onSRCreated);
       realtimeEmitter.on(REALTIME_EVENTS.SR_DELETED, onSRDeleted);
+      realtimeEmitter.on(REALTIME_EVENTS.SR_COMMENTED, onSRCommented);
 
       // Keep-alive를 위한 주기적 핑
       const keepAlive = setInterval(() => {
@@ -56,6 +66,7 @@ export async function GET(request: NextRequest) {
         realtimeEmitter.off(REALTIME_EVENTS.SR_UPDATED, onSRUpdated);
         realtimeEmitter.off(REALTIME_EVENTS.SR_CREATED, onSRCreated);
         realtimeEmitter.off(REALTIME_EVENTS.SR_DELETED, onSRDeleted);
+        realtimeEmitter.off(REALTIME_EVENTS.SR_COMMENTED, onSRCommented);
       });
     },
   });

@@ -114,6 +114,15 @@ export const POST = withAuthAndRateLimit(
       },
     });
 
+    // 실시간 이벤트 발송
+    const { emitRealtimeEvent, REALTIME_EVENTS } = await import('@/lib/realtime-events');
+    emitRealtimeEvent(REALTIME_EVENTS.SR_COMMENTED, {
+      srId: id,
+      commentId: comment.id,
+      userId: session.user.id,
+      action: 'created',
+    });
+
     // Send email notifications to requester and assignee (non-blocking)
     const { emailService } = await import('@/services/email.service');
 

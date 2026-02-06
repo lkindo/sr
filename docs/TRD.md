@@ -407,40 +407,36 @@
 
 ---
 
-### 6. Upstash Redis
+### 6. 캐싱 전략
 
-**버전**: Latest (Redis 7 호환)
+**현재 구현**: Next.js `unstable_cache` (서버 메모리 기반)
 
-**선택 이유**:
+> **참고**: 초기 설계에서는 Upstash Redis를 계획했으나, 현재 프로젝트 규모에서는 Next.js 내장 캐시로 충분하여 간소화되었습니다.
 
-- **Serverless**: 사용량 기반 과금, 유휴 시 비용 없음
-- **REST API**: HTTP 기반, Vercel Edge Functions 호환
-- **저지연**: 전역 복제 지원
-- **무료 플랜**: 10,000 requests/day
+**현재 캐싱 구현**:
 
-**사용 목적**:
-
-- **세션 스토어**: NextAuth 세션 저장
-- **캐싱**: API 응답, 데이터 쿼리 결과
-- **Rate Limiting**: API 호출 제한
-- **실시간 알림**: Pub/Sub (선택적)
+- **캐시 백엔드**: Next.js `unstable_cache`
+- **TTL**: 5분 (300초)
+- **무효화**: `revalidatePath()`, `revalidateTag()`
+- **Rate Limiting**: 환경 변수 기반 인메모리 Map
 
 **대안 기술 비교**:
 
-| 기술              | 장점                       | 단점                   | 선택 여부 |
-| ----------------- | -------------------------- | ---------------------- | --------- |
-| **Upstash Redis** | Serverless, REST API, 저렴 | 제한적인 고급 기능     | ✅ 선택   |
-| Redis Cloud       | 강력, 다양한 기능          | 비용 높음, 설정 복잡   | ❌        |
-| Vercel KV         | Vercel 통합                | Upstash 기반, 중복     | ❌        |
-| Memcached         | 간단, 빠름                 | 기능 제한, 관리형 부족 | ❌        |
+| 기술              | 장점                       | 단점                 | 선택 여부 |
+| ----------------- | -------------------------- | -------------------- | --------- |
+| **Next.js Cache** | 내장, 설정 간편, 무료      | 분산 환경 미지원     | ✅ 현재   |
+| Upstash Redis     | Serverless, REST API, 저렴 | 추가 의존성, 비용    | ❌ 향후   |
+| Redis Cloud       | 강력, 다양한 기능          | 비용 높음, 설정 복잡 | ❌        |
+| Vercel KV         | Vercel 통합                | Upstash 기반, 중복   | ❌        |
 
-**캐싱 전략**:
+**향후 Redis 도입 조건**:
 
-- **Cache Invalidation**: Tag-based revalidation (Next.js revalidateTag)
-- **TTL**: 응답 종류에 따라 5분~1시간
-- **Stale-While-Revalidate**: 백그라운드 갱신
+- 다중 서버 분산 배포 시
+- 세션 공유가 필요한 경우
+- 분산 Rate Limiting 필요 시
+- 실시간 Pub/Sub 기능 필요 시
 
-> **구현 상세**: Redis Client 설정, 캐싱 코드는 [LLD.md](LLD.md) 참조
+> **구현 상세**: 캐시 유틸리티 코드는 [LLD.md](LLD.md) 참조
 
 ---
 

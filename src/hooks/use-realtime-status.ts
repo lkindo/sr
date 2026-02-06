@@ -66,6 +66,27 @@ export function useRealtimeStatus() {
       }
     });
 
+    // 댓글 작성 이벤트 처리
+    eventSource.addEventListener('sr:commented', (event: any) => {
+      try {
+        const data = JSON.parse(event.data);
+        logger.info('[Realtime] Comment added', { data });
+
+        // 현재 보고 있는 SR의 댓글과 활동 내역 갱신
+        if (data.srId) {
+          queryClient.invalidateQueries({ queryKey: ['sr', data.srId, 'comments'] });
+          queryClient.invalidateQueries({ queryKey: ['sr', data.srId, 'activities'] });
+          // 목록에서 댓글 수 등이 표시된다면 목록도 갱신
+          queryClient.invalidateQueries({ queryKey: ['srs'] });
+        }
+      } catch (err) {
+        logger.error(
+          '[Realtime] Error parsing comment event',
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    });
+
     eventSource.onopen = () => {
       logger.info('[Realtime] SSE connection opened');
     };

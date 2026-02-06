@@ -3266,118 +3266,104 @@ export async function deleteSRAttachment(id: string) {
 
 ## 캐싱 전략
 
-### Redis Cache Utility
+### Next.js Cache Utility
 
-**lib/cache.ts**:
+> **참고**: 초기 설계에서는 Upstash Redis를 계획했으나, 현재 규모에서는 Next.js 내장 `unstable_cache`로 충분하여 간소화되었습니다. 향후 분산 환경 배포 시 Redis 도입을 검토할 수 있습니다.
+
+**lib/cache.ts** (현재 구현):
 
 ```typescript
-import { Redis } from '@upstash/redis';
+import { unstable_cache as cache } from 'next/cache';
 
-export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
-});
+import prisma from '@/lib/prisma';
 
 /**
- * 캐시 키 생성
+ * Next.js unstable_cache 기반 캐시 유틸리티
+ * Redis 제거 후 간소화된 버전
  */
-export const CacheKeys = {
-  dashboardStats: (userId: string) => `dashboard:stats:${userId}`,
-  srList: (params: string) => `sr:list:${params}`,
-  srDetail: (srId: string) => `sr:detail:${srId}`,
-  clientList: () => `client:list`,
-  userPermissions: (userId: string) => `user:permissions:${userId}`,
-} as const;
 
-/**
- * 캐시된 데이터 조회 또는 생성
- */
-export async function getCachedData<T>(
-  key: string,
-  fetcher: () => Promise<T>,
-  ttl: number = 300 // 5분
-): Promise<T> {
-  // 캐시 조회
-  const cached = await redis.get<T>(key);
-  if (cached !== null) {
-    return cached;
-  }
+// 사용자 목록 캐싱
+export const getCachedUsers = cache(
+  async () => {
+    return prisma.user.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
+  },
+  ['users'],
+  { revalidate: 300 } // 5분마다 갱신
+);
 
-  // 캐시 미스: 데이터 생성
-  const data = await fetcher();
-
-  // 캐시 저장
-  await redis.setex(key, ttl, data);
-
-  return data;
-}
-
-/**
- * 캐시 무효화
- */
-export async function invalidateCache(pattern: string) {
-  // Upstash Redis는 SCAN 명령 지원
-  const keys = await redis.keys(pattern);
-
-  if (keys.length > 0) {
-    await redis.del(...keys);
-  }
-}
-
-/**
- * 여러 캐시 무효화
- */
-export async function invalidateCaches(patterns: string[]) {
-  await Promise.all(patterns.map((pattern) => invalidateCache(pattern)));
-}
+// 고객사 목록 캐싱
+export const getCachedClients = cache(
+  async () => {
+    return prisma.client.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+      },
+    });
+  },
+  ['clients'],
+  { revalidate: 300 } // 5분마다 갱신
+);
 ```
+
+### 캐싱 전략 요약
+
+| 항목            | 현재 구현                             | 비고              |
+| --------------- | ------------------------------------- | ----------------- |
+| **캐시 백엔드** | Next.js `unstable_cache`              | 서버 메모리 기반  |
+| **TTL**         | 5분 (300초)                           | `revalidate` 옵션 |
+| **무효화**      | `revalidatePath()`, `revalidateTag()` | Next.js 내장      |
+| **분산 캐시**   | 미사용                                | 단일 서버 환경    |
 
 ### Rate Limiting
 
-**lib/rate-limit.ts**:
+Rate Limiting은 환경 변수 기반 인메모리 Map으로 구현되어 있습니다.
+
+**lib/rate-limiter.ts** (현재 구현):
 
 ```typescript
-import { Ratelimit } from '@upstash/ratelimit';
-import { redis } from './cache';
+// 환경 변수 기반 설정
+const WINDOW_MS = Number(process.env.RATE_LIMIT_MIDDLEWARE_WINDOW_MS) || 60000;
+const MAX_REQUESTS = Number(process.env.RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS) || 20;
 
-// API 요청 제한: 10 요청/10초
-export const apiRateLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(10, '10 s'),
-  analytics: true,
-});
+// 인메모리 Map 기반 Rate Limiting
+const requestCounts = new Map<string, { count: number; resetTime: number }>();
 
-// 로그인 시도 제한: 5 요청/15분
-export const loginRateLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, '15 m'),
-  analytics: true,
-});
+export function checkRateLimit(identifier: string): boolean {
+  const now = Date.now();
+  const record = requestCounts.get(identifier);
 
-// SR 생성 제한: 20 요청/시간
-export const srCreationRateLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(20, '1 h'),
-  analytics: true,
-});
-
-/**
- * Rate limit 체크 미들웨어
- */
-export async function checkRateLimit(identifier: string, limiter: Ratelimit = apiRateLimiter) {
-  const { success, limit, remaining, reset } = await limiter.limit(identifier);
-
-  if (!success) {
-    throw new Error('Rate limit exceeded');
+  if (!record || now > record.resetTime) {
+    requestCounts.set(identifier, { count: 1, resetTime: now + WINDOW_MS });
+    return true;
   }
 
-  return {
-    limit,
-    remaining,
-    reset,
-  };
+  if (record.count >= MAX_REQUESTS) {
+    return false; // Rate limit exceeded
+  }
+
+  record.count++;
+  return true;
 }
 ```
+
+### 향후 Redis 도입 시나리오
+
+다음 조건 중 하나라도 해당될 경우 Redis 도입을 권장합니다:
+
+1. **다중 서버 배포**: 분산 캐시 공유 필요
+2. **세션 공유**: 서버 간 세션 상태 동기화
+3. **정밀한 Rate Limiting**: 분산 환경에서의 정확한 요청 제한
+4. **실시간 기능**: Pub/Sub 기반 실시간 알림
 
 ---
 

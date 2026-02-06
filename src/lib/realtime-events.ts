@@ -20,6 +20,7 @@ export const REALTIME_EVENTS = {
   SR_UPDATED: 'sr:updated',
   SR_CREATED: 'sr:created',
   SR_DELETED: 'sr:deleted',
+  SR_COMMENTED: 'sr:commented',
   NOTIFICATION_RECEIVED: 'notification:received',
 } as const;
 
