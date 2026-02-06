@@ -9,12 +9,10 @@ import { PWARegistration } from '@/components/providers/PWARegistration';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
 import { Toaster } from '@/components/ui';
 
-// Devtools를 동적으로 임포트하여 초기 청크 크기를 줄이고 로딩 안정성을 높임
-const ReactQueryDevtools = dynamic(
-  () =>
-    import('@tanstack/react-query-devtools').then((mod) => ({ default: mod.ReactQueryDevtools })),
-  { ssr: false }
-);
+// Devtools를 전용 컴포넌트로 분리하여 HMR 안정성 확보
+const QueryDevtools = dynamic(() => import('./QueryDevtools'), {
+  ssr: false,
+});
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -48,7 +46,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <PWARegistration />
         </RealtimeProvider>
       </SessionProvider>
-      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+      {process.env.NODE_ENV === 'development' && <QueryDevtools />}
     </QueryClientProvider>
   );
 }
