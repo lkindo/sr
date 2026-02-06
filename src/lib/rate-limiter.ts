@@ -140,6 +140,11 @@ export class MemoryRateLimiter {
    * 오래된 버킷 정리
    */
   private startCleanup(): void {
+    // Edge Runtime에서는 setInterval이 모듈 초기화 단계에서 허용되지 않음
+    if (process.env.NEXT_RUNTIME === 'edge') {
+      return;
+    }
+
     // 5분마다 윈도우가 지난 버킷 삭제
     setInterval(
       () => {

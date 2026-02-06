@@ -34,22 +34,24 @@ interface LogEntry {
 }
 
 class Logger {
+  private isEdge = process.env.NEXT_RUNTIME === 'edge';
   private isProduction = process.env.NODE_ENV === 'production';
   private isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
 
-  private pinoLogger = this.isProduction
-    ? pino(
-        {
-          timestamp: false,
-          messageKey: 'message',
-          formatters: {
-            level: (label: string) => ({ level: label }),
+  private pinoLogger =
+    this.isProduction && !this.isEdge
+      ? pino(
+          {
+            timestamp: false,
+            messageKey: 'message',
+            formatters: {
+              level: (label: string) => ({ level: label }),
+            },
+            base: undefined,
           },
-          base: undefined,
-        },
-        pino.destination({ sync: false, minLength: 4096 })
-      )
-    : null;
+          pino.destination({ sync: false, minLength: 4096 })
+        )
+      : null;
 
   /**
    * 로그 레벨에 따라 출력 여부 결정
