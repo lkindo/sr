@@ -1,5 +1,4 @@
-
-import { afterEach,beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PushService } from '@/services/push.service';
 
@@ -15,7 +14,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     notificationPreference: {
       findMany: vi.fn(),
-    }
+    },
   },
 }));
 
@@ -51,7 +50,7 @@ describe('PushService Concurrency Benchmark', () => {
 
     // Mock subscriptions
     const allSubscriptions: any[] = [];
-    userIds.forEach(userId => {
+    userIds.forEach((userId) => {
       for (let i = 0; i < SUBS_PER_USER; i++) {
         allSubscriptions.push({
           userId,
@@ -70,7 +69,7 @@ describe('PushService Concurrency Benchmark', () => {
 
     // Mock sendNotification with delay
     mockSendNotification.mockImplementation(async () => {
-      await new Promise(resolve => setTimeout(resolve, LATENCY_MS));
+      await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
       return { statusCode: 201 };
     });
 
