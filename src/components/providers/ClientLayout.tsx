@@ -1,13 +1,19 @@
 'use client';
 
 import { ReactNode, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
 import { PWARegistration } from '@/components/providers/PWARegistration';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
 import { Toaster } from '@/components/ui';
+
+// Devtools를 동적으로 임포트하여 초기 청크 크기를 줄이고 로딩 안정성을 높임
+const ReactQueryDevtools = dynamic(
+  () => import('@tanstack/react-query-devtools').then((mod) => mod.ReactQueryDevtools),
+  { ssr: false }
+);
 
 interface ClientLayoutProps {
   children: ReactNode;
@@ -41,7 +47,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
           <PWARegistration />
         </RealtimeProvider>
       </SessionProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
+      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );
 }

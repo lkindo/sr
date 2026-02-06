@@ -224,7 +224,7 @@ export const RateLimitPresets = {
    * 기본: 1분당 20회
    * 환경 변수: RATE_LIMIT_MIDDLEWARE_WINDOW_MS, RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS
    */
-  MIDDLEWARE: getEnvRateLimitConfig('MIDDLEWARE', 60 * 1000, 20),
+  MIDDLEWARE: getEnvRateLimitConfig('MIDDLEWARE', 60 * 1000, 100),
 };
 
 /**

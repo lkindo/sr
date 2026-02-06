@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation'; // useSearchParams 제거
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Plus, Search } from 'lucide-react';
 
@@ -25,7 +25,7 @@ interface PaginationData {
 
 export default function UsersClient() {
   const router = useRouter();
-  // useSearchParams를 사용하지 않고 window.location을 직접 사용 (새로고침 에러 방지)
+  const searchParams = useSearchParams();
   // useSession 호출은 유지하되 미사용 리턴값 제거
   useSession();
   const { toast } = useToast();
@@ -36,19 +36,49 @@ export default function UsersClient() {
   const [loading, setLoading] = useState(true);
   // error 상태 제거 (사용되지 않음)
 
-  // 초기 상태값 설정 (URL 파라미터는 useEffect에서 로드)
+  // URL 파라미터에서 초기 상태값 읽기
+  const initialPage = Number(searchParams.get('page')) || 1;
+  const initialQ = searchParams.get('q') || '';
+  const initialIsActive = searchParams.get('isActive') || 'true';
+
   const [pagination, setPagination] = useState<PaginationData>({
-    currentPage: 1,
+    currentPage: initialPage,
     pageSize: 10,
     totalItems: 0,
     totalPages: 1,
   });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('true');
+  const [searchQuery, setSearchQuery] = useState(initialQ);
+  const [statusFilter, setStatusFilter] = useState<string>(initialIsActive);
   const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
-  // URL 파라미터 초기화 여부
-  const [isInitialized, setIsInitialized] = useState(false);
+  // URL 파라미터가 변경될 때 상태 동기화
+  useEffect(() => {
+    const page = Number(searchParams.get('page')) || 1;
+    const q = searchParams.get('q') || '';
+    const isActive = searchParams.get('isActive') || 'true';
+
+    setPagination((prev) => ({ ...prev, currentPage: page }));
+    setSearchQuery(q);
+    setStatusFilter(isActive);
+  }, [searchParams]);
+
+  // URL 업데이트 함수
+  const updateUrl = useCallback(
+    (page: number, search: string, status: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (page > 1) params.set('page', page.toString());
+      else params.delete('page');
+
+      if (search) params.set('q', search);
+      else params.delete('q');
+
+      if (status !== 'true') params.set('isActive', status);
+      else params.delete('isActive');
+
+      router.push(`?${params.toString()}`, { scroll: false });
+    },
+    [router, searchParams]
+  );
 
   // Dialog states
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
@@ -57,39 +87,7 @@ export default function UsersClient() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
-  // 컴포넌트 마운트 시 URL 파라미터 읽기
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const page = Number(params.get('page')) || 1;
-      const q = params.get('q') || '';
-      // isActive 파라미터가 없으면 기본값 'true' 유지
-      const isActive = params.get('isActive');
-
-      setPagination((prev) => ({ ...prev, currentPage: page }));
-      setSearchQuery(q);
-      if (isActive) setStatusFilter(isActive);
-
-      setIsInitialized(true);
-    }
-  }, []);
-
-  // URL 업데이트 함수
-  const updateUrl = useCallback(
-    (page: number, search: string, status: string) => {
-      const params = new URLSearchParams();
-      if (page > 1) params.set('page', page.toString());
-      if (search) params.set('q', search);
-      if (status !== 'true') params.set('isActive', status); // 기본값이 아니면 URL에 추가
-
-      router.push(`?${params.toString()}`, { scroll: false });
-    },
-    [router]
-  );
-
   const fetchUsers = useCallback(async () => {
-    if (!isInitialized) return; // 초기화 전에는 실행하지 않음
-
     try {
       setLoading(true);
       const params = new URLSearchParams({
@@ -99,8 +97,20 @@ export default function UsersClient() {
         isActive: statusFilter,
       });
 
-      const response = await fetch(`/api/users?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch users');
+      const url = `/api/users?${params}`;
+      console.log(`[DEBUG] Fetching users: ${url}`);
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        let errorData = '';
+        try {
+          errorData = await response.text();
+        } catch (e) {
+          errorData = 'Failed to read error body';
+        }
+        console.error(`[DEBUG] Fetch users failed. Status: ${response.status}`, errorData);
+        throw new Error(`Failed to fetch users: ${response.status}`);
+      }
 
       const result = await response.json();
 
@@ -117,7 +127,7 @@ export default function UsersClient() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.pageSize, searchQuery, statusFilter, isInitialized]);
+  }, [pagination.currentPage, pagination.pageSize, searchQuery, statusFilter]);
 
   // 메타데이터(고객사, 역할) 로딩
   const fetchMetadata = useCallback(async () => {
@@ -243,15 +253,6 @@ export default function UsersClient() {
     setIsDeleteDialogOpen(false);
     setUserToDelete(null);
   };
-
-  if (!isInitialized) {
-    return (
-      <div className="h-96 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="sr-card-template bg-white">
