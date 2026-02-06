@@ -1,10 +1,14 @@
 'use server';
 
-import { authenticateAndAuthorize, validateWithSchema } from '@/lib/action-helpers';
+import {
+  authenticateAndAuthorize,
+  getAuthenticatedSession,
+  validateWithSchema,
+} from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
 import { logger } from '@/lib/logger';
-import { PERMISSIONS } from '@/lib/permission-helpers';
+import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { ok, Result } from '@/lib/result';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
@@ -115,7 +119,18 @@ export async function deleteClientAction(id: string) {
 
 export async function getClientAction(id: string) {
   try {
-    // 인증 확인은 필요에 따라 처리 가능
+    const session = await getAuthenticatedSession();
+
+    // 권한 확인: 관리자 권한(CLIENT:READ)이 있거나, 본인의 고객사 ID여야 함
+    const hasReadPermission = hasPermissionFlag(session.user, PERMISSIONS.CLIENT.READ);
+    const isOwnClient = session.user.clientIds?.includes(id);
+
+    if (!hasReadPermission && !isOwnClient) {
+      return {
+        success: false,
+        error: '권한이 없습니다.',
+      };
+    }
 
     // ClientService 인스턴스 생성
     const clientService = new ClientService();
