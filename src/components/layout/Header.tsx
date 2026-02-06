@@ -21,7 +21,7 @@ import {
 import { NAVIGATION_CONFIG } from '@/config/navigation';
 import { cn } from '@/lib/utils';
 
-const UserNav = dynamic(() => import('./UserNav').then((mod) => mod.UserNav), {
+const UserNav = dynamic(() => import('./UserNav').then((mod) => ({ default: mod.UserNav })), {
   ssr: false,
   loading: () => <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />,
 });

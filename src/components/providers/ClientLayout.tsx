@@ -11,7 +11,8 @@ import { Toaster } from '@/components/ui';
 
 // Devtools를 동적으로 임포트하여 초기 청크 크기를 줄이고 로딩 안정성을 높임
 const ReactQueryDevtools = dynamic(
-  () => import('@tanstack/react-query-devtools').then((mod) => mod.ReactQueryDevtools),
+  () =>
+    import('@tanstack/react-query-devtools').then((mod) => ({ default: mod.ReactQueryDevtools })),
   { ssr: false }
 );
 
