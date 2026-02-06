@@ -15,3 +15,9 @@
 **Vulnerability:** `getSRHandlersForSelection` was a public server action used for populating dropdowns but lacked any authentication or authorization checks, allowing unauthenticated enumeration of internal user details (names, emails).
 **Learning:** Helper actions used for UI components (like dropdowns) are often overlooked during security reviews compared to "CRUD" actions. They are still public endpoints and can leak sensitive metadata or user lists.
 **Prevention:** Always apply `authenticateAndAuthorize` or strict permission checks to ALL server actions, including those used only for fetching option lists.
+
+## 2026-03-04 - Unprotected 'Getter' Server Actions
+
+**Vulnerability:** `getClientAction` was exposed as a server action without any authentication or authorization checks, allowing potential IDOR attacks to retrieve sensitive client business data.
+**Learning:** Getter methods in server action files are easy to overlook if they aren't actively used or if they mirror service methods 1:1. Every exported function in a `'use server'` file is a public API endpoint.
+**Prevention:** consistently apply `getAuthenticatedSession()` and permission/ownership checks (e.g., `clientIds.includes(id)`) at the very beginning of every server action.
