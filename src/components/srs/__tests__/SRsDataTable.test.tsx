@@ -64,7 +64,7 @@ describe('SRsDataTable Search Component', () => {
 
     vi.mocked(useRouter).mockReturnValue(mockRouter as any);
     vi.mocked(usePathname).mockReturnValue('/srs');
-    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams);
+    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams as any);
 
     vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as any);
 
@@ -121,7 +121,7 @@ describe('SRsDataTable Search Component', () => {
     // Simulate active search param
     const params = new URLSearchParams();
     params.set('search', 'existing');
-    vi.mocked(useSearchParams).mockReturnValue(params);
+    vi.mocked(useSearchParams).mockReturnValue(params as any);
 
     render(<SRsDataTable {...defaultProps} />);
 
@@ -141,7 +141,7 @@ describe('SRsDataTable Search Component', () => {
 
   it('does NOT update URL if search was local only', () => {
     // No search param initially
-    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams());
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as any);
 
     render(<SRsDataTable {...defaultProps} />);
 
