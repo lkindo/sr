@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -16,6 +16,7 @@ import {
   Search,
   TrendingUp,
   User,
+  X,
 } from 'lucide-react';
 
 import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
@@ -148,6 +149,7 @@ export function SRsDataTable({
   }, [filters]);
 
   const [searchQuery, setSearchQuery] = useState(filters.search);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const createQueryString = useCallback(
     (params: Record<string, string | number | null>) => {
@@ -180,6 +182,14 @@ export function SRsDataTable({
 
   const handleSearch = () => {
     handleFilterChange('search', searchQuery);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    if (filters.search) {
+      handleFilterChange('search', '');
+    }
+    searchInputRef.current?.focus();
   };
 
   const resetFilters = () => {
@@ -491,13 +501,24 @@ export function SRsDataTable({
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
+                ref={searchInputRef}
                 placeholder="SR 번호, 제목, 고객사, 요청자, 담당자로 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                className="pl-10 sr-input-template w-full"
+                className="pl-10 pr-8 sr-input-template w-full"
                 aria-label="검색어 입력"
               />
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full p-0.5"
+                  aria-label="검색어 초기화"
+                  type="button"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
             <Button onClick={handleSearch} className="sr-btn-template-primary shrink-0 h-10">
               <Search className="h-4 w-4 mr-2" />

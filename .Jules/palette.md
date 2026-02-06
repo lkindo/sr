@@ -19,3 +19,8 @@
 
 **Learning:** Generic "No data" messages are frustrating when filters are applied. A context-aware empty state ("No search results") combined with a "Reset Filters" action significantly improves recovery from empty search results.
 **Action:** Always check if filters are active before rendering an empty state in data tables or lists.
+
+## 2025-05-23 - Search Input Clear Action
+
+**Learning:** Search inputs without a clear action force users to manually delete text, which is tedious. Adding a dedicated "Clear" button that resets focus to the input significantly improves the search experience.
+**Action:** Always include a clear button in search inputs, and ensure it manages focus correctly (returns focus to input).
