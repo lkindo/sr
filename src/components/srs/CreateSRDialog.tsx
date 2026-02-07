@@ -24,6 +24,9 @@ import { Textarea } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 
+const MIN_TITLE_LENGTH = 5;
+const MIN_DESCRIPTION_LENGTH = 10;
+
 interface Client {
   id: string;
   code: string;
@@ -191,19 +194,19 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (title.length < 5) {
+    if (title.length < MIN_TITLE_LENGTH) {
       toast({
         title: '오류',
-        description: '제목은 최소 5자 이상이어야 합니다.',
+        description: `제목은 최소 ${MIN_TITLE_LENGTH}자 이상이어야 합니다.`,
         variant: 'destructive',
       });
       return;
     }
 
-    if (description.length < 10) {
+    if (description.length < MIN_DESCRIPTION_LENGTH) {
       toast({
         title: '오류',
-        description: '설명은 최소 10자 이상이어야 합니다.',
+        description: `설명은 최소 ${MIN_DESCRIPTION_LENGTH}자 이상이어야 합니다.`,
         variant: 'destructive',
       });
       return;
@@ -304,10 +307,19 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="SR 제목을 입력하세요 (최소 5자)"
+                placeholder={`SR 제목을 입력하세요 (최소 ${MIN_TITLE_LENGTH}자)`}
                 required
                 disabled={loading}
               />
+              <div
+                className={`text-xs text-right mt-1 ${
+                  title.length > 0 && title.length < MIN_TITLE_LENGTH
+                    ? 'text-red-500 font-medium'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {title.length}자 (최소 {MIN_TITLE_LENGTH}자)
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -316,11 +328,20 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="SR 상세 내용을 입력하세요 (최소 10자)"
+                placeholder={`SR 상세 내용을 입력하세요 (최소 ${MIN_DESCRIPTION_LENGTH}자)`}
                 required
                 disabled={loading}
                 rows={5}
               />
+              <div
+                className={`text-xs text-right mt-1 ${
+                  description.length > 0 && description.length < MIN_DESCRIPTION_LENGTH
+                    ? 'text-red-500 font-medium'
+                    : 'text-muted-foreground'
+                }`}
+              >
+                {description.length}자 (최소 {MIN_DESCRIPTION_LENGTH}자)
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
