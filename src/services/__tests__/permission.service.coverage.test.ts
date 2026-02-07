@@ -8,6 +8,7 @@ import { PermissionService } from '@/services/permission.service';
 vi.mock('@/lib/prisma', () => ({
   default: {
     user: { findUnique: vi.fn(), findMany: vi.fn() },
+    role: { findMany: vi.fn() },
     permission: { findMany: vi.fn() },
   },
 }));
@@ -104,21 +105,26 @@ describe('PermissionService Coverage', () => {
 
   describe('getUsersWithPermissions', () => {
     it('returns users who have all required permissions', async () => {
+      // Mock Roles with Permissions
+      const mockRoles = [
+        {
+          id: 'r1',
+          name: 'ENGINEER',
+          permissions: [
+            { permission: { resource: 'SR', action: 'CREATE' } },
+            { permission: { resource: 'SR', action: 'READ' } },
+          ],
+        },
+      ];
+      vi.mocked(prisma.role.findMany).mockResolvedValue(mockRoles as any);
+
+      // Mock Users with Role IDs
       const mockUsers = [
         {
           id: 'u1',
           name: 'U1',
           email: 'e1',
-          roles: [
-            {
-              role: {
-                permissions: [
-                  { permission: { resource: 'SR', action: 'CREATE' } },
-                  { permission: { resource: 'SR', action: 'READ' } },
-                ],
-              },
-            },
-          ],
+          roles: [{ roleId: 'r1' }],
         },
         {
           id: 'u2',
@@ -135,11 +141,13 @@ describe('PermissionService Coverage', () => {
     });
 
     it('returns users if empty requirement', async () => {
+      vi.mocked(prisma.role.findMany).mockResolvedValue([]);
       const mockUsers = [{ id: 'u1', roles: [] }];
       vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
       const result = await permissionService.getUsersWithPermissions([]);
       expect(result).toHaveLength(1);
     });
+
   });
 
   describe('checkPermission', () => {
