@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
@@ -39,15 +38,47 @@ export class ClientService {
       include: {
         users: {
           include: {
-            user: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
+                emailVerified: true,
+                roles: {
+                  include: {
+                    role: true,
+                  },
+                },
+              },
+            },
           },
         },
         srs: true,
         serviceCategories: true,
         clientHandlers: {
           include: {
-            user: true,
-            backupHandler: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                isActive: true,
+              },
+            },
+            backupHandler: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                isActive: true,
+              },
+            },
           },
         },
       },
