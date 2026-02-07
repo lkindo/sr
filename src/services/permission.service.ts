@@ -170,33 +170,53 @@ export class PermissionService {
   }
 
   async getUsersWithPermissions(requiredPermissions: string[]) {
+    // 1. Fetch all roles and their permissions (small dataset)
+    const roles = await prisma.role.findMany({
+      include: {
+        permissions: {
+          include: {
+            permission: true,
+          },
+        },
+      },
+    });
+
+    // Map Role ID to Permission Set
+    const rolePermissionsMap = new Map<string, Set<string>>();
+
+    roles.forEach((role) => {
+      const perms = new Set<string>();
+      role.permissions.forEach((rp) => {
+        perms.add(`${rp.permission.resource}:${rp.permission.action}`);
+      });
+      rolePermissionsMap.set(role.id, perms);
+    });
+
+    // 2. Fetch users with just their role IDs (optimized query)
     const users = await prisma.user.findMany({
       where: { isActive: true },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        email: true,
         roles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
+          select: {
+            roleId: true,
           },
         },
       },
     });
 
     const srHandlers = users.filter((user) => {
+      const userRoleIds = user.roles.map((ur) => ur.roleId);
+
+      // Aggregate permissions
       const userPermissions = new Set<string>();
-      user.roles.forEach((userRole) => {
-        userRole.role.permissions.forEach((rolePermission) => {
-          userPermissions.add(
-            `${rolePermission.permission.resource}:${rolePermission.permission.action}`
-          );
-        });
+      userRoleIds.forEach((roleId) => {
+        const perms = rolePermissionsMap.get(roleId);
+        if (perms) {
+          perms.forEach((p) => userPermissions.add(p));
+        }
       });
 
       return requiredPermissions.every((permission) => userPermissions.has(permission));
