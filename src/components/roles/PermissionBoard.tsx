@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Search, Shield } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Shield, X } from 'lucide-react';
 
 import { getAllPermissionsAction } from '@/actions/permission.actions';
 import { updateRolePermissionsAction } from '@/actions/role.actions';
@@ -52,6 +52,7 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // 권한 목록 불러오기
@@ -149,6 +150,11 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
     setSelectedIds(next);
   };
 
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    inputRef.current?.focus();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
@@ -164,11 +170,22 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
           <div className="relative w-72">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
+              ref={inputRef}
               placeholder="리소스 또는 권한 검색..."
-              className="pl-8 h-9 bg-white"
+              className="pl-8 pr-8 h-9 bg-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <button
+                onClick={handleClearSearch}
+                className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full p-0.5"
+                aria-label="검색어 초기화"
+                type="button"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
           <Badge variant="secondary" className="h-7 px-3">
             {selectedIds.size} / {allPermissions.length} 선택됨
