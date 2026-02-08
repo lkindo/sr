@@ -21,3 +21,9 @@
 **Vulnerability:** `getClientAction` was exposed as a server action without any authentication or authorization checks, allowing potential IDOR attacks to retrieve sensitive client business data.
 **Learning:** Getter methods in server action files are easy to overlook if they aren't actively used or if they mirror service methods 1:1. Every exported function in a `'use server'` file is a public API endpoint.
 **Prevention:** consistently apply `getAuthenticatedSession()` and permission/ownership checks (e.g., `clientIds.includes(id)`) at the very beginning of every server action.
+
+## 2026-03-11 - Insufficient Scope on Generic Permissions
+
+**Vulnerability:** `SR:READ` permission was assumed to be sufficient for global read access, leading to an IDOR vulnerability where external users (CLIENT_USER/ADMIN) could view SRs of other clients.
+**Learning:** Generic permission flags (like `READ`, `UPDATE`) often imply "can do action" but not "on which resource". For multi-tenant systems, these must be combined with ownership checks (e.g., `clientId` matching) unless the user has an explicit internal/admin role.
+**Prevention:** In policy functions, distinguish between internal roles (who may have global access via permission flags) and external users (who must pass strict ownership/tenant checks IN ADDITION to permission flags).

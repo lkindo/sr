@@ -10,6 +10,12 @@ import { ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { AuthenticatedUser } from '@/types/session';
 
+const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
+
+function isInternalUser(user: AuthenticatedUser): boolean {
+  return user.roles.some((role) => INTERNAL_ROLES.includes(role));
+}
+
 // ============================================================================
 // SR 권한 함수
 // ============================================================================
@@ -20,23 +26,54 @@ export function canCreateSR(user: AuthenticatedUser): boolean {
 
 export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
   const isAdmin = user.roles.includes('ADMIN');
-  const canViewAll = hasPermissionFlag(user, PERMISSIONS.SR.READ);
+  if (isAdmin) return true;
+
+  const hasReadPermission = hasPermissionFlag(user, PERMISSIONS.SR.READ);
+
+  // 내부 사용자(운영팀)는 SR:READ 권한이 있으면 모든 SR 조회 가능
+  if (isInternalUser(user) && hasReadPermission) {
+    return true;
+  }
+
+  // 외부 사용자(고객사)는 소속된 고객사의 SR만 조회 가능
   const belongsToClient = user.clientIds?.includes(sr.clientId) ?? false;
+
+  if (hasReadPermission && belongsToClient) {
+    return true;
+  }
+
+  // 요청자 본인인 경우 (권한이 없더라도 본인이 생성한 것은 볼 수 있는지? 보통은 READ 권한 필요하지만 legacy logic 유지)
   const isRequester =
     sr.requesterId === user.id &&
     hasPermissionFlag(user, PERMISSIONS.SR.UPDATE_SELF) &&
     belongsToClient;
 
-  return isAdmin || canViewAll || isRequester;
+  return isRequester;
 }
 
 export function canUpdateSR(user: AuthenticatedUser, sr: SR): boolean {
   const isAdmin = user.roles.includes('ADMIN');
-  const hasUpdate = hasPermissionFlag(user, PERMISSIONS.SR.UPDATE);
-  const isRequester =
-    sr.requesterId === user.id && hasPermissionFlag(user, PERMISSIONS.SR.UPDATE_SELF);
+  if (isAdmin) return true;
 
-  return Boolean(isAdmin || hasUpdate || isRequester);
+  const hasUpdate = hasPermissionFlag(user, PERMISSIONS.SR.UPDATE);
+
+  // 내부 사용자(운영팀)는 SR:UPDATE 권한이 있으면 모든 SR 수정 가능
+  if (isInternalUser(user) && hasUpdate) {
+    return true;
+  }
+
+  // 외부 사용자(고객사)는 소속된 고객사의 SR만 수정 가능
+  const belongsToClient = user.clientIds?.includes(sr.clientId) ?? false;
+  if (hasUpdate && belongsToClient) {
+    return true;
+  }
+
+  const isRequester =
+    sr.requesterId === user.id &&
+    hasPermissionFlag(user, PERMISSIONS.SR.UPDATE_SELF) &&
+    belongsToClient;
+
+  return isRequester;
 }
 
 export function canDeleteSR(user: AuthenticatedUser): boolean {

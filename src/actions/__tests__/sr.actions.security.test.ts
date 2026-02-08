@@ -177,4 +177,65 @@ describe('SR Server Actions Security', () => {
       }
     });
   });
+
+  describe('Tenant Isolation Security', () => {
+    it('should prevent access to SR of another client even if user has SR:READ permission', async () => {
+      // 1. Setup a user who is a CLIENT_USER (or CLIENT_ADMIN)
+      // They have SR:READ permission.
+      // But they belong to client-2.
+      const attackerUser = {
+        id: 'attacker-1',
+        name: 'Attacker',
+        roles: ['CLIENT_USER'],
+        permissions: ['SR:READ'], // This is the key. CLIENT_USER has this.
+        clientIds: ['client-2'],
+      };
+
+      const targetSR = {
+        id: 'sr-1',
+        clientId: 'client-1',
+        requesterId: 'victim-1',
+        title: 'Secret SR',
+        status: 'REQUESTED',
+      };
+
+      vi.mocked(auth).mockResolvedValue({ user: attackerUser, expires: '2099-01-01' } as any);
+      mockSRService.getSRById.mockResolvedValue(targetSR);
+
+      const result = await getSRAction('sr-1');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toMatch(/권한이 없습니다/);
+      }
+    });
+
+    it('should allow access to internal users (MANAGER) with SR:READ permission regardless of client', async () => {
+      const managerUser = {
+        id: 'manager-1',
+        name: 'Manager',
+        roles: ['MANAGER'],
+        permissions: ['SR:READ'],
+        clientIds: [], // Managers might not have clientIds
+      };
+
+      const targetSR = {
+        id: 'sr-1',
+        clientId: 'client-1',
+        requesterId: 'victim-1',
+        title: 'Secret SR',
+        status: 'REQUESTED',
+      };
+
+      vi.mocked(auth).mockResolvedValue({ user: managerUser, expires: '2099-01-01' } as any);
+      mockSRService.getSRById.mockResolvedValue(targetSR);
+
+      const result = await getSRAction('sr-1');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toEqual(targetSR);
+      }
+    });
+  });
 });
