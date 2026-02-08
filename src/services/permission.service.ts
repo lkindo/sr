@@ -1,4 +1,4 @@
-import { Permission, Role, User } from '@prisma/client';
+import { Permission, Role, User, Prisma } from '@prisma/client';
 
 import prisma from '@/lib/prisma';
 
@@ -181,6 +181,10 @@ export class PermissionService {
       },
     });
 
+    // Identify ADMIN role (grants all permissions implicitly)
+    const adminRole = roles.find((r) => r.name === 'ADMIN');
+    const adminRoleId = adminRole?.id;
+
     // Map Role ID to Permission Set
     const rolePermissionsMap = new Map<string, Set<string>>();
 
@@ -192,40 +196,51 @@ export class PermissionService {
       rolePermissionsMap.set(role.id, perms);
     });
 
-    // 2. Fetch users with just their role IDs (optimized query)
+    // 2. Build optimized query filter
+    // Instead of fetching all users and filtering in memory, we construct a where clause
+    // that requires the user to have at least one role for EACH required permission.
+    const permissionFilters: Prisma.UserWhereInput[] = requiredPermissions.map((permission) => {
+      // Find all role IDs that have this permission
+      const allowedRoleIds: string[] = [];
+
+      // Add roles that explicitly have the permission
+      rolePermissionsMap.forEach((perms, roleId) => {
+        if (perms.has(permission)) {
+          allowedRoleIds.push(roleId);
+        }
+      });
+
+      // Add ADMIN role if it exists (it implicitly has all permissions)
+      if (adminRoleId && !allowedRoleIds.includes(adminRoleId)) {
+        allowedRoleIds.push(adminRoleId);
+      }
+
+      // Construct filter: User must have at least one of these roles
+      return {
+        roles: {
+          some: {
+            roleId: {
+              in: allowedRoleIds,
+            },
+          },
+        },
+      };
+    });
+
+    // 3. Fetch filtered users directly from DB
     const users = await prisma.user.findMany({
-      where: { isActive: true },
+      where: {
+        isActive: true,
+        // Only add AND condition if there are permissions required
+        ...(permissionFilters.length > 0 ? { AND: permissionFilters } : {}),
+      },
       select: {
         id: true,
         name: true,
         email: true,
-        roles: {
-          select: {
-            roleId: true,
-          },
-        },
       },
     });
 
-    const srHandlers = users.filter((user) => {
-      const userRoleIds = user.roles.map((ur) => ur.roleId);
-
-      // Aggregate permissions
-      const userPermissions = new Set<string>();
-      userRoleIds.forEach((roleId) => {
-        const perms = rolePermissionsMap.get(roleId);
-        if (perms) {
-          perms.forEach((p) => userPermissions.add(p));
-        }
-      });
-
-      return requiredPermissions.every((permission) => userPermissions.has(permission));
-    });
-
-    return srHandlers.map((user) => ({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-    }));
+    return users;
   }
 }

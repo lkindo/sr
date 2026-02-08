@@ -126,18 +126,22 @@ describe('PermissionService Coverage', () => {
           email: 'e1',
           roles: [{ roleId: 'r1' }],
         },
-        {
-          id: 'u2',
-          name: 'U2',
-          email: 'e2',
-          roles: [],
-        },
+        // u2 is filtered out by the DB query in the optimized implementation
       ];
       vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
 
       const result = await permissionService.getUsersWithPermissions(['SR:CREATE', 'SR:READ']);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('u1');
+
+      // Verify that the query was constructed correctly (optional, but good for coverage)
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.any(Array),
+          }),
+        })
+      );
     });
 
     it('returns users if empty requirement', async () => {
