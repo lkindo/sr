@@ -27,3 +27,9 @@
 **Vulnerability:** `SR:READ` permission was assumed to be sufficient for global read access, leading to an IDOR vulnerability where external users (CLIENT_USER/ADMIN) could view SRs of other clients.
 **Learning:** Generic permission flags (like `READ`, `UPDATE`) often imply "can do action" but not "on which resource". For multi-tenant systems, these must be combined with ownership checks (e.g., `clientId` matching) unless the user has an explicit internal/admin role.
 **Prevention:** In policy functions, distinguish between internal roles (who may have global access via permission flags) and external users (who must pass strict ownership/tenant checks IN ADDITION to permission flags).
+
+## 2026-03-20 - Hardcoded Secrets in Example/Docker Configs
+
+**Vulnerability:** Production credentials (Gmail password, VAPID private key, NextAuth secrets) were committed to `.env.example` and `.env.docker`.
+**Learning:** Example files and Docker configurations are often treated as "non-production" and thus less scrutinized, but they are part of the codebase and can leak sensitive credentials if developers use real values for testing.
+**Prevention:** Use placeholders (e.g., `your_secret_here`) in `.env.example`. For local dev/docker, use clearly marked weak secrets or mock services. Never commit real credentials, even if they are for "testing" environments, if they are tied to external services.

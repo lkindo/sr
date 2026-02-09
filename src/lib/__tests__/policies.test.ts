@@ -82,13 +82,19 @@ describe('Policy Functions', () => {
 
     it('canUpdateSR: admin/global update/self update logic', () => {
       expect(policies.canUpdateSR(adminUser, sr)).toBe(true);
-      const userUpdate = { ...userNoPerms, id: 'u-upd', permissions: [PERMISSIONS.SR.UPDATE] };
+      const userUpdate = {
+        ...userNoPerms,
+        id: 'u-upd',
+        roles: ['ENGINEER'],
+        permissions: [PERMISSIONS.SR.UPDATE],
+      };
       expect(policies.canUpdateSR(userUpdate, sr)).toBe(true);
 
       const requester = {
         ...userNoPerms,
         id: 'user-regular',
         permissions: [PERMISSIONS.SR.UPDATE_SELF],
+        clientIds: ['c1'],
       };
       expect(policies.canUpdateSR(requester, sr)).toBe(true);
       expect(policies.canUpdateSR(userNoPerms, sr)).toBe(false);
@@ -96,8 +102,13 @@ describe('Policy Functions', () => {
 
     it('canUpdateSR: granular branch tests', () => {
       const uId = 'u-upd';
-      const srU = { id: 's1', requesterId: uId } as any;
-      const user = { id: uId, roles: ['USER'], permissions: [PERMISSIONS.SR.UPDATE_SELF] } as any;
+      const srU = { id: 's1', requesterId: uId, clientId: 'c1' } as any;
+      const user = {
+        id: uId,
+        roles: ['USER'],
+        permissions: [PERMISSIONS.SR.UPDATE_SELF],
+        clientIds: ['c1'],
+      } as any;
 
       // self update works
       expect(policies.canUpdateSR(user, srU)).toBe(true);
