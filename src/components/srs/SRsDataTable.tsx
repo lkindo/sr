@@ -26,6 +26,13 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { usePermissions } from '@/hooks/use-permissions';
 import { getDueDateStatus } from '@/lib/date-utils';
 import { SRService } from '@/services/sr.service';
@@ -165,6 +172,10 @@ export function SRsDataTable({
 
   const handleItemsPerPageChange = (value: string) => {
     router.push(`${pathname}?${createQueryString({ itemsPerPage: value, page: 1 })}`);
+  };
+
+  const handlePageChange = (page: number) => {
+    router.push(`${pathname}?${createQueryString({ page })}`);
   };
 
   const handleSearch = () => {
@@ -789,7 +800,7 @@ export function SRsDataTable({
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template">
+              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template" aria-label="페이지당 항목 수">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -802,6 +813,46 @@ export function SRsDataTable({
             </Select>
             <span className="text-sm text-[hsl(var(--sr-gray-medium))]">페이지당 항목 수</span>
           </div>
+
+          {paginationInfo.totalPages > 1 && (
+            <Pagination className="w-auto mx-0">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (paginationInfo.hasPrevPage) handlePageChange(paginationInfo.currentPage - 1);
+                    }}
+                    aria-disabled={!paginationInfo.hasPrevPage}
+                    className={
+                      !paginationInfo.hasPrevPage
+                        ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                        : 'cursor-pointer'
+                    }
+                  />
+                </PaginationItem>
+                <div className="flex items-center gap-1 text-sm font-medium mx-2">
+                  {paginationInfo.currentPage} / {paginationInfo.totalPages}
+                </div>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (paginationInfo.hasNextPage) handlePageChange(paginationInfo.currentPage + 1);
+                    }}
+                    aria-disabled={!paginationInfo.hasNextPage}
+                    className={
+                      !paginationInfo.hasNextPage
+                        ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                        : 'cursor-pointer'
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       </div>
 
