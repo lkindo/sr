@@ -1,4 +1,4 @@
-import { Permission, Role, User, Prisma } from '@prisma/client';
+import { Permission, Prisma,Role, User } from '@prisma/client';
 
 import prisma from '@/lib/prisma';
 
@@ -90,40 +90,41 @@ export class PermissionService {
    * ```
    */
   async checkPermission(userId: string, requiredPermission: string): Promise<boolean> {
-    const user = await this.getFullUser(userId);
-    if (!user || !user.isActive) {
-      return false;
-    }
-
-    const userRoles = user.roles.map((ur) => ur.role);
-
-    if (userRoles.some((role) => role.name === 'ADMIN')) {
-      return true;
-    }
-
     const [requiredResource, requiredAction] = requiredPermission.split(':');
     if (!requiredResource || !requiredAction) {
       return false; // Invalid permission format
     }
 
-    // 대소문자 구분 없이 비교 (권한은 대문자로 저장되어 있음)
     const normalizedRequiredResource = requiredResource.toUpperCase();
     const normalizedRequiredAction = requiredAction.toUpperCase();
 
-    for (const role of userRoles) {
-      for (const rolePermission of role.permissions) {
-        const { resource, action } = rolePermission.permission;
-        // 대소문자 구분 없이 비교
-        if (
-          resource.toUpperCase() === normalizedRequiredResource &&
-          action.toUpperCase() === normalizedRequiredAction
-        ) {
-          return true;
-        }
-      }
-    }
+    // Optimize: Count UserRoles directly in DB instead of fetching full user object
+    const count = await prisma.userRole.count({
+      where: {
+        userId,
+        // Ensure user is active
+        user: { isActive: true },
+        role: {
+          OR: [
+            // ADMIN role has all permissions
+            { name: 'ADMIN' },
+            // Check for specific permission
+            {
+              permissions: {
+                some: {
+                  permission: {
+                    resource: normalizedRequiredResource,
+                    action: normalizedRequiredAction,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
 
-    return false;
+    return count > 0;
   }
 
   async checkRole(userId: string, roleName: string): Promise<boolean> {
