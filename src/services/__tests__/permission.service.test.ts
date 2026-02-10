@@ -13,6 +13,9 @@ vi.mock('@/lib/prisma', () => ({
     permission: {
       findMany: vi.fn(),
     },
+    userRole: {
+      count: vi.fn(),
+    },
   },
 }));
 
@@ -42,48 +45,25 @@ describe('PermissionService', () => {
 
   describe('checkPermission', () => {
     it('ADMIN 역할은 모든 권한을 가져야 함', async () => {
-      const mockUser = {
-        id: 'user1',
-        isActive: true,
-        roles: [
-          {
-            role: {
-              name: 'ADMIN',
-              permissions: [],
-            },
-          },
-        ],
-      };
-
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(1); // count > 0
 
       const result = await permissionService.checkPermission('user1', 'any:permission');
 
       expect(result).toBe(true);
+      expect(prisma.userRole.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 'user1',
+            role: expect.objectContaining({
+              OR: expect.arrayContaining([{ name: 'ADMIN' }]),
+            }),
+          }),
+        })
+      );
     });
 
     it('권한이 있으면 true를 반환해야 함', async () => {
-      const mockUser = {
-        id: 'user1',
-        isActive: true,
-        roles: [
-          {
-            role: {
-              name: 'USER',
-              permissions: [
-                {
-                  permission: {
-                    resource: 'SR',
-                    action: 'CREATE',
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      };
-
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(1);
 
       const result = await permissionService.checkPermission('user1', 'SR:CREATE');
 
@@ -91,27 +71,7 @@ describe('PermissionService', () => {
     });
 
     it('권한이 없으면 false를 반환해야 함', async () => {
-      const mockUser = {
-        id: 'user1',
-        isActive: true,
-        roles: [
-          {
-            role: {
-              name: 'USER',
-              permissions: [
-                {
-                  permission: {
-                    resource: 'SR',
-                    action: 'READ',
-                  },
-                },
-              ],
-            },
-          },
-        ],
-      };
-
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(0);
 
       const result = await permissionService.checkPermission('user1', 'SR:CREATE');
 

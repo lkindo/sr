@@ -10,6 +10,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     role: { findMany: vi.fn() },
     permission: { findMany: vi.fn() },
+    userRole: { count: vi.fn() },
   },
 }));
 
@@ -83,20 +84,12 @@ describe('PermissionService Coverage', () => {
 
   describe('requirePermission', () => {
     it('resolves if user has permission', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        isActive: true,
-        roles: [{ role: { name: 'ADMIN', permissions: [] } }], // ADMIN has all perms
-      } as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(1);
       await expect(permissionService.requirePermission('u1', 'SR:CREATE')).resolves.not.toThrow();
     });
 
     it('throws ForbiddenError if user lacks permission', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        isActive: true,
-        roles: [],
-      } as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       await expect(permissionService.requirePermission('u1', 'SR:CREATE')).rejects.toThrow(
         ForbiddenError
       );
@@ -155,13 +148,12 @@ describe('PermissionService Coverage', () => {
   });
 
   describe('checkPermission', () => {
-    it('returns false if user not active', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ isActive: false } as any);
+    it('returns false if user not active (simulated by count 0)', async () => {
+      vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       expect(await permissionService.checkPermission('u1', 'A:B')).toBe(false);
     });
 
     it('returns false if invalid permission format', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ isActive: true, roles: [] } as any);
       expect(await permissionService.checkPermission('u1', 'INVALID')).toBe(false);
     });
   });

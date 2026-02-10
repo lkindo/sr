@@ -1,9 +1,11 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SRsDataTable } from '../SRsDataTable';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { fireEvent,render, screen } from '@testing-library/react';
+import { beforeEach,describe, expect, it, vi } from 'vitest';
+
 import { usePermissions } from '@/hooks/use-permissions';
+
+import { SRsDataTable } from '../SRsDataTable';
 
 // Mock dependencies
 vi.mock('next/navigation', () => ({
