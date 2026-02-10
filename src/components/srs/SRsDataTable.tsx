@@ -370,6 +370,8 @@ export function SRsDataTable({
                     variant="outline"
                     size="sm"
                     onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    aria-expanded={showAdvancedFilters}
+                    aria-controls="advanced-filters-section"
                     className="h-8 text-xs shrink-0 rounded-full md:rounded-md border-primary/20 text-primary hover:bg-primary/5"
                   >
                     <Filter className="mr-1.5 h-3.5 w-3.5" />
@@ -380,7 +382,12 @@ export function SRsDataTable({
 
               {/* Advanced Filters (Collapsible) */}
               {showAdvancedFilters && (
-                <div className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))]">
+                <div
+                  id="advanced-filters-section"
+                  role="region"
+                  aria-label="상세 필터 옵션"
+                  className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))]"
+                >
                   {/* First Row: Status, Priority, Client, Assignee */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div>
@@ -537,40 +544,97 @@ export function SRsDataTable({
           <Table className="sr-table-template">
             <TableHeader>
               <TableRow>
-                <TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'srNumber'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('srNumber')}>
                     SR 번호{getSortIcon('srNumber')}
                   </Button>
                 </TableHead>
-                <TableHead className="min-w-[150px]">
+                <TableHead
+                  className="min-w-[150px]"
+                  aria-sort={
+                    sortField === 'title'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('title')}>
                     제목{getSortIcon('title')}
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'client'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('client')}>
                     고객사{getSortIcon('client')}
                   </Button>
                 </TableHead>
                 <TableHead>요청자</TableHead>
                 <TableHead>담당자</TableHead>
-                <TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'priority'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('priority')}>
                     우선순위{getSortIcon('priority')}
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'status'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('status')}>
                     상태{getSortIcon('status')}
                   </Button>
                 </TableHead>
-                <TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'dueDate'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('dueDate')}>
                     마감일{getSortIcon('dueDate')}
                   </Button>
                 </TableHead>
                 <TableHead>댓글/첨부</TableHead>
-                <TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'createdAt'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
                   <Button variant="ghost" onClick={() => handleSort('createdAt')}>
                     생성일{getSortIcon('createdAt')}
                   </Button>
