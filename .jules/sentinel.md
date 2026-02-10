@@ -33,3 +33,9 @@
 **Vulnerability:** Production credentials (Gmail password, VAPID private key, NextAuth secrets) were committed to `.env.example` and `.env.docker`.
 **Learning:** Example files and Docker configurations are often treated as "non-production" and thus less scrutinized, but they are part of the codebase and can leak sensitive credentials if developers use real values for testing.
 **Prevention:** Use placeholders (e.g., `your_secret_here`) in `.env.example`. For local dev/docker, use clearly marked weak secrets or mock services. Never commit real credentials, even if they are for "testing" environments, if they are tied to external services.
+
+## 2026-03-24 - Unprotected Role Getter Actions
+
+**Vulnerability:** `getRoleAction` and `getAllRolesAction` were exposed as public server actions without any authentication or authorization checks.
+**Learning:** Even if server actions are not currently used by the client, they are public endpoints. Developers might assume "getter" actions for internal resources like roles are safe or "internal only", but they can be exploited to enumerate system structure.
+**Prevention:** Audit all exported functions in files with `'use server'`. Apply `authenticateAndAuthorize` by default to everything, even read-only operations.

@@ -5,6 +5,7 @@ import type { Permission, Role } from '@prisma/client';
 import { authenticateAndAuthorize, validateWithSchema } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
 import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
 import { RoleService } from '@/services/role.service';
@@ -72,6 +73,8 @@ export async function deleteRoleAction(id: string): Promise<Result<void>> {
 
 export async function getRoleAction(id: string): Promise<Result<Role>> {
   try {
+    await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
+
     const roleService = new RoleService();
     const role = await roleService.getRoleById(id);
     if (!role) {
@@ -96,6 +99,8 @@ export async function getAllRolesAction(): Promise<
   >
 > {
   try {
+    await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
+
     const roleService = new RoleService();
     const roles = await roleService.getAllRoles();
     return ok(roles);
