@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui';
 import { Checkbox } from '@/components/ui';
-import { Input } from '@/components/ui';
+import { Input, PasswordInput } from '@/components/ui';
 import { Label } from '@/components/ui';
 
 export default function LoginPage() {
@@ -100,9 +100,8 @@ export default function LoginPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">비밀번호</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
