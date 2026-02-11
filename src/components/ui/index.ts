@@ -15,6 +15,7 @@ export * from './form';
 export * from './input';
 export * from './label';
 export * from './pagination';
+export * from './password-input';
 export * from './popover';
 export * from './progress';
 export * from './radio-group';

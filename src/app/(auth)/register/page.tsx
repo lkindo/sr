@@ -26,7 +26,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui';
-import { Input } from '@/components/ui';
+import { Input, PasswordInput } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
@@ -242,10 +242,9 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">비밀번호</Label>
-                <Input
+                <PasswordInput
                   id="password"
                   name="password"
-                  type="password"
                   placeholder="최소 8자 이상"
                   required
                   disabled={isLoading}
@@ -368,10 +367,9 @@ export default function RegisterPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">비밀번호 확인</Label>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
                   placeholder="비밀번호를 다시 입력하세요"
                   required
                   disabled={isLoading}
