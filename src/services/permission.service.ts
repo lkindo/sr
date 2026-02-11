@@ -1,16 +1,6 @@
-import { Permission, Prisma,Role, User } from '@prisma/client';
+import { Permission, Prisma, Role } from '@prisma/client';
 
 import prisma from '@/lib/prisma';
-
-type UserWithPermissions = User & {
-  roles: {
-    role: Role & {
-      permissions: {
-        permission: Permission;
-      }[];
-    };
-  }[];
-};
 
 /**
  * 권한 서비스
@@ -24,34 +14,6 @@ type UserWithPermissions = User & {
  */
 export class PermissionService {
   constructor() {}
-
-  /**
-   * 사용자 전체 정보 조회 (역할, 권한 포함)
-   *
-   * @param userId - 사용자 ID
-   * @returns 사용자 정보 (역할, 권한 포함) 또는 null
-   * @private
-   */
-  private async getFullUser(userId: string): Promise<UserWithPermissions | null> {
-    return prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        roles: {
-          include: {
-            role: {
-              include: {
-                permissions: {
-                  include: {
-                    permission: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    }) as Promise<UserWithPermissions | null>;
-  }
 
   /**
    * 전체 권한 목록 조회
@@ -128,18 +90,35 @@ export class PermissionService {
   }
 
   async checkRole(userId: string, roleName: string): Promise<boolean> {
-    const user = await this.getFullUser(userId);
-    if (!user) return false;
-
-    return user.roles.some((ur) => ur.role.name === roleName);
+    // Optimize: Check role existence directly in DB using count
+    const count = await prisma.userRole.count({
+      where: {
+        userId,
+        role: { name: roleName },
+      },
+    });
+    return count > 0;
   }
 
   async getUserPermissions(userId: string): Promise<Permission[]> {
-    const user = await this.getFullUser(userId);
-    if (!user) return [];
+    // Optimize: Fetch only permissions through UserRole, avoiding full User fetch
+    const userRoles = await prisma.userRole.findMany({
+      where: { userId },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+      },
+    });
 
     const permissionsSet = new Map<string, Permission>();
-    user.roles.forEach((ur) => {
+    userRoles.forEach((ur) => {
       ur.role.permissions.forEach((rp) => {
         permissionsSet.set(rp.permission.id, rp.permission);
       });
@@ -149,10 +128,15 @@ export class PermissionService {
   }
 
   async getUserRoles(userId: string): Promise<Role[]> {
-    const user = await this.getFullUser(userId);
-    if (!user) return [];
+    // Optimize: Fetch only roles through UserRole, avoiding full User fetch
+    const userRoles = await prisma.userRole.findMany({
+      where: { userId },
+      include: {
+        role: true,
+      },
+    });
 
-    return user.roles.map((ur) => ur.role);
+    return userRoles.map((ur) => ur.role);
   }
 
   async requirePermission(userId: string, action: string): Promise<void> {

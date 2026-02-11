@@ -10,7 +10,7 @@ vi.mock('@/lib/prisma', () => ({
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     role: { findMany: vi.fn() },
     permission: { findMany: vi.fn() },
-    userRole: { count: vi.fn() },
+    userRole: { count: vi.fn(), findMany: vi.fn() },
   },
 }));
 
@@ -24,41 +24,32 @@ describe('PermissionService Coverage', () => {
 
   describe('checkRole', () => {
     it('returns true if user has role', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        roles: [{ role: { name: 'ADMIN', permissions: [] } }],
-      } as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(1);
       expect(await permissionService.checkRole('u1', 'ADMIN')).toBe(true);
+      expect(prisma.userRole.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId: 'u1',
+            role: { name: 'ADMIN' },
+          },
+        })
+      );
     });
 
     it('returns false if user does not have role', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        roles: [{ role: { name: 'USER', permissions: [] } }],
-      } as any);
-      expect(await permissionService.checkRole('u1', 'ADMIN')).toBe(false);
-    });
-
-    it('returns false if user not found', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       expect(await permissionService.checkRole('u1', 'ADMIN')).toBe(false);
     });
   });
 
   describe('requireRole', () => {
     it('resolves if user has role', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        roles: [{ role: { name: 'ADMIN', permissions: [] } }],
-      } as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(1);
       await expect(permissionService.requireRole('u1', 'ADMIN')).resolves.not.toThrow();
     });
 
     it('throws Error if user does not have role', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        roles: [],
-      } as any);
+      vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       await expect(permissionService.requireRole('u1', 'ADMIN')).rejects.toThrow(
         '필요한 역할이 없습니다'
       );
@@ -67,18 +58,66 @@ describe('PermissionService Coverage', () => {
 
   describe('getUserRoles', () => {
     it('returns user roles', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({
-        id: 'u1',
-        roles: [{ role: { id: 'r1', name: 'ADMIN', permissions: [] } }],
-      } as any);
+      vi.mocked(prisma.userRole.findMany).mockResolvedValue([
+        { role: { id: 'r1', name: 'ADMIN' } },
+      ] as any);
       const roles = await permissionService.getUserRoles('u1');
       expect(roles).toHaveLength(1);
       expect(roles[0].name).toBe('ADMIN');
+      expect(prisma.userRole.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'u1' },
+          include: { role: true },
+        })
+      );
     });
 
-    it('returns empty array if user not found', async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    it('returns empty array if user has no roles', async () => {
+      vi.mocked(prisma.userRole.findMany).mockResolvedValue([]);
       expect(await permissionService.getUserRoles('u1')).toHaveLength(0);
+    });
+  });
+
+  describe('getUserPermissions', () => {
+    it('returns flattened permissions from user roles', async () => {
+      vi.mocked(prisma.userRole.findMany).mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { id: 'p1', resource: 'SR', action: 'CREATE' } },
+              { permission: { id: 'p2', resource: 'SR', action: 'READ' } },
+            ],
+          },
+        },
+      ] as any);
+
+      const permissions = await permissionService.getUserPermissions('u1');
+      expect(permissions).toHaveLength(2);
+      expect(permissions.some((p) => p.id === 'p1')).toBe(true);
+      expect(permissions.some((p) => p.id === 'p2')).toBe(true);
+    });
+
+    it('deduplicates permissions', async () => {
+      vi.mocked(prisma.userRole.findMany).mockResolvedValue([
+        {
+          role: {
+            permissions: [
+              { permission: { id: 'p1', resource: 'SR', action: 'READ' } },
+            ],
+          },
+        },
+        {
+          role: {
+            permissions: [
+              { permission: { id: 'p1', resource: 'SR', action: 'READ' } }, // Duplicate
+            ],
+          },
+        },
+      ] as any);
+
+      const permissions = await permissionService.getUserPermissions('u1');
+      expect(permissions).toHaveLength(1);
+      expect(permissions[0].id).toBe('p1');
     });
   });
 
