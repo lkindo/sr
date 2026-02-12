@@ -288,51 +288,35 @@ export const GET = withAuthAndRateLimit(
         GROUP BY DATE(created_at)
       `;
 
-      // 성능 지표 계산
-      const completedSRsWithDates = await prisma.sR.findMany({
-        where: {
-          ...baseWhere,
-          status: { in: ['COMPLETED', 'CONFIRMED'] },
-          intakeAt: { not: null },
-          completedAt: { not: null },
-          createdAt: {
-            gte: thirtyDaysAgo,
-          },
-        },
-        select: {
-          intakeAt: true,
-          completedAt: true,
-          dueDate: true,
-          serviceCategory: {
-            select: {
-              slaHours: true,
-            },
-          },
-        },
-      });
-
-      // 평균 처리 시간 계산 (접수부터 완료까지)
-      let avgProcessingHours = 0;
-      if (completedSRsWithDates.length > 0) {
-        const totalHours = completedSRsWithDates.reduce((sum, sr) => {
-          if (sr.intakeAt && sr.completedAt) {
-            const hours = (sr.completedAt.getTime() - sr.intakeAt.getTime()) / (1000 * 60 * 60);
-            return sum + hours;
+      // 성능 지표 계산 - DB Aggregation
+      const performanceStatsRaw = await prisma.$queryRaw<
+        Array<{ avgProcessingHours: number | null; slaComplianceRate: number | null }>
+      >`
+        SELECT
+          AVG(EXTRACT(EPOCH FROM (completed_at - intake_at)) / 3600)::float as "avgProcessingHours",
+          COUNT(*) FILTER (WHERE completed_at <= due_date)::float * 100.0 / NULLIF(COUNT(*), 0) as "slaComplianceRate"
+        FROM "srs"
+        WHERE
+          status IN ('COMPLETED', 'CONFIRMED')
+          AND intake_at IS NOT NULL
+          AND completed_at IS NOT NULL
+          AND created_at >= ${thirtyDaysAgo}
+          ${
+            !isAdminManagerEngineer
+              ? userClientIds.length > 0
+                ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
+                : Prisma.sql`AND 1=0`
+              : Prisma.empty
           }
-          return sum;
-        }, 0);
-        avgProcessingHours = totalHours / completedSRsWithDates.length;
-      }
+      `;
 
-      // SLA 준수율 계산
-      let slaComplianceRate = 0;
-      if (completedSRsWithDates.length > 0) {
-        const compliantCount = completedSRsWithDates.filter((sr) => {
-          if (!sr.dueDate || !sr.completedAt) return false;
-          return sr.completedAt <= sr.dueDate;
-        }).length;
-        slaComplianceRate = (compliantCount / completedSRsWithDates.length) * 100;
-      }
+      const performanceStats = performanceStatsRaw[0] || {
+        avgProcessingHours: null,
+        slaComplianceRate: null,
+      };
+
+      const avgProcessingHours = performanceStats.avgProcessingHours ?? 0;
+      const slaComplianceRate = performanceStats.slaComplianceRate ?? 0;
 
       // 접수 대기 시간 통계
       const waitingTimes = waitingSRs.map((sr) => {

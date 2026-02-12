@@ -50,7 +50,10 @@ describe('Dashboard Stats API Performance', () => {
       ] as any) // Counts query
       .mockResolvedValueOnce([
         { date: '2023-10-01', count: 5 }
-      ] as any); // Trend query
+      ] as any) // Trend query
+      .mockResolvedValueOnce([
+        { avgProcessingHours: 2.5, slaComplianceRate: 95.5 },
+      ] as any); // Stats query
 
     const req = new NextRequest('http://localhost/api/dashboard/stats');
     const response = await GET(req, { params: Promise.resolve({}) });
@@ -60,7 +63,7 @@ describe('Dashboard Stats API Performance', () => {
 
     // Verify optimization
     expect(prisma.sR.count).not.toHaveBeenCalled();
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2); // One for counts, one for trend
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3); // Counts, Trend, Stats
 
     // Verify values
     expect(json.summary.total).toBe(10);
