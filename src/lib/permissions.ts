@@ -69,8 +69,22 @@ export async function hasAllPermissions(
   userId: string,
   permissions: Array<{ resource: string; action: string }>
 ): Promise<boolean> {
+  if (permissions.length === 0) {
+    return true;
+  }
+
+  // Optimization: Check for ADMIN role first (O(1) if cached or single query)
+  if (await hasRole(userId, 'ADMIN')) {
+    return true;
+  }
+
+  // Optimization: Fetch all permissions once instead of checking sequentially
+  // This reduces N database queries to 1 query for getting all permissions
+  const userPermissions = await getUserPermissions(userId);
+  const permissionSet = new Set(userPermissions.map((p) => `${p.resource}:${p.action}`));
+
   for (const perm of permissions) {
-    if (!(await hasPermission(userId, perm.resource, perm.action))) {
+    if (!permissionSet.has(`${perm.resource}:${perm.action}`)) {
       return false;
     }
   }

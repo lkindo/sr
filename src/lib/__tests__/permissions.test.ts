@@ -86,7 +86,11 @@ describe('permissions utility', () => {
 
   describe('hasAllPermissions', () => {
     it('should return true if all permissions are granted', async () => {
-      mocks.checkPermission.mockResolvedValue(true);
+      mocks.checkRole.mockResolvedValue(false);
+      mocks.getUserPermissions.mockResolvedValue([
+        { resource: 'SR', action: 'CREATE', description: null },
+        { resource: 'SR', action: 'READ', description: null },
+      ]);
 
       const result = await hasAllPermissions('user-1', [
         { resource: 'SR', action: 'CREATE' },
@@ -95,8 +99,21 @@ describe('permissions utility', () => {
       expect(result).toBe(true);
     });
 
+    it('should return true if user is ADMIN', async () => {
+      mocks.checkRole.mockResolvedValue(true);
+
+      const result = await hasAllPermissions('user-1', [
+        { resource: 'SR', action: 'CREATE' },
+        { resource: 'SR', action: 'DELETE' },
+      ]);
+      expect(result).toBe(true);
+    });
+
     it('should return false if any permission is denied', async () => {
-      mocks.checkPermission.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+      mocks.checkRole.mockResolvedValue(false);
+      mocks.getUserPermissions.mockResolvedValue([
+        { resource: 'SR', action: 'CREATE', description: null },
+      ]);
 
       const result = await hasAllPermissions('user-1', [
         { resource: 'SR', action: 'CREATE' },
