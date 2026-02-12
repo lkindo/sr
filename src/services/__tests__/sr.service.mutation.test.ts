@@ -21,6 +21,7 @@ vi.mock('@/lib/prisma', () => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     sRActivity: { create: vi.fn(), deleteMany: vi.fn().mockResolvedValue({}) },
+    sRSequence: { upsert: vi.fn().mockResolvedValue({ date: '20230101', seq: 1 }) },
     client: { findUnique: vi.fn().mockResolvedValue(null) },
     user: { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null) },
     serviceCategory: { findUnique: vi.fn().mockResolvedValue(null) },

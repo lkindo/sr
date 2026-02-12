@@ -33,6 +33,36 @@ export class SRService {
   constructor() {}
 
   /**
+   * Synchronizes the SR sequence with the actual max SR number in the DB.
+   * This is a self-healing mechanism for when the sequence table is lagging
+   * (e.g., first deployment mid-day).
+   */
+  private async _syncSRSequence(): Promise<void> {
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+
+    // Get the actual max SR number
+    const lastSR = await prisma.sR.findFirst({
+      where: { srNumber: { startsWith: `SR-${dateStr}-` } },
+      orderBy: { srNumber: 'desc' },
+      select: { srNumber: true },
+    });
+
+    if (lastSR) {
+      const lastSequence = parseInt(lastSR.srNumber.split('-')[2]);
+      if (!isNaN(lastSequence)) {
+        // Update sequence to match the actual max
+        // Next upsert will increment to lastSequence + 1
+        await prisma.sRSequence.upsert({
+          where: { date: dateStr },
+          update: { seq: lastSequence },
+          create: { date: dateStr, seq: lastSequence },
+        });
+      }
+    }
+  }
+
+  /**
    * SR을 생성합니다.
    */
   async createSR(data: SrCreateData, sessionUser: AuthenticatedUser): Promise<SRCreateResult> {
@@ -51,88 +81,58 @@ export class SRService {
       );
     }
 
-    // SR 번호 생성 (트랜잭션으로 동시성 문제 해결)
+    // SR 생성 (트랜잭션으로 SR 번호 생성 및 SR 생성을 원자적으로 수행)
+    // Retry loop added for self-healing sequence initialization
     let sr: SR | null = null;
     let attempts = 0;
-    const maxAttempts = 10;
+    const maxAttempts = 3;
 
     while (!sr && attempts < maxAttempts) {
       attempts++;
-
       try {
-        // 트랜잭션 내에서 SR 번호 생성 및 SR 생성을 원자적으로 수행
-        sr = await prisma.$transaction(
-          async (tx) => {
-            const today = new Date();
-            const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+        sr = await prisma.$transaction(async (tx) => {
+          const today = new Date();
+          const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
 
-            // 가장 마지막 SR 번호 조회 (count는 삭제된 SR이 있을 경우 중복 번호를 생성할 수 있음)
-            const lastSR = await tx.sR.findFirst({
-              where: {
-                srNumber: {
-                  startsWith: `SR-${dateStr}-`,
-                },
-              },
-              orderBy: {
-                srNumber: 'desc',
-              },
-              select: {
-                srNumber: true,
-              },
-            });
+          // 시퀀스 테이블을 사용하여 원자적으로 번호 생성 (upsert 사용)
+          const sequence = await tx.sRSequence.upsert({
+            where: { date: dateStr },
+            update: { seq: { increment: 1 } },
+            create: { date: dateStr, seq: 1 },
+          });
 
-            let sequenceNumber = 1;
-            if (lastSR) {
-              const lastSequence = parseInt(lastSR.srNumber.split('-')[2]);
-              if (!isNaN(lastSequence)) {
-                sequenceNumber = lastSequence + 1;
-              }
-            }
+          const srNumber = `SR-${dateStr}-${String(sequence.seq).padStart(4, '0')}`;
 
-            const srNumber = `SR-${dateStr}-${String(sequenceNumber).padStart(4, '0')}`;
-
-            // SR 생성 (unique constraint 체크는 DB 레벨에서 발생)
-            return await tx.sR.create({
-              data: {
-                srNumber,
-                title: validated.title,
-                description: validated.description,
-                clientId: validated.clientId,
-                serviceCategoryId: validated.serviceCategoryId,
-                requesterId: sessionUser.id,
-                requestedPriority: validated.requestedPriority,
-                priority: validated.requestedPriority,
-                requestedCompletionDate: validated.requestedCompletionDate
-                  ? new Date(validated.requestedCompletionDate)
-                  : undefined,
-                status: 'REQUESTED',
-              },
-            });
-          },
-          {
-            isolationLevel: 'Serializable', // 최고 수준의 격리 레벨
-            maxWait: 5000, // 5초 대기
-            timeout: 10000, // 10초 타임아웃
-          }
-        );
+          // SR 생성
+          return await tx.sR.create({
+            data: {
+              srNumber,
+              title: validated.title,
+              description: validated.description,
+              clientId: validated.clientId,
+              serviceCategoryId: validated.serviceCategoryId,
+              requesterId: sessionUser.id,
+              requestedPriority: validated.requestedPriority,
+              priority: validated.requestedPriority,
+              requestedCompletionDate: validated.requestedCompletionDate
+                ? new Date(validated.requestedCompletionDate)
+                : undefined,
+              status: 'REQUESTED',
+            },
+          });
+        });
       } catch (error) {
+        // If unique constraint on srNumber, it means sequence is lagging (e.g. fresh deploy mid-day)
+        // We need to sync the sequence.
         const isUnique =
           (error instanceof Error && error.message.includes('Unique constraint')) ||
           (error instanceof PrismaClientKnownRequestError && error.code === 'P2002');
 
         if (isUnique && attempts < maxAttempts) {
-          // Unique constraint 위반 시 exponential backoff로 재시도
-          await new Promise((res) => setTimeout(res, 50 * Math.pow(2, attempts - 1)));
+          // Sync sequence
+          await this._syncSRSequence();
           continue;
         }
-
-        if (attempts >= maxAttempts) {
-          throw new ServiceError(
-            'SR 번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요.',
-            'SR_NUMBER_GENERATION_FAILED'
-          );
-        }
-
         throw error;
       }
     }
