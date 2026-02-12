@@ -133,7 +133,16 @@ export class UserService {
         skip,
         take,
         orderBy: orderBy || { createdAt: 'desc' },
-        include: {
+        // Optimize: Use select to fetch only necessary fields and avoid fetching password hash
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          emailVerified: true,
+          image: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
           roles: { include: { role: true } },
           clients: { include: { client: { select: { id: true, name: true, code: true } } } },
         },
@@ -142,7 +151,7 @@ export class UserService {
     ]);
 
     const usersWithType = users.map((user) => ({
-      ...excludePassword(user),
+      ...user,
       userType: user.clients.length > 0 ? ('CLIENT' as const) : ('ENGINEER' as const),
     }));
 
