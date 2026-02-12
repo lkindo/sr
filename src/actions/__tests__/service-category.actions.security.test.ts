@@ -23,7 +23,7 @@ vi.mock('@/services/service-category.service', () => {
   ServiceCategoryService.prototype.getForSelection = vi.fn();
   return {
     ServiceCategoryService,
-    serviceCategoryService: new ServiceCategoryService()
+    serviceCategoryService: new ServiceCategoryService(),
   };
 });
 
@@ -31,6 +31,7 @@ vi.mock('@/lib/action-helpers');
 
 import { getAuthenticatedSession } from '@/lib/action-helpers';
 import { serviceCategoryService } from '@/services/service-category.service';
+
 import { getServiceCategoriesForSelection } from '../service-category.actions';
 
 describe('Service Category Actions Security', () => {

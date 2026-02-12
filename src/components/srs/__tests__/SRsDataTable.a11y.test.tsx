@@ -100,7 +100,10 @@ describe('SRsDataTable Accessibility', () => {
     fireEvent.click(filterButton!);
     expect(filterButton).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('region', { name: '상세 필터 옵션' })).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: '상세 필터 옵션' })).toHaveAttribute('id', 'advanced-filters-section');
+    expect(screen.getByRole('region', { name: '상세 필터 옵션' })).toHaveAttribute(
+      'id',
+      'advanced-filters-section'
+    );
 
     // Click to collapse
     fireEvent.click(filterButton!);

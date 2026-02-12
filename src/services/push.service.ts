@@ -205,8 +205,11 @@ export class PushService {
     const subscriptions = await this.getUserSubscriptions(userId);
     const results: { statusCode: number; body: string }[] = [];
 
-    for (const sub of subscriptions) {
-      const result = await this.sendToSubscription(webPush, sub, payload);
+    const resultsArray = await Promise.all(
+      subscriptions.map((sub) => this.sendToSubscription(webPush, sub, payload))
+    );
+
+    for (const result of resultsArray) {
       if (result) {
         results.push(result);
       }
