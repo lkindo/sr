@@ -41,12 +41,23 @@ describe('Dashboard Stats API', () => {
       // 3. By Client
       .mockResolvedValueOnce([{ clientId: 'c-1', _count: { id: 5 } }] as any);
 
-    // 4. Trend (By Date) - Raw Query
-    vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([
-      { date: new Date().toISOString().split('T')[0], count: BigInt(5) },
-    ] as any);
-
-    vi.mocked(prisma.sR.count).mockResolvedValue(8);
+    // 4. Counts Query + Trend (By Date) - Raw Query
+    vi.mocked(prisma.$queryRaw)
+      .mockResolvedValueOnce([
+        {
+          totalSRs: 8,
+          inProgressSRs: 8,
+          completedSRs: 8,
+          pendingSRs: 8,
+          requestedSRs: 8,
+          urgentSRs: 8,
+          myAssignedSRs: 0,
+          myAssignedInProgress: 0,
+        },
+      ] as any)
+      .mockResolvedValueOnce([
+        { date: new Date().toISOString().split('T')[0], count: BigInt(5) },
+      ] as any);
     vi.mocked(prisma.sR.findMany).mockResolvedValue([]); // For recent/waiting lists
     vi.mocked(prisma.client.findMany).mockResolvedValue([
       { id: 'c-1', name: 'Client 1', code: 'C1' },

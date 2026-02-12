@@ -81,33 +81,69 @@ export const GET = withAuthAndRateLimit(
         {} as Record<string, number>
       );
 
-      // Get total counts - parallelized for performance
-      const [
-        totalSRs,
-        inProgressSRs,
-        completedSRs,
-        pendingSRs,
-        requestedSRs,
-        urgentSRs,
-        myAssignedSRs,
-        myAssignedInProgress,
-      ] = await Promise.all([
-        prisma.sR.count({ where: baseWhere }),
-        prisma.sR.count({ where: { ...baseWhere, status: 'IN_PROGRESS' } }),
-        prisma.sR.count({ where: { ...baseWhere, status: { in: ['COMPLETED', 'CONFIRMED'] } } }),
-        prisma.sR.count({ where: { ...baseWhere, status: { in: ['REQUESTED', 'INTAKE'] } } }),
-        prisma.sR.count({ where: { ...baseWhere, status: 'REQUESTED' } }),
-        prisma.sR.count({ where: { ...baseWhere, priority: { in: ['CRITICAL', 'HIGH'] } } }),
-        // Engineer-specific counts (returns 0 if not engineer)
-        isEngineer
-          ? prisma.sR.count({ where: { ...baseWhere, assigneeId: userId } })
-          : Promise.resolve(0),
-        isEngineer
-          ? prisma.sR.count({
-              where: { ...baseWhere, assigneeId: userId, status: 'IN_PROGRESS' },
-            })
-          : Promise.resolve(0),
-      ]);
+      // Get total counts - optimized with single query using conditional aggregation
+      const countsResult = await prisma.$queryRaw<
+        Array<{
+          totalSRs: bigint;
+          inProgressSRs: bigint;
+          completedSRs: bigint;
+          pendingSRs: bigint;
+          requestedSRs: bigint;
+          urgentSRs: bigint;
+          myAssignedSRs: bigint;
+          myAssignedInProgress: bigint;
+        }>
+      >`
+        SELECT
+          COUNT(*)::int as "totalSRs",
+          COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int as "inProgressSRs",
+          COUNT(*) FILTER (WHERE status IN ('COMPLETED', 'CONFIRMED'))::int as "completedSRs",
+          COUNT(*) FILTER (WHERE status IN ('REQUESTED', 'INTAKE'))::int as "pendingSRs",
+          COUNT(*) FILTER (WHERE status = 'REQUESTED')::int as "requestedSRs",
+          COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int as "urgentSRs",
+          ${
+            isEngineer
+              ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId})::int as "myAssignedSRs",`
+              : Prisma.sql`0 as "myAssignedSRs",`
+          }
+          ${
+            isEngineer
+              ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId} AND status = 'IN_PROGRESS')::int as "myAssignedInProgress"`
+              : Prisma.sql`0 as "myAssignedInProgress"`
+          }
+        FROM "srs"
+        WHERE 1=1
+        ${
+          !isAdminManagerEngineer
+            ? userClientIds.length > 0
+              ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
+              : Prisma.sql`AND 1=0`
+            : Prisma.empty
+        }
+      `;
+
+      // Helper to safely convert BigInt or number to number
+      const toNum = (val: bigint | number | null | undefined) => Number(val ?? 0);
+
+      const counts = countsResult[0] || {
+        totalSRs: 0,
+        inProgressSRs: 0,
+        completedSRs: 0,
+        pendingSRs: 0,
+        requestedSRs: 0,
+        urgentSRs: 0,
+        myAssignedSRs: 0,
+        myAssignedInProgress: 0,
+      };
+
+      const totalSRs = toNum(counts.totalSRs);
+      const inProgressSRs = toNum(counts.inProgressSRs);
+      const completedSRs = toNum(counts.completedSRs);
+      const pendingSRs = toNum(counts.pendingSRs);
+      const requestedSRs = toNum(counts.requestedSRs);
+      const urgentSRs = toNum(counts.urgentSRs);
+      const myAssignedSRs = toNum(counts.myAssignedSRs);
+      const myAssignedInProgress = toNum(counts.myAssignedInProgress);
 
       // Get SR counts by client
       const srByClient = await prisma.sR.groupBy({
