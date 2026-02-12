@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { ensureCanCreateUser, ensureCanReadUser } from '@/lib/policies';
 import { UserService } from '@/services/user.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -10,7 +11,9 @@ import { usePagination } from '@/lib/pagination';
 
 // GET /api/users - 사용자 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { session }: AuthenticatedContext) => {
+    ensureCanReadUser(session.user);
+
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request);
 
@@ -33,7 +36,9 @@ export const GET = withAuthAndRateLimit(
 
 // POST /api/users - 새 사용자 생성 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { session }: AuthenticatedContext) => {
+    ensureCanCreateUser(session.user);
+
     const body = await request.json();
 
     const userService = new UserService();
