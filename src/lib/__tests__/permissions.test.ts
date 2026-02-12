@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   checkRole: vi.fn(),
   getUserPermissions: vi.fn(),
   getUserRoles: vi.fn(),
+  checkAnyPermission: vi.fn(),
 }));
 
 vi.mock('@/services/permission.service', () => ({
@@ -63,22 +64,34 @@ describe('permissions utility', () => {
   });
 
   describe('hasAnyPermission', () => {
-    it('should return true if at least one permission is granted', async () => {
-      mocks.checkPermission.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    it('should return true if service returns true', async () => {
+      mocks.checkAnyPermission.mockResolvedValue(true);
 
       const result = await hasAnyPermission('user-1', [
         { resource: 'SR', action: 'DELETE' },
         { resource: 'SR', action: 'READ' },
       ]);
       expect(result).toBe(true);
+      expect(mocks.checkAnyPermission).toHaveBeenCalledWith('user-1', [
+        { resource: 'SR', action: 'DELETE' },
+        { resource: 'SR', action: 'READ' },
+      ]);
     });
 
-    it('should return false if no permissions are granted', async () => {
-      mocks.checkPermission.mockResolvedValue(false);
+    it('should return false if service returns false', async () => {
+      mocks.checkAnyPermission.mockResolvedValue(false);
 
       const result = await hasAnyPermission('user-1', [
         { resource: 'SR', action: 'DELETE' },
         { resource: 'CLIENT', action: 'DELETE' },
+      ]);
+      expect(result).toBe(false);
+    });
+
+    it('should return false if service throws error', async () => {
+      mocks.checkAnyPermission.mockRejectedValue(new Error('DB Error'));
+      const result = await hasAnyPermission('user-1', [
+        { resource: 'SR', action: 'DELETE' },
       ]);
       expect(result).toBe(false);
     });

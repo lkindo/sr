@@ -17,7 +17,7 @@ export async function hasPermission(
 ): Promise<boolean> {
   try {
     return await permissionService.checkPermission(userId, `${resource}:${action}`);
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }
@@ -51,12 +51,11 @@ export async function hasAnyPermission(
   userId: string,
   permissions: Array<{ resource: string; action: string }>
 ): Promise<boolean> {
-  for (const perm of permissions) {
-    if (await hasPermission(userId, perm.resource, perm.action)) {
-      return true;
-    }
+  try {
+    return await permissionService.checkAnyPermission(userId, permissions);
+  } catch (_error) {
+    return false;
   }
-  return false;
 }
 
 /**
@@ -86,7 +85,7 @@ export async function hasAllPermissions(
 export async function hasRole(userId: string, roleName: string): Promise<boolean> {
   try {
     return await permissionService.checkRole(userId, roleName);
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 }

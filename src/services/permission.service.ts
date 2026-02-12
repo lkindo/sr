@@ -89,6 +89,67 @@ export class PermissionService {
     return count > 0;
   }
 
+  /**
+   * 사용자가 여러 권한 중 하나라도 가지고 있는지 확인합니다. (최적화된 버전)
+   *
+   * @param userId - 사용자 ID
+   * @param permissions - 확인할 권한 목록
+   * @returns 하나라도 권한이 있으면 true
+   */
+  async checkAnyPermission(
+    userId: string,
+    permissions: Array<{ resource: string; action: string }>
+  ): Promise<boolean> {
+    if (!permissions || permissions.length === 0) {
+      return false;
+    }
+
+    // Optimize: Fetch all roles and permissions in one query
+    const userRoles = await prisma.userRole.findMany({
+      where: {
+        userId,
+        user: { isActive: true },
+      },
+      include: {
+        role: {
+          include: {
+            permissions: {
+              include: {
+                permission: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Check for ADMIN role (grants all permissions)
+    if (userRoles.some((ur) => ur.role.name === 'ADMIN')) {
+      return true;
+    }
+
+    // Build a Set of all user permissions "RESOURCE:ACTION"
+    const userPermissions = new Set<string>();
+    for (const ur of userRoles) {
+      for (const rp of ur.role.permissions) {
+        userPermissions.add(
+          `${rp.permission.resource.toUpperCase()}:${rp.permission.action.toUpperCase()}`
+        );
+      }
+    }
+
+    // Check if any requested permission exists in the user's permission set
+    for (const perm of permissions) {
+      if (!perm.resource || !perm.action) continue;
+      const key = `${perm.resource.toUpperCase()}:${perm.action.toUpperCase()}`;
+      if (userPermissions.has(key)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   async checkRole(userId: string, roleName: string): Promise<boolean> {
     // Optimize: Check role existence directly in DB using count
     const count = await prisma.userRole.count({
