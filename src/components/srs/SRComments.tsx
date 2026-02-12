@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, MessageSquare, Send } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
 import { Button } from '@/components/ui';
@@ -146,13 +146,18 @@ export function SRComments({ srId }: SRCommentsProps) {
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="댓글을 입력하세요..."
+              aria-label="댓글 작성"
               rows={3}
               disabled={submitting}
               className="resize-none w-full"
             />
             <div className="flex justify-end">
               <Button type="submit" disabled={submitting} size="sm">
-                <Send className="mr-2 h-4 w-4" />
+                {submitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
                 {submitting ? '추가 중...' : '댓글 추가'}
               </Button>
             </div>
@@ -167,12 +172,18 @@ export function SRComments({ srId }: SRCommentsProps) {
         </CardHeader>
         <CardContent>
           {allComments.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8">아직 댓글이 없습니다.</p>
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-4">
+                <MessageSquare className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium text-foreground">아직 댓글이 없습니다</h3>
+              <p className="text-sm text-muted-foreground mt-1">첫 번째 댓글을 남겨보세요.</p>
+            </div>
           ) : (
             <>
-              <div className="space-y-4">
+              <ul className="space-y-4" role="list">
                 {allComments.map((comment) => (
-                  <div key={comment.id} className="flex gap-4">
+                  <li key={comment.id} className="flex gap-4">
                     <Avatar>
                       <AvatarImage src={comment.user.image || ''} alt={comment.user.name} />
                       <AvatarFallback>{getInitials(comment.user.name)}</AvatarFallback>
@@ -186,9 +197,9 @@ export function SRComments({ srId }: SRCommentsProps) {
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
 
               {/* 무한 스크롤 트리거 */}
               {hasNextPage && (
