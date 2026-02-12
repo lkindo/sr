@@ -1,6 +1,9 @@
+import { createWriteStream } from 'fs';
+import { mkdir } from 'fs/promises';
 import { NextRequest, NextResponse } from 'next/server';
-import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
@@ -75,9 +78,9 @@ export const POST = withAuthAndRateLimit(
           const fileName = `${timestamp}_${index}_${safeFileName}`;
           const filePath = join(uploadDir, fileName);
 
-          // 파일 저장
-          const buffer = Buffer.from(await file.arrayBuffer());
-          await writeFile(filePath, buffer);
+          // 파일 저장 (스트림 사용으로 메모리 효율화)
+          const writableStream = createWriteStream(filePath);
+          await pipeline(Readable.fromWeb(file.stream() as any), writableStream);
 
           // DB 저장 데이터 준비
           const attachmentData = {
