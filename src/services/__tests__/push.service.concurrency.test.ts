@@ -88,4 +88,46 @@ describe('PushService Concurrency Benchmark', () => {
     console.log(`Expected Parallel: ~${LATENCY_MS}ms`);
     console.log(`---------------------------------------------------\n\n`);
   });
+
+  it('measures sendToUser execution time for multiple subscriptions', async () => {
+    const SUBSCRIPTION_COUNT = 10;
+    const LATENCY_MS = 50;
+
+    // Create multiple subscriptions for the user
+    const subscriptions = Array.from({ length: SUBSCRIPTION_COUNT }, (_, i) => ({
+      endpoint: `endpoint-${i}`,
+      p256dh: 'key',
+      auth: 'auth',
+      userId: 'user1',
+      id: `id-${i}`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userAgent: null,
+    }));
+
+    mockFindMany.mockResolvedValue(subscriptions);
+
+    // Mock sendNotification with delay
+    mockSendNotification.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, LATENCY_MS));
+      return { statusCode: 201 };
+    });
+
+    const start = Date.now();
+    await pushService.sendToUser('user1', { title: 'Test', body: 'Benchmark' });
+    const end = Date.now();
+    const duration = end - start;
+
+    console.log(`\n\n---------------------------------------------------`);
+    console.log(`Benchmark Results (sendToUser):`);
+    console.log(`Subs count: ${SUBSCRIPTION_COUNT}`);
+    console.log(`Latency per Req: ${LATENCY_MS}ms`);
+    console.log(`Total Duration: ${duration}ms`);
+    console.log(`Expected Sequential: ${SUBSCRIPTION_COUNT * LATENCY_MS}ms`);
+    console.log(`Expected Parallel: ~${LATENCY_MS}ms`);
+    console.log(`---------------------------------------------------\n\n`);
+
+    // Check for parallel execution
+    expect(duration).toBeLessThan(SUBSCRIPTION_COUNT * LATENCY_MS * 0.5);
+  });
 });

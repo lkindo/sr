@@ -39,9 +39,7 @@ describe('PermissionService Performance Optimization', () => {
         {
           id: 'client-role-id',
           name: 'CLIENT_USER',
-          permissions: [
-            { permission: { resource: 'SR', action: 'CREATE' } },
-          ],
+          permissions: [{ permission: { resource: 'SR', action: 'CREATE' } }],
         },
       ];
       vi.mocked(prisma.role.findMany).mockResolvedValue(mockRoles as any);
@@ -63,7 +61,11 @@ describe('PermissionService Performance Optimization', () => {
                 roles: {
                   some: {
                     roleId: {
-                      in: expect.arrayContaining(['admin-role-id', 'engineer-role-id', 'client-role-id']),
+                      in: expect.arrayContaining([
+                        'admin-role-id',
+                        'engineer-role-id',
+                        'client-role-id',
+                      ]),
                     },
                   },
                 },

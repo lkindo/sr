@@ -23,7 +23,7 @@ vi.mock('@/services/service-category.service', () => {
   ServiceCategoryService.prototype.getForSelection = vi.fn();
   return {
     ServiceCategoryService,
-    serviceCategoryService: new ServiceCategoryService()
+    serviceCategoryService: new ServiceCategoryService(),
   };
 });
 

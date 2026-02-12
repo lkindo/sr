@@ -132,7 +132,6 @@ jobs:
       - name: Run Mutation Tests (Changed Files Only)
         run: pnpm test:mutation:ci
 
-
   # 빌드 검증
   build:
     name: Build Verification

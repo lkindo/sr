@@ -101,9 +101,7 @@ describe('PermissionService Coverage', () => {
       vi.mocked(prisma.userRole.findMany).mockResolvedValue([
         {
           role: {
-            permissions: [
-              { permission: { id: 'p1', resource: 'SR', action: 'READ' } },
-            ],
+            permissions: [{ permission: { id: 'p1', resource: 'SR', action: 'READ' } }],
           },
         },
         {
@@ -183,7 +181,6 @@ describe('PermissionService Coverage', () => {
       const result = await permissionService.getUsersWithPermissions([]);
       expect(result).toHaveLength(1);
     });
-
   });
 
   describe('checkPermission', () => {

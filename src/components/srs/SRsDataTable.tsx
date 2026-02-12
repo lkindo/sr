@@ -864,7 +864,10 @@ export function SRsDataTable({
         <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger className="w-[80px] h-9 sr-dropdown-template" aria-label="페이지당 항목 수">
+              <SelectTrigger
+                className="w-[80px] h-9 sr-dropdown-template"
+                aria-label="페이지당 항목 수"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -886,7 +889,8 @@ export function SRsDataTable({
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      if (paginationInfo.hasPrevPage) handlePageChange(paginationInfo.currentPage - 1);
+                      if (paginationInfo.hasPrevPage)
+                        handlePageChange(paginationInfo.currentPage - 1);
                     }}
                     aria-disabled={!paginationInfo.hasPrevPage}
                     className={
@@ -904,7 +908,8 @@ export function SRsDataTable({
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      if (paginationInfo.hasNextPage) handlePageChange(paginationInfo.currentPage + 1);
+                      if (paginationInfo.hasNextPage)
+                        handlePageChange(paginationInfo.currentPage + 1);
                     }}
                     aria-disabled={!paginationInfo.hasNextPage}
                     className={

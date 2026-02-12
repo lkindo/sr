@@ -1,4 +1,4 @@
-import { beforeEach,describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getAuthenticatedSession } from '@/lib/action-helpers';
 import { PERMISSIONS } from '@/lib/permission-helpers';
