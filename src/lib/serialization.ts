@@ -4,13 +4,76 @@
  */
 
 /**
- * Custom JSON stringifier replacer function that handles Date objects
+ * Deeply serializes an object, converting Dates to ISO strings
+ * and matching JSON.stringify behavior for other types.
+ *
+ * @param value - The value to serialize
+ * @returns The serialized value
  */
-function dateReplacer(key: string, value: unknown): unknown {
+function deepSerialize(value: any): any {
+  // Handle primitives and null
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    // JSON.stringify converts NaN and Infinity to null
+    if (Number.isNaN(value) || !Number.isFinite(value)) {
+      return null;
+    }
+    return value;
+  }
+
+  if (typeof value !== 'object') {
+    // Primitives (string, boolean, symbol, bigint, etc.)
+    // Note: JSON.stringify ignores symbols, throws on bigint.
+    // We preserve them here if they are passed directly, but they might be handled differently in objects/arrays.
+    // For direct calls, we return as is.
+    return value;
+  }
+
+  // Handle Date
   if (value instanceof Date) {
     return value.toISOString();
   }
-  return value;
+
+  // Handle Array
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      // JSON.stringify converts undefined, function, symbol in arrays to null
+      if (
+        typeof item === 'undefined' ||
+        typeof item === 'function' ||
+        typeof item === 'symbol'
+      ) {
+        return null;
+      }
+      return deepSerialize(item);
+    });
+  }
+
+  // Handle objects with toJSON
+  if (typeof value.toJSON === 'function') {
+    return value.toJSON();
+  }
+
+  // Handle plain objects
+  const result: any = {};
+  for (const key in value) {
+    // Only iterate own enumerable properties
+    if (Object.prototype.hasOwnProperty.call(value, key)) {
+      const val = value[key];
+      // JSON.stringify skips undefined, function, symbol in objects
+      if (
+        typeof val !== 'undefined' &&
+        typeof val !== 'function' &&
+        typeof val !== 'symbol'
+      ) {
+        result[key] = deepSerialize(val);
+      }
+    }
+  }
+  return result;
 }
 
 /**
@@ -19,8 +82,8 @@ function dateReplacer(key: string, value: unknown): unknown {
  * @returns Serialized data with Date objects converted to ISO strings
  */
 export function serializeResponse<T>(data: T): T {
-  // Use JSON.parse(JSON.stringify()) with custom replacer to handle nested dates
-  return JSON.parse(JSON.stringify(data, dateReplacer));
+  // Optimized recursive traversal to replace JSON.parse(JSON.stringify())
+  return deepSerialize(data);
 }
 
 /**
