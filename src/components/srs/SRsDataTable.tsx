@@ -26,6 +26,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { CopyButton } from '@/components/ui/copy-button';
 import {
   Pagination,
   PaginationContent,
@@ -656,8 +657,20 @@ export function SRsDataTable({
                       className="cursor-pointer"
                       onClick={() => router.push(`/srs/${sr.id}`)}
                     >
-                      <TableCell className="font-medium text-primary hover:underline text-center">
-                        <Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1 group relative">
+                          <Link
+                            href={`/srs/${sr.id}`}
+                            className="font-medium text-primary hover:underline"
+                          >
+                            {sr.srNumber}
+                          </Link>
+                          <CopyButton
+                            value={sr.srNumber}
+                            className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity absolute -right-7"
+                            aria-label={`${sr.srNumber} 번호 복사`}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate" title={sr.title}>
                         {sr.title}

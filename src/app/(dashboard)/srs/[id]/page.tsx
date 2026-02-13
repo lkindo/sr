@@ -27,6 +27,7 @@ import { SRStatusTimeline } from '@/components/srs/SRStatusTimeline';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
+import { CopyButton } from '@/components/ui/copy-button';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useDeleteSR, useSRDetails } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
@@ -120,6 +121,10 @@ export default function SRDetailPage() {
                 <h2 className="text-lg md:text-3xl font-bold tracking-tight leading-none">
                   {sr.srNumber}
                 </h2>
+                <CopyButton
+                  value={sr.srNumber}
+                  className="text-muted-foreground hover:text-foreground"
+                />
                 <div className="flex gap-1.5 shrink-0">
                   <Badge
                     variant={statusColors[sr.status]}
