@@ -23,6 +23,9 @@ const { mockPrisma } = vi.hoisted(() => {
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
     },
+    sRSequence: {
+      upsert: vi.fn().mockResolvedValue({ date: '20231010', seq: 1 }),
+    },
     sRComment: {
       deleteMany: vi.fn().mockResolvedValue({}),
     },
@@ -540,59 +543,6 @@ describe('SRService', () => {
       });
     });
 
-    // New tests for retry logic
-    it('should retry SR creation on unique constraint violation', async () => {
-      vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({
-        id: 'c-1',
-        isActive: true,
-        name: 'Client',
-      } as any);
-
-      const mockTransaction = vi.mocked(prisma.$transaction);
-
-      // Setup failures then success
-      let attempts = 0;
-      mockTransaction.mockImplementation(async (callback) => {
-        attempts++;
-        if (attempts < 3) {
-          const { PrismaClientKnownRequestError } = await import('@prisma/client/runtime/library');
-          throw new PrismaClientKnownRequestError('Unique constraint failed', {
-            code: 'P2002',
-            clientVersion: '5.0.0',
-          });
-        }
-        return {
-          id: 'sr-1',
-          srNumber: 'SR-20231010-0001',
-          title: 'New SR',
-          requester: { name: 'Requester' },
-          serviceCategory: { categoryName: 'Category' },
-        };
-      });
-
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue({
-        id: 'sr-1',
-        srNumber: 'SR-20231010-0001',
-        title: 'New SR',
-        requester: { name: 'Requester', email: 'req@test.com' },
-        serviceCategory: { categoryName: 'Category' },
-      } as any);
-
-      const data = {
-        title: 'Retry Test',
-        description: 'Description for retry test',
-        clientId: 'c-1',
-        serviceCategoryId: 'cat-1',
-        requestedPriority: 'MEDIUM' as const,
-      };
-
-      const result = await srService.createSR(data, mockUser);
-
-      expect(attempts).toBe(3);
-      expect(mockTransaction).toHaveBeenCalledTimes(3);
-      expect(result.srNumber).toBe('SR-20231010-0001');
-    });
 
     // Tests for updateSR state transition and notifications
     describe('updateSR edge cases', () => {

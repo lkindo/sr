@@ -38,6 +38,9 @@ vi.mock('@/lib/prisma', () => ({
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
     },
+    sRSequence: {
+      upsert: vi.fn().mockResolvedValue({ date: '20231010', seq: 1 }),
+    },
     sRComment: {
       deleteMany: vi.fn().mockResolvedValue({}),
     },
@@ -107,14 +110,16 @@ describe('SRService - Expanded Coverage', () => {
   });
 
   describe('createSR - Sequence Logic', () => {
-    it('should handle sequential SR numbering correctly when lastSR is valid', async () => {
+    it('should handle sequential SR numbering correctly using SRSequence', async () => {
       vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
       vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as any);
 
       const txMock = {
         sR: {
-          findFirst: vi.fn().mockResolvedValue({ srNumber: 'SR-20231010-0005' }),
           create: vi.fn().mockResolvedValue({ id: 'sr-1', srNumber: 'SR-20231010-0006' }),
+        },
+        sRSequence: {
+          upsert: vi.fn().mockResolvedValue({ date: '20231010', seq: 6 }),
         },
         sRActivity: { create: vi.fn() },
       };
@@ -141,6 +146,10 @@ describe('SRService - Expanded Coverage', () => {
         mockUser as any
       );
 
+      // Verify sequence upsert was called
+      expect(txMock.sRSequence.upsert).toHaveBeenCalled();
+
+      // Verify SR creation used the sequence number
       expect(txMock.sR.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ srNumber: 'SR-20231010-0006' }),

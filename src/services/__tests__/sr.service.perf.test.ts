@@ -21,6 +21,9 @@ const { mockPrisma } = vi.hoisted(() => {
     sRActivity: {
       create: vi.fn(),
     },
+    sRSequence: {
+      upsert: vi.fn().mockResolvedValue({ date: '20231010', seq: 1 }),
+    },
     sRStatusHistory: {
       create: vi.fn(),
     },

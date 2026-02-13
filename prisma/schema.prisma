@@ -495,3 +495,14 @@ model NotificationPreference {
 
   @@map("notification_preferences")
 }
+
+// ============================================================================
+// SR 번호 생성을 위한 시퀀스
+// ============================================================================
+
+model SRSequence {
+  date String @id
+  seq  Int
+
+  @@map("sr_sequences")
+}
