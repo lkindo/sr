@@ -333,7 +333,7 @@ export class UserService {
     clientIds?: string[];
     roleIds?: string[];
   }): Promise<Omit<User, 'password'>> {
-    const hashedPassword = await hash(userData.password, 10);
+    const hashedPassword = await hash(userData.password, 12);
 
     // 클라이언트 연결 (clientIds 우선, 없으면 clientId 호환성 지원)
     const clientIds = userData.clientIds || (userData.clientId ? [userData.clientId] : []);
@@ -444,7 +444,7 @@ export class UserService {
     }
 
     // 새 비밀번호 해시
-    const hashedPassword = await hash(newPassword, 10);
+    const hashedPassword = await hash(newPassword, 12);
 
     // 비밀번호 업데이트
     const updatedUser = await prisma.user.update({

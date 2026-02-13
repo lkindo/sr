@@ -4,19 +4,14 @@ import { hash } from 'bcryptjs';
 import { z } from 'zod';
 
 import prisma from '@/lib/prisma';
+import { passwordSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
 const registerSchema = z
   .object({
     name: z.string().min(2, '이름은 최소 2자 이상이어야 합니다.'),
     email: z.string().email('유효한 이메일 주소를 입력하세요.'),
-    password: z
-      .string()
-      .min(8, '비밀번호는 최소 8자 이상이어야 합니다.')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]/,
-        '대소문자, 숫자, 특수문자를 포함해야 합니다.'
-      ),
+    password: passwordSchema,
     confirmPassword: z.string(),
     accountType: z.enum(['ENGINEER', 'CLIENT']),
     clientId: z.string().optional(),

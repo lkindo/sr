@@ -1,21 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { z } from 'zod';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
-
-const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, '현재 비밀번호를 입력하세요.'),
-    newPassword: z.string().min(6, '새 비밀번호는 최소 6자 이상이어야 합니다.'),
-    confirmPassword: z.string().min(1, '비밀번호 확인을 입력하세요.'),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: '새 비밀번호가 일치하지 않습니다.',
-    path: ['confirmPassword'],
-  });
+import { changePasswordSchema } from '@/lib/schemas';
 
 // POST /api/profile/password - 비밀번호 변경 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(
@@ -57,7 +46,7 @@ export const POST = withAuthAndRateLimit(
     }
 
     // 새 비밀번호 해시화
-    const hashedPassword = await bcrypt.hash(validated.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(validated.newPassword, 12);
 
     // 비밀번호 업데이트
     await prisma.user.update({
