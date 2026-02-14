@@ -2,6 +2,7 @@ import type { Prisma, User } from '@prisma/client';
 import { compare, hash } from 'bcryptjs';
 import { z } from 'zod';
 
+import { SECURITY } from '@/lib/constants';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import { userUpdateSchema } from '@/lib/schemas';
@@ -333,7 +334,7 @@ export class UserService {
     clientIds?: string[];
     roleIds?: string[];
   }): Promise<Omit<User, 'password'>> {
-    const hashedPassword = await hash(userData.password, 10);
+    const hashedPassword = await hash(userData.password, SECURITY.BCRYPT_WORK_FACTOR);
 
     // 클라이언트 연결 (clientIds 우선, 없으면 clientId 호환성 지원)
     const clientIds = userData.clientIds || (userData.clientId ? [userData.clientId] : []);
@@ -444,7 +445,7 @@ export class UserService {
     }
 
     // 새 비밀번호 해시
-    const hashedPassword = await hash(newPassword, 10);
+    const hashedPassword = await hash(newPassword, SECURITY.BCRYPT_WORK_FACTOR);
 
     // 비밀번호 업데이트
     const updatedUser = await prisma.user.update({
