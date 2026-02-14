@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { FileUpload } from '../file-upload';
@@ -25,5 +25,27 @@ describe('FileUpload', () => {
     const input = document.querySelector('input[type="file"]');
     expect(input).toBeInTheDocument();
     expect(input).toHaveClass('opacity-0');
+  });
+
+  it('accepts pasted files', () => {
+    const onChange = vi.fn();
+    render(<FileUpload value={[]} onChange={onChange} />);
+
+    const file = new File(['paste content'], 'paste.png', { type: 'image/png' });
+    const clipboardData = {
+      files: [file],
+      types: ['Files'],
+      getData: () => '',
+    };
+
+    const container = document.querySelector('.border-dashed');
+    expect(container).toBeInTheDocument();
+
+    fireEvent.paste(container!, { clipboardData });
+
+    expect(onChange).toHaveBeenCalled();
+    const callArgs = onChange.mock.calls[0][0];
+    expect(callArgs).toHaveLength(1);
+    expect(callArgs[0].name).toBe('paste.png');
   });
 });
