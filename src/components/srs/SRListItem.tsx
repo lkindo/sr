@@ -1,0 +1,203 @@
+'use client';
+
+import React, { memo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Clock } from 'lucide-react';
+
+import { Badge, Button, TableCell, TableRow } from '@/components/ui';
+import { getDueDateStatus } from '@/lib/date-utils';
+import { SRListItem } from '@/types/sr.types';
+
+import { priorityColors, priorityLabels, statusColors, statusLabels } from './constants';
+
+interface SRListItemProps {
+  sr: SRListItem;
+  isStaff: boolean;
+}
+
+export const SRTableRow = memo(({ sr, isStaff }: SRListItemProps) => {
+  const router = useRouter();
+  const dueDateStatus = getDueDateStatus(
+    sr.dueDate ? new Date(sr.dueDate).toISOString() : null,
+    sr.status
+  );
+
+  return (
+    <TableRow
+      className="cursor-pointer"
+      onClick={() => router.push(`/srs/${sr.id}`)}
+    >
+      <TableCell className="font-medium text-primary hover:underline text-center">
+        <Link href={`/srs/${sr.id}`} onClick={(e) => e.stopPropagation()}>{sr.srNumber}</Link>
+      </TableCell>
+      <TableCell className="max-w-[200px] truncate" title={sr.title}>
+        {sr.title}
+      </TableCell>
+      <TableCell>{sr.client.name}</TableCell>
+      <TableCell className="text-center">{sr.requester.name}</TableCell>
+      <TableCell className="text-center">{sr.assignee?.name || '-'}</TableCell>
+      <TableCell className="text-center">
+        <Badge variant={priorityColors[sr.priority]}>
+          {priorityLabels[sr.priority]}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-center">
+        <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+      </TableCell>
+      <TableCell className="text-center">
+        {dueDateStatus ? (
+          <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge>
+        ) : (
+          '-'
+        )}
+      </TableCell>
+      <TableCell className="text-center">
+        {sr._count?.comments || 0} / {sr._count?.attachments || 0}
+      </TableCell>
+      <TableCell className="text-center">
+        {new Date(sr.createdAt)
+          .toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+          })
+          .replace(/\./g, '. ')
+          .trim()}
+      </TableCell>
+      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+        {/* ADMIN/MANAGER/ENGINEER만 접수 및 접수 수정 가능 */}
+        {isStaff ? (
+          <>
+            {sr.status === 'REQUESTED' ? (
+              <Button
+                variant="default"
+                size="sm"
+                className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/srs/${sr.id}/intake`);
+                }}
+              >
+                접수
+              </Button>
+            ) : sr.status === 'IN_PROGRESS' ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/srs/${sr.id}/intake`);
+                }}
+                title="접수 정보 수정"
+                aria-label="접수 정보 수정"
+              >
+                <Clock className="h-4 w-4" />
+              </Button>
+            ) : (
+              <span className="text-muted-foreground text-sm">-</span>
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+});
+
+SRTableRow.displayName = 'SRTableRow';
+
+export const SRCardItem = memo(({ sr, isStaff }: SRListItemProps) => {
+  const router = useRouter();
+  const dueDateStatus = getDueDateStatus(
+    sr.dueDate ? new Date(sr.dueDate).toISOString() : null,
+    sr.status
+  );
+
+  return (
+    <div
+      className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer"
+      onClick={() => router.push(`/srs/${sr.id}`)}
+    >
+      {/* Header: SR Number, Status, Priority */}
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <Link
+            href={`/srs/${sr.id}`}
+            className="font-semibold text-base text-primary hover:underline truncate"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {sr.srNumber}
+          </Link>
+          <Badge
+            variant={statusColors[sr.status]}
+            className="text-[10px] h-5 px-1.5 shrink-0"
+          >
+            {statusLabels[sr.status]}
+          </Badge>
+          <Badge
+            variant={priorityColors[sr.priority]}
+            className="text-[10px] h-5 px-1.5 shrink-0"
+          >
+            {priorityLabels[sr.priority]}
+          </Badge>
+        </div>
+        {/* Action Button */}
+        {isStaff && sr.status === 'REQUESTED' && (
+          <Button
+            variant="default"
+            size="sm"
+            className="h-7 text-xs bg-[hsl(var(--sr-primary-dark))] shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(`/srs/${sr.id}/intake`);
+            }}
+          >
+            접수
+          </Button>
+        )}
+      </div>
+
+      {/* Title */}
+      <h4 className="font-medium text-sm truncate mb-2">{sr.title}</h4>
+
+      {/* 2-Column Grid Info */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] leading-relaxed">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-muted-foreground font-medium shrink-0">고객사</span>
+          <span className="truncate text-foreground font-medium">{sr.client.name}</span>
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-muted-foreground font-medium shrink-0">담당자</span>
+          <span className="truncate text-foreground font-medium">
+            {sr.assignee?.name || '-'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-muted-foreground font-medium shrink-0">마감일</span>
+          <div className="flex-1 min-w-0">
+            {dueDateStatus ? (
+              <Badge
+                variant={dueDateStatus.variant}
+                className="text-[9px] h-3.5 px-1 font-bold"
+              >
+                {dueDateStatus.label}
+              </Badge>
+            ) : (
+              <span className="text-foreground">-</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-muted-foreground font-medium shrink-0">등록일</span>
+          <span className="text-foreground">
+            {new Date(sr.createdAt).toLocaleDateString('ko-KR').slice(2)}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+SRCardItem.displayName = 'SRCardItem';

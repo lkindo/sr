@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
+import { SRCardItem, SRTableRow } from '@/components/srs/SRListItem';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
@@ -34,47 +34,13 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { usePermissions } from '@/hooks/use-permissions';
-import { getDueDateStatus } from '@/lib/date-utils';
-import { SRService } from '@/services/sr.service';
+import { SRListItem } from '@/types/sr.types';
 
-// These types and constants can be moved to a shared file if needed
-const statusLabels: Record<string, string> = {
-  REQUESTED: '요청됨',
-  INTAKE: '접수',
-  IN_PROGRESS: '진행중',
-  ON_HOLD: '대기',
-  COMPLETED: '완료',
-  CONFIRMED: '확인완료',
-  REJECTED: '거부',
-};
-const priorityLabels: Record<string, string> = {
-  CRITICAL: '긴급',
-  HIGH: '높음',
-  MEDIUM: '보통',
-  LOW: '낮음',
-};
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  REQUESTED: 'secondary',
-  INTAKE: 'default',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'default',
-  CONFIRMED: 'default',
-  REJECTED: 'destructive',
-};
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
-const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
+import { ITEMS_PER_PAGE_OPTIONS, priorityLabels, statusLabels } from './constants';
 
 type SortField = 'srNumber' | 'title' | 'client' | 'priority' | 'status' | 'createdAt' | 'dueDate';
 type SortOrder = 'asc' | 'desc';
 
-// SR 타입 정의
-type SRListItem = Awaited<ReturnType<SRService['getAllSRs']>>[number];
 type ClientListItem = { id: string; code: string; name: string };
 type UserListItem = { id: string; name: string; email: string };
 type PaginationInfo = {
@@ -107,6 +73,7 @@ export function SRsDataTable({
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
   const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
+  const isStaff = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -644,95 +611,9 @@ export function SRsDataTable({
             </TableHeader>
             <TableBody>
               {srs && srs.length > 0 ? (
-                srs.map((sr) => {
-                  const dueDateStatus = getDueDateStatus(
-                    sr.dueDate ? new Date(sr.dueDate).toISOString() : null,
-                    sr.status
-                  );
-
-                  return (
-                    <TableRow
-                      key={sr.id}
-                      className="cursor-pointer"
-                      onClick={() => router.push(`/srs/${sr.id}`)}
-                    >
-                      <TableCell className="font-medium text-primary hover:underline text-center">
-                        <Link href={`/srs/${sr.id}`}>{sr.srNumber}</Link>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate" title={sr.title}>
-                        {sr.title}
-                      </TableCell>
-                      <TableCell>{sr.client.name}</TableCell>
-                      <TableCell className="text-center">{sr.requester.name}</TableCell>
-                      <TableCell className="text-center">{sr.assignee?.name || '-'}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={priorityColors[sr.priority]}>
-                          {priorityLabels[sr.priority]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {dueDateStatus ? (
-                          <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge>
-                        ) : (
-                          '-'
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {sr._count?.comments || 0} / {sr._count?.attachments || 0}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {new Date(sr.createdAt)
-                          .toLocaleDateString('ko-KR', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit',
-                          })
-                          .replace(/\./g, '. ')
-                          .trim()}
-                      </TableCell>
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        {/* ADMIN/MANAGER/ENGINEER만 접수 및 접수 수정 가능 */}
-                        {hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']) ? (
-                          <>
-                            {sr.status === 'REQUESTED' ? (
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/srs/${sr.id}/intake`);
-                                }}
-                              >
-                                접수
-                              </Button>
-                            ) : sr.status === 'IN_PROGRESS' ? (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/srs/${sr.id}/intake`);
-                                }}
-                                title="접수 정보 수정"
-                                aria-label="접수 정보 수정"
-                              >
-                                <Clock className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                srs.map((sr) => (
+                  <SRTableRow key={sr.id} sr={sr} isStaff={isStaff} />
+                ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={11} className="text-center py-8">
@@ -756,95 +637,9 @@ export function SRsDataTable({
         {/* Mobile Card View */}
         <div className="md:hidden space-y-3 p-3">
           {srs && srs.length > 0 ? (
-            srs.map((sr) => {
-              const dueDateStatus = getDueDateStatus(
-                sr.dueDate ? new Date(sr.dueDate).toISOString() : null,
-                sr.status
-              );
-              return (
-                <div
-                  key={sr.id}
-                  className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/srs/${sr.id}`)}
-                >
-                  {/* Header: SR Number, Status, Priority */}
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-                      <Link
-                        href={`/srs/${sr.id}`}
-                        className="font-semibold text-base text-primary hover:underline truncate"
-                      >
-                        {sr.srNumber}
-                      </Link>
-                      <Badge
-                        variant={statusColors[sr.status]}
-                        className="text-[10px] h-5 px-1.5 shrink-0"
-                      >
-                        {statusLabels[sr.status]}
-                      </Badge>
-                      <Badge
-                        variant={priorityColors[sr.priority]}
-                        className="text-[10px] h-5 px-1.5 shrink-0"
-                      >
-                        {priorityLabels[sr.priority]}
-                      </Badge>
-                    </div>
-                    {/* Action Button */}
-                    {hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']) && sr.status === 'REQUESTED' && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="h-7 text-xs bg-[hsl(var(--sr-primary-dark))] shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/srs/${sr.id}/intake`);
-                        }}
-                      >
-                        접수
-                      </Button>
-                    )}
-                  </div>
-
-                  {/* Title */}
-                  <h4 className="font-medium text-sm truncate mb-2">{sr.title}</h4>
-
-                  {/* 2-Column Grid Info */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] leading-relaxed">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-muted-foreground font-medium shrink-0">고객사</span>
-                      <span className="truncate text-foreground font-medium">{sr.client.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-muted-foreground font-medium shrink-0">담당자</span>
-                      <span className="truncate text-foreground font-medium">
-                        {sr.assignee?.name || '-'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-muted-foreground font-medium shrink-0">마감일</span>
-                      <div className="flex-1 min-w-0">
-                        {dueDateStatus ? (
-                          <Badge
-                            variant={dueDateStatus.variant}
-                            className="text-[9px] h-3.5 px-1 font-bold"
-                          >
-                            {dueDateStatus.label}
-                          </Badge>
-                        ) : (
-                          <span className="text-foreground">-</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-muted-foreground font-medium shrink-0">등록일</span>
-                      <span className="text-foreground">
-                        {new Date(sr.createdAt).toLocaleDateString('ko-KR').slice(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
+            srs.map((sr) => (
+              <SRCardItem key={sr.id} sr={sr} isStaff={isStaff} />
+            ))
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               {hasActiveFilters ? (
