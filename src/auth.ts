@@ -1,9 +1,9 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
-import { compare } from 'bcryptjs';
 
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
+import { verifyPassword } from '@/lib/security';
 
 import { authConfig } from './auth.config';
 
@@ -59,15 +59,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
           });
 
-          if (!user) {
-            logger.warn(`[Auth] 사용자 찾을 수 없음: ${credentials.email}`);
-            return null;
-          }
+          // Timing attack 방지: 사용자가 없어도 비밀번호 검증 로직 실행 (dummy comparison)
+          const isPasswordValid = await verifyPassword(
+            credentials.password as string,
+            user?.password
+          );
 
-          const isPasswordValid = await compare(credentials.password as string, user.password);
-
-          if (!isPasswordValid) {
-            logger.warn(`[Auth] 비밀번호 불일치: ${credentials.email}`);
+          if (!user || !isPasswordValid) {
+            if (!user) {
+              logger.warn(`[Auth] 사용자 찾을 수 없음: ${credentials.email}`);
+            } else {
+              logger.warn(`[Auth] 비밀번호 불일치: ${credentials.email}`);
+            }
             return null;
           }
 
