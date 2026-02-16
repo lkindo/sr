@@ -81,9 +81,9 @@ export function Header({ user: initialUser }: HeaderProps) {
               className="p-0 w-64 bg-[hsl(var(--sr-primary-dark))] border-r-[#3f4564]"
             >
               {/* Visual Header */}
-              <div className="p-6 text-center border-b border-[#3f4564]">
-                <span className="text-white text-lg font-bold">SR Management</span>
-              </div>
+              <SheetHeader className="p-6 border-b border-[#3f4564]">
+                <SheetTitle className="text-white text-lg font-bold">SR Management</SheetTitle>
+              </SheetHeader>
               <SheetDescription className="sr-only">Mobile navigation sidebar</SheetDescription>
               {/* 사이드바 내용을 모바일에서도 재사용 (모바일용은 fixed 제거 필요할 수 있음) */}
               <div className="h-full overflow-y-auto pb-20">
