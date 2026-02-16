@@ -34,6 +34,8 @@ vi.mock('lucide-react', async (importOriginal) => {
     ...actual,
     Search: () => <div data-testid="icon-search" />,
     X: () => <div data-testid="icon-x" />,
+    Inbox: () => <div data-testid="icon-inbox" />,
+    SearchX: () => <div data-testid="icon-search-x" />,
   };
 });
 
@@ -155,5 +157,24 @@ describe('SRsDataTable Search Component', () => {
     expect(input).toHaveValue('');
     // router.push should NOT be called because filters.search was empty
     expect(mockRouter.push).not.toHaveBeenCalled();
+  });
+
+  describe('Empty State', () => {
+    it('renders "No data" state when list is empty and no filters are active', () => {
+      render(<SRsDataTable {...defaultProps} />);
+      expect(screen.getAllByText('SR이 없습니다')[0]).toBeInTheDocument();
+      expect(screen.getAllByText('SR 등록').length).toBeGreaterThan(0); // Header + Empty State
+      expect(screen.queryByText('필터 초기화')).not.toBeInTheDocument();
+    });
+
+    it('renders "No results" state when list is empty and filters are active', () => {
+      const params = new URLSearchParams();
+      params.set('search', 'something');
+      vi.mocked(useSearchParams).mockReturnValue(params as any);
+
+      render(<SRsDataTable {...defaultProps} />);
+      expect(screen.getAllByText('검색 결과가 없습니다')[0]).toBeInTheDocument();
+      expect(screen.getAllByText('필터 초기화')[0]).toBeInTheDocument();
+    });
   });
 });

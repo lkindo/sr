@@ -12,8 +12,10 @@ import {
   ArrowUpDown,
   Clock,
   Filter,
+  Inbox,
   Plus,
   Search,
+  SearchX,
   TrendingUp,
   User,
   X,
@@ -85,6 +87,30 @@ type PaginationInfo = {
   hasPrevPage: boolean;
   hasNextPage: boolean;
 };
+
+// Empty State Component
+function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 mb-4">
+        <Icon className="h-6 w-6 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-medium text-foreground">{title}</h3>
+      <p className="text-sm text-muted-foreground mt-1 mb-6 max-w-sm">{description}</p>
+      {action}
+    </div>
+  );
+}
 
 // This component now receives data fetched from the server as props
 export function SRsDataTable({
@@ -735,16 +761,32 @@ export function SRsDataTable({
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center py-8">
+                  <TableCell colSpan={11}>
                     {hasActiveFilters ? (
-                      <div className="flex flex-col items-center gap-2">
-                        <span>검색 결과가 없습니다.</span>
-                        <Button variant="outline" size="sm" onClick={resetFilters}>
-                          필터 초기화
-                        </Button>
-                      </div>
+                      <EmptyState
+                        icon={SearchX}
+                        title="검색 결과가 없습니다"
+                        description="다른 검색어나 필터를 시도해보세요."
+                        action={
+                          <Button variant="outline" onClick={resetFilters}>
+                            필터 초기화
+                          </Button>
+                        }
+                      />
                     ) : (
-                      '데이터가 없습니다.'
+                      <EmptyState
+                        icon={Inbox}
+                        title="SR이 없습니다"
+                        description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
+                        action={
+                          <Button
+                            onClick={() => setIsCreateDialogOpen(true)}
+                            className="sr-btn-template-primary"
+                          >
+                            <Plus className="mr-2 h-4 w-4" /> SR 등록
+                          </Button>
+                        }
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -845,19 +887,31 @@ export function SRsDataTable({
                 </div>
               );
             })
+          ) : hasActiveFilters ? (
+            <EmptyState
+              icon={SearchX}
+              title="검색 결과가 없습니다"
+              description="다른 검색어나 필터를 시도해보세요."
+              action={
+                <Button variant="outline" onClick={resetFilters}>
+                  필터 초기화
+                </Button>
+              }
+            />
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              {hasActiveFilters ? (
-                <div className="flex flex-col items-center gap-2">
-                  <span>검색 결과가 없습니다.</span>
-                  <Button variant="outline" size="sm" onClick={resetFilters}>
-                    필터 초기화
-                  </Button>
-                </div>
-              ) : (
-                '데이터가 없습니다.'
-              )}
-            </div>
+            <EmptyState
+              icon={Inbox}
+              title="SR이 없습니다"
+              description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
+              action={
+                <Button
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="sr-btn-template-primary"
+                >
+                  <Plus className="mr-2 h-4 w-4" /> SR 등록
+                </Button>
+              }
+            />
           )}
         </div>
 
