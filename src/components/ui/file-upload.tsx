@@ -1,11 +1,36 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { File, Upload, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+function FilePreview({ file }: { file: File }) {
+  const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPreview(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setPreview(null);
+  }, [file]);
+
+  if (preview) {
+    return (
+      <img
+        src={preview}
+        alt={file.name}
+        className="h-10 w-10 object-cover rounded border bg-background flex-shrink-0"
+      />
+    );
+  }
+
+  return <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />;
+}
 
 interface FileUploadProps {
   onChange: (files: File[]) => void;
@@ -79,6 +104,18 @@ export function FileUpload({
     [disabled, handleFiles]
   );
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const clipboardFiles = e.clipboardData.files;
+      if (clipboardFiles.length > 0) {
+        e.preventDefault();
+        if (disabled) return;
+        handleFiles(Array.from(clipboardFiles));
+      }
+    },
+    [disabled, handleFiles]
+  );
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       e.preventDefault();
@@ -117,6 +154,7 @@ export function FileUpload({
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
         onDrop={handleDrop}
+        onPaste={handlePaste}
       >
         <input
           type="file"
@@ -129,7 +167,7 @@ export function FileUpload({
         <div className="flex flex-col items-center gap-2">
           <Upload className="h-8 w-8 text-muted-foreground" />
           <div className="text-sm">
-            <span className="font-medium text-primary">클릭</span>하거나 파일을 드래그하여 업로드
+            <span className="font-medium text-primary">클릭</span>, 드래그 또는 붙여넣기
           </div>
           <div className="text-xs text-muted-foreground">
             최대 {maxFiles}개, 파일당 {maxSize}MB 이하
@@ -145,7 +183,7 @@ export function FileUpload({
           {value.map((file, index) => (
             <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <FilePreview file={file} />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{file.name}</div>
                   <div className="text-xs text-muted-foreground">{formatFileSize(file.size)}</div>
