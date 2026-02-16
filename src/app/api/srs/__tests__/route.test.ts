@@ -28,7 +28,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
             email: 'test@example.com',
             roles: [],
             permissions: [],
-            clientIds: [],
+            clientIds: ['client-1'],
           },
         };
         return await handler(req, { ...context, session });
