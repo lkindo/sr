@@ -118,6 +118,23 @@ export class SRService {
                 ? new Date(validated.requestedCompletionDate)
                 : undefined,
               status: 'REQUESTED',
+              // Optimized: Create activity and status history in the same transaction/query
+              // This reduces DB round trips and ensures atomicity without separate calls
+              activities: {
+                create: {
+                  userId: sessionUser.id,
+                  type: 'CREATED',
+                  description: 'SR이 생성되었습니다.',
+                },
+              },
+              statusHistory: {
+                create: {
+                  previousStatus: null,
+                  currentStatus: 'REQUESTED',
+                  changedBy: sessionUser.id,
+                  changeReason: 'SR 생성',
+                },
+              },
             },
           });
         });
@@ -140,29 +157,6 @@ export class SRService {
     if (!sr) {
       throw new ServiceError('SR 생성에 실패했습니다.', 'SR_CREATION_FAILED');
     }
-
-    await prisma.sRActivity.create({
-      data: {
-        srId: sr.id,
-        userId: sessionUser.id,
-        type: 'CREATED',
-        description: 'SR이 생성되었습니다.',
-      },
-    });
-
-    await prisma.sR.update({
-      where: { id: sr.id },
-      data: {
-        statusHistory: {
-          create: {
-            previousStatus: null,
-            currentStatus: 'REQUESTED',
-            changedBy: sessionUser.id,
-            changeReason: 'SR 생성',
-          },
-        },
-      },
-    });
 
     const result = await this.getSRDetailsById(sr.id);
     if (!result) {
