@@ -12,7 +12,7 @@ import { AuthenticatedUser } from '@/types/session';
 
 const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
-function isInternalUser(user: AuthenticatedUser): boolean {
+export function isInternalUser(user: AuthenticatedUser): boolean {
   return user.roles.some((role) => INTERNAL_ROLES.includes(role));
 }
 

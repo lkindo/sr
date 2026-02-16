@@ -4,6 +4,7 @@ import { SRPriority, SRStatus } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
+import { isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
 import { PermissionService } from '@/services/permission.service';
@@ -17,18 +18,40 @@ export const revalidate = 0;
 // GET /api/srs - SR 목록 조회 (Rate Limit: 느슨함 - 자주 조회되는 API)
 // 페이지네이션 지원: ?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc
 export const GET = withAuthAndRateLimit(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { session }) => {
     const { searchParams } = new URL(request.url);
+    const { skip, take, orderBy, createResponse } = usePagination(request);
+
+    let clientIdFilter: string | { in: string[] } | undefined =
+      searchParams.get('clientId') || undefined;
+
+    // Authorization Check: External users must be restricted to their assigned clients
+    if (!isInternalUser(session.user)) {
+      const userClientIds = session.user.clientIds || [];
+
+      if (userClientIds.length === 0) {
+        // User has no assigned clients -> return empty list
+        return NextResponse.json(serializeResponse(createResponse([], 0)));
+      }
+
+      if (typeof clientIdFilter === 'string') {
+        // User requested a specific client -> verify they have access
+        if (!userClientIds.includes(clientIdFilter)) {
+          // Unauthorized client -> return empty list
+          return NextResponse.json(serializeResponse(createResponse([], 0)));
+        }
+      } else {
+        // No specific client requested -> restrict query to all assigned clients
+        clientIdFilter = { in: userClientIds };
+      }
+    }
 
     // 필터 파라미터
     const filters = {
       status: (searchParams.get('status') as SRStatus) || undefined,
-      clientId: searchParams.get('clientId') || undefined,
+      clientId: clientIdFilter,
       priority: (searchParams.get('priority') as SRPriority) || undefined,
     };
-
-    // 페이지네이션 파라미터
-    const { skip, take, orderBy, createResponse } = usePagination(request);
 
     const [srs, totalCount] = await Promise.all([
       srService.getAllSRs({

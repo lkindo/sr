@@ -39,3 +39,9 @@
 **Vulnerability:** `getRoleAction` and `getAllRolesAction` were exposed as public server actions without any authentication or authorization checks.
 **Learning:** Even if server actions are not currently used by the client, they are public endpoints. Developers might assume "getter" actions for internal resources like roles are safe or "internal only", but they can be exploited to enumerate system structure.
 **Prevention:** Audit all exported functions in files with `'use server'`. Apply `authenticateAndAuthorize` by default to everything, even read-only operations.
+
+## 2026-03-27 - Missing Authorization on List API Endpoints
+
+**Vulnerability:** `GET /api/srs` relied solely on client-provided query parameters (e.g., `clientId`) for filtering, allowing external users to bypass tenant isolation by omitting the filter or requesting another client's data.
+**Learning:** API routes that return lists must not trust client filters for authorization boundaries. Authentication middleware (`withAuthAndRateLimit`) only identifies the user; it does not enforce data access policies.
+**Prevention:** Always enforce server-side filters based on the authenticated user's session (e.g., force `clientId: { in: session.user.clientIds }` for external users) regardless of what the client requests.
