@@ -125,7 +125,7 @@ describe('UserService', () => {
   });
 
   describe('createUser', () => {
-    it('creates user with userType based roles', async () => {
+    it('creates user with userType based roles and correct password hashing', async () => {
       const txMock = {
         user: {
           create: vi.fn().mockResolvedValue({ id: 'u1' }),
@@ -144,6 +144,9 @@ describe('UserService', () => {
         password: 'P',
         userType: 'ENGINEER',
       });
+
+      const { hash } = await import('bcryptjs');
+      expect(hash).toHaveBeenCalledWith('P', 12);
 
       expect(txMock.role.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -170,6 +173,21 @@ describe('UserService', () => {
       await expect(userService.changePassword('u1', 'wrong', 'new')).rejects.toThrow(
         ValidationError
       );
+    });
+
+    it('hashes new password with correct work factor', async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'u1',
+        password: 'hashed-old',
+      } as any);
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1' } as any);
+
+      const { compare, hash } = await import('bcryptjs');
+      vi.mocked(compare).mockResolvedValue(true as any);
+
+      await userService.changePassword('u1', 'old', 'new');
+
+      expect(hash).toHaveBeenCalledWith('new', 12);
     });
   });
 });

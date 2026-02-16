@@ -103,3 +103,14 @@ export const SLA = {
     LOW: 1.5,
   } as Record<string, number>,
 } as const;
+
+/**
+ * 보안 관련 상수
+ */
+export const SECURITY = {
+  /**
+   * 비밀번호 해싱 워크 팩터 (Cost Factor)
+   * - 12: 보안 강화 (기존 10보다 안전)
+   */
+  BCRYPT_WORK_FACTOR: 12,
+} as const;

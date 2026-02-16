@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { SECURITY } from '@/lib/constants';
 import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 
@@ -57,7 +58,7 @@ export const POST = withAuthAndRateLimit(
     }
 
     // 새 비밀번호 해시화
-    const hashedPassword = await bcrypt.hash(validated.newPassword, 10);
+    const hashedPassword = await bcrypt.hash(validated.newPassword, SECURITY.BCRYPT_WORK_FACTOR);
 
     // 비밀번호 업데이트
     await prisma.user.update({

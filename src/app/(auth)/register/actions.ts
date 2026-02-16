@@ -3,6 +3,7 @@
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
 
+import { SECURITY } from '@/lib/constants';
 import prisma from '@/lib/prisma';
 import { UserService } from '@/services/user.service';
 
@@ -61,7 +62,7 @@ export async function registerUser(formData: FormData) {
     }
 
     // 비밀번호 해싱
-    const hashedPassword = await hash(validated.password, 12);
+    const hashedPassword = await hash(validated.password, SECURITY.BCRYPT_WORK_FACTOR);
 
     // 역할 자동 결정
     const defaultRole = await prisma.role.findFirst({
