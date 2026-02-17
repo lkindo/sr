@@ -58,9 +58,7 @@ describe('Dashboard Stats API', () => {
       .mockResolvedValueOnce([
         { date: new Date().toISOString().split('T')[0], count: BigInt(5) },
       ] as any)
-      .mockResolvedValueOnce([
-        { avgProcessingHours: 2.5, slaComplianceRate: 95.5 },
-      ] as any);
+      .mockResolvedValueOnce([{ avgProcessingHours: 2.5, slaComplianceRate: 95.5 }] as any);
     vi.mocked(prisma.sR.findMany).mockResolvedValue([]); // For recent/waiting lists
     vi.mocked(prisma.client.findMany).mockResolvedValue([
       { id: 'c-1', name: 'Client 1', code: 'C1' },

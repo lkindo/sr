@@ -38,8 +38,8 @@ describe('Permissions Performance Benchmark', () => {
     // Mock findMany implementation with delay (simulating optimized check)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (prisma.userRole.findMany as any).mockImplementation(async () => {
-        await new Promise((resolve) => setTimeout(resolve, DB_DELAY));
-        return [];
+      await new Promise((resolve) => setTimeout(resolve, DB_DELAY));
+      return [];
     });
 
     const start = performance.now();
@@ -47,11 +47,17 @@ describe('Permissions Performance Benchmark', () => {
     const end = performance.now();
     const duration = end - start;
 
-    console.log(`[Benchmark] Duration for ${permissionsToCheck.length} permissions: ${duration.toFixed(2)}ms`);
+    console.log(
+      `[Benchmark] Duration for ${permissionsToCheck.length} permissions: ${duration.toFixed(2)}ms`
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    console.log(`[Benchmark] prisma.userRole.count called: ${(prisma.userRole.count as any).mock.calls.length} times`);
+    console.log(
+      `[Benchmark] prisma.userRole.count called: ${(prisma.userRole.count as any).mock.calls.length} times`
+    );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    console.log(`[Benchmark] prisma.userRole.findMany called: ${(prisma.userRole.findMany as any).mock.calls.length} times`);
+    console.log(
+      `[Benchmark] prisma.userRole.findMany called: ${(prisma.userRole.findMany as any).mock.calls.length} times`
+    );
 
     // Determine behavior based on call counts
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,15 +66,15 @@ describe('Permissions Performance Benchmark', () => {
     const findManyCalls = (prisma.userRole.findMany as any).mock.calls.length;
 
     if (countCalls > 0) {
-        // Current behavior: N+1
-        expect(countCalls).toBe(permissionsToCheck.length);
-        expect(findManyCalls).toBe(0);
-        expect(duration).toBeGreaterThan(permissionsToCheck.length * DB_DELAY * 0.8);
+      // Current behavior: N+1
+      expect(countCalls).toBe(permissionsToCheck.length);
+      expect(findManyCalls).toBe(0);
+      expect(duration).toBeGreaterThan(permissionsToCheck.length * DB_DELAY * 0.8);
     } else {
-        // Optimized behavior
-        expect(countCalls).toBe(0);
-        expect(findManyCalls).toBe(1);
-        expect(duration).toBeLessThan(permissionsToCheck.length * DB_DELAY); // significantly faster
+      // Optimized behavior
+      expect(countCalls).toBe(0);
+      expect(findManyCalls).toBe(1);
+      expect(duration).toBeLessThan(permissionsToCheck.length * DB_DELAY); // significantly faster
     }
   });
 });

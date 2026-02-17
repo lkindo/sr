@@ -54,7 +54,7 @@ vi.mock('@/lib/policies', async () => {
       const canViewAll = user.permissions.includes('USER:READ');
 
       if (!isAdmin && !canViewAll) {
-         throw new ForbiddenError('사용자 조회 권한이 없습니다.');
+        throw new ForbiddenError('사용자 조회 권한이 없습니다.');
       }
     }),
     ensureCanCreateUser: vi.fn((user) => {
@@ -62,7 +62,7 @@ vi.mock('@/lib/policies', async () => {
       const canCreate = user.permissions.includes('USER:CREATE');
 
       if (!isAdmin && !canCreate) {
-         throw new ForbiddenError('사용자 생성 권한이 없습니다.');
+        throw new ForbiddenError('사용자 생성 권한이 없습니다.');
       }
     }),
   };
@@ -128,7 +128,7 @@ describe('API Route: /api/users (Security)', () => {
     // ForbiddenError usually has statusCode 403
 
     if (res.status === 200) {
-        throw new Error('Security Vulnerability: Unauthorized user was able to access user list');
+      throw new Error('Security Vulnerability: Unauthorized user was able to access user list');
     }
 
     expect(res.status).toBe(403);
@@ -137,23 +137,23 @@ describe('API Route: /api/users (Security)', () => {
 
   describe('POST', () => {
     it('should DENY user without permissions to create user', async () => {
-        const req = new NextRequest('http://localhost/api/users', {
-            method: 'POST',
-            body: JSON.stringify({ email: 'test@test.com' }),
-        });
-        const context = {
-            session: {
-                user: { id: 'user-1', roles: ['CLIENT_USER'], permissions: [] }, // No permissions
-            },
-        };
+      const req = new NextRequest('http://localhost/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'test@test.com' }),
+      });
+      const context = {
+        session: {
+          user: { id: 'user-1', roles: ['CLIENT_USER'], permissions: [] }, // No permissions
+        },
+      };
 
-        const res = await POST(req, context as any);
+      const res = await POST(req, context as any);
 
-        if (res.status === 201) {
-            throw new Error('Security Vulnerability: Unauthorized user was able to create user');
-        }
+      if (res.status === 201) {
+        throw new Error('Security Vulnerability: Unauthorized user was able to create user');
+      }
 
-        expect(res.status).toBe(403);
+      expect(res.status).toBe(403);
     });
   });
 });

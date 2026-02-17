@@ -1,38 +1,37 @@
-
 import { performance } from 'perf_hooks';
 import { serializeResponse } from '@/lib/serialization';
 
 // Create a large, complex object to benchmark serialization
 const largeObject = {
   id: 1,
-  name: "Benchmark Object",
+  name: 'Benchmark Object',
   createdAt: new Date(),
   updatedAt: new Date(),
   nested: {
     dates: Array.from({ length: 100 }, () => new Date()),
-    mixed: [1, "string", null, undefined, { date: new Date() }, NaN, Infinity, -Infinity],
+    mixed: [1, 'string', null, undefined, { date: new Date() }, NaN, Infinity, -Infinity],
     deep: {
       a: {
         b: {
           c: {
             d: new Date(),
             e: [new Date(), new Date()],
-            f: { g: undefined, h: null, i: () => {} }
-          }
-        }
-      }
-    }
+            f: { g: undefined, h: null, i: () => {} },
+          },
+        },
+      },
+    },
   },
   items: Array.from({ length: 1000 }, (_, i) => ({
     id: i,
     date: new Date(),
     value: Math.random(),
     metadata: {
-      tags: ["a", "b", "c"],
+      tags: ['a', 'b', 'c'],
       created: new Date(),
-      status: i % 2 === 0 ? "active" : "inactive"
-    }
-  }))
+      status: i % 2 === 0 ? 'active' : 'inactive',
+    },
+  })),
 };
 
 async function benchmark() {
@@ -58,12 +57,12 @@ async function benchmark() {
 
   // Verify correctness on a smaller scale
   const testObj = {
-      date: new Date('2023-01-01T00:00:00Z'),
-      nan: NaN,
-      inf: Infinity,
-      undef: undefined,
-      fn: () => {},
-      arr: [undefined, NaN, Infinity, new Date('2023-01-01T00:00:00Z')]
+    date: new Date('2023-01-01T00:00:00Z'),
+    nan: NaN,
+    inf: Infinity,
+    undef: undefined,
+    fn: () => {},
+    arr: [undefined, NaN, Infinity, new Date('2023-01-01T00:00:00Z')],
   };
 
   const serialized = serializeResponse(testObj);
@@ -74,11 +73,11 @@ async function benchmark() {
   // Note: JSON.stringify converts Date to string, NaN/Infinity to null, undefined/fn to skipped (in obj) or null (in arr)
 
   if (JSON.stringify(serialized) === JSON.stringify(expected)) {
-      console.log('Verification: MATCHES expected JSON behavior');
+    console.log('Verification: MATCHES expected JSON behavior');
   } else {
-      console.error('Verification: MISMATCH');
-      console.error('Expected:', JSON.stringify(expected));
-      console.error('Actual:  ', JSON.stringify(serialized));
+    console.error('Verification: MISMATCH');
+    console.error('Expected:', JSON.stringify(expected));
+    console.error('Actual:  ', JSON.stringify(serialized));
   }
 }
 

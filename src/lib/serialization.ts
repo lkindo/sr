@@ -41,11 +41,7 @@ function deepSerialize(value: any): any {
   if (Array.isArray(value)) {
     return value.map((item) => {
       // JSON.stringify converts undefined, function, symbol in arrays to null
-      if (
-        typeof item === 'undefined' ||
-        typeof item === 'function' ||
-        typeof item === 'symbol'
-      ) {
+      if (typeof item === 'undefined' || typeof item === 'function' || typeof item === 'symbol') {
         return null;
       }
       return deepSerialize(item);
@@ -64,11 +60,7 @@ function deepSerialize(value: any): any {
     if (Object.prototype.hasOwnProperty.call(value, key)) {
       const val = value[key];
       // JSON.stringify skips undefined, function, symbol in objects
-      if (
-        typeof val !== 'undefined' &&
-        typeof val !== 'function' &&
-        typeof val !== 'symbol'
-      ) {
+      if (typeof val !== 'undefined' && typeof val !== 'function' && typeof val !== 'symbol') {
         result[key] = deepSerialize(val);
       }
     }

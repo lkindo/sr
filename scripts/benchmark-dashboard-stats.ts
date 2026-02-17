@@ -1,4 +1,3 @@
-
 /**
  * Benchmark for Dashboard Stats (In-Memory vs DB Aggregation simulation)
  *
@@ -36,7 +35,7 @@ function generateMockData(count: number): SR[] {
       intakeAt,
       completedAt,
       dueDate,
-      serviceCategory: { slaHours: 24 }
+      serviceCategory: { slaHours: 24 },
     });
   }
   return data;
@@ -84,7 +83,9 @@ function runBenchmark() {
     const result = calculateStatsInMemory(data);
     const end = performance.now();
 
-    console.log(`| ${count.toString().padEnd(7)} | ${(end - start).toFixed(4).padEnd(9)} | ${result.avgProcessingHours.toFixed(2).padEnd(20)} | ${result.slaComplianceRate.toFixed(2).padEnd(14)} |`);
+    console.log(
+      `| ${count.toString().padEnd(7)} | ${(end - start).toFixed(4).padEnd(9)} | ${result.avgProcessingHours.toFixed(2).padEnd(20)} | ${result.slaComplianceRate.toFixed(2).padEnd(14)} |`
+    );
   }
   console.log('--------------------------------------------------');
 }

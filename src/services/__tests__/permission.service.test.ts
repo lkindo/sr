@@ -101,7 +101,7 @@ describe('PermissionService', () => {
 
       const result = await permissionService.checkAnyPermission('user1', [
         { resource: 'SR', action: 'DELETE' }, // Missing
-        { resource: 'SR', action: 'READ' },   // Present
+        { resource: 'SR', action: 'READ' }, // Present
       ]);
 
       expect(result).toBe(true);
@@ -184,9 +184,11 @@ describe('PermissionService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe('perm1');
       expect(result[1].id).toBe('perm2');
-      expect(prisma.userRole.findMany).toHaveBeenCalledWith(expect.objectContaining({
-          where: { userId: 'user1' }
-      }));
+      expect(prisma.userRole.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 'user1' },
+        })
+      );
     });
   });
 });
