@@ -225,14 +225,43 @@ describe('UserService Coverage', () => {
     it('filters by UserType CLIENT', async () => {
       const mockUsers = [
         { id: 'u1', clients: [{ clientId: 'c1' }] }, // CLIENT
+      ];
+      vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
+      vi.mocked(prisma.user.count).mockResolvedValue(1);
+
+      const result = await userService.getAllUsers({ userType: 'CLIENT' });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([{ clients: { some: {} } }]),
+          }),
+        })
+      );
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].id).toBe('u1');
+    });
+
+    it('filters by UserType ENGINEER', async () => {
+      const mockUsers = [
         { id: 'u2', clients: [] }, // ENGINEER
       ];
       vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
-      vi.mocked(prisma.user.count).mockResolvedValue(2);
+      vi.mocked(prisma.user.count).mockResolvedValue(1);
 
-      const result = await userService.getAllUsers({ userType: 'CLIENT' });
+      const result = await userService.getAllUsers({ userType: 'ENGINEER' });
+
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            AND: expect.arrayContaining([{ clients: { none: {} } }]),
+          }),
+        })
+      );
+
       expect(result.data).toHaveLength(1);
-      expect(result.data[0].id).toBe('u1');
+      expect(result.data[0].id).toBe('u2');
     });
   });
 

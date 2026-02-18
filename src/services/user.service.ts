@@ -126,6 +126,18 @@ export class UserService {
       where.roles = { some: { role: { name: { in: roleNames } } } };
     }
 
+    if (filters?.userType && filters.userType !== 'all') {
+      // Optimize: Push userType filtering to the database to avoid fetching unnecessary records
+      // and enable correct pagination.
+      const userTypeCondition: Prisma.UserWhereInput =
+        filters.userType === 'CLIENT' ? { clients: { some: {} } } : { clients: { none: {} } };
+
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        userTypeCondition,
+      ];
+    }
+
     const { skip, take, orderBy } = params || {};
 
     const [users, total] = await Promise.all([
@@ -155,11 +167,6 @@ export class UserService {
       ...user,
       userType: user.clients.length > 0 ? ('CLIENT' as const) : ('ENGINEER' as const),
     }));
-
-    if (filters?.userType && filters.userType !== 'all') {
-      const filtered = usersWithType.filter((user) => user.userType === filters.userType);
-      return { data: filtered as any, total };
-    }
 
     return { data: usersWithType as any, total };
   }
