@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
@@ -46,8 +45,8 @@ describe('Accessibility Improvements', () => {
     render(
       <ToastProvider>
         <Toast open={true}>
-           <div>Toast Content</div>
-           <ToastClose />
+          <div>Toast Content</div>
+          <ToastClose />
         </Toast>
         <ToastViewport />
       </ToastProvider>

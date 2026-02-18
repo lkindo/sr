@@ -89,21 +89,21 @@ describe('SRService Concurrency Benchmark', () => {
   it('handles high concurrency without retries (Optimized)', async () => {
     // Mock atomic sequence generation
     mockPrisma.sRSequence.upsert.mockImplementation(async ({ where }) => {
-        const date = where.date;
-        let currentSeq = sequenceMap.get(date) || 0;
+      const date = where.date;
+      let currentSeq = sequenceMap.get(date) || 0;
 
-        // Simulating atomic increment
-        // Even with concurrency, DB locks row, so seq is always unique and incremental
-        // We simulate this by simply incrementing our in-memory map which acts as the "DB state"
-        // Since JS is single threaded, this is safe in the mock.
+      // Simulating atomic increment
+      // Even with concurrency, DB locks row, so seq is always unique and incremental
+      // We simulate this by simply incrementing our in-memory map which acts as the "DB state"
+      // Since JS is single threaded, this is safe in the mock.
 
-        currentSeq += 1;
-        sequenceMap.set(date, currentSeq);
+      currentSeq += 1;
+      sequenceMap.set(date, currentSeq);
 
-        // Simulate a tiny delay to allow concurrency to overlap
-        await new Promise(r => setTimeout(r, 1));
+      // Simulate a tiny delay to allow concurrency to overlap
+      await new Promise((r) => setTimeout(r, 1));
 
-        return { date, seq: currentSeq };
+      return { date, seq: currentSeq };
     });
 
     mockPrisma.sR.create.mockImplementation(async ({ data }) => {
@@ -137,7 +137,7 @@ describe('SRService Concurrency Benchmark', () => {
 
     const promises = [];
     for (let i = 0; i < concurrency; i++) {
-        promises.push(srService.createSR(inputData, mockUser).catch(e => e));
+      promises.push(srService.createSR(inputData, mockUser).catch((e) => e));
     }
 
     await Promise.all(promises);

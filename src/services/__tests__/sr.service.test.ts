@@ -543,7 +543,6 @@ describe('SRService', () => {
       });
     });
 
-
     // Tests for updateSR state transition and notifications
     describe('updateSR edge cases', () => {
       it('should throw Error when changing client in non-REQUESTED status', async () => {

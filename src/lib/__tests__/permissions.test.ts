@@ -90,9 +90,7 @@ describe('permissions utility', () => {
 
     it('should return false if service throws error', async () => {
       mocks.checkAnyPermission.mockRejectedValue(new Error('DB Error'));
-      const result = await hasAnyPermission('user-1', [
-        { resource: 'SR', action: 'DELETE' },
-      ]);
+      const result = await hasAnyPermission('user-1', [{ resource: 'SR', action: 'DELETE' }]);
       expect(result).toBe(false);
     });
   });
