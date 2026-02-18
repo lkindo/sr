@@ -29,17 +29,17 @@ vi.mock('@/components/srs/CreateSRDialog', () => ({
 
 // Mock UI components
 vi.mock('@/components/ui/pagination', () => ({
-  Pagination: ({ children }: any) => <nav aria-label="pagination">{children}</nav>,
+  Pagination: ({ children }: any) => <nav aria-label="페이지 탐색">{children}</nav>,
   PaginationContent: ({ children }: any) => <ul>{children}</ul>,
   PaginationItem: ({ children }: any) => <li>{children}</li>,
   PaginationPrevious: ({ onClick, 'aria-disabled': disabled }: any) => (
-    <button onClick={onClick} disabled={disabled} aria-label="Go to previous page">
-      Previous
+    <button onClick={onClick} disabled={disabled} aria-label="이전 페이지로 이동">
+      이전
     </button>
   ),
   PaginationNext: ({ onClick, 'aria-disabled': disabled }: any) => (
-    <button onClick={onClick} disabled={disabled} aria-label="Go to next page">
-      Next
+    <button onClick={onClick} disabled={disabled} aria-label="다음 페이지로 이동">
+      다음
     </button>
   ),
   PaginationLink: ({ children, isActive, onClick }: any) => (
@@ -133,14 +133,14 @@ describe('SRsDataTable Pagination', () => {
 
   it('renders pagination controls when totalPages > 1', () => {
     render(<SRsDataTable {...defaultProps} />);
-    expect(screen.getByRole('navigation', { name: /pagination/i })).toBeInTheDocument();
-    expect(screen.getByLabelText('Go to previous page')).toBeInTheDocument();
-    expect(screen.getByLabelText('Go to next page')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '페이지 탐색' })).toBeInTheDocument();
+    expect(screen.getByLabelText('이전 페이지로 이동')).toBeInTheDocument();
+    expect(screen.getByLabelText('다음 페이지로 이동')).toBeInTheDocument();
   });
 
   it('navigates to next page', () => {
     render(<SRsDataTable {...defaultProps} />);
-    const nextBtn = screen.getByLabelText('Go to next page');
+    const nextBtn = screen.getByLabelText('다음 페이지로 이동');
     fireEvent.click(nextBtn);
 
     expect(mockRouter.push).toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe('SRsDataTable Pagination', () => {
 
   it('disables previous button on first page', () => {
     render(<SRsDataTable {...defaultProps} />);
-    const prevBtn = screen.getByLabelText('Go to previous page');
+    const prevBtn = screen.getByLabelText('이전 페이지로 이동');
     expect(prevBtn).toBeDisabled();
   });
 
@@ -166,7 +166,7 @@ describe('SRsDataTable Pagination', () => {
       },
     };
     render(<SRsDataTable {...props} />);
-    const nextBtn = screen.getByLabelText('Go to next page');
+    const nextBtn = screen.getByLabelText('다음 페이지로 이동');
     expect(nextBtn).toBeDisabled();
   });
 
