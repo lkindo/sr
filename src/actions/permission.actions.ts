@@ -2,14 +2,15 @@
 
 import type { Permission } from '@prisma/client';
 
-import { getAuthenticatedSession } from '@/lib/action-helpers';
+import { authenticateAndAuthorize } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ok, Result } from '@/lib/result';
 import { PermissionService } from '@/services/permission.service';
 
 export async function getAllPermissionsAction(): Promise<Result<Permission[]>> {
   try {
-    await getAuthenticatedSession();
+    await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
 
     const permissionService = new PermissionService();
     const permissions = await permissionService.getAllPermissions();
