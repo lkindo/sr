@@ -396,12 +396,42 @@ export class SRService {
 
       const assigneeChanged = assigneeId !== undefined && assigneeId !== existingSR.assigneeId;
 
+      // Optimize: Use nested writes for activities to reduce DB round trips
+      const activitiesToCreate: Prisma.SRActivityCreateWithoutSrInput[] = [];
+
+      if (statusChanged) {
+        activitiesToCreate.push({
+          userId: sessionUser.id,
+          type: 'STATUS_CHANGED',
+          description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
+        });
+      }
+
+      if (assigneeChanged) {
+        activitiesToCreate.push({
+          userId: sessionUser.id,
+          type: 'ASSIGNED',
+          description: assigneeId
+            ? '담당자가 할당되었습니다.'
+            : '담당자 할당이 해제되었습니다.',
+        });
+      }
+
+      if (activitiesToCreate.length > 0) {
+        updateData.activities = {
+          create: activitiesToCreate,
+        };
+      }
+
       // 트랜잭션으로 업데이트 및 활동 로그 생성
       return await prisma.$transaction(async (tx) => {
-        // 1. SR 업데이트 (statusHistory 포함)
-        // 1. SR 업데이트 (statusHistory 포함)
+        // 1. SR 업데이트 (statusHistory 및 activities 포함)
         let updatedSR: SRUpdateResult = existingSR;
 
+        // If there are activities to create but no other fields to update,
+        // we still need to run the update to create the activities via nested write.
+        // However, updateData will not be empty because if statusChanged or assigneeChanged is true,
+        // updateData.status or updateData.assigneeId would be set respectively.
         if (Object.keys(updateData).length > 0) {
           updatedSR = await tx.sR.update({
             where: { id },
@@ -442,17 +472,8 @@ export class SRService {
           });
         }
 
-        // 2. 상태 변경 활동 로그
+        // 2. 알림 발송 (활동 로그 생성은 위에서 nested write로 처리됨)
         if (statusChanged) {
-          await tx.sRActivity.create({
-            data: {
-              srId: id,
-              userId: sessionUser.id,
-              type: 'STATUS_CHANGED',
-              description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
-            },
-          });
-
           // 상태 변경 푸시 알림 (요청자에게)
           if (existingSR.requesterId) {
             backgroundTask(
@@ -486,19 +507,8 @@ export class SRService {
           }
         }
 
-        // 3. 담당자 변경 활동 로그
+        // 3. 담당자 변경 알림
         if (assigneeChanged) {
-          await tx.sRActivity.create({
-            data: {
-              srId: id,
-              userId: sessionUser.id,
-              type: 'ASSIGNED',
-              description: assigneeId
-                ? '담당자가 할당되었습니다.'
-                : '담당자 할당이 해제되었습니다.',
-            },
-          });
-
           // 담당자 배정 푸시 알림 (새 담당자에게)
           if (assigneeId) {
             backgroundTask(

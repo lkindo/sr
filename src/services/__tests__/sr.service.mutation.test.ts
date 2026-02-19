@@ -136,7 +136,7 @@ describe('SRService Mutation Tests', () => {
     });
   });
 
-  describe.skip('updateSR', () => {
+  describe('updateSR', () => {
     it('should update SR and send notifications', async () => {
       const existingSR = {
         id: 'sr-1',
@@ -177,9 +177,13 @@ describe('SRService Mutation Tests', () => {
       await srService.updateSR('sr-1', data, mockUser as any);
 
       expect(prisma.sR.update).toHaveBeenCalled();
-      expect(prisma.sRActivity.create).toHaveBeenCalled();
+      // Optimization: sRActivity.create should NOT be called directly, but via nested write
+      expect(prisma.sRActivity.create).not.toHaveBeenCalled();
 
-      expect(prisma.sRActivity.create).toHaveBeenCalled();
+      const updateCall = vi.mocked(prisma.sR.update).mock.calls[0];
+      const updateData = updateCall?.[0]?.data;
+      // @ts-ignore - inspecting private details of update call
+      expect(updateData?.activities?.create).toBeDefined();
 
       // Verify notifications
       expect(emailService.sendSRStatusChanged).toHaveBeenCalled();
