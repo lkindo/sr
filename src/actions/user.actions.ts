@@ -11,7 +11,7 @@ import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
-import { userUpdateSchema } from '@/lib/schemas';
+import { changePasswordSchema, userUpdateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
 export async function updateUserAction(
@@ -43,17 +43,18 @@ export async function updateUserAction(
 
 export async function changePasswordAction(formData: FormData): Promise<Result<void>> {
   try {
-    const currentPassword = getFormDataValue(formData, 'currentPassword') || '';
-    const newPassword = getFormDataValue(formData, 'newPassword') || '';
-    const confirmPassword = getFormDataValue(formData, 'confirmPassword') || '';
+    const data = {
+      currentPassword: getFormDataValue(formData, 'currentPassword') || '',
+      newPassword: getFormDataValue(formData, 'newPassword') || '',
+      confirmNewPassword: getFormDataValue(formData, 'confirmPassword') || '',
+    };
 
-    if (newPassword !== confirmPassword) {
-      return fail('새 비밀번호와 확인 비밀번호가 일치하지 않습니다.', 'VALIDATION_ERROR');
+    const validationResult = validateWithSchema(data, changePasswordSchema);
+    if (!validationResult.success) {
+      return validationResult;
     }
 
-    if (newPassword.length < 8) {
-      return fail('비밀번호는 최소 8자 이상이어야 합니다.', 'VALIDATION_ERROR');
-    }
+    const { currentPassword, newPassword } = validationResult.data;
 
     const session = await authenticateAndAuthorize('user:change_password');
 
