@@ -63,6 +63,11 @@ vi.mock('@/lib/policies', () => ({
   ensureCanDeleteSR: vi.fn(),
 }));
 
+vi.mock('@/lib/sr-state-machine', () => ({
+  validateTransition: vi.fn().mockReturnValue({ valid: true }),
+  getRequiredFields: vi.fn().mockReturnValue([]),
+}));
+
 describe('SRService', () => {
   let srService: SRService;
   // no repository mocks needed here
@@ -139,7 +144,7 @@ describe('SRService', () => {
       );
     });
 
-    it.skip('should execute notification logic during transaction', async () => {
+    it('should execute notification logic during transaction', async () => {
       const existingSR = {
         id: 'sr-1',
         status: 'REQUESTED',
@@ -152,13 +157,6 @@ describe('SRService', () => {
       };
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as any);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
-
-      // Mock dependencies for validation
-      const stateMachine = await import('@/lib/sr-state-machine');
-      // @ts-expect-error: Mocking read-only property for testing
-      stateMachine.validateTransition = vi.fn().mockReturnValue({ valid: true });
-      // @ts-expect-error: Mocking read-only property for testing
-      stateMachine.getRequiredFields = vi.fn().mockReturnValue([]);
 
       // Mock the update result
       const mockUpdateResult = {
@@ -204,10 +202,17 @@ describe('SRService', () => {
 
       // Verify
       expect(txMock.sR.update).toHaveBeenCalled();
-      expect(txMock.sRActivity.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ type: 'STATUS_CHANGED' }),
-        })
+      // Optimization: Activity creation is now nested in update, not a separate call
+      expect(txMock.sRActivity.create).not.toHaveBeenCalled();
+
+      // Verify nested activity creation
+      const updateCall = vi.mocked(txMock.sR.update).mock.calls[0];
+      const updateData = updateCall?.[0]?.data;
+      // @ts-ignore
+      expect(updateData?.activities?.create).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'STATUS_CHANGED' }),
+        ])
       );
 
       expect(sendEmailSpy).toHaveBeenCalledWith(
