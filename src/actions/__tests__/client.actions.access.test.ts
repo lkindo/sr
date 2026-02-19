@@ -37,6 +37,7 @@ describe('getClientAction Security', () => {
     (getAuthenticatedSession as any).mockResolvedValue({
       user: {
         id: 'user-1',
+        roles: [],
         permissions: [],
         clientIds: [],
       },
@@ -54,6 +55,7 @@ describe('getClientAction Security', () => {
     (getAuthenticatedSession as any).mockResolvedValue({
       user: {
         id: 'admin-1',
+        roles: [],
         permissions: [PERMISSIONS.CLIENT.READ],
         clientIds: [],
       },
@@ -69,6 +71,7 @@ describe('getClientAction Security', () => {
     (getAuthenticatedSession as any).mockResolvedValue({
       user: {
         id: 'client-user-1',
+        roles: [],
         permissions: [],
         clientIds: ['client-1'],
       },
