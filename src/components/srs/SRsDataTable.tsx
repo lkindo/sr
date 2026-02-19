@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -12,6 +12,7 @@ import {
   Clock,
   Filter,
   Inbox,
+  Loader2,
   Plus,
   Search,
   SearchX,
@@ -105,6 +106,7 @@ export function SRsDataTable({
   const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const canManageSRs = !isClientUser;
 
+  const [isPending, startTransition] = useTransition();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
@@ -159,20 +161,28 @@ export function SRsDataTable({
 
   const handleFilterChange = (key: string, value: string) => {
     // When filtering, always go back to the first page
-    router.push(`${pathname}?${createQueryString({ [key]: value, page: 1 })}`);
+    startTransition(() => {
+      router.push(`${pathname}?${createQueryString({ [key]: value, page: 1 })}`);
+    });
   };
 
   const handleSort = (field: SortField) => {
     const newOrder = sortField === field && sortOrder === 'asc' ? 'desc' : 'asc';
-    router.push(`${pathname}?${createQueryString({ sort: `${field}.${newOrder}` })}`);
+    startTransition(() => {
+      router.push(`${pathname}?${createQueryString({ sort: `${field}.${newOrder}` })}`);
+    });
   };
 
   const handleItemsPerPageChange = (value: string) => {
-    router.push(`${pathname}?${createQueryString({ itemsPerPage: value, page: 1 })}`);
+    startTransition(() => {
+      router.push(`${pathname}?${createQueryString({ itemsPerPage: value, page: 1 })}`);
+    });
   };
 
   const handlePageChange = (page: number) => {
-    router.push(`${pathname}?${createQueryString({ page })}`);
+    startTransition(() => {
+      router.push(`${pathname}?${createQueryString({ page })}`);
+    });
   };
 
   const handleSearch = () => {
@@ -189,7 +199,9 @@ export function SRsDataTable({
 
   const resetFilters = () => {
     setSearchQuery('');
-    router.push(pathname);
+    startTransition(() => {
+      router.push(pathname);
+    });
   };
 
   const getSortIcon = (field: SortField) => {
@@ -203,7 +215,9 @@ export function SRsDataTable({
 
   const handleSRCreated = () => {
     // Instead of invalidating queries, we just navigate to refresh the server component
-    router.refresh();
+    startTransition(() => {
+      router.refresh();
+    });
     setIsCreateDialogOpen(false);
   };
 
@@ -536,241 +550,249 @@ export function SRsDataTable({
           </span>
         </div>
 
-        {/* Responsive Table - Show Table on larger screens, Cards on smaller screens */}
-        <div className="hidden md:block overflow-x-auto">
-          <Table className="sr-table-template">
-            <TableHeader>
-              <TableRow>
-                <TableHead
-                  aria-sort={
-                    sortField === 'srNumber'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('srNumber')}>
-                    SR 번호{getSortIcon('srNumber')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  className="min-w-[150px]"
-                  aria-sort={
-                    sortField === 'title'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('title')}>
-                    제목{getSortIcon('title')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'client'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('client')}>
-                    고객사{getSortIcon('client')}
-                  </Button>
-                </TableHead>
-                <TableHead>요청자</TableHead>
-                <TableHead>담당자</TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'priority'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('priority')}>
-                    우선순위{getSortIcon('priority')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'status'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('status')}>
-                    상태{getSortIcon('status')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'dueDate'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('dueDate')}>
-                    마감일{getSortIcon('dueDate')}
-                  </Button>
-                </TableHead>
-                <TableHead>댓글/첨부</TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'createdAt'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('createdAt')}>
-                    생성일{getSortIcon('createdAt')}
-                  </Button>
-                </TableHead>
-                <TableHead>작업</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {srs && srs.length > 0 ? (
-                srs.map((sr) => <SRTableRow key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={11}>
-                    {hasActiveFilters ? (
-                      <EmptyState
-                        icon={SearchX}
-                        title="검색 결과가 없습니다"
-                        description="다른 검색어나 필터를 시도해보세요."
-                        action={
-                          <Button variant="outline" onClick={resetFilters}>
-                            필터 초기화
-                          </Button>
-                        }
-                      />
-                    ) : (
-                      <EmptyState
-                        icon={Inbox}
-                        title="SR이 없습니다"
-                        description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
-                        action={
-                          <Button
-                            onClick={() => setIsCreateDialogOpen(true)}
-                            className="sr-btn-template-primary"
-                          >
-                            <Plus className="mr-2 h-4 w-4" /> SR 등록
-                          </Button>
-                        }
-                      />
-                    )}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        {/* Mobile Card View */}
-        <div className="md:hidden space-y-3 p-3">
-          {srs && srs.length > 0 ? (
-            srs.map((sr) => <SRCardItem key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
-          ) : hasActiveFilters ? (
-            <EmptyState
-              icon={SearchX}
-              title="검색 결과가 없습니다"
-              description="다른 검색어나 필터를 시도해보세요."
-              action={
-                <Button variant="outline" onClick={resetFilters}>
-                  필터 초기화
-                </Button>
-              }
-            />
-          ) : (
-            <EmptyState
-              icon={Inbox}
-              title="SR이 없습니다"
-              description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
-              action={
-                <Button
-                  onClick={() => setIsCreateDialogOpen(true)}
-                  className="sr-btn-template-primary"
-                >
-                  <Plus className="mr-2 h-4 w-4" /> SR 등록
-                </Button>
-              }
-            />
+        <div className="relative">
+          {isPending && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
+              <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--sr-primary-dark))]" />
+            </div>
           )}
-        </div>
 
-        <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-              <SelectTrigger
-                className="w-[80px] h-9 sr-dropdown-template"
-                aria-label="페이지당 항목 수"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <span className="text-sm text-[hsl(var(--sr-gray-medium))]">페이지당 항목 수</span>
+          {/* Responsive Table - Show Table on larger screens, Cards on smaller screens */}
+          <div className="hidden md:block overflow-x-auto">
+            <Table className="sr-table-template">
+              <TableHeader>
+                <TableRow>
+                  <TableHead
+                    aria-sort={
+                      sortField === 'srNumber'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('srNumber')}>
+                      SR 번호{getSortIcon('srNumber')}
+                    </Button>
+                  </TableHead>
+                  <TableHead
+                    className="min-w-[150px]"
+                    aria-sort={
+                      sortField === 'title'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('title')}>
+                      제목{getSortIcon('title')}
+                    </Button>
+                  </TableHead>
+                  <TableHead
+                    aria-sort={
+                      sortField === 'client'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('client')}>
+                      고객사{getSortIcon('client')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>요청자</TableHead>
+                  <TableHead>담당자</TableHead>
+                  <TableHead
+                    aria-sort={
+                      sortField === 'priority'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('priority')}>
+                      우선순위{getSortIcon('priority')}
+                    </Button>
+                  </TableHead>
+                  <TableHead
+                    aria-sort={
+                      sortField === 'status'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('status')}>
+                      상태{getSortIcon('status')}
+                    </Button>
+                  </TableHead>
+                  <TableHead
+                    aria-sort={
+                      sortField === 'dueDate'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('dueDate')}>
+                      마감일{getSortIcon('dueDate')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>댓글/첨부</TableHead>
+                  <TableHead
+                    aria-sort={
+                      sortField === 'createdAt'
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                  >
+                    <Button variant="ghost" onClick={() => handleSort('createdAt')}>
+                      생성일{getSortIcon('createdAt')}
+                    </Button>
+                  </TableHead>
+                  <TableHead>작업</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {srs && srs.length > 0 ? (
+                  srs.map((sr) => <SRTableRow key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={11}>
+                      {hasActiveFilters ? (
+                        <EmptyState
+                          icon={SearchX}
+                          title="검색 결과가 없습니다"
+                          description="다른 검색어나 필터를 시도해보세요."
+                          action={
+                            <Button variant="outline" onClick={resetFilters}>
+                              필터 초기화
+                            </Button>
+                          }
+                        />
+                      ) : (
+                        <EmptyState
+                          icon={Inbox}
+                          title="SR이 없습니다"
+                          description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
+                          action={
+                            <Button
+                              onClick={() => setIsCreateDialogOpen(true)}
+                              className="sr-btn-template-primary"
+                            >
+                              <Plus className="mr-2 h-4 w-4" /> SR 등록
+                            </Button>
+                          }
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
 
-          {paginationInfo.totalPages > 1 && (
-            <Pagination className="w-auto mx-0">
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (paginationInfo.hasPrevPage)
-                        handlePageChange(paginationInfo.currentPage - 1);
-                    }}
-                    aria-disabled={!paginationInfo.hasPrevPage}
-                    className={
-                      !paginationInfo.hasPrevPage
-                        ? 'pointer-events-none opacity-50 cursor-not-allowed'
-                        : 'cursor-pointer'
-                    }
-                  />
-                </PaginationItem>
-                <div className="flex items-center gap-1 text-sm font-medium mx-2">
-                  {paginationInfo.currentPage} / {paginationInfo.totalPages}
-                </div>
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (paginationInfo.hasNextPage)
-                        handlePageChange(paginationInfo.currentPage + 1);
-                    }}
-                    aria-disabled={!paginationInfo.hasNextPage}
-                    className={
-                      !paginationInfo.hasNextPage
-                        ? 'pointer-events-none opacity-50 cursor-not-allowed'
-                        : 'cursor-pointer'
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-3 p-3">
+            {srs && srs.length > 0 ? (
+              srs.map((sr) => <SRCardItem key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
+            ) : hasActiveFilters ? (
+              <EmptyState
+                icon={SearchX}
+                title="검색 결과가 없습니다"
+                description="다른 검색어나 필터를 시도해보세요."
+                action={
+                  <Button variant="outline" onClick={resetFilters}>
+                    필터 초기화
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon={Inbox}
+                title="SR이 없습니다"
+                description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
+                action={
+                  <Button
+                    onClick={() => setIsCreateDialogOpen(true)}
+                    className="sr-btn-template-primary"
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> SR 등록
+                  </Button>
+                }
+              />
+            )}
+          </div>
+
+          <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
+                <SelectTrigger
+                  className="w-[80px] h-9 sr-dropdown-template"
+                  aria-label="페이지당 항목 수"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={String(option)}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-[hsl(var(--sr-gray-medium))]">페이지당 항목 수</span>
+            </div>
+
+            {paginationInfo.totalPages > 1 && (
+              <Pagination className="w-auto mx-0">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (paginationInfo.hasPrevPage)
+                          handlePageChange(paginationInfo.currentPage - 1);
+                      }}
+                      aria-disabled={!paginationInfo.hasPrevPage}
+                      className={
+                        !paginationInfo.hasPrevPage
+                          ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer'
+                      }
+                    />
+                  </PaginationItem>
+                  <div className="flex items-center gap-1 text-sm font-medium mx-2">
+                    {paginationInfo.currentPage} / {paginationInfo.totalPages}
+                  </div>
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (paginationInfo.hasNextPage)
+                          handlePageChange(paginationInfo.currentPage + 1);
+                      }}
+                      aria-disabled={!paginationInfo.hasNextPage}
+                      className={
+                        !paginationInfo.hasNextPage
+                          ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer'
+                      }
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </div>
         </div>
       </div>
 

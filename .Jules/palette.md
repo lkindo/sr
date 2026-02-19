@@ -24,3 +24,8 @@
 
 **Learning:** Search inputs without a clear action force users to manually delete text, which is tedious. Adding a dedicated "Clear" button that resets focus to the input significantly improves the search experience.
 **Action:** Always include a clear button in search inputs, and ensure it manages focus correctly (returns focus to input).
+
+## 2025-05-23 - Router Navigation Loading State
+
+**Learning:** Next.js `router.push` navigation in client components does not provide built-in loading feedback, which can make the UI feel unresponsive during server-side filtering or sorting.
+**Action:** Wrap `router.push` calls with `useTransition` and use the `isPending` state to show a visual loading indicator (e.g., overlay with spinner) to improve perceived performance.
