@@ -46,14 +46,211 @@ export const GET = withAuthAndRateLimit(
         }
       }
 
-      // Get SR counts by status
-      const srByStatus = await prisma.sR.groupBy({
-        by: ['status'],
-        where: baseWhere,
-        _count: {
-          id: true,
-        },
-      });
+      // Get SR trend (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - STATS.TREND_DAYS);
+
+      // Parallelize independent queries
+      const [
+        srByStatus,
+        srByPriority,
+        countsResult,
+        srByClient,
+        recentSRs,
+        waitingSRs,
+        myAssignedSRsListRaw,
+        srTrendRaw,
+        performanceStatsRaw,
+      ] = await Promise.all([
+        // 1. Get SR counts by status
+        prisma.sR.groupBy({
+          by: ['status'],
+          where: baseWhere,
+          _count: {
+            id: true,
+          },
+        }),
+        // 2. Get SR counts by priority
+        prisma.sR.groupBy({
+          by: ['priority'],
+          where: baseWhere,
+          _count: {
+            id: true,
+          },
+        }),
+        // 3. Get total counts - optimized with single query using conditional aggregation
+        prisma.$queryRaw<
+          Array<{
+            totalSRs: bigint;
+            inProgressSRs: bigint;
+            completedSRs: bigint;
+            pendingSRs: bigint;
+            requestedSRs: bigint;
+            urgentSRs: bigint;
+            myAssignedSRs: bigint;
+            myAssignedInProgress: bigint;
+          }>
+        >`
+          SELECT
+            COUNT(*)::int as "totalSRs",
+            COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int as "inProgressSRs",
+            COUNT(*) FILTER (WHERE status IN ('COMPLETED', 'CONFIRMED'))::int as "completedSRs",
+            COUNT(*) FILTER (WHERE status IN ('REQUESTED', 'INTAKE'))::int as "pendingSRs",
+            COUNT(*) FILTER (WHERE status = 'REQUESTED')::int as "requestedSRs",
+            COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int as "urgentSRs",
+            ${
+              isEngineer
+                ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId})::int as "myAssignedSRs",`
+                : Prisma.sql`0 as "myAssignedSRs",`
+            }
+            ${
+              isEngineer
+                ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId} AND status = 'IN_PROGRESS')::int as "myAssignedInProgress"`
+                : Prisma.sql`0 as "myAssignedInProgress"`
+            }
+          FROM "srs"
+          WHERE 1=1
+          ${
+            !isAdminManagerEngineer
+              ? userClientIds.length > 0
+                ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
+                : Prisma.sql`AND 1=0`
+              : Prisma.empty
+          }
+        `,
+        // 4. Get SR counts by client
+        prisma.sR.groupBy({
+          by: ['clientId'],
+          where: baseWhere,
+          _count: {
+            id: true,
+          },
+          orderBy: {
+            _count: {
+              id: 'desc',
+            },
+          },
+          take: PAGINATION.DASHBOARD_TOP_CLIENTS,
+        }),
+        // 5. Get recent SRs
+        prisma.sR.findMany({
+          where: baseWhere,
+          take: PAGINATION.DASHBOARD_RECENT_SRS,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            client: {
+              select: {
+                name: true,
+                code: true,
+              },
+            },
+            requester: {
+              select: {
+                name: true,
+              },
+            },
+            assignee: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        }),
+        // 6. 접수 대기 SR 목록 (REQUESTED 상태, 최대 5개)
+        prisma.sR.findMany({
+          where: { ...baseWhere, status: 'REQUESTED' },
+          take: PAGINATION.DASHBOARD_WAITING_SRS,
+          orderBy: { createdAt: 'asc' }, // 오래된 것부터
+          include: {
+            client: {
+              select: {
+                name: true,
+                code: true,
+              },
+            },
+            requester: {
+              select: {
+                name: true,
+              },
+            },
+            serviceCategory: {
+              select: {
+                categoryName: true,
+                priority: true,
+              },
+            },
+          },
+        }),
+        // 7. 내 담당 SR 목록 (ENGINEER용, 최대 5개)
+        isEngineer
+          ? prisma.sR.findMany({
+              where: { ...baseWhere, assigneeId: userId },
+              take: PAGINATION.DASHBOARD_MY_ASSIGNED,
+              orderBy: { dueDate: 'asc' }, // 마감일이 가까운 것부터
+              include: {
+                client: {
+                  select: {
+                    name: true,
+                    code: true,
+                  },
+                },
+                requester: {
+                  select: {
+                    name: true,
+                  },
+                },
+                serviceCategory: {
+                  select: {
+                    categoryName: true,
+                  },
+                },
+              },
+            })
+          : Promise.resolve([]),
+        // 8. Get SR trend (last 30 days) - Optimized: Group by date in DB using raw SQL
+        prisma.$queryRaw<Array<{ date: Date | string; count: bigint }>>`
+          SELECT DATE(created_at) as date, COUNT(id) as count
+          FROM srs
+          WHERE created_at >= ${thirtyDaysAgo}
+          ${
+            !isAdminManagerEngineer
+              ? userClientIds.length > 0
+                ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
+                : Prisma.sql`AND 1=0`
+              : Prisma.empty
+          }
+          GROUP BY DATE(created_at)
+        `,
+        // 9. 성능 지표 계산 - DB Aggregation
+        prisma.$queryRaw<
+          Array<{ avgProcessingHours: number | null; slaComplianceRate: number | null }>
+        >`
+          SELECT
+            AVG(EXTRACT(EPOCH FROM (completed_at - intake_at)) / 3600)::float as "avgProcessingHours",
+            COUNT(*) FILTER (WHERE completed_at <= due_date)::float * 100.0 / NULLIF(COUNT(*), 0) as "slaComplianceRate"
+          FROM "srs"
+          WHERE
+            status IN ('COMPLETED', 'CONFIRMED')
+            AND intake_at IS NOT NULL
+            AND completed_at IS NOT NULL
+            AND created_at >= ${thirtyDaysAgo}
+            ${
+              !isAdminManagerEngineer
+                ? userClientIds.length > 0
+                  ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
+                  : Prisma.sql`AND 1=0`
+                : Prisma.empty
+            }
+        `,
+      ]);
+
+      const myAssignedSRsList = myAssignedSRsListRaw as Prisma.SRGetPayload<{
+        include: {
+          client: { select: { name: true; code: true } };
+          requester: { select: { name: true } };
+          serviceCategory: { select: { categoryName: true } };
+        };
+      }>[];
 
       const statusCounts = srByStatus.reduce(
         (acc, item) => {
@@ -63,15 +260,6 @@ export const GET = withAuthAndRateLimit(
         {} as Record<string, number>
       );
 
-      // Get SR counts by priority
-      const srByPriority = await prisma.sR.groupBy({
-        by: ['priority'],
-        where: baseWhere,
-        _count: {
-          id: true,
-        },
-      });
-
       const priorityCounts = srByPriority.reduce(
         (acc, item) => {
           const key = item.priority ?? 'UNKNOWN';
@@ -80,47 +268,6 @@ export const GET = withAuthAndRateLimit(
         },
         {} as Record<string, number>
       );
-
-      // Get total counts - optimized with single query using conditional aggregation
-      const countsResult = await prisma.$queryRaw<
-        Array<{
-          totalSRs: bigint;
-          inProgressSRs: bigint;
-          completedSRs: bigint;
-          pendingSRs: bigint;
-          requestedSRs: bigint;
-          urgentSRs: bigint;
-          myAssignedSRs: bigint;
-          myAssignedInProgress: bigint;
-        }>
-      >`
-        SELECT
-          COUNT(*)::int as "totalSRs",
-          COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int as "inProgressSRs",
-          COUNT(*) FILTER (WHERE status IN ('COMPLETED', 'CONFIRMED'))::int as "completedSRs",
-          COUNT(*) FILTER (WHERE status IN ('REQUESTED', 'INTAKE'))::int as "pendingSRs",
-          COUNT(*) FILTER (WHERE status = 'REQUESTED')::int as "requestedSRs",
-          COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int as "urgentSRs",
-          ${
-            isEngineer
-              ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId})::int as "myAssignedSRs",`
-              : Prisma.sql`0 as "myAssignedSRs",`
-          }
-          ${
-            isEngineer
-              ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId} AND status = 'IN_PROGRESS')::int as "myAssignedInProgress"`
-              : Prisma.sql`0 as "myAssignedInProgress"`
-          }
-        FROM "srs"
-        WHERE 1=1
-        ${
-          !isAdminManagerEngineer
-            ? userClientIds.length > 0
-              ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
-              : Prisma.sql`AND 1=0`
-            : Prisma.empty
-        }
-      `;
 
       // Helper to safely convert BigInt or number to number
       const toNum = (val: bigint | number | null | undefined) => Number(val ?? 0);
@@ -145,21 +292,7 @@ export const GET = withAuthAndRateLimit(
       const myAssignedSRs = toNum(counts.myAssignedSRs);
       const myAssignedInProgress = toNum(counts.myAssignedInProgress);
 
-      // Get SR counts by client
-      const srByClient = await prisma.sR.groupBy({
-        by: ['clientId'],
-        where: baseWhere,
-        _count: {
-          id: true,
-        },
-        orderBy: {
-          _count: {
-            id: 'desc',
-          },
-        },
-        take: PAGINATION.DASHBOARD_TOP_CLIENTS,
-      });
-
+      // Get client details (Requires srByClient)
       const clientIds = srByClient.map((item) => item.clientId);
       const clients = await prisma.client.findMany({
         where: { id: { in: clientIds } },
@@ -183,132 +316,6 @@ export const GET = withAuthAndRateLimit(
           count: item._count.id,
         };
       });
-
-      // Get recent SRs
-      const recentSRs = await prisma.sR.findMany({
-        where: baseWhere,
-        take: PAGINATION.DASHBOARD_RECENT_SRS,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          client: {
-            select: {
-              name: true,
-              code: true,
-            },
-          },
-          requester: {
-            select: {
-              name: true,
-            },
-          },
-          assignee: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      });
-
-      // 접수 대기 SR 목록 (REQUESTED 상태, 최대 5개)
-      const waitingSRs = await prisma.sR.findMany({
-        where: { ...baseWhere, status: 'REQUESTED' },
-        take: PAGINATION.DASHBOARD_WAITING_SRS,
-        orderBy: { createdAt: 'asc' }, // 오래된 것부터
-        include: {
-          client: {
-            select: {
-              name: true,
-              code: true,
-            },
-          },
-          requester: {
-            select: {
-              name: true,
-            },
-          },
-          serviceCategory: {
-            select: {
-              categoryName: true,
-              priority: true,
-            },
-          },
-        },
-      });
-
-      // 내 담당 SR 목록 (ENGINEER용, 최대 5개)
-      let myAssignedSRsList: Prisma.SRGetPayload<{
-        include: {
-          client: { select: { name: true; code: true } };
-          requester: { select: { name: true } };
-          serviceCategory: { select: { categoryName: true } };
-        };
-      }>[] = [];
-      if (isEngineer) {
-        myAssignedSRsList = await prisma.sR.findMany({
-          where: { ...baseWhere, assigneeId: userId },
-          take: PAGINATION.DASHBOARD_MY_ASSIGNED,
-          orderBy: { dueDate: 'asc' }, // 마감일이 가까운 것부터
-          include: {
-            client: {
-              select: {
-                name: true,
-                code: true,
-              },
-            },
-            requester: {
-              select: {
-                name: true,
-              },
-            },
-            serviceCategory: {
-              select: {
-                categoryName: true,
-              },
-            },
-          },
-        });
-      }
-
-      // Get SR trend (last 30 days)
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - STATS.TREND_DAYS);
-
-      // Optimize: Group by date in DB using raw SQL instead of fetching all timestamps
-      const srTrendRaw = await prisma.$queryRaw<Array<{ date: Date | string; count: bigint }>>`
-        SELECT DATE(created_at) as date, COUNT(id) as count
-        FROM srs
-        WHERE created_at >= ${thirtyDaysAgo}
-        ${
-          !isAdminManagerEngineer
-            ? userClientIds.length > 0
-              ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
-              : Prisma.sql`AND 1=0`
-            : Prisma.empty
-        }
-        GROUP BY DATE(created_at)
-      `;
-
-      // 성능 지표 계산 - DB Aggregation
-      const performanceStatsRaw = await prisma.$queryRaw<
-        Array<{ avgProcessingHours: number | null; slaComplianceRate: number | null }>
-      >`
-        SELECT
-          AVG(EXTRACT(EPOCH FROM (completed_at - intake_at)) / 3600)::float as "avgProcessingHours",
-          COUNT(*) FILTER (WHERE completed_at <= due_date)::float * 100.0 / NULLIF(COUNT(*), 0) as "slaComplianceRate"
-        FROM "srs"
-        WHERE
-          status IN ('COMPLETED', 'CONFIRMED')
-          AND intake_at IS NOT NULL
-          AND completed_at IS NOT NULL
-          AND created_at >= ${thirtyDaysAgo}
-          ${
-            !isAdminManagerEngineer
-              ? userClientIds.length > 0
-                ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
-                : Prisma.sql`AND 1=0`
-              : Prisma.empty
-          }
-      `;
 
       const performanceStats = performanceStatsRaw[0] || {
         avgProcessingHours: null,
