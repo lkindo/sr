@@ -45,7 +45,7 @@ describe('ClientService Security', () => {
       const usersInclude = args?.include?.users;
       expect(usersInclude).toBeDefined();
 
-      const userSelect = usersInclude?.include?.user?.select;
+      const userSelect = (usersInclude as any)?.include?.user?.select;
       expect(userSelect).toBeDefined();
       expect(userSelect).toHaveProperty('id', true);
       expect(userSelect).toHaveProperty('email', true);
@@ -55,12 +55,12 @@ describe('ClientService Security', () => {
       const handlersInclude = args?.include?.clientHandlers;
       expect(handlersInclude).toBeDefined();
 
-      const handlerUserSelect = handlersInclude?.include?.user?.select;
+      const handlerUserSelect = (handlersInclude as any)?.include?.user?.select;
       expect(handlerUserSelect).toBeDefined();
       expect(handlerUserSelect).toHaveProperty('id', true);
       expect(handlerUserSelect).not.toHaveProperty('password');
 
-      const backupHandlerSelect = handlersInclude?.include?.backupHandler?.select;
+      const backupHandlerSelect = (handlersInclude as any)?.include?.backupHandler?.select;
       expect(backupHandlerSelect).toBeDefined();
       expect(backupHandlerSelect).toHaveProperty('id', true);
       expect(backupHandlerSelect).not.toHaveProperty('password');

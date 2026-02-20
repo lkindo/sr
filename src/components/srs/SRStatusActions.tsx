@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, Clock, Loader2, PauseCircle, Play, RotateCcw, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui';
+import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 
 import { CompleteSRDialog } from './CompleteSRDialog';
@@ -48,6 +49,8 @@ export function SRStatusActions({
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const { mutateAsync: changeStatus } = useChangeSRStatus(srId);
+
   // 권한 체크
   const hasRole = (roles: string[]) => roles.some((role) => userRoles.includes(role));
   const canManage = hasRole(['ADMIN', 'MANAGER', 'ENGINEER']);
@@ -59,36 +62,19 @@ export function SRStatusActions({
     setLoadingAction(action);
 
     try {
-      const response = await fetch(`/api/srs/${srId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || '상태 변경에 실패했습니다.');
-      }
+      await changeStatus({ action });
 
       toast({
         title: '성공',
         description: '상태가 변경되었습니다.',
       });
-
-      // 캐시 무효화 및 페이지 새로고침 (완료될 때까지 대기)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sr', srId] }),
-        queryClient.invalidateQueries({ queryKey: ['srs'] }),
-      ]);
-      router.refresh();
     } catch (error) {
       toast({
         title: '오류',
         description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
         variant: 'destructive',
       });
+      console.error(error);
     } finally {
       setLoadingAction(null);
     }

@@ -8,7 +8,6 @@ import { Download, FileIcon, Trash2 } from 'lucide-react';
 
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
-import { updateSRAction } from '@/actions/sr.actions';
 import { getProfileAction } from '@/actions/user.actions';
 import {
   AlertDialog,
@@ -35,6 +34,7 @@ import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
+import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 
 interface Client {
@@ -115,6 +115,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
   const queryClient = useQueryClient();
   // const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
+  const { mutateAsync: updateSR } = useUpdateSR(sr?.id || '');
 
   // CLIENT_ADMIN, CLIENT_USER인지 확인
   const isClientUser = hasAnyRole(['CLIENT_ADMIN', 'CLIENT_USER']);
@@ -344,11 +345,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
     }
 
     try {
-      const result = await updateSRAction(sr.id, formData);
-
-      if (!result.success) {
-        throw new Error(result.error || 'SR 수정에 실패했습니다.');
-      }
+      await updateSR(formData);
 
       // Upload attachments if any
       if (files.length > 0) {
@@ -364,9 +361,9 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
 
       onOpenChange(false); // 다이얼로그 즉시 닫기
 
-      // 병렬 처리로 지연 최소화
+      // 병렬 처리로 지연 최소화 (Optimistic Updates에 의해 UI 갱신은 즉시 되나 데이터 완성을 위해)
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sr', srId] }),
+        queryClient.invalidateQueries({ queryKey: ['sr', sr.id] }),
         Promise.resolve(router.refresh()),
       ]);
 
@@ -377,6 +374,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
         description: error instanceof Error ? error.message : 'SR 수정에 실패했습니다.',
         variant: 'destructive',
       });
+      console.error(error);
     } finally {
       setLoading(false);
     }

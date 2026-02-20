@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { SessionProvider } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { IdleTimeoutProvider } from '@/components/providers/IdleTimeoutProvider';
 import { PWARegistration } from '@/components/providers/PWARegistration';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
 import { Toaster } from '@/components/ui';
@@ -41,9 +42,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
         <RealtimeProvider>
-          {children}
-          <Toaster />
-          <PWARegistration />
+          <IdleTimeoutProvider>
+            {children}
+            <Toaster />
+            <PWARegistration />
+          </IdleTimeoutProvider>
         </RealtimeProvider>
       </SessionProvider>
       {process.env.NODE_ENV === 'development' && <QueryDevtools />}

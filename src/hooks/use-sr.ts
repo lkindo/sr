@@ -144,3 +144,87 @@ export function useDeleteSR() {
     },
   });
 }
+
+/**
+ * SR 상태 변경 훅 (Optimistic Updates 적용)
+ */
+export function useChangeSRStatus(srId: string) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: async ({
+      action,
+      payload = {},
+    }: {
+      action: string;
+      payload?: Record<string, any>;
+    }) => {
+      const response = await fetch(`/api/srs/${srId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action, ...payload }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || '상태 변경에 실패했습니다.');
+      }
+      return await response.json();
+    },
+    onMutate: async ({ action }) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ['sr', srId] });
+
+      // 이전 데이터 백업
+      const previousSR = queryClient.getQueryData<SRDetails>(['sr', srId]);
+
+      // Optimistic Update: 즉시 UI 상태 변경 (단순 추정)
+      if (previousSR) {
+        let optimisticStatus = previousSR.status;
+        if (action === 'start' || action === 'resume' || action === 'reopen') {
+          optimisticStatus = 'IN_PROGRESS';
+        } else if (action === 'hold') {
+          optimisticStatus = 'ON_HOLD';
+        } else if (action === 'reject') {
+          optimisticStatus = 'REJECTED';
+        } else if (action === 'complete') {
+          optimisticStatus = 'COMPLETED';
+        } else if (action === 'confirm') {
+          optimisticStatus = 'CONFIRMED';
+        }
+
+        queryClient.setQueryData<SRDetails>(['sr', srId], {
+          ...previousSR,
+          status: optimisticStatus as SRStatus,
+        });
+      }
+
+      return { previousSR };
+    },
+    onError: (error, variables, context) => {
+      // 에러 발생 시 이전 데이터로 롤백
+      if (context?.previousSR) {
+        queryClient.setQueryData(['sr', srId], context.previousSR);
+      }
+      toast({
+        title: '오류',
+        description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
+        variant: 'destructive',
+      });
+    },
+    onSuccess: () => {
+      // 성공했을 때는 특별히 토스트 할 필요 없이 호출부(컴포넌트)에서 처리하도록 하되,
+      // 목록은 확실히 무효화
+      queryClient.invalidateQueries({ queryKey: ['srs'] });
+    },
+    onSettled: () => {
+      // 쿼리 무효화하여 최신 데이터 가져오기
+      queryClient.invalidateQueries({ queryKey: ['sr', srId] });
+      router.refresh();
+    },
+  });
+}

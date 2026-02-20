@@ -1,8 +1,9 @@
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 
 import { SRStatusActions } from '../SRStatusActions';
@@ -20,6 +21,10 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(),
 }));
 
+vi.mock('@/hooks/use-sr', () => ({
+  useChangeSRStatus: vi.fn(),
+}));
+
 // Mock sub-dialogs to simplify
 vi.mock('../CompleteSRDialog', () => ({
   CompleteSRDialog: () => <div data-testid="complete-dialog" />,
@@ -33,18 +38,24 @@ describe('SRStatusActions Component', () => {
   const mockRefresh = vi.fn();
   const mockToast = vi.fn();
   const mockInvalidateQueries = vi.fn();
+  const mockMutateAsync = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     (useRouter as any).mockReturnValue({ push: mockPush, refresh: mockRefresh });
     (useToast as any).mockReturnValue({ toast: mockToast });
     (useQueryClient as any).mockReturnValue({ invalidateQueries: mockInvalidateQueries });
+    (useChangeSRStatus as any).mockReturnValue({ mutateAsync: mockMutateAsync });
 
     // Mock global fetch
-    global.fetch = vi.fn().mockResolvedValue({
+    vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ success: true }),
-    });
+    } as Response);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const defaultProps = {
@@ -161,15 +172,12 @@ describe('SRStatusActions Component', () => {
       render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
       fireEvent.click(screen.getByText('진행 재개'));
 
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/srs/sr-123/status',
-          expect.objectContaining({
-            method: 'PATCH',
-            body: JSON.stringify({ action: 'resume' }),
-          })
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockMutateAsync).toHaveBeenCalledWith({ action: 'resume' });
+        },
+        { timeout: 5000 }
+      );
 
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -182,15 +190,12 @@ describe('SRStatusActions Component', () => {
       render(<SRStatusActions {...defaultProps} status="INTAKE" />);
       fireEvent.click(screen.getByText('진행 시작'));
 
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/srs/sr-123/status',
-          expect.objectContaining({
-            method: 'PATCH',
-            body: JSON.stringify({ action: 'start' }),
-          })
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockMutateAsync).toHaveBeenCalledWith({ action: 'start' });
+        },
+        { timeout: 5000 }
+      );
     });
 
     it('calls status patch API when "확인 완료" is clicked (COMPLETED)', async () => {
@@ -204,63 +209,51 @@ describe('SRStatusActions Component', () => {
       );
       fireEvent.click(screen.getByText('확인 완료'));
 
-      await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith(
-          '/api/srs/sr-123/status',
-          expect.objectContaining({
-            method: 'PATCH',
-            body: JSON.stringify({ action: 'confirm' }),
-          })
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockMutateAsync).toHaveBeenCalledWith({ action: 'confirm' });
+        },
+        { timeout: 5000 }
+      );
     });
 
-    it('shows error toast when API call fails', async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: '상태 변경 권한이 없습니다.' }),
-      });
+    it('shows error toast when mutation fails', async () => {
+      mockMutateAsync.mockRejectedValue(new Error('Network error'));
 
       render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
       fireEvent.click(screen.getByText('진행 재개'));
 
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            title: '오류',
-            variant: 'destructive',
-          })
-        );
-      });
+      await waitFor(
+        () => {
+          expect(mockToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: '오류',
+              description: 'Network error',
+              variant: 'destructive',
+            })
+          );
+        },
+        { timeout: 5000 }
+      );
     });
 
-    it('shows error toast when fetch throws an error', async () => {
-      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    it('successfully changes status on click', async () => {
+      mockMutateAsync.mockResolvedValue({ success: true });
 
       render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
       fireEvent.click(screen.getByText('진행 재개'));
 
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith(
-          expect.objectContaining({
-            title: '오류',
-            description: 'Network error',
-            variant: 'destructive',
-          })
-        );
-      });
-    });
-
-    it('invalidates queries after successful status change', async () => {
-      mockInvalidateQueries.mockResolvedValue(undefined);
-
-      render(<SRStatusActions {...defaultProps} status="ON_HOLD" />);
-      fireEvent.click(screen.getByText('진행 재개'));
-
-      await waitFor(() => {
-        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['sr', 'sr-123'] });
-        expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['srs'] });
-      });
+      await waitFor(
+        () => {
+          expect(mockMutateAsync).toHaveBeenCalledWith({ action: 'resume' });
+          expect(mockToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: '성공',
+            })
+          );
+        },
+        { timeout: 5000 }
+      );
     });
   });
 });

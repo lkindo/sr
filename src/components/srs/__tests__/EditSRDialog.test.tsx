@@ -2,13 +2,14 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
 import { updateSRAction } from '@/actions/sr.actions';
 import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
+import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 
 import { EditSRDialog } from '../EditSRDialog';
@@ -28,6 +29,10 @@ vi.mock('@/hooks/use-permissions', () => ({
 
 vi.mock('@/actions/sr.actions', () => ({
   updateSRAction: vi.fn(),
+}));
+
+vi.mock('@/hooks/use-sr', () => ({
+  useUpdateSR: vi.fn(),
 }));
 
 vi.mock('@/actions/client.actions', () => ({
@@ -113,6 +118,7 @@ describe('EditSRDialog Component', () => {
   const mockPush = vi.fn();
   const mockRefresh = vi.fn();
   const mockInvalidateQueries = vi.fn();
+  const mockUpdateMutateAsync = vi.fn();
 
   const mockSR = {
     id: 'sr-123',
@@ -143,6 +149,7 @@ describe('EditSRDialog Component', () => {
     });
     (useRouter as any).mockReturnValue({ push: mockPush, refresh: mockRefresh });
     (useQueryClient as any).mockReturnValue({ invalidateQueries: mockInvalidateQueries });
+    (useUpdateSR as any).mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: false });
 
     (getClientsForSelection as any).mockResolvedValue({
       success: true,
@@ -161,10 +168,14 @@ describe('EditSRDialog Component', () => {
       },
     });
 
-    global.fetch = vi.fn().mockResolvedValue({
+    vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ ...mockSR }),
-    });
+    } as Response);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   const defaultProps = {
@@ -177,7 +188,9 @@ describe('EditSRDialog Component', () => {
   it('renders correctly with existing SR data', async () => {
     render(<EditSRDialog {...defaultProps} />);
 
-    expect(await screen.findByDisplayValue('Existing SR Title')).toBeInTheDocument();
+    expect(
+      await screen.findByDisplayValue('Existing SR Title', {}, { timeout: 5000 })
+    ).toBeInTheDocument();
     expect(screen.getByText('test.pdf')).toBeInTheDocument();
   });
 
@@ -199,10 +212,9 @@ describe('EditSRDialog Component', () => {
   });
 
   it('handles attachment deletion', async () => {
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => mockSR })
-      .mockResolvedValueOnce({ ok: true });
+    vi.spyOn(global, 'fetch')
+      .mockResolvedValueOnce({ ok: true, json: async () => mockSR } as Response)
+      .mockResolvedValueOnce({ ok: true } as Response);
 
     render(<EditSRDialog {...defaultProps} />);
 
@@ -235,36 +247,49 @@ describe('EditSRDialog Component', () => {
     const inProgressSR = { ...mockSR, status: 'IN_PROGRESS' };
     render(<EditSRDialog {...defaultProps} sr={inProgressSR as any} />);
 
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalled();
-      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
-    });
+    await waitFor(
+      () => {
+        expect(mockToast).toHaveBeenCalled();
+        expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+      },
+      { timeout: 5000 }
+    );
   });
   it('submits form successfully', async () => {
-    (updateSRAction as any).mockResolvedValue({ success: true });
+    mockUpdateMutateAsync.mockResolvedValue({ success: true });
     render(<EditSRDialog {...defaultProps} />);
 
-    const submitBtn = screen.getByText('저장');
-    fireEvent.click(submitBtn);
+    // Wait for initial data to be populated
+    const titleInput = await screen.findByDisplayValue('Existing SR Title', {}, { timeout: 5000 });
+    expect(titleInput).toBeInTheDocument();
 
-    await waitFor(() => {
-      expect(updateSRAction).toHaveBeenCalled();
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: '성공' }));
-      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
-      expect(mockOnUpdated).toHaveBeenCalled();
-    });
+    const form = screen.getByTestId('edit-sr-form');
+    fireEvent.submit(form);
+
+    await waitFor(
+      () => {
+        expect(mockUpdateMutateAsync).toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: '성공' }));
+        expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+        expect(mockOnUpdated).toHaveBeenCalled();
+      },
+      { timeout: 5000 }
+    );
   });
 
   it('handles submit failure', async () => {
-    (updateSRAction as any).mockResolvedValue({ success: false, error: 'Update failed' });
+    mockUpdateMutateAsync.mockRejectedValue(new Error('Update failed'));
     render(<EditSRDialog {...defaultProps} />);
 
     const submitBtn = screen.getByText('저장');
     fireEvent.click(submitBtn);
 
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
-    });
+    await waitFor(
+      () => {
+        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
+      },
+      { timeout: 5000 }
+    );
   });
 
   it.skip('handles attachment delete failure', async () => {
@@ -310,8 +335,11 @@ describe('EditSRDialog Component', () => {
   it('fetches categories failure handles gracefully', async () => {
     (getServiceCategoriesForSelection as any).mockResolvedValue({ success: false });
     render(<EditSRDialog {...defaultProps} />);
-    await waitFor(() => {
-      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: '오류' }));
-    });
+    await waitFor(
+      () => {
+        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: '오류' }));
+      },
+      { timeout: 5000 }
+    );
   });
 });

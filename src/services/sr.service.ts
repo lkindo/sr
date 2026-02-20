@@ -401,7 +401,7 @@ export class SRService {
 
       if (statusChanged) {
         activitiesToCreate.push({
-          userId: sessionUser.id,
+          user: { connect: { id: sessionUser.id } },
           type: 'STATUS_CHANGED',
           description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
         });
@@ -409,11 +409,9 @@ export class SRService {
 
       if (assigneeChanged) {
         activitiesToCreate.push({
-          userId: sessionUser.id,
+          user: { connect: { id: sessionUser.id } },
           type: 'ASSIGNED',
-          description: assigneeId
-            ? '담당자가 할당되었습니다.'
-            : '담당자 할당이 해제되었습니다.',
+          description: assigneeId ? '담당자가 할당되었습니다.' : '담당자 할당이 해제되었습니다.',
         });
       }
 

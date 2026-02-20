@@ -48,7 +48,9 @@ describe('getClientAction Security', () => {
     // CURRENTLY: This expectation will FAIL because the action allows access
     // AFTER FIX: This expectation will PASS
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/권한이 없습니다/);
+    if (!result.success) {
+      expect(result.error).toMatch(/권한이 없습니다/);
+    }
   });
 
   it('should allow access to user with CLIENT.READ permission', async () => {
@@ -64,7 +66,9 @@ describe('getClientAction Security', () => {
     const result = await getClientAction('client-1');
 
     expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockClient);
+    if (result.success) {
+      expect(result.data).toEqual(mockClient);
+    }
   });
 
   it('should allow access to user belonging to the client', async () => {
@@ -80,6 +84,8 @@ describe('getClientAction Security', () => {
     const result = await getClientAction('client-1');
 
     expect(result.success).toBe(true);
-    expect(result.data).toEqual(mockClient);
+    if (result.success) {
+      expect(result.data).toEqual(mockClient);
+    }
   });
 });

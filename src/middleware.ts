@@ -47,7 +47,44 @@ export default auth(async (req) => {
     return NextResponse.redirect(new URL('/login', req.nextUrl));
   }
 
-  return NextResponse.next();
+  // 3. CSP (Content Security Policy) 적용
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+
+  // NOTE: In development mode, Next.js requires 'unsafe-eval' for HMR.
+  // In production, we omit it for better security.
+  const isDev = process.env.NODE_ENV === 'development';
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data: https:;
+    font-src 'self' data:;
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+    frame-ancestors 'none';
+    block-all-mixed-content;
+    upgrade-insecure-requests;
+  `
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  // 요청 헤더에 x-nonce 추가 (Next.js 가 이 헤더를 읽어 내부 스크립트에 nonce 속성을 부여)
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', cspHeader);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  // 응답 헤더에도 CSP 세팅
+  response.headers.set('Content-Security-Policy', cspHeader);
+  response.headers.set('x-nonce', nonce);
+
+  return response;
 });
 
 export const config = {
