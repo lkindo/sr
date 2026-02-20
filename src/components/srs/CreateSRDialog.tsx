@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { Loader2 } from 'lucide-react';
 
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
@@ -55,7 +55,6 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const { data: session } = useSession();
   const { hasAnyRole } = usePermissions();
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
@@ -447,6 +446,7 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
               취소
             </Button>
             <Button type="submit" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? '요청 중...' : '저장'}
             </Button>
           </DialogFooter>
