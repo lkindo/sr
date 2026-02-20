@@ -29,25 +29,34 @@ describe('Dashboard Stats API Performance', () => {
   });
 
   it('should use single query for counts (Optimized)', async () => {
-    // Setup mocks
-    vi.mocked(prisma.sR.groupBy).mockResolvedValue([]);
+    // Setup mocks for GroupBy (Status)
+    vi.mocked(prisma.sR.groupBy)
+      .mockResolvedValueOnce([
+        { status: 'IN_PROGRESS', _count: { id: 2 } },
+        { status: 'COMPLETED', _count: { id: 3 } },
+        { status: 'REQUESTED', _count: { id: 1 } },
+        { status: 'REJECTED', _count: { id: 4 } }, // Total 10
+      ] as any)
+      // Setup mocks for GroupBy (Priority)
+      .mockResolvedValueOnce([
+        { priority: 'CRITICAL', _count: { id: 1 } },
+        { priority: 'MEDIUM', _count: { id: 9 } },
+      ] as any)
+      // Setup mocks for GroupBy (Client)
+      .mockResolvedValueOnce([
+        { clientId: 'c1', _count: { id: 5 } },
+      ] as any);
+
+    // Setup mocks for MyAssigned counts (Engineer)
+    vi.mocked(prisma.sR.count)
+      .mockResolvedValueOnce(2) // myAssignedSRs
+      .mockResolvedValueOnce(1); // myAssignedInProgress
+
     vi.mocked(prisma.sR.findMany).mockResolvedValue([]);
     vi.mocked(prisma.client.findMany).mockResolvedValue([]);
 
-    // Mock $queryRaw to return counts first, then trend data
+    // Mock $queryRaw to return Trend then Stats (No Counts query anymore)
     vi.mocked(prisma.$queryRaw)
-      .mockResolvedValueOnce([
-        {
-          totalSRs: 10,
-          inProgressSRs: 2,
-          completedSRs: 3,
-          pendingSRs: 1,
-          requestedSRs: 1,
-          urgentSRs: 1,
-          myAssignedSRs: 2,
-          myAssignedInProgress: 1,
-        },
-      ] as any) // Counts query
       .mockResolvedValueOnce([{ date: '2023-10-01', count: 5 }] as any) // Trend query
       .mockResolvedValueOnce([{ avgProcessingHours: 2.5, slaComplianceRate: 95.5 }] as any); // Stats query
 
@@ -58,11 +67,20 @@ describe('Dashboard Stats API Performance', () => {
     expect(response.status).toBe(200);
 
     // Verify optimization
-    expect(prisma.sR.count).not.toHaveBeenCalled();
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3); // Counts, Trend, Stats
+    // We expect sR.count to be called 2 times for ENGINEER (my assigned counts)
+    expect(prisma.sR.count).toHaveBeenCalledTimes(2);
+
+    // We expect $queryRaw to be called 2 times (Trend, Stats) instead of 3
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
 
     // Verify values
     expect(json.summary.total).toBe(10);
     expect(json.summary.inProgress).toBe(2);
+    expect(json.summary.completed).toBe(3);
+    expect(json.summary.requested).toBe(1);
+    expect(json.summary.pending).toBe(1); // REQUESTED + INTAKE(0)
+    expect(json.summary.urgent).toBe(1); // CRITICAL + HIGH(0)
+    expect(json.summary.myAssigned).toBe(2);
+    expect(json.summary.myAssignedInProgress).toBe(1);
   });
 });

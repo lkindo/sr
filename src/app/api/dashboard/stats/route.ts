@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
@@ -23,9 +23,8 @@ export const GET = withAuthAndRateLimit(
     // 사용자별 캐시 키 생성 (역할별로 다른 데이터 표시)
     const baseCacheKey = `dashboard:stats:${userId}:${isAdminManagerEngineer ? 'admin' : 'client'}`;
     // nocache=1 이면 캐시 미스 유도(새 키)로 실시간 계산 강제
-    const cacheKey = noCache ? `${baseCacheKey}:nocache:${Date.now()}` : baseCacheKey;
+    const _cacheKey = noCache ? `${baseCacheKey}:nocache:${Date.now()}` : baseCacheKey;
 
-    // 캐시된 통계 데이터 조회 또는 생성
     // 캐시된 통계 데이터 조회 또는 생성
     const stats = await (async () => {
       // 역할별 필터링 조건 설정
@@ -54,13 +53,15 @@ export const GET = withAuthAndRateLimit(
       const [
         srByStatus,
         srByPriority,
-        countsResult,
+        // countsResult removed (optimization)
         srByClient,
         recentSRs,
         waitingSRs,
         myAssignedSRsListRaw,
         srTrendRaw,
         performanceStatsRaw,
+        myAssignedCount,        // Added for optimization (Engineer only)
+        myAssignedInProgressCount // Added for optimization (Engineer only)
       ] = await Promise.all([
         // 1. Get SR counts by status
         prisma.sR.groupBy({
@@ -78,46 +79,8 @@ export const GET = withAuthAndRateLimit(
             id: true,
           },
         }),
-        // 3. Get total counts - optimized with single query using conditional aggregation
-        prisma.$queryRaw<
-          Array<{
-            totalSRs: bigint;
-            inProgressSRs: bigint;
-            completedSRs: bigint;
-            pendingSRs: bigint;
-            requestedSRs: bigint;
-            urgentSRs: bigint;
-            myAssignedSRs: bigint;
-            myAssignedInProgress: bigint;
-          }>
-        >`
-          SELECT
-            COUNT(*)::int as "totalSRs",
-            COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int as "inProgressSRs",
-            COUNT(*) FILTER (WHERE status IN ('COMPLETED', 'CONFIRMED'))::int as "completedSRs",
-            COUNT(*) FILTER (WHERE status IN ('REQUESTED', 'INTAKE'))::int as "pendingSRs",
-            COUNT(*) FILTER (WHERE status = 'REQUESTED')::int as "requestedSRs",
-            COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int as "urgentSRs",
-            ${
-              isEngineer
-                ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId})::int as "myAssignedSRs",`
-                : Prisma.sql`0 as "myAssignedSRs",`
-            }
-            ${
-              isEngineer
-                ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId} AND status = 'IN_PROGRESS')::int as "myAssignedInProgress"`
-                : Prisma.sql`0 as "myAssignedInProgress"`
-            }
-          FROM "srs"
-          WHERE 1=1
-          ${
-            !isAdminManagerEngineer
-              ? userClientIds.length > 0
-                ? Prisma.sql`AND client_id IN (${Prisma.join(userClientIds)})`
-                : Prisma.sql`AND 1=0`
-              : Prisma.empty
-          }
-        `,
+        // 3. Removed heavy aggregation query
+
         // 4. Get SR counts by client
         prisma.sR.groupBy({
           by: ['clientId'],
@@ -242,6 +205,14 @@ export const GET = withAuthAndRateLimit(
                 : Prisma.empty
             }
         `,
+        // 10. Optimized "My Assigned" counts (Engineer only)
+        isEngineer
+          ? prisma.sR.count({ where: { ...baseWhere, assigneeId: userId } })
+          : Promise.resolve(0),
+        // 11. Optimized "My Assigned In Progress" counts (Engineer only)
+        isEngineer
+          ? prisma.sR.count({ where: { ...baseWhere, assigneeId: userId, status: 'IN_PROGRESS' } })
+          : Promise.resolve(0)
       ]);
 
       const myAssignedSRsList = myAssignedSRsListRaw as Prisma.SRGetPayload<{
@@ -269,28 +240,17 @@ export const GET = withAuthAndRateLimit(
         {} as Record<string, number>
       );
 
-      // Helper to safely convert BigInt or number to number
-      const toNum = (val: bigint | number | null | undefined) => Number(val ?? 0);
+      // In-memory derivation of summary counts (Optimized from DB aggregation)
+      const totalSRs = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+      const inProgressSRs = statusCounts['IN_PROGRESS'] || 0;
+      const completedSRs = (statusCounts['COMPLETED'] || 0) + (statusCounts['CONFIRMED'] || 0);
+      const pendingSRs = (statusCounts['REQUESTED'] || 0) + (statusCounts['INTAKE'] || 0);
+      const requestedSRs = statusCounts['REQUESTED'] || 0;
+      const urgentSRs = (priorityCounts['CRITICAL'] || 0) + (priorityCounts['HIGH'] || 0);
 
-      const counts = countsResult[0] || {
-        totalSRs: 0,
-        inProgressSRs: 0,
-        completedSRs: 0,
-        pendingSRs: 0,
-        requestedSRs: 0,
-        urgentSRs: 0,
-        myAssignedSRs: 0,
-        myAssignedInProgress: 0,
-      };
+      const myAssignedSRs = myAssignedCount;
+      const myAssignedInProgress = myAssignedInProgressCount;
 
-      const totalSRs = toNum(counts.totalSRs);
-      const inProgressSRs = toNum(counts.inProgressSRs);
-      const completedSRs = toNum(counts.completedSRs);
-      const pendingSRs = toNum(counts.pendingSRs);
-      const requestedSRs = toNum(counts.requestedSRs);
-      const urgentSRs = toNum(counts.urgentSRs);
-      const myAssignedSRs = toNum(counts.myAssignedSRs);
-      const myAssignedInProgress = toNum(counts.myAssignedInProgress);
 
       // Get client details (Requires srByClient)
       const clientIds = srByClient.map((item) => item.clientId);
