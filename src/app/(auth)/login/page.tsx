@@ -124,8 +124,8 @@ export default function LoginPage() {
           </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4">
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? '로그인 중...' : '로그인'}
+          <Button type="submit" className="w-full" isLoading={isLoading}>
+            로그인
           </Button>
           <p className="text-sm text-muted-foreground text-center">
             계정이 없으신가요?{' '}

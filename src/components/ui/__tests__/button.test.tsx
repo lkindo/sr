@@ -72,4 +72,28 @@ describe('Button', () => {
     fireEvent.click(button);
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
+
+  it('should show loading spinner and be disabled when isLoading is true', () => {
+    render(<Button isLoading>Loading</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('Loading');
+    // Check if Loader2 is present (it renders an svg)
+    const svg = button.querySelector('svg');
+    expect(svg).toBeInTheDocument();
+    expect(svg).toHaveClass('animate-spin');
+  });
+
+  it('should not show loading spinner when asChild is true even if isLoading is true', () => {
+    render(
+      <Button asChild isLoading>
+        <a href="/link">Link Button</a>
+      </Button>
+    );
+    const link = screen.getByRole('link', { name: /link button/i });
+    expect(link).toBeInTheDocument();
+    // Should verify that the spinner is NOT present inside the link
+    const svg = link.querySelector('svg');
+    expect(svg).not.toBeInTheDocument();
+  });
 });

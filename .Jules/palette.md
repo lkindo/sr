@@ -29,3 +29,7 @@
 
 **Learning:** Next.js `router.push` navigation in client components does not provide built-in loading feedback, which can make the UI feel unresponsive during server-side filtering or sorting.
 **Action:** Wrap `router.push` calls with `useTransition` and use the `isPending` state to show a visual loading indicator (e.g., overlay with spinner) to improve perceived performance.
+
+## 2025-05-23 - Slot Composition and Loading States
+**Learning:** Adding auxiliary elements (like spinners) inside a component using Radix UI's `Slot` (via `asChild`) breaks composition because `Slot` expects a single child. Conditional rendering logic must be careful not to inject multiple children when `asChild` is true.
+**Action:** When implementing `isLoading` or similar wrapper logic in a polymorphic component, disable the injection of extra elements if `asChild` is true, or wrap the logic to ensure a single child is passed.
