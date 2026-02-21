@@ -562,6 +562,11 @@ export class SRService {
     return prisma.sR.findUnique({ where: { id } });
   }
 
+  /**
+   * SR 상세 정보를 조회합니다.
+   * Optimized: Uses explicit selects for related tables (client, serviceCategory)
+   * to avoid over-fetching unused fields like descriptions or addresses.
+   */
   async getSRDetailsById(
     id: string,
     options?: { activitiesLimit?: number; commentsLimit?: number }
@@ -571,7 +576,9 @@ export class SRService {
     return prisma.sR.findUnique({
       where: { id },
       include: {
-        client: true,
+        client: {
+          select: { id: true, code: true, name: true },
+        },
         requester: {
           select: { id: true, name: true, email: true, image: true },
         },
@@ -581,7 +588,14 @@ export class SRService {
         intakeBy: {
           select: { id: true, name: true, email: true, image: true },
         },
-        serviceCategory: true,
+        serviceCategory: {
+          select: {
+            id: true,
+            categoryName: true,
+            slaHours: true,
+            handlerId: true,
+          },
+        },
         activities: {
           include: {
             user: {
