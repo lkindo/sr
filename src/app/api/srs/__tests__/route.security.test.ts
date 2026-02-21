@@ -2,6 +2,8 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PERMISSIONS } from '@/lib/permission-helpers';
+
 // --- Mocks ---
 
 const mocks = vi.hoisted(() => ({
@@ -68,6 +70,7 @@ describe('API Route Security: /api/srs', () => {
         id: 'user-external',
         roles: ['USER'],
         clientIds: ['client-A'],
+        permissions: [PERMISSIONS.SR.READ],
       },
     };
     mocks.isInternalUser.mockReturnValue(false);
@@ -93,6 +96,7 @@ describe('API Route Security: /api/srs', () => {
         id: 'user-admin',
         roles: ['ADMIN'],
         clientIds: [],
+        permissions: [PERMISSIONS.SR.READ],
       },
     };
     mocks.isInternalUser.mockReturnValue(true);
@@ -114,6 +118,7 @@ describe('API Route Security: /api/srs', () => {
         id: 'user-admin',
         roles: ['ADMIN'],
         clientIds: [],
+        permissions: [PERMISSIONS.SR.READ],
       },
     };
     mocks.isInternalUser.mockReturnValue(true);
@@ -139,6 +144,7 @@ describe('API Route Security: /api/srs', () => {
         id: 'user-external',
         roles: ['USER'],
         clientIds: ['client-A'],
+        permissions: [PERMISSIONS.SR.READ],
       },
     };
     mocks.isInternalUser.mockReturnValue(false);
@@ -160,6 +166,7 @@ describe('API Route Security: /api/srs', () => {
         id: 'user-external',
         roles: ['USER'],
         clientIds: [], // No clients
+        permissions: [PERMISSIONS.SR.READ],
       },
     };
     mocks.isInternalUser.mockReturnValue(false);

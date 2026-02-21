@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PERMISSIONS } from '@/lib/permission-helpers';
+
 // Hoist mock functions
 const { mockGetAllSRs, mockCreateSR, mockCheckPermission, mockHandleApiError } = vi.hoisted(() => ({
   mockGetAllSRs: vi.fn(),
@@ -27,7 +29,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
             id: 'user-1',
             email: 'test@example.com',
             roles: [],
-            permissions: [],
+            permissions: [PERMISSIONS.SR.READ],
             clientIds: ['client-1'],
           },
         };
@@ -44,7 +46,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
           user: {
             id: 'user-1',
             roles: [],
-            permissions: [],
+            permissions: [PERMISSIONS.SR.READ],
             clientIds: [],
           },
         };

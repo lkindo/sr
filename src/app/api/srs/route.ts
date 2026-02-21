@@ -4,6 +4,7 @@ import { SRPriority, SRStatus } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
+import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
@@ -19,6 +20,11 @@ export const revalidate = 0;
 // 페이지네이션 지원: ?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc
 export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
+    // 권한 체크: SR:READ 권한 필요
+    if (!hasPermissionFlag(session.user, PERMISSIONS.SR.READ)) {
+      throw new ForbiddenError('SR 조회 권한이 없습니다.');
+    }
+
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request);
 
