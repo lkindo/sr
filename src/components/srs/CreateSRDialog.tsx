@@ -446,8 +446,8 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
             >
               취소
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? '요청 중...' : '저장'}
+            <Button type="submit" isLoading={loading}>
+              저장
             </Button>
           </DialogFooter>
         </form>
