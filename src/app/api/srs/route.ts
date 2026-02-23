@@ -4,10 +4,9 @@ import { SRPriority, SRStatus } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
-import { isInternalUser } from '@/lib/policies';
+import { ensureCanCreateSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
-import { PermissionService } from '@/services/permission.service';
 import { srService } from '@/services/sr.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -76,12 +75,8 @@ export const GET = withAuthAndRateLimit(
 export const POST = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     // 권한 체크: SR:CREATE 권한 필요
-    const permissionService = new PermissionService();
-    const hasPermission = await permissionService.checkPermission(session.user.id, 'SR:CREATE');
-
-    if (!hasPermission) {
-      throw new ForbiddenError('SR 등록 권한이 없습니다. SR:CREATE 권한이 필요합니다.');
-    }
+    // Optimize: Use in-memory check via policy function instead of DB query
+    ensureCanCreateSR(session.user);
 
     const body = await request.json();
     const sr = await srService.createSR(body, session.user);

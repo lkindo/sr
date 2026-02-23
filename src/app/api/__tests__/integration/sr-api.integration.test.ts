@@ -66,7 +66,12 @@ describe('SR API Integration', () => {
   it('Create SR - Valid request calls service', async () => {
     // Mock session
     (auth as any).mockResolvedValue({
-      user: { id: 'user-1', role: 'CLIENT_USER' },
+      user: {
+        id: 'user-1',
+        roles: ['CLIENT_USER'],
+        permissions: ['SR:CREATE'],
+        clientIds: ['client-1'],
+      },
     });
 
     // Mock Service Response
@@ -98,7 +103,12 @@ describe('SR API Integration', () => {
 
   it('Create SR - Validation Error returns 400', async () => {
     (auth as any).mockResolvedValue({
-      user: { id: 'user-1', role: 'CLIENT_USER' },
+      user: {
+        id: 'user-1',
+        roles: ['CLIENT_USER'],
+        permissions: ['SR:CREATE'],
+        clientIds: ['client-1'],
+      },
     });
 
     // Missing title

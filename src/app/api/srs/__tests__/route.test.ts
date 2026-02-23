@@ -22,7 +22,8 @@ vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: vi.fn((handler) => {
     return async (req: any, context: any) => {
       try {
-        const session = {
+        // Use provided session or default to basic user
+        const session = context?.session || {
           user: {
             id: 'user-1',
             email: 'test@example.com',
@@ -40,7 +41,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
   withAuth: vi.fn((handler) => {
     return async (req: any, context: any) => {
       try {
-        const session = {
+        const session = context?.session || {
           user: {
             id: 'user-1',
             roles: [],
@@ -120,7 +121,16 @@ describe('API Route: /api/srs (Integration)', () => {
         body: JSON.stringify({ title: 'New SR', description: 'desc' }),
       });
 
-      const res = await POST(req, { params: Promise.resolve({}) } as any);
+      const session = {
+        user: {
+          id: 'user-1',
+          roles: [],
+          permissions: ['SR:CREATE'],
+          clientIds: ['client-1'],
+        },
+      };
+
+      const res = await POST(req, { params: Promise.resolve({}), session } as any);
 
       expect(res.status).toBe(201);
       const data = await res.json();
@@ -136,7 +146,16 @@ describe('API Route: /api/srs (Integration)', () => {
         body: JSON.stringify({ title: 'No Perm' }),
       });
 
-      const res = await POST(req, { params: Promise.resolve({}) } as any);
+      const session = {
+        user: {
+          id: 'user-1',
+          roles: [],
+          permissions: [], // No permissions
+          clientIds: ['client-1'],
+        },
+      };
+
+      const res = await POST(req, { params: Promise.resolve({}), session } as any);
 
       expect(res.status).toBe(403);
       expect(mockHandleApiError).toHaveBeenCalled();
