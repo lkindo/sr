@@ -26,6 +26,7 @@ describe('Policy Functions', () => {
     it('canCreateSR: verifies create permission', () => {
       const user = { ...userNoPerms, id: 'u-create', permissions: [PERMISSIONS.SR.CREATE] };
       expect(policies.canCreateSR(user)).toBe(true);
+      expect(policies.canCreateSR(adminUser)).toBe(true); // ADMIN implicitly has permission
       expect(policies.canCreateSR(userNoPerms)).toBe(false);
     });
 
@@ -116,6 +117,13 @@ describe('Policy Functions', () => {
       expect(policies.canUpdateSR({ ...user, id: 'other' }, srU)).toBe(false);
       // flag mismatch fails
       expect(policies.canUpdateSR({ ...user, permissions: [] }, srU)).toBe(false);
+    });
+
+    it('canDeleteSR: verifies delete permission', () => {
+      const user = { ...userNoPerms, id: 'u-del', permissions: [PERMISSIONS.SR.DELETE] };
+      expect(policies.canDeleteSR(user)).toBe(true);
+      expect(policies.canDeleteSR(adminUser)).toBe(true); // ADMIN implicitly has permission
+      expect(policies.canDeleteSR(userNoPerms)).toBe(false);
     });
 
     it('ensureCan... throws ForbiddenError on failure', () => {

@@ -21,7 +21,7 @@ export function isInternalUser(user: AuthenticatedUser): boolean {
 // ============================================================================
 
 export function canCreateSR(user: AuthenticatedUser): boolean {
-  return hasPermissionFlag(user, PERMISSIONS.SR.CREATE);
+  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.CREATE);
 }
 
 export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
@@ -77,7 +77,7 @@ export function canUpdateSR(user: AuthenticatedUser, sr: SR): boolean {
 }
 
 export function canDeleteSR(user: AuthenticatedUser): boolean {
-  return hasPermissionFlag(user, PERMISSIONS.SR.DELETE);
+  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.DELETE);
 }
 
 export function ensureCanCreateSR(user: AuthenticatedUser): void {

@@ -21,7 +21,8 @@ const baseSR = {
 const admin = {
   id: 'admin',
   roles: ['ADMIN'],
-  permissions: ['SR:CREATE', 'SR:READ', 'SR:UPDATE', 'SR:DELETE'],
+  // Verify that ADMIN role grants all permissions even if permissions array is empty
+  permissions: [],
   permissionsGrantedAt: {},
   clientIds: ['client-1'],
 } as any;
