@@ -2,10 +2,10 @@ import { compare } from 'bcryptjs';
 
 /**
  * A dummy hash used for constant-time comparison when a user is not found.
- * This hash has a cost of 10, matching the application's default.
- * Generated using bcryptjs with cost 10 and salt.
+ * This hash has a cost of 12, matching the application's default (SECURITY.BCRYPT_WORK_FACTOR).
+ * Generated using bcryptjs with cost 12 and salt.
  */
-const DUMMY_HASH = '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxw96pPrkSL/Cs5qSpG2245.w4r5q';
+const DUMMY_HASH = '$2b$12$jU1yuHrQysMk0JUG2bojU.uo7hYdmoyfVK2K7vtQckT6JpKQ.MCIe';
 
 /**
  * Verifies a password against a hash, or performs a dummy comparison if the hash is missing.
