@@ -148,6 +148,11 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
           >
             {sr.srNumber}
           </Link>
+          <CopyButton
+            value={sr.srNumber}
+            className="h-7 w-7 text-muted-foreground"
+            aria-label={`${sr.srNumber} 번호 복사`}
+          />
           <Badge variant={statusColors[sr.status]} className="text-[10px] h-5 px-1.5 shrink-0">
             {statusLabels[sr.status]}
           </Badge>
