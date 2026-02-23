@@ -143,6 +143,16 @@ export const srUpdateSchema = z.object({
 });
 
 // User Schemas
+export const userCreateSchema = z.object({
+  name: z.string().min(1, '이름을 입력해주세요.').max(100, '이름은 100자를 초과할 수 없습니다.'),
+  email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
+  password: passwordSchema,
+  userType: z.enum(['ENGINEER', 'CLIENT']).optional(),
+  clientId: z.string().optional(),
+  clientIds: z.array(z.string()).optional(),
+  roleIds: z.array(z.string()).optional(),
+});
+
 export const userUpdateSchema = z.object({
   name: z.string().min(1, '이름을 입력해주세요.').optional(),
   email: z.string().email('유효한 이메일 주소를 입력해주세요.').optional(),

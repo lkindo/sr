@@ -4,6 +4,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { ensureCanCreateUser, ensureCanReadUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { userCreateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -42,9 +43,14 @@ export const POST = withAuthAndRateLimit(
     ensureCanCreateUser(session.user);
 
     const body = await request.json();
+    const validatedBody = userCreateSchema.parse(body);
 
     // Security Check: Prevent privilege escalation via role assignment
-    if (body.roleIds && Array.isArray(body.roleIds) && body.roleIds.length > 0) {
+    if (
+      validatedBody.roleIds &&
+      Array.isArray(validatedBody.roleIds) &&
+      validatedBody.roleIds.length > 0
+    ) {
       // 1. Check if user has permission to assign roles
       const canAssignRoles =
         session.user.roles.includes('ADMIN') || session.user.permissions.includes('ROLE:ASSIGN');
@@ -57,7 +63,7 @@ export const POST = withAuthAndRateLimit(
       if (!session.user.roles.includes('ADMIN')) {
         const rolesToAssign = await prisma.role.findMany({
           where: {
-            id: { in: body.roleIds },
+            id: { in: validatedBody.roleIds },
           },
           select: { name: true },
         });
@@ -70,7 +76,7 @@ export const POST = withAuthAndRateLimit(
     }
 
     const userService = new UserService();
-    const user = await userService.createUser(body);
+    const user = await userService.createUser(validatedBody);
 
     return NextResponse.json(user, { status: 201 });
   },

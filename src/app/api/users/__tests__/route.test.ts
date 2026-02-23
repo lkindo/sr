@@ -72,7 +72,11 @@ describe('API Route: /api/users (Integration)', () => {
 
       const req = new NextRequest('http://localhost/api/users', {
         method: 'POST',
-        body: JSON.stringify({ email: 'new@test.com', name: 'New User', password: 'password123' }),
+        body: JSON.stringify({
+          email: 'new@test.com',
+          name: 'New User',
+          password: 'StrongPassword123!',
+        }),
       });
 
       const res = await POST(req, { params: Promise.resolve({}) } as any);

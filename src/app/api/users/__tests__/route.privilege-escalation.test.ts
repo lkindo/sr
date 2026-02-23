@@ -78,7 +78,7 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
       body: JSON.stringify({
         email: 'attacker@evil.com',
         name: 'Attacker',
-        password: 'password123!',
+        password: 'StrongPassword123!',
         roleIds: ['admin-role-id'], // Trying to assign ADMIN role
       }),
     });
@@ -111,6 +111,8 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
       method: 'POST',
       body: JSON.stringify({
         email: 'user@example.com',
+        name: 'User',
+        password: 'StrongPassword123!',
         roleIds: ['some-role-id'],
       }),
     });
@@ -137,6 +139,8 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
       method: 'POST',
       body: JSON.stringify({
         email: 'user@example.com',
+        name: 'User',
+        password: 'StrongPassword123!',
         roleIds: ['engineer-role-id'],
       }),
     });
@@ -166,6 +170,8 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
       method: 'POST',
       body: JSON.stringify({
         email: 'new-admin@example.com',
+        name: 'New Admin',
+        password: 'StrongPassword123!',
         roleIds: ['admin-role-id'],
       }),
     });
