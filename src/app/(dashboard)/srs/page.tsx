@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedClients, getCachedUsers } from '@/lib/cache';
-import prisma from '@/lib/prisma';
 import { srService } from '@/services/sr.service';
 
 type Props = {
@@ -18,6 +17,11 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
 
 export default async function SRsPage({ searchParams }: Props) {
   const resolvedSearchParams = (await searchParams) || {};
+
+  // Start fetching cached data early (parallel execution)
+  const clientsPromise = getCachedClients();
+  const usersPromise = getCachedUsers();
+
   const page = parseInt(getSearchParam(resolvedSearchParams.page) ?? '1', 10);
   const itemsPerPage = parseInt(getSearchParam(resolvedSearchParams.itemsPerPage) ?? '20', 10);
   const sort = getSearchParam(resolvedSearchParams.sort) ?? 'createdAt.desc';
@@ -43,15 +47,8 @@ export default async function SRsPage({ searchParams }: Props) {
   const where: Prisma.SRWhereInput = {};
 
   // 고객사 사용자인 경우 해당 고객사의 SR만 조회
-  let userClientIds: string[] = [];
-  if (!isAdminManagerEngineer && session?.user?.id) {
-    const userClients = await prisma.userClient.findMany({
-      where: { userId: session.user.id },
-      select: { clientId: true },
-    });
-
-    userClientIds = userClients.map((uc) => uc.clientId);
-  }
+  // Optimized: Use clientIds from session instead of DB query
+  const userClientIds: string[] = session?.user?.clientIds || [];
 
   if (status && status !== 'all')
     where.status = status as
@@ -134,19 +131,18 @@ export default async function SRsPage({ searchParams }: Props) {
 
   const orderBy = getOrderBy();
 
-  // Fetch SR data first
-  const srData = await srService.getAllSRs({
-    where,
-    orderBy,
-    skip: (page - 1) * itemsPerPage,
-    take: itemsPerPage,
-  });
-
-  // Use cached data for clients and users to reduce database connections
-  const clients = await getCachedClients();
-  const users = await getCachedUsers();
-
-  const totalCount = await srService.countSRs({ where });
+  // Fetch all data in parallel
+  const [srData, totalCount, clients, users] = await Promise.all([
+    srService.getAllSRs({
+      where,
+      orderBy,
+      skip: (page - 1) * itemsPerPage,
+      take: itemsPerPage,
+    }),
+    srService.countSRs({ where }),
+    clientsPromise,
+    usersPromise,
+  ]);
 
   const paginationInfo = {
     currentPage: page,
