@@ -144,4 +144,24 @@ describe('SRsDataTable Accessibility', () => {
     const srNumberHeader = screen.getByRole('columnheader', { name: /SR 번호/i });
     expect(srNumberHeader).toHaveAttribute('aria-sort', 'none');
   });
+
+  it('renders correct aria-pressed attributes on quick filter buttons', () => {
+    // Mock active filter state: waiting
+    const params = new URLSearchParams();
+    params.set('status', 'REQUESTED');
+    vi.mocked(useSearchParams).mockReturnValue(params as any);
+
+    render(<SRsDataTable {...defaultProps} />);
+
+    // Check Waiting button
+    const waitingButton = screen.getByRole('button', { name: /접수 대기 목록 필터/ });
+    expect(waitingButton).toHaveAttribute('aria-pressed', 'true');
+
+    // Check other buttons
+    const urgentButton = screen.getByRole('button', { name: /긴급 요청 목록 필터/ });
+    expect(urgentButton).toHaveAttribute('aria-pressed', 'false');
+
+    const myButton = screen.getByRole('button', { name: /나의 담당 목록 필터/ });
+    expect(myButton).toHaveAttribute('aria-pressed', 'false');
+  });
 });

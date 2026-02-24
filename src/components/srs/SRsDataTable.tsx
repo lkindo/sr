@@ -72,7 +72,11 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
+    <div
+      className="flex flex-col items-center justify-center py-12 text-center"
+      role="status"
+      aria-live="polite"
+    >
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 mb-4">
         <Icon className="h-6 w-6 text-muted-foreground" />
       </div>
@@ -230,6 +234,10 @@ export function SRsDataTable({
     return srs.filter((sr) => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;
   }, [srs]);
 
+  const myAssignedCount = useMemo(() => {
+    return srs.filter((sr) => sr.assigneeId === session?.user?.id).length;
+  }, [srs, session]);
+
   const inProgressCount = useMemo(() => {
     return srs.filter((sr) => sr.status === 'IN_PROGRESS').length;
   }, [srs]);
@@ -307,9 +315,12 @@ export function SRsDataTable({
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
                 <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
                   <button
+                    type="button"
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
                     }
+                    aria-pressed={activeQuickFilter === 'waiting'}
+                    aria-label={`접수 대기 목록 필터, ${waitingCount}건`}
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'waiting'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
@@ -329,9 +340,12 @@ export function SRsDataTable({
                     </span>
                   </button>
                   <button
+                    type="button"
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
                     }
+                    aria-pressed={activeQuickFilter === 'myAssigned'}
+                    aria-label={`나의 담당 목록 필터, ${myAssignedCount}건`}
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'myAssigned'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
@@ -347,13 +361,16 @@ export function SRsDataTable({
                           : 'bg-muted-foreground text-white'
                       }`}
                     >
-                      {srs.filter((sr) => sr.assigneeId === session?.user?.id).length}
+                      {myAssignedCount}
                     </span>
                   </button>
                   <button
+                    type="button"
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
                     }
+                    aria-pressed={activeQuickFilter === 'urgent'}
+                    aria-label={`긴급 요청 목록 필터, ${urgentCount}건`}
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'urgent'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
