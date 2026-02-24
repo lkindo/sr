@@ -222,31 +222,41 @@ export function SRsDataTable({
   };
 
   // Calculate filter counts
-  const waitingCount = useMemo(() => {
-    return srs.filter((sr) => sr.status === 'REQUESTED').length;
+  // Optimized: Calculate all counts in a single pass (O(N)) instead of 4 passes (O(4N))
+  // Also avoids creating 'new Date()' N times for dueToday calculation
+  const counts = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
+
+    return srs.reduce(
+      (acc, sr) => {
+        if (sr.status === 'REQUESTED') acc.waiting++;
+        if (sr.priority === 'CRITICAL' || sr.priority === 'HIGH') acc.urgent++;
+        if (sr.status === 'IN_PROGRESS') acc.inProgress++;
+
+        if (sr.dueDate) {
+          const due = new Date(sr.dueDate);
+          due.setHours(0, 0, 0, 0);
+          if (
+            due.getTime() === todayTime &&
+            ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)
+          ) {
+            acc.dueToday++;
+          }
+        }
+        return acc;
+      },
+      { waiting: 0, urgent: 0, inProgress: 0, dueToday: 0 }
+    );
   }, [srs]);
 
-  const urgentCount = useMemo(() => {
-    return srs.filter((sr) => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;
-  }, [srs]);
-
-  const inProgressCount = useMemo(() => {
-    return srs.filter((sr) => sr.status === 'IN_PROGRESS').length;
-  }, [srs]);
-
-  const dueTodayCount = useMemo(() => {
-    return srs.filter((sr) => {
-      if (!sr.dueDate) return false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const due = new Date(sr.dueDate);
-      due.setHours(0, 0, 0, 0);
-      return (
-        due.getTime() === today.getTime() &&
-        ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)
-      );
-    }).length;
-  }, [srs]);
+  const {
+    waiting: waitingCount,
+    urgent: urgentCount,
+    inProgress: inProgressCount,
+    dueToday: dueTodayCount,
+  } = counts;
 
   const activeQuickFilter = useMemo(() => {
     if (filters.status === 'REQUESTED') return 'waiting';
