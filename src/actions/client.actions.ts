@@ -9,7 +9,7 @@ import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
 import { logger } from '@/lib/logger';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
-import { ensureCanReadClient } from '@/lib/policies';
+import { ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
@@ -147,11 +147,16 @@ export async function getClientsForSelection() {
     logger.debug('🔍 [getClientsForSelection] 고객사 목록 조회 시작');
 
     // 인증 및 권한 확인 (고객사 조회 권한 필요)
-    await authenticateAndAuthorize(PERMISSIONS.CLIENT.READ);
+    const session = await authenticateAndAuthorize(PERMISSIONS.CLIENT.READ);
 
     const clientService = new ClientService();
+
+    // 내부 사용자인지 확인하여 필터링 적용
+    const isInternal = isInternalUser(session.user);
+    const clientIds = isInternal ? undefined : (session.user.clientIds || []);
+
     // 필요한 정보만 선택적으로 조회 (보안 강화)
-    const clients = await clientService.getClientsForSelection();
+    const clients = await clientService.getClientsForSelection(clientIds);
 
     logger.debug('✅ [getClientsForSelection] 고객사 조회 성공:', {
       count: clients.length,
