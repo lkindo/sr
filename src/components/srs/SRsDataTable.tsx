@@ -221,31 +221,29 @@ export function SRsDataTable({
     setIsCreateDialogOpen(false);
   };
 
-  // Calculate filter counts
-  const waitingCount = useMemo(() => {
-    return srs.filter((sr) => sr.status === 'REQUESTED').length;
-  }, [srs]);
+  // Calculate filter counts - Optimized to single pass O(N)
+  const counts = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTime = today.getTime();
 
-  const urgentCount = useMemo(() => {
-    return srs.filter((sr) => sr.priority === 'CRITICAL' || sr.priority === 'HIGH').length;
-  }, [srs]);
+    return srs.reduce(
+      (acc, sr) => {
+        if (sr.status === 'REQUESTED') acc.waiting++;
+        if (sr.priority === 'CRITICAL' || sr.priority === 'HIGH') acc.urgent++;
+        if (sr.status === 'IN_PROGRESS') acc.inProgress++;
 
-  const inProgressCount = useMemo(() => {
-    return srs.filter((sr) => sr.status === 'IN_PROGRESS').length;
-  }, [srs]);
-
-  const dueTodayCount = useMemo(() => {
-    return srs.filter((sr) => {
-      if (!sr.dueDate) return false;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const due = new Date(sr.dueDate);
-      due.setHours(0, 0, 0, 0);
-      return (
-        due.getTime() === today.getTime() &&
-        ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)
-      );
-    }).length;
+        if (sr.dueDate && ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)) {
+          const due = new Date(sr.dueDate);
+          due.setHours(0, 0, 0, 0);
+          if (due.getTime() === todayTime) {
+            acc.dueToday++;
+          }
+        }
+        return acc;
+      },
+      { waiting: 0, urgent: 0, inProgress: 0, dueToday: 0 }
+    );
   }, [srs]);
 
   const activeQuickFilter = useMemo(() => {
@@ -284,16 +282,16 @@ export function SRsDataTable({
           <div className="hidden md:flex gap-2 mb-4 flex-wrap">
             <Badge variant="secondary" className="text-sm px-3 py-1">
               <Clock className="mr-1 h-3 w-3" />
-              접수 대기 ({waitingCount})
+              접수 대기 ({counts.waiting})
             </Badge>
             <Badge variant="default" className="text-sm px-3 py-1">
               <TrendingUp className="mr-1 h-3 w-3" />
-              진행중 ({inProgressCount})
+              진행중 ({counts.inProgress})
             </Badge>
-            {dueTodayCount > 0 && (
+            {counts.dueToday > 0 && (
               <Badge variant="destructive" className="text-sm px-3 py-1">
                 <AlertCircle className="mr-1 h-3 w-3" />
-                오늘 마감 ({dueTodayCount})
+                오늘 마감 ({counts.dueToday})
               </Badge>
             )}
             <Badge variant="outline" className="text-sm px-3 py-1">
@@ -325,7 +323,7 @@ export function SRsDataTable({
                           : 'bg-destructive text-white'
                       }`}
                     >
-                      {waitingCount}
+                      {counts.waiting}
                     </span>
                   </button>
                   <button
@@ -369,7 +367,7 @@ export function SRsDataTable({
                           : 'bg-destructive text-white'
                       }`}
                     >
-                      {urgentCount}
+                      {counts.urgent}
                     </span>
                   </button>
                 </div>
