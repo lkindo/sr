@@ -58,7 +58,9 @@ describe('Client Actions Security', () => {
 
     it('should return limited fields using the safe service method', async () => {
       // Mock auth success
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'user-1' } });
+      (authenticateAndAuthorize as any).mockResolvedValue({
+        user: { id: 'user-1', roles: ['ADMIN'], clientIds: [] },
+      });
 
       const result: any = await getClientsForSelection();
 

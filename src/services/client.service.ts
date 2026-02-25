@@ -101,8 +101,12 @@ export class ClientService {
     return prisma.client.findMany();
   }
 
-  async getClientsForSelection() {
+  async getClientsForSelection(clientIds?: string[]) {
+    // If clientIds are provided, restrict the query to those IDs
+    const where = clientIds ? { id: { in: clientIds } } : {};
+
     return prisma.client.findMany({
+      where,
       select: {
         id: true,
         code: true,
