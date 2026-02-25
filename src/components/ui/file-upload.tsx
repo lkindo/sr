@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { File, Upload, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,7 @@ export function FileUpload({
   disabled = false,
 }: FileUploadProps) {
   const [dragActive, setDragActive] = useState(false);
+  const descriptionId = useId();
   const { toast } = useToast();
 
   const handleFiles = useCallback(
@@ -163,13 +164,16 @@ export function FileUpload({
           onChange={handleChange}
           disabled={disabled}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          aria-label="파일 업로드"
+          aria-describedby={descriptionId}
+          title="파일 업로드"
         />
         <div className="flex flex-col items-center gap-2">
           <Upload className="h-8 w-8 text-muted-foreground" />
           <div className="text-sm">
             <span className="font-medium text-primary">클릭</span>, 드래그 또는 붙여넣기
           </div>
-          <div className="text-xs text-muted-foreground">
+          <div id={descriptionId} className="text-xs text-muted-foreground">
             최대 {maxFiles}개, 파일당 {maxSize}MB 이하
           </div>
         </div>
