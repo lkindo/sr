@@ -6,11 +6,12 @@ import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SECURITY } from '@/lib/constants';
 import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { passwordSchema } from '@/lib/schemas';
 
 const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, '현재 비밀번호를 입력하세요.'),
-    newPassword: z.string().min(6, '새 비밀번호는 최소 6자 이상이어야 합니다.'),
+    newPassword: passwordSchema,
     confirmPassword: z.string().min(1, '비밀번호 확인을 입력하세요.'),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
