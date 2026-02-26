@@ -69,10 +69,9 @@ export default auth(async (req) => {
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // 요청 헤더에 x-nonce 추가 (Next.js 가 이 헤더를 읽어 내부 스크립트에 nonce 속성을 부여)
+  // 요청 헤더에 x-nonce 추가 (내부용)
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
-  requestHeaders.set('Content-Security-Policy', cspHeader);
 
   const response = NextResponse.next({
     request: {

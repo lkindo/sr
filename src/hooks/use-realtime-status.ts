@@ -102,5 +102,5 @@ export function useRealtimeStatus() {
       eventSource.close();
       eventSourceRef.current = null;
     };
-  }, [queryClient, toast]);
+  }, [queryClient, toast, status]);
 }
