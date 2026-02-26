@@ -17,6 +17,23 @@ interface SRListItemProps {
   canManageSRs: boolean;
 }
 
+// Optimization: Avoid Intl.DateTimeFormat overhead
+function formatTableDate(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}. ${month}. ${day}.`;
+}
+
+function formatCardDate(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const year = String(d.getFullYear()).slice(2);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}. ${month}. ${day}.`;
+}
+
 export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
   const router = useRouter();
 
@@ -29,10 +46,12 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
     router.push(`/srs/${sr.id}/intake`);
   };
 
-  const dueDateStatus = getDueDateStatus(
-    sr.dueDate ? new Date(sr.dueDate).toISOString() : undefined,
-    sr.status
-  );
+  // Optimization: Handle both Date objects (SSR/Tests) and ISO strings (Client hydration)
+  // avoiding redundant new Date(string).toISOString() conversion
+  const dueDateStr =
+    sr.dueDate instanceof Date ? sr.dueDate.toISOString() : (sr.dueDate ?? undefined);
+
+  const dueDateStatus = getDueDateStatus(dueDateStr, sr.status);
 
   return (
     <TableRow className="cursor-pointer" onClick={handleRowClick}>
@@ -71,14 +90,7 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
         {sr._count?.comments || 0} / {sr._count?.attachments || 0}
       </TableCell>
       <TableCell className="text-center">
-        {new Date(sr.createdAt)
-          .toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-          })
-          .replace(/\./g, '. ')
-          .trim()}
+        {formatTableDate(sr.createdAt)}
       </TableCell>
       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
         {canManageSRs ? (
@@ -128,10 +140,11 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
     router.push(`/srs/${sr.id}/intake`);
   };
 
-  const dueDateStatus = getDueDateStatus(
-    sr.dueDate ? new Date(sr.dueDate).toISOString() : undefined,
-    sr.status
-  );
+  // Optimization: Handle both Date objects (SSR/Tests) and ISO strings (Client hydration)
+  const dueDateStr =
+    sr.dueDate instanceof Date ? sr.dueDate.toISOString() : (sr.dueDate ?? undefined);
+
+  const dueDateStatus = getDueDateStatus(dueDateStr, sr.status);
 
   return (
     <div
@@ -201,7 +214,7 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-muted-foreground font-medium shrink-0">등록일</span>
           <span className="text-foreground">
-            {new Date(sr.createdAt).toLocaleDateString('ko-KR').slice(2)}
+            {formatCardDate(sr.createdAt)}
           </span>
         </div>
       </div>
