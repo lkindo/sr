@@ -19,6 +19,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/policies', () => ({
   ensureCanUpdateSR: vi.fn(),
   ensureCanCreateSR: vi.fn(),
+  isInternalUser: vi.fn().mockReturnValue(true),
 }));
 
 describe('SRService.updateSR Branches', () => {

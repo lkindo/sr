@@ -5,7 +5,12 @@ import { z } from 'zod';
 import { getSRUrl } from '@/lib/app-url';
 import { BusinessRuleError, NotFoundError, ServiceError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
-import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import {
+  ensureCanCreateSR,
+  ensureCanDeleteSR,
+  ensureCanUpdateSR,
+  isInternalUser,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
@@ -238,8 +243,12 @@ export class SRService {
 
       ensureCanUpdateSR(sessionUser, existingSR);
 
+      // Security: Determine if user is internal (Admin/Manager/Engineer)
+      const isInternal = isInternalUser(sessionUser);
+
       // 고객사 변경 검증 (REQUESTED 상태에서만 허용)
-      if (validated.clientId && validated.clientId !== existingSR.clientId) {
+      // Only internal users can change clientId
+      if (isInternal && validated.clientId && validated.clientId !== existingSR.clientId) {
         if (existingSR.status !== 'REQUESTED') {
           throw new BusinessRuleError(
             `SR이 이미 접수된 상태(${existingSR.status})입니다. ` +
@@ -315,55 +324,64 @@ export class SRService {
 
       const updateData: Prisma.SRUncheckedUpdateInput = {};
 
-      // basic fields
+      // basic fields (Allowed for everyone)
       if (validated.title !== undefined) updateData.title = validated.title;
       if (validated.description !== undefined) updateData.description = validated.description;
-      if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
-      if (validated.priority !== undefined) updateData.priority = validated.priority;
       if (validated.status !== undefined) updateData.status = validated.status;
-      if (validated.actualPriority !== undefined)
-        updateData.actualPriority = validated.actualPriority;
-      if (validated.estimatedHours !== undefined)
-        updateData.estimatedHours =
-          typeof validated.estimatedHours === 'string'
-            ? parseFloat(validated.estimatedHours)
-            : validated.estimatedHours;
-      if (validated.intakeNotes !== undefined)
-        updateData.intakeNotes = validated.intakeNotes || null;
-      if (validated.resolutionDescription !== undefined)
-        updateData.resolutionDescription = validated.resolutionDescription || null;
-      if (validated.rejectionReason !== undefined)
-        updateData.rejectionReason = validated.rejectionReason || null;
       if (validated.satisfactionRating !== undefined)
         updateData.satisfactionRating = validated.satisfactionRating || null;
       if (validated.additionalFeedback !== undefined)
         updateData.additionalFeedback = validated.additionalFeedback || null;
 
-      // dates
-      if (validated.expectedCompletionDate !== undefined)
-        updateData.expectedCompletionDate = validated.expectedCompletionDate
-          ? new Date(validated.expectedCompletionDate)
-          : null;
-      if (validated.dueDate !== undefined)
-        updateData.dueDate = validated.dueDate ? new Date(validated.dueDate) : null;
-      if (validated.actualCompletionDate !== undefined)
-        updateData.actualCompletionDate = validated.actualCompletionDate
-          ? new Date(validated.actualCompletionDate)
-          : null;
-      if (validated.estimatedCompletionDate !== undefined)
-        updateData.estimatedCompletionDate = validated.estimatedCompletionDate
-          ? new Date(validated.estimatedCompletionDate)
-          : null;
+      // Sensitive fields - Internal only
+      if (isInternal) {
+        if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
+        if (validated.priority !== undefined) updateData.priority = validated.priority;
+        if (validated.actualPriority !== undefined)
+          updateData.actualPriority = validated.actualPriority;
+        if (validated.estimatedHours !== undefined)
+          updateData.estimatedHours =
+            typeof validated.estimatedHours === 'string'
+              ? parseFloat(validated.estimatedHours)
+              : validated.estimatedHours;
+        if (validated.intakeNotes !== undefined)
+          updateData.intakeNotes = validated.intakeNotes || null;
+        if (validated.resolutionDescription !== undefined)
+          updateData.resolutionDescription = validated.resolutionDescription || null;
+        if (validated.rejectionReason !== undefined)
+          updateData.rejectionReason = validated.rejectionReason || null;
 
-      // relations
-      if (validated.serviceCategoryId !== undefined) {
-        if (validated.serviceCategoryId) updateData.serviceCategoryId = validated.serviceCategoryId;
+        // dates
+        if (validated.expectedCompletionDate !== undefined)
+          updateData.expectedCompletionDate = validated.expectedCompletionDate
+            ? new Date(validated.expectedCompletionDate)
+            : null;
+        if (validated.dueDate !== undefined)
+          updateData.dueDate = validated.dueDate ? new Date(validated.dueDate) : null;
+        if (validated.actualCompletionDate !== undefined)
+          updateData.actualCompletionDate = validated.actualCompletionDate
+            ? new Date(validated.actualCompletionDate)
+            : null;
+        if (validated.estimatedCompletionDate !== undefined)
+          updateData.estimatedCompletionDate = validated.estimatedCompletionDate
+            ? new Date(validated.estimatedCompletionDate)
+            : null;
+
+        // relations
+        if (validated.serviceCategoryId !== undefined) {
+          if (validated.serviceCategoryId)
+            updateData.serviceCategoryId = validated.serviceCategoryId;
+        }
+
+        if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
       }
 
-      if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
-
-      // priority SLA adjustment - ServiceCategoryService 활용
-      if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
+      // priority SLA adjustment - ServiceCategoryService 활용 (Internal Only)
+      if (
+        isInternal &&
+        validated.actualPriority &&
+        validated.actualPriority !== existingSR.actualPriority
+      ) {
         try {
           const dueDate = await serviceCategoryService.calculateDueDate(
             existingSR.serviceCategoryId,
