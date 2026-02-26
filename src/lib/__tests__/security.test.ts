@@ -27,7 +27,7 @@ describe('verifyPassword', () => {
 
   it('should return false when hash is missing', async () => {
     // Mock compare to return false (which it would for dummy hash)
-    vi.mocked(compare).mockResolvedValue(false);
+    vi.mocked(compare).mockResolvedValue(false as never);
 
     const result = await verifyPassword('password', null);
     expect(result).toBe(false);

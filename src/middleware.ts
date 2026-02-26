@@ -55,7 +55,7 @@ export default auth(async (req) => {
   const isDev = process.env.NODE_ENV === 'development';
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''};
+    script-src 'self' 'unsafe-inline' 'nonce-${nonce}' ${isDev ? "'unsafe-eval'" : ''};
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https:;
     font-src 'self' data:;

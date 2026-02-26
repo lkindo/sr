@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { fireEvent,render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SRListItem } from '@/types/sr.types';
@@ -13,7 +12,15 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('next/link', () => ({
-  default: ({ children, href, onClick }: { children: React.ReactNode; href: string; onClick?: React.MouseEventHandler }) => (
+  default: ({
+    children,
+    href,
+    onClick,
+  }: {
+    children: React.ReactNode;
+    href: string;
+    onClick?: React.MouseEventHandler;
+  }) => (
     <a href={href} onClick={onClick}>
       {children}
     </a>
@@ -47,7 +54,7 @@ const mockSR: SRListItem = {
   title: 'Test SR',
   status: 'REQUESTED',
   priority: 'HIGH',
-  createdAt: new Date().toISOString(),
+  createdAt: new Date(),
   dueDate: null,
   completedAt: null,
   clientId: 'c1',
