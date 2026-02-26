@@ -10,11 +10,15 @@ import { cn } from '@/lib/utils';
 interface CopyButtonProps extends ButtonProps {
   value: string;
   message?: string;
+  label?: string;
+  successLabel?: string;
 }
 
 export function CopyButton({
   value,
   message = '복사되었습니다',
+  label = '복사',
+  successLabel = '복사됨',
   className,
   variant = 'ghost',
   size = 'icon',
@@ -38,6 +42,8 @@ export function CopyButton({
     });
   };
 
+  const currentLabel = hasCopied ? successLabel : label;
+
   return (
     <Button
       size={size}
@@ -47,9 +53,10 @@ export function CopyButton({
         e.stopPropagation();
         onCopy();
       }}
+      title={currentLabel}
       {...props}
     >
-      <span className="sr-only">Copy</span>
+      <span className="sr-only">{currentLabel}</span>
       {hasCopied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
     </Button>
   );
