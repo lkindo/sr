@@ -103,11 +103,15 @@ export class ServiceCategoryService {
   /**
    * 선택용 간소화된 목록 조회 (드롭다운 등)
    */
-  async getForSelection(clientId?: string) {
+  async getForSelection(params?: { clientIds?: string[] }) {
+    const { clientIds } = params || {};
+
     return prisma.serviceCategory.findMany({
       where: {
         isActive: true,
-        ...(clientId && { clientId }),
+        ...(clientIds && {
+          OR: [{ clientId: { in: clientIds } }, { clientId: null }],
+        }),
       },
       select: {
         id: true,

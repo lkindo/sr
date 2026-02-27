@@ -74,7 +74,7 @@ describe('Service Category Actions Security', () => {
     it('should ALLOW access if authenticated', async () => {
       // Mock getAuthenticatedSession to succeed
       (getAuthenticatedSession as any).mockResolvedValue({
-        user: { id: 'user-1' },
+        user: { id: 'user-1', roles: [], clientIds: [] },
       });
 
       const result = await getServiceCategoriesForSelection();
@@ -85,7 +85,11 @@ describe('Service Category Actions Security', () => {
 
     it('should RETURN only safe fields (using getForSelection)', async () => {
       (getAuthenticatedSession as any).mockResolvedValue({
-        user: { id: 'user-1' },
+        user: {
+          id: 'user-1',
+          roles: [], // Not internal
+          clientIds: ['client-1'],
+        },
       });
 
       const result = await getServiceCategoriesForSelection();
@@ -93,7 +97,9 @@ describe('Service Category Actions Security', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         // Should use getForSelection, not getAll
-        expect(serviceCategoryService.getForSelection).toHaveBeenCalled();
+        expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({
+          clientIds: ['client-1'],
+        });
         expect(serviceCategoryService.getAll).not.toHaveBeenCalled();
 
         // Verify data structure
@@ -102,6 +108,42 @@ describe('Service Category Actions Security', () => {
         expect(firstItem.categoryName).toBe('Category 1');
         expect(firstItem.handler).toBeUndefined(); // Sensitive data should be gone
       }
+    });
+
+    it('should filter categories for external users based on client IDs', async () => {
+      // Mock external user session
+      (getAuthenticatedSession as any).mockResolvedValue({
+        user: {
+          id: 'ext-user-1',
+          roles: ['CLIENT_USER'], // External role
+          clientIds: ['client-A'],
+        },
+      });
+
+      await getServiceCategoriesForSelection();
+
+      // Should pass clientIds to service method
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({
+        clientIds: ['client-A'],
+      });
+    });
+
+    it('should NOT filter categories for internal users (admins/engineers)', async () => {
+      // Mock internal user session
+      (getAuthenticatedSession as any).mockResolvedValue({
+        user: {
+          id: 'int-user-1',
+          roles: ['ENGINEER'], // Internal role
+          clientIds: [],
+        },
+      });
+
+      await getServiceCategoriesForSelection();
+
+      // Should pass undefined clientIds (meaning "all")
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({
+        clientIds: undefined,
+      });
     });
   });
 });
