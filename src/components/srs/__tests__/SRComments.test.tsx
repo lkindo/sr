@@ -1,9 +1,11 @@
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useSRCommentsInfinite } from '@/hooks/use-sr-infinite';
+import { useToast } from '@/hooks/use-toast';
 
 import { SRComments } from '../SRComments';
 
@@ -22,17 +24,27 @@ vi.mock('next/navigation', () => ({
 
 // Mock useToast hook (it's used in the component)
 vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: vi.fn(),
 }));
+
+// Mock global fetch
+const mockFetch = vi.fn();
+global.fetch = mockFetch;
 
 describe('SRComments', () => {
   const mockQueryClient = { invalidateQueries: vi.fn() };
   const mockRouter = { refresh: vi.fn() };
+  const mockToast = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     (useQueryClient as any).mockReturnValue(mockQueryClient);
     (useRouter as any).mockReturnValue(mockRouter);
+    (useToast as any).mockReturnValue({ toast: mockToast });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
   });
 
   it('renders loading state initially', () => {
@@ -109,5 +121,63 @@ describe('SRComments', () => {
 
     expect(screen.getByText('아직 댓글이 없습니다')).toBeInTheDocument();
     expect(screen.getByText('첫 번째 댓글을 남겨보세요.')).toBeInTheDocument();
+  });
+
+  it('disables submit button when input is empty', () => {
+    (useSRCommentsInfinite as any).mockReturnValue({
+      isLoading: false,
+      data: { pages: [] },
+    });
+
+    render(<SRComments srId="test-sr-id" />);
+
+    const submitButton = screen.getByRole('button', { name: '댓글 추가' });
+    expect(submitButton).toBeDisabled();
+
+    const textarea = screen.getByLabelText('댓글 작성');
+    fireEvent.change(textarea, { target: { value: '   ' } });
+    expect(submitButton).toBeDisabled();
+  });
+
+  it('enables submit button when input has text', () => {
+    (useSRCommentsInfinite as any).mockReturnValue({
+      isLoading: false,
+      data: { pages: [] },
+    });
+
+    render(<SRComments srId="test-sr-id" />);
+
+    const submitButton = screen.getByRole('button', { name: '댓글 추가' });
+    const textarea = screen.getByLabelText('댓글 작성');
+
+    fireEvent.change(textarea, { target: { value: 'Hello' } });
+    expect(submitButton).not.toBeDisabled();
+  });
+
+  it('submits comment on Ctrl+Enter', async () => {
+    (useSRCommentsInfinite as any).mockReturnValue({
+      isLoading: false,
+      data: { pages: [] },
+    });
+
+    render(<SRComments srId="test-sr-id" />);
+
+    const textarea = screen.getByLabelText('댓글 작성');
+    await userEvent.type(textarea, 'New comment');
+
+    // Simulate Ctrl+Enter
+    fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('/api/srs/test-sr-id/comments', expect.anything());
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/srs/test-sr-id/comments',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ content: 'New comment' }),
+      })
+    );
   });
 });

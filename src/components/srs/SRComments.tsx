@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, MessageSquare, Send } from 'lucide-react';
+import { Command, Loader2, MessageSquare, Send } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
 import { Button } from '@/components/ui';
@@ -46,15 +46,12 @@ export function SRComments({ srId }: SRCommentsProps) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
 
     if (!newComment.trim()) {
-      toast({
-        title: '오류',
-        description: '댓글 내용을 입력해주세요.',
-        variant: 'destructive',
-      });
       return;
     }
 
@@ -97,6 +94,12 @@ export function SRComments({ srId }: SRCommentsProps) {
         description: error instanceof Error ? error.message : '댓글 추가에 실패했습니다.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      handleSubmit();
     }
   };
 
@@ -145,14 +148,19 @@ export function SRComments({ srId }: SRCommentsProps) {
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={handleKeyDown}
               placeholder="댓글을 입력하세요..."
               aria-label="댓글 작성"
               rows={3}
               disabled={submitting}
               className="resize-none w-full"
             />
-            <div className="flex justify-end">
-              <Button type="submit" disabled={submitting} size="sm">
+            <div className="flex items-center justify-end gap-3">
+              <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1">
+                <Command className="h-3 w-3" />
+                <span className="font-mono">Ctrl + Enter</span>로 등록
+              </span>
+              <Button type="submit" disabled={submitting || !newComment.trim()} size="sm">
                 {submitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
