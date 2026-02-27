@@ -331,6 +331,7 @@ model SR {
   @@index([srNumber])
   @@index([status, priority, createdAt])
   @@index([intakeById])
+  @@index([createdAt])
   @@map("srs")
 }
 
