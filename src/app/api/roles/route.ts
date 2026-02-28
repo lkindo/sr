@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { ensureCanCreateRole, ensureCanReadRole } from '@/lib/policies';
 import { RoleService } from '@/services/role.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -8,7 +9,9 @@ export const runtime = 'nodejs';
 
 // GET /api/roles - 모든 역할 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(
-  async (_request: NextRequest) => {
+  async (_request: NextRequest, { session }: AuthenticatedContext) => {
+    ensureCanReadRole(session.user);
+
     const roleService = new RoleService();
     const roles = await roleService.getAllRoles();
 
@@ -19,7 +22,9 @@ export const GET = withAuthAndRateLimit(
 
 // POST /api/roles - 새 역할 생성 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { session }: AuthenticatedContext) => {
+    ensureCanCreateRole(session.user);
+
     const body = await request.json();
 
     const roleService = new RoleService();
