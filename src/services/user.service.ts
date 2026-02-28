@@ -280,12 +280,23 @@ export class UserService {
   async hardDeleteUser(userId: string): Promise<Omit<User, 'password'>> {
     const prisma = (await import('@/lib/prisma')).default;
 
-    // 1. 연관 데이터 확인 (SR 관련)
-    const relatedDataCount = await prisma.sR.count({
-      where: {
-        OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
-      },
-    });
+    // ⚡ Bolt: 1-4 연관 데이터 확인을 병렬로 처리하여 지연 시간 단축
+    const [relatedDataCount, activityCount, commentCount, statusHistoryCount] = await Promise.all([
+      prisma.sR.count({
+        where: {
+          OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
+        },
+      }),
+      prisma.sRActivity.count({
+        where: { userId },
+      }),
+      prisma.sRComment.count({
+        where: { userId },
+      }),
+      prisma.sRStatusHistory.count({
+        where: { changedBy: userId },
+      }),
+    ]);
 
     if (relatedDataCount > 0) {
       throw new BusinessRuleError(
@@ -293,32 +304,17 @@ export class UserService {
       );
     }
 
-    // 2. 활동 이력 확인
-    const activityCount = await prisma.sRActivity.count({
-      where: { userId },
-    });
-
     if (activityCount > 0) {
       throw new BusinessRuleError(
         '해당 사용자는 SR 활동 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
 
-    // 3. 댓글 이력 확인
-    const commentCount = await prisma.sRComment.count({
-      where: { userId },
-    });
-
     if (commentCount > 0) {
       throw new BusinessRuleError(
         '해당 사용자는 SR 댓글 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
-
-    // 4. 상태 변경 이력 확인
-    const statusHistoryCount = await prisma.sRStatusHistory.count({
-      where: { changedBy: userId },
-    });
 
     if (statusHistoryCount > 0) {
       throw new BusinessRuleError(
