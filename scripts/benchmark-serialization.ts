@@ -1,4 +1,5 @@
 import { performance } from 'perf_hooks';
+
 import { serializeResponse } from '@/lib/serialization';
 
 // Create a large, complex object to benchmark serialization
