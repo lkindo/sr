@@ -1,4 +1,4 @@
-import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 // Mock dependencies BEFORE imports
 vi.mock('next/server', () => ({
@@ -32,6 +32,7 @@ vi.mock('@/services/user.service', () => {
 });
 
 import { authenticateAndAuthorize } from '@/lib/action-helpers';
+
 import { changePasswordAction } from '../user.actions';
 
 describe('changePasswordAction', () => {

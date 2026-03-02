@@ -208,7 +208,7 @@ describe('SRService', () => {
       // Verify nested activity creation
       const updateCall = vi.mocked(txMock.sR.update).mock.calls[0];
       const updateData = updateCall?.[0]?.data;
-      // @ts-ignore
+      // @ts-expect-error: Mock type
       expect(updateData?.activities?.create).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ type: 'STATUS_CHANGED' }),

@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getClientsForSelection } from '../client.actions';
-import { ClientService } from '@/services/client.service';
 import { authenticateAndAuthorize } from '@/lib/action-helpers';
+import { ClientService } from '@/services/client.service';
+
+import { getClientsForSelection } from '../client.actions';
 
 // Mock dependencies
 vi.mock('@/services/client.service', () => {

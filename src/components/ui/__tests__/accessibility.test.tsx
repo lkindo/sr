@@ -1,9 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, expect,it } from 'vitest';
+
 import { Dialog, DialogContent, DialogTrigger } from '../dialog';
 import { Sheet, SheetContent, SheetTrigger } from '../sheet';
-import { ToastProvider, Toast, ToastClose, ToastViewport } from '../toast';
+import { Toast, ToastClose, ToastProvider, ToastViewport } from '../toast';
 
 // Mock ResizeObserver
 global.ResizeObserver = class ResizeObserver {

@@ -50,11 +50,11 @@ describe('Permissions Performance Benchmark', () => {
     console.log(
       `[Benchmark] Duration for ${permissionsToCheck.length} permissions: ${duration.toFixed(2)}ms`
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     console.log(
       `[Benchmark] prisma.userRole.count called: ${(prisma.userRole.count as any).mock.calls.length} times`
     );
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     console.log(
       `[Benchmark] prisma.userRole.findMany called: ${(prisma.userRole.findMany as any).mock.calls.length} times`
     );

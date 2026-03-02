@@ -34,11 +34,8 @@ export const GET = withAuthAndRateLimit(
 
       if (!isAdminManagerEngineer) {
         // 고객사 사용자는 자신의 고객사 SR만 조회
-        const userClients = await prisma.userClient.findMany({
-          where: { userId },
-          select: { clientId: true },
-        });
-        userClientIds = userClients.map((uc) => uc.clientId);
+        // Optimized: Use clientIds from session instead of DB query
+        userClientIds = session.user.clientIds || [];
         if (userClientIds.length > 0) {
           baseWhere.clientId = { in: userClientIds };
         } else {
