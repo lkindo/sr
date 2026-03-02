@@ -84,7 +84,13 @@ export default function LoginPage() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md">{error}</div>
+            <div
+              className="bg-destructive/15 text-destructive text-sm p-3 rounded-md"
+              role="alert"
+              aria-live="polite"
+            >
+              {error}
+            </div>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">이메일</Label>
@@ -96,6 +102,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={isLoading}
+              aria-invalid={!!error}
             />
           </div>
           <div className="space-y-2">
@@ -106,6 +113,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
+              aria-invalid={!!error}
             />
           </div>
           <div className="flex items-center space-x-2">
