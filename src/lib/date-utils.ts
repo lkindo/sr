@@ -1,4 +1,4 @@
-export function getDaysUntilDue(dueDate: string | null | undefined): number | null {
+export function getDaysUntilDue(dueDate: string | Date | null | undefined): number | null {
   if (!dueDate) return null;
 
   const today = new Date();
@@ -14,7 +14,7 @@ export function getDaysUntilDue(dueDate: string | null | undefined): number | nu
 }
 
 export function getDueDateStatus(
-  dueDate: string | null | undefined,
+  dueDate: string | Date | null | undefined,
   status?: string
 ): {
   label: string;
