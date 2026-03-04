@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
+import { ensureCanDeleteRole, ensureCanReadRole, ensureCanUpdateRole } from '@/lib/policies';
 import { RoleService } from '@/services/role.service';
 
 const roleUpdateSchema = z.object({
@@ -15,8 +16,10 @@ const roleUpdateSchema = z.object({
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
+    ensureCanReadRole(session.user);
+
     const { id } = await params;
 
     const roleService = new RoleService();
@@ -35,12 +38,19 @@ export const GET = withAuthAndRateLimit(
 export const PATCH = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
     const validated = await validateRequestBody(request, roleUpdateSchema);
 
     const roleService = new RoleService();
+    const existingRole = await roleService.getRoleById(id);
+    if (!existingRole) {
+      throw new NotFoundError('역할');
+    }
+
+    ensureCanUpdateRole(session.user, existingRole);
+
     const role = await roleService.updateRole(id, validated);
 
     return NextResponse.json(role);
@@ -52,11 +62,18 @@ export const PATCH = withAuthAndRateLimit(
 export const DELETE = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
     const roleService = new RoleService();
+    const existingRole = await roleService.getRoleById(id);
+    if (!existingRole) {
+      throw new NotFoundError('역할');
+    }
+
+    ensureCanDeleteRole(session.user, existingRole);
+
     await roleService.deleteRole(id);
 
     return NextResponse.json({ message: '역할이 삭제되었습니다.' });

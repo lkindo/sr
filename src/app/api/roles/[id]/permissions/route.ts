@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanAssignRole } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
 const permissionAssignSchema = z.object({
@@ -14,7 +15,7 @@ const permissionAssignSchema = z.object({
 export const POST = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -37,6 +38,9 @@ export const POST = withAuthAndRateLimit(
     if (!role) {
       throw new NotFoundError('역할');
     }
+
+    // Ensure permission to assign roles
+    ensureCanAssignRole(session.user, role);
 
     // Delete existing permissions
     await prisma.rolePermission.deleteMany({
