@@ -128,13 +128,15 @@ export async function getClientAction(id: string): Promise<Result<any>> {
     // 고객사 조회
     const client = await clientService.getClientById(id);
 
-    // 권한 확인: 관리자 권한(CLIENT:READ)이 있거나, 본인의 고객사 ID여야 함
-    // ensureCanReadClient 내부에서 ADMIN 여부 및 CLIENT:READ 권한, 소속 고객사 여부 통합 확인
-    ensureCanReadClient(session.user, client || undefined);
-
     if (!client) {
+      // 고객사가 없는 경우에도 권한 확인 (최소한 CLIENT:READ 권한이 있어야 함)
+      ensureCanReadClient(session.user);
       return fail('고객사를 찾을 수 없습니다.', 'NOT_FOUND');
     }
+
+    // 권한 확인: 관리자 권한(CLIENT:READ)이 있거나, 본인의 고객사 ID여야 함
+    // ensureCanReadClient 내부에서 ADMIN 여부 및 CLIENT:READ 권한, 소속 고객사 여부 통합 확인
+    ensureCanReadClient(session.user, client);
 
     return ok(client);
   } catch (error) {
