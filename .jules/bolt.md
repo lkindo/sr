@@ -1,15 +1,3 @@
-# Bolt's Journal - Critical Learnings
-
-## 2024-05-22 - [Example Entry]
-
-**Learning:** [Example Learning]
-**Action:** [Example Action]
-
-## 2024-05-23 - Permission Check Optimization
-
-**Learning:** `PermissionService.checkPermission` was fetching the full user object graph (User -> Roles -> Permissions) for every single permission check. This causes significant overhead on frequently accessed endpoints.
-**Action:** Replaced in-memory filtering with a direct database `count` query (`prisma.userRole.count`) that leverages database indexes to verify permissions efficiently without data transfer.
-
-## 2024-05-19 - [Optimize Dashboard Stats API]
-**Learning:** `session.user` object correctly contains pre-populated relations like `clientIds`. In heavily queried endpoints like `/api/dashboard/stats/route.ts`, making an additional Prisma query to fetch `userClients` when `session.user.clientIds` is already available is redundant and adds latency.
-**Action:** When working in API routes or Server Actions, always check the `Session` object definitions in `src/types/next-auth.d.ts` to see what data is already available before querying the database for user-related associations.
+## YYYY-MM-DD - [Optimize Filter Counts in SRsDataTable]
+**Learning:** `SRsDataTable` calculated several filter counts inside an optimized `useMemo` block with `array.reduce`. However, a separate `srs.filter(sr => sr.assigneeId === session?.user?.id).length` was being called during the render phase to calculate the `myAssigned` count. This re-introduced an unmemoized O(N) array traversal that ran on every component re-render.
+**Action:** Always verify that *all* derived data points from large arrays are consolidated into the same single-pass reduction and memoized appropriately. When optimizing a loop, ensure no stray `.filter` or `.map` calls are left running outside of it.

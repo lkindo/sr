@@ -221,17 +221,20 @@ export function SRsDataTable({
     setIsCreateDialogOpen(false);
   };
 
-  // Calculate filter counts - Optimized to single pass O(N)
+  // ⚡ Bolt: Calculate filter counts in a single pass O(N)
+  // Moved myAssigned calculation here to prevent re-filtering the entire array during every render.
   const counts = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayTime = today.getTime();
+    const currentUserId = session?.user?.id;
 
     return srs.reduce(
       (acc, sr) => {
         if (sr.status === 'REQUESTED') acc.waiting++;
         if (sr.priority === 'CRITICAL' || sr.priority === 'HIGH') acc.urgent++;
         if (sr.status === 'IN_PROGRESS') acc.inProgress++;
+        if (sr.assigneeId === currentUserId) acc.myAssigned++;
 
         if (sr.dueDate && ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)) {
           const due = new Date(sr.dueDate);
@@ -242,9 +245,9 @@ export function SRsDataTable({
         }
         return acc;
       },
-      { waiting: 0, urgent: 0, inProgress: 0, dueToday: 0 }
+      { waiting: 0, urgent: 0, inProgress: 0, dueToday: 0, myAssigned: 0 }
     );
-  }, [srs]);
+  }, [srs, session?.user?.id]);
 
   const activeQuickFilter = useMemo(() => {
     if (filters.status === 'REQUESTED') return 'waiting';
@@ -345,7 +348,7 @@ export function SRsDataTable({
                           : 'bg-muted-foreground text-white'
                       }`}
                     >
-                      {srs.filter((sr) => sr.assigneeId === session?.user?.id).length}
+                      {counts.myAssigned}
                     </span>
                   </button>
                   <button
