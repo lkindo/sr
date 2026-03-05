@@ -126,9 +126,9 @@ describe('POST /api/permissions/check', () => {
 
     // Act & Assert
     const { POST } = await import('../route');
-    await expect(POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as any)).rejects.toThrow(
-      '리소스와 액션을 제공해야 합니다'
-    );
+    await expect(
+      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as any)
+    ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
   });
 
   it('action이 없으면 BadRequestError를 던져야 함', async () => {
@@ -142,9 +142,9 @@ describe('POST /api/permissions/check', () => {
 
     // Act & Assert
     const { POST } = await import('../route');
-    await expect(POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as any)).rejects.toThrow(
-      '리소스와 액션을 제공해야 합니다'
-    );
+    await expect(
+      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as any)
+    ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
   });
 
   it('다양한 리소스와 액션 조합을 처리해야 함', async () => {

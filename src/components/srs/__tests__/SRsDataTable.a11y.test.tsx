@@ -144,4 +144,39 @@ describe('SRsDataTable Accessibility', () => {
     const srNumberHeader = screen.getByRole('columnheader', { name: /SR 번호/i });
     expect(srNumberHeader).toHaveAttribute('aria-sort', 'none');
   });
+
+  it('renders correct aria-pressed attributes on quick filter buttons', () => {
+    // We need to mock useSearchParams and router to return the changed query string
+    const pushMock = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ push: pushMock, refresh: vi.fn() } as any);
+
+    // Test that the initial state is correct when no filter is active
+    const { unmount } = render(<SRsDataTable {...defaultProps} />);
+
+    let waitingButton = screen.getByRole('button', { name: /접수/i });
+    let myAssignedButton = screen.getByRole('button', { name: /담당/i });
+    let urgentButton = screen.getByRole('button', { name: /긴급/i });
+
+    expect(waitingButton).toHaveAttribute('aria-pressed', 'false');
+    expect(myAssignedButton).toHaveAttribute('aria-pressed', 'false');
+    expect(urgentButton).toHaveAttribute('aria-pressed', 'false');
+
+    // Since handleQuickFilter updates URL and the component reads from useSearchParams,
+    // we need to re-render with the new search params instead of testing local state changes.
+    unmount();
+
+    const paramsWithWaiting = new URLSearchParams();
+    paramsWithWaiting.set('status', 'REQUESTED');
+    vi.mocked(useSearchParams).mockReturnValue(paramsWithWaiting as any);
+
+    render(<SRsDataTable {...defaultProps} />);
+
+    waitingButton = screen.getByRole('button', { name: /접수/i });
+    myAssignedButton = screen.getByRole('button', { name: /담당/i });
+    urgentButton = screen.getByRole('button', { name: /긴급/i });
+
+    expect(waitingButton).toHaveAttribute('aria-pressed', 'true');
+    expect(myAssignedButton).toHaveAttribute('aria-pressed', 'false');
+    expect(urgentButton).toHaveAttribute('aria-pressed', 'false');
+  });
 });

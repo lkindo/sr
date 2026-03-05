@@ -308,6 +308,8 @@ export function SRsDataTable({
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
                     }
+                    aria-pressed={activeQuickFilter === 'waiting'}
+                    type="button"
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'waiting'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
@@ -330,6 +332,8 @@ export function SRsDataTable({
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
                     }
+                    aria-pressed={activeQuickFilter === 'myAssigned'}
+                    type="button"
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'myAssigned'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
@@ -352,6 +356,8 @@ export function SRsDataTable({
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
                     }
+                    aria-pressed={activeQuickFilter === 'urgent'}
+                    type="button"
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'urgent'
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'

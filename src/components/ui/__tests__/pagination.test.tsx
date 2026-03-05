@@ -1,12 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import {
-  Pagination,
-  PaginationEllipsis,
-  PaginationNext,
-  PaginationPrevious,
-} from '../pagination';
+import { Pagination, PaginationEllipsis, PaginationNext, PaginationPrevious } from '../pagination';
 
 describe('Pagination', () => {
   it('renders with correct Korean accessibility labels', () => {
