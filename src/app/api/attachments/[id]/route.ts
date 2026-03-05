@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanUpdateSR } from '@/lib/policies';
+import { ensureCanReadSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { deleteAttachmentBlob } from '@/lib/storage';
 
@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -25,6 +25,15 @@ export const GET = withAuthAndRateLimit(
     if (!attachment) {
       throw new NotFoundError('첨부파일');
     }
+
+    // SR 접근 권한 체크
+    const sr = await prisma.sR.findUnique({
+      where: { id: attachment.srId },
+    });
+    if (!sr) {
+      throw new NotFoundError('SR');
+    }
+    ensureCanReadSR(session.user, sr);
 
     return NextResponse.json(attachment);
   },
