@@ -3,6 +3,7 @@ import { SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
+import { ensureCanUpdateSR } from '@/lib/policies';
 import { srService } from '@/services/sr.service';
 
 const statusActionSchema = z.object({
@@ -36,6 +37,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const currentSR = await srService.getSRById(srId);
     if (!currentSR) {
       return NextResponse.json({ error: 'SR을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 권한 확인
+    try {
+      ensureCanUpdateSR(session.user, currentSR);
+    } catch (e) {
+      return NextResponse.json({ error: '상태를 변경할 권한이 없습니다.' }, { status: 403 });
     }
 
     const currentStatus = currentSR.status;
