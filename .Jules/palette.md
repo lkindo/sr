@@ -29,3 +29,6 @@
 
 **Learning:** Next.js `router.push` navigation in client components does not provide built-in loading feedback, which can make the UI feel unresponsive during server-side filtering or sorting.
 **Action:** Wrap `router.push` calls with `useTransition` and use the `isPending` state to show a visual loading indicator (e.g., overlay with spinner) to improve perceived performance.
+## 2024-03-06 - [Contextual ARIA Labels for Attachment Buttons]
+**Learning:** Adding static `aria-label` to list items' actions (like "Delete") isn't enough when there are multiple items; screen reader users lose context of *which* item they are acting on. Dynamically including the item name (e.g., `${attachment.fileName} 삭제`) provides crucial, contextual clarity.
+**Action:** Always verify if a button inside a mapped list needs contextual information in its `aria-label` to distinguish it from identical buttons in other rows.

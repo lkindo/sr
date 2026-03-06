@@ -193,6 +193,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                 onClick={fetchAttachments}
                 disabled={loading || uploading}
                 title="새로고침"
+                aria-label="첨부파일 새로고침"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
@@ -235,6 +236,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                     size="sm"
                     onClick={() => window.open(attachment.fileUrl, '_blank')}
                     title="미리보기"
+                    aria-label={`${attachment.fileName} 미리보기`}
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
@@ -259,6 +261,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                       }
                     }}
                     title="다운로드"
+                    aria-label={`${attachment.fileName} 다운로드`}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
@@ -268,6 +271,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
                       size="sm"
                       onClick={() => handleDeleteClick(attachment.id)}
                       title="삭제"
+                      aria-label={`${attachment.fileName} 삭제`}
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
