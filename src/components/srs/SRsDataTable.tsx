@@ -305,6 +305,9 @@ export function SRsDataTable({
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
                 <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
                   <button
+                    type="button"
+                    aria-pressed={activeQuickFilter === 'waiting'}
+                    aria-label="접수 대기 필터"
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
                     }
@@ -327,6 +330,9 @@ export function SRsDataTable({
                     </span>
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={activeQuickFilter === 'myAssigned'}
+                    aria-label="내 담당 필터"
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
                     }
@@ -349,6 +355,9 @@ export function SRsDataTable({
                     </span>
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={activeQuickFilter === 'urgent'}
+                    aria-label="긴급 필터"
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
                     }

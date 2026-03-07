@@ -144,4 +144,49 @@ describe('SRsDataTable Accessibility', () => {
     const srNumberHeader = screen.getByRole('columnheader', { name: /SR 번호/i });
     expect(srNumberHeader).toHaveAttribute('aria-sort', 'none');
   });
+
+  it('renders quick filter buttons with correct aria-pressed states', () => {
+    // Mock no active filter
+    const params = new URLSearchParams();
+    vi.mocked(useSearchParams).mockReturnValue(params as any);
+
+    const { rerender } = render(<SRsDataTable {...defaultProps} />);
+
+    // Quick filters are hidden for client users. The mocked user isn't explicit but hasAnyRole is mocked to true
+    // so the filters should be visible.
+    const waitingButton = screen.getByRole('button', { name: '접수 대기 필터' });
+    const assignedButton = screen.getByRole('button', { name: '내 담당 필터' });
+    const urgentButton = screen.getByRole('button', { name: '긴급 필터' });
+
+    expect(waitingButton).toHaveAttribute('aria-pressed', 'false');
+    expect(assignedButton).toHaveAttribute('aria-pressed', 'false');
+    expect(urgentButton).toHaveAttribute('aria-pressed', 'false');
+
+    // Mock waiting filter active
+    const paramsWaiting = new URLSearchParams();
+    paramsWaiting.set('status', 'REQUESTED');
+    vi.mocked(useSearchParams).mockReturnValue(paramsWaiting as any);
+    rerender(<SRsDataTable {...defaultProps} />);
+
+    expect(screen.getByRole('button', { name: '접수 대기 필터' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: '내 담당 필터' })).toHaveAttribute('aria-pressed', 'false');
+
+    // Mock assigned filter active
+    const paramsAssigned = new URLSearchParams();
+    paramsAssigned.set('assigneeId', 'user-1'); // matches mocked session user id
+    vi.mocked(useSearchParams).mockReturnValue(paramsAssigned as any);
+    rerender(<SRsDataTable {...defaultProps} />);
+
+    expect(screen.getByRole('button', { name: '접수 대기 필터' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '내 담당 필터' })).toHaveAttribute('aria-pressed', 'true');
+
+    // Mock urgent filter active
+    const paramsUrgent = new URLSearchParams();
+    paramsUrgent.set('priority', 'CRITICAL');
+    vi.mocked(useSearchParams).mockReturnValue(paramsUrgent as any);
+    rerender(<SRsDataTable {...defaultProps} />);
+
+    expect(screen.getByRole('button', { name: '내 담당 필터' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: '긴급 필터' })).toHaveAttribute('aria-pressed', 'true');
+  });
 });
