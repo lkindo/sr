@@ -5,6 +5,7 @@ import { RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
 const commentSchema = z.object({
@@ -15,9 +16,26 @@ const commentSchema = z.object({
 export const GET = withAuthAndRateLimit(
   async (
     _request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
+
+    const sr = await prisma.sR.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        clientId: true,
+        requesterId: true,
+        assigneeId: true,
+      },
+    });
+
+    if (!sr) {
+      throw new NotFoundError('SR');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ensureCanReadSR(session.user, sr as any);
 
     const comments = await prisma.sRComment.findMany({
       where: { srId: id },
@@ -64,6 +82,8 @@ export const POST = withAuthAndRateLimit(
       where: { id },
       select: {
         id: true,
+        clientId: true,
+        requesterId: true,
         srNumber: true,
         title: true,
         requester: {
@@ -86,6 +106,9 @@ export const POST = withAuthAndRateLimit(
     if (!sr) {
       throw new NotFoundError('SR');
     }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ensureCanReadSR(session.user, sr as any);
 
     const comment = await prisma.sRComment.create({
       data: {
