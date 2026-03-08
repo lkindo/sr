@@ -51,10 +51,7 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
 
   // ⚡ Bolt: Pass raw dueDate to avoid expensive new Date().toISOString()
   // Eliminates ~400ms overhead for 100k items.
-  const dueDateStatus = getDueDateStatus(
-    sr.dueDate,
-    sr.status
-  );
+  const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
   return (
     <TableRow className="cursor-pointer" onClick={handleRowClick}>
@@ -92,9 +89,7 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
       <TableCell className="text-center">
         {sr._count?.comments || 0} / {sr._count?.attachments || 0}
       </TableCell>
-      <TableCell className="text-center">
-        {formatFastDate(sr.createdAt)}
-      </TableCell>
+      <TableCell className="text-center">{formatFastDate(sr.createdAt)}</TableCell>
       <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
         {canManageSRs ? (
           <>
@@ -145,10 +140,7 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
 
   // ⚡ Bolt: Pass raw dueDate to avoid expensive new Date().toISOString()
   // Eliminates ~400ms overhead for 100k items.
-  const dueDateStatus = getDueDateStatus(
-    sr.dueDate,
-    sr.status
-  );
+  const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
   return (
     <div
@@ -217,9 +209,7 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
         </div>
         <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-muted-foreground font-medium shrink-0">등록일</span>
-          <span className="text-foreground">
-            {formatFastShortDate(sr.createdAt)}
-          </span>
+          <span className="text-foreground">{formatFastShortDate(sr.createdAt)}</span>
         </div>
       </div>
     </div>

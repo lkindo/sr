@@ -1,5 +1,5 @@
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { beforeEach,describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock dependencies
 const { mockPrisma } = vi.hoisted(() => {

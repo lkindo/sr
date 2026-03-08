@@ -11,5 +11,6 @@
 **Action:** Replaced in-memory filtering with a direct database `count` query (`prisma.userRole.count`) that leverages database indexes to verify permissions efficiently without data transfer.
 
 ## 2024-05-19 - [Optimize Dashboard Stats API]
+
 **Learning:** `session.user` object correctly contains pre-populated relations like `clientIds`. In heavily queried endpoints like `/api/dashboard/stats/route.ts`, making an additional Prisma query to fetch `userClients` when `session.user.clientIds` is already available is redundant and adds latency.
 **Action:** When working in API routes or Server Actions, always check the `Session` object definitions in `src/types/next-auth.d.ts` to see what data is already available before querying the database for user-related associations.
