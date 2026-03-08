@@ -153,7 +153,7 @@ export async function getClientsForSelection() {
 
     // 내부 사용자인지 확인하여 필터링 적용
     const isInternal = isInternalUser(session.user);
-    const clientIds = isInternal ? undefined : (session.user.clientIds || []);
+    const clientIds = isInternal ? undefined : session.user.clientIds || [];
 
     // 필요한 정보만 선택적으로 조회 (보안 강화)
     const clients = await clientService.getClientsForSelection(clientIds);

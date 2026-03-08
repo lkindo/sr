@@ -19,7 +19,8 @@ vi.mock('@/lib/action-helpers', () => ({
 }));
 
 vi.mock('@/lib/policies', () => ({
-  isInternalUser: (user: any) => ['ADMIN', 'MANAGER', 'ENGINEER'].some(role => user.roles.includes(role)),
+  isInternalUser: (user: any) =>
+    ['ADMIN', 'MANAGER', 'ENGINEER'].some((role) => user.roles.includes(role)),
 }));
 
 vi.mock('@/lib/logger', () => ({
