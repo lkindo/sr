@@ -6,6 +6,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SLA } from '@/lib/constants';
 import { BadRequestError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 
@@ -198,7 +199,7 @@ export const POST = withAuthAndRateLimit(
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -206,6 +207,8 @@ export const GET = withAuthAndRateLimit(
       where: { id },
       select: {
         id: true,
+        clientId: true,
+        requesterId: true,
         srNumber: true,
         title: true,
         description: true,
@@ -276,6 +279,8 @@ export const GET = withAuthAndRateLimit(
     if (!sr) {
       throw new NotFoundError('SR');
     }
+
+    ensureCanReadSR(session.user, sr as any);
 
     return NextResponse.json(sr);
   },

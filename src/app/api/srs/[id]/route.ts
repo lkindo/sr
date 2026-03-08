@@ -4,6 +4,7 @@ import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
+import { ensureCanReadSR } from '@/lib/policies';
 import { srUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { srService } from '@/services/sr.service';
@@ -15,7 +16,7 @@ export const runtime = 'nodejs';
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -25,6 +26,9 @@ export const GET = withAuthAndRateLimit(
     if (!sr) {
       throw new NotFoundError('SR');
     }
+
+    // 권한 체크
+    ensureCanReadSR(session.user, sr as any);
 
     // 디버깅 로그: SR 상세 조회 결과 확인 (개발 환경에서만 출력)
     logger.debug('[API /srs/[id]] SR 조회 성공', {
