@@ -210,9 +210,7 @@ describe('SRService', () => {
       const updateData = updateCall?.[0]?.data;
       // @ts-expect-error: Mock type
       expect(updateData?.activities?.create).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ type: 'STATUS_CHANGED' }),
-        ])
+        expect.arrayContaining([expect.objectContaining({ type: 'STATUS_CHANGED' })])
       );
 
       expect(sendEmailSpy).toHaveBeenCalledWith(

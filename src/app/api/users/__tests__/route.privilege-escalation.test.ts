@@ -185,7 +185,7 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
     // We still mock it just in case logic changes, but we don't expect it to be called
     // unless we change logic.
     vi.mocked(prisma.role.findMany).mockResolvedValue([
-        { id: 'admin-role-id', name: 'ADMIN' } as any,
+      { id: 'admin-role-id', name: 'ADMIN' } as any,
     ]);
 
     const res = await POST(req, { session } as any);

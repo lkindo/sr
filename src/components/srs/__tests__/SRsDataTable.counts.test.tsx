@@ -1,5 +1,4 @@
-
-import { usePathname,useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,7 +31,6 @@ vi.mock('../SRListItem', () => ({
   SRCardItem: () => <div data-testid="sr-card-item" />,
   SRTableRow: () => <tr data-testid="sr-table-row" />,
 }));
-
 
 describe('SRsDataTable Counts', () => {
   beforeEach(() => {

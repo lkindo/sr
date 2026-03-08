@@ -18,7 +18,8 @@ vi.mock('next-auth', () => ({
 
 // Mock internal modules
 vi.mock('@/lib/action-helpers', async () => {
-  const actual = await vi.importActual<typeof import('@/lib/action-helpers')>('@/lib/action-helpers');
+  const actual =
+    await vi.importActual<typeof import('@/lib/action-helpers')>('@/lib/action-helpers');
   return {
     ...actual,
     authenticateAndAuthorize: vi.fn(),

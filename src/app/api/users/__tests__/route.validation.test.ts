@@ -22,7 +22,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
       user: {
         id: 'admin-1',
         roles: ['ADMIN'],
-        permissions: ['USER:CREATE', 'USER:READ']
+        permissions: ['USER:CREATE', 'USER:READ'],
       },
     };
     try {
