@@ -9,6 +9,7 @@ import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BadRequestError, NotFoundError } from '@/lib/errors';
 import { FileValidationError, validateFile } from '@/lib/file-validator';
+import { ensureCanReadSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
 // Force Node.js runtime (file system operations require Node.js)
@@ -46,6 +47,8 @@ export const POST = withAuthAndRateLimit(
     if (!sr) {
       throw new NotFoundError('SR');
     }
+
+    ensureCanUpdateSR(session.user, sr as any);
 
     // FormData에서 파일 추출
     const formData = await req.formData();
@@ -164,9 +167,20 @@ export const POST = withAuthAndRateLimit(
 export const GET = withAuthAndRateLimit(
   async (
     req: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id: srId } = await params;
+
+    // SR 존재 확인 및 권한 체크
+    const sr = await prisma.sR.findUnique({
+      where: { id: srId },
+    });
+
+    if (!sr) {
+      throw new NotFoundError('SR');
+    }
+
+    ensureCanReadSR(session.user, sr as any);
 
     const attachments = await prisma.sRAttachment.findMany({
       where: { srId },
