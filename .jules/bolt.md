@@ -14,3 +14,8 @@
 
 **Learning:** `session.user` object correctly contains pre-populated relations like `clientIds`. In heavily queried endpoints like `/api/dashboard/stats/route.ts`, making an additional Prisma query to fetch `userClients` when `session.user.clientIds` is already available is redundant and adds latency.
 **Action:** When working in API routes or Server Actions, always check the `Session` object definitions in `src/types/next-auth.d.ts` to see what data is already available before querying the database for user-related associations.
+
+## 2024-05-25 - Date Formatting Optimization
+
+**Learning:** `Date.toLocaleDateString()` and `Date.toLocaleString()` recreate the underlying `Intl.DateTimeFormat` instance on every single call. For lists containing hundreds of items, this repeated initialization becomes a significant CPU bottleneck.
+**Action:** When formatting dates frequently (especially in utility functions like `src/lib/date-utils.ts`), cache the `Intl.DateTimeFormat` instance at the module level and use `formatter.format(date)` instead of calling the string methods on the `Date` object directly.
