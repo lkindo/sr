@@ -45,3 +45,9 @@
 **Vulnerability:** `GET /api/srs` relied solely on client-provided query parameters (e.g., `clientId`) for filtering, allowing external users to bypass tenant isolation by omitting the filter or requesting another client's data.
 **Learning:** API routes that return lists must not trust client filters for authorization boundaries. Authentication middleware (`withAuthAndRateLimit`) only identifies the user; it does not enforce data access policies.
 **Prevention:** Always enforce server-side filters based on the authenticated user's session (e.g., force `clientId: { in: session.user.clientIds }` for external users) regardless of what the client requests.
+
+## 2024-05-30 - IDOR Vulnerability in API GET Route
+
+**Vulnerability:** `GET /api/srs/[id]` allowed any authenticated user to retrieve SR details by ID without authorization checks.
+**Learning:** API routes require explicit resource authorization just like Server Actions. Returning a resource just because an ID is known allows IDOR.
+**Prevention:** Always verify ownership or permission on the retrieved resource before returning it in an API route. Use `ensureCanRead...` policies immediately after fetching the resource.
