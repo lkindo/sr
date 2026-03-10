@@ -144,8 +144,17 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
 
   return (
     <div
-      className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer"
+      className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       onClick={handleCardClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`${sr.title} 상세 보기`}
     >
       {/* Header: SR Number, Status, Priority */}
       <div className="flex items-center justify-between gap-2 mb-2">

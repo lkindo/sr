@@ -6,9 +6,11 @@ import { SRListItem } from '@/types/sr.types';
 
 import { SRCardItem } from '../SRListItem';
 
+const mockPush = vi.fn();
+
 // Mock dependencies
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: mockPush }),
 }));
 
 vi.mock('next/link', () => ({
@@ -85,5 +87,17 @@ describe('SRCardItem', () => {
 
     fireEvent.click(copyButton);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('SR-2023-0001');
+  });
+
+  it('can be clicked and activated via keyboard', () => {
+    mockPush.mockClear();
+
+    render(<SRCardItem sr={mockSR} canManageSRs={true} />);
+
+    const card = screen.getByRole('button', { name: 'Test SR 상세 보기' });
+    expect(card).toBeInTheDocument();
+
+    fireEvent.keyDown(card, { key: 'Enter', code: 'Enter' });
+    expect(mockPush).toHaveBeenCalledWith('/srs/sr-1');
   });
 });
