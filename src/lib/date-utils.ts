@@ -112,20 +112,39 @@ export function getDueDateStatus(
   };
 }
 
+// ⚡ Bolt: Cache Intl.DateTimeFormat instances for performance
+// Avoids recreating the formatter on every function call
+let dateFormatter: Intl.DateTimeFormat | null = null;
+let dateTimeFormatter: Intl.DateTimeFormat | null = null;
+
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  });
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '-';
+
+  if (!dateFormatter) {
+    dateFormatter = new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
+
+  return dateFormatter.format(d);
 }
 
 export function formatDateTime(date: string | Date): string {
-  return new Date(date).toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '-';
+
+  if (!dateTimeFormatter) {
+    dateTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  return dateTimeFormatter.format(d);
 }
