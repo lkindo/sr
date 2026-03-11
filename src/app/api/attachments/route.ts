@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BadRequestError, NotFoundError } from '@/lib/errors';
+import { ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { uploadAttachmentBlob } from '@/lib/storage';
 
@@ -29,12 +30,13 @@ export const POST = withAuthAndRateLimit(
     // SR 존재 확인 및 권한 체크
     const sr = await prisma.sR.findUnique({
       where: { id: srId },
-      select: { id: true, requesterId: true, assigneeId: true },
     });
 
     if (!sr) {
       throw new NotFoundError('SR');
     }
+
+    ensureCanUpdateSR(session.user, sr);
 
     // 파일 저장 (Vercel Blob)
     const uploadResult = await uploadAttachmentBlob(srId, file);
