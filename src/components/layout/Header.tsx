@@ -71,7 +71,7 @@ export function Header({ user: initialUser }: HeaderProps) {
         <div className="flex md:hidden items-center px-4">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
+              <Button variant="ghost" size="icon" className="md:hidden" aria-label="메뉴 열기" title="메뉴 열기">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">메뉴 열기</span>
               </Button>

@@ -228,8 +228,8 @@ export default function ClientDetailPage() {
       {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/clients">
+          <Button variant="ghost" size="icon" asChild title="고객사 목록으로 돌아가기">
+            <Link href="/clients" aria-label="고객사 목록으로 돌아가기">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
@@ -501,6 +501,8 @@ export default function ClientDetailPage() {
                             size="icon"
                             onClick={() => handleRemoveUser(userClient.user.id)}
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            aria-label={`${userClient.user.name} 사용자 제외`}
+                            title="사용자 제외"
                           >
                             <UserMinus className="h-4 w-4" />
                           </Button>

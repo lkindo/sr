@@ -166,8 +166,8 @@ export default function UserDetailPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 md:gap-4 min-w-0">
-          <Button variant="ghost" size="icon" asChild className="shrink-0">
-            <Link href="/users">
+          <Button variant="ghost" size="icon" asChild className="shrink-0" title="사용자 목록으로 돌아가기">
+            <Link href="/users" aria-label="사용자 목록으로 돌아가기">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
