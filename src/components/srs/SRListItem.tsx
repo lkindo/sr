@@ -53,8 +53,22 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
   // Eliminates ~400ms overhead for 100k items.
   const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleRowClick();
+    }
+  };
+
   return (
-    <TableRow className="cursor-pointer" onClick={handleRowClick}>
+    <TableRow
+      className="cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      onClick={handleRowClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      aria-label={`${sr.srNumber} 상세 보기`}
+    >
       <TableCell className="text-center">
         <div className="flex items-center justify-center gap-1 group relative">
           <Link
@@ -142,10 +156,21 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
   // Eliminates ~400ms overhead for 100k items.
   const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick();
+    }
+  };
+
   return (
     <div
-      className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer"
+      className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       onClick={handleCardClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      aria-label={`${sr.srNumber} 상세 보기`}
     >
       {/* Header: SR Number, Status, Priority */}
       <div className="flex items-center justify-between gap-2 mb-2">
