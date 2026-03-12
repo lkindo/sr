@@ -5,6 +5,7 @@ import { RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
 const commentSchema = z.object({
@@ -15,9 +16,14 @@ const commentSchema = z.object({
 export const GET = withAuthAndRateLimit(
   async (
     _request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
+
+    const sr = await prisma.sR.findUnique({ where: { id } });
+    if (!sr) throw new NotFoundError('SR');
+
+    ensureCanReadSR(session.user, sr);
 
     const comments = await prisma.sRComment.findMany({
       where: { srId: id },
@@ -62,10 +68,7 @@ export const POST = withAuthAndRateLimit(
     // Check if SR exists and get related data
     const sr = await prisma.sR.findUnique({
       where: { id },
-      select: {
-        id: true,
-        srNumber: true,
-        title: true,
+      include: {
         requester: {
           select: {
             id: true,
@@ -86,6 +89,8 @@ export const POST = withAuthAndRateLimit(
     if (!sr) {
       throw new NotFoundError('SR');
     }
+
+    ensureCanReadSR(session.user, sr);
 
     const comment = await prisma.sRComment.create({
       data: {
