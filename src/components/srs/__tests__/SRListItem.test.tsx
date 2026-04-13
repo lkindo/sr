@@ -70,6 +70,7 @@ const mockSR: SRListItem = {
     priority: 'HIGH',
     slaHours: 24,
     handlerId: null,
+    handler: null,
   },
   _count: { comments: 0, attachments: 0 },
 };

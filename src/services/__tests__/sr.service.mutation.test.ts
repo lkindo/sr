@@ -182,7 +182,6 @@ describe('SRService Mutation Tests', () => {
 
       const updateCall = vi.mocked(prisma.sR.update).mock.calls[0];
       const updateData = updateCall?.[0]?.data;
-      // @ts-expect-error - inspecting private details of update call
       expect(updateData?.activities?.create).toBeDefined();
 
       // Verify notifications

@@ -23,7 +23,7 @@ export interface User {
   email: string;
   name: string;
   isActive: boolean;
-  userType: 'ENGINEER' | 'CLIENT' | string; // Allowing string for flexibility if DB differs
+  userType: 'ENGINEER' | 'CLIENT';
   roles: UserRole[];
   clients: UserClient[];
   createdAt?: string | Date;

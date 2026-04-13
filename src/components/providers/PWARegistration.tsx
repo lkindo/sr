@@ -7,13 +7,36 @@ import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 
+/**
+ * 모바일 기기 감지 함수
+ * PC에서는 PWA 기능을 비활성화하기 위해 사용
+ */
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  // User Agent 기반 감지
+  const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+  const mobileRegex = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
+
+  // iPad는 iPadOS 13+에서 desktop mode를 사용하므로 별도로 체크
+  const isIpad =
+    /iPad/.test(userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  return mobileRegex.test(userAgent) || isIpad;
+}
+
 export function PWARegistration() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // 1. Service Worker 등록 (상시 실행)
+    // PC에서는 PWA 기능을 완전히 비활성화
+    if (!isMobileDevice()) {
+      return;
+    }
+
+    // 1. Service Worker 등록 (모바일에서만 실행)
     const registerSW = () => {
       if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
         navigator.serviceWorker
@@ -36,7 +59,7 @@ export function PWARegistration() {
       window.addEventListener('load', registerSW);
     }
 
-    // 2. 설치 프로모션 이벤트 캡처 (상시 실행)
+    // 2. 설치 프로모션 이벤트 캡처 (모바일에서만 실행)
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
 
