@@ -137,31 +137,8 @@ export async function getSRActivitiesAction(
 
     ensureCanReadSR(session.user, sr);
 
-    const prisma = (await import('@/lib/prisma')).default;
-
-    const limit = options?.limit || 20;
-    const cursor = options?.cursor;
-
-    const activities = await prisma.sRActivity.findMany({
-      where: { srId },
-      take: limit + 1,
-      ...(cursor && {
-        skip: 1,
-        cursor: { id: cursor },
-      }),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: { id: true, name: true, image: true },
-        },
-      },
-    });
-
-    const hasMore = activities.length > limit;
-    const items = hasMore ? activities.slice(0, limit) : activities;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
-
-    return ok({ activities: items, nextCursor });
+    const result = await srService.getSRActivities(srId, options);
+    return ok(result);
   } catch (error) {
     return errorToResult(error);
   }
@@ -192,31 +169,8 @@ export async function getSRCommentsAction(
 
     ensureCanReadSR(session.user, sr);
 
-    const prisma = (await import('@/lib/prisma')).default;
-
-    const limit = options?.limit || 20;
-    const cursor = options?.cursor;
-
-    const comments = await prisma.sRComment.findMany({
-      where: { srId },
-      take: limit + 1,
-      ...(cursor && {
-        skip: 1,
-        cursor: { id: cursor },
-      }),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: { id: true, name: true, image: true },
-        },
-      },
-    });
-
-    const hasMore = comments.length > limit;
-    const items = hasMore ? comments.slice(0, limit) : comments;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
-
-    return ok({ comments: items, nextCursor });
+    const result = await srService.getSRComments(srId, options);
+    return ok(result);
   } catch (error) {
     return errorToResult(error);
   }

@@ -90,8 +90,11 @@ export class MemoryRateLimiter {
    */
   async check(key: string): Promise<RateLimitResult> {
     const now = Date.now();
-    let bucket = this.buckets.get(key);
 
+    // 점진적 수동 청소 실행 (Edge Runtime 등 타이머 미지원 환경 대응)
+    this.performIncrementalEviction(now);
+
+    let bucket = this.buckets.get(key);
     // 버킷이 없거나 윈도우가 만료된 경우 새로 생성
     if (!bucket || now - bucket.lastRefill >= this.config.windowMs) {
       bucket = {
@@ -134,6 +137,32 @@ export class MemoryRateLimiter {
    */
   async resetAll(): Promise<void> {
     this.buckets.clear();
+  }
+
+  /**
+   * 점진적 만료 데이터 정리 및 임계치 도달 시 강제 방출
+   */
+  private performIncrementalEviction(now: number): void {
+    // 10%의 확률로 임의의 만료 버킷 청소 (전체 루프 성능 저하 완화)
+    if (Math.random() < 0.1) {
+      const expiredKeys: string[] = [];
+      this.buckets.forEach((bucket, k) => {
+        if (now - bucket.lastRefill >= this.config.windowMs) {
+          expiredKeys.push(k);
+        }
+      });
+      expiredKeys.forEach((k) => this.buckets.delete(k));
+    }
+
+    // 버킷 맵 크기가 한계 임계치(10,000개)를 넘어가면 OOM 방지를 위해 가장 오래된 100개 항목 강제 방출
+    if (this.buckets.size > 10000) {
+      const iterator = this.buckets.keys();
+      for (let i = 0; i < 100; i++) {
+        const next = iterator.next();
+        if (next.done) break;
+        this.buckets.delete(next.value);
+      }
+    }
   }
 
   /**

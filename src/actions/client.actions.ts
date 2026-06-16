@@ -12,9 +12,11 @@ import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
-import { ClientService } from '@/services/client.service';
+import type { ClientService } from '@/services/client.service';
+import { services } from '@/services/service-registry';
 
 type ClientCreateResult = Awaited<ReturnType<ClientService['createClient']>>;
+type ClientGetResult = Awaited<ReturnType<ClientService['getClientById']>>;
 
 export async function createClientAction(formData: FormData): Promise<Result<ClientCreateResult>> {
   try {
@@ -40,7 +42,7 @@ export async function createClientAction(formData: FormData): Promise<Result<Cli
     await authenticateAndAuthorize('client:create');
 
     // ClientService 인스턴스 생성
-    const clientService = new ClientService();
+    const clientService = services.clientService;
 
     // 고객사 생성
     const client = await clientService.createClient(validated);
@@ -77,7 +79,7 @@ export async function updateClientAction(id: string, formData: FormData) {
     await authenticateAndAuthorize('client:update');
 
     // ClientService 인스턴스 생성
-    const clientService = new ClientService();
+    const clientService = services.clientService;
 
     // 고객사 업데이트
     const client = await clientService.updateClient(id, validated);
@@ -88,10 +90,7 @@ export async function updateClientAction(id: string, formData: FormData) {
       message: '고객사가 성공적으로 업데이트되었습니다.',
     };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '고객사 업데이트 중 오류가 발생했습니다.',
-    };
+    return errorToResult(error);
   }
 }
 
@@ -101,7 +100,7 @@ export async function deleteClientAction(id: string) {
     await authenticateAndAuthorize('client:delete');
 
     // ClientService 인스턴스 생성
-    const clientService = new ClientService();
+    const clientService = services.clientService;
 
     // 고객사 삭제
     await clientService.deleteClient(id);
@@ -111,19 +110,16 @@ export async function deleteClientAction(id: string) {
       message: '고객사가 성공적으로 삭제되었습니다.',
     };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '고객사 삭제 중 오류가 발생했습니다.',
-    };
+    return errorToResult(error);
   }
 }
 
-export async function getClientAction(id: string): Promise<Result<any>> {
+export async function getClientAction(id: string): Promise<Result<ClientGetResult>> {
   try {
     const session = await getAuthenticatedSession();
 
     // ClientService 인스턴스 생성
-    const clientService = new ClientService();
+    const clientService = services.clientService;
 
     // 고객사 조회
     const client = await clientService.getClientById(id);
@@ -149,7 +145,7 @@ export async function getClientsForSelection() {
     // 인증 및 권한 확인 (고객사 조회 권한 필요)
     const session = await authenticateAndAuthorize(PERMISSIONS.CLIENT.READ);
 
-    const clientService = new ClientService();
+    const clientService = services.clientService;
 
     // 내부 사용자인지 확인하여 필터링 적용
     const isInternal = isInternalUser(session.user);

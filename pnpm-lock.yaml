@@ -116,6 +116,9 @@ importers:
       nodemailer:
         specifier: ^7.0.13
         version: 7.0.13
+      pino:
+        specifier: ^10.3.1
+        version: 10.3.1
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -249,9 +252,6 @@ importers:
       msw:
         specifier: ^2.12.10
         version: 2.12.10(@types/node@25.3.0)(typescript@5.9.3)
-      pino:
-        specifier: ^10.3.1
-        version: 10.3.1
       playwright:
         specifier: ^1.58.2
         version: 1.58.2

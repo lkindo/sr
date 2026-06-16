@@ -1,12 +1,5 @@
-﻿'use client';
+'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-
-import { getClientsForSelection } from '@/actions/client.actions';
-import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
-import { createSRAction } from '@/actions/sr.actions';
-import { getProfileAction } from '@/actions/user.actions';
 import { Button } from '@/components/ui';
 import {
   Dialog,
@@ -21,8 +14,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
-import { usePermissions } from '@/hooks/use-permissions';
-import { useToast } from '@/hooks/use-toast';
+import { useCreateSRForm } from '@/hooks/useCreateSRForm';
 
 const MIN_TITLE_LENGTH = 5;
 const MIN_DESCRIPTION_LENGTH = 10;
@@ -44,251 +36,31 @@ interface CreateSRDialogProps {
 }
 
 export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialogProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
-  const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-  const { data: session } = useSession();
-  const { hasAnyRole } = usePermissions();
-
-  // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
-  const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
-  const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
-
-  const fetchClients = useCallback(async () => {
-    // 고객사 사용자인 경우 자신의 고객사만 가져오기
-    if (isClientUser) {
-      const profileResult = await getProfileAction();
-
-      if (profileResult.success && profileResult.data) {
-        const userClients =
-          (
-            profileResult.data as {
-              clients?: Array<{ client: { id: string; code: string; name: string } }>;
-            }
-          ).clients || [];
-
-        if (userClients.length > 0) {
-          // 첫 번째 고객사 사용 (일반적으로 사용자는 하나의 고객사에만 속함)
-          const userClient = userClients[0].client;
-          setClients([
-            {
-              id: userClient.id,
-              code: userClient.code,
-              name: userClient.name,
-            },
-          ]);
-          // 자동으로 고객사 설정
-          setClientId(userClient.id);
-        } else {
-          toast({
-            title: '오류',
-            description: '고객사 정보를 찾을 수 없습니다.',
-            variant: 'destructive',
-          });
-        }
-      } else {
-        const errorMsg =
-          profileResult.success === false
-            ? profileResult.error
-            : '사용자 정보를 불러오지 못했습니다.';
-        toast({
-          title: '오류',
-          description: errorMsg,
-          variant: 'destructive',
-        });
-      }
-    } else {
-      // ADMIN, MANAGER, ENGINEER인 경우 모든 고객사 가져오기
-      const result = await getClientsForSelection();
-
-      if (result.success) {
-        setClients(result.data as Client[]);
-      } else {
-        toast({
-          title: '오류',
-          description: '고객사 목록을 불러오지 못했습니다.',
-          variant: 'destructive',
-        });
-      }
-    }
-  }, [toast, isClientUser]);
-
-  const fetchCategories = useCallback(async () => {
-    const result = await getServiceCategoriesForSelection();
-    if (result.success && result.data) {
-      setCategories(result.data.map((cat) => ({ id: cat.id, name: cat.categoryName })));
-    } else {
-      toast({
-        title: '오류',
-        description: '서비스 카테고리 목록을 불러오지 못했습니다.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  // 다이얼로그가 열릴 때마다 폼 초기화 (고객사 제외)
-  useEffect(() => {
-    if (open) {
-      setTitle('');
-      setDescription('');
-      // 고객사 사용자가 아닌 경우에만 clientId 초기화
-      if (!isClientUser) {
-        setClientId('');
-      }
-      setCategoryId('');
-      setRequestedPriority('MEDIUM');
-      setRequestedCompletionDate('');
-      setFiles([]);
-    }
-  }, [open, isClientUser]);
-
-  useEffect(() => {
-    if (open) {
-      fetchClients();
-      fetchCategories(); // 전체 서비스 카테고리 조회
-    }
-  }, [open, fetchClients, fetchCategories]);
-
-  // 고객사 사용자인 경우 고객사 자동 설정 (fetchClients 완료 후)
-  useEffect(() => {
-    if (open && isClientUser && clients.length > 0 && !clientId) {
-      setClientId(clients[0].id);
-    }
-  }, [open, isClientUser, clients, clientId]);
-
-  const uploadAttachments = async (srId: string, files: File[]) => {
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-
-    try {
-      const response = await fetch(`/api/srs/${srId}/attachments`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        await response.text();
-        throw new Error('Failed to upload attachments');
-      }
-
-      await response.json();
-    } catch {
-      toast({
-        title: '경고',
-        description: 'SR은 생성되었으나 첨부파일 업로드에 실패했습니다.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (title.length < MIN_TITLE_LENGTH) {
-      toast({
-        title: '오류',
-        description: `제목은 최소 ${MIN_TITLE_LENGTH}자 이상이어야 합니다.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (description.length < MIN_DESCRIPTION_LENGTH) {
-      toast({
-        title: '오류',
-        description: `설명은 최소 ${MIN_DESCRIPTION_LENGTH}자 이상이어야 합니다.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!clientId) {
-      toast({
-        title: '오류',
-        description: '고객사를 선택해주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!categoryId) {
-      toast({
-        title: '오류',
-        description: '서비스 카테고리를 선택해주세요.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('clientId', clientId);
-    formData.append('serviceCategoryId', categoryId);
-    formData.append('requestedPriority', requestedPriority);
-    if (requestedCompletionDate) {
-      formData.append('requestedCompletionDate', requestedCompletionDate);
-    }
-
-    try {
-      const result = await createSRAction(formData);
-
-      if (!result.success) {
-        throw new Error(result.error || 'SR 생성에 실패했습니다.');
-      }
-
-      const createdSR = result.data;
-
-      // Upload attachments if any
-      if (files.length > 0) {
-        await uploadAttachments(createdSR.id, files);
-      }
-
-      toast({
-        title: '성공',
-        description: `SR이 생성되었습니다.${files.length > 0 ? ` (첨부파일 ${files.length}개 업로드)` : ''}`,
-      });
-
-      // Reset form
-      setTitle('');
-      setDescription('');
-      setClientId('');
-      setCategoryId('');
-      setRequestedPriority('MEDIUM');
-      setRequestedCompletionDate('');
-      setFiles([]);
-
-      onCreated();
-    } catch (error) {
-      let errorMessage = 'SR 생성에 실패했습니다.';
-
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null && 'message' in error) {
-        errorMessage = String(error.message);
-      }
-
-      toast({
-        title: '오류',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { state, actions, constants } = useCreateSRForm({ onCreated, open });
+  const {
+    title,
+    description,
+    clientId,
+    categoryId,
+    requestedPriority,
+    requestedCompletionDate,
+    files,
+    clients,
+    categories,
+    loading,
+    canSelectClient,
+  } = state;
+  const {
+    setTitle,
+    setDescription,
+    setClientId,
+    setCategoryId,
+    setRequestedPriority,
+    setRequestedCompletionDate,
+    setFiles,
+    handleSubmit,
+  } = actions;
+  const { MIN_TITLE_LENGTH, MIN_DESCRIPTION_LENGTH } = constants;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

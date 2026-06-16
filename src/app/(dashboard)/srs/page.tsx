@@ -131,8 +131,31 @@ export default async function SRsPage({ searchParams }: Props) {
 
   const orderBy = getOrderBy();
 
+  // 통계 집계용 기본 where 조건 (status, priority 필터 제외)
+  const whereBase: Prisma.SRWhereInput = {};
+  if (where.clientId) whereBase.clientId = where.clientId;
+  if (where.assigneeId) whereBase.assigneeId = where.assigneeId;
+  if (where.createdAt) whereBase.createdAt = where.createdAt;
+  if (where.OR) whereBase.OR = where.OR;
+
+  // 오늘 날짜 및 마감일 범위 계산
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
   // Fetch all data in parallel
-  const [srData, totalCount, clients, users] = await Promise.all([
+  const [
+    srData,
+    totalCount,
+    waitingCount,
+    inProgressCount,
+    urgentCount,
+    dueTodayCount,
+    myAssignedCount,
+    clients,
+    users,
+  ] = await Promise.all([
     srService.getAllSRs({
       where,
       orderBy,
@@ -140,9 +163,33 @@ export default async function SRsPage({ searchParams }: Props) {
       take: itemsPerPage,
     }),
     srService.countSRs({ where }),
+    srService.countSRs({ where: { ...whereBase, status: 'REQUESTED' } }),
+    srService.countSRs({ where: { ...whereBase, status: 'IN_PROGRESS' } }),
+    srService.countSRs({ where: { ...whereBase, priority: { in: ['CRITICAL', 'HIGH'] } } }),
+    srService.countSRs({
+      where: {
+        ...whereBase,
+        dueDate: { gte: today, lt: tomorrow },
+        status: { in: ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
+      },
+    }),
+    srService.countSRs({
+      where: {
+        ...whereBase,
+        assigneeId: session?.user?.id || 'non-existent',
+      },
+    }),
     clientsPromise,
     usersPromise,
   ]);
+
+  const globalCounts = {
+    waiting: waitingCount,
+    inProgress: inProgressCount,
+    urgent: urgentCount,
+    dueToday: dueTodayCount,
+    myAssigned: myAssignedCount,
+  };
 
   const paginationInfo = {
     currentPage: page,
@@ -154,6 +201,12 @@ export default async function SRsPage({ searchParams }: Props) {
   };
 
   return (
-    <SRsDataTable srs={srData} paginationInfo={paginationInfo} clients={clients} users={users} />
+    <SRsDataTable
+      srs={srData}
+      paginationInfo={paginationInfo}
+      clients={clients}
+      users={users}
+      globalCounts={globalCounts}
+    />
   );
 }

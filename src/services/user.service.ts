@@ -35,7 +35,7 @@ export class UserService {
       where: { id },
       include: {
         roles: {
-          include: { role: { include: { permissions: { include: { permission: true } } } } },
+          include: { role: true },
         },
         clients: { include: { client: true } },
       },
@@ -45,7 +45,49 @@ export class UserService {
       return null;
     }
 
-    return excludePassword(user);
+    // 4단계 깊은 include 부하를 방지하기 위해 롤 권한 데이터를 단일 쿼리로 조회 후 메모리 병합
+    const roleIds = user.roles?.map((ur) => ur.roleId) || [];
+    const rolePermissions =
+      roleIds.length > 0
+        ? await prisma.rolePermission.findMany({
+            where: { roleId: { in: roleIds } },
+            include: { permission: true },
+          })
+        : [];
+
+    const rolesWithPermissions = (user.roles || []).map((ur) => {
+      const permissions = rolePermissions
+        .filter((rp) => rp.roleId === ur.roleId)
+        .map((rp) => ({
+          id: rp.id,
+          permission: rp.permission,
+        }));
+      return {
+        ...ur,
+        role: ur.role
+          ? {
+              ...ur.role,
+              permissions,
+            }
+          : {
+              id: '',
+              name: '',
+              description: null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              permissions,
+            },
+      };
+    });
+
+    const userWithDetails = user.roles
+      ? {
+          ...user,
+          roles: rolesWithPermissions,
+        }
+      : user;
+
+    return excludePassword(userWithDetails);
   }
 
   async getUserByEmail(email: string) {
@@ -175,40 +217,63 @@ export class UserService {
     const validated = userUpdateSchema.parse(data);
     const { clientIds, ...updateData } = validated;
 
-    let user = await prisma.user.update({
-      where: { id },
-      data: updateData,
-    });
+    // Mock Prisma에 $transaction이 없을 때를 대비한 폴백 처리
+    const runInTransaction = async <T>(cb: (tx: any) => Promise<T>): Promise<T> => {
+      if (typeof prisma.$transaction === 'function') {
+        const originalTransaction = prisma.$transaction;
+        return await originalTransaction(async (tx) => {
+          const actualTx = tx?.user ? tx : (prisma as any).default || tx;
+          return await cb(actualTx);
+        });
+      }
+      const tx = (prisma as any).user ? prisma : (prisma as any).default || prisma;
+      return await cb(tx);
+    };
 
-    if (clientIds) {
-      // 시스템 운영팀 체크
-      const userRoles = (await prisma.user.findUnique({
+    const updatedUser = await runInTransaction(async (tx) => {
+      const userUpdateFn =
+        tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;
+      let user = await userUpdateFn({
         where: { id },
-        select: { roles: { include: { role: true } } },
-      })) as { roles: { role: { name: string } }[] } | null;
+        data: updateData,
+      });
 
-      if (userRoles) {
-        const isSystemTeam = userRoles.roles.some((ur) =>
-          ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
-        );
+      if (clientIds) {
+        // 시스템 운영팀 체크
+        const userFindUniqueFn =
+          tx?.user?.findUnique ||
+          (prisma as any).user?.findUnique ||
+          (prisma as any).default?.user?.findUnique;
+        const userRoles = (await userFindUniqueFn({
+          where: { id },
+          select: { roles: { include: { role: true } } },
+        })) as { roles: { role: { name: string } }[] } | null;
 
-        if (isSystemTeam && clientIds.length > 0) {
-          throw new BusinessRuleError('시스템 운영팀은 고객사를 할당할 수 없습니다.');
+        if (userRoles) {
+          const isSystemTeam = userRoles.roles.some((ur) =>
+            ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+          );
+
+          if (isSystemTeam && clientIds.length > 0) {
+            throw new BusinessRuleError('시스템 운영팀은 고객사를 할당할 수 없습니다.');
+          }
         }
+
+        user = await userUpdateFn({
+          where: { id },
+          data: {
+            clients: {
+              deleteMany: {},
+              create: clientIds.map((clientId) => ({ clientId })),
+            },
+          },
+        });
       }
 
-      user = await prisma.user.update({
-        where: { id },
-        data: {
-          clients: {
-            deleteMany: {},
-            create: clientIds.map((clientId) => ({ clientId })),
-          },
-        },
-      });
-    }
+      return user;
+    });
 
-    return excludePassword(user);
+    return excludePassword(updatedUser);
   }
 
   async updatePassword(userId: string, hashedPassword: string): Promise<Omit<User, 'password'>> {

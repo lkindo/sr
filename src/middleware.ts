@@ -12,8 +12,11 @@ import { rateLimiters } from '@/lib/rate-limiter';
 const ratelimit = rateLimiters.middleware;
 
 export default auth(async (req) => {
-  // 1. API 라우트 Rate Limiting
-  if (req.nextUrl.pathname.startsWith('/api/')) {
+  // 1. API 라우트 및 Server Actions Rate Limiting
+  const isApiRoute = req.nextUrl.pathname.startsWith('/api/');
+  const isServerAction = req.method === 'POST' && req.headers.has('next-action');
+
+  if (isApiRoute || isServerAction) {
     const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1';
     const { allowed, limit, resetTime, remaining } = await ratelimit.check(ip);
 
@@ -55,7 +58,7 @@ export default auth(async (req) => {
   const isDev = process.env.NODE_ENV === 'development';
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ''};
+    script-src 'self' 'unsafe-inline' 'nonce-${nonce}' ${isDev ? "'unsafe-eval'" : ''};
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data: https:;
     font-src 'self' data:;

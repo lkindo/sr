@@ -100,22 +100,22 @@ class EmailService {
     link: string
   ) {
     const subject = `[SR System] SR 상태가 변경되었습니다: ${srNumber}`;
-    const statusMap: Record<string, string> = {
-      REQUESTED: '요청됨',
-      INTAKE: '접수',
-      IN_PROGRESS: '진행중',
-      ON_HOLD: '보류',
-      COMPLETED: '완료',
-      CONFIRMED: '확인완료',
-      REJECTED: '거절됨',
-    };
+    const statusMap = new Map<string, string>([
+      ['REQUESTED', '요청됨'],
+      ['INTAKE', '접수'],
+      ['IN_PROGRESS', '진행중'],
+      ['ON_HOLD', '보류'],
+      ['COMPLETED', '완료'],
+      ['CONFIRMED', '확인완료'],
+      ['REJECTED', '거절됨'],
+    ]);
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">SR 상태 변경 알림</h2>
         <p><strong>SR 번호:</strong> ${srNumber}</p>
         <p><strong>제목:</strong> ${title}</p>
-        <p><strong>상태:</strong> ${statusMap[oldStatus] || oldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${statusMap[newStatus] || newStatus}</span></p>
+        <p><strong>상태:</strong> ${statusMap.get(oldStatus) || oldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${statusMap.get(newStatus) || newStatus}</span></p>
         <a href="${link}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
       </div>
     `;

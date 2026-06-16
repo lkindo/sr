@@ -13,7 +13,7 @@ import { AuthenticatedUser } from '@/types/session';
 const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
 export function isInternalUser(user: AuthenticatedUser): boolean {
-  return user.roles.some((role) => INTERNAL_ROLES.includes(role));
+  return user.roles?.some((role) => INTERNAL_ROLES.includes(role)) ?? false;
 }
 
 // ============================================================================
@@ -21,11 +21,11 @@ export function isInternalUser(user: AuthenticatedUser): boolean {
 // ============================================================================
 
 export function canCreateSR(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.CREATE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.CREATE);
 }
 
 export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return true;
 
   const hasReadPermission = hasPermissionFlag(user, PERMISSIONS.SR.READ);
@@ -52,7 +52,7 @@ export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
 }
 
 export function canUpdateSR(user: AuthenticatedUser, sr: SR): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return true;
 
   const hasUpdate = hasPermissionFlag(user, PERMISSIONS.SR.UPDATE);
@@ -77,7 +77,7 @@ export function canUpdateSR(user: AuthenticatedUser, sr: SR): boolean {
 }
 
 export function canDeleteSR(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.DELETE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.DELETE);
 }
 
 export function ensureCanCreateSR(user: AuthenticatedUser): void {
@@ -109,11 +109,11 @@ export function ensureCanDeleteSR(user: AuthenticatedUser): void {
 // ============================================================================
 
 export function canCreateClient(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.CREATE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.CREATE);
 }
 
 export function canReadClient(user: AuthenticatedUser, client?: Client): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const canViewAll = hasPermissionFlag(user, PERMISSIONS.CLIENT.READ);
 
   if (client) {
@@ -125,11 +125,11 @@ export function canReadClient(user: AuthenticatedUser, client?: Client): boolean
 }
 
 export function canUpdateClient(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.UPDATE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.UPDATE);
 }
 
 export function canDeleteClient(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.DELETE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.DELETE);
 }
 
 export function ensureCanCreateClient(user: AuthenticatedUser): void {
@@ -161,11 +161,11 @@ export function ensureCanDeleteClient(user: AuthenticatedUser): void {
 // ============================================================================
 
 export function canCreateUser(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
 }
 
 export function canReadUser(user: AuthenticatedUser, targetUser?: User): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const canViewAll = hasPermissionFlag(user, PERMISSIONS.USER.READ);
 
   if (targetUser) {
@@ -177,7 +177,7 @@ export function canReadUser(user: AuthenticatedUser, targetUser?: User): boolean
 }
 
 export function canUpdateUser(user: AuthenticatedUser, targetUser: User): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const hasUpdate = hasPermissionFlag(user, PERMISSIONS.USER.UPDATE);
   const isSelf = targetUser.id === user.id && hasPermissionFlag(user, PERMISSIONS.USER.UPDATE_SELF);
 
@@ -185,7 +185,7 @@ export function canUpdateUser(user: AuthenticatedUser, targetUser: User): boolea
 }
 
 export function canDeleteUser(user: AuthenticatedUser, targetUser: User): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const hasDelete = hasPermissionFlag(user, PERMISSIONS.USER.DELETE);
 
   // 자기 자신은 삭제 불가
@@ -230,11 +230,11 @@ export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: User): 
 const SYSTEM_ROLES = ['ADMIN', 'USER', 'GUEST'];
 
 export function canCreateRole(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.CREATE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.CREATE);
 }
 
 export function canReadRole(user: AuthenticatedUser): boolean {
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.READ);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.READ);
 }
 
 export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
@@ -243,7 +243,7 @@ export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
     return false;
   }
 
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.UPDATE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.UPDATE);
 }
 
 export function canDeleteRole(user: AuthenticatedUser, role: Role): boolean {
@@ -252,11 +252,11 @@ export function canDeleteRole(user: AuthenticatedUser, role: Role): boolean {
     return false;
   }
 
-  return user.roles.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.DELETE);
+  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.DELETE);
 }
 
 export function canAssignRole(user: AuthenticatedUser, role: Role): boolean {
-  const isAdmin = user.roles.includes('ADMIN');
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
 
   // ADMIN 역할 할당은 ADMIN만 가능
   if (role.name === 'ADMIN') {
@@ -297,7 +297,7 @@ export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
 }
 
 export function ensureCanAssignRole(user: AuthenticatedUser, role: Role): void {
-  if (role.name === 'ADMIN' && !user.roles.includes('ADMIN')) {
+  if (role.name === 'ADMIN' && !user.roles?.includes('ADMIN')) {
     throw new ForbiddenError('ADMIN 역할 할당은 ADMIN만 가능합니다.');
   }
   if (!canAssignRole(user, role)) {

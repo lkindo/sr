@@ -8,7 +8,8 @@ import { getFormDataValue } from '@/lib/form-data-parser';
 import { PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
 import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
-import { RoleService } from '@/services/role.service';
+import type { RoleService } from '@/services/role.service';
+import { services } from '@/services/service-registry';
 
 export async function createRoleAction(formData: FormData): Promise<Result<Role>> {
   try {
@@ -25,7 +26,7 @@ export async function createRoleAction(formData: FormData): Promise<Result<Role>
 
     await authenticateAndAuthorize('role:create');
 
-    const roleService = new RoleService();
+    const roleService = services.roleService;
     const role = await roleService.createRole(validated);
 
     return ok(role);
@@ -49,7 +50,7 @@ export async function updateRoleAction(id: string, formData: FormData): Promise<
 
     await authenticateAndAuthorize('role:update');
 
-    const roleService = new RoleService();
+    const roleService = services.roleService;
     const role = await roleService.updateRole(id, validated);
 
     return ok(role);
@@ -62,7 +63,7 @@ export async function deleteRoleAction(id: string): Promise<Result<void>> {
   try {
     await authenticateAndAuthorize('role:delete');
 
-    const roleService = new RoleService();
+    const roleService = services.roleService;
     await roleService.deleteRole(id);
 
     return ok(undefined);
@@ -75,7 +76,7 @@ export async function getRoleAction(id: string): Promise<Result<Role>> {
   try {
     await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
 
-    const roleService = new RoleService();
+    const roleService = services.roleService;
     const role = await roleService.getRoleById(id);
     if (!role) {
       return fail('역할을 찾을 수 없습니다.', 'NOT_FOUND');
@@ -101,7 +102,7 @@ export async function getAllRolesAction(): Promise<
   try {
     await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
 
-    const roleService = new RoleService();
+    const roleService = services.roleService;
     const roles = await roleService.getAllRoles();
     return ok(roles);
   } catch (error) {
@@ -116,7 +117,7 @@ export async function updateRolePermissionsAction(
   try {
     await authenticateAndAuthorize('role:update_permissions');
 
-    const roleService = new RoleService();
+    const roleService = services.roleService;
     await roleService.updateRolePermissions(roleId, permissionIds);
 
     return ok(undefined);

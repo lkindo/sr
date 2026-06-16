@@ -15,12 +15,12 @@ type ServiceCategoryUpdateData = z.infer<typeof serviceCategoryUpdateSchema>;
  * MEDIUM: 100% 시간 (기본)
  * LOW: 150% 시간 (여유)
  */
-const SLA_PRIORITY_MULTIPLIERS: Record<SRPriority, number> = {
-  CRITICAL: 0.5,
-  HIGH: 0.75,
-  MEDIUM: 1.0,
-  LOW: 1.5,
-};
+const SLA_PRIORITY_MULTIPLIERS = new Map<SRPriority, number>([
+  ['CRITICAL', 0.5],
+  ['HIGH', 0.75],
+  ['MEDIUM', 1.0],
+  ['LOW', 1.5],
+]);
 
 /**
  * 서비스 카테고리 서비스
@@ -354,7 +354,7 @@ export class ServiceCategoryService {
    * 우선순위별 SLA 배율 조회
    */
   getSLAMultiplier(priority: SRPriority): number {
-    return SLA_PRIORITY_MULTIPLIERS[priority];
+    return SLA_PRIORITY_MULTIPLIERS.get(priority) || 1.0;
   }
 
   /**

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
@@ -89,11 +89,19 @@ export function SRsDataTable({
   paginationInfo,
   clients,
   users,
+  globalCounts,
 }: {
   srs: SRListItem[];
   paginationInfo: PaginationInfo;
   clients: ClientListItem[];
   users: UserListItem[];
+  globalCounts?: {
+    waiting: number;
+    inProgress: number;
+    urgent: number;
+    dueToday: number;
+    myAssigned: number;
+  };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -143,6 +151,26 @@ export function SRsDataTable({
 
   const [searchQuery, setSearchQuery] = useState(filters.search);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // 검색 디바운싱 적용 (500ms)
+  useEffect(() => {
+    // 렌더링 시점과 현재 검색 필터 값이 동일하다면 필터 갱신 생략
+    if (searchQuery === (searchParams?.get('search') ?? '')) return;
+
+    const timer = setTimeout(() => {
+      handleFilterChange('search', searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // 외부(필터 초기화 등)에서 search 필터가 갱신되었을 때 로컬 searchQuery 상태도 동기화
+  useEffect(() => {
+    const currentSearch = searchParams?.get('search') ?? '';
+    if (searchQuery !== currentSearch) {
+      setSearchQuery(currentSearch);
+    }
+  }, [searchParams]);
 
   const createQueryString = useCallback(
     (params: Record<string, string | number | null>) => {
@@ -221,30 +249,14 @@ export function SRsDataTable({
     setIsCreateDialogOpen(false);
   };
 
-  // Calculate filter counts - Optimized to single pass O(N)
-  const counts = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTime = today.getTime();
-
-    return srs.reduce(
-      (acc, sr) => {
-        if (sr.status === 'REQUESTED') acc.waiting++;
-        if (sr.priority === 'CRITICAL' || sr.priority === 'HIGH') acc.urgent++;
-        if (sr.status === 'IN_PROGRESS') acc.inProgress++;
-
-        if (sr.dueDate && ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status)) {
-          const due = new Date(sr.dueDate);
-          due.setHours(0, 0, 0, 0);
-          if (due.getTime() === todayTime) {
-            acc.dueToday++;
-          }
-        }
-        return acc;
-      },
-      { waiting: 0, urgent: 0, inProgress: 0, dueToday: 0 }
-    );
-  }, [srs]);
+  // 서버로부터 전달받은 전체 글로벌 통계 수치 바인딩 (기본값 폴백 제공)
+  const counts = globalCounts ?? {
+    waiting: 0,
+    inProgress: 0,
+    urgent: 0,
+    dueToday: 0,
+    myAssigned: 0,
+  };
 
   const activeQuickFilter = useMemo(() => {
     if (filters.status === 'REQUESTED') return 'waiting';
@@ -345,7 +357,7 @@ export function SRsDataTable({
                           : 'bg-muted-foreground text-white'
                       }`}
                     >
-                      {srs.filter((sr) => sr.assigneeId === session?.user?.id).length}
+                      {counts.myAssigned}
                     </span>
                   </button>
                   <button

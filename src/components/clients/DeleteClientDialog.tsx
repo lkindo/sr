@@ -45,7 +45,9 @@ export function DeleteClientDialog({
       const result = await deleteClientAction(client.id);
 
       if (!result.success) {
-        throw new Error(result.error || '고객사 삭제에 실패했습니다.');
+        throw new Error(
+          'error' in result ? (result.error as string) : '고객사 삭제에 실패했습니다.'
+        );
       }
 
       toast({

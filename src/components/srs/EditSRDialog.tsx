@@ -1,14 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { Download, FileIcon, Trash2 } from 'lucide-react';
 
-import { getClientsForSelection } from '@/actions/client.actions';
-import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
-import { getProfileAction } from '@/actions/user.actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,9 +26,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
-import { usePermissions } from '@/hooks/use-permissions';
-import { useUpdateSR } from '@/hooks/use-sr';
-import { useToast } from '@/hooks/use-toast';
+import { useEditSRForm } from '@/hooks/useEditSRForm';
 
 interface Client {
   id: string;
@@ -97,169 +88,35 @@ interface EditSRDialogProps {
 }
 
 export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialogProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
-  const [priority, setPriority] = useState('');
-  const [status, setStatus] = useState('');
-  const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
-  const [files, setFiles] = useState<File[]>([]);
-  const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [categories, setCategories] = useState<ServiceCategory[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  // const { data: session } = useSession();
-  const { hasAnyRole } = usePermissions();
-  const { mutateAsync: updateSR } = useUpdateSR(sr?.id || '');
-
-  // CLIENT_ADMIN, CLIENT_USER인지 확인
-  const isClientUser = hasAnyRole(['CLIENT_ADMIN', 'CLIENT_USER']);
-  const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
-
-  const fetchClients = useCallback(async () => {
-    // CLIENT_ADMIN, CLIENT_USER인 경우 자신의 고객사만 가져오기
-    if (isClientUser) {
-      const profileResult = await getProfileAction();
-      if (profileResult.success && profileResult.data) {
-        const userClients =
-          (
-            profileResult.data as {
-              clients?: Array<{ client: { id: string; code: string; name: string } }>;
-            }
-          ).clients || [];
-        if (userClients.length > 0) {
-          const userClient = userClients[0].client;
-          setClients([
-            {
-              id: userClient.id,
-              code: userClient.code,
-              name: userClient.name,
-            },
-          ]);
-          // 고객사는 수정 불가이므로 현재 SR의 고객사 사용
-          if (sr.clientId) {
-            setClientId(sr.clientId);
-          }
-        }
-      }
-    } else {
-      // ADMIN, MANAGER, ENGINEER인 경우 모든 고객사 가져오기
-      const result = await getClientsForSelection();
-      if (result.success) {
-        setClients(result.data as Client[]);
-      }
-    }
-  }, [isClientUser, sr.clientId]);
-
-  const fetchCategories = useCallback(async () => {
-    const result = await getServiceCategoriesForSelection();
-    if (result.success && result.data) {
-      setCategories(result.data.map((cat) => ({ id: cat.id, categoryName: cat.categoryName })));
-    } else {
-      toast({
-        title: '오류',
-        description: '서비스 카테고리 목록을 불러오지 못했습니다.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  const fetchExistingAttachments = useCallback(async (srId: string) => {
-    try {
-      const response = await fetch(`/api/srs/${srId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setExistingAttachments(data.attachments || []);
-      }
-    } catch {
-      // 첨부 파일 로드 실패 시 무시
-    }
-  }, []);
-
-  // 안정적인 의존성 값 생성
-  const srId = useMemo(() => sr?.id || '', [sr?.id]);
-
-  useEffect(() => {
-    if (!open || !sr) return;
-
-    // 관리자는 모든 상태에서 수정 가능, 그 외는 REQUESTED 상태에서만 수정 가능
-    const isAdmin = hasAnyRole(['ADMIN']);
-    if (sr.status !== 'REQUESTED' && !isAdmin) {
-      toast({
-        title: '알림',
-        description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
-        variant: 'default',
-      });
-      onOpenChange(false);
-      return;
-    }
-
-    setTitle(sr.title);
-    setDescription(sr.description);
-    setClientId(sr.clientId || sr.client?.id || '');
-    // serviceCategory 또는 category 중 하나를 사용
-    setCategoryId(sr.serviceCategory?.id || sr.category?.id || '');
-    setRequestedPriority(sr.requestedPriority || 'MEDIUM');
-    setPriority(sr.actualPriority || 'MEDIUM');
-    setStatus(sr.status);
-    setRequestedCompletionDate(
-      sr.requestedCompletionDate
-        ? new Date(sr.requestedCompletionDate).toISOString().split('T')[0]
-        : ''
-    );
-    setFiles([]);
-    // 기존 첨부 파일 로드
-    if (sr.attachments && sr.attachments.length > 0) {
-      setExistingAttachments(sr.attachments);
-    } else {
-      // SR 상세 정보에서 첨부 파일 가져오기
-      fetchExistingAttachments(sr.id);
-    }
-    fetchClients();
-    fetchCategories();
-  }, [open, srId]);
-
-  const [fileToDelete, setFileToDelete] = useState<string | null>(null);
-
-  const handleDeleteAttachmentClick = (attachmentId: string) => {
-    setFileToDelete(attachmentId);
-  };
-
-  const executeDeleteAttachment = async () => {
-    if (!fileToDelete) return;
-
-    const attachmentId = fileToDelete;
-    setFileToDelete(null);
-
-    try {
-      const response = await fetch(`/api/attachments/${attachmentId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '파일 삭제 실패' }));
-        throw new Error(errorData.error || `파일 삭제 실패 (${response.status})`);
-      }
-
-      setExistingAttachments(existingAttachments.filter((a) => a.id !== attachmentId));
-
-      toast({
-        title: '성공',
-        description: '파일이 삭제되었습니다.',
-      });
-    } catch (error) {
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '파일 삭제에 실패했습니다.',
-        variant: 'destructive',
-      });
-    }
-  };
+  const { state, actions } = useEditSRForm({ sr, open, onOpenChange, onUpdated });
+  const {
+    title,
+    description,
+    clientId,
+    categoryId,
+    requestedPriority,
+    requestedCompletionDate,
+    files,
+    existingAttachments,
+    clients,
+    categories,
+    loading,
+    fileToDelete,
+    canSelectClient,
+  } = state;
+  const {
+    setTitle,
+    setDescription,
+    setClientId,
+    setCategoryId,
+    setRequestedPriority,
+    setRequestedCompletionDate,
+    setFiles,
+    setFileToDelete,
+    handleDeleteAttachmentClick,
+    executeDeleteAttachment,
+    handleSubmit,
+  } = actions;
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
@@ -267,117 +124,6 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
     const sizes = ['Bytes', 'KB', 'MB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const uploadAttachments = async (srId: string, files: File[]) => {
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-
-    try {
-      const response = await fetch(`/api/srs/${srId}/attachments`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload attachments');
-      }
-    } catch {
-      // 업로드 실패 시 toast로 사용자에게 알림
-      toast({
-        title: '경고',
-        description: 'SR은 수정되었으나 첨부파일 업로드에 실패했습니다.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // 관리자는 모든 상태에서 수정 가능, 그 외는 REQUESTED 상태에서만 수정 가능
-    const isAdmin = hasAnyRole(['ADMIN']);
-    if (sr.status !== 'REQUESTED' && !isAdmin) {
-      toast({
-        title: '오류',
-        description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (title.length < 5) {
-      toast({
-        title: '오류',
-        description: '제목은 최소 5자 이상이어야 합니다.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (description.length < 10) {
-      toast({
-        title: '오류',
-        description: '설명은 최소 10자 이상이어야 합니다.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('status', status);
-    // priority가 빈 문자열이 아닐 때만 추가
-    if (priority && priority.trim() !== '') {
-      formData.append('priority', priority);
-    }
-    formData.append('serviceCategoryId', categoryId || '');
-    if (requestedPriority && requestedPriority.trim() !== '') {
-      formData.append('requestedPriority', requestedPriority);
-    }
-    if (requestedCompletionDate) {
-      formData.append('requestedCompletionDate', requestedCompletionDate);
-    }
-
-    try {
-      await updateSR(formData);
-
-      // Upload attachments if any
-      if (files.length > 0) {
-        await uploadAttachments(sr.id, files);
-        // 업로드 후 기존 첨부 파일 목록 다시 로드
-        await fetchExistingAttachments(sr.id);
-      }
-
-      toast({
-        title: '성공',
-        description: 'SR이 수정되었습니다.',
-      });
-
-      onOpenChange(false); // 다이얼로그 즉시 닫기
-
-      // 병렬 처리로 지연 최소화 (Optimistic Updates에 의해 UI 갱신은 즉시 되나 데이터 완성을 위해)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sr', sr.id] }),
-        Promise.resolve(router.refresh()),
-      ]);
-
-      onUpdated();
-    } catch (error) {
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : 'SR 수정에 실패했습니다.',
-        variant: 'destructive',
-      });
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (

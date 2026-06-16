@@ -94,16 +94,20 @@ export const getRequiredFields = (toStatus: SRStatus): string[] => {
 };
 
 /**
- * 상태 전환 가능 여부와 사유를 함께 반환 (권한 검증 포함)
+ * 상태 전환 가능 여부와 사유를 함께 반환 (권한 및 필수 데이터 검증 포함)
  * @param from 현재 상태
  * @param to 목표 상태
  * @param userRoles 사용자 역할 목록 (Optional)
+ * @param currentData 현재 SR 데이터 (Optional)
+ * @param updateData 업데이트할 SR 데이터 (Optional)
  * @returns 가능 여부와 메시지
  */
 export const validateTransition = (
   from: SRStatus,
   to: SRStatus,
-  userRoles?: string[]
+  userRoles?: string[],
+  currentData?: any,
+  updateData?: any
 ): { valid: boolean; message?: string } => {
   // 1. 상태 흐름 유효성 검사
   if (!canTransition(from, to)) {
@@ -127,15 +131,38 @@ export const validateTransition = (
     }
   }
 
-  // 3. 필수 필드 검사는 Service 레벨에서 데이터 유무와 함께 수행하는 것이 더 적절할 수 있으나,
-  // 여기서는 "필요하다"는 정보만 제공하거나, 호출자가 getRequiredFields를 사용하도록 유도.
-  // 기존 로직 유지:
+  // 3. 필수 필드 데이터 검증
   const requiredFields = getRequiredFields(to);
-  if (requiredFields.length > 0) {
-    return {
-      valid: true, // Transition itself is valid, but needs data. Service should check data.
-      message: `필수 입력: ${requiredFields.join(', ')}`,
-    };
+  if (requiredFields.length > 0 && currentData && updateData) {
+    const missingFields: string[] = [];
+
+    for (const field of requiredFields) {
+      // assigneeId는 특별 케이스 (assignedToId라는 별칭 사용 가능성)
+      if (field === 'assigneeId') {
+        if (!updateData.assigneeId && !updateData.assignedToId && !currentData.assigneeId) {
+          missingFields.push('담당자(assigneeId)');
+        }
+      } else if (field === 'resolutionDescription') {
+        if (!updateData.resolutionDescription && !currentData.resolutionDescription) {
+          missingFields.push('해결 내용(resolutionDescription)');
+        }
+      } else if (field === 'rejectionReason') {
+        if (!updateData.rejectionReason && !currentData.rejectionReason) {
+          missingFields.push('거절 사유(rejectionReason)');
+        }
+      } else {
+        if (!updateData[field] && !currentData[field]) {
+          missingFields.push(field);
+        }
+      }
+    }
+
+    if (missingFields.length > 0) {
+      return {
+        valid: false,
+        message: `${to} 상태로 전환하려면 다음 필드가 필요합니다: ${missingFields.join(', ')}`,
+      };
+    }
   }
 
   return { valid: true };

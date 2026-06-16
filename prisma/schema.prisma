@@ -379,6 +379,7 @@ model SRComment {
   user User @relation(fields: [userId], references: [id])
 
   @@index([srId, createdAt])
+  @@index([srId, isInternal, createdAt])
   @@index([userId])
   @@map("sr_comments")
 }
@@ -431,6 +432,7 @@ model Notification {
 
   @@index([status, createdAt])
   @@index([recipient])
+  @@index([recipient, createdAt])
   @@map("notifications")
 }
 

@@ -190,6 +190,18 @@ describe('SRService', () => {
       // Mock services
       const { emailService } = await import('@/services/email.service');
       const { pushService } = await import('@/services/push.service');
+      const { domainEvents } = await import('@/lib/domain-events');
+      const { registerSRNotificationListeners } =
+        await import('@/services/listeners/sr-notification.listener');
+
+      // Ensure listeners are registered
+      domainEvents.removeAllListeners('sr:status_changed');
+      registerSRNotificationListeners();
+
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        email: 'req@test.com',
+        notificationPreference: { emailSRStatusChanged: true },
+      } as any);
 
       const sendEmailSpy = vi
         .spyOn(emailService, 'sendSRStatusChanged')
@@ -199,6 +211,9 @@ describe('SRService', () => {
       // Execute
       const data = { status: 'IN_PROGRESS' as const };
       await srService.updateSR('sr-1', data, mockUser);
+
+      // Wait for async domain event listeners to execute
+      await new Promise((resolve) => setTimeout(resolve, 15));
 
       // Verify
       expect(txMock.sR.update).toHaveBeenCalled();
@@ -265,30 +280,15 @@ describe('SRService', () => {
 
       await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow('삭제 권한이 없습니다');
     });
-    it('should delete related data in transaction', async () => {
+    it('should delete SR successfully', async () => {
       const mockSR = { id: 'sr-1', clientId: 'client-1' };
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
       vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
-
-      const txMock = {
-        sRActivity: { deleteMany: vi.fn() },
-        sRComment: { deleteMany: vi.fn() },
-        sRAttachment: { deleteMany: vi.fn() },
-        sRStatusHistory: { deleteMany: vi.fn() },
-        sR: { delete: vi.fn() },
-      };
-
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        return callback(txMock as any);
-      });
+      vi.mocked(prisma.sR.delete).mockResolvedValue(mockSR as any);
 
       await srService.deleteSR('sr-1', mockUser);
 
-      expect(txMock.sRActivity.deleteMany).toHaveBeenCalledWith({ where: { srId: 'sr-1' } });
-      expect(txMock.sRComment.deleteMany).toHaveBeenCalledWith({ where: { srId: 'sr-1' } });
-      expect(txMock.sRAttachment.deleteMany).toHaveBeenCalledWith({ where: { srId: 'sr-1' } });
-      expect(txMock.sRStatusHistory.deleteMany).toHaveBeenCalledWith({ where: { srId: 'sr-1' } });
-      expect(txMock.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+      expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
     });
   });
 
@@ -511,13 +511,7 @@ describe('SRService', () => {
         const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
         vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
-
-        // Mock transaction for delete
-        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-          if (typeof callback === 'function') {
-            return undefined;
-          }
-        });
+        vi.mocked(prisma.sR.delete).mockResolvedValue(mockSR as any);
 
         await srService.deleteSR('sr-1', mockUser);
 
@@ -525,8 +519,8 @@ describe('SRService', () => {
         expect(prisma.sR.findUnique).toHaveBeenCalledWith(
           expect.objectContaining({ where: { id: 'sr-1' } })
         );
-        // Verify transaction called (implies delete logic executed)
-        expect(prisma.$transaction).toHaveBeenCalled();
+        // Verify delete called
+        expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
       });
 
       it('should throw NotFoundError if SR to delete does not exist', async () => {
@@ -539,7 +533,7 @@ describe('SRService', () => {
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
         vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
-        vi.mocked(prisma.$transaction).mockRejectedValue(new Error('Delete failed'));
+        vi.mocked(prisma.sR.delete).mockRejectedValue(new Error('Delete failed'));
 
         await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow('Delete failed');
       });
