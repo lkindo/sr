@@ -99,9 +99,11 @@ describe('SRService - Expanded Coverage', () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as any);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
-      const { validateTransition, getRequiredFields } = await import('@/lib/sr-state-machine');
-      vi.mocked(validateTransition).mockReturnValue({ valid: true });
-      vi.mocked(getRequiredFields).mockReturnValue(['assigneeId']);
+      const { validateTransition } = await import('@/lib/sr-state-machine');
+      vi.mocked(validateTransition).mockReturnValue({
+        valid: false,
+        message: 'IN_PROGRESS 상태로 전환하려면 다음 필드가 필요합니다: 담당자(assigneeId)',
+      });
 
       await expect(
         srService.updateSR('sr-1', { status: 'IN_PROGRESS' }, mockUser as any)
@@ -118,9 +120,7 @@ describe('SRService - Expanded Coverage', () => {
         sR: {
           create: vi.fn().mockResolvedValue({ id: 'sr-1', srNumber: 'SR-20231010-0006' }),
         },
-        sRSequence: {
-          upsert: vi.fn().mockResolvedValue({ date: '20231010', seq: 6 }),
-        },
+        $queryRaw: vi.fn().mockResolvedValue([{ seq: 6 }]),
         sRActivity: { create: vi.fn() },
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) =>
@@ -146,8 +146,8 @@ describe('SRService - Expanded Coverage', () => {
         mockUser as any
       );
 
-      // Verify sequence upsert was called
-      expect(txMock.sRSequence.upsert).toHaveBeenCalled();
+      // Verify queryRaw was called
+      expect(txMock.$queryRaw).toHaveBeenCalled();
 
       // Verify SR creation used the sequence number
       expect(txMock.sR.create).toHaveBeenCalledWith(

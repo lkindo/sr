@@ -24,6 +24,8 @@ const { mockSRService } = vi.hoisted(() => {
     mockSRService: {
       getSRById: vi.fn(),
       getSRDetailsById: vi.fn(),
+      getSRActivities: vi.fn(),
+      getSRComments: vi.fn(),
     },
   };
 });
@@ -129,7 +131,10 @@ describe('SR Server Actions Security', () => {
       vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as any);
       mockSRService.getSRById.mockResolvedValue(targetSR); // SR exists
       const mockActivities = [{ id: 'act-1', description: 'Secret Activity' }];
-      mockPrisma.sRActivity.findMany.mockResolvedValue(mockActivities);
+      mockSRService.getSRActivities.mockResolvedValue({
+        activities: mockActivities,
+        nextCursor: null,
+      });
 
       const result = await getSRActivitiesAction('sr-1');
 
@@ -140,7 +145,10 @@ describe('SR Server Actions Security', () => {
       vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as any);
       mockSRService.getSRById.mockResolvedValue(targetSR);
       const mockActivities = [{ id: 'act-1', description: 'Secret Activity' }];
-      mockPrisma.sRActivity.findMany.mockResolvedValue(mockActivities);
+      mockSRService.getSRActivities.mockResolvedValue({
+        activities: mockActivities,
+        nextCursor: null,
+      });
 
       const result = await getSRActivitiesAction('sr-1');
 
@@ -156,7 +164,7 @@ describe('SR Server Actions Security', () => {
       vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as any);
       mockSRService.getSRById.mockResolvedValue(targetSR);
       const mockComments = [{ id: 'cmt-1', content: 'Secret Comment' }];
-      mockPrisma.sRComment.findMany.mockResolvedValue(mockComments);
+      mockSRService.getSRComments.mockResolvedValue({ comments: mockComments, nextCursor: null });
 
       const result = await getSRCommentsAction('sr-1');
 
@@ -167,7 +175,7 @@ describe('SR Server Actions Security', () => {
       vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as any);
       mockSRService.getSRById.mockResolvedValue(targetSR);
       const mockComments = [{ id: 'cmt-1', content: 'Secret Comment' }];
-      mockPrisma.sRComment.findMany.mockResolvedValue(mockComments);
+      mockSRService.getSRComments.mockResolvedValue({ comments: mockComments, nextCursor: null });
 
       const result = await getSRCommentsAction('sr-1');
 

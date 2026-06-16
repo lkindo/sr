@@ -52,6 +52,8 @@ const { mockSRService } = vi.hoisted(() => ({
     deleteSR: vi.fn(),
     getSRById: vi.fn(),
     getSRDetailsById: vi.fn(),
+    getSRActivities: vi.fn(),
+    getSRComments: vi.fn(),
   },
 }));
 
@@ -212,7 +214,10 @@ describe('SR Server Actions', () => {
     it('returns activities', async () => {
       const mockActivities = [{ id: 'act-1' }];
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      mockPrisma.sRActivity.findMany.mockResolvedValue(mockActivities);
+      mockSRService.getSRActivities.mockResolvedValue({
+        activities: mockActivities,
+        nextCursor: null,
+      });
 
       const result = await getSRActivitiesAction('sr-1', { limit: 10 });
 
@@ -227,7 +232,7 @@ describe('SR Server Actions', () => {
     it('returns comments', async () => {
       const mockComments = [{ id: 'c1' }];
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      mockPrisma.sRComment.findMany.mockResolvedValue(mockComments);
+      mockSRService.getSRComments.mockResolvedValue({ comments: mockComments, nextCursor: null });
 
       const result = await getSRCommentsAction('sr-1', { limit: 10 });
 

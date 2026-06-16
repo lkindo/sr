@@ -70,6 +70,13 @@ describe('SRsDataTable Counts', () => {
     },
     clients: [],
     users: [],
+    globalCounts: {
+      waiting: 2,
+      inProgress: 2,
+      urgent: 3,
+      dueToday: 3,
+      myAssigned: 0,
+    },
   };
 
   it('calculates and displays correct counts', () => {

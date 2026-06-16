@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const { mockPrisma } = vi.hoisted(() => {
   const mock = {
     $transaction: vi.fn((cb) => cb(mock)),
+    $queryRaw: vi.fn(),
     sR: {
       findFirst: vi.fn(),
       create: vi.fn(),
@@ -87,9 +88,9 @@ describe('SRService Concurrency Benchmark', () => {
   });
 
   it('handles high concurrency without retries (Optimized)', async () => {
-    // Mock atomic sequence generation
-    mockPrisma.sRSequence.upsert.mockImplementation(async ({ where }) => {
-      const date = where.date;
+    // Mock atomic sequence generation using $queryRaw
+    mockPrisma.$queryRaw.mockImplementation(async (query, ...values) => {
+      const date = values[0] || new Date().toISOString().slice(0, 10).replace(/-/g, '');
       let currentSeq = sequenceMap.get(date) || 0;
 
       // Simulating atomic increment
@@ -103,7 +104,7 @@ describe('SRService Concurrency Benchmark', () => {
       // Simulate a tiny delay to allow concurrency to overlap
       await new Promise((r) => setTimeout(r, 1));
 
-      return { date, seq: currentSeq };
+      return [{ seq: currentSeq }];
     });
 
     mockPrisma.sR.create.mockImplementation(async ({ data }) => {

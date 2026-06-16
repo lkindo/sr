@@ -119,9 +119,15 @@ describe('SR State Machine', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('필수 필드가 있는 전환은 valid: true와 필수 필드 메시지 반환 (권한 검증 통과 후)', () => {
-      const result = validateTransition('INTAKE', 'IN_PROGRESS', managerRoles);
-      expect(result.valid).toBe(true);
+    it('필수 필드가 누락된 전환은 valid: false와 필수 필드 메시지 반환 (데이터 검증 실패)', () => {
+      const result = validateTransition(
+        'INTAKE',
+        'IN_PROGRESS',
+        managerRoles,
+        { assigneeId: null },
+        { assigneeId: null }
+      );
+      expect(result.valid).toBe(false);
       expect(result.message).toContain('assigneeId');
     });
   });

@@ -262,7 +262,7 @@ describe('CreateSRDialog Component', () => {
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          description: '고객사를 선택해주세요.',
+          description: '고객사와 카테고리를 모두 선택해주세요.',
         })
       );
     });
@@ -285,7 +285,7 @@ describe('CreateSRDialog Component', () => {
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
-          description: '서비스 카테고리를 선택해주세요.',
+          description: '고객사와 카테고리를 모두 선택해주세요.',
         })
       );
     });

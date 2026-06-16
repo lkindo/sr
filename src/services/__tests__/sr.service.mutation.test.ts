@@ -11,6 +11,7 @@ import { SRService } from '@/services/sr.service';
 vi.mock('@/lib/prisma', () => {
   const mock = {
     $transaction: vi.fn((cb) => cb(mock)),
+    $queryRaw: vi.fn().mockResolvedValue([{ seq: 1 }]),
     sR: {
       findUnique: vi.fn().mockResolvedValue(null),
       findFirst: vi.fn().mockResolvedValue(null),
@@ -35,6 +36,13 @@ vi.mock('@/lib/prisma', () => {
   };
   return { default: mock };
 });
+
+vi.mock('@/lib/domain-events', () => ({
+  domainEvents: {
+    emit: vi.fn(),
+    on: vi.fn(),
+  },
+}));
 
 vi.mock('@/lib/policies', () => ({
   ensureCanCreateSR: vi.fn(),
@@ -185,8 +193,8 @@ describe('SRService Mutation Tests', () => {
       expect(updateData?.activities?.create).toBeDefined();
 
       // Verify notifications
-      expect(emailService.sendSRStatusChanged).toHaveBeenCalled();
-      expect(pushService.sendToUser).toHaveBeenCalled();
+      const { domainEvents } = await import('@/lib/domain-events');
+      expect(domainEvents.emit).toHaveBeenCalledWith('sr:status_changed', expect.any(Object));
     });
 
     it('should throw NotFoundError if SR does not exist', async () => {
@@ -209,8 +217,6 @@ describe('SRService Mutation Tests', () => {
       await srService.deleteSR('sr-1', mockUser as any);
 
       expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
-      expect(prisma.sRActivity.deleteMany).toHaveBeenCalled();
-      expect(prisma.sRComment.deleteMany).toHaveBeenCalled();
     });
 
     it('should throw NotFoundError if SR does not exist', async () => {

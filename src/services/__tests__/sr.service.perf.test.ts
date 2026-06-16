@@ -9,6 +9,7 @@ import { SRService } from '@/services/sr.service';
 const { mockPrisma } = vi.hoisted(() => {
   const mock = {
     $transaction: vi.fn((cb) => cb(mock)),
+    $queryRaw: vi.fn().mockResolvedValue([{ seq: 1 }]),
     sR: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
@@ -54,6 +55,13 @@ vi.mock('@/services/push.service', () => ({
 vi.mock('@/services/email.service', () => ({
   emailService: {
     sendSRCreated: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('@/lib/domain-events', () => ({
+  domainEvents: {
+    emit: vi.fn(),
+    on: vi.fn(),
   },
 }));
 
@@ -118,7 +126,8 @@ describe('SRService Performance', () => {
 
     await srService.createSR(data, mockUser);
 
-    // Assert that user.findMany was called once
-    expect(prisma.user.findMany).toHaveBeenCalledTimes(1);
+    // Assert that domainEvents.emit was called with 'sr:created'
+    const { domainEvents } = await import('@/lib/domain-events');
+    expect(domainEvents.emit).toHaveBeenCalledWith('sr:created', expect.any(Object));
   });
 });

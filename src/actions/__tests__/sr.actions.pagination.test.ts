@@ -36,6 +36,8 @@ const { mockSRService } = vi.hoisted(() => {
     mockSRService: {
       getSRDetailsById: vi.fn(),
       getSRById: vi.fn(),
+      getSRActivities: vi.fn(),
+      getSRComments: vi.fn(),
     },
   };
 });
@@ -82,7 +84,6 @@ describe('SR Actions - Details and Pagination', () => {
 
   describe('getSRActivitiesAction', () => {
     it('handles pagination correctly', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       const mockActivities = [
         {
           id: 'act-1',
@@ -101,7 +102,13 @@ describe('SR Actions - Details and Pagination', () => {
       ];
       // Mock SR existence
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      vi.mocked(prisma.sRActivity.findMany).mockResolvedValue(mockActivities as any);
+      mockSRService.getSRActivities.mockImplementation(async (srId, options) => {
+        const limit = options?.limit || 20;
+        const hasMore = mockActivities.length > limit;
+        const items = hasMore ? mockActivities.slice(0, limit) : mockActivities;
+        const nextCursor = hasMore ? items[items.length - 1].id : null;
+        return { activities: items, nextCursor };
+      });
 
       const result = await actions.getSRActivitiesAction('sr-1', { limit: 1 });
       expect(result.success).toBe(true);
@@ -114,7 +121,6 @@ describe('SR Actions - Details and Pagination', () => {
 
   describe('getSRCommentsAction', () => {
     it('handles pagination correctly', async () => {
-      const { default: prisma } = await import('@/lib/prisma');
       const mockComments = [
         {
           id: 'c1',
@@ -133,7 +139,13 @@ describe('SR Actions - Details and Pagination', () => {
       ];
       // Mock SR existence
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      vi.mocked(prisma.sRComment.findMany).mockResolvedValue(mockComments as any);
+      mockSRService.getSRComments.mockImplementation(async (srId, options) => {
+        const limit = options?.limit || 20;
+        const hasMore = mockComments.length > limit;
+        const items = hasMore ? mockComments.slice(0, limit) : mockComments;
+        const nextCursor = hasMore ? items[items.length - 1].id : null;
+        return { comments: items, nextCursor };
+      });
 
       const result = await actions.getSRCommentsAction('sr-1', { limit: 1 });
       expect(result.success).toBe(true);

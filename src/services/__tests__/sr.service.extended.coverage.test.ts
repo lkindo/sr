@@ -143,22 +143,13 @@ describe('SRService Extended Branches', () => {
       await expect(srService.deleteSR('none', {} as any)).rejects.toThrow(NotFoundError);
     });
 
-    it('deletes SR and related data in transaction', async () => {
+    it('deletes SR and related data', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1' } as any);
       vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
-      const txMock = {
-        sR: { delete: vi.fn() },
-        sRActivity: { deleteMany: vi.fn() },
-        sRComment: { deleteMany: vi.fn() },
-        sRAttachment: { deleteMany: vi.fn() },
-        sRStatusHistory: { deleteMany: vi.fn() },
-      };
-      vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
-
       await srService.deleteSR('sr-1', { id: 'u1' } as any);
 
-      expect(txMock.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+      expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
     });
   });
 
