@@ -12,6 +12,16 @@ import { rateLimiters } from '@/lib/rate-limiter';
 const ratelimit = rateLimiters.middleware;
 
 export default auth(async (req) => {
+  // Next.js 내부 요청 및 static 자산은 미들웨어 로직을 건너뜀 (더블 슬래시 static chunk 로드 버그 방지)
+  const { pathname } = req.nextUrl;
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/static/') ||
+    pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|json|wasm)$/)
+  ) {
+    return NextResponse.next();
+  }
+
   // 1. API 라우트 및 Server Actions Rate Limiting
   const isApiRoute = req.nextUrl.pathname.startsWith('/api/');
   const isServerAction = req.method === 'POST' && req.headers.has('next-action');
