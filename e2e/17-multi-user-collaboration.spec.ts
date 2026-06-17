@@ -41,7 +41,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
   test.setTimeout(120000);
 
   // SR ID가 없으면 후속 테스트를 스킵
-  test.beforeEach(async (_, testInfo) => {
+  // eslint-disable-next-line no-empty-pattern
+  test.beforeEach(async ({}, testInfo) => {
     if (testInfo.title !== '1. CLIENT: SR 생성' && !srId) {
       test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
     }

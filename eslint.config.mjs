@@ -10,6 +10,7 @@ import simpleImportSort from 'eslint-plugin-simple-import-sort';
 const eslintConfig = [
   {
     ignores: [
+      '.agent/',
       '.next/',
       'node_modules/',
       'coverage/',
