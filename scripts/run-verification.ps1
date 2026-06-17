@@ -1,5 +1,7 @@
 param (
-    [switch]$fast
+    [switch]$fast,
+    [switch]$clean,
+    [switch]$full
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,6 +16,24 @@ function Log-Success ($msg) {
 
 function Log-Error ($msg) {
     Write-Host "[ERROR] $msg" -ForegroundColor Red
+}
+
+# 0. Cache Cleaning (Optional)
+if ($clean) {
+    Log-Info "Cleaning cache files..."
+    $filesToClean = @(
+        ".eslintcache",
+        "tsconfig.tsbuildinfo",
+        "tsconfig.full.tsbuildinfo",
+        "test-results"
+    )
+    foreach ($file in $filesToClean) {
+        if (Test-Path $file) {
+            Log-Info "Removing: $file"
+            Remove-Item -Path $file -Recurse -Force | Out-Null
+        }
+    }
+    Log-Success "Cache files cleaned successfully!"
 }
 
 # 1. Preflight Check
@@ -83,27 +103,43 @@ try {
         pnpm prisma generate
     }
 
-    # 3. TypeScript Type Checking
-    Run-Step "TypeScript Type Checking" {
-        pnpm type-check
+    # 3. Parallel Static Checks (Type, Lint, Format)
+    Run-Step "Parallel Static Checks" {
+        pnpm verify:static
     }
 
-    # 4. ESLint Check
-    Run-Step "ESLint Linting" {
-        pnpm lint
-    }
-
-    # 5. Prettier Check
-    Run-Step "Prettier Formatting Check" {
-        pnpm format:check
-    }
-
-    # 6. Vitest Tests
+    # 4. Vitest Tests
     Run-Step "Vitest Unit & Integration Tests" {
-        pnpm test run
+        if ($full) {
+            Log-Info "Running FULL Vitest test suite..."
+            pnpm test run
+        } else {
+            # Check for uncommitted changes in Git
+            $gitChanges = git status --porcelain
+            $meaningfulChanges = @()
+            if ($gitChanges) {
+                $lines = if ($gitChanges -is [string]) { $gitChanges -split "`r?`n" } else { $gitChanges }
+                foreach ($line in $lines) {
+                    if ($line.Trim().Length -gt 0 -and $line.Length -gt 3) {
+                        $file = $line.Substring(3).Trim()
+                        if ($file -notmatch 'package\.json|pnpm-lock\.yaml|scripts/run-verification\.ps1|\.gemini/|walkthrough\.md|task\.md|implementation_plan\.md|harness_critique_report\.md|\.eslintcache|\.gitignore') {
+                            $meaningfulChanges += $file
+                        }
+                    }
+                }
+            }
+
+            if ($meaningfulChanges.Count -eq 0) {
+                Log-Info "No meaningful code changes detected (only configs, docs or harness modified). Skipping Vitest tests."
+                Log-Info "Tip: Use -full flag to run the complete test suite."
+            } else {
+                Log-Info "Running INCREMENTAL Vitest tests (changed files only)..."
+                pnpm test run --changed
+            }
+        }
     }
 
-    # 7. Playwright E2E Tests (Conditional)
+    # 5. Playwright E2E Tests (Conditional)
     if ($fast) {
         Log-Info "[--fast] option specified. Skipping Playwright E2E tests."
         $steps.Add(([PSCustomObject]@{

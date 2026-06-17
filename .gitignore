@@ -95,3 +95,6 @@ playwright/.auth/
 *.swp
 *.swo
 *~
+
+# ESLint Cache
+.eslintcache
