@@ -1,5 +1,5 @@
 # Stage 1: Dependency 설치
-FROM node:24-slim AS deps
+FROM node:24 AS deps
 WORKDIR /app
 
 # Corepack 활성화하여 pnpm 사용 준비
@@ -16,7 +16,7 @@ ENV PNPM_MINIMUM_RELEASE_AGE=0
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Application 빌드
-FROM node:24-slim AS builder
+FROM node:24 AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
