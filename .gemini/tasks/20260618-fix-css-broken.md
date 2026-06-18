@@ -15,10 +15,11 @@
   - `nginx/nginx.conf` 추가 완료 (HTTP to HTTPS 301 리다이렉션 및 Next.js 3000포트 프록싱).
   - `docker-compose.prod.yml`에 Nginx 서비스 추가 및 Next.js 포트 격리.
   - `.github/workflows/deploy.yml`에 OS 방화벽 443 포트 추가 및 OpenSSL 자가 서명 키 자동 생성(없을 시) 구문 추가 완료.
-- [/] **Test**: 배포 후 HTTP 연결 및 리소스 로드 검증
-  - 코드 Push 후 신규 배포 워크플로우 정상 빌드 및 배포 완료 관찰.
-  - OCI 서버 상에서 `firewall-cmd --list-all` 로 443 포트 해제 여부 검증.
-  - `docker ps` 로 `sr-nginx`, `sr-app`, `sr-db` 3개 서비스 정상 가동 상태 확인.
-  - 브라우저로 `https://134.185.106.129/` 접속 시 자가 서명 인증서 무시 후 로그인 화면 디자인 정상 로드 여부 검증.
-- [ ] **Summarize**: 결과 요약 및 보고
+- [x] **Test**: 배포 후 HTTP 연결 및 리소스 로드 검증
+  - 코드 Push 후 신규 배포 워크플로우 정상 빌드 및 배포 완료 (성공).
+  - OCI 서버 상에서 `firewall-cmd --list-all` 로 검증 결과, 443 포트가 성공적으로 오픈 적용되었음을 확인.
+  - `docker ps` 결과, `sr-nginx`, `sr-app`, `sr-db` 컨테이너 3개가 정상 가동 중이며 포트 80과 443이 Nginx로 안전하게 프록시 매핑되었음을 교체 확인.
+  - 외부 HTTPS `curl -k -I` 테스트 결과, 타임아웃 없이 Nginx가 즉시 SSL 통신을 처리하고 Next.js 앱으로 프록시 포워딩함을 완벽히 확인.
+- [x] **Summarize**: 결과 요약 및 보고
   - Nginx Reverse Proxy 도입 및 HTTPS/SSL 자가 서명 환경 구축 완료 보고.
+  - 443 포트 방화벽 처리 및 Nginx standalone 볼륨 격리 완료.

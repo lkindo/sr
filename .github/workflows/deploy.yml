@@ -233,5 +233,9 @@ jobs:
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             
+            # 6.5. 데이터베이스 마이그레이션 및 시딩 자동화 (Swap 4GB 및 버닝 방지 버전 고정)
+            docker exec -i sr-app npx prisma@6.19.0 db push --accept-data-loss
+            docker exec -i sr-app npx tsx prisma/seed.ts
+            
             # 7. 미사용 도커 이미지 정리 (디스크 부족 방지)
             docker compose -f docker-compose.prod.yml image prune -af || docker image prune -af

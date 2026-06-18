@@ -1,8 +1,12 @@
 import { PrismaClient } from '@prisma/client';
-import { config } from 'dotenv';
 
-// 환경 변수 명시적 로드
-config({ override: true });
+// 환경 변수 명시적 로드 (로컬 개발 시에만 dotenv 활용, 프로덕션은 시스템 환경변수 우선 적용)
+try {
+  const { config } = require('dotenv');
+  config({ override: true });
+} catch (e) {
+  // dotenv 모듈이 없는 프로덕션 환경(Docker runner)인 경우 예외 우회
+}
 
 const prisma = new PrismaClient();
 
