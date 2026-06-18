@@ -73,10 +73,10 @@ jobs:
             
             # GHCR 로그인 및 최신 이미지 Pull
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose pull
+            docker compose -f docker-compose.prod.yml pull
             
             # 컨테이너 롤링 리스타트
-            docker compose up -d
+            docker compose -f docker-compose.prod.yml up -d
             
             # 미사용 도커 이미지 정리 (디스크 부족 방지)
-            docker image prune -af
+            docker compose -f docker-compose.prod.yml image prune -af || docker image prune -af
