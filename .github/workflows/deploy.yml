@@ -1,10 +1,7 @@
 name: Deploy to Self-Hosted Docker Server
 
 on:
-  workflow_run:
-    workflows: ['CI/CD Pipeline']
-    types:
-      - completed
+  push:
     branches:
       - main
       - dev
@@ -17,13 +14,10 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
