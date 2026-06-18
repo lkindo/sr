@@ -9,7 +9,7 @@ setup('authenticate', async ({ page }) => {
 
   // 로그인 폼 입력
   await page.fill('input[name="email"]', process.env.TEST_USER_EMAIL || 'admin@example.com');
-  await page.fill('input[name="password"]', process.env.TEST_USER_PASSWORD || 'password123');
+  await page.fill('input[name="password"]', process.env.TEST_USER_PASSWORD || 'admin123');
 
   // 로그인 버튼 클릭
   await page.click('button[type="submit"]');
