@@ -50,10 +50,10 @@ RUN mkdir -p /app && chown -R nextjs:nodejs /app
 ENV HOME=/home/nextjs
 
 # 빌드 결과물 복사 (Standalone 모드)
-COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
 # entrypoint 스크립트 복사 및 실행 권한 부여
 COPY docker-entrypoint.sh /usr/local/bin/
