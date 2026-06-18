@@ -69,13 +69,62 @@ jobs:
           key: ${{ secrets.SERVER_KEY }}
           port: 22
           script: |
+            mkdir -p /home/opc/sr
             cd /home/opc/sr
+            
+            # docker-compose.prod.yml 동기화 (네트워크 MTU 1400 포함)
+            cat << 'EOF' > docker-compose.prod.yml
+            services:
+              app:
+                image: ghcr.io/lkindo/sr:latest
+                container_name: sr-app
+                restart: always
+                ports:
+                  - '80:3000'
+                env_file:
+                  - .env.docker
+                depends_on:
+                  db:
+                    condition: service_healthy
+                networks:
+                  - sr-net
+
+              db:
+                image: postgres:16-alpine
+                container_name: sr-db
+                restart: always
+                environment:
+                  - POSTGRES_USER=lkind
+                  - POSTGRES_PASSWORD=sr1234
+                  - POSTGRES_DB=sr_db
+                ports:
+                  - '5432:5432'
+                volumes:
+                  - sr_db_data:/var/lib/postgresql/data
+                healthcheck:
+                  test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db']
+                  interval: 10s
+                  timeout: 5s
+                  retries: 5
+                networks:
+                  - sr-net
+
+            volumes:
+              sr_db_data:
+
+            networks:
+              sr-net:
+                driver: bridge
+                driver_opts:
+                  com.docker.network.driver.mtu: 1400
+            EOF
             
             # GHCR 로그인 및 최신 이미지 Pull
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull
             
-            # 컨테이너 롤링 리스타트
+            # 컨테이너 및 네트워크 완전 삭제 후 재생성 (MTU 변경사항 반영 목적)
+            docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             
             # 미사용 도커 이미지 정리 (디스크 부족 방지)

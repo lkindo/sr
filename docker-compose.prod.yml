@@ -10,6 +10,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - sr-net
 
   db:
     image: postgres:16-alpine
@@ -28,6 +30,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - sr-net
 
 volumes:
   sr_db_data:
+
+networks:
+  sr-net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1400
