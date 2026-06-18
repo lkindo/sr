@@ -13,7 +13,7 @@ COPY prisma ./prisma/
 ENV PNPM_VERIFY_STORE_INTEGRITY=false
 ENV PNPM_VERIFY_SIGNATURES=false
 ENV PNPM_MINIMUM_RELEASE_AGE=0
-RUN pnpm install --frozen-lockfile --network-concurrency 1
+RUN pnpm install --frozen-lockfile
 
 # Stage 2: Application 빌드
 FROM node:24-slim AS builder
