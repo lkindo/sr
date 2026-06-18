@@ -278,16 +278,13 @@ async function main() {
   });
 
   let adminUser;
+  const adminHash = '$2b$10$VarymB/cfMVOCvlVWsDHX.jwOJd.qma9FEKr4H1.skoGt7h1WzZxK';
   if (!existingAdmin) {
-    // Use bcrypt to hash password
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-
     adminUser = await prisma.user.create({
       data: {
         email: 'admin@example.com',
         name: 'Admin User',
-        password: hashedPassword,
+        password: adminHash,
         notificationPreference: { create: {} }, // Add default preferences
       },
     });
@@ -308,14 +305,10 @@ async function main() {
 
     console.log('Created admin user: admin@example.com / admin123');
   } else {
-    // Admin user already exists, update password and ensure preferences
-    const bcrypt = require('bcryptjs');
-    const hashedPassword = await bcrypt.hash('admin123', 10);
-
     adminUser = await prisma.user.update({
       where: { email: 'admin@example.com' },
       data: {
-        password: hashedPassword,
+        password: adminHash,
         notificationPreference: { upsert: { create: {}, update: {} } },
       },
     });
@@ -326,15 +319,13 @@ async function main() {
   const engineerEmail = 'engineeruser@example.com';
   let engineerUser = await prisma.user.findUnique({ where: { email: engineerEmail } });
 
+  const engineerHash = '$2b$10$pZqoLVt6i.EgPg.xkXhqn.hrfDnm1U2ql/dT/i73NBxuxx4pN/4s6';
   if (!engineerUser) {
-    const bcrypt = require('bcryptjs');
-    const engineerPassword = 'engineer123';
-    const hashed = await bcrypt.hash(engineerPassword, 10);
     engineerUser = await prisma.user.create({
       data: {
         email: engineerEmail,
         name: 'Engineer User',
-        password: hashed,
+        password: engineerHash,
         notificationPreference: { create: {} },
       },
     });
@@ -343,16 +334,13 @@ async function main() {
     if (engRole) {
       await prisma.userRole.create({ data: { userId: engineerUser.id, roleId: engRole.id } });
     }
-    console.log(`Created engineer user: ${engineerEmail} / ${engineerPassword}`);
+    console.log(`Created engineer user: ${engineerEmail} / engineer123`);
   } else {
     // Ensure preference AND PASSWORD for existing engineer user
-    const bcrypt = require('bcryptjs');
-    const engineerPassword = 'engineer123';
-    const hashed = await bcrypt.hash(engineerPassword, 10);
 
     await prisma.user.update({
       where: { id: engineerUser.id },
-      data: { password: hashed },
+      data: { password: engineerHash },
     });
 
     await prisma.notificationPreference.upsert({
@@ -420,15 +408,13 @@ async function main() {
   const clientEmail = 'clientuser@example.com';
   let clientUser = await prisma.user.findUnique({ where: { email: clientEmail } });
 
+  const clientHash = '$2b$10$b5TgWLUPy8AgUvjjwGdHYOg2QPsj9thL9BNSZ1GB/ZNCoPR9brocK';
   if (!clientUser) {
-    const bcrypt = require('bcryptjs');
-    const clientPassword = 'client123';
-    const hashed = await bcrypt.hash(clientPassword, 10);
     clientUser = await prisma.user.create({
       data: {
         email: clientEmail,
         name: 'Client User',
-        password: hashed,
+        password: clientHash,
         notificationPreference: { create: {} }, // Add default preferences
       },
     });
@@ -440,13 +426,9 @@ async function main() {
     console.log(`Created client user: ${clientEmail}`);
   } else {
     // Ensure preference AND PASSWORD for existing client user
-    const bcrypt = require('bcryptjs');
-    const clientPassword = 'client123';
-    const hashed = await bcrypt.hash(clientPassword, 10);
-
     await prisma.user.update({
       where: { id: clientUser.id },
-      data: { password: hashed },
+      data: { password: clientHash },
     });
 
     await prisma.notificationPreference.upsert({

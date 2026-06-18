@@ -69,7 +69,7 @@ jobs:
           key: ${{ secrets.SERVER_KEY }}
           port: 22
           script: |
-            mkdir -p /home/opc/sr/nginx/certs
+            mkdir -p /home/opc/sr/nginx/certs /home/opc/sr/scripts
             cd /home/opc/sr
             
             # 1. 방화벽 443 포트 해제
@@ -176,6 +176,7 @@ jobs:
                 volumes:
                   - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
                   - ./nginx/certs:/etc/nginx/certs:ro
+                  - ./nginx/html:/usr/share/nginx/html:ro
                 depends_on:
                   - app
                 networks:
@@ -232,6 +233,44 @@ jobs:
             # 6. 전체 컨테이너 삭제 및 재생성 (Nginx 서비스 및 MTU 변경사항 완벽 반영)
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
+            
+            # 6.2. Let's Encrypt 발급 스크립트 생성 및 권한 설정
+            cat << 'OUTER_EOF' > scripts/setup-letsencrypt.sh
+            #!/bin/bash
+            set -e
+            
+            echo "Checking DNS resolution for lkindo.kr..."
+            if ! nslookup lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
+              echo "Error: lkindo.kr does not resolve yet. Please wait for DNS propagation."
+              exit 1
+            fi
+            
+            echo "Creating acme-challenge directory..."
+            mkdir -p nginx/html/.well-known/acme-challenge
+            
+            echo "Issuing SSL certificate via Certbot..."
+            docker run --rm \
+              -v /home/opc/sr/nginx/certs:/etc/letsencrypt \
+              -v /home/opc/sr/nginx/html:/usr/share/nginx/html \
+              certbot/certbot certonly --webroot \
+              --webroot-path=/usr/share/nginx/html \
+              -d lkindo.kr -d www.lkindo.kr \
+              --email lkind@naver.com --agree-tos --no-eff-email --keep-yet-valid
+            
+            echo "Copying issued certificates to Nginx production certs directory..."
+            # Let's Encrypt 발급 파일을 Nginx 마운트 폴더에 덮어씌움
+            sudo cp -f nginx/certs/live/lkindo.kr/fullchain.pem nginx/certs/server.crt
+            sudo cp -f nginx/certs/live/lkindo.kr/privkey.pem nginx/certs/server.key
+            
+            sudo chmod 644 nginx/certs/server.crt
+            sudo chmod 600 nginx/certs/server.key
+            
+            echo "Restarting Nginx to apply new official SSL certificate..."
+            docker compose -f docker-compose.prod.yml restart nginx
+            
+            echo "SSL Certificate issued and applied successfully!"
+            OUTER_EOF
+            chmod +x scripts/setup-letsencrypt.sh
             
             # 6.5. 데이터베이스 마이그레이션 및 시딩 자동화 (Swap 4GB 및 버닝 방지 버전 고정)
             docker exec -i sr-app npx prisma@6.19.0 db push --accept-data-loss
