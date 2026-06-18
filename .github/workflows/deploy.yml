@@ -69,18 +69,124 @@ jobs:
           key: ${{ secrets.SERVER_KEY }}
           port: 22
           script: |
-            mkdir -p /home/opc/sr
+            mkdir -p /home/opc/sr/nginx/certs
             cd /home/opc/sr
             
-            # docker-compose.prod.yml 동기화 (네트워크 MTU 1400 포함)
+            # 1. 방화벽 443 포트 해제
+            sudo firewall-cmd --permanent --add-port=443/tcp || true
+            sudo firewall-cmd --reload || true
+            
+            # 2. 자가 서명 인증서 자동 생성 (certs 하위에 파일 없을 때만 발급)
+            if [ ! -f nginx/certs/server.crt ]; then
+              echo "Generating self-signed SSL certificate..."
+              sudo openssl req -x509 -nodes -days 730 -newkey rsa:2048 \
+                -keyout nginx/certs/server.key \
+                -out nginx/certs/server.crt \
+                -subj "/C=KR/ST=Seoul/L=Seoul/O=SR/CN=134.185.106.129"
+              sudo chmod 644 nginx/certs/server.crt
+              sudo chmod 600 nginx/certs/server.key
+            fi
+            
+            # 3. nginx/nginx.conf 동기화
+            cat << 'EOF' > nginx/nginx.conf
+            user nginx;
+            worker_processes auto;
+            error_log /var/log/nginx/error.log warn;
+            pid /var/run/nginx.pid;
+
+            events {
+                worker_connections 1024;
+            }
+
+            http {
+                include /etc/nginx/mime.types;
+                default_type application/octet-stream;
+
+                log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                                '$status $body_bytes_sent "$http_referer" '
+                                '"$http_user_agent" "$http_x_forwarded_for"';
+
+                access_log /var/log/nginx/access.log main;
+
+                sendfile on;
+                tcp_nopush on;
+                tcp_nodelay on;
+                keepalive_timeout 65;
+                types_hash_max_size 2048;
+
+                gzip on;
+                gzip_disable "msie6";
+                gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+                server {
+                    listen 80;
+                    listen [::]:80;
+                    server_name _;
+
+                    location /.well-known/acme-challenge/ {
+                        root /usr/share/nginx/html;
+                    }
+
+                    location / {
+                        return 301 https://$host$request_uri;
+                    }
+                }
+
+                server {
+                    listen 443 ssl;
+                    listen [::]:443 ssl;
+                    server_name _;
+
+                    ssl_certificate /etc/nginx/certs/server.crt;
+                    ssl_certificate_key /etc/nginx/certs/server.key;
+
+                    ssl_protocols TLSv1.2 TLSv1.3;
+                    ssl_prefer_server_ciphers on;
+                    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+
+                    location / {
+                        proxy_pass http://app:3000;
+                        proxy_http_version 1.1;
+                        proxy_set_header Upgrade $http_upgrade;
+                        proxy_set_header Connection 'upgrade';
+                        proxy_set_header Host $host;
+                        proxy_cache_bypass $http_upgrade;
+                        proxy_set_header X-Real-IP $remote_addr;
+                        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                        proxy_set_header X-Forwarded-Proto $scheme;
+                        proxy_set_header X-Forwarded-Host $host;
+                        proxy_set_header X-Forwarded-Port $server_port;
+
+                        client_max_body_size 10m;
+                    }
+                }
+            }
+            EOF
+            
+            # 4. docker-compose.prod.yml 동기화 (Nginx 서비스 추가 및 네트워크 MTU 1400 포함)
             cat << 'EOF' > docker-compose.prod.yml
             services:
+              nginx:
+                image: nginx:alpine
+                container_name: sr-nginx
+                restart: always
+                ports:
+                  - '80:80'
+                  - '443:443'
+                volumes:
+                  - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+                  - ./nginx/certs:/etc/nginx/certs:ro
+                depends_on:
+                  - app
+                networks:
+                  - sr-net
+
               app:
                 image: ghcr.io/lkindo/sr:latest
                 container_name: sr-app
                 restart: always
-                ports:
-                  - '80:3000'
+                expose:
+                  - '3000'
                 env_file:
                   - .env.docker
                 depends_on:
@@ -119,13 +225,13 @@ jobs:
                   com.docker.network.driver.mtu: 1400
             EOF
             
-            # GHCR 로그인 및 최신 이미지 Pull
+            # 5. GHCR 로그인 및 최신 이미지 Pull
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose -f docker-compose.prod.yml pull
             
-            # 컨테이너 및 네트워크 완전 삭제 후 재생성 (MTU 변경사항 반영 목적)
+            # 6. 전체 컨테이너 삭제 및 재생성 (Nginx 서비스 및 MTU 변경사항 완벽 반영)
             docker compose -f docker-compose.prod.yml down
             docker compose -f docker-compose.prod.yml up -d
             
-            # 미사용 도커 이미지 정리 (디스크 부족 방지)
+            # 7. 미사용 도커 이미지 정리 (디스크 부족 방지)
             docker compose -f docker-compose.prod.yml image prune -af || docker image prune -af

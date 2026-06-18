@@ -1,10 +1,25 @@
 services:
+  nginx:
+    image: nginx:alpine
+    container_name: sr-nginx
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - app
+    networks:
+      - sr-net
+
   app:
     image: ghcr.io/lkindo/sr:latest
     container_name: sr-app
     restart: always
-    ports:
-      - '80:3000'
+    expose:
+      - '3000'
     env_file:
       - .env.docker
     depends_on:
