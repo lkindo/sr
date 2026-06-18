@@ -1,5 +1,5 @@
 # Stage 1: Dependency 설치
-FROM node:24 AS deps
+FROM node:22 AS deps
 WORKDIR /app
 
 # Corepack 활성화하여 pnpm 사용 준비
@@ -9,14 +9,14 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 COPY package.json pnpm-lock.yaml .npmrc ./
 COPY prisma ./prisma/
 
-# 의존성 설치 (CI 모드, 네트워크 지연에 의한 pnpm 10+ 공급망 검증 오류 해결)
+# 의존성 설치 (CI 모드, 라이프사이클 스크립트 실행 우회로 husky/pnpm 보안 에러 방지)
 ENV PNPM_VERIFY_STORE_INTEGRITY=false
 ENV PNPM_VERIFY_SIGNATURES=false
 ENV PNPM_MINIMUM_RELEASE_AGE=0
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Application 빌드
-FROM node:24 AS builder
+FROM node:22 AS builder
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -31,7 +31,7 @@ RUN npx prisma generate
 RUN pnpm run build
 
 # Stage 3: Runner
-FROM node:24-slim AS runner
+FROM node:22-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
