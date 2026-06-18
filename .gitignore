@@ -100,3 +100,7 @@ playwright/.auth/
 
 # ESLint Cache
 .eslintcache
+
+# Temporary & Generated files
+actions_runs.json
+output.css
