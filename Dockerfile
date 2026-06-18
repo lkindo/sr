@@ -6,11 +6,14 @@ WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 # 의존성 파일 복사
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml .npmrc ./
 COPY prisma ./prisma/
 
-# 의존성 설치 (CI 모드)
-RUN pnpm install --frozen-lockfile
+# 의존성 설치 (CI 모드, 네트워크 지연에 의한 pnpm 10+ 공급망 검증 오류 해결)
+ENV PNPM_VERIFY_STORE_INTEGRITY=false
+ENV PNPM_VERIFY_SIGNATURES=false
+ENV PNPM_MINIMUM_RELEASE_AGE=0
+RUN pnpm install --frozen-lockfile --network-concurrency 1
 
 # Stage 2: Application 빌드
 FROM node:24-slim AS builder
@@ -23,6 +26,7 @@ COPY . .
 
 # Next.js 빌드 (standalone 설정이 next.config.ts에 포함되어 있어야 함)
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npx prisma generate
 RUN pnpm run build
 

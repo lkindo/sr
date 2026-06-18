@@ -17,6 +17,8 @@
 vapid.json
 vapid_final.json
 *.pem
+*.key
+project.tar.gz
 
 # Testing & Coverage
 /coverage

@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: sr-app:latest
+    image: ghcr.io/lkindo/sr:latest
     container_name: sr-app
     restart: always
     ports:
