@@ -68,3 +68,6 @@ vapid_final.json
 docker-compose.yml
 Dockerfile
 .dockerignore
+
+# Nginx config and certs
+nginx

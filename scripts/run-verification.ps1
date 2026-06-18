@@ -103,6 +103,11 @@ try {
         pnpm prisma generate
     }
 
+    # 2.1 Test DB Schema Migration
+    Run-Step "Test DB Schema Migration" {
+        pnpm prisma migrate deploy
+    }
+
     # 3. Parallel Static Checks (Type, Lint, Format)
     Run-Step "Parallel Static Checks" {
         pnpm verify:static

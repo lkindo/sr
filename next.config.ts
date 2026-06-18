@@ -45,6 +45,9 @@ const nextConfig: NextConfig = {
 
   // Docker 빌드 최적화
   output: 'standalone',
+
+  // 외부 서버 패키지 번들링 방지 (Pino, thread-stream 에러 우회)
+  serverExternalPackages: ['pino', 'thread-stream'],
 };
 
 export default withBundleAnalyzer(nextConfig);

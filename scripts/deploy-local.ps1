@@ -28,7 +28,7 @@ if ($LASTEXITCODE -ne 0) {
 Remove-Item -Force sr-app.tar
 
 Write-Host "========== 4. 서버 원격 갱신 (SSH) ==========" -ForegroundColor Cyan
-ssh -i ssh-key-2026-01-18.key -o StrictHostKeyChecking=no opc@134.185.106.129 "cd /home/opc/sr && docker compose down && docker load -i sr-app.tar && rm -f sr-app.tar && docker compose up -d"
+ssh -i ssh-key-2026-01-18.key -o StrictHostKeyChecking=no opc@134.185.106.129 "cd /home/opc/sr && docker compose -f docker-compose.prod.yml down && docker load -i sr-app.tar && rm -f sr-app.tar && docker compose -f docker-compose.prod.yml up -d"
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "서버 원격 실행에 실패했습니다."
@@ -36,4 +36,5 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "========== 배포 완료! ==========" -ForegroundColor Green
-Write-Host "접속 주소: http://134.185.106.129:3001" -ForegroundColor Yellow
+Write-Host "접속 주소: https://lkindo.kr" -ForegroundColor Yellow
+
