@@ -67,7 +67,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          source: ".env.docker.test,docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf"
+          source: ".env.docker.test,docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh"
           target: "/home/opc/sr"
 
       # SSH를 이용해 대상 서버로 배포 원격 실행
@@ -127,42 +127,9 @@ jobs:
               docker compose -f docker-compose.prod.yml down
               docker compose -f docker-compose.prod.yml up -d
               
-              # 4. Let's Encrypt 발급 스크립트 생성 및 권한 설정 (test.lkindo.kr 도메인 추가 발급 지원)
-              cat << 'OUTER_EOF' > scripts/setup-letsencrypt.sh
-              #!/bin/bash
-              set -e
-              
-              echo "Checking DNS resolution..."
-              if ! nslookup lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
-                echo "Error: lkindo.kr does not resolve yet."
-                exit 1
-              fi
-              
-              echo "Creating acme-challenge directory..."
-              mkdir -p nginx/html/.well-known/acme-challenge
-              
-              echo "Issuing SSL certificate via Certbot for multiple domains..."
-              docker run --rm \
-                -v /home/opc/sr/nginx/certs:/etc/letsencrypt \
-                -v /home/opc/sr/nginx/html:/usr/share/nginx/html \
-                certbot/certbot certonly --webroot \
-                --webroot-path=/usr/share/nginx/html \
-                -d lkindo.kr -d www.lkindo.kr -d test.lkindo.kr \
-                --email lkind@naver.com --agree-tos --no-eff-email --keep-until-expiring
-              
-              echo "Copying issued certificates to Nginx production certs directory..."
-              sudo cp -f nginx/certs/live/lkindo.kr/fullchain.pem nginx/certs/server.crt
-              sudo cp -f nginx/certs/live/lkindo.kr/privkey.pem nginx/certs/server.key
-              
-              sudo chmod 644 nginx/certs/server.crt
-              sudo chmod 600 nginx/certs/server.key
-              
-              echo "Restarting Nginx to apply new official SSL certificate..."
-              docker compose -f docker-compose.prod.yml restart nginx
-              
-              echo "SSL Certificate issued and applied successfully!"
-OUTER_EOF
+              # 4. Let's Encrypt 발급 스크립트 실행
               chmod +x scripts/setup-letsencrypt.sh
+              ./scripts/setup-letsencrypt.sh
               
               # 5. 데이터베이스 마이그레이션 및 시딩 자동화
               docker exec -i sr-app npx prisma@6.19.0 db push --accept-data-loss
