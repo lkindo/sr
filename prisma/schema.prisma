@@ -361,7 +361,7 @@ model SRActivity {
   sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
-  @@index([srId, createdAt])
+  @@index([srId, createdAt(sort: Desc)])
   @@index([userId])
   @@map("sr_activities")
 }
@@ -378,8 +378,8 @@ model SRComment {
   sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
   user User @relation(fields: [userId], references: [id])
 
-  @@index([srId, createdAt])
-  @@index([srId, isInternal, createdAt])
+  @@index([srId, createdAt(sort: Desc)])
+  @@index([srId, isInternal, createdAt(sort: Desc)])
   @@index([userId])
   @@map("sr_comments")
 }
