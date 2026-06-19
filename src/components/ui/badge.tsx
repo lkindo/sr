@@ -27,11 +27,16 @@ export interface BadgeProps
 
 function Badge({ className, variant, ...props }: BadgeProps) {
   const baseClass = cn(badgeVariants({ variant }), className);
-  const opacityVariants = ['destructive', 'success', 'warning'];
-  const finalClass = opacityVariants.includes(variant || '')
-    ? `${baseClass} bg-opacity-10`
-    : baseClass;
-  return <div className={finalClass} {...props} />;
+  if (variant === 'destructive') {
+    return <div className={`${baseClass} bg-destructive/10`} {...props} />;
+  }
+  if (variant === 'success') {
+    return <div className={`${baseClass} bg-emerald-500/10`} {...props} />;
+  }
+  if (variant === 'warning') {
+    return <div className={`${baseClass} bg-amber-500/10`} {...props} />;
+  }
+  return <div className={baseClass} {...props} />;
 }
 
 export { Badge, badgeVariants };
