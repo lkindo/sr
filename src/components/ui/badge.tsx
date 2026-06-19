@@ -10,10 +10,10 @@ const badgeVariants = cva(
       variant: {
         default: 'border-transparent bg-primary/10 text-primary shadow-none',
         secondary: 'border-transparent bg-secondary text-[#475569]',
-        destructive: 'border-transparent bg-destructive bg-opacity-10 text-destructive',
+        destructive: 'border-transparent bg-destructive text-destructive',
         outline: 'border-input text-foreground bg-transparent',
-        success: 'border-transparent bg-[#10B981] bg-opacity-10 text-[#10B981]',
-        warning: 'border-transparent bg-[#F59E0B] bg-opacity-10 text-[#F59E0B]',
+        success: 'border-transparent bg-emerald-500 text-emerald-700',
+        warning: 'border-transparent bg-amber-500 text-amber-700',
       },
     },
     defaultVariants: {
@@ -27,7 +27,10 @@ export interface BadgeProps
 
 function Badge({ className, variant, ...props }: BadgeProps) {
   const baseClass = cn(badgeVariants({ variant }), className);
-  const finalClass = variant === 'destructive' ? `${baseClass} bg-destructive` : baseClass;
+  const opacityVariants = ['destructive', 'success', 'warning'];
+  const finalClass = opacityVariants.includes(variant || '')
+    ? `${baseClass} bg-opacity-10`
+    : baseClass;
   return <div className={finalClass} {...props} />;
 }
 
