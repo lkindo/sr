@@ -10,9 +10,16 @@ services:
       - '3001:3000'
     env_file:
       - .env.docker
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=450
     depends_on:
       db:
         condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   db:
     image: postgres:16-alpine
@@ -31,6 +38,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   sr_db_data:

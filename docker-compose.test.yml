@@ -9,11 +9,18 @@ services:
       - '3001:3000'
     env_file:
       - .env.docker.test
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=450
     depends_on:
       db-test:
         condition: service_healthy
     networks:
       - sr-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   db-test:
     image: postgres:16-alpine
@@ -34,6 +41,11 @@ services:
       retries: 5
     networks:
       - sr-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   sr_db_test_data:

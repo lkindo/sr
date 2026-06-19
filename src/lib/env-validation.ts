@@ -78,7 +78,7 @@ export const ENV_VARIABLES: EnvVariable[] = [
   },
   {
     name: 'NEXTAUTH_URL',
-    required: true,
+    required: false,
     description: 'NextAuth 콜백 URL',
     category: 'auth',
     validate: (value) => value.startsWith('http://') || value.startsWith('https://'),
