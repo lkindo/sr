@@ -1,9 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "Checking DNS resolution for lkindo.kr and test.lkindo.kr..."
+echo "Checking DNS resolution for lkindo.kr, sr.lkindo.kr and test.lkindo.kr..."
 if ! nslookup lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
   echo "Error: lkindo.kr does not resolve yet."
+  exit 1
+fi
+if ! nslookup sr.lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
+  echo "Error: sr.lkindo.kr does not resolve yet. Please wait for DNS propagation."
   exit 1
 fi
 if ! nslookup test.lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
@@ -20,12 +24,13 @@ docker run --rm \
   -v /home/opc/sr/nginx/html:/usr/share/nginx/html \
   certbot/certbot certonly --webroot \
   --webroot-path=/usr/share/nginx/html \
-  -d lkindo.kr -d www.lkindo.kr -d test.lkindo.kr \
-  --email lkind@naver.com --agree-tos --no-eff-email --keep-until-expiring
+  -d lkindo.kr -d www.lkindo.kr -d sr.lkindo.kr -d test.lkindo.kr \
+  --email lkind@naver.com --agree-tos --no-eff-email --keep-until-expiring \
+  --expand --non-interactive
 
 echo "Copying issued certificates to Nginx production certs directory..."
 # live/ 디렉토리 아래의 lkindo.kr* 패턴 디렉토리 중 가장 최근에 변경된 최신 경로 탐색 (절대 경로 지정)
-LATEST_DIR=$(ls -td /home/opc/sr/nginx/certs/live/lkindo.kr* | head -n 1)
+LATEST_DIR=$(sudo ls -td /home/opc/sr/nginx/certs/live/lkindo.kr* | head -n 1)
 echo "Resolved latest cert directory: ${LATEST_DIR}"
 
 sudo cp -f "${LATEST_DIR}/fullchain.pem" /home/opc/sr/nginx/certs/server.crt

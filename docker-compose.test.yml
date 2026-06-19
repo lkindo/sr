@@ -41,3 +41,4 @@ volumes:
 networks:
   sr-net:
     external: true
+    name: sr_sr-net
