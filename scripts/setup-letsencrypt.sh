@@ -12,7 +12,7 @@ if ! nslookup test.lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
 fi
 
 echo "Creating acme-challenge directory..."
-mkdir -p nginx/html/.well-known/acme-challenge
+mkdir -p /home/opc/sr/nginx/html/.well-known/acme-challenge
 
 echo "Issuing SSL certificate via Certbot for multiple domains..."
 docker run --rm \
@@ -24,13 +24,17 @@ docker run --rm \
   --email lkind@naver.com --agree-tos --no-eff-email --keep-until-expiring
 
 echo "Copying issued certificates to Nginx production certs directory..."
-sudo cp -f nginx/certs/live/lkindo.kr/fullchain.pem nginx/certs/server.crt
-sudo cp -f nginx/certs/live/lkindo.kr/privkey.pem nginx/certs/server.key
+# live/ 디렉토리 아래의 lkindo.kr* 패턴 디렉토리 중 가장 최근에 변경된 최신 경로 탐색 (절대 경로 지정)
+LATEST_DIR=$(ls -td /home/opc/sr/nginx/certs/live/lkindo.kr* | head -n 1)
+echo "Resolved latest cert directory: ${LATEST_DIR}"
 
-sudo chmod 644 nginx/certs/server.crt
-sudo chmod 600 nginx/certs/server.key
+sudo cp -f "${LATEST_DIR}/fullchain.pem" /home/opc/sr/nginx/certs/server.crt
+sudo cp -f "${LATEST_DIR}/privkey.pem" /home/opc/sr/nginx/certs/server.key
+
+sudo chmod 644 /home/opc/sr/nginx/certs/server.crt
+sudo chmod 600 /home/opc/sr/nginx/certs/server.key
 
 echo "Restarting Nginx to apply new official SSL certificate..."
-docker compose -f docker-compose.prod.yml restart nginx
+docker compose -f /home/opc/sr/docker-compose.prod.yml restart nginx
 
 echo "SSL Certificate issued and applied successfully!"

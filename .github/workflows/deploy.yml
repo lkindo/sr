@@ -93,16 +93,16 @@ jobs:
               echo "Deploying Staging (dev branch)..."
               
               # 1. Pull 최신 dev 이미지 및 재시작
-              docker compose -f docker-compose.test.yml pull
-              docker compose -f docker-compose.test.yml down
-              docker compose -f docker-compose.test.yml up -d
+              docker compose -p sr-test -f docker-compose.test.yml pull
+              docker compose -p sr-test -f docker-compose.test.yml down
+              docker compose -p sr-test -f docker-compose.test.yml up -d
 
-              # 2. DB 마이그레이션 및 시딩
-              docker exec -i sr-app-test npx prisma@6.19.0 db push --accept-data-loss
-              docker exec -i sr-app-test npx tsx prisma/seed.ts
+              # 2. DB 마이그레이션 및 시딩 (프로젝트 지정 exec 방식 적용)
+              docker compose -p sr-test exec -T app-test npx prisma@6.19.0 db push --accept-data-loss
+              docker compose -p sr-test exec -T app-test npx tsx prisma/seed.ts
               
               # 3. 미사용 이미지 prune
-              docker compose -f docker-compose.test.yml image prune -af || docker image prune -af
+              docker compose -p sr-test -f docker-compose.test.yml image prune -af || docker image prune -af
 
             else
               echo "Deploying Production (main branch)..."
