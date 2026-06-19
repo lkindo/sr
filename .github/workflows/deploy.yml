@@ -60,6 +60,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Copy Config Files to Remote VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_KEY }}
+          port: 22
+          source: ".env.docker.test,docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf"
+          target: "/home/opc/sr"
+
       # SSH를 이용해 대상 서버로 배포 원격 실행
       - name: Deploy to Remote VM via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -82,89 +92,16 @@ jobs:
             if [ "$BRANCH_NAME" = "dev" ]; then
               echo "Deploying Staging (dev branch)..."
               
-              # 1. .env.docker.test 동기화
-              cat << 'EOF' > .env.docker.test
-              # Database (Docker 내부 테스트용 컨테이너 연결)
-              DATABASE_URL="postgresql://lkind:sr1234@db-test:5432/sr_db_test?schema=public"
-              DIRECT_URL="postgresql://lkind:sr1234@db-test:5432/sr_db_test?schema=public"
-
-              # NextAuth (테스트 서브도메인 타겟)
-              NEXTAUTH_SECRET="IMEgNyMpmNdWLBOiEmExrWryMI0r4FQXouanAd/XZd4="
-              AUTH_SECRET="IMEgNyMpmNdWLBOiEmExrWryMI0r4FQXouanAd/XZd4="
-              NEXTAUTH_URL="https://test.lkindo.kr"
-              NEXT_PUBLIC_APP_URL="https://test.lkindo.kr"
-              AUTH_TRUST_HOST=true
-
-              # Email (Gmail SMTP - 필요 시 설정)
-              EMAIL_SERVER_HOST="smtp.gmail.com"
-              EMAIL_SERVER_PORT="587"
-              EMAIL_SERVER_USER="your_email@gmail.com"
-              EMAIL_SERVER_PASSWORD="your_app_password_here"
-              EMAIL_FROM="SR System Test <no-reply@sr-system.com>"
-
-              # Web Push
-              NEXT_PUBLIC_VAPID_PUBLIC_KEY="your_vapid_public_key_here"
-              VAPID_PRIVATE_KEY="your_vapid_private_key_here"
-              VAPID_SUBJECT="mailto:admin@example.com"
-              EOF
-
-              # 2. docker-compose.test.yml 동기화
-              cat << 'EOF' > docker-compose.test.yml
-              services:
-                app-test:
-                  image: ghcr.io/lkindo/sr:dev
-                  container_name: sr-app-test
-                  restart: always
-                  expose:
-                    - '3000'
-                  ports:
-                    - '3001:3000'
-                  env_file:
-                    - .env.docker.test
-                  depends_on:
-                    db-test:
-                      condition: service_healthy
-                  networks:
-                    - sr-net
-
-                db-test:
-                  image: postgres:16-alpine
-                  container_name: sr-db-test
-                  restart: always
-                  environment:
-                    - POSTGRES_USER=lkind
-                    - POSTGRES_PASSWORD=sr1234
-                    - POSTGRES_DB=sr_db_test
-                  ports:
-                    - '5433:5432'
-                  volumes:
-                    - sr_db_test_data:/var/lib/postgresql/data
-                  healthcheck:
-                    test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db_test']
-                    interval: 10s
-                    timeout: 5s
-                    retries: 5
-                  networks:
-                    - sr-net
-
-              volumes:
-                sr_db_test_data:
-
-              networks:
-                sr-net:
-                  external: true
-              EOF
-
-              # 3. Pull 최신 dev 이미지 및 재시작
+              # 1. Pull 최신 dev 이미지 및 재시작
               docker compose -f docker-compose.test.yml pull
               docker compose -f docker-compose.test.yml down
               docker compose -f docker-compose.test.yml up -d
 
-              # 4. DB 마이그레이션 및 시딩
+              # 2. DB 마이그레이션 및 시딩
               docker exec -i sr-app-test npx prisma@6.19.0 db push --accept-data-loss
               docker exec -i sr-app-test npx tsx prisma/seed.ts
               
-              # 5. 미사용 이미지 prune
+              # 3. 미사용 이미지 prune
               docker compose -f docker-compose.test.yml image prune -af || docker image prune -af
 
             else
@@ -185,186 +122,12 @@ jobs:
                 sudo chmod 600 nginx/certs/server.key
               fi
               
-              # 3. nginx/nginx.conf 동기화 (SAN 멀티 도메인 지원 및 RESOLVER 동적 바인딩)
-              cat << 'EOF' > nginx/nginx.conf
-              user nginx;
-              worker_processes auto;
-              error_log /var/log/nginx/error.log warn;
-              pid /var/run/nginx.pid;
-
-              events {
-                  worker_connections 1024;
-              }
-
-              http {
-                  include /etc/nginx/mime.types;
-                  default_type application/octet-stream;
-
-                  log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                                  '$status $body_bytes_sent "$http_referer" '
-                                  '"$http_user_agent" "$http_x_forwarded_for"';
-
-                  access_log /var/log/nginx/access.log main;
-
-                  sendfile on;
-                  tcp_nopush on;
-                  tcp_nodelay on;
-                  keepalive_timeout 65;
-                  types_hash_max_size 2048;
-
-                  gzip on;
-                  gzip_disable "msie6";
-                  gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
-
-                  resolver 127.0.0.11 valid=30s;
-
-                  server {
-                      listen 80;
-                      listen [::]:80;
-                      server_name _;
-
-                      location /.well-known/acme-challenge/ {
-                          root /usr/share/nginx/html;
-                      }
-
-                      location / {
-                          return 301 https://$host$request_uri;
-                      }
-                  }
-
-                  # Production Server Block
-                  server {
-                      listen 443 ssl;
-                      listen [::]:443 ssl;
-                      server_name lkindo.kr www.lkindo.kr 134.185.106.129;
-
-                      ssl_certificate /etc/nginx/certs/server.crt;
-                      ssl_certificate_key /etc/nginx/certs/server.key;
-
-                      ssl_protocols TLSv1.2 TLSv1.3;
-                      ssl_prefer_server_ciphers on;
-                      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-
-                      location / {
-                          set $upstream_prod http://app:3000;
-                          proxy_pass $upstream_prod;
-                          proxy_http_version 1.1;
-                          proxy_set_header Upgrade $http_upgrade;
-                          proxy_set_header Connection 'upgrade';
-                          proxy_set_header Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header X-Real-IP $remote_addr;
-                          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header X-Forwarded-Proto $scheme;
-                          proxy_set_header X-Forwarded-Host $host;
-                          proxy_set_header X-Forwarded-Port $server_port;
-
-                          client_max_body_size 10m;
-                      }
-                  }
-
-                  # Staging/Test Server Block
-                  server {
-                      listen 443 ssl;
-                      listen [::]:443 ssl;
-                      server_name test.lkindo.kr;
-
-                      ssl_certificate /etc/nginx/certs/server.crt;
-                      ssl_certificate_key /etc/nginx/certs/server.key;
-
-                      ssl_protocols TLSv1.2 TLSv1.3;
-                      ssl_prefer_server_ciphers on;
-                      ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
-
-                      location / {
-                          set $upstream_staging http://app-test:3000;
-                          proxy_pass $upstream_staging;
-                          proxy_http_version 1.1;
-                          proxy_set_header Upgrade $http_upgrade;
-                          proxy_set_header Connection 'upgrade';
-                          proxy_set_header Host $host;
-                          proxy_cache_bypass $http_upgrade;
-                          proxy_set_header X-Real-IP $remote_addr;
-                          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                          proxy_set_header X-Forwarded-Proto $scheme;
-                          proxy_set_header X-Forwarded-Host $host;
-                          proxy_set_header X-Forwarded-Port $server_port;
-
-                          client_max_body_size 10m;
-                      }
-                  }
-              }
-              EOF
-              
-              # 4. docker-compose.prod.yml 동기화 (Nginx 서비스 추가 및 네트워크 MTU 1400 포함)
-              cat << 'EOF' > docker-compose.prod.yml
-              services:
-                nginx:
-                  image: nginx:alpine
-                  container_name: sr-nginx
-                  restart: always
-                  ports:
-                    - '80:80'
-                    - '443:443'
-                  volumes:
-                    - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-                    - ./nginx/certs:/etc/nginx/certs:ro
-                    - ./nginx/html:/usr/share/nginx/html:ro
-                  depends_on:
-                    - app
-                  networks:
-                    - sr-net
-
-                app:
-                  image: ghcr.io/lkindo/sr:latest
-                  container_name: sr-app
-                  restart: always
-                  expose:
-                    - '3000'
-                  env_file:
-                    - .env.docker
-                  depends_on:
-                    db:
-                      condition: service_healthy
-                  networks:
-                    - sr-net
-
-                db:
-                  image: postgres:16-alpine
-                  container_name: sr-db
-                  restart: always
-                  environment:
-                    - POSTGRES_USER=lkind
-                    - POSTGRES_PASSWORD=sr1234
-                    - POSTGRES_DB=sr_db
-                  ports:
-                    - '5432:5432'
-                  volumes:
-                    - sr_db_data:/var/lib/postgresql/data
-                  healthcheck:
-                    test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db']
-                    interval: 10s
-                    timeout: 5s
-                    retries: 5
-                  networks:
-                    - sr-net
-
-              volumes:
-                sr_db_data:
-
-              networks:
-                sr-net:
-                  driver: bridge
-                  driver_opts:
-                    com.docker.network.driver.mtu: 1400
-              EOF
-              
-              # 5. 최신 이미지 Pull 및 재구동
+              # 3. 최신 이미지 Pull 및 재구동
               docker compose -f docker-compose.prod.yml pull
               docker compose -f docker-compose.prod.yml down
               docker compose -f docker-compose.prod.yml up -d
               
-              # 6. Let's Encrypt 발급 스크립트 생성 및 권한 설정 (test.lkindo.kr 도메인 추가 발급 지원)
+              # 4. Let's Encrypt 발급 스크립트 생성 및 권한 설정 (test.lkindo.kr 도메인 추가 발급 지원)
               cat << 'OUTER_EOF' > scripts/setup-letsencrypt.sh
               #!/bin/bash
               set -e
@@ -398,13 +161,13 @@ jobs:
               docker compose -f docker-compose.prod.yml restart nginx
               
               echo "SSL Certificate issued and applied successfully!"
-              OUTER_EOF
+OUTER_EOF
               chmod +x scripts/setup-letsencrypt.sh
               
-              # 7. 데이터베이스 마이그레이션 및 시딩 자동화
+              # 5. 데이터베이스 마이그레이션 및 시딩 자동화
               docker exec -i sr-app npx prisma@6.19.0 db push --accept-data-loss
               docker exec -i sr-app npx tsx prisma/seed.ts
               
-              # 8. 미사용 이미지 정리
+              # 6. 미사용 이미지 정리
               docker compose -f docker-compose.prod.yml image prune -af || docker image prune -af
             fi
