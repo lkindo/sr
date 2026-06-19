@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useId, useState } from 'react';
-import { File, Upload, X } from 'lucide-react';
+import { File, UploadCloud, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -145,11 +145,11 @@ export function FileUpload({
     <div className="space-y-4">
       <div
         className={cn(
-          'relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2',
+          'relative border-2 border-dashed rounded-[8px] p-8 text-center cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2',
           dragActive
-            ? 'border-primary bg-primary/5'
-            : 'border-muted-foreground/25 hover:border-muted-foreground/50',
-          disabled && 'opacity-50 cursor-not-allowed'
+            ? 'border-primary bg-primary/10'
+            : 'border-[#c7d2fe] bg-[#f8fafc] hover:border-primary/50',
+          disabled && 'opacity-40 cursor-not-allowed'
         )}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -169,7 +169,7 @@ export function FileUpload({
           title="파일 업로드"
         />
         <div className="flex flex-col items-center gap-2">
-          <Upload className="h-8 w-8 text-muted-foreground" />
+          <UploadCloud className="h-8 w-8 text-muted-foreground" />
           <div className="text-sm">
             <span className="font-medium text-primary">클릭</span>, 드래그 또는 붙여넣기
           </div>
