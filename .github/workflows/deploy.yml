@@ -63,6 +63,9 @@ jobs:
       # SSH를 이용해 대상 서버로 배포 원격 실행
       - name: Deploy to Remote VM via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          GITHUB_ACTOR: ${{ github.actor }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
