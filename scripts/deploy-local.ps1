@@ -1,6 +1,6 @@
 # deploy-local.ps1
 Write-Host "========== 1. 로컬 Docker 이미지 빌드 시작 (Platform: linux/amd64) ==========" -ForegroundColor Cyan
-docker build --platform linux/amd64 -t sr-app:latest .
+docker build --platform linux/amd64 -t ghcr.io/lkindo/sr:latest .
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "로컬 Docker 빌드에 실패했습니다."
@@ -8,7 +8,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "========== 2. Docker 이미지 tar로 아카이브 저장 ==========" -ForegroundColor Cyan
-docker save -o sr-app.tar sr-app:latest
+docker save -o sr-app.tar ghcr.io/lkindo/sr:latest
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Docker 이미지 tar 저장에 실패했습니다."

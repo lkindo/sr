@@ -12,8 +12,8 @@ COPY prisma ./prisma/
 # 의존성 설치 (CI 모드, 라이프사이클 스크립트 실행 우회로 husky/pnpm 보안 에러 방지)
 ENV PNPM_VERIFY_STORE_INTEGRITY=false
 ENV PNPM_VERIFY_SIGNATURES=false
-ENV PNPM_MINIMUM_RELEASE_AGE=0
-RUN pnpm install --frozen-lockfile --ignore-scripts
+ENV NODE_OPTIONS="--dns-result-order=ipv4first"
+RUN pnpm config set registry https://registry.npmjs.org/ && pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Application 빌드
 FROM node:22 AS builder
@@ -55,8 +55,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
+# 마이그레이션을 위해 prisma CLI 글로벌 설치
+RUN npm install -g prisma@6.19.0
+
 # entrypoint 스크립트 복사 및 실행 권한 부여
 COPY docker-entrypoint.sh /usr/local/bin/
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER nextjs
