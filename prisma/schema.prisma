@@ -34,6 +34,7 @@ model User {
   sessions Session[]
   roles    UserRole[]
   clients  UserClient[]
+  auditLogs AuditLog[]
 
   // SR Relations
   createdSRs      SR[]              @relation("SRRequester")
@@ -507,4 +508,26 @@ model SRSequence {
   seq  Int
 
   @@map("sr_sequences")
+}
+
+// ============================================================================
+// 전역 시스템/역할/사용자 변경 감사 로그 (Audit Log)
+// ============================================================================
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?  @map("user_id")
+  actionType   String   @map("action_type")
+  targetEntity String   @map("target_entity")
+  targetId     String?  @map("target_id")
+  changes      String   @map("changes")
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

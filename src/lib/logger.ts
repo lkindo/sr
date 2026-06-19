@@ -4,7 +4,7 @@
  * 프로덕션 환경에서 에러 트래킹 서비스(Sentry 등) 연동 가능
  */
 
-import pino from 'pino';
+import type pino from 'pino';
 
 import { ServiceError } from './errors';
 
@@ -55,9 +55,15 @@ class Logger {
     }
 
     try {
-      // pino.destination이 존재하고 함수인지 확인 (Node.js 환경 검증)
-      if (typeof pino.destination === 'function') {
-        this.pinoLogger = pino(
+      // 런타임에 서버 환경(Node.js)일 때만 동적으로 pino를 로드하여 클라이언트/Edge 번들과의 의존성 격리
+      const req = typeof window === 'undefined' ? require : null;
+      if (!req) return;
+
+      const pinoModule = req('pino') as typeof pino;
+      const pinoDestination = pinoModule.destination;
+
+      if (typeof pinoDestination === 'function') {
+        this.pinoLogger = pinoModule(
           {
             timestamp: false,
             messageKey: 'message',
@@ -66,11 +72,11 @@ class Logger {
             },
             base: undefined,
           },
-          pino.destination({ sync: false, minLength: 4096 })
+          pinoDestination({ sync: false, minLength: 4096 })
         );
       } else {
         // pino.destination이 없는 경우 기본 출력 사용
-        this.pinoLogger = pino({
+        this.pinoLogger = pinoModule({
           timestamp: false,
           messageKey: 'message',
           base: undefined,

@@ -5,6 +5,7 @@ import type { User } from '@prisma/client';
 import {
   authenticateAndAuthorize,
   getAuthenticatedSession,
+  requireRateLimit,
   validateWithSchema,
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
@@ -45,6 +46,7 @@ export async function updateUserAction(
 
 export async function changePasswordAction(formData: FormData): Promise<Result<void>> {
   try {
+    await requireRateLimit('strict');
     const data = {
       currentPassword: getFormDataValue(formData, 'currentPassword') || '',
       newPassword: getFormDataValue(formData, 'newPassword') || '',

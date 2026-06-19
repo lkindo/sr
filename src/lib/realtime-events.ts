@@ -1,5 +1,7 @@
 import { EventEmitter } from 'events';
 
+import { transactionLocalStorage } from './transaction-context';
+
 /**
  * 실시간 이벤트를 처리하기 위한 싱글톤 이벤트 이미터
  */
@@ -28,5 +30,10 @@ export const REALTIME_EVENTS = {
  * 전역에 이벤트 발행 헬퍼
  */
 export function emitRealtimeEvent(event: string, data: any) {
+  const context = transactionLocalStorage.getStore();
+  if (context) {
+    context.realtimeEvents.push({ event, data });
+    return;
+  }
   realtimeEmitter.emit(event, data);
 }

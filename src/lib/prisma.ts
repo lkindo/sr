@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
+import { transactionLocalStorage } from './transaction-context';
+
 const prismaClientSingleton = () => {
   // 빌드 타임에는 DATABASE_URL이 없을 수 있으므로 체크
   if (!process.env.DATABASE_URL) {
@@ -24,6 +26,37 @@ declare const globalThis: {
 } & typeof global;
 
 const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
+
+if (prisma) {
+  const originalTransaction = prisma.$transaction.bind(prisma);
+
+  prisma.$transaction = async function (arg1: any, arg2: any) {
+    const context = {
+      domainEvents: [] as any[],
+      realtimeEvents: [] as any[],
+    };
+
+    const result = await transactionLocalStorage.run(context, async () => {
+      return await originalTransaction(arg1, arg2);
+    });
+
+    if (context.domainEvents.length > 0) {
+      const { domainEvents } = await import('./domain-events');
+      context.domainEvents.forEach(({ eventName, args }) => {
+        domainEvents.emit(eventName, ...args);
+      });
+    }
+
+    if (context.realtimeEvents.length > 0) {
+      const { emitRealtimeEvent } = await import('./realtime-events');
+      context.realtimeEvents.forEach(({ event, data }) => {
+        emitRealtimeEvent(event, data);
+      });
+    }
+
+    return result;
+  } as any;
+}
 
 // Fallback for build time - create a mock object
 const safePrisma = prisma ?? ({} as PrismaClient);

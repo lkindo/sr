@@ -143,21 +143,26 @@ export class MemoryRateLimiter {
    * 점진적 만료 데이터 정리 및 임계치 도달 시 강제 방출
    */
   private performIncrementalEviction(now: number): void {
-    // 10%의 확률로 임의의 만료 버킷 청소 (전체 루프 성능 저하 완화)
-    if (Math.random() < 0.1) {
-      const expiredKeys: string[] = [];
-      this.buckets.forEach((bucket, k) => {
-        if (now - bucket.lastRefill >= this.config.windowMs) {
-          expiredKeys.push(k);
+    // 1. O(1) 랜덤 샘플링 축출 (Random Sampling Eviction)
+    // 매 호출 시 10% 확률로 임의의 5개 샘플을 추출해 만료 상태인 것만 지워 O(1) 수준으로 성능 저하를 방지합니다.
+    if (Math.random() < 0.1 && this.buckets.size > 0) {
+      const keys = Array.from(this.buckets.keys());
+      const sampleSize = Math.min(5, keys.length);
+      for (let i = 0; i < sampleSize; i++) {
+        const randomIndex = Math.floor(Math.random() * keys.length);
+        const randomKey = keys[randomIndex];
+        const bucket = this.buckets.get(randomKey);
+        if (bucket && now - bucket.lastRefill >= this.config.windowMs) {
+          this.buckets.delete(randomKey);
         }
-      });
-      expiredKeys.forEach((k) => this.buckets.delete(k));
+      }
     }
 
-    // 버킷 맵 크기가 한계 임계치(10,000개)를 넘어가면 OOM 방지를 위해 가장 오래된 100개 항목 강제 방출
+    // 2. 최대 크기 강제 방어 (OOM 방지 FIFO Eviction)
+    // 버킷 맵 크기가 임계치(10,000개)를 초과하면, 가장 오래전에 등록된 500개 항목을 맵에서 강제 방출(FIFO)합니다.
     if (this.buckets.size > 10000) {
       const iterator = this.buckets.keys();
-      for (let i = 0; i < 100; i++) {
+      for (let i = 0; i < 500; i++) {
         const next = iterator.next();
         if (next.done) break;
         this.buckets.delete(next.value);
@@ -166,35 +171,12 @@ export class MemoryRateLimiter {
   }
 
   /**
-   * 오래된 버킷 정리
+   * 오래된 버킷 정리 (Edge Runtime 타이머 미작동 및 메모리 누수 대응)
+   * performIncrementalEviction 수동 청소로 일괄 통제하므로 setInterval 타이머는 폐지합니다.
    */
   private startCleanup(): void {
-    // Edge Runtime에서는 setInterval이 모듈 초기화 단계에서 허용되지 않음
-    if (process.env.NEXT_RUNTIME === 'edge') {
-      return;
-    }
-
-    // 5분마다 윈도우가 지난 버킷 삭제
-    setInterval(
-      () => {
-        const now = Date.now();
-        const keysToDelete: string[] = [];
-
-        this.buckets.forEach((bucket, key) => {
-          if (now - bucket.lastRefill >= this.config.windowMs * 2) {
-            keysToDelete.push(key);
-          }
-        });
-
-        keysToDelete.forEach((key) => this.buckets.delete(key));
-
-        if (keysToDelete.length > 0 && process.env.NODE_ENV === 'development') {
-          // 개발 환경에서만 정리 로그 출력
-          logger.info(`[RateLimiter] Cleaned up ${keysToDelete.length} expired buckets`);
-        }
-      },
-      5 * 60 * 1000
-    ); // 5분
+    // performIncrementalEviction에서 점진적으로 만료 처리를 하여 메모리를 회수하므로 타이머를 가동하지 않습니다.
+    return;
   }
 }
 

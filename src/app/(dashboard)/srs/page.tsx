@@ -131,12 +131,17 @@ export default async function SRsPage({ searchParams }: Props) {
 
   const orderBy = getOrderBy();
 
-  // 통계 집계용 기본 where 조건 (status, priority 필터 제외)
-  const whereBase: Prisma.SRWhereInput = {};
-  if (where.clientId) whereBase.clientId = where.clientId;
-  if (where.assigneeId) whereBase.assigneeId = where.assigneeId;
-  if (where.createdAt) whereBase.createdAt = where.createdAt;
-  if (where.OR) whereBase.OR = where.OR;
+  // 1. 통계 집계용 격리 (Isolation) 기반 where 조건
+  // 임시 필터(상태, 담당자, 검색어 등)에 의해 상단 대시보드 배지 통계가 왜곡되는 결함을 정정합니다.
+  // 단, 멀티테넌트 데이터 격리(clientId 격리)는 철저히 유지합니다.
+  const whereStats: Prisma.SRWhereInput = {};
+  if (!isAdminManagerEngineer) {
+    if (userClientIds.length > 0) {
+      whereStats.clientId = { in: userClientIds };
+    } else {
+      whereStats.clientId = { in: [] };
+    }
+  }
 
   // 오늘 날짜 및 마감일 범위 계산
   const today = new Date();
@@ -162,20 +167,20 @@ export default async function SRsPage({ searchParams }: Props) {
       skip: (page - 1) * itemsPerPage,
       take: itemsPerPage,
     }),
-    srService.countSRs({ where }),
-    srService.countSRs({ where: { ...whereBase, status: 'REQUESTED' } }),
-    srService.countSRs({ where: { ...whereBase, status: 'IN_PROGRESS' } }),
-    srService.countSRs({ where: { ...whereBase, priority: { in: ['CRITICAL', 'HIGH'] } } }),
+    srService.countSRs({ where }), // 현재 활성화된 필터/검색 적용 결과 총 개수
+    srService.countSRs({ where: { ...whereStats, status: 'REQUESTED' } }),
+    srService.countSRs({ where: { ...whereStats, status: 'IN_PROGRESS' } }),
+    srService.countSRs({ where: { ...whereStats, priority: { in: ['CRITICAL', 'HIGH'] } } }),
     srService.countSRs({
       where: {
-        ...whereBase,
+        ...whereStats,
         dueDate: { gte: today, lt: tomorrow },
         status: { in: ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
       },
     }),
     srService.countSRs({
       where: {
-        ...whereBase,
+        ...whereStats,
         assigneeId: session?.user?.id || 'non-existent',
       },
     }),

@@ -114,6 +114,17 @@ export class DuplicateError extends ServiceError {
 }
 
 /**
+ * 너무 많은 요청 에러 (Rate Limit 초과)
+ */
+export class TooManyRequestsError extends ServiceError {
+  constructor(message: string = '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.') {
+    super(message, 'TOO_MANY_REQUESTS', 429);
+    this.name = 'TooManyRequestsError';
+    Object.setPrototypeOf(this, TooManyRequestsError.prototype);
+  }
+}
+
+/**
  * ServiceError를 Result 타입으로 변환하는 헬퍼 함수
  */
 

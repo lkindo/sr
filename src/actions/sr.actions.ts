@@ -6,6 +6,7 @@ import type { SR } from '@prisma/client';
 import {
   authenticateAndAuthorize,
   getAuthenticatedSession,
+  requireRateLimit,
   validateWithSchema,
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
@@ -20,6 +21,7 @@ import { buildSRCreateInput, buildSRUpdateInput } from './sr-form.utils';
 
 export async function createSRAction(formData: FormData): Promise<Result<SRCreateResult>> {
   try {
+    await requireRateLimit('strict');
     const payload = buildSRCreateInput(formData);
     const validationResult = validateWithSchema(payload, srCreateSchema);
     if (!validationResult.success) {

@@ -1,0 +1,43 @@
+services:
+  app-test:
+    image: ghcr.io/lkindo/sr:dev
+    container_name: sr-app-test
+    restart: always
+    expose:
+      - '3000'
+    ports:
+      - '3001:3000'
+    env_file:
+      - .env.docker.test
+    depends_on:
+      db-test:
+        condition: service_healthy
+    networks:
+      - sr-net
+
+  db-test:
+    image: postgres:16-alpine
+    container_name: sr-db-test
+    restart: always
+    environment:
+      - POSTGRES_USER=lkind
+      - POSTGRES_PASSWORD=sr1234
+      - POSTGRES_DB=sr_db_test
+    ports:
+      - '5433:5432'
+    volumes:
+      - sr_db_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db_test']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sr-net
+
+volumes:
+  sr_db_test_data:
+
+networks:
+  sr-net:
+    external: true

@@ -1,6 +1,8 @@
 import type { SRStatus } from '@prisma/client';
 import { EventEmitter } from 'events';
 
+import { transactionLocalStorage } from './transaction-context';
+
 /**
  * 도메인 이벤트 페이로드 정의
  */
@@ -50,6 +52,11 @@ class DomainEventEmitter extends EventEmitter {
     eventName: K,
     ...args: Parameters<DomainEventsMap[K]>
   ): boolean {
+    const context = transactionLocalStorage.getStore();
+    if (context) {
+      context.domainEvents.push({ eventName, args });
+      return true;
+    }
     return super.emit(eventName, ...args);
   }
 

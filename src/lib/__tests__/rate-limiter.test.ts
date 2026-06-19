@@ -138,6 +138,58 @@ describe('MemoryRateLimiter', () => {
       expect(result2.remaining).toBe(2);
     });
   });
+
+  describe('OOM 방어 및 점진적 축출', () => {
+    it('임계치 초과 시 오래된 버킷 500개를 방출해야 함 (FIFO)', async () => {
+      const oomLimiter = new MemoryRateLimiter({
+        windowMs: 10000,
+        maxRequests: 5,
+      });
+
+      const bucketsMap = (oomLimiter as any).buckets as Map<string, any>;
+      for (let i = 0; i < 10005; i++) {
+        bucketsMap.set(`key-${i}`, {
+          tokens: 5,
+          lastRefill: Date.now(),
+        });
+      }
+
+      expect(bucketsMap.size).toBe(10005);
+
+      await oomLimiter.check('new-key');
+
+      expect(bucketsMap.size).toBeLessThanOrEqual(9506);
+      expect(bucketsMap.has('key-0')).toBe(false);
+      expect(bucketsMap.has('key-499')).toBe(false);
+      expect(bucketsMap.has('key-500')).toBe(true);
+    });
+
+    it('랜덤 샘플링을 통해 만료된 데이터를 O(1) 수준으로 지워야 함', async () => {
+      const randSpy = vi.spyOn(Math, 'random').mockReturnValue(0.05);
+
+      const sampleLimiter = new MemoryRateLimiter({
+        windowMs: 1000,
+        maxRequests: 5,
+      });
+
+      const bucketsMap = (sampleLimiter as any).buckets as Map<string, any>;
+      const expiredTime = Date.now() - 2000;
+      for (let i = 0; i < 10; i++) {
+        bucketsMap.set(`expired-${i}`, {
+          tokens: 5,
+          lastRefill: expiredTime,
+        });
+      }
+
+      expect(bucketsMap.size).toBe(10);
+
+      await sampleLimiter.check('active-key');
+
+      expect(bucketsMap.size).toBeLessThan(11);
+
+      randSpy.mockRestore();
+    });
+  });
 });
 
 describe('RateLimitPresets', () => {

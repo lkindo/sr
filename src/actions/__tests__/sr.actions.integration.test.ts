@@ -13,6 +13,7 @@ vi.mock('@/lib/action-helpers', () => ({
   getAuthenticatedSession: vi.fn(async () => ({
     user: { id: 'user-2', permissions: ['SR:UPDATE', 'SR:READ'], roles: ['ENGINEER'] },
   })),
+  requireRateLimit: vi.fn(async () => {}),
 }));
 
 describe('SR actions integration-ish', () => {

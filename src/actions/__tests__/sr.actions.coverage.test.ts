@@ -14,6 +14,7 @@ vi.mock('@/lib/action-helpers', () => ({
   authenticateAndAuthorize: vi.fn(),
   validateWithSchema: vi.fn(),
   getAuthenticatedSession: vi.fn(),
+  requireRateLimit: vi.fn(async () => {}),
 }));
 
 // Mock errorToResult

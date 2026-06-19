@@ -3,6 +3,7 @@
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
 
+import { requireRateLimit } from '@/lib/action-helpers';
 import { SECURITY } from '@/lib/constants';
 import prisma from '@/lib/prisma';
 import { UserService } from '@/services/user.service';
@@ -29,6 +30,7 @@ const registerSchema = z
 
 export async function registerUser(formData: FormData) {
   try {
+    await requireRateLimit('strict');
     const clientIdValue = formData.get('clientId');
     const data = {
       name: formData.get('name') as string,

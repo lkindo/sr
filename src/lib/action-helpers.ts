@@ -3,10 +3,12 @@
  * 인증, 권한, 검증 로직의 중복을 제거
  */
 
+import { headers } from 'next/headers';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
-import { UnauthorizedError } from '@/lib/errors';
+import { TooManyRequestsError, UnauthorizedError } from '@/lib/errors';
+import { rateLimiters } from '@/lib/rate-limiter';
 import { fail, Result } from '@/lib/result';
 import { PermissionService } from '@/services/permission.service';
 import { isAuthenticatedSession } from '@/types/session';
@@ -66,4 +68,27 @@ export function withActionErrorHandling<T>(action: () => Promise<Result<T>>): Pr
     }
     throw error;
   });
+}
+
+/**
+ * Server Action 내에서 IP 기반 속도 제한을 검사합니다.
+ * 제한 초과 시 TooManyRequestsError를 발생시킵니다.
+ */
+export async function requireRateLimit(
+  preset: keyof typeof rateLimiters = 'standard'
+): Promise<void> {
+  let ip = '127.0.0.1';
+  try {
+    const headersList = await headers();
+    ip = headersList.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+  } catch (error) {
+    // 테스트 환경 등 Request Context가 없는 경우 예외 처리 및 127.0.0.1로 폴백
+  }
+
+  const limiter = rateLimiters[preset];
+  const { allowed } = await limiter.check(ip);
+
+  if (!allowed) {
+    throw new TooManyRequestsError();
+  }
 }

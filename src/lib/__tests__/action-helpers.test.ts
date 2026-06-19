@@ -13,6 +13,26 @@ const { mockRequirePermission } = vi.hoisted(() => ({
   mockRequirePermission: vi.fn(),
 }));
 
+const { mockHeadersGet, mockCheck } = vi.hoisted(() => ({
+  mockHeadersGet: vi.fn(),
+  mockCheck: vi.fn(),
+}));
+
+// Mock next/headers for requireRateLimit testing
+vi.mock('next/headers', () => ({
+  headers: async () => ({
+    get: mockHeadersGet,
+  }),
+}));
+
+// Mock rate-limiter for requireRateLimit testing
+vi.mock('@/lib/rate-limiter', () => ({
+  rateLimiters: {
+    standard: { check: mockCheck },
+    strict: { check: mockCheck },
+  },
+}));
+
 vi.mock('@/services/permission.service', () => ({
   PermissionService: class {
     requirePermission = mockRequirePermission;
@@ -177,6 +197,24 @@ describe('Action Helpers', () => {
       const action = vi.fn().mockRejectedValue(new Error('Database error'));
 
       await expect(helpers.withActionErrorHandling(action)).rejects.toThrow('Database error');
+    });
+  });
+
+  describe('requireRateLimit', () => {
+    it('요청이 허용된 한도 내인 경우 에러 없이 리졸브되어야 함', async () => {
+      mockHeadersGet.mockReturnValue('127.0.0.1');
+      mockCheck.mockResolvedValue({ allowed: true });
+
+      await expect(helpers.requireRateLimit('standard')).resolves.toBeUndefined();
+      expect(mockCheck).toHaveBeenCalled();
+    });
+
+    it('속도 제한 초과 시 TooManyRequestsError를 발생시켜야 함', async () => {
+      mockHeadersGet.mockReturnValue('12.34.56.78');
+      mockCheck.mockResolvedValue({ allowed: false });
+
+      const { TooManyRequestsError } = await import('@/lib/errors');
+      await expect(helpers.requireRateLimit('strict')).rejects.toThrow(TooManyRequestsError);
     });
   });
 });
