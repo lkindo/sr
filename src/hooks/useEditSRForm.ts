@@ -143,17 +143,7 @@ export function useEditSRForm({
     }
     fetchClients();
     fetchCategories();
-  }, [
-    open,
-    srId,
-    fetchClients,
-    fetchCategories,
-    fetchExistingAttachments,
-    hasAnyRole,
-    onOpenChange,
-    sr,
-    toast,
-  ]);
+  }, [open, srId]);
 
   const handleDeleteAttachmentClick = (attachmentId: string) => setFileToDelete(attachmentId);
 

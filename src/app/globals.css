@@ -16,72 +16,74 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 217 33% 17%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 217 33% 17%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 243 75% 59%;
-    --chart-1: 12 76% 61%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --chart-1: 221.2 83.2% 53.3%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
 
-    /* SR Management Design System Colors - Based on HTML Template */
-    --sr-primary-dark: 235 45% 23%;
-    /* #2a3053 - Main sidebar color */
-    --sr-primary-darker: 233 47% 19%;
-    /* #212642 - Sidebar submenu color */
-    --sr-sidebar-hover: 233 30% 29%;
-    /* #34395b - Hover state */
-    --sr-gray-medium: 233 15% 60%;
-    /* #9497a9 - Text muted */
-    --sr-gray-light: 233 15% 65%;
-    /* #9092a0 - Submenu text */
-    --sr-bg-light: 232 45% 97%;
-    /* #f5f6f9 - Light background */
-    --sr-bg-lighter: 234 11% 93%;
-    --sr-border: 0 0% 88%;
-    /* #e1e1e1 - Border light */
-    --sr-accent-orange: 16 100% 50%;
-    /* #ff5000 - Accent color */
-    --sr-accent-blue: 228 31% 42%;
+    /* SR Management Design System Colors - Blue Theme */
+    --sr-primary-dark: 222.2 47.4% 11.2%;
+    /* #0F172A - Slate 900 (Main sidebar color) */
+    --sr-primary-darker: 224 71% 4%;
+    /* #030712 - Slate 950 (Sidebar submenu color) */
+    --sr-sidebar-hover: 222.2 47.4% 17.6%;
+    /* #1E293B - Slate 800 (Hover state) */
+    --sr-gray-medium: 215.4 16.3% 46.9%;
+    /* #64748B - Slate 500 (Text muted) */
+    --sr-gray-light: 217.9 10.6% 64.9%;
+    /* #94A3B8 - Slate 400 (Submenu text) */
+    --sr-bg-light: 210 40% 98%;
+    /* #F8FAFC - Light background (Slate 50) */
+    --sr-bg-lighter: 210 40% 96.1%;
+    /* #F1F5F9 - Slate 100 */
+    --sr-border: 214.3 31.8% 91.4%;
+    /* #E2E8F0 - Border light (Slate 200) */
+    --sr-accent-orange: 221.2 83.2% 53.3%;
+    /* #2563EB - Mapped to Blue 600 to unify orange elements to blue */
+    --sr-accent-blue: 224.3 76.3% 48%;
+    /* #1D4ED8 - Blue 700 */
   }
 
   .dark {
-    --background: 232 28% 10%;
-    --foreground: 0 0% 98%;
-    --card: 232 28% 12%;
-    --card-foreground: 0 0% 98%;
-    --popover: 232 28% 12%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 234 11% 93%;
-    --primary-foreground: 232 28% 24%;
-    --secondary: 232 28% 18%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 232 28% 16%;
-    --muted-foreground: 234 11% 71%;
-    --accent: 232 28% 20%;
-    --accent-foreground: 0 0% 98%;
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 8%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222.2 47.4% 11.2%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+    --accent: 222.2 47.4% 11.2%;
+    --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 232 28% 22%;
-    --input: 232 28% 22%;
-    --ring: 234 11% 93%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222.2 47.4% 17.6%;
+    --input: 222.2 47.4% 17.6%;
+    --ring: 210 40% 98%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -89,15 +91,15 @@
     --chart-5: 340 75% 55%;
 
     /* SR Management Design System Colors - Dark Mode */
-    --sr-primary-dark: 234 11% 93%;
-    --sr-primary-darker: 0 0% 98%;
-    --sr-gray-medium: 234 11% 71%;
-    --sr-gray-light: 234 11% 51%;
-    --sr-bg-light: 232 28% 16%;
-    --sr-bg-lighter: 232 28% 18%;
-    --sr-border: 232 28% 22%;
-    --sr-accent-orange: 16 100% 60%;
-    --sr-accent-blue: 228 50% 60%;
+    --sr-primary-dark: 210 40% 98%;
+    --sr-primary-darker: 0 0% 100%;
+    --sr-gray-medium: 215.4 16.3% 56.9%;
+    --sr-gray-light: 217.9 10.6% 64.9%;
+    --sr-bg-light: 222.2 47.4% 11.2%;
+    --sr-bg-lighter: 222.2 47.4% 17.6%;
+    --sr-border: 222.2 47.4% 17.6%;
+    --sr-accent-orange: 221.2 83.2% 53.3%;
+    --sr-accent-blue: 217.2 91.2% 59.8%;
   }
 }
 
@@ -166,44 +168,34 @@
   }
 
   .sr-table thead {
-    @apply bg-muted border-b-2 border-primary;
+    @apply bg-slate-50/80 border-b border-slate-200;
   }
 
   .sr-table th {
     @apply h-12 px-6 text-left;
-    @apply text-sm font-medium text-foreground;
-    @apply border-r border-border;
-  }
-
-  .sr-table th:last-child {
-    @apply border-r-0;
+    @apply text-xs font-semibold text-slate-500;
   }
 
   .sr-table td {
     @apply h-12 px-6;
-    @apply text-sm text-muted-foreground;
-    @apply border-r border-border;
-  }
-
-  .sr-table td:last-child {
-    @apply border-r-0;
+    @apply text-sm text-slate-600;
   }
 
   .sr-table tbody tr {
-    @apply border-b border-border;
+    @apply border-b border-slate-100;
     @apply transition-colors duration-150;
   }
 
   .sr-table tbody tr:hover {
-    @apply bg-muted/50 cursor-pointer;
+    @apply bg-blue-50/30 cursor-pointer;
   }
 
   /* Header Styles */
   .sr-header {
     @apply sticky top-0 z-[60];
     @apply w-full h-[72px];
-    @apply bg-background/95 backdrop-blur;
-    @apply border-b-2 border-primary;
+    @apply bg-background/90 backdrop-blur-md;
+    @apply border-b border-slate-100;
   }
 
   .sr-header-nav-item {
@@ -257,26 +249,47 @@
 
   /* Status Badges */
   .sr-status-badge {
-    @apply inline-flex items-center;
+    @apply inline-flex items-center gap-1.5;
     @apply px-2.5 py-0.5;
-    @apply text-xs font-medium;
-    @apply rounded;
+    @apply text-xs font-semibold;
+    @apply rounded-md border;
   }
 
   .sr-status-badge.requested {
-    @apply bg-orange-100 text-orange-800 border border-orange-200;
+    @apply bg-slate-100 text-slate-600 border-slate-200;
   }
 
-  .sr-status-badge.in-progress {
-    @apply bg-blue-100 text-blue-800 border border-blue-200;
+  .sr-status-badge.accepted {
+    @apply bg-blue-50 text-blue-700 border-blue-200;
+  }
+
+  .sr-status-badge.in-progress,
+  .sr-status-badge.in_progress {
+    @apply bg-blue-50 text-blue-700 border-blue-200;
   }
 
   .sr-status-badge.resolved {
-    @apply bg-green-100 text-green-800 border border-green-200;
+    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
   }
 
   .sr-status-badge.completed {
-    @apply bg-slate-100 text-slate-800 border border-slate-200;
+    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+  }
+
+  .sr-status-badge.closed {
+    @apply bg-emerald-600 text-white border-emerald-700;
+  }
+
+  .sr-status-badge.rejected {
+    @apply bg-red-50 text-red-700 border-red-200;
+  }
+
+  .sr-status-badge.hold {
+    @apply bg-amber-50 text-amber-700 border-amber-200;
+  }
+
+  .sr-status-badge.reopened {
+    @apply bg-purple-50 text-purple-700 border-purple-200;
   }
 
   /* Priority Badges */
@@ -541,33 +554,32 @@
 
   /* Sidebar (LNB) Styles */
   .sr-sidebar-bg {
-    @apply bg-[hsl(var(--sr-primary-dark))];
+    @apply bg-slate-50;
   }
 
   .sr-sidebar-item {
-    @apply text-[hsl(var(--sr-gray-medium))];
-    @apply hover:text-white hover:bg-[hsl(var(--sr-sidebar-hover))];
+    @apply text-slate-600;
+    @apply hover:text-slate-900 hover:bg-slate-200/50;
     @apply transition-all duration-200;
   }
 
   .sr-sidebar-item.active {
-    @apply text-white bg-[hsl(var(--sr-sidebar-hover))];
+    @apply text-primary bg-blue-50/50 font-semibold border-l-4 border-primary;
   }
 
   .sr-sidebar-submenu {
-    @apply bg-[hsl(var(--sr-primary-darker))];
+    @apply bg-slate-100/30;
   }
 
   .sr-sidebar-submenu-item {
-    @apply text-[hsl(var(--sr-gray-light))];
-    @apply hover:text-white;
+    @apply text-slate-500 hover:text-slate-900;
     @apply transition-colors duration-200;
   }
 
   .sr-sidebar-submenu-item::before {
     content: '';
-    @apply inline-block w-1 h-1 rounded-full;
-    @apply bg-gray-400 mr-3;
+    @apply inline-block w-1.5 h-1.5 rounded-full;
+    @apply bg-blue-500 mr-3;
     @apply opacity-0;
   }
 
@@ -577,13 +589,13 @@
 
   /* Header with Accent Border */
   .sr-header-accent {
-    border-bottom-width: 2px;
-    border-color: hsl(var(--sr-primary-dark));
+    border-bottom-width: 1px;
+    border-color: #f1f5f9;
   }
 
   /* Content Background */
   .sr-content-bg {
-    @apply bg-[hsl(var(--sr-bg-light))];
+    @apply bg-slate-50/50;
   }
 
   /* Card with Template Shadow */

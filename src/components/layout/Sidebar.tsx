@@ -68,11 +68,11 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
       })
       .map((section, idx) => (
         <Collapsible key={idx} defaultOpen={getDefaultOpen(section)} className="mb-2">
-          <CollapsibleTrigger className="flex items-center justify-between w-full h-[50px] px-8 text-sm font-medium sr-sidebar-item group text-gray-300 hover:text-white">
+          <CollapsibleTrigger className="flex items-center justify-between w-full h-[50px] px-8 text-sm font-medium sr-sidebar-item group">
             <span>{section.title}</span>
             <ChevronRight className="h-4 w-4 sr-chevron transition-transform duration-200 data-[state=open]:rotate-90" />
           </CollapsibleTrigger>
-          <CollapsibleContent className="sr-sidebar-submenu bg-black/20 pb-2">
+          <CollapsibleContent className="sr-sidebar-submenu pb-2">
             {section.items
               .filter((item) => canAccessItem(item))
               .map((item) => {
@@ -84,12 +84,12 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'flex items-center h-10 px-8 pl-12 text-sm sr-sidebar-submenu-item relative text-gray-400 hover:text-white',
-                      isActive && 'text-white font-medium bg-white/5'
+                      'flex items-center h-10 px-8 pl-12 text-sm sr-sidebar-submenu-item relative text-slate-500 hover:text-slate-900',
+                      isActive && 'text-primary font-semibold bg-blue-50/50'
                     )}
                   >
                     {isActive && (
-                      <span className="absolute left-[35px] w-1 h-1 rounded-full bg-sr-accent" />
+                      <span className="absolute left-[35px] w-1.5 h-1.5 rounded-full bg-primary" />
                     )}
                     {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
                     {item.title}
@@ -104,9 +104,9 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
   return (
     <aside
       className={cn(
-        'z-40 h-full w-full sr-sidebar-bg text-white overflow-y-auto',
+        'z-40 h-full w-full sr-sidebar-bg overflow-y-auto',
         !isMobile &&
-          'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-[#3f4564] hidden md:block'
+          'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-slate-200 hidden md:block'
       )}
     >
       <nav className="flex flex-col pt-5 pb-20">
@@ -125,8 +125,8 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                     className={cn(
                       'flex items-center px-6 py-3 text-base font-semibold transition-colors',
                       isActiveTop
-                        ? 'text-white bg-white/10 border-l-4 border-sr-accent'
-                        : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                        ? 'text-primary bg-blue-50/50 border-l-4 border-primary font-semibold'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     )}
                   >
                     {topItem.icon && <topItem.icon className="mr-3 h-5 w-5" />}
