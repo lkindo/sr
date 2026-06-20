@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanReadClient, ensureCanUpdateClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serviceCategoryCreateSchema } from '@/lib/schemas';
 import { serviceCategoryService } from '@/services/service-category.service';
@@ -11,9 +12,20 @@ import { serviceCategoryService } from '@/services/service-category.service';
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
+
+    // 고객사 존재 확인 및 권한 검증
+    const client = await prisma.client.findUnique({
+      where: { id },
+    });
+
+    if (!client) {
+      throw new NotFoundError('고객사');
+    }
+
+    ensureCanReadClient(session.user, client);
 
     // ServiceCategoryService 활용
     const categories = await serviceCategoryService.getByClientId(id);
@@ -33,9 +45,27 @@ export const GET = withAuthAndRateLimit(
 export const POST = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
+
+    // 고객사 존재 확인 및 권한 검증
+    const client = await prisma.client.findUnique({
+      where: { id },
+    });
+
+    if (!client) {
+      throw new NotFoundError('고객사');
+    }
+
+    ensureCanUpdateClient(session.user);
+
+    if (!isInternalUser(session.user)) {
+      const userClientIds = session.user.clientIds || [];
+      if (!userClientIds.includes(id)) {
+        throw new ForbiddenError('해당 고객사의 카테고리를 생성할 권한이 없습니다.');
+      }
+    }
 
     const body = await request.json();
     let validated;
@@ -50,15 +80,6 @@ export const POST = withAuthAndRateLimit(
         throw new ValidationError(zodError.issues[0].message);
       }
       throw error;
-    }
-
-    // 고객사 존재 확인
-    const client = await prisma.client.findUnique({
-      where: { id },
-    });
-
-    if (!client) {
-      throw new NotFoundError('고객사');
     }
 
     // ServiceCategoryService를 활용한 카테고리 생성

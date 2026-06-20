@@ -6,6 +6,7 @@ import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
 import { ensureCanCreateSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { srCreateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { srService } from '@/services/sr.service';
 
@@ -79,7 +80,19 @@ export const POST = withAuthAndRateLimit(
     ensureCanCreateSR(session.user);
 
     const body = await request.json();
-    const sr = await srService.createSR(body, session.user);
+
+    // Zod validation을 먼저 수행하여 잘못된 페이로드에 대해 400 Bad Request 유도
+    const validated = srCreateSchema.parse(body);
+
+    // Multi-tenant Spoofing Prevention: External users must request for their own client only
+    if (!isInternalUser(session.user)) {
+      const userClientIds = session.user.clientIds || [];
+      if (!validated.clientId || !userClientIds.includes(validated.clientId)) {
+        throw new ForbiddenError('소속되지 않은 고객사의 SR을 생성할 수 없습니다.');
+      }
+    }
+
+    const sr = await srService.createSR(validated, session.user);
 
     return NextResponse.json(serializeResponse(sr), { status: 201 });
   },

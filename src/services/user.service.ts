@@ -135,7 +135,7 @@ export class UserService {
       userType?: string;
       roleId?: string;
       role?: string;
-      clientId?: string;
+      clientId?: string | { in: string[] };
     },
     params?: {
       skip?: number;
@@ -163,8 +163,10 @@ export class UserService {
     if (filters?.clientId && filters.clientId !== 'all') {
       if (filters.clientId === 'unassigned') {
         where.clients = { none: {} };
-      } else {
+      } else if (typeof filters.clientId === 'object') {
         where.clients = { some: { clientId: filters.clientId } };
+      } else {
+        where.clients = { some: { clientId: filters.clientId as string } };
       }
     }
 

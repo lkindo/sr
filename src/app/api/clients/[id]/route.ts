@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import {
+  ensureCanDeleteClient,
+  ensureCanReadClient,
+  ensureCanUpdateClient,
+  isInternalUser,
+} from '@/lib/policies';
 import { clientUpdateSchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
 
@@ -10,7 +16,7 @@ import { ClientService } from '@/services/client.service';
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -22,6 +28,9 @@ export const GET = withAuthAndRateLimit(
       throw new NotFoundError('고객사');
     }
 
+    // Enforce authorization check
+    ensureCanReadClient(session.user, clientWithCategories as any);
+
     return NextResponse.json(clientWithCategories);
   },
   { preset: 'standard' }
@@ -31,9 +40,20 @@ export const GET = withAuthAndRateLimit(
 export const PATCH = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
+    ensureCanUpdateClient(session.user);
+
     const { id } = await params;
+
+    // Multi-tenant Isolation: External users cannot modify other clients
+    if (!isInternalUser(session.user)) {
+      const userClientIds = session.user.clientIds || [];
+      if (!userClientIds.includes(id)) {
+        throw new ForbiddenError('해당 고객사 수정 권한이 없습니다.');
+      }
+    }
+
     const validated = await validateRequestBody(request, clientUpdateSchema);
 
     // Service 레이어를 통해 고객사 수정
@@ -52,8 +72,10 @@ export const PATCH = withAuthAndRateLimit(
 export const DELETE = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
+    ensureCanDeleteClient(session.user);
+
     const { id } = await params;
 
     // Service 레이어를 통해 고객사 삭제

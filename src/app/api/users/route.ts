@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
-import { ensureCanCreateUser, ensureCanReadUser } from '@/lib/policies';
+import { ensureCanCreateUser, ensureCanReadUser, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { userCreateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
@@ -20,13 +20,33 @@ export const GET = withAuthAndRateLimit(
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request);
 
+    let clientIdFilter: string | { in: string[] } | undefined =
+      searchParams.get('clientId') || undefined;
+
+    // Multi-tenant Isolation: External users must be restricted to their assigned clients' users
+    if (!isInternalUser(session.user)) {
+      const userClientIds = session.user.clientIds || [];
+
+      if (userClientIds.length === 0) {
+        return NextResponse.json(createResponse([], 0));
+      }
+
+      if (typeof clientIdFilter === 'string') {
+        if (!userClientIds.includes(clientIdFilter)) {
+          return NextResponse.json(createResponse([], 0));
+        }
+      } else {
+        clientIdFilter = { in: userClientIds };
+      }
+    }
+
     const filters = {
       search: searchParams.get('search') || undefined,
       isActive: searchParams.get('isActive') || undefined,
       userType: searchParams.get('userType') || undefined,
       roleId: searchParams.get('roleId') || undefined,
       role: searchParams.get('role') || undefined,
-      clientId: searchParams.get('clientId') || undefined,
+      clientId: clientIdFilter,
     };
 
     const userService = new UserService();

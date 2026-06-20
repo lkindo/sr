@@ -16,10 +16,10 @@ services:
       db:
         condition: service_healthy
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
   db:
     image: postgres:16-alpine
@@ -39,10 +39,10 @@ services:
       timeout: 5s
       retries: 5
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 volumes:
   sr_db_data:

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { usePagination } from '@/lib/pagination';
+import { ensureCanCreateClient, ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { ClientService } from '@/services/client.service';
 
@@ -14,7 +15,9 @@ export const runtime = 'nodejs';
 // GET /api/clients - 모든 고객사 조회 (Rate Limit: 표준)
 // 페이지네이션 지원: ?page=1&pageSize=20&sortBy=name&sortOrder=asc
 export const GET = withAuthAndRateLimit(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { session }) => {
+    ensureCanReadClient(session.user);
+
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request);
 
@@ -23,6 +26,12 @@ export const GET = withAuthAndRateLimit(
     const isActive = searchParams.get('isActive');
 
     const where: Prisma.ClientWhereInput = {};
+
+    // Multi-tenant Isolation: External users can only view their assigned clients
+    if (!isInternalUser(session.user)) {
+      const userClientIds = session.user.clientIds || [];
+      where.id = { in: userClientIds };
+    }
 
     if (search) {
       where.OR = [
@@ -64,7 +73,9 @@ export const GET = withAuthAndRateLimit(
 
 // POST /api/clients - 새 고객사 생성 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(
-  async (request: NextRequest) => {
+  async (request: NextRequest, { session }) => {
+    ensureCanCreateClient(session.user);
+
     const body = await request.json();
 
     const clientService = new ClientService();

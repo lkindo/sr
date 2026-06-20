@@ -37,10 +37,10 @@ export default defineConfig({
       ],
     },
     alias: {
-      'next/server': path.resolve(__dirname, './src/__tests__/mocks/next-server.ts'),
-      'next/navigation': path.resolve(__dirname, './src/__tests__/mocks/next-navigation.ts'),
-      'next/cache': path.resolve(__dirname, './src/__tests__/mocks/next-cache.ts'),
-      'server-only': path.resolve(__dirname, './src/__tests__/mocks/server-only.ts'),
+      'next/server': path.resolve(dirname, './src/__tests__/mocks/next-server.ts'),
+      'next/navigation': path.resolve(dirname, './src/__tests__/mocks/next-navigation.ts'),
+      'next/cache': path.resolve(dirname, './src/__tests__/mocks/next-cache.ts'),
+      'server-only': path.resolve(dirname, './src/__tests__/mocks/server-only.ts'),
     },
     projects: [
       {
@@ -85,7 +85,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(dirname, './src'),
     },
   },
 });

@@ -17,10 +17,10 @@ services:
     networks:
       - sr-net
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
   db-test:
     image: postgres:16-alpine
@@ -42,10 +42,10 @@ services:
     networks:
       - sr-net
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 volumes:
   sr_db_test_data:

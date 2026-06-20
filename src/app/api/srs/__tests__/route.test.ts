@@ -118,7 +118,13 @@ describe('API Route: /api/srs (Integration)', () => {
 
       const req = new NextRequest('http://localhost/api/srs', {
         method: 'POST',
-        body: JSON.stringify({ title: 'New SR', description: 'desc' }),
+        body: JSON.stringify({
+          title: 'New SR Title',
+          description: 'This is a valid description.',
+          clientId: 'client-1',
+          serviceCategoryId: 'category-1',
+          requestedPriority: 'MEDIUM',
+        }),
       });
 
       const session = {
@@ -143,7 +149,13 @@ describe('API Route: /api/srs (Integration)', () => {
 
       const req = new NextRequest('http://localhost/api/srs', {
         method: 'POST',
-        body: JSON.stringify({ title: 'No Perm' }),
+        body: JSON.stringify({
+          title: 'New SR Title',
+          description: 'This is a valid description.',
+          clientId: 'client-1',
+          serviceCategoryId: 'category-1',
+          requestedPriority: 'MEDIUM',
+        }),
       });
 
       const session = {

@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next';
+import withBundleAnalyzer from '@next/bundle-analyzer';
 
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
+const analyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === 'true',
 });
 
@@ -50,4 +51,4 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['pino', 'thread-stream'],
 };
 
-export default withBundleAnalyzer(nextConfig);
+export default analyzer(nextConfig);
