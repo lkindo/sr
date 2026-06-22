@@ -1,106 +1,101 @@
-# Dependencies
+# ==============================================================================
+# SR MANAGEMENT SYSTEM - OPTIMIZED GITIGNORE
+# ==============================================================================
+
+# 1. Dependencies & Package Managers
+# ------------------------------------------------------------------------------
 /node_modules
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+.pnpm-store/
+.pnpm-debug.log*
 
-# Next.js
+# 2. Next.js, Vercel & Turbo Build Outputs
+# ------------------------------------------------------------------------------
 /.next/
 /out/
-/build
-/dist
+/build/
+/dist/
+.turbo/
+.vercel/
+.vercelignore
 
-# Environment Variables & Secrets
+# 3. Environment Variables & Credentials (CRITICAL SECRETS)
+# ------------------------------------------------------------------------------
 .env
 .env*.local
 /prisma/.env
-vapid.json
-vapid_final.json
 *.pem
 *.key
 project.tar.gz
 
-# Testing & Coverage
-/coverage
-/coverage_*.txt
-/coverage_*.log
-/reports
-/test-results/
-test_output*.txt
-test_verbose*.txt
-test_failure.log
-*.log
-
-# Stryker (Mutation Testing)
-.stryker-tmp
-stryker.log
-stryker_debug.log
-.stryker*/
-
-# Playwright
-/playwright-report/
-/playwright/.cache/
-
-# Debug Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# Misc & OS
-.DS_Store
-Thumbs.db
-nul
+# 4. Prisma Generated Files
+# ------------------------------------------------------------------------------
 /src/generated
 
-*storybook.log
-storybook-static
+# 5. Playwright & Testing Frameworks
+# ------------------------------------------------------------------------------
+/playwright-report/
+/playwright/.cache/
+/coverage/
+/test-results/
+.stryker-tmp/
 
-# Local uploads
-public/uploads/*
-!public/uploads/.gitkeep
-
-# Test results and logs
-*.test-result.json
-test-results/
-e2e_test_results.txt
-e2e_debug*.txt
-e2e_users_result.json
-e2e_debug.json
-absolute_final_test_results.txt
-final_test_results.txt
-system_test_result.txt
-test_results.txt
-failing_test_detail*.txt
-lint_results*.txt
-lint_output.txt
-eslint_results.txt
-build_output.txt
-typecheck_output.txt
-rate_limiter_fail_detail.txt
-
-# Debug and temporary files
-debug*.log
-*.tmp
-*.temp
-
-# Playwright auth (contains sensitive data)
+# Playwright 인증 정보 세션 (민감 데이터 누출 차단)
 playwright/.auth/
 
-# IDE and editor files
+# 6. Temporary Logs & Test Results (Generalized wildcard patterns)
+# ------------------------------------------------------------------------------
+*.log
+*.log*
+*_debug.log
+*_output.txt
+*_verbose.txt
+*results.txt
+*result.json
+coverage_summary.txt
+coverage_summary_utf8.txt
+build_error.log
+eslint_results.txt
+eslint_output.txt
+eslintcache
+.eslintcache
+
+# 7. Local Media & Storybook Uploads
+# ------------------------------------------------------------------------------
+public/uploads/*
+!public/uploads/.gitkeep
+*storybook.log
+storybook-static/
+
+# 8. OS & Common Editor Settings (Includes MS Office Lock files)
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+nul
+
+# MS Office (Word, Excel, PowerPoint) 임시/락 파일 차단 (시스템 매뉴얼 파워포인트 편집용)
+~$*
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# IDEs
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 *.swp
 *.swo
 *~
 
-# ESLint Cache
-.eslintcache
-
-# Temporary & Generated files
+# 9. Other Temporary & Generated Assets
+# ------------------------------------------------------------------------------
 actions_runs.json
 output.css
+tsconfig.tsbuildinfo
+next-env.d.ts
