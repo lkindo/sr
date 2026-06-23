@@ -462,12 +462,14 @@ export const PATCH = withAuthAndRateLimit(
       changes.push(`우선순위: ${previousValues.actualPriority} → ${validated.actualPriority}`);
       newValues.actualPriority = validated.actualPriority;
     }
-    if (
-      validated.estimatedHours !== undefined &&
-      validated.estimatedHours !== previousValues.estimatedHours
-    ) {
+    const prevEstimatedHours =
+      previousValues.estimatedHours !== null && previousValues.estimatedHours !== undefined
+        ? Number(previousValues.estimatedHours)
+        : undefined;
+
+    if (validated.estimatedHours !== undefined && validated.estimatedHours !== prevEstimatedHours) {
       changes.push(
-        `예상 작업 시간: ${previousValues.estimatedHours}시간 → ${validated.estimatedHours}시간`
+        `예상 작업 시간: ${prevEstimatedHours !== undefined ? prevEstimatedHours : '미정'}시간 → ${validated.estimatedHours}시간`
       );
       newValues.estimatedHours = validated.estimatedHours;
     }

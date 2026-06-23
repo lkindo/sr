@@ -106,7 +106,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
           {sr.estimatedHours !== null && sr.estimatedHours !== undefined && (
             <div>
               <h4 className="text-sm font-medium text-muted-foreground">예상 작업 시간</h4>
-              <p className="mt-1 text-foreground">{sr.estimatedHours}시간</p>
+              <p className="mt-1 text-foreground">{Number(sr.estimatedHours)}시간</p>
             </div>
           )}
           {sr.estimatedCompletionDate && (

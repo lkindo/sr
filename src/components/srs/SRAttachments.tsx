@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 interface Attachment {
   id: string;
   fileName: string;
-  fileSize: number;
+  fileSize: number | bigint;
   fileType: string;
   fileUrl: string;
   createdAt: string;
@@ -151,12 +151,13 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+  const formatFileSize = (bytes: number | bigint) => {
+    const numBytes = Number(bytes);
+    if (numBytes === 0) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    const i = Math.floor(Math.log(numBytes) / Math.log(k));
+    return Math.round((numBytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   if (loading) {

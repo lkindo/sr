@@ -122,7 +122,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{file.fileName}</span>
                       <span className="text-xs text-muted-foreground">
-                        ({(file.fileSize / 1024).toFixed(1)} KB)
+                        ({(Number(file.fileSize) / 1024).toFixed(1)} KB)
                       </span>
                     </div>
                     <a

@@ -18,7 +18,7 @@ interface Client {
 interface Attachment {
   id: string;
   fileName: string;
-  fileSize: number;
+  fileSize: number | bigint;
   fileType: string;
   fileUrl: string;
   createdAt: Date | string;
