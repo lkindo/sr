@@ -30,8 +30,6 @@ model User {
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  accounts  Account[]
-  sessions  Session[]
   roles     UserRole[]
   clients   UserClient[]
   auditLogs AuditLog[]
@@ -61,46 +59,7 @@ model User {
   @@map("users")
 }
 
-model Account {
-  id                String  @id @default(cuid()) @db.VarChar(30)
-  userId            String  @map("user_id") @db.VarChar(30)
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid()) @db.VarChar(30)
-  sessionToken String   @unique @map("session_token") @db.VarChar(255)
-  userId       String   @map("user_id") @db.VarChar(30)
-  expires      DateTime @db.Timestamptz
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("sessions")
-}
-
-model VerificationToken {
-  identifier String   @db.VarChar(255)
-  token      String   @unique @db.VarChar(255)
-  expires    DateTime @db.Timestamptz
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
 
 // ============================================================================
 // 권한 관리 (RBAC)
