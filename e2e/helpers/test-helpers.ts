@@ -89,7 +89,7 @@ export async function findSRInList(
     }
 
     console.log(`⚠️  Retry ${i + 1}/${maxRetries}: SR not found, reloading page...`);
-    await page.reload({ waitUntil: 'networkidle' });
+    await page.reload({ waitUntil: 'load' });
     await page.waitForTimeout(500);
   }
 

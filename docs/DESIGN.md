@@ -1,213 +1,567 @@
-# 디자인 시스템: SaaSify UI 킷 (Design System: SaaSify UI Kit)
+---
+version: alpha
+name: Framer-design-analysis
+description: 'A confident dark-canvas builder marketing site that treats the page like a working artboard — pure black surfaces, white display type set in GT Walsheim Medium with aggressive negative tracking, and a single confident blue (#0099ff) reserved for hyperlinks and selection states. The page rhythm is broken by oversized vibrant gradient atmosphere panels — magenta, violet, orange spotlights — that act as living showcase tiles, not decoration. Every CTA is a white pill on dark; every card is a translucent or charcoal surface; every section title pulls letter-spacing tight enough to feel like a poster.'
 
-**프로젝트 ID:** SaaSify-UI-Kit
+colors:
+  primary: '#ffffff'
+  on-primary: '#000000'
+  accent-blue: '#0099ff'
+  ink: '#ffffff'
+  ink-muted: '#999999'
+  canvas: '#090909'
+  surface-1: '#141414'
+  surface-2: '#1c1c1c'
+  hairline: '#262626'
+  hairline-soft: '#1a1a1a'
+  inverse-canvas: '#ffffff'
+  inverse-ink: '#000000'
+  gradient-magenta: '#d44df0'
+  gradient-violet: '#6a4cf5'
+  gradient-orange: '#ff7a3d'
+  gradient-coral: '#ff5577'
+  semantic-success: '#22c55e'
 
+typography:
+  display-xxl:
+    fontFamily: GT Walsheim Framer Medium
+    fontSize: 110px
+    fontWeight: 500
+    lineHeight: 0.85
+    letterSpacing: -5.5px
+  display-xl:
+    fontFamily: GT Walsheim Medium
+    fontSize: 85px
+    fontWeight: 500
+    lineHeight: 0.95
+    letterSpacing: -4.25px
+    fontFeature: ss02
+  display-lg:
+    fontFamily: GT Walsheim Medium
+    fontSize: 62px
+    fontWeight: 500
+    lineHeight: 1.00
+    letterSpacing: -3.1px
+    fontFeature: ss02
+  display-md:
+    fontFamily: GT Walsheim Medium
+    fontSize: 32px
+    fontWeight: 500
+    lineHeight: 1.13
+    letterSpacing: -1.0px
+  headline:
+    fontFamily: Inter
+    fontSize: 22px
+    fontWeight: 700
+    lineHeight: 1.20
+    letterSpacing: -0.8px
+    fontFeature: cv05
+  subhead:
+    fontFamily: Inter Variable
+    fontSize: 24px
+    fontWeight: 400
+    lineHeight: 1.30
+    letterSpacing: -0.01px
+    fontFeature: cv11
+  body-lg:
+    fontFamily: Inter Variable
+    fontSize: 18px
+    fontWeight: 400
+    lineHeight: 1.30
+    letterSpacing: -0.18px
+    fontFeature: cv11
+  body:
+    fontFamily: Inter Variable
+    fontSize: 15px
+    fontWeight: 400
+    lineHeight: 1.30
+    letterSpacing: -0.15px
+    fontFeature: cv11
+  body-sm:
+    fontFamily: Inter Variable
+    fontSize: 14px
+    fontWeight: 500
+    lineHeight: 1.40
+    letterSpacing: -0.14px
+    fontFeature: cv11
+  caption:
+    fontFamily: Inter Variable
+    fontSize: 13px
+    fontWeight: 500
+    lineHeight: 1.20
+    letterSpacing: -0.13px
+    fontFeature: cv11
+  micro:
+    fontFamily: Inter Variable
+    fontSize: 12px
+    fontWeight: 400
+    lineHeight: 1.20
+    letterSpacing: -0.12px
+    fontFeature: cv11
+  button:
+    fontFamily: Inter Variable
+    fontSize: 14px
+    fontWeight: 500
+    lineHeight: 1.0
+    letterSpacing: -0.14px
+    fontFeature: cv11
+
+rounded:
+  xs: 4px
+  sm: 6px
+  md: 10px
+  lg: 15px
+  xl: 20px
+  xxl: 30px
+  pill: 100px
+  full: 9999px
+
+spacing:
+  hair: 1px
+  xxs: 4px
+  xs: 8px
+  sm: 12px
+  md: 15px
+  lg: 20px
+  xl: 30px
+  xxl: 40px
+  section: 96px
+
+components:
+  button-primary:
+    backgroundColor: '{colors.primary}'
+    textColor: '{colors.on-primary}'
+    typography: '{typography.button}'
+    rounded: '{rounded.pill}'
+    padding: 10px 15px
+  button-primary-pressed:
+    backgroundColor: '{colors.primary}'
+    textColor: '{colors.on-primary}'
+    typography: '{typography.button}'
+    rounded: '{rounded.pill}'
+  button-secondary:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.button}'
+    rounded: '{rounded.pill}'
+    padding: 10px 15px
+  button-translucent:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.ink}'
+    typography: '{typography.button}'
+    rounded: '{rounded.xxl}'
+    padding: 8px 14px
+  button-icon-circular:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.button}'
+    rounded: '{rounded.full}'
+    size: 40px
+  pricing-tab-default:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink-muted}'
+    typography: '{typography.button}'
+    rounded: '{rounded.pill}'
+    padding: 8px 14px
+  pricing-tab-selected:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.ink}'
+    typography: '{typography.button}'
+    rounded: '{rounded.pill}'
+    padding: 8px 14px
+  text-input:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: 10px 14px
+  text-input-focused:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: 10px 14px
+  pricing-card:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.xl}'
+    padding: 24px
+  pricing-card-featured:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.xl}'
+    padding: 24px
+  template-card:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body-sm}'
+    rounded: '{rounded.lg}'
+    padding: 12px
+  gradient-spotlight-card:
+    backgroundColor: '{colors.gradient-violet}'
+    textColor: '{colors.ink}'
+    typography: '{typography.subhead}'
+    rounded: '{rounded.xl}'
+    padding: 32px
+  gradient-spotlight-card-magenta:
+    backgroundColor: '{colors.gradient-magenta}'
+    textColor: '{colors.ink}'
+    typography: '{typography.subhead}'
+    rounded: '{rounded.xl}'
+    padding: 32px
+  gradient-spotlight-card-orange:
+    backgroundColor: '{colors.gradient-orange}'
+    textColor: '{colors.ink}'
+    typography: '{typography.subhead}'
+    rounded: '{rounded.xl}'
+    padding: 32px
+  product-mockup-tile:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body-sm}'
+    rounded: '{rounded.xl}'
+    padding: 16px
+  feature-row:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.xs}'
+  comparison-row:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink-muted}'
+    typography: '{typography.body-sm}'
+    rounded: '{rounded.xs}'
+  top-nav:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body-sm}'
+    rounded: '{rounded.xs}'
+    height: 56px
+  faq-row:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: 24px
+  footer:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink-muted}'
+    typography: '{typography.caption}'
+    rounded: '{rounded.xs}'
+    padding: 64px 32px
 ---
 
-## 1. 시각적 테마 및 분위기 (Visual Theme & Atmosphere)
+## Overview
 
-SaaSify UI 킷은 **현대적이고 전문적인 IT/SaaS 제품**을 구축하기 위한 완성도 높은 디자인 시스템입니다. 복잡한 데이터와 인터페이스를 명확하고 정돈되게 보여줄 수 있도록 설계되었습니다.
+Framer's marketing canvas is a near-pure black artboard. The dominant surface is `{colors.canvas}` — almost pure black with a faint warmth — and on top of it sits oversized white display type set in **GT Walsheim Medium** with letter-spacing pulled to extreme negative values (-5.5px on the 110px display, -4.25px on the 85px hero). The page reads like a poster: one assertive statement per band, generous breathing room above and below.
 
-전체적인 분위기는 **신뢰감 있고 직관적(Clean and Trustworthy)**이며, 기본 브랜딩에 **선명한 블루(Blue) 계열**을 적용하여 비즈니스의 신뢰도와 청량감을 강조합니다. 부드러운 그림자와 충분한 여백을 활용해 시각적 피로도를 낮추고 모던한 감성을 극대화합니다.
+The single accent is `{colors.accent-blue}` — used scarcely, mostly for hyperlinks, selection halos, and a subtle blue-tinted shadow ring on focused inputs. The brand chrome itself is monochrome: white pill buttons, charcoal cards, gray secondary text. What makes Framer distinctive is the rhythm break — every few sections the page drops in a **vibrant gradient atmosphere card**: a magenta-violet spotlight, a sunset-orange wash, a coral-pink panel. These aren't section backgrounds; they're individual cards arranged in a card grid, each one a small living poster that shows what Framer can produce.
 
-**핵심 특징:**
+Body type is **Inter Variable**, with Framer leaning hard into Inter's character variants (`cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07`, `dlig`) — the result is a body voice that feels custom-tuned, with single-storey "a", straight-leg "l", and tabular figures. There's no light mode on the marketing site; the brand IS dark.
 
-- 정보의 인지 오류를 줄이기 위한 명확한 타이포그래피 계층 구조
-- 컴포넌트 전반에 모서리 반경 8px를 기본값으로 사용하는 현대적인 미학
-- 부드럽고 자연스럽게 스며드는 레이어 그림자(Elevation) 처리
-- 시각적 일관성을 유지하는 간격 규칙(8px 배수)
+**Key Characteristics:**
 
----
+- Black-canvas marketing system: `{colors.canvas}` is the surface for hero, body, pricing, FAQ, and footer alike — no light interludes.
+- Massive negative letter-spacing on display sizes (-5.5px / -4.25px / -3.1px) creates a poster-grade headline cadence.
+- White pill (`{components.button-primary}`) is the only primary CTA shape across the site; secondary actions live as charcoal pills (`{components.button-secondary}`) or text links.
+- Oversized **gradient spotlight cards** (violet, magenta, orange, coral) act as showcase tiles inside the dark grid; they are individual cards, not section backgrounds.
+- Inter Variable with bespoke OpenType character variants (`cv01/05/09/11`, `ss03/ss07`, `dlig`) used everywhere body type appears — the typographic voice is unmistakable.
+- Border radius scale runs from 4px utility chips up to 100px pills and full circles, with 15–20px the default for cards and 30px for atmospheric gradient cards.
+- A single chromatic accent `{colors.accent-blue}` reserved for hyperlinks, focus, and selection — never decorative.
 
-## 2. 색상 팔레트 및 역할 (Color Palette & Roles)
+## Colors
 
-### 기본색 (Primary Brand Color)
+> Source pages: framer.com (home), /ai/, /startups/, /marketplace/templates/nudge/, /gallery/a16z-speedrun-×-tonik, /pricing.
 
-선명하고 신뢰감 높은 블루(Blue) 계열을 브랜드의 핵심 아이덴티티 컬러로 사용하여 안정성과 기술적 신뢰도를 강조합니다.
+### Brand & Accent
 
-- **블루 50** (`#EFF6FF`) - 초경량 강조 배경 및 태그 배경.
-- **블루 100** (`#DBEAFE`) - 아바타 이니셜 배경 등 보조적이고 옅은 표면색.
-- **블루 200** (`#BFDBFE`) - 파일 드롭존 경계선 등 옅은 구분선.
-- **블루 500** (`#3B82F6`) - 체크박스/라디오 등 상호작용 요소의 활성 상태 배경.
-- **블루 600** (`#2563EB`) - 주 브랜드 액션 컬러 (주요 버튼, 핵심 링크).
-- **블루 700** (`#1D4ED8`) - 진한 텍스트 강조 및 은은한 태그 글자색.
-- **블루 900** (`#1E3A8A`) - 깊은 강조 및 레이아웃 구조체 텍스트색.
+- **Pure White** ({colors.primary}): The brand primary surface. Every primary CTA pill, every display headline, every body line on canvas.
+- **Sky Blue** ({colors.accent-blue}): The single chromatic accent. Hyperlinks, focused-input rings, and a few selection states. Never used for backgrounds or as a brand fill.
 
-### 중립색 (Neutral Foundation Color)
+### Surface
 
-UI 전반의 프레임워크와 뼈대를 잡아주고 블루 테마와 조화되도록 청회색빛이 감도는 슬레이트(Slate) 계열을 폭넓게 활용합니다.
+- **Canvas** ({colors.canvas}): Default page background — near-black with a faint warmth. Footer, pricing, hero, and FAQ all sit on it.
+- **Surface 1** ({colors.surface-1}): One step above canvas — pricing cards, secondary buttons, mockup tiles.
+- **Surface 2** ({colors.surface-2}): Two steps above — featured pricing card, hero pill backdrop, selected pricing tab.
+- **Hairline** ({colors.hairline}): 1px borders on input groups, comparison-table dividers.
+- **Hairline Soft** ({colors.hairline-soft}): Subtler dividers — between FAQ rows and footer column rules.
+- **Inverse Canvas** ({colors.inverse-canvas}): Pure white — used as the surface of light-on-dark pill CTAs and a small set of light-mode template thumbnails embedded in the showcase grid.
 
-- **슬레이트 50** (`#F8FAFC`) - 가장 밝은 카드 배경이나 파일 드롭존 표면색, 테이블 헤더 배경.
-- **슬레이트 100** (`#F1F5F9`) - 보조 컨테이너 배경 및 옅은 구분선.
-- **슬레이트 200** (`#E2E8F0`) - 입력 필드 기본 테두리, 일반 구분선 및 비활성 스위치 배경.
-- **슬레이트 400** (`#94A3B8`) - 비활성 텍스트, 플레이스홀더 및 상태 배지 꼬리표 텍스트.
-- **슬레이트 500** (`#64748B`) - 서브 텍스트, 레이블 명세 및 테이블 헤더 텍스트.
-- **슬레이트 600** (`#475569`) - 일반 본문 텍스트.
-- **슬레이트 800** (`#1E293B`) - 주 헤드라인 텍스트 및 기본 콘텐츠 다크 텍스트.
-- **슬레이트 900** (`#0F172A`) - 메인 타이틀 텍스트, 다크 사이드바 배경.
+### Text
 
-### 시맨틱 컬러 (Semantic Colors)
+- **Ink** ({colors.ink}): All headline and emphasized body type — pure white.
+- **Ink Muted** ({colors.ink-muted}): Secondary type — gray (#999999) used for meta info, footer columns, comparison-row labels, deselected pricing tabs. Hierarchy on the dark canvas is carried by ink → ink-muted contrast, not by weight changes.
 
-시스템의 피드백 및 상태 변화를 즉각 전달하기 위해 표준화된 색상을 지정합니다.
+### Semantic
 
-- **성공 (Success)** (`#10B981`) - 긍정 피드백, 온라인 상태 점 및 성공 배지/태그 배경.
-- **경고 (Warning)** (`#F59E0B`) - 주의 피드백, 자리 비움 상태 점 및 경고 배지/태그 배경.
-- **오류 (Error)** (`#EF4444`) - 에러 메시지 텍스트, 오류 상태 보더, 바쁨 상태 점 및 오류 배지/태그 배경.
-- **정보 (Info)** (`#3B82F6`) - 시스템 알림 및 중립 정보 제공 배경.
+- **Success Green** ({colors.semantic-success}): Pricing comparison-table checkmarks. Glyph fill, not surface.
 
----
+### Brand Gradient (signature)
 
-## 3. 타이포그래피 규칙 (Typography Rules)
+- **Gradient Magenta** ({colors.gradient-magenta}): Spotlight card variant.
+- **Gradient Violet** ({colors.gradient-violet}): Spotlight card variant — most common.
+- **Gradient Orange** ({colors.gradient-orange}): Spotlight card variant — sunset wash.
+- **Gradient Coral** ({colors.gradient-coral}): Spotlight card variant — coral/pink.
 
-SaaSify UI 킷은 전반적으로 `Pretendard Variable`, `Geist`, `Noto Sans KR` 폰트를 혼용하여 가독성과 서체 디자인의 완성도를 높였습니다. 소스코드 가독성을 위해서는 고정폭 서체인 `JetBrains Mono`를 적용합니다.
+These four sit as oversized atmospheric tiles inside otherwise monochrome card grids — a dark canvas with one or two glowing spotlight cards is a recurring page signature.
 
-### 텍스트 스케일 Hierarchy
+## Typography
 
-- **대형 디스플레이 제목 (Display):** `48px / Bold`, 줄높이 1.1. 서비스 메인 대문용.
-- **헤드라인 레벨 1 (H1):** `36px / Bold`, 줄높이 1.2. 페이지 주요 섹션 제목용.
-- **서브 헤드라인 레벨 2 (H2):** `28px / SemiBold`, 줄높이 1.3. 서브 섹션 카드 타이틀용.
-- **본문 크게 (Body Large):** `16px / Regular`, 줄높이 1.5. 상세 설명 및 본문용.
-- **본문 기본 (Body Base):** `14px / Regular`, 줄높이 1.5. 일반 안내 및 리스트 본문 텍스트용.
-- **본문 소형 / 설명 (Caption):** `12px / Regular`, 줄높이 1.4. 폼 하단 헬퍼 텍스트, 메타데이터 정보용.
-- **입력 폼 레이블 (Form Label):** `14px / SemiBold`, 줄높이 1.4. 입력란 타이틀용.
-- **코드 (Code):** `13px / Mono`, 줄높이 1.6. 개발 소스코드 영역 전용.
+### Font Family
 
----
+- **GT Walsheim Framer Medium** / **GT Walsheim Medium** — Framer's display typeface. Geometric, slightly humanist, very confident at large sizes with extreme negative tracking. Fallbacks: `GT Walsheim Medium Placeholder` system font.
+- **Inter Variable** — System body typeface. Used with extensive OpenType character variants: `cv01` (alternate "1"), `cv05` (alternate "g"), `cv09` (alternate "i" / "l"), `cv11` (alternate "0"), `ss03` / `ss07` stylistic sets, `dlig` discretionary ligatures, and `tnum` for numerics in tabular contexts. The result is a body voice that feels bespoke without commissioning a custom face.
+- **Inter** — Used selectively for `{typography.headline}` (the 22px / 20px tier). The non-variable cut catches small tracking targets that the variable file rounds.
 
-## 4. 구조 레이아웃 명세 (Structural Layout Specifications)
+### Hierarchy
 
-페이지의 전체 구조 및 뼈대를 구성하는 고정 영역 디자인 규격입니다.
+| Token                      | Size  | Weight | Line Height | Letter Spacing | Use                                         |
+| -------------------------- | ----- | ------ | ----------- | -------------- | ------------------------------------------- |
+| `{typography.display-xxl}` | 110px | 500    | 0.85        | -5.5px         | Largest hero headline (home, AI page)       |
+| `{typography.display-xl}`  | 85px  | 500    | 0.95        | -4.25px        | Section opener headlines                    |
+| `{typography.display-lg}`  | 62px  | 500    | 1.00        | -3.1px         | Sub-section openers                         |
+| `{typography.display-md}`  | 32px  | 500    | 1.13        | -1.0px         | Card titles, smaller display                |
+| `{typography.headline}`    | 22px  | 700    | 1.20        | -0.8px         | Pricing tier headlines, FAQ category titles |
+| `{typography.subhead}`     | 24px  | 400    | 1.30        | -0.01px        | Lead body next to display headlines         |
+| `{typography.body-lg}`     | 18px  | 400    | 1.30        | -0.18px        | Hero subhead, lead paragraphs               |
+| `{typography.body}`        | 15px  | 400    | 1.30        | -0.15px        | Default body, card descriptions             |
+| `{typography.body-sm}`     | 14px  | 500    | 1.40        | -0.14px        | Pricing comparison rows, dense data         |
+| `{typography.caption}`     | 13px  | 500    | 1.20        | -0.13px        | Eyebrows, footer columns, meta              |
+| `{typography.micro}`       | 12px  | 400    | 1.20        | -0.12px        | Disclaimer, footnote                        |
+| `{typography.button}`      | 14px  | 500    | 1.0         | -0.14px        | Pill buttons                                |
 
-### 4.1. 헤더 (Header / GNB)
+### Principles
 
-- **배경색 및 선:** 기본 흰색 (`bg-white/80 backdrop-blur-md`) 배경에 하단 `1px` 실선 (`border-b border-slate-100`) 적용.
-- **배치 및 효과:** 스크롤 시 상단에 고정(`sticky top-0 z-50`)하여 사용성을 높임.
-- **메뉴 디자인:** 기본 상태 `Slate 600`, 마우스 호버 및 선택 활성화 시 브랜드 컬러 `Blue 600` 적용.
+- **Letter-spacing scales with size, hard.** Display-xxl pulls -5.5px (5% of size); body sticks to about -1% (-0.15px on 15px). The result: posters at the top, comfortable reading at body.
+- **OpenType character variants are the brand voice.** Switching off `cv11`, `ss03`, etc. visibly changes the body voice — the brand depends on them.
+- **Weight stays in a narrow band.** Display sits at 500, body at 400, body-sm/caption at 500. Hierarchy is carried by size + tracking, not by 700/900 ramps.
+- **Tight line-heights everywhere.** Even body runs at 1.30 — Framer's editorial tone is denser than typical SaaS marketing.
 
-### 4.2. 사이드바 (Sidebar)
+### Note on Font Substitutes
 
-- **추천 옵션 (다크 테마):**
-  - **배경색:** `Slate 900` (`#0F172A`)을 기본 바탕색으로 하여 견고한 깊이감 부여.
-  - **메뉴 항목:** 기본 `Slate 400` 텍스트. Hover 시 `bg-slate-800` 배경 및 `Slate 100` 텍스트 전환.
-  - **활성(Active) 메뉴:** 블루 세로 포인트 선 적용 (`border-l-4 border-blue-500`) + 배경 `bg-slate-800` + 글자 `text-white`.
-- **대안 옵션 (라이트 테마):**
-  - **배경색:** `Slate 50` (`#F8FAFC`)에 우측 경계선 `border-r border-slate-200` 적용.
-  - **활성 메뉴:** 연한 블루 배경(`bg-blue-50`) + 글자 `text-blue-600` 적용.
+If implementing without GT Walsheim Medium, suitable open-source substitutes include **Mona Sans**, **Geist**, or **Inter** at weight 600–700 with manually tightened tracking. Mona Sans's hairline weights at 100–300 are particularly close to Framer's cleaner section openers. Inter Variable is open-source — keep it as-is and preserve the documented OpenType variants.
 
-### 4.3. 푸터 (Footer)
+## Layout
 
-- **배경색 및 선:** 연한 `Slate 50` (`#F8FAFC`) 배경에 상단 `border-t border-slate-200` 구분선 배치.
-- **텍스트:** 저작권 및 링크 등 부가 텍스트는 `Slate 400` 또는 `Slate 500`을 활용하여 메인 콘텐츠를 방해하지 않도록 처리.
+### Spacing System
 
-### 4.4. 목록 라인 및 테이블 (Table & List Lines)
+- **Base unit**: 5px (Framer uses non-standard 5/10/15/20/30 increments rather than the more common 4/8/16/24).
+- **Tokens (front matter)**: `{spacing.hair}` 1px · `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 15px · `{spacing.lg}` 20px · `{spacing.xl}` 30px · `{spacing.xxl}` 40px · `{spacing.section}` 96px.
+- Card interior padding: `{spacing.lg}` 20px on pricing cards; `{spacing.xl}` 30px on gradient spotlight cards.
+- Pill button padding: 10px vertical · 15px horizontal — `{components.button-primary}`.
+- Section padding (vertical): roughly `{spacing.section}` 96px on home; tighter (~64px) on pricing comparison.
 
-- **구분선:** 각 행(Row) 사이의 가로 구분선은 아주 옅은 `Slate 100` (`border-b border-slate-100`)을 적용하여 텍스트와의 간섭 최소화. 세로 구분선은 생략.
-- **호버 효과:** 마우스 오버 시 연한 블루 톤 (`hover:bg-blue-50/30` 또는 `hover:bg-slate-50`) 적용.
-- **헤더 영역:** `bg-slate-50` 배경 위에 `Slate 500 / SemiBold / 12px` 혹은 `13px` 텍스트로 지정.
+### Grid & Container
 
----
+- Max content width sits around the 1199px breakpoint, with side gutters that scale toward `{spacing.xl}` on desktop.
+- Card grids on the home gallery use 2-up at desktop, collapsing to 1-up below 810px.
+- Pricing tier grid is 4-up across the documented breakpoints; comparison table beneath it uses fixed-width left column with horizontally scrolling tier columns at narrow widths.
 
-## 5. 컴포넌트 스타일링 (Component Stylings)
+### Whitespace Philosophy
 
-### 버튼 (Buttons)
+The dark canvas IS the whitespace. Where lighter brands lean on white air to separate sections, Framer leans on long stretches of black with a single oversized statement floating in the middle. Sections separate by mode change: a band of charcoal cards, then a band of black with a gradient spotlight, then back to charcoal — like cuts in a dark film.
 
-- **모양:** 모서리 반경 8px (`rounded-[8px]`)을 기본으로 유지합니다.
-- **크기 체계:**
-  - **XS:** `px-[8px] py-[6px]`, 폰트 `11px` (매우 좁은 레이아웃용)
-  - **SM:** `px-[12px] py-[8px]`, 폰트 `13px` (테이블 행 내부 등 조밀한 영역용)
-  - **MD:** `px-[16px] py-[10px]`, 높이 `40px`, 폰트 `14px` (기본 표준 크기)
-  - **LG:** `px-[24px] py-[14px]`, 폰트 `16px` (강조 액션용)
-  - **XL:** `px-[32px] py-[17px]`, 폰트 `18px` (메인 가입/랜딩 페이지용)
-- **변형 스타일:**
-  - _기본형(Primary):_ 블루 배경 (`#2563EB` 또는 `#3B82F6`) + 흰색 텍스트.
-  - _보조형(Secondary):_ 투명 배경 + 블루 테두리 (`border-[#2563EB]`) + 블루 텍스트.
-  - _고스트(Ghost):_ 투명 배경 + 테두리 없음 + 블루 텍스트.
-  - _위험(Danger):_ 빨간색 배경 (`#EF4444`) + 흰색 텍스트.
-  - _성공(Success):_ 초록색 배경 (`#10B981`) + 흰색 텍스트.
-- **인터랙티브 상태:**
-  - 활성: `opacity-80`
-  - 비활성: `opacity-40` + 클릭 불가능
-  - 로딩: "로딩 중..." 텍스트로 변화 및 로딩 상태 유지
+## Elevation & Depth
 
-### 카드 및 컨테이너 (Cards & Containers)
+| Level          | Treatment                                                                       | Use                                                       |
+| -------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0 (flat)       | No shadow, no border                                                            | Default for canvas-mounted display type, FAQ rows, footer |
+| 1 (charcoal)   | `{colors.surface-1}` lift on canvas                                             | Pricing cards, mockup tiles, secondary buttons            |
+| 2 (light-edge) | `rgba(255,255,255,0.10)` 0.5px top edge + `rgba(0,0,0,0.25)` 0px 10px 30px drop | Floating product cards, modal cards                       |
+| 3 (selected)   | `rgba(0,153,255,0.15)` 0px 0px 0px 1px ring                                     | Focused inputs, selected option                           |
 
-- **모서리 반경:** 기본 `12px (rounded-[12px])` 혹은 넓은 영역은 `16px (rounded-[16px])` 사용.
-- **배경색 및 선:** 기본 흰색 (`bg-white`) 배경에 얇은 테두리 (`border-[#e2e8f0]`) 적용.
-- **그림자 고도 (Elevation Shadows):**
-  - **XS:** `0px 1px 2px 0px rgba(0,0,0,0.05)` (플랫한 칩 및 소형 카드)
-  - **SM:** `0px 4px 6px 0px rgba(0,0,0,0.05)`
-  - **MD:** `0px 10px 15px 0px rgba(0,0,0,0.1), 0px 4px 6px 0px rgba(0,0,0,0.05)` (일반 카드/다이얼로그)
-  - **LG:** `0px 20px 25px 0px rgba(0,0,0,0.05)`
-  - **XL:** `0px 25px 50px 0px rgba(0,0,0,0.1)` (드롭다운 메뉴 및 오버레이 팝업)
+Four shadow signatures recur across the homepage: a 1px subtle drop, a translucent blue ring, a thick near-black 2px outline (used as the active-element marker on sub-nav), and the layered light-edge + drop-shadow used for floating cards.
 
-### 입력란 및 폼 (Inputs & Forms)
+### Decorative Depth
 
-- **텍스트 입력창 (Text Inputs):**
-  - 높이 `40px`, 모서리 반경 `8px` (`rounded-[8px]`).
-  - _기본:_ `border-[#e2e8f0]`, 플레이스홀더 `#94a3b8`.
-  - _포커스:_ 두꺼운 블루 보더 `border-2 border-[#3b82f6]`.
-  - _오류:_ 빨간색 보더 `border-[#ef4444]`, 하단에 12px 에러 텍스트 표시.
-  - _비활성:_ 배경 `#f8fafc`, 텍스트/플레이스홀더 `#94a3b8`.
-- **텍스트 영역 (Textarea):** 높이 `120px`, 모서리 반경 `8px`, 우측 하단에 글자 수 표기기(`0/500`) 배치.
-- **선택 컨트롤 (Selection Controls):**
-  - _체크박스:_ 선택 시 블루 배경 사각형 (`rounded-[4px] size-[18px]`), 미선택 시 슬레이트 200 테두리.
-  - _라디오 버튼:_ 선택 시 두꺼운 테두리의 블루 동그라미 (`circle r="7" stroke="#2563EB" strokeWidth="4"`), 미선택 시 슬레이트 200 원형 테두리.
-  - _토글스위치:_ 선택 시 블루 배경에 우측 원 배치 (`cx="29"`), 미선택 시 슬레이트 200 배경에 좌측 원 배치 (`cx="11"`).
-- **파일 업로드 드롭존 (File Upload Zone):** 옅은 슬레이트 배경 (`#f8fafc`) + 블루 200 점선 테두리 (`border-[#bfdbfe]`), 업로드용 구름 모양 아이콘 포함.
+- **Gradient spotlight cards** are the dominant depth device — color saturation against black canvas substitutes for shadow-driven elevation.
+- **Layered product mockups** (browser frames containing live Framer-built sites) sit inside `{colors.surface-1}` cards with the level-2 light-edge treatment.
+- **Subtle blue ring (focus / selected)** is the only chromatic depth signal — used to mark the active state of input groups and pricing tier toggles without changing the underlying surface.
 
-### 배지, 태그 및 아바타 (Badges, Tags & Avatars)
+## Shapes
 
-- **숫자 배지:** 소형(24px), 중형(32px), 대형(48px - 아바타 우측 상단에 걸침). 알림 수 표시에 빨간색 (`#ef4444`) 혹은 블루 배경 사용.
-- **상태 점:** 10px 크기 동그라미. 온라인(성공 초록), 자리 비움(경고 주황), 바쁨(오류 빨강) 등으로 분류.
-- **태그/칩 (Tags/Chips):** 완전 둥근 알약 모양 (`rounded-[9999px]`). 블루/그린/옐로우/레드 계열의 배경과 텍스트를 조합하거나, 옅은 톤의 백그라운드를 활용. 닫기 버튼은 우측에 `x-circle` 아이콘 배치.
-- **아바타 (Avatars):** 20px(XS)부터 96px(3XL)까지의 크기를 제공하며, 원형 이미지 또는 블루 100 배경 위의 영문 이니셜 텍스트로 구성.
+### Border Radius Scale
 
----
+Framer's extracted radius set is unusually granular (1px, 4px, 5px, 6px, 8px, 10px, 12px, 15px, 20px, 30px, 40px, 100px). The named scale below picks the levels the marketing surface actually consumes.
 
-## 6. SR 관리 시스템 도메인 특화 규격 (Domain-Specific System)
+| Token            | Value  | Use                                        |
+| ---------------- | ------ | ------------------------------------------ |
+| `{rounded.xs}`   | 4px    | Small chip / utility radius                |
+| `{rounded.sm}`   | 6px    | Inline tag, badge                          |
+| `{rounded.md}`   | 10px   | Form input, list item                      |
+| `{rounded.lg}`   | 15px   | Template card thumbnails                   |
+| `{rounded.xl}`   | 20px   | Pricing cards, mockup tiles                |
+| `{rounded.xxl}`  | 30px   | Gradient spotlight cards, oversized panels |
+| `{rounded.pill}` | 100px  | All primary text CTAs                      |
+| `{rounded.full}` | 9999px | Circular icon buttons, avatar circles      |
 
-비즈니스 헌법에 정의된 권한 및 상태 전이 규칙의 시각적 명확성을 보장하기 위한 디자인 명세입니다.
+### Photography & Illustration Geometry
 
-### 6.1. 사용자 역할(Role) 배지 가이드
+- Embedded site mockups (browser-chromed previews of Framer-built sites) sit in `{rounded.xl}` 20px tiles with `{spacing.md}` 15px interior padding.
+- Gradient spotlight cards use `{rounded.xxl}` 30px corners — softer than the 20px content cards by design, to make them feel like atmospheric panels rather than tighter UI.
+- Icon glyphs and sub-nav glyphs render in `{rounded.full}` circles at 32–40px sizes.
 
-- **시스템 관리자 (SYSTEM_ADMIN):** 짙은 `Blue 900` 배경 + `Blue 100` 텍스트 (강한 인상)
-- **고객사 관리자 (CLIENT_ADMIN):** `Slate 800` 배경 + `Slate 100` 텍스트 (신뢰감 있는 어두운 그레이)
-- **개발자 (DEVELOPER):** 연한 블루 배경(`bg-blue-50`) + 진한 블루 `text-blue-700`
-- **고객사 사용자 (CLIENT_USER):** 연한 슬레이트 배경(`bg-slate-100`) + 슬레이트 `text-slate-600`
+## Components
 
-### 6.2. 8단계 SR 상태(Status) 배지 가이드
+### Buttons
 
-- **신청 (REQUESTED):** `bg-slate-100 text-slate-600` (신규 대기)
-- **접수 (ACCEPTED):** `bg-blue-50 text-blue-700` (처리 준비)
-- **진행중 (IN_PROGRESS):** `bg-blue-50 text-blue-700` + 좌측 회전 스피너 아이콘 배치 (작업 중)
-- **완료 (COMPLETED):** `bg-emerald-50 text-emerald-700` (고객 확인 대기)
-- **확인완료 (CLOSED):** `bg-emerald-600 text-white` (종료 상태)
-- **거절 (REJECTED):** `bg-red-50 text-red-700` (거절 사유 링크 제공)
-- **보류 (HOLD):** `bg-amber-50 text-amber-700` (보류 사유 명시)
-- **재오픈 (REOPENED):** `bg-purple-50 text-purple-700` (재검토 필요)
+**`button-primary`** — White pill on dark canvas. The primary CTA across home, pricing, AI, and gallery pages.
 
-### 6.3. SLA 우선순위(Priority) 시각적 표시
+- Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 10px 15px, rounded `{rounded.pill}`.
+- Pressed state lives in `button-primary-pressed` (the live site uses a transform-scale shrink rather than a darkened fill).
 
-- **긴급 (Critical):** 텍스트 좌측에 빨간색 경보 아이콘(⚠️ 또는 🚨) 노출 및 전체 배지에 `animate-pulse` 애니메이션을 부여하여 최우선 해결을 유도.
-- **SLA 임박 상태:** 목표 처리 마감 시간 대비 남은 시간이 20% 미만인 목록 행은 노란색/주황색 테두리가 반짝이는 시각적 경고 효과 적용.
+**`button-secondary`** — Charcoal pill. Used for secondary navigation actions ("Sign in", "Talk to sales") and as the visual counterpart to the primary pill.
 
-### 6.4. 타임라인(Timeline) 및 댓글/내부 노트 격리
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.button}`, padding 10px 15px, rounded `{rounded.pill}`.
 
-- **히스토리 타임라인:** 상태 전이를 보여주는 타임라인의 중심선은 `Blue 200`, 상태 노드는 `Blue 600`으로 렌더링.
-- **공개 댓글 vs 내부 노트:**
-  - **공개 댓글 (고객 노출):** 흰색 배경 (`bg-white`) + 일반 슬레이트 200 경계선.
-  - **내부 노트 (개발/관리자 전용):** 연한 노란색/주황색 배경 (`bg-amber-50/50`) + 경고 테두리(`border-amber-200`) + 우측 상단 자물쇠 아이콘(🔒) 배치로 확실히 구분.
+**`button-translucent`** — Translucent / lifted secondary used on top of busy backgrounds (gallery hero, gradient cards).
 
----
+- Background `{colors.surface-2}`, text `{colors.ink}`, type `{typography.button}`, rounded `{rounded.xxl}`, padding 8px 14px.
 
-## 7. 레이아웃 및 반응형 원칙 (Layout & Responsive Principles)
+**`button-icon-circular`** — 40px circle for inline icon actions (carousel arrows, social links).
 
-- **그리드 간격:** 모든 간격은 8px의 배수(`8px`, `16px`, `24px`, `32px`, `48px`, `64px`)를 엄격하게 적용하여 시각적 질서를 보장합니다.
-- **반응형 중단점 (Breakpoints):**
-  - **모바일 (Mobile):** 가로폭 `640px` 미만. 사이드바가 햄버거 메뉴로 전환되며 본문은 1열 레이아웃.
-  - **태블릿 (Tablet):** 가로폭 `768px` ~ `1024px`. 사이드바는 아이콘 전용 좁은 바 형태로 축소.
-  - **데스크톱 (Desktop):** 가로폭 `1024px` 이상. 기본 `1440px` 해상도를 기준 대지로 레이아웃 정렬.
-- **다크 모드 (Dark Mode):**
-  - 라이트 모드의 `bg-white` ➡️ 다크 모드 `bg-slate-900`
-  - 라이트 모드의 `bg-slate-50` ➡️ 다크 모드 `bg-slate-800`
-  - 라이트 모드의 `text-slate-800` ➡️ 다크 모드 `text-slate-100` 등으로 1:1 대칭 매핑.
+- Background `{colors.surface-1}`, text `{colors.ink}`, rounded `{rounded.full}`, size 40px.
+
+### Pricing Tabs
+
+**`pricing-tab-default`** + **`pricing-tab-selected`** — The pill-toggle that switches between Basic / Pro / Business / Enterprise on `/pricing`.
+
+- Default: `{colors.canvas}` background, `{colors.ink-muted}` text, rounded `{rounded.pill}`.
+- Selected: `{colors.surface-2}` background, `{colors.ink}` text — selected = lift, not color. Surface depth communicates "active" without needing a chromatic fill.
+
+### Inputs & Forms
+
+**`text-input`** + **`text-input-focused`** — Form fields on `/pricing` (seat-count, currency switcher) and the in-product preview surfaces.
+
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.md}`, padding 10px 14px.
+- Focused state retains the same surface; the focus ring is the level-3 blue-tinted shadow `rgba(0,153,255,0.15)` 0 0 0 1px.
+
+### Cards & Containers
+
+**`pricing-card`** — Each tier on `/pricing`.
+
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.xl}`, padding 24px.
+
+**`pricing-card-featured`** — The Pro tier (visually emphasized).
+
+- Background `{colors.surface-2}`, otherwise identical structure. The lift is one surface step up — no chromatic outline.
+
+**`template-card`** — Thumbnail tile in the home "Built with Framer" gallery and `/marketplace`.
+
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body-sm}`, rounded `{rounded.lg}`, padding 12px.
+
+**`product-mockup-tile`** — Larger tile that frames a live product UI mock (Framer canvas, Workshop video, AI translate panel).
+
+- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body-sm}`, rounded `{rounded.xl}`, padding 16px.
+
+### Gradient Spotlight Cards (signature)
+
+The defining decorative surface of Framer's marketing — oversized atmospheric tiles dropped into otherwise monochrome card grids. Variants:
+
+**`gradient-spotlight-card`** — violet ground (most common).
+
+- Background `{colors.gradient-violet}`, text `{colors.ink}`, type `{typography.subhead}`, rounded `{rounded.xl}`, padding 32px. (The on-site card often pushes to `{rounded.xxl}` 30px when it spans a wider tile.)
+
+**`gradient-spotlight-card-magenta`** — magenta-pink ground.
+
+- Background `{colors.gradient-magenta}`, otherwise identical.
+
+**`gradient-spotlight-card-orange`** — sunset-orange wash.
+
+- Background `{colors.gradient-orange}`, otherwise identical.
+
+(Coral pink follows the same shape with `{colors.gradient-coral}`.)
+
+### Comparison & FAQ
+
+**`feature-row`** + **`comparison-row`** — Single rows inside the pricing comparison table.
+
+- `feature-row`: `{colors.canvas}` background, `{colors.ink}` text. Header rows.
+- `comparison-row`: `{colors.canvas}` background, `{colors.ink-muted}` text. Data rows with `{typography.body-sm}` and 1px `{colors.hairline-soft}` underlines.
+
+**`faq-row`** — Each accordion line in the pricing-page FAQ.
+
+- Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.md}`, padding 24px.
+
+### Navigation
+
+**`top-nav`** — Sticky bar on `{colors.canvas}` with the Framer wordmark left, primary nav links centered, and a `button-secondary` ("Sign in") + `button-primary` ("Get started for free") pair right.
+
+- Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body-sm}`, height 56px.
+- Mobile: collapses primary links into a hamburger; the two pill CTAs collapse into a single primary pill on the bar.
+
+### Footer
+
+**`footer`** — Dense link grid on `{colors.canvas}` with the Framer wordmark left and 5–6 columns of caption-sized links.
+
+- Background `{colors.canvas}`, text `{colors.ink-muted}`, type `{typography.caption}`, padding 64px 32px.
+
+## Do's and Don'ts
+
+### Do
+
+- Reserve `{colors.primary}` (white) and `{colors.canvas}` (near-black) as the system's two anchor surfaces. Every band of the page chooses one or the other.
+- Push display-size letter-spacing aggressively negative — `{typography.display-xxl}` at -5.5px is the brand signature, not a stylistic accident.
+- Use `{colors.accent-blue}` only for hyperlinks, focus rings, and selected indicators. Never as a background or button fill.
+- Drop one or two `gradient-spotlight-card` variants into a card grid; they are the brand's atmosphere device. Don't overdo it — three or more in the same viewport reads as a moodboard, not a system.
+- Compose every CTA as a pill (`{rounded.pill}`); secondary actions live as charcoal pills, never as bordered ghost buttons.
+- Keep body type Inter Variable with character variants `cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07` enabled — the brand voice depends on them.
+- Use surface lift (canvas → surface-1 → surface-2) to mark hierarchy on dark, not opacity changes on white type.
+
+### Don't
+
+- Don't ship a light-mode marketing page. Framer's identity is dark.
+- Don't introduce mid-tone gray text outside `{colors.ink-muted}`. The hierarchy is binary: `ink` or `ink-muted`.
+- Don't use `{colors.accent-blue}` as a brand fill (e.g., a blue CTA pill). The blue is a signal color, not a surface.
+- Don't square off CTAs. Pill (`{rounded.pill}`) or full circle is the brand vocabulary.
+- Don't reduce the negative letter-spacing on display sizes "for accessibility". The compression is intrinsic to the brand voice; reduce the SIZE if needed, but keep the percentage.
+- Don't apply gradient backgrounds to whole sections. Gradients are CARDS, not section grounds.
+- Don't combine more than one chromatic accent. The palette is monochrome plus one blue plus the gradient family — not "blue, green, and red".
+
+## Responsive Behavior
+
+### Breakpoints
+
+| Name      | Width  | Key Changes                                               |
+| --------- | ------ | --------------------------------------------------------- |
+| Desktop   | 1199px | Default desktop layout                                    |
+| Tablet    | 810px  | Card grids collapse 4-up → 2-up; nav becomes hamburger    |
+| Mobile-Lg | 809px  | Pricing comparison table becomes per-tier accordion       |
+| Mobile-XS | 98px   | Smallest documented breakpoint — single-column everything |
+
+### Touch Targets
+
+- Pill buttons (`button-primary`, `button-secondary`) maintain a minimum 44px tap height across all viewports — combine `{typography.button}` 14px line-height with the documented 10px vertical padding.
+- Circular icon buttons (`button-icon-circular`) are 40px on desktop and grow to 44px on touch viewports.
+- Pricing-tab pills hold ≥40px tap height; below 810px they may collapse into a horizontal-scroll row instead of stacking.
+
+### Collapsing Strategy
+
+- **Nav**: horizontal nav with a centered link group + right-anchored pill pair collapses to a hamburger overlay below 810px. The `button-primary` stays visible on the bar.
+- **Card grids**: the gallery and template-card grids go 2-up on desktop → 1-up on mobile. Gradient spotlight cards retain `{rounded.xxl}` corners at every viewport — they don't bleed.
+- **Pricing comparison table**: collapses into per-tier accordions below 810px to avoid horizontal scroll.
+- **Display type**: `{typography.display-xxl}` 110px scales down toward `{typography.display-lg}` 62px on tablet and `{typography.display-md}` 32px on mobile, preserving the percentage-negative letter-spacing.
+
+### Image Behavior
+
+- Embedded product mockups (browser frames containing live Framer-built sites) maintain their aspect ratio and never crop.
+- Gradient spotlight cards keep their gradient orientations across breakpoints — the gradient direction is part of the brand spec.
+
+## Iteration Guide
+
+1. Focus on ONE component at a time and reference it by its `components:` token name (e.g., `{components.button-primary}`, `{components.gradient-spotlight-card}`).
+2. When introducing a new section on the dark canvas, decide first which surface lift it lives on — `{colors.canvas}` for hero/FAQ, `{colors.surface-1}` for cards, `{colors.surface-2}` for featured cards. The depth choice is the most consequential decision.
+3. Default body to `{typography.body}` with all the documented OpenType variants; reach for `{typography.subhead}` only inside spotlight cards.
+4. Run `npx @google/design.md lint DESIGN.md` after edits — `broken-ref`, `contrast-ratio`, and `orphaned-tokens` warnings flag issues automatically.
+5. Add new variants as separate component entries (`-pressed`, `-featured`, `-selected`) — do not bury them in prose.
+6. Treat `{colors.accent-blue}` as a single-shot signal color: hyperlinks, focus, and selection — that's it. If you find yourself reaching for a second blue, the brand is drifting.
+7. Gradient spotlight cards are scarce by design. One or two per long page is the spec; three is a moodboard.
+
+## Known Gaps
+
+- The exact gradient stops for the spotlight cards are derived from screenshot pixels rather than from CSS variables — the production gradients are likely defined as `linear-gradient` strings on individual elements rather than as design tokens. Treat the documented `{colors.gradient-*}` hex values as base anchors, not as exact gradient specs.
+- Form-field validation / error styling is not visible on the inspected pages because no error states render in the static screenshots.
+- Dark mode is the only mode — no light-mode adaptation is documented because the marketing site does not ship one.
+- The marketplace template detail page returned sparser CSS variable data than the other pages; surface tokens for that page were inferred from the matching home / gallery treatment rather than extracted directly.

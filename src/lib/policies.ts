@@ -28,12 +28,19 @@ export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return true;
 
-  const hasReadPermission = hasPermissionFlag(user, PERMISSIONS.SR.READ);
-
-  // 내부 사용자(운영팀)는 SR:READ 권한이 있으면 모든 SR 조회 가능
-  if (isInternalUser(user) && hasReadPermission) {
+  const isManager = user.roles?.includes('MANAGER') ?? false;
+  if (isManager && hasPermissionFlag(user, PERMISSIONS.SR.READ)) {
     return true;
   }
+
+  // ENGINEER 역할 제약 조건 (비즈니스 헌법 제1조 1.1 및 1.2 격리 원칙 반영)
+  const isEngineer = user.roles?.includes('ENGINEER') ?? false;
+  if (isEngineer) {
+    // 자신에게 명시적으로 배정/할당된 SR에 한해서만 조회 허용
+    return sr.assigneeId === user.id && hasPermissionFlag(user, PERMISSIONS.SR.READ);
+  }
+
+  const hasReadPermission = hasPermissionFlag(user, PERMISSIONS.SR.READ);
 
   // 외부 사용자(고객사)는 소속된 고객사의 SR만 조회 가능
   const belongsToClient = user.clientIds?.includes(sr.clientId) ?? false;
@@ -55,12 +62,19 @@ export function canUpdateSR(user: AuthenticatedUser, sr: SR): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return true;
 
-  const hasUpdate = hasPermissionFlag(user, PERMISSIONS.SR.UPDATE);
-
-  // 내부 사용자(운영팀)는 SR:UPDATE 권한이 있으면 모든 SR 수정 가능
-  if (isInternalUser(user) && hasUpdate) {
+  const isManager = user.roles?.includes('MANAGER') ?? false;
+  if (isManager && hasPermissionFlag(user, PERMISSIONS.SR.UPDATE)) {
     return true;
   }
+
+  // ENGINEER 역할 제약 조건 (비즈니스 헌법 제1조 1.1 및 1.2 격리 원칙 반영)
+  const isEngineer = user.roles?.includes('ENGINEER') ?? false;
+  if (isEngineer) {
+    // 자신에게 명시적으로 배정/할당된 SR에 한해서만 수정 허용
+    return sr.assigneeId === user.id && hasPermissionFlag(user, PERMISSIONS.SR.UPDATE);
+  }
+
+  const hasUpdate = hasPermissionFlag(user, PERMISSIONS.SR.UPDATE);
 
   // 외부 사용자(고객사)는 소속된 고객사의 SR만 수정 가능
   const belongsToClient = user.clientIds?.includes(sr.clientId) ?? false;

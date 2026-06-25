@@ -34,11 +34,13 @@ describe('SR actions integration-ish', () => {
     vi.spyOn(SRService.prototype, 'updateSR').mockResolvedValue({
       id: 'sr-1',
       title: 'Updated',
+      assigneeId: 'user-2',
     } as any);
 
     vi.spyOn(SRService.prototype, 'getSRById').mockResolvedValue({
       id: 'sr-1',
       title: 'New SR',
+      assigneeId: 'user-2',
     } as any);
   });
 

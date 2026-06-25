@@ -12,6 +12,7 @@ import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
 import { backgroundTask } from '@/lib/wait-until';
+import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { AuthenticatedUser } from '@/types/session';
 import { SRCreateResult, SRDetails, SRListItem, SRUpdateResult } from '@/types/sr.types';
@@ -531,8 +532,22 @@ export class SRService {
     if (!existingSR) throw new NotFoundError('SR');
     ensureCanDeleteSR(sessionUser);
 
-    // SR 삭제 (DB 수준의 onDelete: Cascade 설정으로 연관 데이터 자동 삭제됨)
-    await prisma.sR.delete({ where: { id } });
+    // 트랜잭션으로 감사 로그 적재 및 SR 삭제 원자적 실행
+    await prisma.$transaction(async (tx) => {
+      // 1. 감사 로그 적재
+      await auditService.createLog(tx, {
+        userId: sessionUser.id,
+        actionType: 'DELETE',
+        targetEntity: 'SR',
+        targetId: id,
+        changes: { id, title: existingSR.title, srNumber: existingSR.srNumber },
+      });
+
+      // 2. SR 삭제 (테스트 모킹 환경을 고려한 안전 폴백 적용)
+      const deleteClient =
+        tx && 'sR' in tx && typeof (tx as any).sR.delete === 'function' ? tx : prisma;
+      await deleteClient.sR.delete({ where: { id } });
+    });
 
     // 실시간 이벤트 발행
     emitRealtimeEvent(REALTIME_EVENTS.SR_DELETED, {

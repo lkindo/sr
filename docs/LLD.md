@@ -117,9 +117,6 @@ sr-management/
 │   │   │   │       └── route.ts     # NextAuth 핸들러
 │   │   │   ├── inngest/
 │   │   │   │   └── route.ts         # Inngest webhook
-│   │   │   ├── webhooks/
-│   │   │   │   └── mattermost/
-│   │   │   │       └── route.ts     # Mattermost webhook
 │   │   │   └── srs/
 │   │   │       ├── route.ts         # SR REST API
 │   │   │       └── [id]/
@@ -216,7 +213,6 @@ sr-management/
 │   │   ├── client.ts                # Inngest 클라이언트
 │   │   └── functions/
 │   │       ├── send-email.ts        # 이메일 발송
-│   │       ├── send-mattermost.ts   # Mattermost 알림
 │   │       ├── sla-monitor.ts       # SLA 모니터링
 │   │       └── generate-reports.ts  # 보고서 생성
 │   │
@@ -2092,44 +2088,6 @@ export const sendEmailFunction = inngest.createFunction(
 );
 ```
 
-**inngest/functions/send-mattermost.ts**:
-
-```typescript
-import { inngest } from '@/inngest/client';
-import { db } from '@/lib/db';
-import { NotificationService } from '@/server/services/notification-service';
-import { MattermostWebhookService } from '@/lib/mattermost';
-
-export const sendMattermostFunction = inngest.createFunction(
-  { id: 'send-mattermost' },
-  { event: 'notification/send-mattermost' },
-  async ({ event, step }) => {
-    const { notificationId, recipient, message } = event.data;
-
-    try {
-      // Mattermost 발송
-      await step.run('send-mattermost', async () => {
-        await MattermostWebhookService.sendMessage(recipient, message);
-      });
-
-      // 발송 성공 처리
-      await step.run('mark-as-sent', async () => {
-        await NotificationService.markAsSent(notificationId);
-      });
-
-      return { success: true, notificationId };
-    } catch (error) {
-      // 발송 실패 처리
-      await step.run('mark-as-failed', async () => {
-        await NotificationService.markAsFailed(notificationId, error.message);
-      });
-
-      throw error;
-    }
-  }
-);
-```
-
 **inngest/functions/sla-monitor.ts**:
 
 ```typescript
@@ -2787,7 +2745,7 @@ export interface NotificationCondition {
   trigger: NotificationTrigger;
   description: string;
   recipients: (sr: SR) => Promise<string[]>; // User IDs 또는 Emails
-  channels: ('EMAIL' | 'MATTERMOST' | 'IN_APP')[];
+  channels: ('EMAIL' | 'IN_APP')[];
   immediate: boolean; // 즉시 발송 여부
   template: string;
   enabled: boolean;
@@ -2805,7 +2763,7 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
       });
       return handlers.map((h) => h.userId);
     },
-    channels: ['EMAIL', 'MATTERMOST'],
+    channels: ['EMAIL'],
     immediate: true,
     template: 'sr-created',
     enabled: true,
@@ -2818,7 +2776,7 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
       // 배정된 담당자
       return sr.assigneeId ? [sr.assigneeId] : [];
     },
-    channels: ['EMAIL', 'MATTERMOST', 'IN_APP'],
+    channels: ['EMAIL', 'IN_APP'],
     immediate: true,
     template: 'sr-assigned',
     enabled: true,
@@ -2914,7 +2872,7 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
 
       return [...new Set(recipients)]; // 중복 제거
     },
-    channels: ['EMAIL', 'MATTERMOST'],
+    channels: ['EMAIL'],
     immediate: true,
     template: 'sla-warning',
     enabled: true,
@@ -2940,7 +2898,7 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
 
       return [...warningRecipients, ...sysAdmins.map((a) => a.id)];
     },
-    channels: ['EMAIL', 'MATTERMOST'],
+    channels: ['EMAIL'],
     immediate: true,
     template: 'sla-violated',
     enabled: true,
@@ -3897,8 +3855,7 @@ RESEND_API_KEY="re_..."
 INNGEST_EVENT_KEY="<event-key>"
 INNGEST_SIGNING_KEY="<signing-key>"
 
-# Mattermost
-MATTERMOST_WEBHOOK_URL="https://..."
+
 
 # Monitoring
 NEXT_PUBLIC_SENTRY_DSN="https://..."

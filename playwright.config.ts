@@ -84,12 +84,18 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /global-setup\.ts/,
+      use: {
+        storageState: { cookies: [], origins: [] },
+      },
     },
 
     // Multi-user setup - 다중 사용자 인증 상태 저장 (CLIENT, MANAGER, ENGINEER)
     {
       name: 'multi-user-setup',
       testMatch: /auth-multi-user\.setup\.ts/,
+      use: {
+        storageState: { cookies: [], origins: [] },
+      },
     },
 
     // Chromium 테스트 - setup에 의존 (일반 기능 테스트)
@@ -134,7 +140,7 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
       },
-      dependencies: [],
+      dependencies: ['multi-user-setup'],
     },
 
     /* 추가 브라우저 테스트 (선택사항) */

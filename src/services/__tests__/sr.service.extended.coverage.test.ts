@@ -138,6 +138,14 @@ describe('SRService Extended Branches', () => {
   });
 
   describe('deleteSR', () => {
+    beforeEach(() => {
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+        if (typeof callback === 'function') {
+          return await callback(prisma);
+        }
+      });
+    });
+
     it('throws NotFoundError if SR missing', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
       await expect(srService.deleteSR('none', {} as any)).rejects.toThrow(NotFoundError);

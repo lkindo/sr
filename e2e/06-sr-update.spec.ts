@@ -6,9 +6,8 @@ import { createTestSR } from './helpers/test-helpers';
  * SR 수정 플로우 테스트
  */
 
-test.describe.skip('SR 수정', () => {
-  // UpstashError: ERR max requests limit exceeded 오류로 인해 스킵 (2025-11-30)
-  // Redis 쿼터 확보 후 다시 활성화 필요
+test.describe('SR 수정', () => {
+  // 레이트 리미트 정책이 로컬 메모리 기반(MemoryRateLimiter)으로 전면 통합되어 쿼터 제한 없이 안전하게 구동됨
   test.use({ storageState: './playwright/.auth/manager.json' });
 
   test('SR 생성 후 수정 플로우', async ({ page }) => {

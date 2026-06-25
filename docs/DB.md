@@ -755,7 +755,7 @@ SR의 첨부파일 메타데이터
 
 **ENUM 타입:**
 
-- **type**: `EMAIL`, `MATTERMOST`, `IN_APP`, `PUSH`
+- **type**: `EMAIL`, `IN_APP`, `PUSH`
 - **status**: `PENDING`, `SENT`, `FAILED`
 
 **인덱스:**
@@ -1042,7 +1042,6 @@ model ClientHandler {
   id              String    @id @default(cuid())
   clientId        String    @map("client_id")
   userId          String    @map("user_id")
-  mattermostId    String?   @map("mattermost_id")
   backupHandlerId String?   @map("backup_handler_id")
   assignedDate    DateTime  @default(now()) @map("assigned_date")
   unassignedDate  DateTime? @map("unassigned_date")
@@ -1221,8 +1220,8 @@ model SRAttachment {
 
 enum NotificationType {
   EMAIL
-  MATTERMOST
   IN_APP
+  PUSH
 }
 
 enum NotificationStatus {

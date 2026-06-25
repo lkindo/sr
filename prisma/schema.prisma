@@ -189,7 +189,6 @@ model ClientHandler {
   id              String    @id @default(cuid()) @db.VarChar(30)
   clientId        String    @map("client_id") @db.VarChar(30)
   userId          String    @map("user_id") @db.VarChar(30)
-  mattermostId    String?   @map("mattermost_id") @db.VarChar(100)
   backupHandlerId String?   @map("backup_handler_id") @db.VarChar(30)
   assignedDate    DateTime  @default(now()) @map("assigned_date") @db.Timestamptz
   unassignedDate  DateTime? @map("unassigned_date") @db.Timestamptz
@@ -362,7 +361,6 @@ model SRAttachment {
 
 enum NotificationType {
   EMAIL
-  MATTERMOST
   IN_APP
   PUSH
 }

@@ -1,15 +1,15 @@
 import { expect, test } from '@playwright/test';
 
+import prisma from '../src/lib/prisma';
+
 import { createTestSR } from './helpers/test-helpers';
 
 // 이 테스트는 setup 프로젝트에서 생성한 인증 상태를 사용합니다
 // playwright.config.ts에서 storageState가 설정되어 있어야 합니다
 
-test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
-  // UpstashError: ERR max requests limit exceeded 오류로 인해 스킵 (2025-11-30)
-  // Redis 쿼터 확보 후 다시 활성화 필요
-  let srId: string;
+let srId: string; // 모든 describe 블록에서 공유하기 위해 상위 스코프로 격상
 
+test.describe('SR 권한 및 접수 기능 테스트', () => {
   test.beforeAll(async ({ browser }) => {
     // 테스트용 SR 생성 (Manager 권한 필요)
     const page = await browser.newPage({ storageState: './playwright/.auth/manager.json' });
@@ -110,17 +110,85 @@ test.describe.skip('SR 권한 및 접수 기능 테스트', () => {
     }
   });
 
-  test('SR 삭제 버튼 권한 확인 (ADMIN)', async ({ page }) => {
+  test('SR 삭제 버튼 권한 확인 및 Audit Log 적재 검증 (ADMIN)', async ({ page }) => {
     test.skip(!srId, 'SR 생성을 실패하여 테스트를 건너뜁니다.');
 
     await page.goto(`/srs/${srId}`);
 
     // ADMIN은 삭제 버튼이 보여야 함
-    // 렌더링 지연을 고려하여 타임아웃 증가
     const deleteButton = page.locator('button', { hasText: /삭제|Delete/ }).first();
     await expect(deleteButton).toBeVisible({ timeout: 30000 });
 
-    console.log('✅ ADMIN 권한: 삭제 버튼 표시 확인 완료');
+    // 삭제 전 현재 DB Audit Log 개수 기록
+    const beforeCount = await prisma.auditLog.count({
+      where: {
+        actionType: 'DELETE',
+        targetEntity: 'SR',
+        targetId: srId,
+      },
+    });
+
+    // 삭제 버튼 클릭 실행
+    await deleteButton.click();
+
+    // 다이얼로그 확인 버튼 클릭 (Shadcn Alert / Dialog)
+    const confirmButton = page.getByRole('button', { name: /확인|삭제|Delete|Submit/i });
+    if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await confirmButton.click();
+    }
+
+    // 삭제 후 목록 페이지 리디렉션 대기
+    await page.waitForURL(/\/srs/, { timeout: 10000 });
+    console.log('✅ ADMIN 권한: SR 삭제 및 리디렉션 성공');
+
+    // Audit Log 적재 검증 및 스키마/데이터 정합성 정밀 검증 (최대 5초 폴링 대기)
+    let auditLogRecord = null;
+    for (let i = 0; i < 10; i++) {
+      auditLogRecord = await prisma.auditLog.findFirst({
+        where: {
+          actionType: 'DELETE',
+          targetEntity: 'SR',
+          targetId: srId,
+        },
+      });
+      if (auditLogRecord) {
+        break;
+      }
+      await page.waitForTimeout(500);
+    }
+
+    // 감사 로그가 존재해야 함
+    expect(auditLogRecord).not.toBeNull();
+    expect(auditLogRecord).toBeDefined();
+
+    // 감사 로그 스키마 및 주요 세부 필드 검증
+    expect(auditLogRecord!.id).toBeDefined();
+    expect(typeof auditLogRecord!.id).toBe('string');
+    expect(auditLogRecord!.userId).toBeDefined();
+    expect(typeof auditLogRecord!.userId).toBe('string');
+    expect(auditLogRecord!.actionType).toBe('DELETE');
+    expect(auditLogRecord!.targetEntity).toBe('SR');
+    expect(auditLogRecord!.targetId).toBe(srId);
+    expect(auditLogRecord!.createdAt).toBeInstanceOf(Date);
+
+    // changes 필드 구조 검증 (DB에 직렬화된 문자열로 적재되므로 역직렬화 필요)
+    expect(auditLogRecord!.changes).toBeDefined();
+    expect(auditLogRecord!.changes).not.toBeNull();
+
+    const changes =
+      typeof auditLogRecord!.changes === 'string'
+        ? JSON.parse(auditLogRecord!.changes)
+        : auditLogRecord!.changes;
+
+    expect(changes).toBeDefined();
+    expect(changes).not.toBeNull();
+    expect(changes.id).toBe(srId);
+    expect(changes.title).toBeDefined();
+    expect(changes.srNumber).toBeDefined();
+
+    console.log(
+      '✅ Audit Log 검증: SR 삭제에 대한 감사 로그 레코드가 올바른 스키마와 세부 데이터 규격으로 적재되었습니다.'
+    );
   });
 });
 
@@ -157,5 +225,54 @@ test.describe('SR 권한 테스트 (ENGINEER)', () => {
       console.log('⚠️ SR이 없어 삭제 버튼 테스트를 건너뜁니다.');
       test.skip();
     }
+  });
+
+  test('자신에게 배정되지 않은 타 고객사 SR 상세 API 접근 시 403 반환 확인 (음성 테스트)', async ({
+    request,
+  }) => {
+    // 워커 격리로 인해 상위 srId 메모리가 유실되었을 경우를 대비해 DB에서 직접 최신 SR을 조회하여 활용
+    const dbSR = await prisma.sR.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
+    const activeSrId = srId || dbSR?.id;
+    test.skip(!activeSrId, 'SR ID가 존재하지 않아 음성 테스트를 건너뜁니다.');
+
+    // Playwright의 request 객체는 이 describe 블록의 engineer.json 세션을 사용함
+    console.log(
+      `🤖 [음성 테스트] ENGINEER 권한으로 타인 소유 SR 조회 API(${activeSrId}) 접근 시도`
+    );
+    const response = await request.get(`/api/srs/${activeSrId}`);
+
+    // 403 Forbidden 검증
+    expect(response.status()).toBe(403);
+    console.log(
+      '✅ ENGINEER 권한 격리 검증: 타 고객사/미배정 SR 조회 차단(403 Forbidden) 확인 완료'
+    );
+  });
+
+  test('자신에게 배정되지 않은 타 고객사 SR 수정 API 접근 시 403 반환 확인 (음성 테스트 - 수정)', async ({
+    request,
+  }) => {
+    const dbSR = await prisma.sR.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
+    const activeSrId = srId || dbSR?.id;
+    test.skip(!activeSrId, 'SR ID가 존재하지 않아 음성 테스트를 건너뜁니다.');
+
+    console.log(
+      `🤖 [음성 테스트] ENGINEER 권한으로 타인 소유 SR 수정 API(${activeSrId}) 접근 시도`
+    );
+    const response = await request.patch(`/api/srs/${activeSrId}`, {
+      data: {
+        title: '해킹 시도된 제목',
+        description: '허가받지 않은 엔지니어의 수정 시도입니다.',
+      },
+    });
+
+    // 403 Forbidden 검증
+    expect(response.status()).toBe(403);
+    console.log(
+      '✅ ENGINEER 권한 격리 검증: 타 고객사/미배정 SR 수정 차단(403 Forbidden) 확인 완료'
+    );
   });
 });

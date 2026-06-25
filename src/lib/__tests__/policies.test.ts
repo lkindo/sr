@@ -83,13 +83,19 @@ describe('Policy Functions', () => {
 
     it('canUpdateSR: admin/global update/self update logic', () => {
       expect(policies.canUpdateSR(adminUser, sr)).toBe(true);
+
+      // ENGINEER 권한 사용자는 자신에게 배정되지 않은 SR은 수정 불가 (false)
       const userUpdate = {
         ...userNoPerms,
         id: 'u-upd',
         roles: ['ENGINEER'],
         permissions: [PERMISSIONS.SR.UPDATE],
       };
-      expect(policies.canUpdateSR(userUpdate, sr)).toBe(true);
+      expect(policies.canUpdateSR(userUpdate, sr)).toBe(false);
+
+      // ENGINEER 권한 사용자가 본인에게 배정된 SR은 수정 가능 (true)
+      const assignedSR = { ...sr, assigneeId: 'u-upd' };
+      expect(policies.canUpdateSR(userUpdate, assignedSR)).toBe(true);
 
       const requester = {
         ...userNoPerms,

@@ -507,6 +507,14 @@ describe('SRService', () => {
     });
 
     describe('deleteSR', () => {
+      beforeEach(() => {
+        vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
+          if (typeof callback === 'function') {
+            return await callback(prisma);
+          }
+        });
+      });
+
       it('should delete SR successfully', async () => {
         const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
