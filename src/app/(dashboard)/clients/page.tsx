@@ -189,7 +189,7 @@ export default function ClientsPage() {
                   }}
                   className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
                     industryFilter === tab.value
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
+                      ? 'bg-[hsl(var(--sr-primary-dark))] text-black border-[hsl(var(--sr-primary-dark))]'
                       : 'bg-card text-muted-foreground border-border hover:bg-muted'
                   }`}
                 >
@@ -214,7 +214,7 @@ export default function ClientsPage() {
                     }}
                     className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
                       statusFilter === tab.value
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                        ? 'bg-[hsl(var(--sr-primary-dark))] text-black border-[hsl(var(--sr-primary-dark))] shadow-sm'
                         : 'bg-card text-muted-foreground border-border hover:bg-muted'
                     }`}
                   >

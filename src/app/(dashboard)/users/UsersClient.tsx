@@ -371,7 +371,7 @@ export default function UsersClient() {
                   onClick={() => handleStatusChange(tab.value)}
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
                     statusFilter === tab.value
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                      ? 'bg-[hsl(var(--sr-primary-dark))] text-black border-[hsl(var(--sr-primary-dark))] shadow-sm'
                       : 'bg-card text-muted-foreground border-border hover:bg-muted'
                   }`}
                 >
@@ -395,7 +395,7 @@ export default function UsersClient() {
                 type="submit"
                 size="sm"
                 variant="secondary"
-                className="h-9 px-4 rounded-full bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-primary-dark))/90] shrink-0"
+                className="h-9 px-4 rounded-full bg-[hsl(var(--sr-primary-dark))] text-black hover:bg-[hsl(var(--sr-primary-dark))]/90 shrink-0"
               >
                 검색
               </Button>

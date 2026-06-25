@@ -394,19 +394,21 @@ export default function OrganizationPage() {
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
             조직 구조
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
             고객사 및 소속 사용자를 통합적으로 관리합니다.
           </p>
         </div>
-        <Button onClick={handleAddClient} className="sr-btn-template-primary">
-          <Plus className="mr-2 h-4 w-4" />
-          고객사 추가
-        </Button>
+        <div className="flex justify-start sm:justify-end shrink-0">
+          <Button onClick={handleAddClient} className="sr-btn-template-primary w-full sm:w-auto">
+            <Plus className="mr-2 h-4 w-4" />
+            고객사 추가
+          </Button>
+        </div>
       </div>
 
       {/* 통계 카드 */}
