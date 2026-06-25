@@ -14,6 +14,7 @@ import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadSR } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
+import { serializeResponse } from '@/lib/serialization';
 import { srService } from '@/services/sr.service';
 import { SRCreateResult, SRDetails, SRUpdateResult } from '@/types/sr.types';
 
@@ -35,7 +36,7 @@ export async function createSRAction(formData: FormData): Promise<Result<SRCreat
     const sr = await srService.createSR(validated, session.user);
 
     revalidatePath('/srs');
-    return ok(sr);
+    return ok(serializeResponse(sr));
   } catch (error) {
     return errorToResult(error);
   }
@@ -60,7 +61,7 @@ export async function updateSRAction(
 
     revalidatePath('/srs');
     revalidatePath(`/srs/${id}`);
-    return ok(sr);
+    return ok(serializeResponse(sr));
   } catch (error) {
     return errorToResult(error);
   }
@@ -91,7 +92,7 @@ export async function getSRAction(id: string): Promise<Result<SR>> {
 
     ensureCanReadSR(session.user, sr);
 
-    return ok(sr);
+    return ok(serializeResponse(sr));
   } catch (error) {
     return errorToResult(error);
   }
@@ -108,7 +109,7 @@ export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>>
 
     ensureCanReadSR(session.user, sr);
 
-    return ok(sr);
+    return ok(serializeResponse(sr));
   } catch (error) {
     return errorToResult(error);
   }

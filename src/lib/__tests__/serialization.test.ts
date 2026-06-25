@@ -19,6 +19,22 @@ describe('serialization utility', () => {
       expect(result.nested.updatedAt).toBe(date.toISOString());
     });
 
+    it('should convert Decimal objects to numbers', () => {
+      class Decimal {
+        constructor(private val: number) {}
+        toNumber() {
+          return this.val;
+        }
+      }
+      const decimalVal = new Decimal(15.5);
+      const input = {
+        id: 1,
+        estimatedHours: decimalVal,
+      };
+      const result = serializeResponse(input);
+      expect(result.estimatedHours).toBe(15.5);
+    });
+
     it('should handle arrays', () => {
       const date = new Date('2025-01-01T12:00:00Z');
       const input = [{ d: date }, { d: date }];

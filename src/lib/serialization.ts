@@ -16,6 +16,16 @@ function deepSerialize(value: any): any {
     return value;
   }
 
+  // Handle Prisma / decimal.js Decimal
+  if (
+    value &&
+    typeof value.toNumber === 'function' &&
+    value.constructor &&
+    value.constructor.name === 'Decimal'
+  ) {
+    return value.toNumber();
+  }
+
   if (typeof value === 'number') {
     // JSON.stringify converts NaN and Infinity to null
     if (Number.isNaN(value) || !Number.isFinite(value)) {
