@@ -542,17 +542,17 @@ export default function DashboardPage() {
               {stats.recentSRs.map((sr) => (
                 <div
                   key={sr.id}
-                  className="flex items-center justify-between border-b border-border pb-4 last:border-0 last:pb-0 hover:bg-muted/30 -mx-2 px-2 py-2 rounded transition-colors"
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4 last:border-0 last:pb-0 hover:bg-muted/30 -mx-2 px-2 py-2 rounded transition-colors"
                 >
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <Link
                       href={`/srs/${sr.id}`}
                       className="font-medium text-[hsl(var(--sr-primary-dark))] hover:text-[hsl(var(--sr-accent-orange))] hover:underline transition-colors"
                     >
                       {sr.srNumber}
                     </Link>
-                    <p className="text-sm text-muted-foreground mt-0.5">{sr.title}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <p className="text-sm text-muted-foreground mt-0.5 truncate">{sr.title}</p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <span className="text-xs text-muted-foreground">{sr.client.name}</span>
                       <span className="text-xs text-muted-foreground">•</span>
                       <span className="text-xs text-muted-foreground">{sr.requester.name}</span>
@@ -566,7 +566,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     <Badge variant={priorityColors[sr.priority]}>
                       {priorityLabels[sr.priority]}
                     </Badge>

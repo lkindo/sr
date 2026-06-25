@@ -407,7 +407,7 @@ export function SRsDataTable({
                   id="advanced-filters-section"
                   role="region"
                   aria-label="상세 필터 옵션"
-                  className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))]"
+                  className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))] max-h-[280px] md:max-h-none overflow-y-auto no-scrollbar"
                 >
                   {/* First Row: Status, Priority, Client, Assignee */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

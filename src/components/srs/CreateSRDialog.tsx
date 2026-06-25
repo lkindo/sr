@@ -116,7 +116,7 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="client">고객사 *</Label>
                 <Select
@@ -165,7 +165,7 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="requestedPriority">희망 우선순위 *</Label>
                 <Select

@@ -147,7 +147,7 @@ export default function SRDetailPage() {
           </div>
 
           {/* Action Buttons - Mobile: Icon only */}
-          <div className="flex gap-1 shrink-0">
+          <div className="flex gap-1.5 md:gap-2 shrink-0">
             {((sr.status as string) === 'INTAKE' || (sr.status as string) === 'IN_PROGRESS') &&
               hasAnyRole(['MANAGER', 'ADMIN']) && (
                 <Button
