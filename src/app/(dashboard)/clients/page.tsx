@@ -156,7 +156,7 @@ export default function ClientsPage() {
   return (
     <div className="space-y-6">
       {/* 메인 컨텐츠 카드 */}
-      <div className="sr-card-template bg-white">
+      <div className="sr-card-template">
         {/* 리스트 헤더 */}
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
@@ -190,7 +190,7 @@ export default function ClientsPage() {
                   className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
                     industryFilter === tab.value
                       ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))]'
-                      : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                      : 'bg-card text-muted-foreground border-border hover:bg-muted'
                   }`}
                 >
                   {tab.label}
@@ -215,7 +215,7 @@ export default function ClientsPage() {
                     className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
                       statusFilter === tab.value
                         ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
-                        : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                        : 'bg-card text-muted-foreground border-border hover:bg-muted'
                     }`}
                   >
                     {tab.label}
@@ -246,7 +246,7 @@ export default function ClientsPage() {
         </div>
 
         {/* Total Count - 테이블 바로 위 */}
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-slate-50/50">
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-card/50">
           <div className="text-xs text-muted-foreground font-medium">
             전체{' '}
             <span className="text-[hsl(var(--sr-primary-dark))] font-bold">

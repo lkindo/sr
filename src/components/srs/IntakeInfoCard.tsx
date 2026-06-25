@@ -33,7 +33,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
   const priorityChanged = sr.requestedPriority !== sr.actualPriority;
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow border">
+    <div className="p-6 bg-card rounded-lg shadow border">
       <div className="flex items-center gap-2 mb-4">
         <FileText className="h-5 w-5 text-[hsl(var(--sr-primary))]" />
         <h3 className="text-lg font-semibold">접수 정보</h3>
@@ -127,7 +127,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
         {sr.intakeNotes && (
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-1">접수 메모</h4>
-            <div className="mt-1 p-3 bg-gray-50 rounded-md border border-gray-200">
+            <div className="mt-1 p-3 bg-muted rounded-md border border-border">
               <p className="text-sm text-foreground whitespace-pre-line">{sr.intakeNotes}</p>
             </div>
           </div>

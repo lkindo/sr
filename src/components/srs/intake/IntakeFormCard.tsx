@@ -55,7 +55,7 @@ export function IntakeFormCard({
   const router = useRouter();
 
   return (
-    <div className="sr-card-template bg-white">
+    <div className="sr-card-template">
       {/* 카드 헤더 */}
       <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
         <div className="flex items-center gap-3">
@@ -111,7 +111,7 @@ export function IntakeFormCard({
                       </SelectItem>
                       <SelectItem value="LOW">
                         <div className="flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4 text-gray-600" />
+                          <AlertCircle className="h-4 w-4 text-muted-foreground" />
                           낮음 (LOW)
                         </div>
                       </SelectItem>

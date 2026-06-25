@@ -411,7 +411,7 @@ export default function OrganizationPage() {
 
       {/* 통계 카드 */}
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="sr-card-template bg-white p-6">
+        <div className="sr-card-template p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-lg bg-primary/10">
               <Building2 className="h-6 w-6 text-primary" />
@@ -423,7 +423,7 @@ export default function OrganizationPage() {
           </div>
         </div>
 
-        <div className="sr-card-template bg-white p-6">
+        <div className="sr-card-template p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-lg bg-green-100">
               <Building2 className="h-6 w-6 text-green-600" />
@@ -435,7 +435,7 @@ export default function OrganizationPage() {
           </div>
         </div>
 
-        <div className="sr-card-template bg-white p-6">
+        <div className="sr-card-template p-6">
           <div className="flex items-center gap-3">
             <div className="p-3 rounded-lg bg-blue-100">
               <Users className="h-6 w-6 text-blue-600" />
@@ -449,7 +449,7 @@ export default function OrganizationPage() {
       </div>
 
       {/* 조직 트리 */}
-      <div className="sr-card-template bg-white">
+      <div className="sr-card-template">
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">조직 트리</h3>

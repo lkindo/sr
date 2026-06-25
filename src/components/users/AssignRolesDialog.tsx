@@ -195,12 +195,12 @@ export function AssignRolesDialog({
         </DialogHeader>
 
         {/* 검색 영역 */}
-        <div className="px-6 py-3 bg-slate-50/50 border-b shrink-0">
+        <div className="px-6 py-3 bg-card/50 border-b shrink-0">
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="역할 검색..."
-              className="pl-8 bg-white"
+              className="pl-8 bg-card"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -208,7 +208,7 @@ export function AssignRolesDialog({
         </div>
 
         {/* 역할 리스트 (카드형) */}
-        <ScrollArea className="flex-1 p-6 bg-slate-50/30">
+        <ScrollArea className="flex-1 p-6 bg-card/30">
           {loading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="animate-spin text-muted-foreground" />
@@ -222,7 +222,7 @@ export function AssignRolesDialog({
                     key={role.id}
                     onClick={() => handleToggleRole(role.id)}
                     className={cn(
-                      'cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-white',
+                      'cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-card',
                       isSelected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary'
                         : 'hover:border-primary/50'
@@ -264,7 +264,7 @@ export function AssignRolesDialog({
           )}
         </ScrollArea>
 
-        <DialogFooter className="px-6 py-4 border-t bg-white shrink-0">
+        <DialogFooter className="px-6 py-4 border-t bg-card shrink-0">
           <div className="flex-1 text-sm text-muted-foreground flex items-center">
             {selectedRoleIds.length}개 역할 선택됨
           </div>

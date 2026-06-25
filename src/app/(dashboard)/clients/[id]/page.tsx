@@ -257,7 +257,7 @@ export default function ClientDetailPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <div className="md:col-span-2 sr-card-template bg-white">
+        <div className="md:col-span-2 sr-card-template">
           {/* 카드 헤더 */}
           <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">기본 정보</h3>
@@ -352,7 +352,7 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        <div className="sr-card-template bg-white">
+        <div className="sr-card-template">
           {/* 카드 헤더 */}
           <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h3>
@@ -397,7 +397,7 @@ export default function ClientDetailPage() {
         </TabsList>
 
         <TabsContent value="categories" className="mt-6">
-          <div className="sr-card-template bg-white">
+          <div className="sr-card-template">
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
               <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
@@ -458,7 +458,7 @@ export default function ClientDetailPage() {
         </TabsContent>
 
         <TabsContent value="users" className="mt-6">
-          <div className="sr-card-template bg-white">
+          <div className="sr-card-template">
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
               <div>
@@ -515,7 +515,7 @@ export default function ClientDetailPage() {
         </TabsContent>
 
         <TabsContent value="srs" className="mt-6">
-          <div className="sr-card-template bg-white">
+          <div className="sr-card-template">
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
               <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">최근 SR</h3>

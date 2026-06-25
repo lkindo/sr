@@ -216,7 +216,7 @@ export default function SRDetailPage() {
       <div className="grid gap-4 md:gap-6 md:grid-cols-3 md:items-stretch">
         {/* Details Card */}
         <div className="md:col-span-2 space-y-4 md:space-y-6 flex flex-col">
-          <div className="p-4 md:p-6 bg-white rounded-lg shadow border flex-1">
+          <div className="p-4 md:p-6 bg-card rounded-lg shadow border flex-1">
             <h3 className="text-base md:text-lg font-semibold mb-3">상세 정보</h3>
             <div className="space-y-3 md:space-y-4">
               <div>

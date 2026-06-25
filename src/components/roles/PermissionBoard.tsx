@@ -158,7 +158,7 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b bg-white shrink-0 z-10">
+        <DialogHeader className="px-6 py-4 border-b bg-card shrink-0 z-10">
           <DialogTitle className="text-xl">권한 설정 - {role?.name}</DialogTitle>
           <DialogDescription>
             리소스별 권한을 설정하세요. 우측 스위치로 그룹 전체를 제어할 수 있습니다.
@@ -166,13 +166,13 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
         </DialogHeader>
 
         {/* 툴바 영역 */}
-        <div className="px-6 py-3 bg-slate-50/50 border-b flex items-center justify-between shrink-0">
+        <div className="px-6 py-3 bg-card/50 border-b flex items-center justify-between shrink-0">
           <div className="relative w-72">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               ref={inputRef}
               placeholder="리소스 또는 권한 검색..."
-              className="pl-8 pr-8 h-9 bg-white"
+              className="pl-8 pr-8 h-9 bg-card"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -193,7 +193,7 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
         </div>
 
         {/* 스크롤 가능한 컨텐츠 영역 */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-6 bg-card/30">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pb-6">
             {Object.entries(groupedPermissions).map(([resource, permissions]) => {
               const isAllSelected = permissions.every((p) => selectedIds.has(p.id));
@@ -205,11 +205,11 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
                   key={resource}
                   className="shadow-sm hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary h-fit"
                 >
-                  <CardHeader className="pb-3 bg-white border-b px-4 py-3">
+                  <CardHeader className="pb-3 bg-card border-b px-4 py-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4 text-slate-500" />
-                        <CardTitle className="text-base font-bold capitalize text-slate-800">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <CardTitle className="text-base font-bold capitalize text-foreground">
                           {resource}
                         </CardTitle>
                       </div>
@@ -225,16 +225,16 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
                     </div>
                   </CardHeader>
 
-                  <CardContent className="pt-3 pb-3 px-4 space-y-3 bg-white">
+                  <CardContent className="pt-3 pb-3 px-4 space-y-3 bg-card">
                     {permissions.map((p) => (
                       <div
                         key={p.id}
-                        className="flex items-center justify-between group hover:bg-slate-50 -mx-2 px-2 py-1.5 rounded-md transition-colors"
+                        className="flex items-center justify-between group hover:bg-muted -mx-2 px-2 py-1.5 rounded-md transition-colors"
                       >
                         <div className="flex flex-col gap-0.5">
                           <Label
                             htmlFor={p.id}
-                            className="font-medium text-sm cursor-pointer text-slate-700 group-hover:text-primary transition-colors"
+                            className="font-medium text-sm cursor-pointer text-foreground/80 group-hover:text-primary transition-colors"
                           >
                             {p.action}
                           </Label>
@@ -266,7 +266,7 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
         </div>
 
         {/* 하단 고정 버튼 영역 */}
-        <DialogFooter className="px-6 py-4 border-t bg-white shrink-0">
+        <DialogFooter className="px-6 py-4 border-t bg-card shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             취소
           </Button>

@@ -270,7 +270,7 @@ export default function RegisterForm() {
                         {passwordStrength.label}
                       </span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 ${passwordStrength.color}`}
                         style={{ width: `${passwordStrength.score}%` }}
@@ -283,7 +283,7 @@ export default function RegisterForm() {
                         {passwordStrength.checks.length ? (
                           <Check className="h-3 w-3 text-green-600" />
                         ) : (
-                          <X className="h-3 w-3 text-gray-400" />
+                          <X className="h-3 w-3 text-muted-foreground" />
                         )}
                         <span
                           className={
@@ -299,7 +299,7 @@ export default function RegisterForm() {
                         {passwordStrength.checks.uppercase ? (
                           <Check className="h-3 w-3 text-green-600" />
                         ) : (
-                          <X className="h-3 w-3 text-gray-400" />
+                          <X className="h-3 w-3 text-muted-foreground" />
                         )}
                         <span
                           className={
@@ -315,7 +315,7 @@ export default function RegisterForm() {
                         {passwordStrength.checks.lowercase ? (
                           <Check className="h-3 w-3 text-green-600" />
                         ) : (
-                          <X className="h-3 w-3 text-gray-400" />
+                          <X className="h-3 w-3 text-muted-foreground" />
                         )}
                         <span
                           className={
@@ -331,7 +331,7 @@ export default function RegisterForm() {
                         {passwordStrength.checks.number ? (
                           <Check className="h-3 w-3 text-green-600" />
                         ) : (
-                          <X className="h-3 w-3 text-gray-400" />
+                          <X className="h-3 w-3 text-muted-foreground" />
                         )}
                         <span
                           className={
@@ -347,7 +347,7 @@ export default function RegisterForm() {
                         {passwordStrength.checks.special ? (
                           <Check className="h-3 w-3 text-green-600" />
                         ) : (
-                          <X className="h-3 w-3 text-gray-400" />
+                          <X className="h-3 w-3 text-muted-foreground" />
                         )}
                         <span
                           className={

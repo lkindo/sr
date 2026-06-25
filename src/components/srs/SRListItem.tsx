@@ -97,7 +97,7 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
               <Button
                 variant="default"
                 size="sm"
-                className="bg-[hsl(var(--sr-primary-dark))] text-white hover:bg-[hsl(var(--sr-sidebar-hover))]"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={handleIntakeClick}
               >
                 접수
@@ -109,6 +109,7 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
                 onClick={handleIntakeClick}
                 title="접수 정보 수정"
                 aria-label="접수 정보 수정"
+                className="border-border hover:bg-muted text-foreground"
               >
                 <Clock className="h-4 w-4" />
               </Button>
@@ -174,7 +175,7 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
           <Button
             variant="default"
             size="sm"
-            className="h-7 text-xs bg-[hsl(var(--sr-primary-dark))] shrink-0"
+            className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
             onClick={handleIntakeClick}
           >
             접수

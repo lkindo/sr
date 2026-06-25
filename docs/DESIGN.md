@@ -21,6 +21,10 @@ colors:
   gradient-orange: '#ff7a3d'
   gradient-coral: '#ff5577'
   semantic-success: '#22c55e'
+  semantic-warning: '#f59e0b'
+  semantic-error: '#ef4444'
+  semantic-info: '#0099ff'
+  semantic-pending: '#a3a3a3'
 
 typography:
   display-xxl:
@@ -181,6 +185,89 @@ components:
     typography: '{typography.body}'
     rounded: '{rounded.md}'
     padding: 10px 14px
+  text-input-invalid:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    borderColor: '{colors.semantic-error}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: 10px 14px
+  text-input-disabled:
+    backgroundColor: '{colors.canvas}'
+    textColor: '{colors.ink-muted}'
+    opacity: 0.5
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: 10px 14px
+  status-badge-requested:
+    backgroundColor: 'rgba(163, 163, 163, 0.1)'
+    textColor: '{colors.semantic-pending}'
+    typography: '{typography.micro}'
+    rounded: '{rounded.sm}'
+    padding: 4px 8px
+  status-badge-intake:
+    backgroundColor: 'rgba(0, 153, 255, 0.1)'
+    textColor: '{colors.accent-blue}'
+    typography: '{typography.micro}'
+    rounded: '{rounded.sm}'
+    padding: 4px 8px
+  status-badge-in-progress:
+    backgroundColor: 'rgba(0, 153, 255, 0.15)'
+    textColor: '{colors.accent-blue}'
+    typography: '{typography.micro}'
+    rounded: '{rounded.sm}'
+    padding: 4px 8px
+  status-badge-completed:
+    backgroundColor: 'rgba(34, 197, 94, 0.1)'
+    textColor: '{colors.semantic-success}'
+    typography: '{typography.micro}'
+    rounded: '{rounded.sm}'
+    padding: 4px 8px
+  status-badge-rejected:
+    backgroundColor: 'rgba(239, 68, 68, 0.1)'
+    textColor: '{colors.semantic-error}'
+    typography: '{typography.micro}'
+    rounded: '{rounded.sm}'
+    padding: 4px 8px
+  status-badge-on-hold:
+    backgroundColor: 'rgba(245, 158, 11, 0.1)'
+    textColor: '{colors.semantic-warning}'
+    typography: '{typography.micro}'
+    rounded: '{rounded.sm}'
+    padding: 4px 8px
+  data-table-container:
+    backgroundColor: '{colors.surface-1}'
+    rounded: '{rounded.xl}'
+    border: '1px solid {colors.hairline}'
+    overflow: 'hidden'
+  data-table-header:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.ink}'
+    typography: '{typography.caption}'
+    padding: 12px 16px
+    borderBottom: '1px solid {colors.hairline}'
+  data-table-row:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body-sm}'
+    padding: 16px
+    borderBottom: '1px solid {colors.hairline-soft}'
+  data-table-row-hover:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.ink}'
+  pagination-button-default:
+    backgroundColor: '{colors.surface-1}'
+    textColor: '{colors.ink-muted}'
+    typography: '{typography.body-sm}'
+    rounded: '{rounded.md}'
+    padding: 6px 12px
+  pagination-button-active:
+    backgroundColor: '{colors.surface-2}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body-sm}'
+    rounded: '{rounded.md}'
+    padding: 6px 12px
+    border: '1px solid {colors.accent-blue}'
   pricing-card:
     backgroundColor: '{colors.surface-1}'
     textColor: '{colors.ink}'
@@ -297,6 +384,10 @@ Body type is **Inter Variable**, with Framer leaning hard into Inter's character
 ### Semantic
 
 - **Success Green** ({colors.semantic-success}): Pricing comparison-table checkmarks. Glyph fill, not surface.
+- **Warning Orange** ({colors.semantic-warning}): On-hold status indicator. (#f59e0b)
+- **Error Red** ({colors.semantic-error}): Rejected status indicator and input error states. (#ef4444)
+- **Info Blue** ({colors.semantic-info}): Active or processing status indicator. (#0099ff)
+- **Pending Gray** ({colors.semantic-pending}): Requested status indicator. (#a3a3a3)
 
 ### Brand Gradient (signature)
 
@@ -341,7 +432,19 @@ These four sit as oversized atmospheric tiles inside otherwise monochrome card g
 
 ### Note on Font Substitutes
 
-If implementing without GT Walsheim Medium, suitable open-source substitutes include **Mona Sans**, **Geist**, or **Inter** at weight 600–700 with manually tightened tracking. Mona Sans's hairline weights at 100–300 are particularly close to Framer's cleaner section openers. Inter Variable is open-source — keep it as-is and preserve the documented OpenType variants.
+If implementing without GT Walsheim Medium, suitable open-source substitutes include **Mona Sans**, **Geist**, or **Inter** at weight 600–700 with manually tightened tracking.
+
+When using substitutes, apply the following tracking adjustment formulas to mimic the poster-grade negative letter-spacing:
+
+- **Mona Sans / Geist**:
+  - Display-XXL (110px): `letter-spacing: -0.06em; font-weight: 600;`
+  - Display-XL (85px): `letter-spacing: -0.05em; font-weight: 600;`
+  - Display-LG (62px): `letter-spacing: -0.04em; font-weight: 600;`
+- **Inter (Non-Variable)**:
+  - Display-XXL (110px): `letter-spacing: -0.055em; font-weight: 700;`
+  - Display-XL (85px): `letter-spacing: -0.045em; font-weight: 700;`
+
+Inter Variable is open-source — keep it as-is and preserve the documented OpenType variants (`cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07`, `dlig`).
 
 ## Layout
 
@@ -559,9 +662,47 @@ The defining decorative surface of Framer's marketing — oversized atmospheric 
 6. Treat `{colors.accent-blue}` as a single-shot signal color: hyperlinks, focus, and selection — that's it. If you find yourself reaching for a second blue, the brand is drifting.
 7. Gradient spotlight cards are scarce by design. One or two per long page is the spec; three is a moodboard.
 
+## Gradient Spotlight Implementation Spec
+
+To achieve the seamless glowing atmosphere on the dark canvas without breaking design token consistency, implement the gradient spotlight cards using the following CSS pattern:
+
+```css
+.gradient-spotlight-card-violet {
+  position: relative;
+  background: #141414; /* Fallback surface */
+  overflow: hidden;
+}
+
+.gradient-spotlight-card-violet::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -30%;
+  width: 150%;
+  height: 150%;
+  background: radial-gradient(
+    circle at 30% 30%,
+    rgba(106, 76, 245, 0.25) 0%,
+    /* colors.gradient-violet with 25% opacity */ rgba(106, 76, 245, 0.05) 40%,
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* For premium glassmorphic atmosphere */
+.gradient-spotlight-card-glass {
+  background: rgba(20, 20, 20, 0.7) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+```
+
+---
+
 ## Known Gaps
 
 - The exact gradient stops for the spotlight cards are derived from screenshot pixels rather than from CSS variables — the production gradients are likely defined as `linear-gradient` strings on individual elements rather than as design tokens. Treat the documented `{colors.gradient-*}` hex values as base anchors, not as exact gradient specs.
-- Form-field validation / error styling is not visible on the inspected pages because no error states render in the static screenshots.
 - Dark mode is the only mode — no light-mode adaptation is documented because the marketing site does not ship one.
 - The marketplace template detail page returned sparser CSS variable data than the other pages; surface tokens for that page were inferred from the matching home / gallery treatment rather than extracted directly.

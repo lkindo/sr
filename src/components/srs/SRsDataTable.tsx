@@ -281,10 +281,10 @@ export function SRsDataTable({
 
   return (
     <div className="space-y-6">
-      <div className="sr-card-template bg-white">
-        <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+      <div className="sr-card-template bg-card">
+        <div className="px-6 py-5 border-b border-border">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">SR 목록</h3>
+            <h3 className="text-xl font-semibold text-foreground">SR 목록</h3>
             <Button onClick={() => setIsCreateDialogOpen(true)} className="sr-btn-template-primary">
               <Plus className="mr-2 h-4 w-4" /> 등록
             </Button>
@@ -322,8 +322,8 @@ export function SRsDataTable({
                     }
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'waiting'
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
-                        : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
+                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
                     }`}
                   >
                     <Clock className="h-2.5 w-2.5" />
@@ -331,7 +331,7 @@ export function SRsDataTable({
                     <span
                       className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'waiting'
-                          ? 'bg-white text-primary font-bold'
+                          ? 'bg-background text-foreground font-bold'
                           : 'bg-destructive text-white'
                       }`}
                     >
@@ -344,8 +344,8 @@ export function SRsDataTable({
                     }
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'myAssigned'
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
-                        : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
+                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
                     }`}
                   >
                     <User className="h-2.5 w-2.5" />
@@ -353,7 +353,7 @@ export function SRsDataTable({
                     <span
                       className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'myAssigned'
-                          ? 'bg-white text-primary font-bold'
+                          ? 'bg-background text-foreground font-bold'
                           : 'bg-muted-foreground text-white'
                       }`}
                     >
@@ -366,8 +366,8 @@ export function SRsDataTable({
                     }
                     className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
                       activeQuickFilter === 'urgent'
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
-                        : 'bg-white text-muted-foreground border-border hover:bg-muted font-medium'
+                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
                     }`}
                   >
                     <AlertTriangle className="h-2.5 w-2.5" />
@@ -375,7 +375,7 @@ export function SRsDataTable({
                     <span
                       className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'urgent'
-                          ? 'bg-white text-primary font-bold'
+                          ? 'bg-background text-foreground font-bold'
                           : 'bg-destructive text-white'
                       }`}
                     >
@@ -562,8 +562,8 @@ export function SRsDataTable({
 
         <div className="relative">
           {isPending && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/50 backdrop-blur-[1px]">
-              <Loader2 className="h-8 w-8 animate-spin text-[hsl(var(--sr-primary-dark))]" />
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
+              <Loader2 className="h-8 w-8 animate-spin text-foreground" />
             </div>
           )}
 

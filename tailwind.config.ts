@@ -58,6 +58,20 @@ export default {
         'card-sm': '8px',
         'card-md': '12px',
         'card-lg': '16px',
+        // DESIGN.md Framer Scale
+        'framer-xs': '4px',
+        'framer-sm': '6px',
+        'framer-md': '10px',
+        'framer-lg': '15px',
+        'framer-xl': '20px',
+        'framer-xxl': '30px',
+        'framer-pill': '100px',
+      },
+      letterSpacing: {
+        'framer-xxl': '-0.05em',
+        'framer-xl': '-0.045em',
+        'framer-lg': '-0.035em',
+        'framer-md': '-0.03em',
       },
       boxShadow: {
         xs: '0px 1px 2px 0px rgba(0, 0, 0, 0.05)',

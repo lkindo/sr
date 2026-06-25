@@ -112,7 +112,7 @@ function DraggableUserCard({
       >
         <Link
           href={user.id ? `/users/${user.id}` : '#'}
-          className="flex items-center gap-2 p-1.5 md:p-2 rounded-md border bg-white hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
+          className="flex items-center gap-2 p-1.5 md:p-2 rounded-md border bg-card hover:bg-accent hover:border-primary/50 hover:shadow-sm transition-all group relative"
         >
           {/* 드래그 핸들 */}
           <div
@@ -326,7 +326,7 @@ export function OrganizationTree({
     if (!activeUser) return null;
 
     return (
-      <div className="flex items-center gap-3 p-3 rounded-md border bg-white shadow-lg ring-2 ring-primary/20 opacity-95">
+      <div className="flex items-center gap-3 p-3 rounded-md border bg-card shadow-lg ring-2 ring-primary/20 opacity-95">
         <div className="p-2 rounded-full bg-primary/10 shrink-0">
           <Users className="h-4 w-4 text-primary" />
         </div>
@@ -375,7 +375,7 @@ export function OrganizationTree({
           return (
             <div
               key={client.id}
-              className="border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+              className="border rounded-lg overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow"
             >
               {/* 고객사 헤더 */}
               <DroppableClientHeader

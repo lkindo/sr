@@ -133,14 +133,14 @@ export function PWARegistration() {
           <div className="flex items-center gap-1.5 shrink-0">
             <Button
               size="sm"
-              className="bg-white text-[hsl(var(--sr-primary-dark))] hover:bg-gray-100 h-7 px-2 text-xs"
+              className="bg-card text-[hsl(var(--sr-primary-dark))] hover:bg-muted h-7 px-2 text-xs"
               onClick={handleInstallClick}
             >
               설치
             </Button>
             <button
               onClick={handleDismiss}
-              className="text-gray-400 hover:text-white transition-colors p-1"
+              className="text-muted-foreground hover:text-white transition-colors p-1"
             >
               <X className="h-4 w-4" />
             </button>

@@ -125,19 +125,19 @@ export function UserReassignDialog({
                       <FileText className="h-4 w-4" />
                       진행 중인 SR 목록
                     </div>
-                    <ScrollArea className="h-48 rounded-md border bg-white dark:bg-gray-950">
+                    <ScrollArea className="h-48 rounded-md border bg-card">
                       <div className="p-3 space-y-2">
                         {ongoingSRs.map((sr) => (
                           <div
                             key={sr.id}
-                            className="p-3 bg-gray-50 dark:bg-gray-900 rounded-md space-y-2 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                            className="p-3 bg-muted rounded-md space-y-2 hover:bg-accent transition-colors"
                           >
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                <div className="text-sm font-medium text-foreground truncate">
                                   {sr.srNumber}
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 line-clamp-2">
+                                <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
                                   {sr.title}
                                 </div>
                               </div>
@@ -146,7 +146,7 @@ export function UserReassignDialog({
                                 {getPriorityBadge(sr.priority)}
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400">
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
                               <span>고객사: {sr.clientName}</span>
                               {sr.assigneeName && <span>담당자: {sr.assigneeName}</span>}
                             </div>

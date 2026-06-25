@@ -488,10 +488,10 @@ export default function UserDetailPage() {
                   }, new Map<string, Permission['permission'][]>())
                 ).map(([resource, permissions]) => (
                   <Card key={resource} className="shadow-sm">
-                    <CardHeader className="pb-2 bg-slate-50/50 border-b px-4 py-3">
+                    <CardHeader className="pb-2 bg-card/50 border-b px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Shield className="h-3.5 w-3.5 text-slate-500" />
-                        <CardTitle className="text-sm font-bold capitalize text-slate-700">
+                        <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                        <CardTitle className="text-sm font-bold capitalize text-foreground">
                           {resource}
                         </CardTitle>
                       </div>
@@ -502,7 +502,7 @@ export default function UserDetailPage() {
                           <Badge
                             key={p.id}
                             variant="outline"
-                            className="bg-white hover:bg-slate-50 font-normal text-slate-600 border-slate-200"
+                            className="bg-card hover:bg-muted font-normal text-muted-foreground border-border"
                           >
                             {p.action}
                           </Badge>

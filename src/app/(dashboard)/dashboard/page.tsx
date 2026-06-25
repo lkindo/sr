@@ -200,21 +200,23 @@ export default function DashboardPage() {
       </div>
       {/* 접수 대기 SR 강조 카드 (ADMIN/MANAGER/ENGINEER만) */}
       {isAdminManagerEngineer && stats.summary.requested > 0 && (
-        <Card className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-orange))] bg-gradient-to-r from-orange-50/50 to-transparent dark:from-orange-950/20">
+        <Card className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-orange))] bg-gradient-to-r from-blue-500/10 to-transparent">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <AlertTriangle className="h-6 w-6 text-[hsl(var(--sr-accent-orange))]" />
                 <div>
-                  <CardTitle className="text-lg font-semibold">접수 대기 SR</CardTitle>
-                  <CardDescription className="mt-1">
+                  <CardTitle className="text-lg font-semibold text-foreground">
+                    접수 대기 SR
+                  </CardTitle>
+                  <CardDescription className="mt-1 text-muted-foreground">
                     {stats.summary.requested}개의 SR이 접수를 기다리고 있습니다
                   </CardDescription>
                 </div>
               </div>
               <Button
                 variant="default"
-                className="bg-[hsl(var(--sr-accent-orange))] hover:bg-[hsl(var(--sr-accent-orange))]/90"
+                className="bg-[hsl(var(--sr-accent-orange))] hover:bg-[hsl(var(--sr-accent-orange))]/90 text-white"
                 onClick={() => router.push('/srs?status=REQUESTED')}
               >
                 접수하기

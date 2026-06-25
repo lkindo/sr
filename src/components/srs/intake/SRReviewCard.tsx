@@ -23,7 +23,7 @@ interface SRReviewCardProps {
 
 export function SRReviewCard({ sr }: SRReviewCardProps) {
   return (
-    <div className="sr-card-template bg-white">
+    <div className="sr-card-template">
       {/* 카드 헤더 */}
       <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
         <div className="flex items-center gap-3">

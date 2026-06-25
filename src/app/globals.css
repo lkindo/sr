@@ -15,91 +15,77 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --background: 0 0% 3.5%; /* Canvas #090909 */
+    --foreground: 0 0% 100%; /* Ink #ffffff */
+    --card: 0 0% 7.8%; /* Surface 1 #141414 */
+    --card-foreground: 0 0% 100%; /* Ink #ffffff */
+    --popover: 0 0% 11%; /* Surface 2 #1c1c1c */
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%; /* Ink #ffffff / Primary CTA */
+    --primary-foreground: 0 0% 0%; /* on-primary #000000 */
+    --secondary: 0 0% 7.8%; /* Surface 1 #141414 */
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 7.8%;
+    --muted-foreground: 0 0% 60%; /* Ink Muted #999999 */
+    --accent: 204 100% 50%; /* Accent Blue #0099ff */
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --chart-1: 221.2 83.2% 53.3%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 14.9%; /* Hairline #262626 */
+    --input: 0 0% 14.9%;
+    --ring: 204 100% 50%; /* Accent Blue #0099ff */
+    --chart-1: 204 100% 50%;
+    --chart-2: 280 65% 60%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 160 60% 45%;
+    --chart-5: 340 75% 55%;
+    --radius: 0.625rem; /* 10px - md */
 
-    /* SR Management Design System Colors - Blue Theme */
-    --sr-primary-dark: 222.2 47.4% 11.2%;
-    /* #0F172A - Slate 900 (Main sidebar color) */
-    --sr-primary-darker: 224 71% 4%;
-    /* #030712 - Slate 950 (Sidebar submenu color) */
-    --sr-sidebar-hover: 222.2 47.4% 17.6%;
-    /* #1E293B - Slate 800 (Hover state) */
-    --sr-gray-medium: 215.4 16.3% 46.9%;
-    /* #64748B - Slate 500 (Text muted) */
-    --sr-gray-light: 217.9 10.6% 64.9%;
-    /* #94A3B8 - Slate 400 (Submenu text) */
-    --sr-bg-light: 210 40% 98%;
-    /* #F8FAFC - Light background (Slate 50) */
-    --sr-bg-lighter: 210 40% 96.1%;
-    /* #F1F5F9 - Slate 100 */
-    --sr-border: 214.3 31.8% 91.4%;
-    /* #E2E8F0 - Border light (Slate 200) */
-    --sr-accent-orange: 221.2 83.2% 53.3%;
-    /* #2563EB - Mapped to Blue 600 to unify orange elements to blue */
-    --sr-accent-blue: 224.3 76.3% 48%;
-    /* #1D4ED8 - Blue 700 */
+    /* SR Management Design System Colors - Framer Dark Canvas Mapped */
+    --sr-primary-dark: 0 0% 100%; /* Ink */
+    --sr-primary-darker: 0 0% 100%; /* Ink */
+    --sr-sidebar-hover: 0 0% 11%; /* Surface 2 #1c1c1c */
+    --sr-gray-medium: 0 0% 60%; /* Ink Muted */
+    --sr-gray-light: 0 0% 60%;
+    --sr-bg-light: 0 0% 3.5%; /* Canvas */
+    --sr-bg-lighter: 0 0% 7.8%; /* Surface 1 */
+    --sr-border: 0 0% 14.9%; /* Hairline */
+    --sr-accent-orange: 204 100% 50%; /* Accent Blue */
+    --sr-accent-blue: 204 100% 50%; /* Accent Blue */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 8%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 8%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 222.2 47.4% 11.2%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 222.2 47.4% 11.2%;
-    --muted-foreground: 215.4 16.3% 56.9%;
-    --accent: 222.2 47.4% 11.2%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 222.2 47.4% 17.6%;
-    --input: 222.2 47.4% 17.6%;
-    --ring: 210 40% 98%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Same as root to enforce dark canvas throughout */
+    --background: 0 0% 3.5%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 7.8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 7.8%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 7.8%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 204 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 204 100% 50%;
 
-    /* SR Management Design System Colors - Dark Mode */
-    --sr-primary-dark: 210 40% 98%;
+    /* SR Dark Mode */
+    --sr-primary-dark: 0 0% 100%;
     --sr-primary-darker: 0 0% 100%;
-    --sr-gray-medium: 215.4 16.3% 56.9%;
-    --sr-gray-light: 217.9 10.6% 64.9%;
-    --sr-bg-light: 222.2 47.4% 11.2%;
-    --sr-bg-lighter: 222.2 47.4% 17.6%;
-    --sr-border: 222.2 47.4% 17.6%;
-    --sr-accent-orange: 221.2 83.2% 53.3%;
-    --sr-accent-blue: 217.2 91.2% 59.8%;
+    --sr-gray-medium: 0 0% 60%;
+    --sr-gray-light: 0 0% 60%;
+    --sr-bg-light: 0 0% 3.5%;
+    --sr-bg-lighter: 0 0% 7.8%;
+    --sr-border: 0 0% 14.9%;
+    --sr-accent-orange: 204 100% 50%;
+    --sr-accent-blue: 204 100% 50%;
   }
 }
 
@@ -114,28 +100,35 @@
 }
 
 @layer components {
-  /* SR Management Custom Styles */
+  /* SR Management Custom Styles - Framer Dark Canvas Paradigm */
 
-  /* Quick Filter Buttons */
+  /* Quick Filter Buttons (Pill / Pricing Tab Paradigm) */
   .sr-filter-button {
     @apply inline-flex items-center justify-center gap-2;
     @apply h-10 px-4 py-2;
-    @apply border rounded-lg;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    border-radius: 9999px; /* rounded-framer-pill */
     @apply text-sm font-medium;
     @apply transition-all duration-200;
-    @apply bg-white border-border text-muted-foreground;
+    background: transparent;
+    color: #999999; /* Ink Muted */
   }
 
   .sr-filter-button:hover {
-    @apply bg-secondary/80 border-primary text-foreground;
+    background: rgba(20, 20, 20, 0.5);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.08);
   }
 
   .sr-filter-button.active {
-    @apply bg-primary border-primary text-primary-foreground;
+    background: #1c1c1c; /* Surface 2 LIFT */
+    color: #ffffff; /* Ink */
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 
   .sr-filter-button:disabled {
-    @apply bg-muted/50 text-muted-foreground/50 cursor-not-allowed;
+    @apply opacity-40 cursor-not-allowed;
   }
 
   /* Badge in Filter Button */
@@ -143,6 +136,13 @@
     @apply inline-flex items-center justify-center;
     @apply h-5 min-w-5 px-1.5;
     @apply rounded text-xs font-medium;
+    background: rgba(255, 255, 255, 0.08);
+    color: #999999;
+  }
+
+  .sr-filter-button.active .sr-filter-badge {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
   }
 
   /* Content Area */
@@ -151,74 +151,93 @@
     @apply px-4 py-6;
   }
 
-  /* Card Styles */
+  /* Card Styles (Premium Glassmorphism & Lift) */
   .sr-card {
-    @apply bg-card border border-border rounded-card-md;
-    @apply shadow-sm;
-    @apply transition-shadow duration-200;
+    background: rgba(20, 20, 20, 0.75); /* Surface 1 with opacity */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05); /* Hairline Soft */
+    border-radius: 20px; /* rounded-framer-xl */
+    @apply shadow-sm transition-all duration-300;
   }
 
   .sr-card:hover {
-    @apply shadow-md;
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(28, 28, 28, 0.85); /* Lifted to Surface 2 */
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
   }
 
-  /* Table Styles */
+  /* Table Styles (Premium Data Table Paradigm) */
   .sr-table {
-    @apply w-full border-collapse;
+    @apply w-full border-collapse overflow-hidden;
+    border-radius: 15px; /* rounded-framer-lg */
   }
 
   .sr-table thead {
-    @apply bg-slate-50/80 border-b border-slate-200;
+    background: #1c1c1c; /* Surface 2 */
+    border-bottom: 1px solid #262626; /* Hairline */
   }
 
   .sr-table th {
     @apply h-12 px-6 text-left;
-    @apply text-xs font-semibold text-slate-500;
+    @apply text-xs font-semibold;
+    color: #ffffff; /* Ink */
+    letter-spacing: -0.13px; /* caption tracking */
   }
 
   .sr-table td {
     @apply h-12 px-6;
-    @apply text-sm text-slate-600;
+    @apply text-sm;
+    color: rgba(255, 255, 255, 0.8); /* soft white */
   }
 
   .sr-table tbody tr {
-    @apply border-b border-slate-100;
-    @apply transition-colors duration-150;
+    background: #141414; /* Surface 1 */
+    border-bottom: 1px solid #1a1a1a; /* Hairline Soft */
+    @apply transition-all duration-200;
   }
 
   .sr-table tbody tr:hover {
-    @apply bg-blue-50/30 cursor-pointer;
+    background: #1c1c1c; /* Surface 2 LIFT */
+    color: #ffffff;
+    cursor: pointer;
   }
 
-  /* Header Styles */
+  /* Header Styles (Transparent backdrop-blur bar) */
   .sr-header {
     @apply sticky top-0 z-[60];
     @apply w-full h-[72px];
-    @apply bg-background/90 backdrop-blur-md;
-    @apply border-b border-slate-100;
+    background: rgba(9, 9, 9, 0.8); /* Canvas with opacity */
+    backdrop-blur: 16px;
+    -webkit-backdrop-filter: blur(16px);
+    border-b: 1px solid #262626; /* Hairline */
   }
 
   .sr-header-nav-item {
-    @apply px-3 py-2 rounded;
+    @apply px-3 py-2 rounded-full;
     @apply text-sm transition-colors;
   }
 
   .sr-header-nav-item.active {
-    @apply bg-primary text-primary-foreground font-medium;
+    background: #1c1c1c; /* Surface 2 */
+    color: #ffffff; /* Ink */
+    font-weight: 500;
   }
 
   .sr-header-nav-item:not(.active) {
-    @apply text-muted-foreground;
+    color: #999999; /* Ink Muted */
   }
 
   .sr-header-nav-item:not(.active):hover {
-    @apply text-foreground bg-accent;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
   }
 
   /* Filter Panel */
   .sr-filter-panel {
-    @apply p-6 bg-muted/30 rounded-lg;
-    @apply border border-border;
+    @apply p-6 bg-card/40 rounded-xl;
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   /* List Head */
@@ -234,86 +253,158 @@
   /* Icon Buttons */
   .sr-icon-button {
     @apply inline-flex items-center justify-center;
-    @apply w-10 h-10 rounded;
-    @apply bg-secondary text-foreground;
+    @apply w-10 h-10 rounded-full;
+    background: #141414; /* Surface 1 */
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.05);
     @apply transition-colors duration-200;
   }
 
   .sr-icon-button:hover {
-    @apply bg-accent;
+    background: #1c1c1c; /* Surface 2 */
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
   .sr-icon-button:active {
-    @apply bg-accent/80;
+    @apply scale-95;
   }
 
-  /* Status Badges */
+  /* Status Badges (Granular translucent semantic sets) */
   .sr-status-badge {
     @apply inline-flex items-center gap-1.5;
     @apply px-2.5 py-0.5;
     @apply text-xs font-semibold;
-    @apply rounded-md border;
+    border-radius: 6px; /* rounded-framer-sm */
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .sr-status-badge.requested {
-    @apply bg-slate-100 text-slate-600 border-slate-200;
+    background: rgba(163, 163, 163, 0.1);
+    color: #a3a3a3; /* semantic-pending */
   }
 
+  .sr-status-badge.intake,
   .sr-status-badge.accepted {
-    @apply bg-blue-50 text-blue-700 border-blue-200;
+    background: rgba(0, 153, 255, 0.1);
+    color: #0099ff; /* semantic-info / accent-blue */
   }
 
   .sr-status-badge.in-progress,
   .sr-status-badge.in_progress {
-    @apply bg-blue-50 text-blue-700 border-blue-200;
+    background: rgba(0, 153, 255, 0.15);
+    color: #0099ff; /* semantic-info */
   }
 
-  .sr-status-badge.resolved {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
-  }
-
-  .sr-status-badge.completed {
-    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
-  }
-
+  .sr-status-badge.resolved,
+  .sr-status-badge.completed,
   .sr-status-badge.closed {
-    @apply bg-emerald-600 text-white border-emerald-700;
+    background: rgba(34, 197, 94, 0.1);
+    color: #22c55e; /* semantic-success */
   }
 
   .sr-status-badge.rejected {
-    @apply bg-red-50 text-red-700 border-red-200;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444; /* semantic-error */
   }
 
   .sr-status-badge.hold {
-    @apply bg-amber-50 text-amber-700 border-amber-200;
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b; /* semantic-warning */
   }
 
   .sr-status-badge.reopened {
-    @apply bg-purple-50 text-purple-700 border-purple-200;
+    background: rgba(168, 85, 247, 0.1);
+    color: #a855f7; /* purple - info/transition */
   }
 
-  /* Priority Badges */
+  /* Priority Badges (Framer premium semantic chips) */
   .sr-priority-badge {
     @apply inline-flex items-center;
     @apply px-2.5 py-0.5;
     @apply text-xs font-medium;
-    @apply rounded;
+    border-radius: 4px; /* rounded-framer-xs */
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .sr-priority-badge.critical {
-    @apply bg-red-100 text-red-800 border border-red-200;
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.2);
   }
 
   .sr-priority-badge.high {
-    @apply bg-orange-100 text-orange-800 border border-orange-200;
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+    border-color: rgba(249, 115, 22, 0.2);
   }
 
   .sr-priority-badge.medium {
-    @apply bg-yellow-100 text-yellow-800 border border-yellow-200;
+    background: rgba(234, 179, 8, 0.1);
+    color: #eab308;
+    border-color: rgba(234, 179, 8, 0.2);
   }
 
   .sr-priority-badge.low {
-    @apply bg-gray-100 text-gray-800 border border-gray-200;
+    background: rgba(163, 163, 163, 0.1);
+    color: #a3a3a3;
+    border-color: rgba(163, 163, 163, 0.2);
+  }
+
+  /* Gradient Spotlight Atmosphere Utilities */
+  .gradient-spotlight-violet {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gradient-spotlight-violet::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    left: -30%;
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(106, 76, 245, 0.15) 0%,
+      /* colors.gradient-violet with 15% opacity */ rgba(106, 76, 245, 0.03) 45%,
+      transparent 75%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .gradient-spotlight-orange {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .gradient-spotlight-orange::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    left: -30%;
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(
+      circle at 30% 30%,
+      rgba(255, 122, 61, 0.12) 0%,
+      /* colors.gradient-orange with 12% opacity */ rgba(255, 122, 61, 0.02) 45%,
+      transparent 75%
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Form Text Input Multi-state Extensions */
+  .sr-input-invalid {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2) !important;
+  }
+
+  .sr-input-disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    background-color: rgba(9, 9, 9, 0.5) !important;
   }
 
   /* Icon Utility Classes */
@@ -554,32 +645,32 @@
 
   /* Sidebar (LNB) Styles */
   .sr-sidebar-bg {
-    @apply bg-slate-50;
+    @apply bg-card;
   }
 
   .sr-sidebar-item {
-    @apply text-slate-600;
-    @apply hover:text-slate-900 hover:bg-slate-200/50;
+    @apply text-muted-foreground;
+    @apply hover:text-foreground hover:bg-muted/50;
     @apply transition-all duration-200;
   }
 
   .sr-sidebar-item.active {
-    @apply text-primary bg-blue-50/50 font-semibold border-l-4 border-primary;
+    @apply text-foreground bg-muted font-semibold border-l-2 border-accent;
   }
 
   .sr-sidebar-submenu {
-    @apply bg-slate-100/30;
+    @apply bg-background/30;
   }
 
   .sr-sidebar-submenu-item {
-    @apply text-slate-500 hover:text-slate-900;
+    @apply text-muted-foreground hover:text-foreground hover:bg-muted/30;
     @apply transition-colors duration-200;
   }
 
   .sr-sidebar-submenu-item::before {
     content: '';
     @apply inline-block w-1.5 h-1.5 rounded-full;
-    @apply bg-blue-500 mr-3;
+    @apply bg-accent mr-3;
     @apply opacity-0;
   }
 
@@ -595,13 +686,13 @@
 
   /* Content Background */
   .sr-content-bg {
-    @apply bg-slate-50/50;
+    @apply bg-background;
   }
 
   /* Card with Template Shadow */
   .sr-card-template {
-    @apply bg-white border border-gray-200/40;
-    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.05);
+    @apply bg-card border border-border;
+    box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.2);
   }
 
   /* Button Styles from Template */
@@ -609,15 +700,14 @@
     @apply inline-flex items-center justify-center;
     @apply h-10 px-6 rounded;
     @apply text-sm font-medium;
-    @apply bg-[hsl(var(--sr-bg-lighter))] text-gray-800;
-    @apply hover:bg-gray-300 active:bg-gray-400;
+    @apply bg-[hsl(var(--sr-bg-lighter))] text-foreground;
+    @apply hover:bg-muted active:bg-muted/80;
     @apply transition-colors duration-200;
   }
 
   .sr-btn-template-primary {
-    @apply bg-[hsl(var(--sr-primary-dark))] text-white;
-    @apply hover:bg-[hsl(var(--sr-sidebar-hover))];
-    @apply active:bg-[hsl(var(--sr-primary-darker))];
+    @apply bg-primary text-primary-foreground;
+    @apply hover:bg-primary/90 active:bg-primary/85;
   }
 
   .sr-btn-template-accent {

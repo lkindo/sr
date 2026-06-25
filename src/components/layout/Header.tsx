@@ -65,7 +65,7 @@ export function Header({ user: initialUser }: HeaderProps) {
   const activeMenu = getActiveMenu();
 
   return (
-    <header className="sticky top-0 z-[60] w-full border-b border-slate-100 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-[60] w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-16 md:h-[104px] items-center">
         {/* 모바일 햄버거 메뉴 (md 미만 표시) */}
         <div className="flex md:hidden items-center px-4">
@@ -76,9 +76,9 @@ export function Header({ user: initialUser }: HeaderProps) {
                 <span className="sr-only">메뉴 열기</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 bg-slate-50 border-r border-slate-200">
+            <SheetContent side="left" className="p-0 w-64 bg-card border-r border-border">
               {/* Visual Header */}
-              <SheetHeader className="p-6 border-b border-slate-100 bg-white">
+              <SheetHeader className="p-6 border-b border-border bg-card">
                 <SheetTitle className="text-primary text-lg font-bold">SR Management</SheetTitle>
               </SheetHeader>
               <SheetDescription className="sr-only">Mobile navigation sidebar</SheetDescription>
@@ -91,12 +91,12 @@ export function Header({ user: initialUser }: HeaderProps) {
         </div>
 
         {/* 데스크톱 로고 영역 (md 이상 표시) */}
-        <div className="hidden md:flex w-64 flex-col items-center justify-center px-6 border-r border-slate-100 h-full bg-white text-center">
+        <div className="hidden md:flex w-64 flex-col items-center justify-center px-6 border-r border-border h-full bg-background text-center">
           <Link href="/dashboard" className="flex flex-col items-center space-y-1 group">
-            <span className="font-bold text-lg text-primary group-hover:opacity-90 transition-opacity">
+            <span className="font-bold text-lg text-foreground group-hover:opacity-90 transition-opacity">
               SR Management
             </span>
-            <span className="text-xs text-slate-500">서비스 요청 관리</span>
+            <span className="text-xs text-muted-foreground">서비스 요청 관리</span>
           </Link>
         </div>
 
@@ -122,8 +122,8 @@ export function Header({ user: initialUser }: HeaderProps) {
                 className={cn(
                   'px-4 py-2 rounded text-sm transition-colors font-medium',
                   activeMenu === item.href
-                    ? 'bg-blue-50 text-primary font-semibold'
-                    : 'text-[hsl(var(--sr-gray-medium))] hover:text-foreground hover:bg-accent'
+                    ? 'bg-muted text-foreground font-semibold'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
               >
                 {item.title}

@@ -255,7 +255,7 @@ export default function UsersClient() {
   };
   return (
     <div className="space-y-6">
-      <div className="sr-card-template bg-white">
+      <div className="sr-card-template">
         <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
@@ -372,7 +372,7 @@ export default function UsersClient() {
                   className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
                     statusFilter === tab.value
                       ? 'bg-[hsl(var(--sr-primary-dark))] text-white border-[hsl(var(--sr-primary-dark))] shadow-sm'
-                      : 'bg-white text-muted-foreground border-border hover:bg-muted'
+                      : 'bg-card text-muted-foreground border-border hover:bg-muted'
                   }`}
                 >
                   {tab.label}
@@ -403,7 +403,7 @@ export default function UsersClient() {
           </div>
         </div>
 
-        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-slate-50/50">
+        <div className="px-6 py-2 border-b border-[hsl(var(--sr-border))] flex justify-end bg-card/50">
           <div className="text-xs text-muted-foreground font-medium">
             전체{' '}
             <span className="text-[hsl(var(--sr-primary-dark))] font-bold">

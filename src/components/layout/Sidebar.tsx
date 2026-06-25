@@ -84,12 +84,12 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'flex items-center h-10 px-8 pl-12 text-sm sr-sidebar-submenu-item relative text-slate-500 hover:text-slate-900',
-                      isActive && 'text-primary font-semibold bg-blue-50/50'
+                      'flex items-center h-10 px-8 pl-12 text-sm sr-sidebar-submenu-item relative text-muted-foreground hover:text-foreground',
+                      isActive && 'text-foreground font-semibold bg-muted/50'
                     )}
                   >
                     {isActive && (
-                      <span className="absolute left-[35px] w-1.5 h-1.5 rounded-full bg-primary" />
+                      <span className="absolute left-[35px] w-1.5 h-1.5 rounded-full bg-accent" />
                     )}
                     {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
                     {item.title}
@@ -106,7 +106,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
       className={cn(
         'z-40 h-full w-full sr-sidebar-bg overflow-y-auto',
         !isMobile &&
-          'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-slate-200 hidden md:block'
+          'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-border hidden md:block'
       )}
     >
       <nav className="flex flex-col pt-5 pb-20">
@@ -125,8 +125,8 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                     className={cn(
                       'flex items-center px-6 py-3 text-base font-semibold transition-colors',
                       isActiveTop
-                        ? 'text-primary bg-blue-50/50 border-l-4 border-primary font-semibold'
-                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        ? 'text-foreground bg-muted/50 border-l-4 border-accent font-semibold'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
                     {topItem.icon && <topItem.icon className="mr-3 h-5 w-5" />}
