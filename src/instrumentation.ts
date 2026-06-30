@@ -14,8 +14,13 @@ export async function register() {
     // 서버 시작 시 이벤트 리스너(service-registry) 즉시 로드 적용
     await import('@/services/service-registry');
 
-    // E2E 테스트 중이거나 명시적으로 비활성화된 경우 검증 스킵
-    if (process.env.SKIP_ENV_VALIDATION === 'true' || process.env.PLAYWRIGHT_TEST === 'true') {
+    // E2E 테스트 등에서만 검증 스킵을 허용한다. 프로덕션에서는 스킵 플래그를 무시하고
+    // 항상 환경 변수 검증을 수행한다(실수로 켜진 플래그로 fast-fail이 비활성화되는 것 방지).
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (
+      !isProduction &&
+      (process.env.SKIP_ENV_VALIDATION === 'true' || process.env.PLAYWRIGHT_TEST === 'true')
+    ) {
       console.log('✅ Instrumentation registered (env validation skipped for testing)');
       return;
     }

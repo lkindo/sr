@@ -1,41 +1,25 @@
 import { NextResponse } from 'next/server';
 
+import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// GET /api/health - 데이터베이스 연결 상태 확인
+// GET /api/health - DB 연결 상태 확인 (공개 엔드포인트: 최소 정보만 노출)
+// 보안: DB 서버 시간/원시 쿼리 결과/드라이버 에러 메시지를 외부에 노출하지 않는다.
 export async function GET() {
   try {
-    // Prisma로 간단한 쿼리 실행하여 연결 테스트
-    const result = await prisma.$queryRaw`SELECT 1 as connected`;
-
-    // 현재 시간도 가져와서 DB 시간 확인
-    const dbTime = await prisma.$queryRaw`SELECT NOW() as server_time`;
-
-    return NextResponse.json({
-      status: 'healthy',
-      database: {
-        connected: true,
-        result: result,
-        serverTime: dbTime,
-      },
-      timestamp: new Date().toISOString(),
-    });
+    await prisma.$queryRaw`SELECT 1`;
+    return NextResponse.json({ status: 'healthy', timestamp: new Date().toISOString() });
   } catch (error) {
-    console.error('Database health check failed:', error);
-
+    logger.error(
+      '[health] Database health check failed',
+      error instanceof Error ? error : undefined
+    );
     return NextResponse.json(
-      {
-        status: 'unhealthy',
-        database: {
-          connected: false,
-          error: error instanceof Error ? error.message : '알 수 없는 오류',
-        },
-        timestamp: new Date().toISOString(),
-      },
+      { status: 'unhealthy', timestamp: new Date().toISOString() },
       { status: 503 }
     );
   }

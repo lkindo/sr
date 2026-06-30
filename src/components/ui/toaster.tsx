@@ -17,7 +17,12 @@ export function Toaster() {
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
-          <Toast key={id} {...props}>
+          // 오류(destructive) 토스트는 assertive(foreground)로 즉시 안내, 그 외는 polite(background)
+          <Toast
+            key={id}
+            type={props.variant === 'destructive' ? 'foreground' : 'background'}
+            {...props}
+          >
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && <ToastDescription>{description}</ToastDescription>}

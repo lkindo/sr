@@ -44,12 +44,14 @@ export function withAuth<T extends NextRequest = NextRequest, P = Promise<Record
   handler: (request: T, context: AuthenticatedContext<P>) => Promise<NextResponse>
 ) {
   return async (request: T, routeContext: { params: P }): Promise<NextResponse> => {
+    let actorId: string | undefined;
     try {
       // 인증 확인
       const session = await auth();
       if (!session || !session.user?.id) {
         throw new UnauthorizedError();
       }
+      actorId = session.user.id;
 
       // 타입 안전한 세션으로 변환
       const authenticatedSession: AuthenticatedSession = {
@@ -73,9 +75,9 @@ export function withAuth<T extends NextRequest = NextRequest, P = Promise<Record
 
       return await handler(request, context);
     } catch (error) {
-      const session = await auth();
+      // 이미 해석된 세션의 userId를 재사용 (catch에서 auth() 재호출 방지)
       return handleApiError(error, {
-        userId: session?.user?.id,
+        userId: actorId,
         path: request.url,
         method: request.method,
       });

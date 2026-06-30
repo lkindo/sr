@@ -285,6 +285,9 @@ model SR {
   @@index([serviceCategoryId])
   @@index([status, priority, createdAt])
   @@index([intakeById])
+  // 마감일 기반 큐/대시보드(dueToday, 담당자별 마감 임박) 조회 가속
+  @@index([status, dueDate])
+  @@index([assigneeId, dueDate])
   @@map("srs")
 }
 

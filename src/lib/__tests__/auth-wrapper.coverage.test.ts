@@ -116,8 +116,8 @@ describe('withAuth', () => {
     expect(res.status).toBe(401);
     const body = await res.json();
     expect(body.code).toBe('UNAUTHORIZED');
-    // auth() is called once in try, once in catch
-    expect(mockedAuth).toHaveBeenCalledTimes(2);
+    // auth() is called once in try; the catch reuses the already-resolved id (no second call)
+    expect(mockedAuth).toHaveBeenCalledTimes(1);
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
@@ -163,21 +163,19 @@ describe('withAuth', () => {
     expect(body.error).toBe('boom');
   });
 
-  it('still produces an error response when the catch-block auth() also fails (userId undefined)', async () => {
-    // First call (try) succeeds, handler throws; second call (catch) rejects.
-    mockedAuth
-      .mockResolvedValueOnce(fullSession as any)
-      .mockRejectedValueOnce(new Error('auth down'));
+  it('reuses the resolved session in the catch block (does not call auth() a second time)', async () => {
+    // auth() succeeds in the try block, then the handler throws.
+    mockedAuth.mockResolvedValue(fullSession as any);
 
     const handler = vi.fn(async () => {
       throw new UnauthorizedError();
     });
     const wrapped = withAuth(handler);
 
-    // The catch block awaits auth() again; if it rejects the wrapper rejects.
-    await expect(wrapped(makeRequest(), { params: Promise.resolve({}) })).rejects.toThrow(
-      'auth down'
-    );
+    // Handler-thrown error is converted to a response (no rejection) and auth() ran only once.
+    const res = await wrapped(makeRequest(), { params: Promise.resolve({}) });
+    expect(res.status).toBe(401);
+    expect(mockedAuth).toHaveBeenCalledTimes(1);
   });
 });
 
