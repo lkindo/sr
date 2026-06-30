@@ -83,15 +83,14 @@ jobs:
         run: pnpm exec playwright install --with-deps
         timeout-minutes: 5
 
-      - name: Run tests
-        run: pnpm test
+      # 커버리지로 테스트를 실행하여 vitest.config.ts의 임계값(80/80/75/70)이
+      # 실제로 CI를 게이트하도록 한다. (과거 continue-on-error:true 로 임계값 미달이
+      # 무시되던 문제 수정 + 중복 테스트 실행 제거)
+      - name: Run tests with coverage
+        run: pnpm test:coverage
         env:
           DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
           DIRECT_URL: ${{ secrets.TEST_DIRECT_URL }}
-
-      - name: Generate coverage report
-        run: pnpm test:coverage
-        continue-on-error: true
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

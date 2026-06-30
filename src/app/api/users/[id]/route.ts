@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BusinessRuleError, NotFoundError } from '@/lib/errors';
+import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+import { ensureCanDeleteUser, ensureCanReadUser, ensureCanUpdateUser } from '@/lib/policies';
 import { userUpdateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
@@ -10,7 +12,7 @@ import { UserService } from '@/services/user.service';
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -21,6 +23,9 @@ export const GET = withAuthAndRateLimit(
       throw new NotFoundError('사용자');
     }
 
+    // 권한 체크: 관리자 / USER:READ 권한자 / 본인만 조회 가능
+    ensureCanReadUser(session.user, user);
+
     return NextResponse.json(user);
   },
   { preset: 'standard' }
@@ -30,13 +35,30 @@ export const GET = withAuthAndRateLimit(
 export const PATCH = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
     const validated = await validateRequestBody(request, userUpdateSchema);
 
     const userService = new UserService();
-    const user = await userService.updateUser(id, validated);
+    const targetUser = await userService.getUserById(id);
+    if (!targetUser) {
+      throw new NotFoundError('사용자');
+    }
+
+    // 권한 체크: 관리자 / USER:UPDATE 권한자 / (USER:UPDATE_SELF 보유) 본인만 수정 가능
+    ensureCanUpdateUser(session.user, targetUser);
+
+    // 권한 상승/테넌트 이탈 방지: 타인을 관리할 수 없는(본인 셀프 수정) 사용자는
+    // 민감 필드(email/isActive/clientIds)를 변경할 수 없고 이름/이미지만 수정 가능.
+    const canManageOthers =
+      session.user.roles.includes('ADMIN') ||
+      hasPermissionFlag(session.user, PERMISSIONS.USER.UPDATE);
+    const updateData = canManageOthers
+      ? validated
+      : { name: validated.name, image: validated.image };
+
+    const user = await userService.updateUser(id, updateData, session.user.id);
 
     return NextResponse.json(user);
   },
@@ -58,12 +80,19 @@ export const DELETE = withAuthAndRateLimit(
     }
 
     const userService = new UserService();
+    const targetUser = await userService.getUserById(id);
+    if (!targetUser) {
+      throw new NotFoundError('사용자');
+    }
+
+    // 권한 체크: 관리자 / USER:DELETE 권한자만 삭제 가능
+    ensureCanDeleteUser(session.user, targetUser);
 
     if (isHardDelete) {
-      await userService.hardDeleteUser(id);
+      await userService.hardDeleteUser(id, session.user.id);
       return NextResponse.json({ message: '사용자가 완전히 삭제되었습니다.' });
     } else {
-      await userService.deactivateUser(id);
+      await userService.deactivateUser(id, session.user.id);
       return NextResponse.json({ message: '사용자가 비활성화되었습니다.' });
     }
   },

@@ -214,7 +214,8 @@ describe('RateLimitPresets', () => {
 });
 
 describe('getClientIdentifier', () => {
-  it('X-Forwarded-For 헤더에서 IP를 추출해야 함', () => {
+  it('X-Forwarded-For에서 신뢰 프록시가 추가한 마지막(실제 클라이언트) IP를 사용해야 함', () => {
+    // 클라이언트가 첫 항목(1.2.3.4)을 위조하더라도, nginx가 마지막에 실제 IP(5.6.7.8)를 추가한다.
     const request = new Request('http://localhost', {
       headers: {
         'x-forwarded-for': '1.2.3.4, 5.6.7.8',
@@ -222,7 +223,7 @@ describe('getClientIdentifier', () => {
     });
 
     const ip = getClientIdentifier(request);
-    expect(ip).toBe('1.2.3.4');
+    expect(ip).toBe('5.6.7.8');
   });
 
   it('X-Real-IP 헤더에서 IP를 추출해야 함', () => {
@@ -236,7 +237,7 @@ describe('getClientIdentifier', () => {
     expect(ip).toBe('9.10.11.12');
   });
 
-  it('X-Forwarded-For가 우선순위가 높아야 함', () => {
+  it('X-Real-IP(위조 불가)가 X-Forwarded-For보다 우선순위가 높아야 함', () => {
     const request = new Request('http://localhost', {
       headers: {
         'x-forwarded-for': '1.2.3.4',
@@ -245,7 +246,7 @@ describe('getClientIdentifier', () => {
     });
 
     const ip = getClientIdentifier(request);
-    expect(ip).toBe('1.2.3.4');
+    expect(ip).toBe('9.10.11.12');
   });
 
   it('헤더가 없으면 기본값을 반환해야 함', () => {

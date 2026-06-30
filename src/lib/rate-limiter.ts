@@ -4,8 +4,6 @@
  * 메모리 기반의 토큰 버킷 알고리즘을 사용한 Rate Limiting 구현
  */
 
-import { logger } from '@/lib/logger';
-
 export interface RateLimitConfig {
   /**
    * 시간 윈도우 (밀리초)
@@ -250,21 +248,41 @@ export const rateLimiters = {
 };
 
 /**
- * IP 주소 추출 헬퍼 (Next.js Request)
+ * 헤더에서 신뢰 가능한 클라이언트 IP를 추출한다.
+ *
+ * 보안: 클라이언트가 임의로 채울 수 있는 X-Forwarded-For 의 "첫" 항목은 신뢰하지 않는다.
+ * 신뢰 가능한 리버스 프록시(nginx)가 설정하는 값만 사용한다.
+ *   - X-Real-IP: nginx 가 `$remote_addr`(실제 TCP peer)로 덮어쓰므로 위조 불가 → 최우선.
+ *   - X-Forwarded-For: nginx 가 `$proxy_add_x_forwarded_for`로 실제 클라이언트를 "마지막"에
+ *     추가하므로 마지막 항목을 사용한다(첫 항목은 클라이언트가 위조 가능하여 사용 금지).
+ *
+ * 전제: 앱 앞단의 신뢰 프록시가 위 헤더를 신뢰 가능하게 설정한다(nginx.conf 참조).
  */
-export function getClientIdentifier(request: Request): string {
-  // 1. X-Forwarded-For 헤더 확인 (프록시 뒤에 있을 경우)
-  const forwardedFor = request.headers.get('x-forwarded-for');
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim();
-  }
-
-  // 2. X-Real-IP 헤더 확인
-  const realIp = request.headers.get('x-real-ip');
+export function getClientIp(headers: { get(name: string): string | null }): string {
+  const realIp = headers.get('x-real-ip')?.trim();
   if (realIp) {
     return realIp;
   }
 
-  // 3. 기본값 (로컬 개발 환경)
+  const forwardedFor = headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const parts = forwardedFor
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length > 0) {
+      // 신뢰 프록시가 추가한 "마지막" 항목이 실제 클라이언트 IP다.
+      return parts[parts.length - 1];
+    }
+  }
+
+  // 기본값 (로컬 개발 환경 / 프록시 미경유)
   return 'unknown';
+}
+
+/**
+ * IP 주소 추출 헬퍼 (Next.js Request)
+ */
+export function getClientIdentifier(request: Request): string {
+  return getClientIp(request.headers);
 }

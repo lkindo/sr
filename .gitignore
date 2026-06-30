@@ -66,6 +66,8 @@ eslintcache
 # ------------------------------------------------------------------------------
 public/uploads/*
 !public/uploads/.gitkeep
+# 첨부파일 로컬 저장소 (웹루트 밖, 런타임 데이터)
+/var/uploads/
 *storybook.log
 storybook-static/
 

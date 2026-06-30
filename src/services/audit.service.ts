@@ -17,8 +17,18 @@ export class AuditService {
    */
   async createLog(tx: any, data: AuditLogData): Promise<void> {
     const client = tx || prisma;
-    const changesString =
-      typeof data.changes === 'string' ? data.changes : JSON.stringify(data.changes);
+
+    // changes 컬럼은 Prisma `Json`(jsonb) 타입이므로 객체를 그대로 전달해야 한다.
+    // (과거에는 JSON.stringify 로 문자열을 넣어 jsonb 안에 JSON "문자열 스칼라"가
+    //  저장되는 이중 인코딩 버그가 있었고, jsonb 경로 쿼리/인덱싱이 무력화되었다.)
+    let changes: unknown = data.changes;
+    if (typeof data.changes === 'string') {
+      try {
+        changes = JSON.parse(data.changes);
+      } catch {
+        changes = data.changes; // 유효한 JSON이 아니면 문자열 스칼라로 저장
+      }
+    }
 
     try {
       if (client.auditLog && typeof client.auditLog.create === 'function') {
@@ -28,7 +38,7 @@ export class AuditService {
             actionType: data.actionType,
             targetEntity: data.targetEntity,
             targetId: data.targetId || null,
-            changes: changesString,
+            changes,
             ipAddress: data.ipAddress || null,
           },
         });

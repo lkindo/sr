@@ -409,34 +409,37 @@ export class UserService {
     actorId?: string | null,
     ipAddress?: string | null
   ): Promise<Omit<User, 'password'>> {
-    // 1. 진행 중인 SR 확인
-    const prismaInstance = (await import('@/lib/prisma')).default;
-    const activeSRs =
-      prismaInstance.sR && typeof prismaInstance.sR.findMany === 'function'
-        ? await prismaInstance.sR.findMany({
-            where: {
-              assigneeId: userId,
-              status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
-            },
-            select: {
-              id: true,
-              srNumber: true,
-              title: true,
-              status: true,
-            },
-          })
-        : [];
-
-    // 2. 진행 중인 SR이 있으면 에러 반환
-    if (activeSRs.length > 0) {
-      const srList = activeSRs.map((sr) => `${sr.srNumber} (${sr.status})`).join(', ');
-      throw new ValidationError(
-        `사용자에게 ${activeSRs.length}개의 진행 중인 SR이 할당되어 있습니다. ` +
-          `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
-      );
-    }
-
     return this.runInTransaction(async (tx) => {
+      // 1. 진행 중인 SR 확인 — TOCTOU 방지를 위해 검사와 비활성화를 같은 트랜잭션에서 수행한다.
+      //    (검사 후 비활성화 사이에 새 SR이 배정되어 비활성 담당자에게 orphan SR이
+      //     남는 문제를 줄인다. 배정 경로의 isActive 가드와 함께 동작.)
+      const activeSRs =
+        tx?.sR && typeof tx.sR.findMany === 'function'
+          ? await tx.sR.findMany({
+              where: {
+                assigneeId: userId,
+                status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
+              },
+              select: {
+                id: true,
+                srNumber: true,
+                title: true,
+                status: true,
+              },
+            })
+          : [];
+
+      // 2. 진행 중인 SR이 있으면 비활성화 차단
+      if (activeSRs.length > 0) {
+        const srList = activeSRs
+          .map((sr: { srNumber: string; status: string }) => `${sr.srNumber} (${sr.status})`)
+          .join(', ');
+        throw new ValidationError(
+          `사용자에게 ${activeSRs.length}개의 진행 중인 SR이 할당되어 있습니다. ` +
+            `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
+        );
+      }
+
       // 3. 진행 중인 SR이 없으면 비활성화
       const userUpdateFn =
         tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;

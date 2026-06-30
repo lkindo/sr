@@ -111,7 +111,10 @@ describe('SRService.updateSR Branches', () => {
     vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
     const txMock = {
-      sR: { update: vi.fn().mockResolvedValue({ id: 'sr-1' }) },
+      sR: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        update: vi.fn().mockResolvedValue({ id: 'sr-1' }),
+      },
       sRActivity: { create: vi.fn() },
     };
     vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));

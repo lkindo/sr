@@ -8,7 +8,7 @@ import { authConfig } from '@/auth.config';
 const { auth } = NextAuth(authConfig);
 
 // Rate Limiter 인스턴스 (메모리 유지 - 람다/엣지에서는 인스턴스마다 별도일 수 있음)
-import { rateLimiters } from '@/lib/rate-limiter';
+import { getClientIdentifier, rateLimiters } from '@/lib/rate-limiter';
 const ratelimit = rateLimiters.middleware;
 
 export default auth(async (req) => {
@@ -27,7 +27,8 @@ export default auth(async (req) => {
   const isServerAction = req.method === 'POST' && req.headers.has('next-action');
 
   if (isApiRoute || isServerAction) {
-    const ip = req.headers.get('x-forwarded-for') ?? '127.0.0.1';
+    // 신뢰 프록시 기반 IP 해석 (조작 가능한 XFF 첫 항목 사용 금지)
+    const ip = getClientIdentifier(req);
     const { allowed, limit, resetTime, remaining } = await ratelimit.check(ip);
 
     if (!allowed) {

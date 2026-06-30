@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { getSRUrl } from '@/lib/app-url';
 import { domainEvents } from '@/lib/domain-events';
-import { BusinessRuleError, NotFoundError, ServiceError } from '@/lib/errors';
+import { BusinessRuleError, ConflictError, NotFoundError, ServiceError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
@@ -307,6 +307,21 @@ export class SRService {
         let currentSR: SRUpdateResult = existingSR;
 
         if (Object.keys(updateData).length > 0) {
+          // 낙관적 동시성 제어:
+          // 스냅샷(existingSR)을 읽은 이후 상태가 변경되지 않았을 때만 갱신을 허용한다.
+          // updateMany 의 WHERE 에 기대 상태를 포함하면, 동시 전이 시 매칭 0건이 되어
+          // lost update / 불법 상태 전이 / 이중 처리를 방지한다.
+          // (이 updateMany 는 행 잠금을 획득하므로 이어지는 update 도 일관성이 보장된다.)
+          const guard = await tx.sR.updateMany({
+            where: { id, status: existingSR.status },
+            data: { updatedAt: new Date() },
+          });
+          if (guard.count === 0) {
+            throw new ConflictError(
+              '다른 사용자가 먼저 이 SR을 변경했습니다. 새로고침 후 다시 시도해주세요.'
+            );
+          }
+
           currentSR = await tx.sR.update({
             where: { id },
             data: updateData,

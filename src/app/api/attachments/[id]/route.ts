@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanUpdateSR } from '@/lib/policies';
+import { ensureCanReadSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { deleteAttachmentBlob } from '@/lib/storage';
 
@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 export const GET = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -26,7 +26,19 @@ export const GET = withAuthAndRateLimit(
       throw new NotFoundError('첨부파일');
     }
 
-    return NextResponse.json(attachment);
+    // 권한 체크: 첨부파일이 속한 SR을 조회할 수 있어야 함 (IDOR 방지)
+    const sr = await prisma.sR.findUnique({
+      where: { id: attachment.srId },
+    });
+    if (!sr) {
+      throw new NotFoundError('SR');
+    }
+    ensureCanReadSR(session.user, sr);
+
+    // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
+    const { storagePath: _storagePath, ...safeAttachment } = attachment;
+
+    return NextResponse.json(safeAttachment);
   },
   { preset: 'standard' }
 ); // 1분당 100회

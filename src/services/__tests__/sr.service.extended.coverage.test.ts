@@ -107,6 +107,7 @@ describe('SRService Extended Branches', () => {
 
       const txMock = {
         sR: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
           update: vi.fn().mockResolvedValue({
             id: 'sr-1',
             srNumber: 'SR-1',
@@ -170,7 +171,10 @@ describe('SRService Extended Branches', () => {
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
       const txMock = {
-        sR: { update: vi.fn().mockResolvedValue({ id: 'sr-1' }) },
+        sR: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          update: vi.fn().mockResolvedValue({ id: 'sr-1' }),
+        },
         sRActivity: { create: vi.fn() },
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
@@ -221,7 +225,10 @@ describe('SRService Extended Branches', () => {
       } as any);
 
       const txMock = {
-        sR: { update: vi.fn().mockResolvedValue({ id: 'sr-1' }) },
+        sR: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          update: vi.fn().mockResolvedValue({ id: 'sr-1' }),
+        },
         sRActivity: { create: vi.fn() },
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));

@@ -128,9 +128,11 @@ export class PushService {
   /**
    * Remove a push subscription by endpoint
    */
-  async removeSubscription(endpoint: string): Promise<void> {
+  async removeSubscription(endpoint: string, userId?: string): Promise<void> {
+    // userId가 주어지면 호출자 소유 구독만 삭제한다(IDOR 방지).
+    // userId 미지정은 내부 정리 용도(전송 실패로 확인된 죽은 구독 제거)로만 사용한다.
     await prisma.pushSubscription.deleteMany({
-      where: { endpoint },
+      where: userId ? { endpoint, userId } : { endpoint },
     });
   }
 

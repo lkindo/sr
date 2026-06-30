@@ -58,8 +58,8 @@ export async function DELETE(request: NextRequest) {
     const endpoint = searchParams.get('endpoint');
 
     if (endpoint) {
-      // Remove specific subscription
-      await pushService.removeSubscription(endpoint);
+      // Remove specific subscription (호출자 소유 구독만 삭제 — IDOR 방지)
+      await pushService.removeSubscription(endpoint, session.user.id);
     } else {
       // Remove all subscriptions for the user
       await pushService.removeUserSubscriptions(session.user.id);

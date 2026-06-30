@@ -11,6 +11,7 @@ import { BadRequestError, NotFoundError } from '@/lib/errors';
 import { FileValidationError, validateFile } from '@/lib/file-validator';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { STORAGE_DIR } from '@/lib/storage';
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';
@@ -63,8 +64,8 @@ export const POST = withAuthAndRateLimit(
       throw new BadRequestError('한 번에 최대 10개의 파일만 업로드할 수 있습니다.');
     }
 
-    // 업로드 디렉토리 생성
-    const uploadDir = join(process.cwd(), 'public', 'uploads', 'attachments');
+    // 업로드 디렉토리 생성 (웹루트 밖 STORAGE_DIR 기준 — 정적 서빙 차단)
+    const uploadDir = join(STORAGE_DIR, 'attachments');
     await mkdir(uploadDir, { recursive: true });
 
     // 모든 파일에 대해 동일한 타임스탬프 사용 (배치 처리)
@@ -86,13 +87,15 @@ export const POST = withAuthAndRateLimit(
           await pipeline(Readable.fromWeb(file.stream() as any), writableStream);
 
           // DB 저장 데이터 준비
+          // fileUrl 은 생성 후 attachment id 기반 인증 다운로드 경로로 갱신된다(아래 참조).
+          // storagePath 는 STORAGE_DIR 기준 상대 경로로 저장한다.
           const attachmentData = {
             srId,
             fileName: file.name,
-            fileUrl: `/uploads/attachments/${fileName}`,
+            fileUrl: '',
             fileSize: size,
             fileType: mimeType, // 검증된 MIME 타입 사용
-            storagePath: filePath,
+            storagePath: `attachments/${fileName}`,
             uploadedBy: session.user.id,
           };
 
@@ -122,6 +125,20 @@ export const POST = withAuthAndRateLimit(
       createdAttachments = await prisma.sRAttachment.createManyAndReturn({
         data: attachmentsToInsert,
       });
+
+      // fileUrl 을 인증 다운로드 라우트로 설정 (attachment id 가 필요하므로 생성 후 갱신)
+      await Promise.all(
+        createdAttachments.map((a) =>
+          prisma.sRAttachment.update({
+            where: { id: a.id },
+            data: { fileUrl: `/api/attachments/${a.id}/download` },
+          })
+        )
+      );
+      createdAttachments = createdAttachments.map((a) => ({
+        ...a,
+        fileUrl: `/api/attachments/${a.id}/download`,
+      }));
     }
 
     const uploadedAttachments = createdAttachments.map((attachment) => ({

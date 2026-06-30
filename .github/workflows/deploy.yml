@@ -98,8 +98,9 @@ jobs:
               docker compose -p sr-test -f docker-compose.test.yml down
               docker compose -p sr-test -f docker-compose.test.yml up -d
 
-              # 2. DB 마이그레이션 및 시딩 (프로젝트 지정 exec 방식 적용)
-              docker compose -p sr-test exec -T app-test npx prisma@6.19.0 db push --accept-data-loss
+              # 2. DB 시딩 (스테이징 테스트 데이터)
+              #    스키마 마이그레이션은 컨테이너 시작 시 docker-entrypoint.sh의
+              #    `prisma migrate deploy`가 자동 수행하므로 `db push --accept-data-loss`는 제거.
               docker compose -p sr-test exec -T app-test npx tsx prisma/seed.ts
               
               # 3. 미사용 이미지 prune
@@ -132,9 +133,12 @@ jobs:
               chmod +x scripts/setup-letsencrypt.sh
               ./scripts/setup-letsencrypt.sh
               
-              # 5. 데이터베이스 마이그레이션 및 시딩 자동화
-              docker exec -i sr-app npx prisma@6.19.0 db push --accept-data-loss
-              docker exec -i sr-app npx tsx prisma/seed.ts
+              # 5. 데이터베이스 마이그레이션
+              #    스키마 마이그레이션은 컨테이너 시작 시 docker-entrypoint.sh의
+              #    `prisma migrate deploy`가 자동 수행한다.
+              #    (과거의 `db push --accept-data-loss` + 무조건 reseed 는 프로덕션
+              #     데이터 유실 및 운영 계정 비밀번호 초기화 위험이 있어 제거.
+              #     운영 초기 시딩이 필요하면 1회성 수동 작업으로만 수행한다.)
               
               # 6. 미사용 이미지 정리
               docker compose -f docker-compose.prod.yml image prune -af || docker image prune -af

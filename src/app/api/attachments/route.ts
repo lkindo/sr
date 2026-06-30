@@ -36,21 +36,26 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    // 파일 저장 (Vercel Blob)
+    // 파일 저장 (웹루트 밖 STORAGE_DIR)
     const uploadResult = await uploadAttachmentBlob(srId, file);
 
-    // DB에 첨부파일 정보 저장
+    // DB에 첨부파일 정보 저장 (fileUrl 은 생성 후 id 기반 인증 다운로드 경로로 갱신)
     const attachment = await prisma.sRAttachment.create({
       data: {
         srId,
         fileName: file.name,
         fileSize: file.size,
         fileType: file.type,
-        fileUrl: uploadResult.url,
+        fileUrl: '',
         storagePath: uploadResult.pathname,
         uploadedBy: session.user.id,
       },
     });
+
+    // fileUrl 을 인증 다운로드 라우트로 설정 (attachment id 필요)
+    const fileUrl = `/api/attachments/${attachment.id}/download`;
+    await prisma.sRAttachment.update({ where: { id: attachment.id }, data: { fileUrl } });
+    attachment.fileUrl = fileUrl;
 
     // 활동 내역 추가
     await prisma.sRActivity.create({

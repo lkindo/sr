@@ -22,8 +22,14 @@ class EmailService {
         pass: process.env.EMAIL_SERVER_PASSWORD,
       },
       tls: {
-        rejectUnauthorized: false, // 개발 환경에서 로컬 인증서 문제 방지
+        // 프로덕션에서는 반드시 TLS 인증서를 검증한다(MITM 자격증명 탈취 방지).
+        // 자체서명 인증서를 쓰는 로컬 개발 환경에서만 검증을 완화한다.
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
       },
+      // 외부 SMTP 서버 응답 지연으로 풀 연결이 묶이는 것을 방지
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
   }
 

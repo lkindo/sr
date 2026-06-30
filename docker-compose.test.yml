@@ -11,6 +11,11 @@ services:
       - .env.docker.test
     environment:
       - NODE_OPTIONS=--max-old-space-size=450
+      # 첨부파일 저장 위치(웹루트 밖). 아래 명명 볼륨이 이 경로에 마운트된다.
+      - STORAGE_DIR=/app/var/uploads
+    volumes:
+      # 첨부파일 영속화 (재배포 시 유실 방지 + 웹루트 밖 보관)
+      - sr_uploads_test:/app/var/uploads
     depends_on:
       db-test:
         condition: service_healthy
@@ -49,6 +54,7 @@ services:
 
 volumes:
   sr_db_test_data:
+  sr_uploads_test:
 
 networks:
   sr-net:

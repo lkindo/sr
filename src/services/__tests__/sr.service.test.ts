@@ -175,6 +175,7 @@ describe('SRService', () => {
 
       const txMock = {
         sR: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
           update: vi.fn().mockResolvedValue(mockUpdateResult),
         },
         sRActivity: {

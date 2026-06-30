@@ -63,6 +63,10 @@ COPY docker-entrypoint.sh /usr/local/bin/
 RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# 첨부파일 저장 디렉토리(웹루트 밖). 명명 볼륨이 nextjs 소유로 초기화되도록 미리 생성.
+RUN mkdir -p /app/var/uploads && chown -R nextjs:nodejs /app/var
+ENV STORAGE_DIR=/app/var/uploads
+
 USER nextjs
 
 EXPOSE 3000

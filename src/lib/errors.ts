@@ -114,6 +114,20 @@ export class DuplicateError extends ServiceError {
 }
 
 /**
+ * 동시성 충돌 에러 (낙관적 잠금 실패)
+ * 다른 트랜잭션이 먼저 리소스를 변경하여 현재 작업이 stale 스냅샷에 근거한 경우.
+ */
+export class ConflictError extends ServiceError {
+  constructor(
+    message: string = '다른 사용자가 먼저 이 항목을 변경했습니다. 새로고침 후 다시 시도해주세요.'
+  ) {
+    super(message, 'CONFLICT', 409);
+    this.name = 'ConflictError';
+    Object.setPrototypeOf(this, ConflictError.prototype);
+  }
+}
+
+/**
  * 너무 많은 요청 에러 (Rate Limit 초과)
  */
 export class TooManyRequestsError extends ServiceError {

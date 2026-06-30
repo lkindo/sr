@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanUpdateRole } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
 const permissionAssignSchema = z.object({
@@ -14,7 +15,7 @@ const permissionAssignSchema = z.object({
 export const POST = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
 
@@ -37,6 +38,9 @@ export const POST = withAuthAndRateLimit(
     if (!role) {
       throw new NotFoundError('역할');
     }
+
+    // 권한 체크: 역할 수정 권한(ADMIN 또는 ROLE:UPDATE)이 있어야 하며 ADMIN 역할은 변경 불가
+    ensureCanUpdateRole(session.user, role);
 
     // Delete existing permissions
     await prisma.rolePermission.deleteMany({

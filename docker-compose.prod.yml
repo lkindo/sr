@@ -30,6 +30,11 @@ services:
       - .env.docker
     environment:
       - NODE_OPTIONS=--max-old-space-size=450
+      # 첨부파일 저장 위치(웹루트 밖). 아래 명명 볼륨이 이 경로에 마운트된다.
+      - STORAGE_DIR=/app/var/uploads
+    volumes:
+      # 첨부파일 영속화 (재배포 시 유실 방지 + 웹루트 밖 보관)
+      - sr_uploads:/app/var/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -49,8 +54,10 @@ services:
       - POSTGRES_USER=lkind
       - POSTGRES_PASSWORD=sr1234
       - POSTGRES_DB=sr_db
-    ports:
-      - '5432:5432'
+    # 보안: DB 포트를 호스트로 공개하지 않는다. app 컨테이너는 내부 브리지(sr-net)로 접근한다.
+    # 관리 접근이 필요하면 SSH 터널 또는 `docker exec`를 사용한다.
+    # ports:
+    #   - '5432:5432'
     volumes:
       - sr_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -68,6 +75,7 @@ services:
 
 volumes:
   sr_db_data:
+  sr_uploads:
 
 networks:
   sr-net:

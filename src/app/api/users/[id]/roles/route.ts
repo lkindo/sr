@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 
 const roleAssignSchema = z.object({
@@ -14,9 +14,17 @@ const roleAssignSchema = z.object({
 export const POST = withAuthAndRateLimit(
   async (
     request: NextRequest,
-    { params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
+
+    // 권한 체크: 역할 할당 권한(ADMIN 또는 ROLE:ASSIGN)이 있어야 함
+    // (인증만 하는 withAuthAndRateLimit 만으로는 인가가 보장되지 않으므로 필수)
+    const canAssignRoles =
+      session.user.roles.includes('ADMIN') || session.user.permissions.includes('ROLE:ASSIGN');
+    if (!canAssignRoles) {
+      throw new ForbiddenError('역할을 할당할 권한이 없습니다.');
+    }
 
     const body = await request.json();
     let validated;
@@ -57,6 +65,12 @@ export const POST = withAuthAndRateLimit(
       });
 
       const roleNames = roles.map((r) => r.name);
+
+      // 권한 상승 방지: ADMIN 역할 할당은 ADMIN만 가능
+      if (!session.user.roles.includes('ADMIN') && roleNames.includes('ADMIN')) {
+        throw new ForbiddenError('ADMIN 역할은 ADMIN만 할당할 수 있습니다.');
+      }
+
       const SYSTEM_TEAM_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
       const CLIENT_TEAM_ROLES = ['CLIENT_ADMIN', 'CLIENT_USER'];
 

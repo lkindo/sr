@@ -4,7 +4,7 @@ import { $Enums, Prisma } from '@prisma/client';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SLA } from '@/lib/constants';
-import { BadRequestError, ForbiddenError, NotFoundError } from '@/lib/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
@@ -66,6 +66,7 @@ export const POST = withAuthAndRateLimit(
           id: true,
           name: true,
           email: true,
+          isActive: true,
         },
       }),
     ]);
@@ -90,105 +91,123 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('담당자');
     }
 
+    // 비활성 사용자에게는 담당자를 배정할 수 없음 (비활성 담당자에게 orphan SR 방지)
+    if (!assignee.isActive) {
+      throw new BadRequestError('비활성 상태의 사용자에게는 담당자를 배정할 수 없습니다.');
+    }
+
     // 4. SLA 기반 마감일 자동 계산
     const slaHours = sr.serviceCategory.slaHours;
     const adjustedHours = slaHours * SLA.PRIORITY_MULTIPLIER[validated.actualPriority];
     const dueDate = new Date();
     dueDate.setHours(dueDate.getHours() + adjustedHours);
 
-    // 5. SR 업데이트 (REQUESTED → INTAKE) 및 상태 이력 생성
-    const updatedSR = await prisma.sR.update({
-      where: { id },
-      data: {
-        status: 'INTAKE',
-        intakeAt: new Date(),
-        intakeBy: {
-          connect: { id: session.user.id },
-        },
-        statusHistory: {
-          create: {
-            previousStatus: 'REQUESTED',
-            currentStatus: 'INTAKE',
-            changedBy: session.user.id,
-            changeReason: 'SR 접수 처리',
-          },
-        },
-        actualPriority: validated.actualPriority,
-        estimatedHours: validated.estimatedHours,
-        estimatedCompletionDate: new Date(validated.estimatedCompletionDate),
-        dueDate: dueDate,
-        intakeNotes: validated.intakeNotes || null,
-        assignee: {
-          connect: { id: validated.assigneeId },
-        },
-      },
-      include: {
-        client: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-        serviceCategory: true,
-        requester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        intakeBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+    // 5. SR 업데이트 (REQUESTED → INTAKE) — 하나의 트랜잭션에서 원자적으로 처리
+    //    상태 변경 + 상태 이력 + 활동 로그를 함께 커밋하여 중간 실패 시
+    //    부분 기록(상태만 바뀌고 활동 로그 누락 등)이 남지 않도록 한다.
+    const updatedSR = await prisma.$transaction(async (tx) => {
+      // 낙관적 동시성 제어: REQUESTED 상태일 때만 접수 진행 (동시 이중 접수 방지).
+      // 상태 조건 매칭이 0건이면 그 사이 다른 트랜잭션이 먼저 접수한 것이다.
+      const guard = await tx.sR.updateMany({
+        where: { id, status: 'REQUESTED' },
+        data: { updatedAt: new Date() },
+      });
+      if (guard.count === 0) {
+        throw new ConflictError('이미 접수되었거나 다른 사용자가 먼저 접수 처리했습니다.');
+      }
 
-    // 6. Activity 로그 생성
-    await prisma.sRActivity.create({
-      data: {
-        srId: id,
-        userId: session.user.id,
-        type: $Enums.SRActivityType.STATUS_CHANGED,
-        description: `SR이 접수되었습니다 (담당자: ${assignee.name})`,
-        metadata: {
-          previousStatus: 'REQUESTED',
-          currentStatus: 'INTAKE',
+      const result = await tx.sR.update({
+        where: { id },
+        data: {
+          status: 'INTAKE',
+          intakeAt: new Date(),
+          intakeBy: {
+            connect: { id: session.user.id },
+          },
+          statusHistory: {
+            create: {
+              previousStatus: 'REQUESTED',
+              currentStatus: 'INTAKE',
+              changedBy: session.user.id,
+              changeReason: 'SR 접수 처리',
+            },
+          },
           actualPriority: validated.actualPriority,
           estimatedHours: validated.estimatedHours,
-          estimatedCompletionDate: validated.estimatedCompletionDate,
-          assigneeId: validated.assigneeId,
-          assigneeName: assignee.name,
+          estimatedCompletionDate: new Date(validated.estimatedCompletionDate),
+          dueDate: dueDate,
+          intakeNotes: validated.intakeNotes || null,
+          assignee: {
+            connect: { id: validated.assigneeId },
+          },
         },
-      },
-    });
-
-    // 7. 상태 이력 생성 - 이미 94-110 라인에서 SR 업데이트 시 statusHistory가 INTAKE로 생성됨
-    // 중복 생성 코드 제거 (기존에 IN_PROGRESS로 잘못 기록되던 버그 수정)
-
-    // 8. 담당자 배정 Activity 로그
-    await prisma.sRActivity.create({
-      data: {
-        srId: id,
-        userId: session.user.id,
-        type: $Enums.SRActivityType.ASSIGNED,
-        description: `담당자가 배정되었습니다: ${assignee.name}`,
-        metadata: {
-          assigneeId: assignee.id,
-          assigneeName: assignee.name,
+        include: {
+          client: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          serviceCategory: true,
+          requester: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          intakeBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
         },
-      },
+      });
+
+      // 6. Activity 로그 생성 (상태 변경)
+      await tx.sRActivity.create({
+        data: {
+          srId: id,
+          userId: session.user.id,
+          type: $Enums.SRActivityType.STATUS_CHANGED,
+          description: `SR이 접수되었습니다 (담당자: ${assignee.name})`,
+          metadata: {
+            previousStatus: 'REQUESTED',
+            currentStatus: 'INTAKE',
+            actualPriority: validated.actualPriority,
+            estimatedHours: validated.estimatedHours,
+            estimatedCompletionDate: validated.estimatedCompletionDate,
+            assigneeId: validated.assigneeId,
+            assigneeName: assignee.name,
+          },
+        },
+      });
+
+      // 7. 담당자 배정 Activity 로그
+      await tx.sRActivity.create({
+        data: {
+          srId: id,
+          userId: session.user.id,
+          type: $Enums.SRActivityType.ASSIGNED,
+          description: `담당자가 배정되었습니다: ${assignee.name}`,
+          metadata: {
+            assigneeId: assignee.id,
+            assigneeName: assignee.name,
+          },
+        },
+      });
+
+      return result;
     });
 
     return NextResponse.json(
@@ -217,6 +236,7 @@ export const GET = withAuthAndRateLimit(
         id: true,
         clientId: true,
         requesterId: true,
+        assigneeId: true,
         srNumber: true,
         title: true,
         description: true,
@@ -288,7 +308,7 @@ export const GET = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    ensureCanReadSR(session.user, sr as any);
+    ensureCanReadSR(session.user, sr);
 
     return NextResponse.json(sr);
   },

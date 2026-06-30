@@ -1,5 +1,6 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
+import { auth } from '@/auth';
 import { logger } from '@/lib/logger';
 import { REALTIME_EVENTS, realtimeEmitter } from '@/lib/realtime-events';
 
@@ -9,9 +10,19 @@ export const runtime = 'nodejs';
  * GET /api/realtime - Server-Sent Events (SSE) 엔드포인트
  *
  * 클라이언트가 이 엔드포인트에 접속하여 실시간 이벤트를 수신합니다.
+ *
+ * 보안: 인증된 사용자만 접속 가능.
+ * TODO(보안): 현재는 모든 SR 이벤트가 연결된 모든 사용자에게 브로드캐스트됩니다.
+ *   테넌트/RBAC 격리를 위해 이벤트 페이로드에 권한 키(clientId 등)를 포함하고
+ *   연결별로 ensureCanReadSR 기준 필터링이 필요합니다.
  */
 export async function GET(request: NextRequest) {
-  logger.info('[SSE] Client connected');
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+  }
+
+  logger.info('[SSE] Client connected', { userId: session.user.id });
 
   const encoder = new TextEncoder();
 

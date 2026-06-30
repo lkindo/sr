@@ -12,6 +12,16 @@ import { AuthenticatedUser } from '@/types/session';
 
 const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
+/**
+ * 권한 검증에 필요한 SR 필드만 추린 형태.
+ * 전체 SR 객체 대신 이 형태만 요구하여, 라우트에서 `as any` 캐스팅 없이
+ * `select`로 필요한 필드만 조회해 정책 함수에 전달할 수 있게 한다.
+ */
+export type SRAccessFields = Pick<SR, 'id' | 'clientId' | 'requesterId' | 'assigneeId'>;
+
+/** 권한 검증에 필요한 User 식별 필드(id)만 추린 형태. */
+export type UserIdentity = Pick<User, 'id'>;
+
 export function isInternalUser(user: AuthenticatedUser): boolean {
   return user.roles?.some((role) => INTERNAL_ROLES.includes(role)) ?? false;
 }
@@ -24,7 +34,7 @@ export function canCreateSR(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.CREATE);
 }
 
-export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
+export function canReadSR(user: AuthenticatedUser, sr: SRAccessFields): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return true;
 
@@ -58,7 +68,7 @@ export function canReadSR(user: AuthenticatedUser, sr: SR): boolean {
   return isRequester;
 }
 
-export function canUpdateSR(user: AuthenticatedUser, sr: SR): boolean {
+export function canUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return true;
 
@@ -100,13 +110,13 @@ export function ensureCanCreateSR(user: AuthenticatedUser): void {
   }
 }
 
-export function ensureCanReadSR(user: AuthenticatedUser, sr: SR): void {
+export function ensureCanReadSR(user: AuthenticatedUser, sr: SRAccessFields): void {
   if (!canReadSR(user, sr)) {
     throw new ForbiddenError('SR 조회 권한이 없습니다.');
   }
 }
 
-export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SR): void {
+export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): void {
   if (!canUpdateSR(user, sr)) {
     throw new ForbiddenError('SR 수정 권한이 없습니다.');
   }
@@ -178,7 +188,7 @@ export function canCreateUser(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
 }
 
-export function canReadUser(user: AuthenticatedUser, targetUser?: User): boolean {
+export function canReadUser(user: AuthenticatedUser, targetUser?: UserIdentity): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const canViewAll = hasPermissionFlag(user, PERMISSIONS.USER.READ);
 
@@ -190,7 +200,7 @@ export function canReadUser(user: AuthenticatedUser, targetUser?: User): boolean
   return isAdmin || canViewAll;
 }
 
-export function canUpdateUser(user: AuthenticatedUser, targetUser: User): boolean {
+export function canUpdateUser(user: AuthenticatedUser, targetUser: UserIdentity): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const hasUpdate = hasPermissionFlag(user, PERMISSIONS.USER.UPDATE);
   const isSelf = targetUser.id === user.id && hasPermissionFlag(user, PERMISSIONS.USER.UPDATE_SELF);
@@ -198,7 +208,7 @@ export function canUpdateUser(user: AuthenticatedUser, targetUser: User): boolea
   return isAdmin || hasUpdate || isSelf;
 }
 
-export function canDeleteUser(user: AuthenticatedUser, targetUser: User): boolean {
+export function canDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const hasDelete = hasPermissionFlag(user, PERMISSIONS.USER.DELETE);
 
@@ -216,19 +226,19 @@ export function ensureCanCreateUser(user: AuthenticatedUser): void {
   }
 }
 
-export function ensureCanReadUser(user: AuthenticatedUser, targetUser?: User): void {
+export function ensureCanReadUser(user: AuthenticatedUser, targetUser?: UserIdentity): void {
   if (!canReadUser(user, targetUser)) {
     throw new ForbiddenError('사용자 조회 권한이 없습니다.');
   }
 }
 
-export function ensureCanUpdateUser(user: AuthenticatedUser, targetUser: User): void {
+export function ensureCanUpdateUser(user: AuthenticatedUser, targetUser: UserIdentity): void {
   if (!canUpdateUser(user, targetUser)) {
     throw new ForbiddenError('사용자 수정 권한이 없습니다.');
   }
 }
 
-export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: User): void {
+export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity): void {
   if (targetUser.id === user.id) {
     throw new ForbiddenError('자기 자신을 삭제할 수 없습니다.');
   }

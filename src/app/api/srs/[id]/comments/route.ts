@@ -77,6 +77,7 @@ export const POST = withAuthAndRateLimit(
         id: true,
         clientId: true,
         requesterId: true,
+        assigneeId: true,
         srNumber: true,
         title: true,
         requester: {
@@ -100,7 +101,7 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    ensureCanReadSR(session.user, sr as any);
+    ensureCanReadSR(session.user, sr);
 
     const comment = await prisma.sRComment.create({
       data: {
