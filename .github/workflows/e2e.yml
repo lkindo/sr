@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       # pnpm을 먼저 설치해야 setup-node의 cache:'pnpm'이 pnpm store를 찾을 수 있다.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
