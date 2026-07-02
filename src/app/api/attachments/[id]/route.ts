@@ -94,15 +94,7 @@ export const DELETE = withAuthAndRateLimit(
       },
     });
 
-    // SR의 attachmentCount 업데이트
-    await prisma.sR.update({
-      where: { id: attachment.srId },
-      data: {
-        attachmentCount: {
-          decrement: 1,
-        },
-      },
-    });
+    // 첨부 개수는 조회 시 _count 로 계산하므로 별도 스칼라 컬럼을 유지하지 않는다.
 
     return NextResponse.json({ message: '파일이 삭제되었습니다.' });
   },

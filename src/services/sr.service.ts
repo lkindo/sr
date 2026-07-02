@@ -270,8 +270,16 @@ export class SRService {
               validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
           },
         };
-        if (validated.status === 'COMPLETED' && !updateData.actualCompletionDate) {
-          updateData.actualCompletionDate = new Date();
+        if (validated.status === 'COMPLETED') {
+          if (!updateData.actualCompletionDate) {
+            updateData.actualCompletionDate = new Date();
+          }
+          // 재오픈(7일) 창 판정 기준이 되는 completedAt 을 항상 기록
+          // (status 라우트뿐 아니라 updateSR 경로로 완료돼도 창 규칙이 동작하도록)
+          updateData.completedAt = new Date();
+        }
+        if (validated.status === 'CONFIRMED') {
+          updateData.confirmedAt = new Date();
         }
       }
 

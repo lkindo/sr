@@ -67,15 +67,7 @@ export const POST = withAuthAndRateLimit(
       },
     });
 
-    // SR의 attachmentCount 업데이트
-    await prisma.sR.update({
-      where: { id: srId },
-      data: {
-        attachmentCount: {
-          increment: 1,
-        },
-      },
-    });
+    // 첨부 개수는 조회 시 _count 로 계산하므로 별도 스칼라 컬럼을 유지하지 않는다.
 
     return NextResponse.json(attachment, { status: 201 });
   },

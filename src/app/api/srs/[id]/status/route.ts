@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
-import { auth } from '@/auth';
+import { RouteContext } from '@/lib/api-helpers';
+import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { srService } from '@/services/sr.service';
 
 const statusActionSchema = z.object({
@@ -11,26 +12,22 @@ const statusActionSchema = z.object({
   resolutionDescription: z.string().optional(),
 });
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const session = await auth();
-    if (!session?.user) {
-      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
-    }
-
+// PATCH /api/srs/[id]/status - SR 상태 전이 (Rate Limit: 표준)
+//
+// 인증/레이트리밋/에러→HTTP상태 매핑은 withAuthAndRateLimit + handleApiError 에 위임한다
+// (과거: 수동 auth, 레이트리밋 없음, 모든 에러를 500+원시 error.message 로 노출).
+// 실제 쓰기는 srService.updateSR 가 담당하며 낙관적 락/인가(ensureCanUpdateSR)/이벤트를 처리한다.
+// (전이 규칙 자체는 상태머신과 일부 중복 — 완전 통합은 후속 리팩터로 남김.)
+export const PATCH = withAuthAndRateLimit(
+  async (
+    request: NextRequest,
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+  ) => {
     const { id: srId } = await params;
     const body = await request.json();
 
-    // 입력 검증
-    const validationResult = statusActionSchema.safeParse(body);
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { error: '잘못된 요청입니다.', details: validationResult.error },
-        { status: 400 }
-      );
-    }
-
-    const { action, reason, resolutionDescription } = validationResult.data;
+    // 검증 실패 시 ZodError 를 던져 handleApiError 가 400 으로 매핑하게 한다.
+    const { action, reason, resolutionDescription } = statusActionSchema.parse(body);
 
     // 현재 SR 조회
     const currentSR = await srService.getSRById(srId);
@@ -44,11 +41,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     interface UpdateData {
       resolutionDescription?: string;
       rejectionReason?: string;
-      completedAt?: Date;
     }
     const updateData: UpdateData = {};
 
-    // 액션에 따른 상태 전이
+    // 액션에 따른 상태 전이 (사전조건 검사)
     switch (action) {
       case 'start':
         // INTAKE → IN_PROGRESS
@@ -74,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
         newStatus = 'COMPLETED';
         updateData.resolutionDescription = resolutionDescription;
-        updateData.completedAt = new Date();
+        // completedAt 은 updateSR 가 COMPLETED 전이 시 직접 기록한다.
         break;
 
       case 'hold':
@@ -142,7 +138,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (!reason) {
           return NextResponse.json({ error: '재오픈 사유를 입력해주세요.' }, { status: 400 });
         }
-        // 7일 이내 확인
+        // 7일 이내 확인 (completedAt 이 기록된 경우)
         if (currentSR.completedAt) {
           const daysSinceCompletion =
             (new Date().getTime() - new Date(currentSR.completedAt).getTime()) /
@@ -161,20 +157,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: '알 수 없는 액션입니다.' }, { status: 400 });
     }
 
-    // 상태 업데이트
+    // 상태 업데이트 (낙관적 락/인가/이벤트는 updateSR 가 처리; 오류는 handleApiError 로 전파)
     const result = await srService.updateSR(
       srId,
       {
         status: newStatus,
         changeReason: reason || `상태 변경: ${currentStatus} → ${newStatus}`,
-        ...(updateData.resolutionDescription &&
-          typeof updateData.resolutionDescription === 'string' && {
-            resolutionDescription: updateData.resolutionDescription,
-          }),
-        ...(updateData.rejectionReason &&
-          typeof updateData.rejectionReason === 'string' && {
-            rejectionReason: updateData.rejectionReason,
-          }),
+        ...(updateData.resolutionDescription && {
+          resolutionDescription: updateData.resolutionDescription,
+        }),
+        ...(updateData.rejectionReason && {
+          rejectionReason: updateData.rejectionReason,
+        }),
       },
       session.user
     );
@@ -184,13 +178,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: result,
       message: '상태가 변경되었습니다.',
     });
-  } catch (error) {
-    console.error('SR 상태 변경 오류:', error);
-    return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : '상태 변경 중 오류가 발생했습니다.',
-      },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { preset: 'standard' }
+);
