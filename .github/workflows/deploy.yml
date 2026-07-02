@@ -67,7 +67,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          source: '.env.docker.test,docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh'
+          source: '.env.docker.test,docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh,scripts/backup.sh,scripts/restore.sh'
           target: '/home/opc/sr'
 
       # SSH를 이용해 대상 서버로 배포 원격 실행
@@ -86,6 +86,12 @@ jobs:
           script: |
             mkdir -p /home/opc/sr/nginx/certs /home/opc/sr/scripts
             cd /home/opc/sr
+
+            # 백업/복구 스크립트 실행권한 보장(CRLF 정리 포함)
+            if [ -f scripts/backup.sh ]; then
+              sed -i 's/\r$//' scripts/backup.sh scripts/restore.sh 2>/dev/null || true
+              chmod +x scripts/backup.sh scripts/restore.sh 2>/dev/null || true
+            fi
 
             # GHCR 로그인 수행으로 pull denied 오류 해결
             echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
