@@ -412,12 +412,14 @@ export function SRsDataTable({
                   {/* First Row: Status, Priority, Client, Assignee */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div>
-                      <Label className="text-sm mb-2 block">상태</Label>
+                      <Label htmlFor="filter-status" className="text-sm mb-2 block">
+                        상태
+                      </Label>
                       <Select
                         value={filters.status}
                         onValueChange={(v) => handleFilterChange('status', v)}
                       >
-                        <SelectTrigger className="sr-input-template w-full">
+                        <SelectTrigger id="filter-status" className="sr-input-template w-full">
                           <SelectValue placeholder="모든 상태" />
                         </SelectTrigger>
                         <SelectContent>
@@ -431,12 +433,14 @@ export function SRsDataTable({
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-sm mb-2 block">우선순위</Label>
+                      <Label htmlFor="filter-priority" className="text-sm mb-2 block">
+                        우선순위
+                      </Label>
                       <Select
                         value={filters.priority}
                         onValueChange={(v) => handleFilterChange('priority', v)}
                       >
-                        <SelectTrigger className="sr-input-template w-full">
+                        <SelectTrigger id="filter-priority" className="sr-input-template w-full">
                           <SelectValue placeholder="모든 우선순위" />
                         </SelectTrigger>
                         <SelectContent>
@@ -450,12 +454,14 @@ export function SRsDataTable({
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-sm mb-2 block">고객사</Label>
+                      <Label htmlFor="filter-client" className="text-sm mb-2 block">
+                        고객사
+                      </Label>
                       <Select
                         value={filters.clientId}
                         onValueChange={(v) => handleFilterChange('clientId', v)}
                       >
-                        <SelectTrigger className="sr-input-template w-full">
+                        <SelectTrigger id="filter-client" className="sr-input-template w-full">
                           <SelectValue placeholder="모든 고객사" />
                         </SelectTrigger>
                         <SelectContent>
@@ -469,12 +475,14 @@ export function SRsDataTable({
                       </Select>
                     </div>
                     <div>
-                      <Label className="text-sm mb-2 block">담당자</Label>
+                      <Label htmlFor="filter-assignee" className="text-sm mb-2 block">
+                        담당자
+                      </Label>
                       <Select
                         value={filters.assigneeId}
                         onValueChange={(v) => handleFilterChange('assigneeId', v)}
                       >
-                        <SelectTrigger className="sr-input-template w-full">
+                        <SelectTrigger id="filter-assignee" className="sr-input-template w-full">
                           <SelectValue placeholder="모든 담당자" />
                         </SelectTrigger>
                         <SelectContent>
@@ -492,8 +500,11 @@ export function SRsDataTable({
                   {/* Second Row: Date Range */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <Label className="text-sm mb-2 block">생성일 시작</Label>
+                      <Label htmlFor="filter-date-from" className="text-sm mb-2 block">
+                        생성일 시작
+                      </Label>
                       <Input
+                        id="filter-date-from"
                         type="date"
                         value={filters.dateFrom}
                         onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
@@ -502,8 +513,11 @@ export function SRsDataTable({
                       />
                     </div>
                     <div>
-                      <Label className="text-sm mb-2 block">생성일 종료</Label>
+                      <Label htmlFor="filter-date-to" className="text-sm mb-2 block">
+                        생성일 종료
+                      </Label>
                       <Input
+                        id="filter-date-to"
                         type="date"
                         value={filters.dateTo}
                         onChange={(e) => handleFilterChange('dateTo', e.target.value)}
@@ -560,10 +574,15 @@ export function SRsDataTable({
           </span>
         </div>
 
-        <div className="relative">
+        <div className="relative" aria-busy={isPending}>
           {isPending && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
-              <Loader2 className="h-8 w-8 animate-spin text-foreground" />
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-foreground" aria-hidden="true" />
+              <span className="sr-only">목록을 불러오는 중</span>
             </div>
           )}
 

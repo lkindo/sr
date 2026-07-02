@@ -71,8 +71,9 @@ export function SRActivities({ srId }: SRActivitiesProps) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-8" role="status" aria-live="polite">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" aria-hidden="true" />
+            <span className="sr-only">활동 이력을 불러오는 중</span>
           </div>
         </CardContent>
       </Card>

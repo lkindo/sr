@@ -44,6 +44,16 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
     router.push(`/srs/${sr.id}`);
   };
 
+  // 키보드 조작: 행 자체가 포커스된 상태에서 Enter/Space 로 상세 이동
+  // (자식 링크/버튼의 키 입력은 무시하여 이중 동작 방지)
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleRowClick();
+    }
+  };
+
   const handleIntakeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     router.push(`/srs/${sr.id}/intake`);
@@ -54,7 +64,13 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
   const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
   return (
-    <TableRow className="cursor-pointer" onClick={handleRowClick}>
+    <TableRow
+      className="cursor-pointer"
+      onClick={handleRowClick}
+      onKeyDown={handleRowKeyDown}
+      tabIndex={0}
+      aria-label={`SR ${sr.srNumber} 상세 보기`}
+    >
       <TableCell className="text-center">
         <div className="flex items-center justify-center gap-1 group relative">
           <Link
@@ -134,6 +150,15 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
     router.push(`/srs/${sr.id}`);
   };
 
+  // 키보드 조작: 카드 자체 포커스 상태에서 Enter/Space 로 상세 이동
+  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick();
+    }
+  };
+
   const handleIntakeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     router.push(`/srs/${sr.id}/intake`);
@@ -147,6 +172,10 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
     <div
       className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer"
       onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={`SR ${sr.srNumber} 상세 보기`}
     >
       {/* Header: SR Number, Status, Priority */}
       <div className="flex items-center justify-between gap-2 mb-2">
