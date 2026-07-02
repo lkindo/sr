@@ -44,7 +44,7 @@ jobs:
           target: '/home/opc/sr'
 
       - name: Run backup on server
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         env:
           RETENTION_DAYS: ${{ github.event.inputs.retention_days || '14' }}
         with:
