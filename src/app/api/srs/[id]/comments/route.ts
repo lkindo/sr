@@ -103,31 +103,35 @@ export const POST = withAuthAndRateLimit(
 
     ensureCanReadSR(session.user, sr);
 
-    const comment = await prisma.sRComment.create({
-      data: {
-        srId: id,
-        userId: session.user.id,
-        content: validated.content,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    // 댓글 + 활동로그를 하나의 트랜잭션으로 커밋 (중간 실패 시 감사 이력 불일치 방지)
+    const comment = await prisma.$transaction(async (tx) => {
+      const created = await tx.sRComment.create({
+        data: {
+          srId: id,
+          userId: session.user.id,
+          content: validated.content,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Create activity log
-    await prisma.sRActivity.create({
-      data: {
-        srId: id,
-        userId: session.user.id,
-        type: 'COMMENTED',
-        description: '댓글이 추가되었습니다.',
-      },
+      await tx.sRActivity.create({
+        data: {
+          srId: id,
+          userId: session.user.id,
+          type: 'COMMENTED',
+          description: '댓글이 추가되었습니다.',
+        },
+      });
+
+      return created;
     });
 
     // 실시간 이벤트 발송

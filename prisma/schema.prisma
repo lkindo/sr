@@ -227,7 +227,7 @@ enum SRPriority {
 
 model SR {
   id          String     @id @default(cuid()) @db.VarChar(30)
-  srNumber    String     @unique @map("sr_number")
+  srNumber    String     @unique @map("sr_number") @db.VarChar(30)
   title       String     @db.VarChar(255)
   description String
   status      SRStatus   @default(REQUESTED)

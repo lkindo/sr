@@ -431,40 +431,54 @@ export const PATCH = withAuthAndRateLimit(
       updateData.dueDate = dueDate;
     }
 
-    const updatedSR = await prisma.sR.update({
-      where: { id },
-      data: updateData,
-      include: {
-        client: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
+    // 낙관적 동시성 제어: 스냅샷(sr.status) 이후 상태가 바뀌지 않았을 때만 수정한다.
+    // (동시 인테이크 수정으로 인한 lost update 방지 — updateSR/intake POST 와 동일 패턴)
+    const updatedSR = await prisma.$transaction(async (tx) => {
+      const guard = await tx.sR.updateMany({
+        where: { id, status: sr.status },
+        data: { updatedAt: new Date() },
+      });
+      if (guard.count === 0) {
+        throw new ConflictError(
+          '다른 사용자가 먼저 이 SR을 변경했습니다. 새로고침 후 다시 시도해주세요.'
+        );
+      }
+
+      return tx.sR.update({
+        where: { id },
+        data: updateData,
+        include: {
+          client: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+            },
+          },
+          serviceCategory: true,
+          requester: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+          intakeBy: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-        serviceCategory: true,
-        requester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        intakeBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
+      });
     });
 
     // 8. 변경 사항 추적 및 이력 생성
