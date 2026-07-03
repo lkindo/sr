@@ -26,10 +26,11 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const handleSignOut = async () => {
-    await signOut({
-      callbackUrl: '/',
-      redirect: true,
-    });
+    // NextAuth 의 redirect:true 는 서버 base URL 로 콜백을 절대화하는데,
+    // 리버스 프록시(nginx) 뒤 컨테이너에서는 내부 주소(0.0.0.0:3000)로 잘못 이동한다.
+    // 세션만 정리한 뒤, 실제 접속 origin 기준으로 초기 화면(/)으로 직접 이동시킨다.
+    await signOut({ redirect: false });
+    window.location.href = '/';
   };
 
   const initials =
