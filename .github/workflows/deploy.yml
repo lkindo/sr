@@ -100,9 +100,20 @@ jobs:
               echo "Deploying Staging (dev branch)..."
               
               # 1. Pull 최신 dev 이미지 및 재시작
+              #    과거: compose 프로젝트(sr-test) 밖에서 생성된 동명 컨테이너와 이름이 충돌해
+              #    `up`이 조용히 실패하고(뒤 명령 성공으로 워크플로는 success 보고) 컨테이너가
+              #    교체되지 않았다. 아래처럼 동명 컨테이너를 강제 정리한 뒤 재생성한다.
+              #    (DB/업로드는 named volume 에 있으므로 데이터는 보존된다.)
               docker compose -p sr-test -f docker-compose.test.yml pull
-              docker compose -p sr-test -f docker-compose.test.yml down
-              docker compose -p sr-test -f docker-compose.test.yml up -d
+              docker compose -p sr-test -f docker-compose.test.yml down --remove-orphans || true
+              docker rm -f sr-app-test sr-db-test 2>/dev/null || true
+              docker compose -p sr-test -f docker-compose.test.yml up -d --force-recreate --remove-orphans
+
+              # 1-1. 재생성 검증: app 컨테이너가 실제로 실행 중이 아니면 배포를 실패로 처리
+              sleep 5
+              if [ -z "$(docker ps -q -f name=sr-app-test -f status=running)" ]; then
+                echo "ERROR: sr-app-test failed to start"; docker logs sr-app-test --tail 40 2>&1 || true; exit 1
+              fi
 
               # 2. DB 시딩 (스테이징 테스트 데이터)
               #    스키마 마이그레이션은 컨테이너 시작 시 docker-entrypoint.sh의
@@ -131,9 +142,19 @@ jobs:
               fi
               
               # 3. 최신 이미지 Pull 및 재구동
+              #    동명 컨테이너(프로젝트 밖 생성분) 강제 정리 후 재생성하여 이름 충돌로 인한
+              #    "성공 보고 + 미교체" 문제를 방지한다. DB(sr_db_data)/업로드(sr_uploads)는
+              #    named volume 이므로 데이터는 보존되고, nginx 인증서는 bind-mount 로 유지된다.
               docker compose -f docker-compose.prod.yml pull
-              docker compose -f docker-compose.prod.yml down
-              docker compose -f docker-compose.prod.yml up -d
+              docker compose -f docker-compose.prod.yml down --remove-orphans || true
+              docker rm -f sr-nginx sr-app sr-db 2>/dev/null || true
+              docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+
+              # 3-1. 재생성 검증: app 컨테이너가 실행 중이 아니면 배포를 실패로 처리
+              sleep 5
+              if [ -z "$(docker ps -q -f name=sr-app -f status=running)" ]; then
+                echo "ERROR: sr-app failed to start"; docker logs sr-app --tail 40 2>&1 || true; exit 1
+              fi
               
               # 4. Let's Encrypt 발급 스크립트 실행
               chmod +x scripts/setup-letsencrypt.sh
