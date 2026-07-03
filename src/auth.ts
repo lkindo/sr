@@ -124,6 +124,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             },
             clients: {
+              // 승인된 소속만 세션 clientIds 에 반영한다.
+              // PENDING 소속은 데이터 접근 범위(clientIds)에서 제외되어 승인 전까지 차단된다.
+              where: { status: 'APPROVED' },
               select: {
                 clientId: true,
               },
@@ -175,6 +178,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               },
             },
             clients: {
+              // 승인된 소속만 세션 clientIds 에 반영한다.
+              // PENDING 소속은 데이터 접근 범위(clientIds)에서 제외되어 승인 전까지 차단된다.
+              where: { status: 'APPROVED' },
               select: {
                 clientId: true,
               },

@@ -11,7 +11,6 @@ import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
-import { backgroundTask } from '@/lib/wait-until';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { AuthenticatedUser } from '@/types/session';
@@ -127,6 +126,11 @@ export class SRService {
       srNumber: result.srNumber,
       title: result.title,
       status: result.status,
+      // 권한 필터링용 키: SSE 연결별 테넌트/역할 격리 및 본인 에코(중복 토스트) 방지
+      clientId: sr.clientId,
+      requesterId: sr.requesterId,
+      assigneeId: sr.assigneeId,
+      actorId: sessionUser.id,
     });
 
     return result;
@@ -270,6 +274,18 @@ export class SRService {
               validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
           },
         };
+        // REQUESTED → INTAKE 전이 시 접수 메타데이터를 채운다.
+        // (전용 intake 라우트가 아닌 일반 PATCH 로 접수돼도 intakeAt 이 기록되지 않으면
+        //  대시보드의 SLA/처리시간 통계 쿼리 조건(intake_at IS NOT NULL)에서 누락되어
+        //  통계가 오염된다.)
+        if (
+          validated.status === 'INTAKE' &&
+          existingSR.status === 'REQUESTED' &&
+          !existingSR.intakeAt
+        ) {
+          updateData.intakeAt = new Date();
+          updateData.intakeById = sessionUser.id;
+        }
         if (validated.status === 'COMPLETED') {
           if (!updateData.actualCompletionDate) {
             updateData.actualCompletionDate = new Date();
@@ -401,6 +417,11 @@ export class SRService {
         srNumber: updatedSR.srNumber,
         title: updatedSR.title,
         status: updatedSR.status,
+        // 권한 필터링용 키: SSE 연결별 테넌트/역할 격리 및 본인 에코(중복 토스트) 방지
+        clientId: updatedSR.clientId,
+        requesterId: updatedSR.requesterId,
+        assigneeId: updatedSR.assigneeId,
+        actorId: sessionUser.id,
       });
 
       return updatedSR;
@@ -576,6 +597,11 @@ export class SRService {
     emitRealtimeEvent(REALTIME_EVENTS.SR_DELETED, {
       id,
       srNumber: existingSR.srNumber,
+      // 권한 필터링용 키: 삭제 전 스냅샷 기준으로 테넌트/역할 격리 및 본인 에코 방지
+      clientId: existingSR.clientId,
+      requesterId: existingSR.requesterId,
+      assigneeId: existingSR.assigneeId,
+      actorId: sessionUser.id,
     });
   }
 

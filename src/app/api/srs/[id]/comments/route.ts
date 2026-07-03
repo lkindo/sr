@@ -7,6 +7,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { backgroundTask } from '@/lib/wait-until';
 
 const commentSchema = z.object({
   content: z.string().min(1, '댓글 내용을 입력해주세요.'),
@@ -141,19 +142,22 @@ export const POST = withAuthAndRateLimit(
       commentId: comment.id,
       userId: session.user.id,
       action: 'created',
+      // 권한 필터링용 키: SSE 연결별 테넌트/역할 격리 및 본인 에코 방지
+      clientId: sr.clientId,
+      requesterId: sr.requesterId,
+      assigneeId: sr.assigneeId,
+      actorId: session.user.id,
     });
 
-    // Send email notifications to requester and assignee (non-blocking)
+    // 이메일 알림(비차단): 서버리스에서 유실되지 않도록 요청 수명(waitUntil)에 연결한다.
     const { emailService } = await import('@/services/email.service');
+    const emailTasks: Promise<unknown>[] = [];
 
-    // Requester check
-    const requesterPrefs = sr.requester.notificationPreference;
-    // Schema: emailCommentAdded Boolean @default(false)
-    const shouldSendRequester = requesterPrefs?.emailCommentAdded ?? false;
-
+    // Requester check (Schema: emailCommentAdded Boolean @default(false))
+    const shouldSendRequester = sr.requester.notificationPreference?.emailCommentAdded ?? false;
     if (sr.requester.id !== session.user.id && sr.requester.email && shouldSendRequester) {
-      emailService
-        .sendCommentAdded(
+      emailTasks.push(
+        emailService.sendCommentAdded(
           sr.requester.email,
           sr.srNumber,
           sr.title,
@@ -161,17 +165,15 @@ export const POST = withAuthAndRateLimit(
           validated.content,
           getSRUrl(sr.id)
         )
-        .catch((e) => console.error('Failed to send comment email to requester:', e));
+      );
     }
 
     // Assignee check
     if (sr.assignee && sr.assignee.id !== session.user.id && sr.assignee.email) {
-      const assigneePrefs = sr.assignee.notificationPreference;
-      const shouldSendAssignee = assigneePrefs?.emailCommentAdded ?? false;
-
+      const shouldSendAssignee = sr.assignee.notificationPreference?.emailCommentAdded ?? false;
       if (shouldSendAssignee) {
-        emailService
-          .sendCommentAdded(
+        emailTasks.push(
+          emailService.sendCommentAdded(
             sr.assignee.email,
             sr.srNumber,
             sr.title,
@@ -179,8 +181,12 @@ export const POST = withAuthAndRateLimit(
             validated.content,
             getSRUrl(sr.id)
           )
-          .catch((e) => console.error('Failed to send comment email to assignee:', e));
+        );
       }
+    }
+
+    if (emailTasks.length > 0) {
+      backgroundTask(Promise.allSettled(emailTasks), 'comment-email');
     }
 
     return NextResponse.json(comment, { status: 201 });

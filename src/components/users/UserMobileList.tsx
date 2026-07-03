@@ -5,6 +5,7 @@ import { CheckSquare, Square } from 'lucide-react';
 
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { ClientApprovalActions } from '@/components/users/ClientApprovalActions';
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
 import { UserActions } from '@/components/users/UserActions';
@@ -165,16 +166,27 @@ export function UserMobileList({
                       );
                     return (
                       <div className="flex gap-1 items-center overflow-hidden">
-                        {user.clients.slice(0, 1).map((uc: any) => (
-                          <ClientBadgeWithActions
-                            key={uc.client.id}
-                            userId={user.id}
-                            userName={user.name}
-                            client={uc.client}
-                            allClients={clients}
-                            onChanged={onRefresh}
-                          />
-                        ))}
+                        {user.clients
+                          .slice(0, 1)
+                          .map((uc: any) =>
+                            uc.status === 'PENDING' ? (
+                              <ClientApprovalActions
+                                key={uc.client.id}
+                                userId={user.id}
+                                clientName={uc.client.name}
+                                onChanged={onRefresh}
+                              />
+                            ) : (
+                              <ClientBadgeWithActions
+                                key={uc.client.id}
+                                userId={user.id}
+                                userName={user.name}
+                                client={uc.client}
+                                allClients={clients}
+                                onChanged={onRefresh}
+                              />
+                            )
+                          )}
                         {user.clients.length > 1 && (
                           <span className="text-muted-foreground text-[10px] font-bold">
                             +{user.clients.length - 1}

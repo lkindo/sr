@@ -42,20 +42,31 @@ export const POST = withAuthAndRateLimit(
     // 권한 체크: 역할 수정 권한(ADMIN 또는 ROLE:UPDATE)이 있어야 하며 ADMIN 역할은 변경 불가
     ensureCanUpdateRole(session.user, role);
 
-    // Delete existing permissions
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: id },
-    });
-
-    // Add new permissions
+    // 존재하지 않는 permissionId 사전 차단(잘못된 id 로 교체가 실패해 권한이 전부
+    // 사라지는 것을 방지)
     if (validated.permissionIds.length > 0) {
-      await prisma.rolePermission.createMany({
-        data: validated.permissionIds.map((permissionId) => ({
-          roleId: id,
-          permissionId,
-        })),
+      const existing = await prisma.permission.findMany({
+        where: { id: { in: validated.permissionIds } },
+        select: { id: true },
       });
+      const foundIds = new Set(existing.map((p) => p.id));
+      const missing = validated.permissionIds.filter((pid) => !foundIds.has(pid));
+      if (missing.length > 0) {
+        throw new ValidationError('존재하지 않는 권한이 포함되어 있습니다.');
+      }
     }
+
+    // 권한 교체는 원자적으로 수행한다: 삭제와 생성을 하나의 트랜잭션으로 묶어,
+    // 중간 실패 시 역할의 권한이 전부 사라지는 상태를 방지한다.
+    await prisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({ where: { roleId: id } });
+      if (validated.permissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: validated.permissionIds.map((permissionId) => ({ roleId: id, permissionId })),
+          skipDuplicates: true,
+        });
+      }
+    });
 
     // Fetch updated role with permissions
     const updatedRole = await prisma.role.findUnique({

@@ -66,6 +66,30 @@ export function useRealtimeStatus() {
       }
     });
 
+    // SR 삭제 이벤트 처리 (다른 사용자가 삭제한 SR을 목록/상세에서 제거)
+    eventSource.addEventListener('sr:deleted', (event: any) => {
+      try {
+        const data = JSON.parse(event.data);
+        logger.info('[Realtime] SR deleted', { data });
+
+        queryClient.invalidateQueries({ queryKey: ['srs'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+        if (data.id) {
+          queryClient.removeQueries({ queryKey: ['sr', data.id] });
+        }
+
+        toast({
+          title: 'SR 삭제됨',
+          description: `SR #${data.srNumber}가 삭제되었습니다.`,
+        });
+      } catch (err) {
+        logger.error(
+          '[Realtime] Error parsing SR delete event',
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    });
+
     // 댓글 작성 이벤트 처리
     eventSource.addEventListener('sr:commented', (event: any) => {
       try {

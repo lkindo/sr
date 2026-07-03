@@ -1,35 +1,60 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 
 import { auth } from '@/auth';
+import { logger } from '@/lib/logger';
 import { srService } from '@/services/sr.service';
 
-export async function GET(request: Request) {
+// 단일 응답으로 메모리에 적재하므로 방어적 상한을 둔다.
+const EXPORT_ROW_LIMIT = 50000;
+
+/**
+ * CSV 셀 이스케이프 + 수식 인젝션(=,+,-,@ 등으로 시작하는 값) 방어.
+ */
+function csvCell(value: unknown): string {
+  let s = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(s)) {
+    s = `'${s}`;
+  }
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+export async function GET() {
   try {
     const session = await auth();
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const { roles } = session.user;
-    const canExport = roles.some((role) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role));
+    const isAdminOrManager = roles.some((role) => ['ADMIN', 'MANAGER'].includes(role));
+    const isEngineer = roles.includes('ENGINEER');
 
-    if (!canExport) {
+    if (!isAdminOrManager && !isEngineer) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    // For export, we might want to apply filters from query params in the future.
-    // For now, export all SRs sorted by creation date descending.
+    // 데이터 격리: ENGINEER 는 자신에게 배정된 SR 만 내보낼 수 있다(canReadSR 정책과 일치).
+    // ADMIN/MANAGER 는 전체 조회 가능.
+    const where: Prisma.SRWhereInput = isAdminOrManager ? {} : { assigneeId: session.user.id };
+
     const srs = await srService.getAllSRs({
+      where,
       orderBy: { createdAt: 'desc' },
-      // Fetching all records - caution with large datasets, but ok for now.
+      take: EXPORT_ROW_LIMIT,
     });
 
-    // Validating data before map
     if (!srs || srs.length === 0) {
       return new NextResponse('No data found', { status: 404 });
     }
 
-    // Define CSV Header
+    if (srs.length === EXPORT_ROW_LIMIT) {
+      logger.warn('[Export] 결과가 상한에 도달하여 잘렸을 수 있습니다.', {
+        limit: EXPORT_ROW_LIMIT,
+        userId: session.user.id,
+      });
+    }
+
     const headers = [
       'SR 번호',
       '제목',
@@ -44,9 +69,7 @@ export async function GET(request: Request) {
       '처리시간(시간)',
     ];
 
-    // Map data to CSV rows
     const rows = srs.map((sr) => {
-      // Calculate processing time if completed
       let processingTime = '';
       if (sr.completedAt && sr.createdAt) {
         const diff = new Date(sr.completedAt).getTime() - new Date(sr.createdAt).getTime();
@@ -54,23 +77,22 @@ export async function GET(request: Request) {
       }
 
       return [
-        sr.srNumber,
-        `"${sr.title.replace(/"/g, '""')}"`, // Escape quotes
-        sr.status,
-        sr.priority,
-        `"${sr.client?.name || ''}"`,
-        `"${sr.requester?.name || ''}"`,
-        `"${sr.assignee?.name || '미지정'}"`,
-        `"${sr.serviceCategory?.categoryName || ''}"`,
-        sr.createdAt ? new Date(sr.createdAt).toLocaleDateString('ko-KR') : '',
-        sr.completedAt ? new Date(sr.completedAt).toLocaleDateString('ko-KR') : '',
-        processingTime,
+        csvCell(sr.srNumber),
+        csvCell(sr.title),
+        csvCell(sr.status),
+        csvCell(sr.priority),
+        csvCell(sr.client?.name || ''),
+        csvCell(sr.requester?.name || ''),
+        csvCell(sr.assignee?.name || '미지정'),
+        csvCell(sr.serviceCategory?.categoryName || ''),
+        csvCell(sr.createdAt ? new Date(sr.createdAt).toLocaleDateString('ko-KR') : ''),
+        csvCell(sr.completedAt ? new Date(sr.completedAt).toLocaleDateString('ko-KR') : ''),
+        csvCell(processingTime),
       ].join(',');
     });
 
-    // BOM for Excel to recognize UTF-8
-    const BOM = '\uFEFF';
-    const csvContent = BOM + headers.join(',') + '\n' + rows.join('\n');
+    const BOM = '﻿';
+    const csvContent = BOM + headers.map(csvCell).join(',') + '\n' + rows.join('\n');
 
     return new NextResponse(csvContent, {
       headers: {
@@ -79,7 +101,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    console.error('Export error:', error);
+    logger.error('[Export] SR CSV 내보내기 실패', error instanceof Error ? error : undefined);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

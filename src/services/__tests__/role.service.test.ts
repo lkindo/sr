@@ -71,6 +71,14 @@ describe('RoleService', () => {
         updatedAt: new Date(),
       };
 
+      // 수정 대상 역할이 존재해야 한다(존재 확인 후 update 진행).
+      vi.mocked(prisma.role.findUnique).mockResolvedValue({
+        id: '1',
+        name: 'Old Role',
+        description: 'Old description',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
       vi.mocked(prisma.role.update).mockResolvedValue(updatedRole as any);
 
       const result = await roleService.updateRole('1', updateData);

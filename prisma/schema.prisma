@@ -59,8 +59,6 @@ model User {
   @@map("users")
 }
 
-
-
 // ============================================================================
 // 권한 관리 (RBAC)
 // ============================================================================
@@ -148,17 +146,28 @@ model Client {
   @@map("clients")
 }
 
+// 사용자-고객사 소속 승인 상태.
+// 관리자/운영자가 직접 배정한 소속은 신뢰할 수 있으므로 기본값은 APPROVED 이며,
+// 셀프 회원가입으로 생성되는 소속만 PENDING 으로 만들어 승인 전까지 데이터 접근을 차단한다.
+enum UserClientStatus {
+  PENDING
+  APPROVED
+}
+
 model UserClient {
-  id        String   @id @default(cuid()) @db.VarChar(30)
-  userId    String   @map("user_id") @db.VarChar(30)
-  clientId  String   @map("client_id") @db.VarChar(30)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String           @id @default(cuid()) @db.VarChar(30)
+  userId     String           @map("user_id") @db.VarChar(30)
+  clientId   String           @map("client_id") @db.VarChar(30)
+  status     UserClientStatus @default(APPROVED)
+  approvedAt DateTime?        @map("approved_at") @db.Timestamptz
+  createdAt  DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@unique([userId, clientId])
   @@index([clientId])
+  @@index([status])
   @@map("user_clients")
 }
 

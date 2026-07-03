@@ -65,26 +65,7 @@ export class RoleService {
   ): Promise<Role> {
     const validated = roleUpdateSchema.parse(data);
 
-    const isMock =
-      typeof prisma.role.findUnique === 'function' &&
-      (prisma.role.findUnique as any).mock !== undefined;
-
-    let existingRole = await prisma.role.findUnique({ where: { id } });
-
-    if (
-      isMock &&
-      !existingRole &&
-      (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test')
-    ) {
-      existingRole = {
-        id,
-        name: 'MOCK_ROLE',
-        description: 'Mock Role',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-    }
-
+    const existingRole = await prisma.role.findUnique({ where: { id } });
     if (!existingRole) {
       throw new NotFoundError('역할', id);
     }

@@ -24,20 +24,20 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    // 권한 체크: SR.INTAKE 권한 또는 ADMIN, MANAGER, ENGINEER 역할
+    // 권한 체크: 접수(Intake)는 담당 엔지니어 배정·SLA 산정 등 운영팀의 트리아지 행위이므로
+    // ADMIN/MANAGER/ENGINEER 역할 또는 전용 SR:INTAKE 권한이 있어야 한다.
+    // (과거 버그: SR:CREATE 를 접수 권한으로 인정 → SR:CREATE 를 가진 CLIENT_USER 가
+    //  자신의 SR 을 스스로 접수하고 엔지니어까지 배정할 수 있었다.)
     const userRoles = session.user?.roles || [];
     const hasIntakePermission =
-      session.user?.permissions?.some((p: string) => {
-        const normalized = p.toUpperCase();
-        return normalized === 'SR:INTAKE' || normalized === 'SR:CREATE';
-      }) ?? false;
+      session.user?.permissions?.some((p: string) => p.toUpperCase() === 'SR:INTAKE') ?? false;
     const hasIntakeRole = userRoles.some((role: string) =>
       ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
     );
 
     if (!hasIntakePermission && !hasIntakeRole) {
       throw new ForbiddenError(
-        'SR 접수 권한이 없습니다. SR.INTAKE 권한 또는 ADMIN/MANAGER/ENGINEER 역할이 필요합니다.'
+        'SR 접수 권한이 없습니다. SR:INTAKE 권한 또는 ADMIN/MANAGER/ENGINEER 역할이 필요합니다.'
       );
     }
 

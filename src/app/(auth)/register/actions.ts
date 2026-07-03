@@ -102,20 +102,24 @@ export async function registerUser(formData: FormData) {
       });
 
       // 3. 고객사 할당 (CLIENT인 경우)
+      // 셀프 가입으로 생성되는 소속은 PENDING 으로 두어, 고객사 관리자/운영자 승인 전까지
+      // 세션 clientIds 에 포함되지 않도록 한다. (승인 전 크로스테넌트 데이터 접근 차단)
       if (validated.accountType === 'CLIENT' && validated.clientId) {
         await tx.userClient.create({
           data: {
             userId: user.id,
             clientId: validated.clientId,
+            status: 'PENDING',
           },
         });
       }
     });
 
     // 계정 유형별 안내 메시지
+    // CLIENT 계정도 소속 승인 전까지는 데이터에 접근할 수 없으므로 승인 안내를 노출한다.
     const message =
       validated.accountType === 'CLIENT'
-        ? '회원가입이 완료되었습니다. 로그인해주세요.'
+        ? '회원가입이 완료되었습니다. 고객사 관리자 승인 후 이용할 수 있습니다.'
         : '회원가입이 완료되었습니다. 관리자 승인 후 사용 가능합니다.';
 
     return {

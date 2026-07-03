@@ -66,6 +66,14 @@ export const POST = withAuthAndRateLimit(
 
       const roleNames = roles.map((r) => r.name);
 
+      // 존재하지 않는 roleId 사전 차단: 잘못된 id 로 createMany 가 실패하면
+      // 아래 교체 트랜잭션이 롤백되지만, 사전 검증으로 명확한 400 을 반환한다.
+      const foundRoleIds = new Set(roles.map((r) => r.id));
+      const missingRoleIds = validated.roleIds.filter((rid) => !foundRoleIds.has(rid));
+      if (missingRoleIds.length > 0) {
+        throw new ValidationError('존재하지 않는 역할이 포함되어 있습니다.');
+      }
+
       // 권한 상승 방지: ADMIN 역할 할당은 ADMIN만 가능
       if (!session.user.roles.includes('ADMIN') && roleNames.includes('ADMIN')) {
         throw new ForbiddenError('ADMIN 역할은 ADMIN만 할당할 수 있습니다.');
@@ -130,20 +138,17 @@ export const POST = withAuthAndRateLimit(
       }
     }
 
-    // Delete existing roles
-    await prisma.userRole.deleteMany({
-      where: { userId: id },
+    // 역할 교체는 원자적으로 수행한다: 삭제와 생성을 하나의 트랜잭션으로 묶어,
+    // 중간 실패 시 사용자가 역할 0개(잠금) 상태로 남는 것을 방지한다.
+    await prisma.$transaction(async (tx) => {
+      await tx.userRole.deleteMany({ where: { userId: id } });
+      if (validated.roleIds.length > 0) {
+        await tx.userRole.createMany({
+          data: validated.roleIds.map((roleId) => ({ userId: id, roleId })),
+          skipDuplicates: true,
+        });
+      }
     });
-
-    // Add new roles
-    if (validated.roleIds.length > 0) {
-      await prisma.userRole.createMany({
-        data: validated.roleIds.map((roleId) => ({
-          userId: id,
-          roleId,
-        })),
-      });
-    }
 
     // Fetch updated user with roles
     const updatedUser = await prisma.user.findUnique({

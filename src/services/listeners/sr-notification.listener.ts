@@ -2,6 +2,7 @@ import { getSRUrl } from '@/lib/app-url';
 import { domainEvents } from '@/lib/domain-events';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
+import { backgroundTask } from '@/lib/wait-until';
 import { emailService } from '@/services/email.service';
 import { pushService } from '@/services/push.service';
 
@@ -58,7 +59,8 @@ export function registerSRNotificationListeners() {
         }
       });
 
-      await Promise.allSettled(promises);
+      // 서버리스에서 응답 후 함수가 동결되어 알림이 유실되지 않도록 요청 수명에 연결한다.
+      backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
         'Failed to handle sr:created notification',
@@ -109,7 +111,8 @@ export function registerSRNotificationListeners() {
         );
       }
 
-      await Promise.allSettled(promises);
+      // 서버리스에서 응답 후 함수가 동결되어 알림이 유실되지 않도록 요청 수명에 연결한다.
+      backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
         'Failed to handle sr:status_changed notification',
@@ -162,7 +165,8 @@ export function registerSRNotificationListeners() {
         );
       }
 
-      await Promise.allSettled(promises);
+      // 서버리스에서 응답 후 함수가 동결되어 알림이 유실되지 않도록 요청 수명에 연결한다.
+      backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
         'Failed to handle sr:assigned notification',

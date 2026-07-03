@@ -6,6 +6,7 @@ import { CheckSquare, Square } from 'lucide-react';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { ClientApprovalActions } from '@/components/users/ClientApprovalActions';
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
 import { UserActions } from '@/components/users/UserActions';
@@ -132,16 +133,25 @@ export function UserTable({
                           onAssigned={onRefresh}
                         />
                       ) : (
-                        user.clients.map((uc: any) => (
-                          <ClientBadgeWithActions
-                            key={uc.client.id}
-                            userId={user.id}
-                            userName={user.name}
-                            client={uc.client}
-                            allClients={clients}
-                            onChanged={onRefresh}
-                          />
-                        ))
+                        user.clients.map((uc: any) =>
+                          uc.status === 'PENDING' ? (
+                            <ClientApprovalActions
+                              key={uc.client.id}
+                              userId={user.id}
+                              clientName={uc.client.name}
+                              onChanged={onRefresh}
+                            />
+                          ) : (
+                            <ClientBadgeWithActions
+                              key={uc.client.id}
+                              userId={user.id}
+                              userName={user.name}
+                              client={uc.client}
+                              allClients={clients}
+                              onChanged={onRefresh}
+                            />
+                          )
+                        )
                       );
                     })()}
                   </div>
