@@ -4,9 +4,20 @@ import { z } from 'zod';
 
 import { getSRUrl } from '@/lib/app-url';
 import { domainEvents } from '@/lib/domain-events';
-import { BusinessRuleError, ConflictError, NotFoundError, ServiceError } from '@/lib/errors';
+import {
+  BusinessRuleError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ServiceError,
+} from '@/lib/errors';
 import { logger } from '@/lib/logger';
-import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import {
+  ensureCanCreateSR,
+  ensureCanDeleteSR,
+  ensureCanUpdateSR,
+  isInternalUser,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
@@ -32,12 +43,40 @@ export class SRService {
   constructor() {}
 
   /**
+   * 서비스 카테고리가 해당 고객사에서 사용 가능한지 검증합니다.
+   * 전역 카테고리(clientId = null)이거나 해당 고객사 전용 카테고리만 허용합니다.
+   */
+  private async ensureCategoryBelongsToClient(
+    serviceCategoryId: string | null | undefined,
+    clientId: string
+  ): Promise<void> {
+    if (!serviceCategoryId) return;
+
+    const category = await prisma.serviceCategory.findUnique({
+      where: { id: serviceCategoryId },
+      select: { clientId: true },
+    });
+    if (category && category.clientId && category.clientId !== clientId) {
+      throw new ForbiddenError('다른 고객사의 서비스 카테고리는 사용할 수 없습니다.');
+    }
+  }
+
   /**
    * SR을 생성합니다.
    */
   async createSR(data: SrCreateData, sessionUser: AuthenticatedUser): Promise<SRCreateResult> {
     ensureCanCreateSR(sessionUser);
     const validated = srCreateSchema.parse(data);
+
+    // 테넌트 경계 검증: 외부 사용자는 본인이 소속된 고객사로만 SR을 생성할 수 있다.
+    // (REST 라우트와 Server Action 이 모두 이 지점을 거치므로 규칙은 여기 한 곳에만 둔다.)
+    // 조회보다 먼저 검증해야 타 고객사의 존재 여부/이름이 오류 메시지로 새지 않는다.
+    if (
+      !isInternalUser(sessionUser) &&
+      !(sessionUser.clientIds ?? []).includes(validated.clientId)
+    ) {
+      throw new ForbiddenError('소속되지 않은 고객사의 SR을 생성할 수 없습니다.');
+    }
 
     // 고객사 활성 상태 확인
     const client = await prisma.client.findUnique({ where: { id: validated.clientId } });
@@ -50,6 +89,8 @@ export class SRService {
           `고객사 관리자에게 문의하세요.`
       );
     }
+
+    await this.ensureCategoryBelongsToClient(validated.serviceCategoryId, validated.clientId);
 
     // SR 생성 (트랜잭션으로 SR 번호 생성 및 SR 생성을 원자적으로 수행)
     const sr = await prisma.$transaction(async (tx) => {
@@ -158,6 +199,15 @@ export class SRService {
           );
         }
 
+        // 테넌트 경계 검증: 외부 사용자는 본인이 소속된 고객사로만 이관할 수 있다.
+        // (검증이 없으면 다른 테넌트의 격리 경계 안으로 SR과 댓글/첨부를 옮길 수 있다.)
+        if (
+          !isInternalUser(sessionUser) &&
+          !(sessionUser.clientIds ?? []).includes(validated.clientId)
+        ) {
+          throw new ForbiddenError('소속되지 않은 고객사로 SR을 이관할 수 없습니다.');
+        }
+
         // 새 고객사가 활성 상태인지 확인
         const newClient = await prisma.client.findUnique({ where: { id: validated.clientId } });
         if (!newClient) {
@@ -242,7 +292,15 @@ export class SRService {
 
       // relations
       if (validated.serviceCategoryId !== undefined) {
-        if (validated.serviceCategoryId) updateData.serviceCategoryId = validated.serviceCategoryId;
+        if (validated.serviceCategoryId) {
+          // 생성 경로와 동일한 테넌트 경계를 적용한다.
+          // (없으면 타 고객사 카테고리로 바꿔 이름/SLA를 되읽을 수 있다.)
+          await this.ensureCategoryBelongsToClient(
+            validated.serviceCategoryId,
+            validated.clientId ?? existingSR.clientId
+          );
+          updateData.serviceCategoryId = validated.serviceCategoryId;
+        }
       }
 
       if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;

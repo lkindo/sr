@@ -26,15 +26,19 @@ services:
     container_name: sr-db
     restart: always
     environment:
-      - POSTGRES_USER=lkind
-      - POSTGRES_PASSWORD=sr1234
-      - POSTGRES_DB=sr_db
+      # 로컬 개발 전용 기본값이다. 운영(docker-compose.prod.yml)은 기본값 없이
+      # 주입을 강제하므로 이 값들이 운영에 재사용되지 않는다.
+      # 로컬에서 바꾸려면 저장소 루트 `.env`(추적 제외)에 POSTGRES_* 를 지정한다.
+      - POSTGRES_USER=${POSTGRES_USER:-lkind}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sr1234} # gitleaks:allow (로컬 전용 기본값)
+      - POSTGRES_DB=${POSTGRES_DB:-sr_db}
     ports:
       - '5432:5432'
     volumes:
       - sr_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db']
+      # `$$` 는 compose 보간을 회피해 컨테이너 셸이 자신의 POSTGRES_* 환경변수를 읽게 한다.
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 10s
       timeout: 5s
       retries: 5

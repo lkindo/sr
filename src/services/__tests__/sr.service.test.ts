@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BusinessRuleError, NotFoundError, ServiceError } from '@/lib/errors';
+import { BusinessRuleError, ForbiddenError, NotFoundError, ServiceError } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
@@ -57,11 +57,18 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 // Mock policy functions
-vi.mock('@/lib/policies', () => ({
-  ensureCanCreateSR: vi.fn(),
-  ensureCanUpdateSR: vi.fn(),
-  ensureCanDeleteSR: vi.fn(),
-}));
+// ensure* 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 그대로 사용한다.
+// (테넌트 경계 판정을 mock 반환값으로 조작하지 않아야, 픽스처의 roles/clientIds 가
+//  실제 서비스에서와 동일한 분기를 타는지 검증할 수 있다.)
+vi.mock('@/lib/policies', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/policies')>();
+  return {
+    ...actual,
+    ensureCanCreateSR: vi.fn(),
+    ensureCanUpdateSR: vi.fn(),
+    ensureCanDeleteSR: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/sr-state-machine', () => ({
   validateTransition: vi.fn().mockReturnValue({ valid: true }),
@@ -72,6 +79,9 @@ describe('SRService', () => {
   let srService: SRService;
   // no repository mocks needed here
 
+  // 외부(고객사) 사용자. 이 스위트가 다루는 고객사 3곳에 모두 소속되어 있으므로
+  // 테넌트 가드를 통과하며, 각 테스트가 검증하려는 후속 분기까지 도달한다.
+  // (isInternalUser 는 실제 구현이므로 roles 에 내부 역할이 없으면 외부 사용자로 판정된다.)
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
@@ -79,12 +89,27 @@ describe('SRService', () => {
     image: null,
     roles: ['USER'],
     permissions: [],
-    clientIds: [],
+    clientIds: ['client-1', 'c-1', 'c-2'],
+  };
+
+  // 다른 테넌트에 소속된 외부 사용자. 테넌트 경계 침범 시나리오 전용.
+  const foreignUser = {
+    id: 'user-foreign',
+    email: 'foreign@example.com',
+    name: 'Foreign User',
+    image: null,
+    roles: ['USER'],
+    permissions: [],
+    clientIds: ['client-foreign'],
   };
 
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
+
+    // 카테고리 테넌트 검증 기본값: 카테고리 미존재(no-op).
+    // clearAllMocks 는 구현을 되돌리지 않으므로, 경계 위반 시나리오가 뒤 테스트로 새지 않도록 명시적으로 초기화한다.
+    mockPrisma.serviceCategory.findUnique.mockResolvedValue(null);
 
     srService = new SRService();
   });
@@ -122,6 +147,113 @@ describe('SRService', () => {
       };
 
       await expect(srService.createSR(data, mockUser)).rejects.toThrow(BusinessRuleError);
+    });
+
+    it('외부 사용자가 소속되지 않은 고객사로 SR을 생성하면 ForbiddenError (고객사 조회 이전에 차단)', async () => {
+      vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({
+        id: 'client-1',
+        isActive: true,
+        name: '남의 고객사',
+      } as any);
+
+      const data = {
+        title: 'Cross Tenant SR',
+        description: 'Description long enough',
+        clientId: 'client-1', // foreignUser 의 clientIds 에 없음
+        serviceCategoryId: 'cat-1',
+        requestedPriority: 'MEDIUM' as const,
+      };
+
+      await expect(srService.createSR(data, foreignUser)).rejects.toThrow(ForbiddenError);
+
+      // 테넌트 가드가 조회보다 먼저 실행되어야 타 고객사의 존재 여부/이름이
+      // 오류 메시지나 타이밍으로 새지 않는다.
+      expect(prisma.client.findUnique).not.toHaveBeenCalled();
+      expect(prisma.serviceCategory.findUnique).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('외부 사용자가 소속된 고객사로 SR을 생성하면 정상 성공한다', async () => {
+      vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({
+        id: 'client-foreign',
+        isActive: true,
+        name: 'Own Client',
+      } as any);
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as any);
+
+      const createdSR = { id: 'sr-own', srNumber: 'SR-OWN-0001', title: 'Own SR' };
+      vi.mocked(prisma.$transaction).mockImplementation(async () => createdSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(createdSR as any);
+
+      const data = {
+        title: 'Own Tenant SR',
+        description: 'Description long enough',
+        clientId: 'client-foreign', // foreignUser 가 실제로 소속된 고객사
+        serviceCategoryId: 'cat-1',
+        requestedPriority: 'MEDIUM' as const,
+      };
+
+      const result = await srService.createSR(data, foreignUser);
+
+      expect(result).toEqual(createdSR);
+      expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { id: 'client-foreign' } });
+    });
+
+    it('타 고객사 전용 서비스 카테고리를 사용하면 ForbiddenError', async () => {
+      vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({
+        id: 'client-1',
+        isActive: true,
+        name: 'Client',
+      } as any);
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+        clientId: 'other-client',
+      } as any);
+
+      const data = {
+        title: 'Category Leak SR',
+        description: 'Description long enough',
+        clientId: 'client-1',
+        serviceCategoryId: 'cat-of-other-client',
+        requestedPriority: 'MEDIUM' as const,
+      };
+
+      await expect(srService.createSR(data, mockUser)).rejects.toThrow(ForbiddenError);
+      // 카테고리 경계 위반은 SR 생성 트랜잭션 이전에 차단되어야 한다.
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('전역 카테고리(clientId null)와 동일 고객사 카테고리는 모두 허용된다', async () => {
+      vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({
+        id: 'client-1',
+        isActive: true,
+        name: 'Client',
+      } as any);
+
+      const createdSR = { id: 'sr-ok', srNumber: 'SR-OK-0001', title: 'OK SR' };
+      vi.mocked(prisma.$transaction).mockImplementation(async () => createdSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(createdSR as any);
+
+      const data = {
+        title: 'Allowed Category SR',
+        description: 'Description long enough',
+        clientId: 'client-1',
+        serviceCategoryId: 'cat-1',
+        requestedPriority: 'MEDIUM' as const,
+      };
+
+      // 1) 전역 카테고리
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ clientId: null } as any);
+      await expect(srService.createSR(data, mockUser)).resolves.toEqual(createdSR);
+
+      // 2) 동일 고객사 전용 카테고리
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+        clientId: 'client-1',
+      } as any);
+      await expect(srService.createSR(data, mockUser)).resolves.toEqual(createdSR);
     });
   });
 

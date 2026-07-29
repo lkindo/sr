@@ -300,12 +300,21 @@ export class UserService {
           }
         }
 
+        // 기존 소속은 유지(승인 상태/승인일시 보존)하고, 제출되지 않은 소속만 제거한다.
+        const existingClientIds = (
+          (beforeUser as { clients?: { clientId: string }[] }).clients ?? []
+        ).map((membership) => membership.clientId);
+        const newClientIds = clientIds.filter((clientId) => !existingClientIds.includes(clientId));
+
         user = await userUpdateFn({
           where: { id },
           data: {
             clients: {
-              deleteMany: {},
-              create: clientIds.map((clientId) => ({ clientId })),
+              deleteMany: clientIds.length > 0 ? { clientId: { notIn: clientIds } } : {},
+              // 신규 소속은 PENDING 으로 생성하여 승인자가 반드시 개입하도록 한다.
+              // (src/app/(auth)/register/actions.ts 의 셀프 가입 소속 생성 규칙과 동일하며,
+              //  auth.ts 는 APPROVED 소속만 세션 clientIds 에 담으므로 승인 전 접근이 차단된다.)
+              create: newClientIds.map((clientId) => ({ clientId, status: 'PENDING' as const })),
             },
           },
         });

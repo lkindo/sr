@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedClients, getCachedUsers } from '@/lib/cache';
+import { paginationSchema } from '@/lib/pagination';
 import { srService } from '@/services/sr.service';
 
 type Props = {
@@ -15,6 +16,9 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
   return Array.isArray(param) ? param[0] : param;
 };
 
+// 페이지 번호 상한 (과도한 OFFSET으로 인한 DB 부하 방지)
+const MAX_PAGE = 10000;
+
 export default async function SRsPage({ searchParams }: Props) {
   const resolvedSearchParams = (await searchParams) || {};
 
@@ -22,8 +26,14 @@ export default async function SRsPage({ searchParams }: Props) {
   const clientsPromise = getCachedClients();
   const usersPromise = getCachedUsers();
 
-  const page = parseInt(getSearchParam(resolvedSearchParams.page) ?? '1', 10);
-  const itemsPerPage = parseInt(getSearchParam(resolvedSearchParams.itemsPerPage) ?? '20', 10);
+  // 페이지네이션 파라미터는 /api/srs와 동일한 검증 규칙(lib/pagination)을 공유합니다.
+  // 잘못된 값(NaN, 0, 음수, 과도한 크기)은 안전한 기본값으로 대체되어 500/OOM을 방지합니다.
+  const parsedPagination = paginationSchema.parse({
+    page: getSearchParam(resolvedSearchParams.page),
+    pageSize: getSearchParam(resolvedSearchParams.itemsPerPage),
+  });
+  const page = Math.min(parsedPagination.page, MAX_PAGE);
+  const itemsPerPage = parsedPagination.pageSize;
   const sort = getSearchParam(resolvedSearchParams.sort) ?? 'createdAt.desc';
   const [sortField, sortOrder] = sort.split('.');
 

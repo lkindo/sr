@@ -4,7 +4,12 @@ import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BusinessRuleError, NotFoundError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
-import { ensureCanDeleteUser, ensureCanReadUser, ensureCanUpdateUser } from '@/lib/policies';
+import {
+  ensureCanDeleteUser,
+  ensureCanReadUser,
+  ensureCanUpdateUser,
+  isInternalUser,
+} from '@/lib/policies';
 import { userUpdateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
@@ -54,9 +59,16 @@ export const PATCH = withAuthAndRateLimit(
     const canManageOthers =
       session.user.roles.includes('ADMIN') ||
       hasPermissionFlag(session.user, PERMISSIONS.USER.UPDATE);
-    const updateData = canManageOthers
-      ? validated
+
+    const updateData: typeof validated = canManageOthers
+      ? { ...validated }
       : { name: validated.name, image: validated.image };
+
+    // Multi-tenant Isolation: 고객사 소속(clientIds) 변경은 내부 사용자(ADMIN/MANAGER/ENGINEER)만 가능.
+    // 외부 사용자(예: CLIENT_ADMIN)가 보낸 clientIds 는 제거하여 타 테넌트로의 권한 상승을 차단한다.
+    if (!isInternalUser(session.user)) {
+      delete updateData.clientIds;
+    }
 
     const user = await userService.updateUser(id, updateData, session.user.id);
 

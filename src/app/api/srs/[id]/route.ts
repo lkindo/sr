@@ -65,7 +65,8 @@ export const PATCH = withAuthAndRateLimit(
     // Service 레이어를 통해 SR 수정 (권한 체크 포함)
     const updatedSR = await srService.updateSR(id, validated, session.user);
 
-    return NextResponse.json(updatedSR);
+    // GET 과 동일하게 직렬화 (Decimal → number, BigInt → number, Date → ISO 문자열)
+    return NextResponse.json(serializeResponse(updatedSR));
   },
   { preset: 'strict' }
 ); // 1분당 5회 (민감한 작업)
@@ -78,10 +79,12 @@ export const DELETE = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    // Service 레이어를 통해 SR 삭제
-    const result = await srService.deleteSR(id, session.user);
+    // Service 레이어를 통해 SR 삭제 (반환값 없음)
+    await srService.deleteSR(id, session.user);
 
-    return NextResponse.json(result);
+    // deleteSR 은 void 이므로 명시적인 응답 바디를 반환한다.
+    // (undefined 를 그대로 넘기면 JSON.stringify 결과가 undefined 가 되어 500 이 발생)
+    return NextResponse.json({ success: true, message: 'SR이 삭제되었습니다.' });
   },
   { preset: 'strict' }
 ); // 1분당 5회 (삭제는 민감한 작업)

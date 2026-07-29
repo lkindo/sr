@@ -111,12 +111,88 @@ describe('UserService Coverage', () => {
           where: { id: 'u1' },
           data: {
             clients: {
-              deleteMany: {},
-              create: [{ clientId: 'c1' }, { clientId: 'c2' }],
+              // 감사 3.7: 무조건 전체 삭제가 아니라 제출되지 않은 소속만 제거한다.
+              deleteMany: { clientId: { notIn: ['c1', 'c2'] } },
+              // 신규 소속은 APPROVED 기본값이 아니라 PENDING 으로 생성되어야 한다.
+              create: [
+                { clientId: 'c1', status: 'PENDING' },
+                { clientId: 'c2', status: 'PENDING' },
+              ],
             },
           },
         })
       );
+    });
+
+    // 회귀 방지: 셀프 테넌트 가입 권한 상승(감사 3.7)을 고정한다.
+    it('신규 고객사 소속은 모두 PENDING 으로 생성된다 (APPROVED 기본값 금지)', async () => {
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1' } as any);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        roles: [{ role: { name: 'CLIENT_USER' } }],
+      } as any);
+
+      await userService.updateUser('u1', { clientIds: ['c1', 'c2'] });
+
+      const membershipCall = vi
+        .mocked(prisma.user.update)
+        .mock.calls.map((call) => call[0] as any)
+        .find((args) => args?.data?.clients);
+      expect(membershipCall).toBeDefined();
+
+      const created = membershipCall.data.clients.create as Array<Record<string, unknown>>;
+      expect(created).toHaveLength(2);
+      for (const membership of created) {
+        expect(membership.status).toBe('PENDING');
+        expect(membership.status).not.toBe('APPROVED');
+        // 승인 상태를 우회할 수 있는 승인 메타데이터를 함께 심어서는 안 된다.
+        expect(membership).not.toHaveProperty('approvedAt');
+        expect(membership).not.toHaveProperty('approvedById');
+      }
+    });
+
+    it('deleteMany 는 제출된 목록 밖 소속만 지우도록 범위가 지정된다', async () => {
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1' } as any);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        roles: [{ role: { name: 'CLIENT_USER' } }],
+      } as any);
+
+      await userService.updateUser('u1', { clientIds: ['c1', 'c2'] });
+
+      const membershipCall = vi
+        .mocked(prisma.user.update)
+        .mock.calls.map((call) => call[0] as any)
+        .find((args) => args?.data?.clients);
+
+      const deleteMany = membershipCall.data.clients.deleteMany;
+      // 무조건적 전체 삭제({})로 되돌아가면 승인 이력이 통째로 날아간다.
+      expect(deleteMany).not.toEqual({});
+      expect(deleteMany).toEqual({ clientId: { notIn: ['c1', 'c2'] } });
+    });
+
+    it('기존 APPROVED 소속은 PENDING 으로 강등되지 않고 보존된다', async () => {
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1' } as any);
+      // 이미 c1 에 APPROVED 로 소속된 사용자
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'u1',
+        roles: [{ role: { name: 'CLIENT_USER' } }],
+        clients: [{ clientId: 'c1', status: 'APPROVED' }],
+      } as any);
+
+      await userService.updateUser('u1', { clientIds: ['c1', 'c2'] });
+
+      const membershipCall = vi
+        .mocked(prisma.user.update)
+        .mock.calls.map((call) => call[0] as any)
+        .find((args) => args?.data?.clients);
+
+      const created = membershipCall.data.clients.create as Array<Record<string, unknown>>;
+      // 기존 APPROVED 소속(c1)은 재생성 대상이 아니어야 한다 (재생성 시 PENDING 으로 강등됨).
+      expect(created).toEqual([{ clientId: 'c2', status: 'PENDING' }]);
+      expect(created.map((membership) => membership.clientId)).not.toContain('c1');
+      // 그리고 삭제 범위에서도 제외되어 승인 상태가 그대로 유지된다.
+      expect(membershipCall.data.clients.deleteMany).toEqual({
+        clientId: { notIn: ['c1', 'c2'] },
+      });
     });
 
     it('throws BusinessRuleError if assigning clients to System Team', async () => {

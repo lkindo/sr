@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
+import { serializeResponse } from '@/lib/serialization';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -310,7 +311,9 @@ export const GET = withAuthAndRateLimit(
 
     ensureCanReadSR(session.user, sr);
 
-    return NextResponse.json(sr);
+    // attachments.fileSize 는 Prisma BigInt 이므로 직렬화 후 응답
+    // (미변환 시 JSON.stringify TypeError → 첨부가 있는 SR 의 접수 정보 조회가 500)
+    return NextResponse.json(serializeResponse(sr));
   },
   { preset: 'standard' }
 ); // 1분당 100회

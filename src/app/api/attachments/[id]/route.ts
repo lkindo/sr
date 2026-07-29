@@ -5,6 +5,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanReadSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob } from '@/lib/storage';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -38,7 +39,8 @@ export const GET = withAuthAndRateLimit(
     // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
     const { storagePath: _storagePath, ...safeAttachment } = attachment;
 
-    return NextResponse.json(safeAttachment);
+    // fileSize(BigInt) / createdAt(Date) 직렬화
+    return NextResponse.json(serializeResponse(safeAttachment));
   },
   { preset: 'standard' }
 ); // 1분당 100회

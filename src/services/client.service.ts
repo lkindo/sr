@@ -57,7 +57,27 @@ export class ClientService {
             },
           },
         },
-        srs: true,
+        // 테넌트 노출 최소화: 고객사 상세 응답에 전체 SR 본문(설명/처리결과/반려사유)이
+        // 실려나가지 않도록 상세 화면에 필요한 최근 SR 요약만 제한적으로 조회한다.
+        srs: {
+          select: {
+            id: true,
+            srNumber: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        // 통계/삭제 가능 여부 판정을 위한 실제 전체 건수
+        _count: {
+          select: {
+            srs: true,
+            users: true,
+          },
+        },
         serviceCategories: true,
         clientHandlers: {
           include: {

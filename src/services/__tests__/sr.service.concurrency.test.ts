@@ -20,6 +20,10 @@ const { mockPrisma } = vi.hoisted(() => {
     client: {
       findUnique: vi.fn(),
     },
+    serviceCategory: {
+      // null = 카테고리 미존재 → 카테고리 테넌트 검증은 no-op (벤치마크 원래 의도 유지)
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     user: {
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -34,9 +38,14 @@ vi.mock('@/lib/prisma', () => ({
   default: mockPrisma,
 }));
 
-vi.mock('@/lib/policies', () => ({
-  ensureCanCreateSR: vi.fn(),
-}));
+// ensureCanCreateSR 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 사용한다.
+vi.mock('@/lib/policies', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/policies')>();
+  return {
+    ...actual,
+    ensureCanCreateSR: vi.fn(),
+  };
+});
 
 vi.mock('@/services/push.service', () => ({
   pushService: {
@@ -80,8 +89,8 @@ describe('SRService Concurrency Benchmark', () => {
     // Mock SR.update (status history)
     mockPrisma.sR.update.mockResolvedValue({});
 
-    // Mock user for session
-    const mockUser = { id: 'user-1', roles: [] } as any;
+    // 카테고리 미존재 → 카테고리 테넌트 검증은 no-op
+    mockPrisma.serviceCategory.findUnique.mockResolvedValue(null);
 
     // Reset transaction mock to just execute callback
     mockPrisma.$transaction.mockImplementation((cb) => cb(mockPrisma));
@@ -127,7 +136,9 @@ describe('SRService Concurrency Benchmark', () => {
     });
 
     const concurrency = 10;
-    const mockUser = { id: 'user-1', roles: [] } as any;
+    // 외부(고객사) 사용자이지만 'client-1' 에 소속되어 있으므로 테넌트 가드를 통과한다.
+    // (clientIds 를 비워두면 매 요청이 ForbiddenError 로 끝나 벤치마크가 무의미해진다.)
+    const mockUser = { id: 'user-1', roles: [], clientIds: ['client-1'] } as any;
     const inputData = {
       title: 'Test SR',
       description: 'Description must be long enough',

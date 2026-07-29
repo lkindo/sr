@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { hash } from 'bcryptjs';
 
 // 환경 변수 명시적 로드 (로컬 개발 시에만 dotenv 활용, 프로덕션은 시스템 환경변수 우선 적용)
 try {
@@ -9,6 +10,24 @@ try {
 }
 
 const prisma = new PrismaClient();
+
+// 개발용 픽스처(테스트 계정/고객사/샘플 SR) 실행 여부.
+// - 프로덕션(NODE_ENV=production)에서는 어떤 경우에도 실행하지 않는다.
+// - 그 외 환경에서도 SEED_DEV_FIXTURES=true 를 명시해야만 실행된다(명시적 opt-in).
+// 로컬 개발: SEED_DEV_FIXTURES=true SEED_ADMIN_PASSWORD=... pnpm db:seed
+const shouldSeedDevFixtures =
+  process.env.NODE_ENV !== 'production' && process.env.SEED_DEV_FIXTURES === 'true';
+
+// bcrypt 비용. src/lib/constants.ts 의 SECURITY.BCRYPT_WORK_FACTOR 와 동일하게 유지한다.
+// (시드는 앱 소스에 의존하지 않도록 값을 복제한다.)
+const BCRYPT_WORK_FACTOR = 12;
+
+// 로컬/E2E 전용 고정 해시(engineer123 / client123).
+// 위 픽스처 가드로 프로덕션에서는 절대 생성되지 않으며, 이미 존재하는 계정의
+// 비밀번호를 덮어쓰는 데에는 절대 사용하지 않는다.
+// 필요 시 SEED_ENGINEER_PASSWORD / SEED_CLIENT_PASSWORD 로 대체할 수 있다.
+const ENGINEER_DEV_HASH = '$2b$10$pZqoLVt6i.EgPg.xkXhqn.hrfDnm1U2ql/dT/i73NBxuxx4pN/4s6';
+const CLIENT_DEV_HASH = '$2b$10$b5TgWLUPy8AgUvjjwGdHYOg2QPsj9thL9BNSZ1GB/ZNCoPR9brocK';
 
 const permissions = [
   // SR 관련 권한
@@ -82,9 +101,11 @@ const roles = [
   },
 ];
 
-async function main() {
-  console.log('Starting seed...');
-
+/**
+ * 기준 데이터(권한/역할/역할-권한 매핑) 시딩.
+ * 멱등하며 사용자 데이터를 건드리지 않으므로 프로덕션에서도 안전하게 실행할 수 있다.
+ */
+async function seedReferenceData() {
   // Create permissions
   console.log('Creating permissions...');
   for (const permission of permissions) {
@@ -268,88 +289,105 @@ async function main() {
     });
     console.log(`Assigned ${clientUserPermissions.length} permissions to CLIENT_USER role`);
   }
+}
 
+/**
+ * 개발/E2E용 픽스처(테스트 계정, 고객사, 서비스 분류, 샘플 SR) 시딩.
+ * 기존 계정의 비밀번호는 어떤 경우에도 덮어쓰지 않는다.
+ */
+async function seedDevFixtures() {
   // Create test users
   console.log('Creating test users...');
 
-  // Check if admin user already exists
-  const existingAdmin = await prisma.user.findUnique({
-    where: { email: 'admin@example.com' },
+  const adminEmail = 'admin@example.com';
+  let adminUser = await prisma.user.findUnique({
+    where: { email: adminEmail },
   });
 
-  let adminUser;
-  const adminHash = '$2b$10$VarymB/cfMVOCvlVWsDHX.jwOJd.qma9FEKr4H1.skoGt7h1WzZxK';
-  if (!existingAdmin) {
-    adminUser = await prisma.user.create({
-      data: {
-        email: 'admin@example.com',
-        name: 'Admin User',
-        password: adminHash,
-        notificationPreference: { create: {} }, // Add default preferences
-      },
-    });
+  if (!adminUser) {
+    // 기본값 없음: SEED_ADMIN_PASSWORD 가 없으면 관리자 계정을 만들지 않는다.
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD;
 
-    // Assign ADMIN role to user
-    const adminRoleForUser = await prisma.role.findUnique({
-      where: { name: 'ADMIN' },
-    });
-
-    if (adminRoleForUser) {
-      await prisma.userRole.create({
+    if (!adminPassword) {
+      console.log(
+        'SEED_ADMIN_PASSWORD가 설정되지 않아 admin 계정 생성을 건너뜁니다. ' +
+          '(생성하려면 SEED_ADMIN_PASSWORD를 지정하세요)'
+      );
+    } else {
+      adminUser = await prisma.user.create({
         data: {
-          userId: adminUser.id,
-          roleId: adminRoleForUser.id,
+          email: adminEmail,
+          name: 'Admin User',
+          password: await hash(adminPassword, BCRYPT_WORK_FACTOR),
+          notificationPreference: { create: {} }, // Add default preferences
         },
       });
-    }
 
-    console.log('Created admin user: admin@example.com / admin123');
+      // Assign ADMIN role to user
+      const adminRoleForUser = await prisma.role.findUnique({
+        where: { name: 'ADMIN' },
+      });
+
+      if (adminRoleForUser) {
+        await prisma.userRole.create({
+          data: {
+            userId: adminUser.id,
+            roleId: adminRoleForUser.id,
+          },
+        });
+      }
+
+      console.log(`Created admin user: ${adminEmail}`);
+    }
   } else {
-    adminUser = await prisma.user.update({
-      where: { email: 'admin@example.com' },
-      data: {
-        password: adminHash,
-        notificationPreference: { upsert: { create: {}, update: {} } },
-      },
+    // 기존 계정의 비밀번호는 절대 재설정하지 않는다(운영자가 변경한 값 보존).
+    await prisma.notificationPreference.upsert({
+      where: { userId: adminUser.id },
+      create: { userId: adminUser.id },
+      update: {},
     });
-    console.log('Admin user already exists, updated password and preferences');
+    console.log('Admin user already exists, password left untouched');
   }
 
   // Create Engineer User for E2E tests
   const engineerEmail = 'engineeruser@example.com';
-  let engineerUser = await prisma.user.findUnique({ where: { email: engineerEmail } });
+  const engineerUser = await prisma.user.findUnique({ where: { email: engineerEmail } });
 
-  const engineerHash = '$2b$10$pZqoLVt6i.EgPg.xkXhqn.hrfDnm1U2ql/dT/i73NBxuxx4pN/4s6';
   if (!engineerUser) {
-    engineerUser = await prisma.user.create({
+    const engineerPassword = process.env.SEED_ENGINEER_PASSWORD;
+    const created = await prisma.user.create({
       data: {
         email: engineerEmail,
         name: 'Engineer User',
-        password: engineerHash,
+        password: engineerPassword
+          ? await hash(engineerPassword, BCRYPT_WORK_FACTOR)
+          : ENGINEER_DEV_HASH,
         notificationPreference: { create: {} },
       },
     });
     // ENGINEER 역할 부여
     const engRole = await prisma.role.findUnique({ where: { name: 'ENGINEER' } });
     if (engRole) {
-      await prisma.userRole.create({ data: { userId: engineerUser.id, roleId: engRole.id } });
+      await prisma.userRole.create({ data: { userId: created.id, roleId: engRole.id } });
     }
-    console.log(`Created engineer user: ${engineerEmail} / engineer123`);
+    console.log(`Created engineer user: ${engineerEmail}`);
   } else {
-    // Ensure preference AND PASSWORD for existing engineer user
-
-    await prisma.user.update({
-      where: { id: engineerUser.id },
-      data: { password: engineerHash },
-    });
-
+    // 알림 설정만 보정하고 비밀번호는 그대로 둔다.
     await prisma.notificationPreference.upsert({
       where: { userId: engineerUser.id },
       create: { userId: engineerUser.id },
       update: {},
     });
-    console.log('Engineer user exists, password reset to engineer123');
+    console.log('Engineer user exists, password left untouched');
   }
+
+  if (!adminUser) {
+    console.log('admin 계정이 없어 고객사/서비스 분류/샘플 SR 픽스처를 건너뜁니다.');
+    return;
+  }
+
+  // 이후 단계는 admin 계정이 반드시 존재한다(위 가드 통과).
+  const admin = adminUser;
 
   // Create test clients
   console.log('Creating test clients...');
@@ -372,7 +410,7 @@ async function main() {
         isActive: true,
         users: {
           create: {
-            userId: adminUser.id,
+            userId: admin.id,
           },
         },
       },
@@ -389,7 +427,7 @@ async function main() {
         isActive: true,
         users: {
           create: {
-            userId: adminUser.id,
+            userId: admin.id,
           },
         },
       },
@@ -408,13 +446,13 @@ async function main() {
   const clientEmail = 'clientuser@example.com';
   let clientUser = await prisma.user.findUnique({ where: { email: clientEmail } });
 
-  const clientHash = '$2b$10$b5TgWLUPy8AgUvjjwGdHYOg2QPsj9thL9BNSZ1GB/ZNCoPR9brocK';
   if (!clientUser) {
+    const clientPassword = process.env.SEED_CLIENT_PASSWORD;
     clientUser = await prisma.user.create({
       data: {
         email: clientEmail,
         name: 'Client User',
-        password: clientHash,
+        password: clientPassword ? await hash(clientPassword, BCRYPT_WORK_FACTOR) : CLIENT_DEV_HASH,
         notificationPreference: { create: {} }, // Add default preferences
       },
     });
@@ -425,18 +463,13 @@ async function main() {
     }
     console.log(`Created client user: ${clientEmail}`);
   } else {
-    // Ensure preference AND PASSWORD for existing client user
-    await prisma.user.update({
-      where: { id: clientUser.id },
-      data: { password: clientHash },
-    });
-
+    // 알림 설정만 보정하고 비밀번호는 그대로 둔다.
     await prisma.notificationPreference.upsert({
       where: { userId: clientUser.id },
       create: { userId: clientUser.id },
       update: {},
     });
-    console.log('Client user exists, password reset to client123');
+    console.log('Client user exists, password left untouched');
   }
 
   // Ensure client user is linked to TEST001
@@ -523,7 +556,7 @@ async function main() {
 
   const existingSRs = await prisma.sR.count();
 
-  if (existingSRs === 0 && testClient1 && adminUser) {
+  if (existingSRs === 0 && testClient1) {
     const category = await prisma.serviceCategory.findFirst({
       where: { clientId: testClient1.id },
     });
@@ -540,9 +573,9 @@ async function main() {
           actualPriority: 'HIGH',
           clientId: testClient1.id,
           serviceCategoryId: category.id,
-          requesterId: adminUser.id,
-          assigneeId: adminUser.id,
-          intakeById: adminUser.id,
+          requesterId: admin.id,
+          assigneeId: admin.id,
+          intakeById: admin.id,
           intakeAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2일 전
         },
       });
@@ -552,21 +585,21 @@ async function main() {
         data: [
           {
             srId: sr1.id,
-            userId: adminUser.id,
+            userId: admin.id,
             type: 'CREATED',
             description: 'SR이 생성되었습니다',
             createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr1.id,
-            userId: adminUser.id,
+            userId: admin.id,
             type: 'ASSIGNED',
             description: '담당자가 할당되었습니다',
             createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 1000),
           },
           {
             srId: sr1.id,
-            userId: adminUser.id,
+            userId: admin.id,
             type: 'STATUS_CHANGED',
             description: '상태가 IN_PROGRESS로 변경되었습니다',
             createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
@@ -580,7 +613,7 @@ async function main() {
           {
             srId: sr1.id,
             currentStatus: 'REQUESTED',
-            changedBy: adminUser.id,
+            changedBy: admin.id,
             changeReason: '초기 생성',
             changedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
           },
@@ -588,7 +621,7 @@ async function main() {
             srId: sr1.id,
             previousStatus: 'REQUESTED',
             currentStatus: 'IN_PROGRESS',
-            changedBy: adminUser.id,
+            changedBy: admin.id,
             changeReason: '작업 시작',
             changedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
           },
@@ -606,9 +639,9 @@ async function main() {
           actualPriority: 'MEDIUM',
           clientId: testClient1.id,
           serviceCategoryId: category.id,
-          requesterId: adminUser.id,
-          assigneeId: adminUser.id,
-          intakeById: adminUser.id,
+          requesterId: admin.id,
+          assigneeId: admin.id,
+          intakeById: admin.id,
           intakeAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           completedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
         },
@@ -618,14 +651,14 @@ async function main() {
         data: [
           {
             srId: sr2.id,
-            userId: adminUser.id,
+            userId: admin.id,
             type: 'CREATED',
             description: 'SR이 생성되었습니다',
             createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           },
           {
             srId: sr2.id,
-            userId: adminUser.id,
+            userId: admin.id,
             type: 'STATUS_CHANGED',
             description: '상태가 COMPLETED로 변경되었습니다',
             createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
@@ -638,7 +671,7 @@ async function main() {
           {
             srId: sr2.id,
             currentStatus: 'REQUESTED',
-            changedBy: adminUser.id,
+            changedBy: admin.id,
             changeReason: '초기 생성',
             changedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           },
@@ -646,7 +679,7 @@ async function main() {
             srId: sr2.id,
             previousStatus: 'REQUESTED',
             currentStatus: 'IN_PROGRESS',
-            changedBy: adminUser.id,
+            changedBy: admin.id,
             changeReason: '작업 시작',
             changedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
           },
@@ -654,7 +687,7 @@ async function main() {
             srId: sr2.id,
             previousStatus: 'IN_PROGRESS',
             currentStatus: 'COMPLETED',
-            changedBy: adminUser.id,
+            changedBy: admin.id,
             changeReason: '작업 완료',
             changedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
           },
@@ -671,14 +704,14 @@ async function main() {
           requestedPriority: 'LOW',
           clientId: testClient1.id,
           serviceCategoryId: category.id,
-          requesterId: adminUser.id,
+          requesterId: admin.id,
         },
       });
 
       await prisma.sRActivity.create({
         data: {
           srId: sr3.id,
-          userId: adminUser.id,
+          userId: admin.id,
           type: 'CREATED',
           description: 'SR이 생성되었습니다',
         },
@@ -688,7 +721,7 @@ async function main() {
         data: {
           srId: sr3.id,
           currentStatus: 'REQUESTED',
-          changedBy: adminUser.id,
+          changedBy: admin.id,
           changeReason: '초기 생성',
         },
       });
@@ -698,6 +731,23 @@ async function main() {
   } else {
     console.log(`Sample SRs already exist (${existingSRs} found)`);
   }
+}
+
+async function main() {
+  console.log('Starting seed...');
+
+  await seedReferenceData();
+
+  if (!shouldSeedDevFixtures) {
+    console.log(
+      '개발용 픽스처를 건너뜁니다(기준 데이터만 시딩). ' +
+        '필요 시 비프로덕션 환경에서 SEED_DEV_FIXTURES=true 로 실행하세요.'
+    );
+    console.log('Seed completed successfully!');
+    return;
+  }
+
+  await seedDevFixtures();
 
   console.log('Seed completed successfully!');
 }

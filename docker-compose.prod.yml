@@ -51,9 +51,15 @@ services:
     container_name: sr-db
     restart: always
     environment:
-      - POSTGRES_USER=lkind
-      - POSTGRES_PASSWORD=sr1234
-      - POSTGRES_DB=sr_db
+      # 자격증명은 저장소에 두지 않는다. compose 가 배포 호스트의 기본 env 파일
+      # (`/home/opc/sr/.env`) 또는 셸 환경에서 보간하며, 값이 비면 `:?` 문법으로
+      # 즉시 실패한다 — 안전하지 않은 기본값으로 조용히 뜨는 것을 막는다.
+      # 주의: POSTGRES_* 는 데이터 디렉터리가 비어 있는 최초 기동에만 반영된다.
+      # 기존 볼륨의 비밀번호 교체는 `ALTER USER` 로 수행한다(docs/SECRET_ROTATION.md).
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # DB 이름은 비밀이 아니므로 기존 볼륨 호환을 위해 현재 값을 기본값으로 남긴다.
+      - POSTGRES_DB=${POSTGRES_DB:-sr_db}
     # 보안: DB 포트를 호스트로 공개하지 않는다. app 컨테이너는 내부 브리지(sr-net)로 접근한다.
     # 관리 접근이 필요하면 SSH 터널 또는 `docker exec`를 사용한다.
     # ports:
@@ -61,7 +67,8 @@ services:
     volumes:
       - sr_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db']
+      # `$$` 는 compose 보간을 회피해 컨테이너 셸이 자신의 POSTGRES_* 환경변수를 읽게 한다.
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 10s
       timeout: 5s
       retries: 5

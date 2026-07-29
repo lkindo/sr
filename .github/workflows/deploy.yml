@@ -1,10 +1,26 @@
 name: Deploy to Self-Hosted Docker Server
 
+# CI(`CI/CD Pipeline`)가 성공으로 끝난 뒤에만 배포한다.
+# - 과거: push 트리거로 CI와 동시에 실행되어 lint/type/test 결과와 무관하게 배포되었다.
+# - 경로 필터(paths-ignore: '**.md', 'docs/**')는 workflow_run 에서 지원되지 않으므로
+#   ci-cd.yml 의 push 트리거에 이미 정의된 필터가 그대로 게이트 역할을 한다.
+#   (문서만 수정하면 CI 자체가 돌지 않으므로 이 워크플로도 트리거되지 않는다.)
+# - 주의: workflow_run 워크플로는 "기본 브랜치(main)에 있는 정의"가 실행된다.
+#   이 파일을 수정하면 main 에 병합되어야 실제 배포 동작이 바뀐다.
 on:
-  push:
+  workflow_run:
+    workflows: ['CI/CD Pipeline']
+    types: [completed]
     branches:
       - main
       - dev
+
+# 단일 서버(/home/opc/sr, 동일 docker 데몬)를 main/dev 배포가 공유하므로 전부 직렬화한다.
+# workflow_run 이벤트에서 github.ref 는 기본 브랜치로 고정되어 그룹이 하나로 묶인다(의도된 동작).
+# 배포 도중 취소되면 컨테이너가 down 상태로 남을 수 있어 cancel-in-progress 는 false.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -14,10 +30,19 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    # CI가 성공한 push 이벤트에 대해서만 배포한다.
+    # (PR로 촉발된 CI는 소스 브랜치명이 main/dev와 겹칠 수 있으므로 event로 한 번 더 차단)
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
 
     steps:
+      # workflow_run 은 기본적으로 기본 브랜치를 체크아웃하므로,
+      # CI를 통과한 "그 커밋"을 명시적으로 체크아웃한다.
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -40,10 +65,14 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
 
+      # 배포 대상 브랜치는 CI를 통과한 워크플로 실행의 head_branch 를 사용한다.
+      # (workflow_run 에서 github.ref_name 은 기본 브랜치라 dev 배포가 깨진다)
       - name: Set Env Tags
         id: tags
+        env:
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.ref_name }}" = "main" ]; then
+          if [ "${HEAD_BRANCH}" = "main" ]; then
             echo "tag=latest" >> ${GITHUB_OUTPUT}
           else
             echo "tag=dev" >> ${GITHUB_OUTPUT}
@@ -67,25 +96,66 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          source: '.env.docker.test,docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh,scripts/backup.sh,scripts/restore.sh'
+          # `.env.docker*` 는 더 이상 저장소에 없다(시크릿 커밋 제거).
+          # 런타임 env 파일은 아래 SSH 스텝에서 GitHub Secrets 로부터 서버에 직접 기록한다.
+          source: 'docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh,scripts/backup.sh,scripts/restore.sh'
           target: '/home/opc/sr'
 
       # SSH를 이용해 대상 서버로 배포 원격 실행
       - name: Deploy to Remote VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         env:
-          BRANCH_NAME: ${{ github.ref_name }}
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 컨테이너 런타임 env(.env.docker / .env.docker.test) 전체를 base64 로 담은 시크릿.
+          ENV_DOCKER_B64: ${{ github.event.workflow_run.head_branch == 'main' && secrets.PROD_ENV_DOCKER_B64 || secrets.STAGING_ENV_DOCKER_B64 }}
+          # compose 보간용 env(POSTGRES_USER/PASSWORD/DB) 를 base64 로 담은 시크릿.
+          COMPOSE_ENV_B64: ${{ github.event.workflow_run.head_branch == 'main' && secrets.PROD_COMPOSE_ENV_B64 || secrets.STAGING_COMPOSE_ENV_B64 }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          envs: BRANCH_NAME, GITHUB_ACTOR, GITHUB_TOKEN
+          envs: BRANCH_NAME, GITHUB_ACTOR, GITHUB_TOKEN, ENV_DOCKER_B64, COMPOSE_ENV_B64
           script: |
             mkdir -p /home/opc/sr/nginx/certs /home/opc/sr/scripts
-            cd /home/opc/sr
+            cd /home/opc/sr || exit 1
+
+            # ── 런타임 시크릿 배치 ──────────────────────────────────────────────
+            # 저장소에는 자격증명이 없다. 배포 시 GitHub Secrets 에서 서버에 기록한다.
+            # 컨테이너를 내리기 전에 먼저 검증해, 시크릿 미등록 상태에서 서비스가
+            # down 된 채로 멈추는 사고를 막는다.
+            if [ -z "$ENV_DOCKER_B64" ] || [ -z "$COMPOSE_ENV_B64" ]; then
+              echo "ERROR: 배포 시크릿이 비어 있습니다. 컨테이너를 건드리지 않고 중단합니다."
+              echo "  필요한 Secrets: PROD_ENV_DOCKER_B64 / PROD_COMPOSE_ENV_B64 (main)"
+              echo "                  STAGING_ENV_DOCKER_B64 / STAGING_COMPOSE_ENV_B64 (dev)"
+              echo "  등록 절차: docs/SECRET_ROTATION.md 3절"
+              exit 1
+            fi
+
+            # 시크릿 파일은 소유자만 읽게 생성한다.
+            umask 077
+            if [ "$BRANCH_NAME" = "main" ]; then
+              printf '%s' "$ENV_DOCKER_B64"  | base64 -d > .env.docker
+              printf '%s' "$COMPOSE_ENV_B64" | base64 -d > .env
+              COMPOSE_ARGS="--env-file .env -f docker-compose.prod.yml"
+            else
+              printf '%s' "$ENV_DOCKER_B64"  | base64 -d > .env.docker.test
+              printf '%s' "$COMPOSE_ENV_B64" | base64 -d > .env.staging
+              # 운영과 스테이징이 같은 디렉터리를 공유하므로, 기본 `.env`(운영 자격증명)가
+              # 스테이징에 딸려 들어가지 않도록 `--env-file` 을 반드시 명시한다.
+              COMPOSE_ARGS="--env-file .env.staging -p sr-test -f docker-compose.test.yml"
+            fi
+            chmod 600 .env .env.staging .env.docker .env.docker.test 2>/dev/null || true
+
+            # 보간이 성립하는지 먼저 확인한다. 여기서 실패하면 아직 아무것도 내리지 않은
+            # 상태이므로 현재 서비스는 계속 살아 있다.
+            if ! docker compose $COMPOSE_ARGS config -q; then
+              echo "ERROR: compose 설정 보간 실패(자격증명 누락 가능). 컨테이너를 건드리지 않고 중단합니다."
+              exit 1
+            fi
+            umask 022
 
             # 백업/복구 스크립트 실행권한 보장(CRLF 정리 포함)
             if [ -f scripts/backup.sh ]; then
@@ -98,16 +168,16 @@ jobs:
 
             if [ "$BRANCH_NAME" = "dev" ]; then
               echo "Deploying Staging (dev branch)..."
-              
+
               # 1. Pull 최신 dev 이미지 및 재시작
               #    과거: compose 프로젝트(sr-test) 밖에서 생성된 동명 컨테이너와 이름이 충돌해
               #    `up`이 조용히 실패하고(뒤 명령 성공으로 워크플로는 success 보고) 컨테이너가
               #    교체되지 않았다. 아래처럼 동명 컨테이너를 강제 정리한 뒤 재생성한다.
               #    (DB/업로드는 named volume 에 있으므로 데이터는 보존된다.)
-              docker compose -p sr-test -f docker-compose.test.yml pull
-              docker compose -p sr-test -f docker-compose.test.yml down --remove-orphans || true
+              docker compose $COMPOSE_ARGS pull
+              docker compose $COMPOSE_ARGS down --remove-orphans || true
               docker rm -f sr-app-test sr-db-test 2>/dev/null || true
-              docker compose -p sr-test -f docker-compose.test.yml up -d --force-recreate --remove-orphans
+              docker compose $COMPOSE_ARGS up -d --force-recreate --remove-orphans
 
               # 1-1. 재생성 검증: app 컨테이너가 실제로 실행 중이 아니면 배포를 실패로 처리
               sleep 5
@@ -115,13 +185,19 @@ jobs:
                 echo "ERROR: sr-app-test failed to start"; docker logs sr-app-test --tail 40 2>&1 || true; exit 1
               fi
 
-              # 2. DB 시딩 (스테이징 테스트 데이터)
+              # 2. DB 시딩은 배포 파이프라인에서 수행하지 않는다.
               #    스키마 마이그레이션은 컨테이너 시작 시 docker-entrypoint.sh의
-              #    `prisma migrate deploy`가 자동 수행하므로 `db push --accept-data-loss`는 제거.
-              docker compose -p sr-test exec -T app-test npx tsx prisma/seed.ts
-              
+              #    `prisma migrate deploy`가 자동 수행한다.
+              #    (과거의 무조건 reseed 는 매 배포마다 스테이징 계정 비밀번호를
+              #     하드코딩 값으로 되돌려 운영자의 변경을 무효화했다.)
+              #    초기 1회 기준 데이터(권한/역할) 시딩이 필요하면 서버에서 수동 실행한다:
+              #      docker compose --env-file .env.staging -p sr-test -f docker-compose.test.yml \
+              #        exec -T app-test npx tsx prisma/seed.ts
+              #    이 이미지는 NODE_ENV=production 이므로 테스트 계정/샘플 데이터 픽스처는
+              #    실행되지 않는다(의도된 동작). 스테이징 계정은 앱에서 직접 생성한다.
+
               # 3. 미사용 이미지 prune
-              docker compose -p sr-test -f docker-compose.test.yml image prune -af || docker image prune -af
+              docker compose $COMPOSE_ARGS image prune -af || docker image prune -af
 
             else
               echo "Deploying Production (main branch)..."
@@ -129,7 +205,7 @@ jobs:
               # 1. 방화벽 443 포트 해제
               sudo firewall-cmd --permanent --add-port=443/tcp || true
               sudo firewall-cmd --reload || true
-              
+
               # 2. 자가 서명 인증서 자동 생성 (certs 하위에 파일 없을 때만 발급)
               if [ ! -f nginx/certs/server.crt ]; then
                 echo "Generating self-signed SSL certificate..."
@@ -140,33 +216,33 @@ jobs:
                 sudo chmod 644 nginx/certs/server.crt
                 sudo chmod 600 nginx/certs/server.key
               fi
-              
+
               # 3. 최신 이미지 Pull 및 재구동
               #    동명 컨테이너(프로젝트 밖 생성분) 강제 정리 후 재생성하여 이름 충돌로 인한
               #    "성공 보고 + 미교체" 문제를 방지한다. DB(sr_db_data)/업로드(sr_uploads)는
               #    named volume 이므로 데이터는 보존되고, nginx 인증서는 bind-mount 로 유지된다.
-              docker compose -f docker-compose.prod.yml pull
-              docker compose -f docker-compose.prod.yml down --remove-orphans || true
+              docker compose $COMPOSE_ARGS pull
+              docker compose $COMPOSE_ARGS down --remove-orphans || true
               docker rm -f sr-nginx sr-app sr-db 2>/dev/null || true
-              docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+              docker compose $COMPOSE_ARGS up -d --force-recreate --remove-orphans
 
               # 3-1. 재생성 검증: app 컨테이너가 실행 중이 아니면 배포를 실패로 처리
               sleep 5
               if [ -z "$(docker ps -q -f name=sr-app -f status=running)" ]; then
                 echo "ERROR: sr-app failed to start"; docker logs sr-app --tail 40 2>&1 || true; exit 1
               fi
-              
+
               # 4. Let's Encrypt 발급 스크립트 실행
               chmod +x scripts/setup-letsencrypt.sh
               ./scripts/setup-letsencrypt.sh
-              
+
               # 5. 데이터베이스 마이그레이션
               #    스키마 마이그레이션은 컨테이너 시작 시 docker-entrypoint.sh의
               #    `prisma migrate deploy`가 자동 수행한다.
               #    (과거의 `db push --accept-data-loss` + 무조건 reseed 는 프로덕션
               #     데이터 유실 및 운영 계정 비밀번호 초기화 위험이 있어 제거.
               #     운영 초기 시딩이 필요하면 1회성 수동 작업으로만 수행한다.)
-              
+
               # 6. 미사용 이미지 정리
-              docker compose -f docker-compose.prod.yml image prune -af || docker image prune -af
+              docker compose $COMPOSE_ARGS image prune -af || docker image prune -af
             fi

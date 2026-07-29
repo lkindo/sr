@@ -20,6 +20,10 @@ export const GET = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
+    // Multi-tenant Isolation: 상세 데이터를 적재하기 전에 대상 고객사 ID 기준으로 권한을 검증한다.
+    // (CLIENT:READ 플래그만 가진 외부 사용자가 타 고객사 상세를 조회하지 못하도록 차단)
+    ensureCanReadClient(session.user, { id });
+
     // Service 레이어를 통해 고객사 조회
     const clientService = new ClientService();
     const clientWithCategories = await clientService.getClientWithDetailsAndCategories(id);
@@ -27,9 +31,6 @@ export const GET = withAuthAndRateLimit(
     if (!clientWithCategories) {
       throw new NotFoundError('고객사');
     }
-
-    // Enforce authorization check
-    ensureCanReadClient(session.user, clientWithCategories as any);
 
     return NextResponse.json(clientWithCategories);
   },

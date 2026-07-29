@@ -261,15 +261,15 @@ export default function OrganizationPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to reassign user');
-      }
+        // 진행 중인 SR이 있어 서버가 거부한 경우 - 경고를 표시하고 강제 이동을 유도
+        if (response.status === 409 && result.code === 'ONGOING_SRS') {
+          setOngoingSRs(result.data?.ongoingSRs || []);
+          setShowWarning(true);
+          setIsReassigning(false);
+          return;
+        }
 
-      // 경고가 있고 강제 이동이 아니면 경고 표시
-      if (result.warning && !force) {
-        setOngoingSRs(result.data.ongoingSRs || []);
-        setShowWarning(true);
-        setIsReassigning(false);
-        return;
+        throw new Error(result.error || 'Failed to reassign user');
       }
 
       // 성공 처리

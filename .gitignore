@@ -25,6 +25,9 @@
 # ------------------------------------------------------------------------------
 .env
 .env*.local
+# Docker 배포용 실제 시크릿(NEXTAUTH_SECRET/AUTH_SECRET, DB 비밀번호) 추적 차단.
+# 플레이스홀더만 담은 .env.example 은 계속 추적한다.
+.env.docker*
 /prisma/.env
 *.pem
 *.key

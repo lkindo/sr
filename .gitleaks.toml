@@ -1,17 +1,55 @@
 title = "gitleaks config"
 
+# gitleaks 기본 규칙 세트를 상속한 뒤, 이 저장소 고유의 시크릿 패턴만 [[rules]]로 보강한다.
+# 과거에는 `path = ""`(빈 경로)만 있어 어떤 규칙도 로드되지 않았고, 그래서 커밋된
+# `.env.docker`의 NEXTAUTH_SECRET 이 한 번도 탐지되지 않았다.
 [extend]
-path = ""
+useDefault = true
 
-[rules]
-# 기본 규칙 사용, 프로젝트 특성상 허용할 false positive만 추가 예외 처리
+# ------------------------------------------------------------------------------
+# 프로젝트 고유 규칙
+# `.env.docker` / `.env.docker.test` 는 배포 시크릿을 담으므로 반드시 스캔 대상이며
+# allowlist 에 넣지 않는다. 두 파일이 .gitignore 로 빠진 뒤에도 이력 스캔
+# (`gitleaks detect`)과 작업트리 스캔(`gitleaks dir . --no-git`) 양쪽에서 걸려야 한다.
+# ------------------------------------------------------------------------------
+
+[[rules]]
+id = "sr-auth-signing-secret"
+description = "NextAuth/Auth.js 서명 시크릿 하드코딩 (base64 32바이트 등 고엔트로피 값)"
+regex = '''(?i)\b(?:nextauth_secret|auth_secret)\s*[:=]\s*['"]?([A-Za-z0-9+/]{32,}={0,2})['"]?'''
+secretGroup = 1
+keywords = ["nextauth_secret", "auth_secret"]
+tags = ["secret", "auth", "nextauth"]
+
+[[rules]]
+id = "sr-postgres-password"
+description = "POSTGRES_PASSWORD 하드코딩 (compose / env 파일)"
+# 첫 글자에서 `$`, `?`, `{` 를 제외해 `${POSTGRES_PASSWORD:?...}` 같은 보간 구문은 걸지 않는다.
+regex = '''(?i)\bpostgres_password\s*[:=]\s*['"]?([^\s'"$#?{][^\s'"#]{2,})['"]?'''
+secretGroup = 1
+keywords = ["postgres_password"]
+tags = ["secret", "database"]
+
+[[rules]]
+id = "sr-postgres-connection-string"
+description = "PostgreSQL 연결 문자열에 비밀번호 인라인 (DATABASE_URL/DIRECT_URL)"
+regex = '''(?i)\bpostgres(?:ql)?://[^:\s'"/@]+:([^@\s'"]{3,})@'''
+secretGroup = 1
+keywords = ["postgresql://", "postgres://"]
+tags = ["secret", "database"]
 
 [allowlist]
 description = "Common test fixtures and examples"
+# 경로는 저장소 루트 기준 상대 경로로 평가되므로 `(^|/)` 로 시작을 함께 허용한다.
+# (기존 `/docs?/` 형태는 선행 슬래시가 없는 `docs/...` 에 매칭되지 않아 무력했다.)
 paths = [
   '''\.env\.example$''',
-  '''/tests?/''',
-  '''/e2e/''',
-  '''/docs?/'''
+  '''(^|/)tests?/''',
+  '''(^|/)e2e/''',
+  '''(^|/)docs?/'''
 ]
-
+# 실제 값이 아닌 플레이스홀더는 노이즈이므로 제외한다.
+regexes = [
+  '''your_[a-z0-9_]*_here''',
+  '''change_me[a-z0-9_]*'''
+]

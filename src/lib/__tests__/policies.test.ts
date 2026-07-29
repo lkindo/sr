@@ -143,12 +143,47 @@ describe('Policy Functions', () => {
   describe('Client Policies', () => {
     const client = { id: 'c1' } as any;
 
-    it('canReadClient: admin/global read/member logic', () => {
+    it('canReadClient: ADMIN은 소속과 무관하게 고객사 상세를 조회할 수 있다', () => {
       expect(policies.canReadClient(adminUser, client)).toBe(true);
-      const userRead = { ...userNoPerms, id: 'u-read-c', permissions: [PERMISSIONS.CLIENT.READ] };
-      expect(policies.canReadClient(userRead, client)).toBe(true);
-      expect(policies.canReadClient(clientUser, client)).toBe(true);
+    });
 
+    it('canReadClient: 내부 사용자(MANAGER)는 CLIENT:READ 플래그로 고객사 상세를 조회할 수 있다', () => {
+      const internalReader = {
+        ...userNoPerms,
+        id: 'u-internal-read-c',
+        roles: ['MANAGER'],
+        permissions: [PERMISSIONS.CLIENT.READ],
+        clientIds: [],
+      };
+      expect(policies.canReadClient(internalReader, client)).toBe(true);
+    });
+
+    it('canReadClient: 외부 사용자는 CLIENT:READ 플래그만으로 타 고객사 상세를 조회할 수 없다 (테넌트 격리)', () => {
+      const externalReader = {
+        ...userNoPerms,
+        id: 'u-external-read-c',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.CLIENT.READ],
+        clientIds: ['other'],
+      };
+      expect(policies.canReadClient(externalReader, client)).toBe(false);
+      expect(() => policies.ensureCanReadClient(externalReader, client)).toThrow(ForbiddenError);
+
+      // 플래그가 있어도 소속 정보 자체가 없으면 차단
+      const externalNoMembership = {
+        ...externalReader,
+        id: 'u-external-no-membership',
+        clientIds: undefined,
+      };
+      expect(policies.canReadClient(externalNoMembership, client)).toBe(false);
+    });
+
+    it('canReadClient: 외부 사용자라도 해당 고객사 소속이면 상세를 조회할 수 있다', () => {
+      expect(policies.canReadClient(clientUser, client)).toBe(true);
+      expect(() => policies.ensureCanReadClient(clientUser, client)).not.toThrow();
+    });
+
+    it('canReadClient: 비소속/무권한 사용자는 상세 조회 불가', () => {
       // non-member fails
       const userOther = { ...clientUser, clientIds: ['other'] };
       expect(policies.canReadClient(userOther, client)).toBe(false);
@@ -158,7 +193,9 @@ describe('Policy Functions', () => {
       expect(policies.canReadClient(userUndef, client)).toBe(false);
 
       expect(policies.canReadClient(userNoPerms, client)).toBe(false);
+    });
 
+    it('canReadClient: 목록 조회(client 미지정)는 플래그 기준으로 판정된다', () => {
       // Without client object
       expect(policies.canReadClient(adminUser)).toBe(true);
       expect(policies.canReadClient(userNoPerms)).toBe(false);
@@ -166,6 +203,16 @@ describe('Policy Functions', () => {
       // Admin check for no client
       const adminNoClientPerm = { id: 'a', roles: ['ADMIN'], permissions: [] } as any;
       expect(policies.canReadClient(adminNoClientPerm)).toBe(true);
+
+      // 목록은 라우트에서 clientIds 로 스코프되므로 외부 사용자도 플래그만으로 통과한다
+      const externalReader = {
+        ...userNoPerms,
+        id: 'u-external-list-c',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.CLIENT.READ],
+        clientIds: ['other'],
+      };
+      expect(policies.canReadClient(externalReader)).toBe(true);
     });
 
     it('canCreate/Update/DeleteClient basic permissions', () => {
@@ -182,23 +229,64 @@ describe('Policy Functions', () => {
   });
 
   describe('User Policies', () => {
-    const targetUser = { id: 'user-target' } as any;
+    // UserIdentity 는 소속 고객사(clients)를 함께 실어 테넌트 판정을 수행한다.
+    const targetUser = { id: 'user-target', clients: [{ clientId: 'c1' }] } as any;
+    const foreignTargetUser = { id: 'user-foreign', clients: [{ clientId: 'other' }] } as any;
 
-    it('canReadUser: admin/global/self logic', () => {
+    it('canReadUser: ADMIN과 본인은 항상 조회 가능하고, 무권한 사용자는 불가', () => {
       expect(policies.canReadUser(adminUser, targetUser)).toBe(true);
       const self = { ...userNoPerms, id: 'user-target' };
       expect(policies.canReadUser(self, targetUser)).toBe(true);
       expect(policies.canReadUser(userNoPerms, targetUser)).toBe(false);
     });
 
-    it('canUpdateUser: admin/global/self_update logic', () => {
-      expect(policies.canUpdateUser(adminUser, targetUser)).toBe(true);
-      const userGlobal = {
+    it('canReadUser: 내부 사용자(MANAGER)는 USER:READ 플래그로 타 고객사 사용자도 조회 가능', () => {
+      const internalReader = {
         ...userNoPerms,
-        id: 'u-upd-all',
-        permissions: [PERMISSIONS.USER.UPDATE],
+        id: 'u-internal-read-u',
+        roles: ['MANAGER'],
+        permissions: [PERMISSIONS.USER.READ],
+        clientIds: [],
       };
-      expect(policies.canUpdateUser(userGlobal, targetUser)).toBe(true);
+      expect(policies.canReadUser(internalReader, foreignTargetUser)).toBe(true);
+    });
+
+    it('canReadUser: 외부 사용자는 USER:READ 플래그만으로 타 고객사 사용자를 조회할 수 없다 (테넌트 격리)', () => {
+      const externalReader = {
+        ...userNoPerms,
+        id: 'u-external-read-u',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.USER.READ],
+        clientIds: ['c1'],
+      };
+      expect(policies.canReadUser(externalReader, foreignTargetUser)).toBe(false);
+      expect(() => policies.ensureCanReadUser(externalReader, foreignTargetUser)).toThrow(
+        ForbiddenError
+      );
+
+      // 대상의 소속 정보가 없으면(테넌트 특정 불가) 차단
+      const targetNoMembership = { id: 'user-unknown-tenant', clients: [] } as any;
+      expect(policies.canReadUser(externalReader, targetNoMembership)).toBe(false);
+    });
+
+    it('canReadUser: 외부 사용자는 고객사를 공유하는 사용자와 본인은 조회 가능', () => {
+      const externalReader = {
+        ...userNoPerms,
+        id: 'u-external-read-u',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.USER.READ],
+        clientIds: ['c1'],
+      };
+      // 같은 고객사(c1)를 공유하는 대상 -> 허용
+      expect(policies.canReadUser(externalReader, targetUser)).toBe(true);
+
+      // 본인은 소속 정보와 무관하게 항상 허용
+      const selfIdentity = { id: 'u-external-read-u', clients: [] } as any;
+      expect(policies.canReadUser(externalReader, selfIdentity)).toBe(true);
+    });
+
+    it('canUpdateUser: ADMIN과 본인(UPDATE_SELF)은 수정 가능', () => {
+      expect(policies.canUpdateUser(adminUser, targetUser)).toBe(true);
 
       const self = {
         ...userNoPerms,
@@ -212,6 +300,56 @@ describe('Policy Functions', () => {
       expect(policies.canUpdateUser(selfNoFlag, targetUser)).toBe(false);
 
       expect(policies.canUpdateUser(userNoPerms, targetUser)).toBe(false);
+    });
+
+    it('canUpdateUser: 내부 사용자(MANAGER)는 USER:UPDATE 플래그로 타 고객사 사용자도 수정 가능', () => {
+      const internalUpdater = {
+        ...userNoPerms,
+        id: 'u-internal-upd',
+        roles: ['MANAGER'],
+        permissions: [PERMISSIONS.USER.UPDATE],
+        clientIds: [],
+      };
+      expect(policies.canUpdateUser(internalUpdater, foreignTargetUser)).toBe(true);
+    });
+
+    it('canUpdateUser: 외부 사용자는 USER:UPDATE 플래그만으로 타 고객사 사용자를 수정할 수 없다 (테넌트 격리)', () => {
+      const externalUpdater = {
+        ...userNoPerms,
+        id: 'u-external-upd',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.USER.UPDATE],
+        clientIds: ['c1'],
+      };
+      expect(policies.canUpdateUser(externalUpdater, foreignTargetUser)).toBe(false);
+      expect(() => policies.ensureCanUpdateUser(externalUpdater, foreignTargetUser)).toThrow(
+        ForbiddenError
+      );
+
+      // 대상의 소속이 액터의 소속을 벗어나면(부분 포함) 차단
+      const straddlingTarget = {
+        id: 'user-straddling',
+        clients: [{ clientId: 'c1' }, { clientId: 'other' }],
+      } as any;
+      expect(policies.canUpdateUser(externalUpdater, straddlingTarget)).toBe(false);
+
+      // 액터/대상 어느 한쪽이라도 소속이 비면 차단
+      const targetNoMembership = { id: 'user-unknown-tenant', clients: [] } as any;
+      expect(policies.canUpdateUser(externalUpdater, targetNoMembership)).toBe(false);
+      const actorNoMembership = { ...externalUpdater, clientIds: undefined };
+      expect(policies.canUpdateUser(actorNoMembership, targetUser)).toBe(false);
+    });
+
+    it('canUpdateUser: 외부 사용자는 자신의 고객사에 포함된 사용자는 수정 가능', () => {
+      const externalUpdater = {
+        ...userNoPerms,
+        id: 'u-external-upd',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.USER.UPDATE],
+        clientIds: ['c1', 'c2'],
+      };
+      expect(policies.canUpdateUser(externalUpdater, targetUser)).toBe(true);
+      expect(() => policies.ensureCanUpdateUser(externalUpdater, targetUser)).not.toThrow();
     });
 
     it('canDeleteUser: user cannot delete themselves', () => {

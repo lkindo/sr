@@ -3,6 +3,16 @@
 import { useState } from 'react';
 import { Building2, Loader2 } from 'lucide-react';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
@@ -31,6 +41,12 @@ export function ClientAssignDropdown({
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+  // 진행 중인 SR 때문에 서버가 거부한 할당 요청 (확인 후 강제 재시도용)
+  const [pendingAssign, setPendingAssign] = useState<{
+    clientId: string;
+    clientName: string;
+    ongoingSRCount: number;
+  } | null>(null);
   const { toast } = useToast();
 
   const filteredClients = clients.filter(
@@ -39,39 +55,46 @@ export function ClientAssignDropdown({
       client.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAssign = async (clientId: string, clientName: string) => {
+  const handleAssign = async (clientId: string, clientName: string, force = false) => {
     setIsAssigning(true);
     try {
       const response = await fetch(`/api/users/${userId}/client`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify(force ? { clientId, force: true } : { clientId }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
+        // 진행 중인 SR이 있어 서버가 거부한 경우 - 확인 후 강제 할당
+        if (response.status === 409 && result.code === 'ONGOING_SRS') {
+          setPendingAssign({
+            clientId,
+            clientName,
+            ongoingSRCount: result.data?.ongoingSRCount || 0,
+          });
+          setOpen(false);
+          return;
+        }
+
         throw new Error(result.error || 'Failed to assign client');
       }
 
-      // 경고가 있으면 사용자에게 알림
-      if (result.warning) {
-        const ongoingSRCount = result.data?.ongoingSRCount || 0;
-        toast({
-          title: '진행 중인 SR 확인',
-          description: `${userName}님에게 진행 중인 SR ${ongoingSRCount}건이 있습니다. 고객사가 할당되었지만, SR 재할당을 권장합니다.`,
-          variant: 'default',
-        });
-      } else {
-        toast({
-          title: '성공',
-          description: `${userName}님이 ${clientName}에 할당되었습니다.`,
-        });
-      }
+      const ongoingSRsHandled = result.data?.ongoingSRsHandled || 0;
+      toast({
+        title: '성공',
+        description:
+          ongoingSRsHandled > 0
+            ? `${userName}님이 ${clientName}에 할당되었습니다. 진행 중인 SR ${ongoingSRsHandled}건은 재할당을 권장합니다.`
+            : `${userName}님이 ${clientName}에 할당되었습니다.`,
+      });
 
+      setPendingAssign(null);
       setOpen(false);
       onAssigned?.();
     } catch (error) {
+      setPendingAssign(null);
       toast({
         title: '오류',
         description: error instanceof Error ? error.message : '고객사 할당에 실패했습니다.',
@@ -83,67 +106,105 @@ export function ClientAssignDropdown({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-900"
-          disabled={isAssigning}
-        >
-          {isAssigning ? (
-            <>
-              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-              처리 중
-            </>
-          ) : (
-            <>
-              <Building2 className="mr-2 h-3 w-3" />
-              고객사 할당
-            </>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start">
-        <div className="flex flex-col">
-          <div className="px-3 py-2 border-b">
-            <Input
-              placeholder="고객사 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8"
-              autoFocus
-            />
-          </div>
-          <div className="max-h-64 overflow-y-auto">
-            {filteredClients.length === 0 ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                검색 결과가 없습니다.
-              </div>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 border-dashed border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-700 hover:text-amber-900"
+            disabled={isAssigning}
+          >
+            {isAssigning ? (
+              <>
+                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                처리 중
+              </>
             ) : (
-              <div className="p-1">
-                {filteredClients.map((client) => (
-                  <button
-                    key={client.id}
-                    onClick={() => handleAssign(client.id, client.name)}
-                    disabled={isAssigning}
-                    className={cn(
-                      'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors text-left',
-                      isAssigning && 'opacity-50 cursor-not-allowed'
-                    )}
-                  >
-                    <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{client.name}</p>
-                      <p className="text-xs text-muted-foreground">{client.code}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              <>
+                <Building2 className="mr-2 h-3 w-3" />
+                고객사 할당
+              </>
             )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-80 p-0" align="start">
+          <div className="flex flex-col">
+            <div className="px-3 py-2 border-b">
+              <Input
+                placeholder="고객사 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-8"
+                autoFocus
+              />
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              {filteredClients.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  검색 결과가 없습니다.
+                </div>
+              ) : (
+                <div className="p-1">
+                  {filteredClients.map((client) => (
+                    <button
+                      key={client.id}
+                      onClick={() => handleAssign(client.id, client.name)}
+                      disabled={isAssigning}
+                      className={cn(
+                        'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors text-left',
+                        isAssigning && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{client.name}</p>
+                        <p className="text-xs text-muted-foreground">{client.code}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+
+      {/* 진행 중인 SR 확인 다이얼로그 (강제 할당) */}
+      <AlertDialog
+        open={pendingAssign !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            setPendingAssign(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>진행 중인 SR이 있습니다</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{userName}</strong>님에게 진행 중인 SR {pendingAssign?.ongoingSRCount ?? 0}
+              건이 있습니다. <strong>{pendingAssign?.clientName}</strong>에 그대로 할당하시겠습니까?
+              <span className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded block">
+                ⚠ 진행 중인 SR은 이동하지 않으므로, 할당 후 SR 재할당이 필요합니다.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isAssigning}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingAssign) {
+                  handleAssign(pendingAssign.clientId, pendingAssign.clientName, true);
+                }
+              }}
+              disabled={isAssigning}
+            >
+              {isAssigning ? '처리 중...' : '계속 할당'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

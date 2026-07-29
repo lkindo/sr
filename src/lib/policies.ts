@@ -19,8 +19,17 @@ const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
  */
 export type SRAccessFields = Pick<SR, 'id' | 'clientId' | 'requesterId' | 'assigneeId'>;
 
-/** 권한 검증에 필요한 User 식별 필드(id)만 추린 형태. */
-export type UserIdentity = Pick<User, 'id'>;
+/** 권한 검증에 필요한 Client 식별 필드(id)만 추린 형태. */
+export type ClientAccessFields = Pick<Client, 'id'>;
+
+/**
+ * 권한 검증에 필요한 User 식별 필드(id)와 테넌트 판정을 위한 소속 고객사 목록.
+ * 소속 정보가 전달되지 않으면(undefined/null) 소속이 없는 것으로 간주하여
+ * 외부 사용자에게는 테넌트 조건이 성립하지 않도록(차단) 처리한다.
+ */
+export type UserIdentity = Pick<User, 'id'> & {
+  clients?: { clientId: string }[] | null;
+};
 
 export function isInternalUser(user: AuthenticatedUser): boolean {
   return user.roles?.some((role) => INTERNAL_ROLES.includes(role)) ?? false;
@@ -136,15 +145,18 @@ export function canCreateClient(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.CREATE);
 }
 
-export function canReadClient(user: AuthenticatedUser, client?: Client): boolean {
+export function canReadClient(user: AuthenticatedUser, client?: ClientAccessFields): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   const canViewAll = hasPermissionFlag(user, PERMISSIONS.CLIENT.READ);
 
   if (client) {
+    // 테넌트 격리: 권한 플래그(CLIENT:READ)만으로는 타 고객사 상세를 볼 수 없다.
+    // 외부 사용자(고객사)는 반드시 해당 고객사에 소속되어 있어야 한다.
     const isMemberOfClient = user.clientIds?.includes(client.id) ?? false;
-    return isAdmin || canViewAll || isMemberOfClient;
+    return isAdmin || (canViewAll && isInternalUser(user)) || isMemberOfClient;
   }
 
+  // 목록 조회는 라우트에서 clientIds 로 스코프되므로 플래그만으로 통과시킨다.
   return isAdmin || canViewAll;
 }
 
@@ -162,7 +174,7 @@ export function ensureCanCreateClient(user: AuthenticatedUser): void {
   }
 }
 
-export function ensureCanReadClient(user: AuthenticatedUser, client?: Client): void {
+export function ensureCanReadClient(user: AuthenticatedUser, client?: ClientAccessFields): void {
   if (!canReadClient(user, client)) {
     throw new ForbiddenError('고객사 조회 권한이 없습니다.');
   }
@@ -184,6 +196,32 @@ export function ensureCanDeleteClient(user: AuthenticatedUser): void {
 // User 권한 함수
 // ============================================================================
 
+/** 대상 사용자가 소속된 고객사 ID 목록. 소속 정보가 없으면 빈 배열. */
+function getTargetClientIds(targetUser: UserIdentity): string[] {
+  return targetUser.clients?.map((membership) => membership.clientId) ?? [];
+}
+
+/** 액터와 대상이 고객사를 하나 이상 공유하는지 여부. */
+function sharesClientWith(user: AuthenticatedUser, targetUser: UserIdentity): boolean {
+  const actorClientIds = user.clientIds ?? [];
+  return getTargetClientIds(targetUser).some((clientId) => actorClientIds.includes(clientId));
+}
+
+/**
+ * 대상의 소속 고객사가 액터의 소속 고객사에 모두 포함되는지 여부.
+ * 어느 한쪽이라도 소속이 비어 있으면(= 테넌트를 특정할 수 없으면) 차단한다.
+ */
+function isTargetWithinActorClients(user: AuthenticatedUser, targetUser: UserIdentity): boolean {
+  const actorClientIds = user.clientIds ?? [];
+  const targetClientIds = getTargetClientIds(targetUser);
+
+  if (actorClientIds.length === 0 || targetClientIds.length === 0) {
+    return false;
+  }
+
+  return targetClientIds.every((clientId) => actorClientIds.includes(clientId));
+}
+
 export function canCreateUser(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
 }
@@ -194,7 +232,16 @@ export function canReadUser(user: AuthenticatedUser, targetUser?: UserIdentity):
 
   if (targetUser) {
     const isSelf = targetUser.id === user.id;
-    return isAdmin || canViewAll || isSelf;
+    if (isAdmin || isSelf) {
+      return true;
+    }
+    if (!canViewAll) {
+      return false;
+    }
+
+    // 테넌트 격리: 권한 플래그(USER:READ)만으로는 타 고객사 사용자를 볼 수 없다.
+    // 외부 사용자(고객사)는 소속 고객사를 공유하는 사용자만 조회 가능하다.
+    return isInternalUser(user) || sharesClientWith(user, targetUser);
   }
 
   return isAdmin || canViewAll;
@@ -202,10 +249,23 @@ export function canReadUser(user: AuthenticatedUser, targetUser?: UserIdentity):
 
 export function canUpdateUser(user: AuthenticatedUser, targetUser: UserIdentity): boolean {
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
-  const hasUpdate = hasPermissionFlag(user, PERMISSIONS.USER.UPDATE);
-  const isSelf = targetUser.id === user.id && hasPermissionFlag(user, PERMISSIONS.USER.UPDATE_SELF);
+  if (isAdmin) {
+    return true;
+  }
 
-  return isAdmin || hasUpdate || isSelf;
+  const isSelf = targetUser.id === user.id && hasPermissionFlag(user, PERMISSIONS.USER.UPDATE_SELF);
+  if (isSelf) {
+    return true;
+  }
+
+  const hasUpdate = hasPermissionFlag(user, PERMISSIONS.USER.UPDATE);
+  if (!hasUpdate) {
+    return false;
+  }
+
+  // 테넌트 격리: 권한 플래그(USER:UPDATE)만으로는 타 고객사 사용자를 수정할 수 없다.
+  // 외부 사용자(고객사)는 대상의 소속 고객사가 자신의 소속 고객사에 모두 포함될 때만 수정 가능하다.
+  return isInternalUser(user) || isTargetWithinActorClients(user, targetUser);
 }
 
 export function canDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity): boolean {

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SRPriority, SRStatus } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError } from '@/lib/errors';
 import { usePagination } from '@/lib/pagination';
 import { ensureCanCreateSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
@@ -84,14 +83,8 @@ export const POST = withAuthAndRateLimit(
     // Zod validation을 먼저 수행하여 잘못된 페이로드에 대해 400 Bad Request 유도
     const validated = srCreateSchema.parse(body);
 
-    // Multi-tenant Spoofing Prevention: External users must request for their own client only
-    if (!isInternalUser(session.user)) {
-      const userClientIds = session.user.clientIds || [];
-      if (!validated.clientId || !userClientIds.includes(validated.clientId)) {
-        throw new ForbiddenError('소속되지 않은 고객사의 SR을 생성할 수 없습니다.');
-      }
-    }
-
+    // Multi-tenant Spoofing Prevention 은 srService.createSR 내부에서 일괄 처리한다.
+    // (Server Action 경로도 동일한 규칙을 적용받도록 서비스 계층에 단일화)
     const sr = await srService.createSR(validated, session.user);
 
     return NextResponse.json(serializeResponse(sr), { status: 201 });

@@ -5,6 +5,7 @@ import { BadRequestError, NotFoundError } from '@/lib/errors';
 import { FileValidationError, validateFile } from '@/lib/file-validator';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { serializeResponse } from '@/lib/serialization';
 import { uploadAttachmentBlob } from '@/lib/storage';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -84,7 +85,11 @@ export const POST = withAuthAndRateLimit(
 
     // 첨부 개수는 조회 시 _count 로 계산하므로 별도 스칼라 컬럼을 유지하지 않는다.
 
-    return NextResponse.json(attachment, { status: 201 });
+    // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
+    const { storagePath: _storagePath, ...safeAttachment } = attachment;
+
+    // fileSize 는 Prisma BigInt 이므로 직렬화 후 응답 (미변환 시 JSON.stringify TypeError → 500)
+    return NextResponse.json(serializeResponse(safeAttachment), { status: 201 });
   },
   { preset: 'fileUpload' }
 ); // 1분당 20회 (파일 업로드는 더 제한적)

@@ -11,6 +11,7 @@ import { BadRequestError, NotFoundError } from '@/lib/errors';
 import { FileValidationError, validateFile } from '@/lib/file-validator';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { serializeMany, serializeResponse } from '@/lib/serialization';
 import { STORAGE_DIR } from '@/lib/storage';
 
 // Force Node.js runtime (file system operations require Node.js)
@@ -141,10 +142,13 @@ export const POST = withAuthAndRateLimit(
       }));
     }
 
-    const uploadedAttachments = createdAttachments.map((attachment) => ({
-      ...attachment,
-      createdAt: attachment.createdAt.toISOString(),
-    }));
+    // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
+    const uploadedAttachments = createdAttachments.map(
+      ({ storagePath: _storagePath, ...attachment }) => ({
+        ...attachment,
+        createdAt: attachment.createdAt.toISOString(),
+      })
+    );
 
     const validationErrors = results
       .filter(
@@ -165,15 +169,16 @@ export const POST = withAuthAndRateLimit(
 
     // Invalidate caches: detail and my-requests (첨부 카운트 등 반영)
 
+    // fileSize 는 Prisma BigInt 이므로 직렬화 없이 응답하면 JSON.stringify 가 TypeError 를 던진다.
     return NextResponse.json(
-      {
+      serializeResponse({
         success: true,
         message: `${uploadedAttachments.length}개의 파일이 업로드되었습니다.`,
         data: {
           attachments: uploadedAttachments,
           errors: validationErrors.length > 0 ? validationErrors : undefined,
         },
-      },
+      }),
       { status: 201 }
     );
   },
@@ -205,7 +210,11 @@ export const GET = withAuthAndRateLimit(
       },
     });
 
-    return NextResponse.json(attachments);
+    // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
+    const safeAttachments = attachments.map(({ storagePath: _storagePath, ...rest }) => rest);
+
+    // fileSize(BigInt) / createdAt(Date) 직렬화
+    return NextResponse.json(serializeMany(safeAttachments));
   },
   { preset: 'standard' }
 ); // 1분당 100회
