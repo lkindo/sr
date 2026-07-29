@@ -22,12 +22,15 @@ const shouldSeedDevFixtures =
 // (시드는 앱 소스에 의존하지 않도록 값을 복제한다.)
 const BCRYPT_WORK_FACTOR = 12;
 
-// 로컬/E2E 전용 고정 해시(engineer123 / client123).
+// 로컬/E2E 전용 고정 해시(engineer123 / client123 / manager123 / clientadmin123).
 // 위 픽스처 가드로 프로덕션에서는 절대 생성되지 않으며, 이미 존재하는 계정의
 // 비밀번호를 덮어쓰는 데에는 절대 사용하지 않는다.
-// 필요 시 SEED_ENGINEER_PASSWORD / SEED_CLIENT_PASSWORD 로 대체할 수 있다.
+// 필요 시 SEED_ENGINEER_PASSWORD / SEED_CLIENT_PASSWORD /
+// SEED_MANAGER_PASSWORD / SEED_CLIENT_ADMIN_PASSWORD 로 대체할 수 있다.
 const ENGINEER_DEV_HASH = '$2b$10$pZqoLVt6i.EgPg.xkXhqn.hrfDnm1U2ql/dT/i73NBxuxx4pN/4s6';
 const CLIENT_DEV_HASH = '$2b$10$b5TgWLUPy8AgUvjjwGdHYOg2QPsj9thL9BNSZ1GB/ZNCoPR9brocK';
+const MANAGER_DEV_HASH = '$2b$12$KVxZuS/KJhY1JmZw7Cb4kORat7TQYg2Ec941O1M7bbe.r.wfT9/IC';
+const CLIENT_ADMIN_DEV_HASH = '$2b$12$Xr5qU2Jjx1yL4/HD/kmAyOGDmaqfZUIldEQifY0Tj9kS9Txcx4aN.';
 
 const permissions = [
   // SR 관련 권한
@@ -381,6 +384,40 @@ async function seedDevFixtures() {
     console.log('Engineer user exists, password left untouched');
   }
 
+  // Create Manager User for E2E tests (role-personas 프로젝트 계약).
+  // e2e/helpers/auth-helpers.ts 의 `manager` 페르소나는 세션 역할이 정확히 ['MANAGER'] 여야 통과한다.
+  // 따라서 ADMIN 등 다른 역할을 겸하게 만들면 안 되며, 고객사 소속도 부여하지 않는다.
+  const managerEmail = 'manageruser@example.com';
+  const managerUser = await prisma.user.findUnique({ where: { email: managerEmail } });
+
+  if (!managerUser) {
+    const managerPassword = process.env.SEED_MANAGER_PASSWORD;
+    const created = await prisma.user.create({
+      data: {
+        email: managerEmail,
+        name: 'Manager User',
+        password: managerPassword
+          ? await hash(managerPassword, BCRYPT_WORK_FACTOR)
+          : MANAGER_DEV_HASH,
+        notificationPreference: { create: {} },
+      },
+    });
+    // MANAGER 역할만 부여(단일 역할)
+    const mgrRole = await prisma.role.findUnique({ where: { name: 'MANAGER' } });
+    if (mgrRole) {
+      await prisma.userRole.create({ data: { userId: created.id, roleId: mgrRole.id } });
+    }
+    console.log(`Created manager user: ${managerEmail}`);
+  } else {
+    // 알림 설정만 보정하고 비밀번호/역할은 그대로 둔다.
+    await prisma.notificationPreference.upsert({
+      where: { userId: managerUser.id },
+      create: { userId: managerUser.id },
+      update: {},
+    });
+    console.log('Manager user exists, password left untouched');
+  }
+
   if (!adminUser) {
     console.log('admin 계정이 없어 고객사/서비스 분류/샘플 SR 픽스처를 건너뜁니다.');
     return;
@@ -491,6 +528,65 @@ async function seedDevFixtures() {
         },
       });
       console.log('Linked client user to TEST001');
+    }
+  }
+
+  // Create Client Admin User for E2E tests (role-personas 프로젝트 계약).
+  // 세션 역할이 정확히 ['CLIENT_ADMIN'] 이어야 하고, 소속 고객사가 최소 1개 있어야 한다
+  // (minClientIds: 1). 소속은 TEST001 **한 곳만** 부여한다 — TEST002 를 "다른 테넌트"로
+  // 남겨 두어야 교차 테넌트 회귀(자사 외 SR/사용자 조회, clientIds 상향)를 잡을 수 있다.
+  const clientAdminEmail = 'clientadminuser@example.com';
+  let clientAdminUser = await prisma.user.findUnique({ where: { email: clientAdminEmail } });
+
+  if (!clientAdminUser) {
+    const clientAdminPassword = process.env.SEED_CLIENT_ADMIN_PASSWORD;
+    clientAdminUser = await prisma.user.create({
+      data: {
+        email: clientAdminEmail,
+        name: 'Client Admin User',
+        password: clientAdminPassword
+          ? await hash(clientAdminPassword, BCRYPT_WORK_FACTOR)
+          : CLIENT_ADMIN_DEV_HASH,
+        notificationPreference: { create: {} },
+      },
+    });
+    // CLIENT_ADMIN 역할만 부여(단일 역할)
+    const clientAdminRole = await prisma.role.findUnique({ where: { name: 'CLIENT_ADMIN' } });
+    if (clientAdminRole) {
+      await prisma.userRole.create({
+        data: { userId: clientAdminUser.id, roleId: clientAdminRole.id },
+      });
+    }
+    console.log(`Created client admin user: ${clientAdminEmail}`);
+  } else {
+    // 알림 설정만 보정하고 비밀번호/역할은 그대로 둔다.
+    await prisma.notificationPreference.upsert({
+      where: { userId: clientAdminUser.id },
+      create: { userId: clientAdminUser.id },
+      update: {},
+    });
+    console.log('Client admin user exists, password left untouched');
+  }
+
+  // Ensure client admin user is linked to TEST001 only (TEST002 는 의도적으로 제외)
+  if (clientAdminUser && testClient1) {
+    const existingAdminLink = await prisma.userClient.findUnique({
+      where: {
+        userId_clientId: {
+          userId: clientAdminUser.id,
+          clientId: testClient1.id,
+        },
+      },
+    });
+
+    if (!existingAdminLink) {
+      await prisma.userClient.create({
+        data: {
+          userId: clientAdminUser.id,
+          clientId: testClient1.id,
+        },
+      });
+      console.log('Linked client admin user to TEST001');
     }
   }
 

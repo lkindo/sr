@@ -1,3 +1,6 @@
+# 워크플로 이름은 절대 바꾸지 않는다.
+# deploy.yml 이 `workflow_run: workflows: ['CI/CD Pipeline']` 로 이 이름에 매달려 있어서
+# 이름을 바꾸면 배포가 조용히 멈춘다.
 name: CI/CD Pipeline
 
 on:
@@ -22,6 +25,9 @@ permissions:
   pull-requests: write
   actions: read
 
+# 주의: 워크플로 레벨 env 는 `jobs.<job_id>.env` 에서 참조할 수 없다(GitHub 컨텍스트 제약).
+# 그래서 DB 접속 문자열/시크릿은 각 잡의 env 에 리터럴로 적는다. 여기에 두면 조용히
+# 빈 문자열이 되어 "DB 없이 통과하는 CI" 가 다시 만들어진다.
 env:
   NODE_VERSION: '22'
   PNPM_VERSION: '10'
@@ -31,6 +37,7 @@ jobs:
   code-quality:
     name: Code Quality Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -60,6 +67,35 @@ jobs:
   test:
     name: Unit & Integration Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # 실제 postgres 를 띄운다. 두 가지 목적이 있다.
+    # 1) 모든 push/PR 에서 prisma 마이그레이션이 "빈 DB에 실제로 적용되는지" 검증한다.
+    # 2) 테스트가 $transaction 을 스텁하지 않고 진짜 쿼리를 실행할 수 있는 환경을 제공한다.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sr_ci
+          POSTGRES_PASSWORD: sr_ci
+          POSTGRES_DB: sr_ci
+        ports:
+          - 5432:5432
+        # health check 가 통과해야 스텝이 시작된다(GitHub Actions 보장).
+        options: >-
+          --health-cmd "pg_isready -U sr_ci -d sr_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    # 러너 안에서만 존재하는 일회용 값이다(잡이 끝나면 DB째로 사라진다).
+    # NEXTAUTH_SECRET 은 src/lib/env-validation.ts 규칙(32자 이상, 플레이스홀더 패턴 아님)을
+    # 만족해야 src/instrumentation.ts 의 fail-fast 검증을 통과한다.
+    env:
+      DATABASE_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      DIRECT_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      NEXTAUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      AUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
 
     steps:
       - name: Checkout code
@@ -80,17 +116,43 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+        run: pnpm exec playwright install --with-deps chromium
         timeout-minutes: 5
 
-      # 테스트 + 커버리지 실행. vitest.config.ts의 임계값(lines/stmts 80, funcs 75, branches 70)을
-      # 실제로 게이트한다(단일 스텝 통합). 임계값 미달 시 빌드 실패.
+      # `db push` 가 아니라 `migrate deploy` 를 쓴다.
+      # 마이그레이션 파일이 빈 DB에 순서대로 적용되지 않으면 여기서 빨간불이 켜진다.
+      # (배포 시 docker-entrypoint.sh 가 실행하는 명령과 동일하다)
+      - name: Apply database migrations
+        run: pnpm exec prisma migrate deploy
+
+      # 마이그레이션 결과 스키마와 schema.prisma 가 일치하는지 검사한다.
+      # exit code: 0=동일, 1=오류, 2=차이 있음.
+      # schema.prisma 만 고치고 마이그레이션을 만들지 않은 PR 이 여기서 실패한다.
+      # 실패 시 조치: `pnpm exec prisma migrate dev --name <변경내용>` 으로 마이그레이션 생성 후 커밋.
+      - name: Verify migrations match schema.prisma (drift check)
+        run: |
+          pnpm exec prisma migrate diff \
+            --from-schema-datasource prisma/schema.prisma \
+            --to-schema-datamodel prisma/schema.prisma \
+            --exit-code
+
+      # 시드 스크립트 자체도 회귀 대상이다. 실패하면 잡이 빨간불이 된다.
+      # NODE_ENV 를 production 으로 두지 않아야 개발용 픽스처가 실행된다(prisma/seed.ts 가드).
+      - name: Seed database
+        run: pnpm db:seed
+        env:
+          SEED_DEV_FIXTURES: 'true'
+          SEED_ADMIN_PASSWORD: 'admin123'
+          SEED_ENGINEER_PASSWORD: 'engineer123'
+          SEED_CLIENT_PASSWORD: 'client123'
+
+      # 테스트 + 커버리지 실행. vitest.config.ts의 임계값을 실제로 게이트한다(단일 스텝 통합).
+      # 임계값 미달 시 빌드 실패.
       - name: Run tests with coverage
         run: pnpm test:coverage
-        env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.TEST_DIRECT_URL }}
 
+      # 커버리지 "게이트"는 위 스텝(vitest 임계값)이 담당한다.
+      # 이 스텝은 외부 리포팅 전용이며 Codecov 장애로 CI 를 막지 않는다(의도된 비게이팅).
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         if: success()
@@ -101,12 +163,48 @@ jobs:
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
+      # mutation-test 잡이 "테스트가 존재하는 파일"만 뮤테이션 대상으로 고르는 데 사용한다.
+      # 테스트가 아예 없는 파일은 커버리지 게이트가 담당하므로 뮤테이션 점수에서 제외한다.
+      - name: Upload coverage map for mutation testing
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: coverage-final
+          path: coverage/coverage-final.json
+          if-no-files-found: error
+          retention-days: 1
+
   # 뮤테이션 테스트 (변경된 파일만 검사)
   mutation-test:
     name: Mutation Testing
     runs-on: ubuntu-latest
     needs: [test]
     if: github.event_name == 'pull_request' # PR에서만 실행 (변경분 분석 용이)
+    timeout-minutes: 60
+
+    # 뮤테이션 테스트는 단위 테스트를 그대로 재실행한다.
+    # test 잡에만 DB가 있으면 "test 는 통과하는데 stryker 만 실패"하는 어긋남이 생기므로
+    # 동일한 DB 환경을 제공한다.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sr_ci
+          POSTGRES_PASSWORD: sr_ci
+          POSTGRES_DB: sr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sr_ci -d sr_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      DIRECT_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      NEXTAUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      AUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
 
     steps:
       - name: Checkout code
@@ -128,6 +226,26 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Apply database migrations
+        run: pnpm exec prisma migrate deploy
+
+      - name: Seed database
+        run: pnpm db:seed
+        env:
+          SEED_DEV_FIXTURES: 'true'
+          SEED_ADMIN_PASSWORD: 'admin123'
+          SEED_ENGINEER_PASSWORD: 'engineer123'
+          SEED_CLIENT_PASSWORD: 'client123'
+
+      # test 잡이 만든 커버리지 맵. stryker-ci.ts 가 이걸로 "테스트가 있는 파일"만 고른다.
+      # 없으면 스크립트가 경고 후 전체 변경 파일을 대상으로 삼는다(게이트는 계속 동작).
+      - name: Download coverage map
+        uses: actions/download-artifact@v4
+        continue-on-error: true # 아티팩트 부재는 스크립트가 처리한다
+        with:
+          name: coverage-final
+          path: coverage
+
       - name: Run Mutation Tests (Changed Files Only)
         run: pnpm test:mutation:ci
 
@@ -136,6 +254,7 @@ jobs:
     name: Build Verification
     runs-on: ubuntu-latest
     needs: [code-quality, test]
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -171,12 +290,85 @@ jobs:
           fi
           echo "Build successful ✓"
 
-  # E2E 테스트 (선택사항 - 시간이 오래 걸림)
+  # E2E 테스트
+  #
+  # push(main) 와 pull_request 양쪽에서 실행된다.
+  #  - main push: 전체 선택(2026-07-30 `--list` 실측 185개)을 돌린다. deploy.yml 이 이 워크플로의
+  #    최종 결론에 매달려 있으므로, 여기서 실패하면 운영 배포가 차단된다.
+  #  - pull_request: 보안·권한 스펙만 골라 돌린다(실측 24 + 26 = 50개, 아래 "PR 범위" 참고).
+  #    나쁜 머지를 배포 전에 막는 것이 목적이며, 머지 후 main push 에서 전체가 다시 돌아
+  #    공백을 메운다.
+  #    (deploy.yml 은 `workflow_run.event == 'push'` 를 요구하므로 PR 실행이 배포를 유발하지 않는다.)
+  #
+  # 왜 PR 에서 전체를 돌리지 않는가: workers=1 · retries=2 로 185개를 돌리면 빌드 포함 시간이
+  # timeout-minutes: 120 에 육박한다. 전량 실행은 PR 마다 감당할 비용이 아니다.
   e2e-test:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: [build]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'pull_request'
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sr_ci
+          POSTGRES_PASSWORD: sr_ci
+          POSTGRES_DB: sr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sr_ci -d sr_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      DIRECT_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      NEXTAUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      # Auth.js v5 는 AUTH_SECRET 을 직접 읽는다(NEXTAUTH_SECRET 폴백이 있지만 명시한다).
+      AUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      NEXTAUTH_URL: 'http://localhost:3000'
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
+      # 프록시 없이 localhost 로 직접 접속하므로 호스트를 신뢰하도록 명시한다.
+      AUTH_TRUST_HOST: 'true'
+      # push 발송 건너뛰기(playwright.config.ts 의 webServer.env 와 동일한 의도).
+      TEST_MODE: 'true'
+      # src/proxy.ts 의 미들웨어 rate limit 은 IP 기준인데 CI 는 모든 요청이 127.0.0.1 이다.
+      # 기본값(1분 100회)이면 스위트가 스스로를 429 로 막는다. E2E 는 rate limit 을 검증하지
+      # 않으므로(관련 spec 없음) 한도를 사실상 해제한다. rate limit 자체는 단위 테스트가 검증한다.
+      RATE_LIMIT_MIDDLEWARE_WINDOW_MS: '60000'
+      RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS: '1000000'
+      # playwright.config.ts 의 webServer 는 쓰지 않는다(아래 "포트 충돌" 주석 참고).
+      SKIP_WEBSERVER: '1'
+      BASE_URL: 'http://localhost:3000'
+      # 시드가 만드는 계정과 스펙이 로그인에 쓰는 계정을 한 곳에서 맞춘다.
+      # (e2e/global-setup.ts, e2e/auth-multi-user.setup.ts 의 기본값과 동일)
+      SEED_DEV_FIXTURES: 'true'
+      SEED_ADMIN_PASSWORD: 'admin123'
+      SEED_ENGINEER_PASSWORD: 'engineer123'
+      SEED_CLIENT_PASSWORD: 'client123'
+      TEST_USER_EMAIL: 'admin@example.com'
+      TEST_USER_PASSWORD: 'admin123'
+      TEST_MANAGER_EMAIL: 'admin@example.com'
+      TEST_MANAGER_PASSWORD: 'admin123'
+      TEST_ENGINEER_EMAIL: 'engineeruser@example.com'
+      TEST_ENGINEER_PASSWORD: 'engineer123'
+      TEST_CLIENT_EMAIL: 'clientuser@example.com'
+      TEST_CLIENT_PASSWORD: 'client123'
+      # 역할 페르소나(role-personas 프로젝트) 계약.
+      # e2e/helpers/auth-helpers.ts 의 ROLE_PERSONAS 가 요구하는 계정이며,
+      # prisma/seed.ts 가 아래 계정을 MANAGER / CLIENT_ADMIN 역할로 만들어 주어야 통과한다.
+      # (계정이 없으면 role-persona-setup 이 빨갛게 죽는다 — 의도된 게이트다)
+      SEED_MANAGER_PASSWORD: 'manager123'
+      SEED_CLIENT_ADMIN_PASSWORD: 'clientadmin123'
+      TEST_MANAGER_ROLE_EMAIL: 'manageruser@example.com'
+      TEST_MANAGER_ROLE_PASSWORD: 'manager123'
+      TEST_CLIENT_ADMIN_EMAIL: 'clientadminuser@example.com'
+      TEST_CLIENT_ADMIN_PASSWORD: 'clientadmin123'
 
     steps:
       - name: Checkout code
@@ -204,38 +396,165 @@ jobs:
           restore-keys: |
             playwright-${{ runner.os }}-
 
+      # 아래 --project 선택이 chromium 계열뿐이므로 chromium 만 받는다.
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps
+        run: pnpm exec playwright install --with-deps chromium
         timeout-minutes: 5
 
-      - name: Run E2E tests
-        run: pnpm test:e2e
-        env:
-          DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.TEST_DIRECT_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          NEXTAUTH_URL: http://localhost:3000
+      # src/instrumentation.ts 는 필수 env 가 없으면 process.exit(1) 로 죽는다.
+      # 그 상태로 서버를 띄우면 "왜 죽는지 모를 크래시 루프"가 되므로 먼저 여기서 명확히 실패시킨다.
+      - name: Verify required environment variables
+        run: |
+          missing=0
+          for name in DATABASE_URL DIRECT_URL NEXTAUTH_SECRET; do
+            value="${!name-}"
+            if [ -z "$value" ]; then
+              echo "::error::필수 환경 변수 누락: $name"
+              missing=1
+            fi
+          done
+          if [ "${#NEXTAUTH_SECRET}" -lt 32 ]; then
+            echo "::error::NEXTAUTH_SECRET 은 32자 이상이어야 합니다 (현재 ${#NEXTAUTH_SECRET}자)"
+            missing=1
+          fi
+          [ "$missing" -eq 0 ] || exit 1
+          echo "✓ 필수 환경 변수 확인 완료"
 
+      - name: Apply database migrations
+        run: pnpm exec prisma migrate deploy
+
+      - name: Seed database
+        run: pnpm db:seed
+
+      # E2E 는 프로덕션 빌드를 대상으로 돌린다.
+      # `next dev` 는 라우트마다 온디맨드 컴파일이 일어나 CI 에서 타임아웃 플레이크를 만든다.
+      - name: Build application
+        run: pnpm build
+
+      # ── 포트 충돌 ──────────────────────────────────────────────────────────
+      # playwright.config.ts 의 webServer 는 3000 포트에서 `npm run dev` 를 띄우고,
+      # CI 에서는 reuseExistingServer=false 라 이미 3000 이 쓰이면 즉시 실패한다.
+      # 그래서 서버는 워크플로가 직접 띄우고 SKIP_WEBSERVER=1 로 webServer 를 끈다.
+      # (기존 e2e.yml 은 `pnpm dev &` 로 3000 을 점유한 채 SKIP_WEBSERVER 를 비워 두어
+      #  구조적으로 이 충돌을 일으키고 있었다.)
+      - name: Start application server
+        run: |
+          pnpm start > server.log 2>&1 &
+          echo $! > server.pid
+          if ! timeout 120 bash -c 'until curl -sf http://localhost:3000/login > /dev/null; do sleep 2; done'; then
+            echo "::error::앱 서버가 120초 안에 준비되지 않았습니다."
+            cat server.log
+            exit 1
+          fi
+          echo "✓ 앱 서버 준비 완료"
+
+      # ── 실행 대상 프로젝트 ────────────────────────────────────────────────
+      # chromium / multi-user / role-personas / permissions 를 게이트한다.
+      # 의존 프로젝트(setup, multi-user-setup, role-persona-setup)는 playwright 가 먼저 돌린다.
+      # 프로젝트 이름이 사라지면 playwright 가 "Project(s) ... not found" 로 즉시 실패한다.
+      # 조용히 건너뛰지 않는다는 뜻이므로, 이름 변경은 여기서 반드시 드러난다.
+      #
+      # 제외 사유(모두 playwright.config.ts / 스펙 쪽 문제라 이 워크플로에서 고칠 수 없다):
+      #  - firefox / webkit / Mobile Chrome: testIgnore 가 없어 멀티유저 스펙까지 단일
+      #    인증 상태로 중복 실행한다. 켜면 앱 회귀가 아닌 설정 결함으로 항상 빨간불이 된다.
+      #  - 'Dashboard Visual & Performance': 스냅샷이 *-win32.png 뿐이라 리눅스에서 무조건
+      #    실패하고, 4개 중 3개는 :6006 Storybook 서버를 요구한다.
+      #  - 'Manual Screen Captures': 검증이 아니라 문서용 스크린샷 생성 작업이다.
+      - name: Run E2E tests (full selection)
+        if: github.event_name == 'push'
+        run: |
+          pnpm exec playwright test \
+            --project=chromium \
+            --project=multi-user \
+            --project=role-personas \
+            --project=permissions \
+            --grep-invert "Dashboard Visual & Performance|Manual Screen Captures"
+
+      # ── PR 범위 ───────────────────────────────────────────────────────────
+      # 목적: 최근 감사가 고친 테넌트 경계 / RBAC 회귀를 "머지 전에" 막는다.
+      #
+      # 돌리는 것 (2026-07-30 `--list` 실측, 총 50회 실행):
+      #  1) 첫 명령(24) = role-personas(11) + permissions(7) + 의존 6
+      #     - role-personas: e2e/roles/*.spec.ts. MANAGER / CLIENT_ADMIN 행위 검증.
+      #       감사에서 나온 치명 결함(CLIENT_ADMIN 이 타 고객사 SR/사용자 조회, clientIds 자가 상향)이
+      #       E2E 로 재발 검증되는 유일한 곳이다.
+      #     - permissions: sr-permissions.spec.ts. ENGINEER 가 배정되지 않은 SR 을 조회/수정할 때
+      #       403 인지, ADMIN 삭제가 감사 로그에 남는지.
+      #     - 의존: setup(1) / multi-user-setup(3) / role-persona-setup(2).
+      #       role-persona-setup 은 시드에 MANAGER/CLIENT_ADMIN 계정이 없으면 실패하는 계약
+      #       게이트다. 이 스텝이 그 게이트를 머지 전으로 끌어온다.
+      #  2) 둘째 명령(26) = multi-user 중 08 / 09 / 23(22) + 의존 setup·multi-user-setup(4)
+      #     - 사용자·고객사 관리 화면의 역할별 접근 통제와 역할 배타성.
+      #     - 위치 인자(파일 필터)는 의존 프로젝트에는 적용되지 않는다(실측 확인).
+      #
+      # 돌리지 않는 것 (= PR 에서 검증되지 않음, main push 에서만 검증됨):
+      #  - chromium(86): 01~07 / 10~16 / 24~31 등 일반 기능 스펙과 시각 회귀.
+      #  - multi-user 의 17~22(53): 협업, 재배정, 파일 업로드, 알림, 상태 전이, 접수 프로세스.
+      #  - firefox / webkit / Mobile Chrome: 어디서도 돌지 않는다(위 "제외 사유" 참고).
+      #
+      # 두 명령을 나눈 이유: 위치 인자(파일 필터)를 붙이면 명시적으로 지정한 프로젝트에도
+      # 그 필터가 적용되어 role-persona-setup 이 0개로 잘려 나간다(실측 확인).
+      - name: Run E2E tests (pull request — security-critical subset)
+        if: github.event_name == 'pull_request'
+        run: |
+          pnpm exec playwright test \
+            --project=permissions \
+            --project=role-personas
+          pnpm exec playwright test \
+            --project=multi-user \
+            08-user-management 09-client-management 23-role-exclusivity
+
+      # 리포터는 test-results/ 로 출력한다(playwright.config.ts 의 outputDir/html outputFolder).
+      # 기존 설정은 존재하지 않는 playwright-report/ 를 올려 빈 아티팩트만 남겼다.
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload application server log
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-server-log
+          path: server.log
+          if-no-files-found: warn
           retention-days: 7
 
   # 보안 스캔
   security:
     name: Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run dependency vulnerability scan
-        run: |
-          npm audit --production --audit-level=moderate || true
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # ── 이 스텝은 게이트다 ────────────────────────────────────────────────
+      # 과거: `npm audit --production ... || true`.
+      #   1) 이 저장소에는 package-lock.json 이 없어 npm audit 은 항상 오류로 끝났고,
+      #   2) `|| true` 가 그 오류를 삼켜 취약점이 몇 개든 초록불이었다.
+      # 이제 pnpm-lock.yaml 을 실제로 감사하고, critical 이 하나라도 있으면 실패한다.
+      # 실패를 없애는 방법은 의존성 업그레이드뿐이다.
+      # 위험을 의도적으로 수용해야 한다면 `|| true` 가 아니라 package.json 의
+      # pnpm.auditConfig.ignoreGhsas 에 GHSA 를 명시해 기록으로 남긴다.
+      # 로컬 재현: pnpm audit --prod --audit-level=critical
+      - name: Run dependency vulnerability scan (gating)
+        run: pnpm audit --prod --audit-level=critical
 
       - name: Run Trivy vulnerability scanner (SARIF)
         uses: aquasecurity/trivy-action@master
@@ -246,7 +565,11 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH'
 
-      - name: Run Trivy vulnerability scanner (Table)
+      # 사람이 로그에서 바로 볼 수 있게 표로도 남긴다.
+      # 이 스텝은 리포트 전용이며 게이트가 아니다(exit-code 미지정 = 항상 0).
+      # 의존성 게이트는 위의 `pnpm audit` 이 담당한다. Trivy 를 이중 게이트로 만들면
+      # 시크릿 스캐너 오탐(시드의 bcrypt 해시 등)으로 앱 회귀와 무관하게 빨간불이 된다.
+      - name: Run Trivy vulnerability scanner (Table, report only)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -254,6 +577,8 @@ jobs:
           format: 'table'
           severity: 'CRITICAL,HIGH'
 
+      # SARIF 업로드는 GitHub Advanced Security 가 켜져 있어야 성공한다.
+      # 리포트 발행 실패로 파이프라인을 막지 않는다(의도된 비게이팅).
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         if: always()
@@ -262,11 +587,15 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   # 배포 준비 완료 알림
+  #
+  # e2e-test 를 needs 에 포함한다. E2E 가 실패했는데 "All checks passed" 를 찍으면
+  # 그 자체가 거짓 신호다.
   deployment-ready:
     name: Deployment Ready
     runs-on: ubuntu-latest
-    needs: [code-quality, test, build]
+    needs: [code-quality, test, build, e2e-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 5
 
     steps:
       - name: Notify deployment ready
@@ -277,3 +606,4 @@ jobs:
           echo "✓ Code quality: PASSED"
           echo "✓ Tests: PASSED"
           echo "✓ Build: PASSED"
+          echo "✓ E2E: PASSED"

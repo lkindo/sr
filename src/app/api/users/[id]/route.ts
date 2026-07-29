@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { BusinessRuleError, NotFoundError } from '@/lib/errors';
+import { BusinessRuleError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import {
   ensureCanDeleteUser,
@@ -65,8 +65,21 @@ export const PATCH = withAuthAndRateLimit(
       : { name: validated.name, image: validated.image };
 
     // Multi-tenant Isolation: 고객사 소속(clientIds) 변경은 내부 사용자(ADMIN/MANAGER/ENGINEER)만 가능.
-    // 외부 사용자(예: CLIENT_ADMIN)가 보낸 clientIds 는 제거하여 타 테넌트로의 권한 상승을 차단한다.
-    if (!isInternalUser(session.user)) {
+    // 외부 사용자(예: CLIENT_ADMIN)가 타 테넌트를 추가하면 권한 상승이 되므로 차단한다.
+    //
+    // 조용히 필드만 버리면 호출자는 성공(200)으로 읽고 변경된 줄 안다.
+    // 다만 UserDialog 는 편집 시 항상 clientIds 를 함께 보내므로, 무조건 거부하면
+    // 자기 테넌트 내 정상 편집까지 막힌다. 따라서 "실제로 바꾸려 한 경우"에만 거부한다.
+    if (!isInternalUser(session.user) && updateData.clientIds !== undefined) {
+      const currentClientIds = targetUser.clients.map((c) => c.clientId);
+      const isUnchanged =
+        updateData.clientIds.length === currentClientIds.length &&
+        [...updateData.clientIds].sort().every((id, i) => id === [...currentClientIds].sort()[i]);
+
+      if (!isUnchanged) {
+        throw new ForbiddenError('고객사 소속은 변경할 수 없습니다.');
+      }
+      // 값이 동일하면 불필요한 재작성을 피한다.
       delete updateData.clientIds;
     }
 

@@ -1,51 +1,174 @@
 name: E2E
 
+# main push 트리거는 제거했다.
+# 같은 스위트를 ci-cd.yml(`CI/CD Pipeline`)의 e2e-test 잡이 이미 게이트로 돌리고 있고,
+# deploy.yml 은 그 워크플로의 결론만 본다. 즉 여기서 한 번 더 도는 실행은
+# 아무것도 막지 못하면서 러너 시간만 두 배로 쓰는 중복이었다.
+# 이 워크플로는 (1) 배포된 환경 대상 수동 실행, (2) PR 옵트인 실행 전용이다.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       base_url:
-        description: '테스트 대상 BASE_URL (미지정 시 로컬 dev)'
+        description: '테스트 대상 BASE_URL (미지정 시 러너 안에서 앱을 빌드/기동)'
         required: false
         default: ''
   pull_request:
-    types: [labeled]
+    # labeled 만 있으면 라벨을 단 뒤 push 된 커밋은 검증되지 않는다.
+    # synchronize 를 추가해 `e2e` 라벨이 붙어 있는 동안 새 커밋마다 다시 돈다.
+    types: [labeled, synchronize]
 
 jobs:
   e2e:
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    # 러너 안에서 앱을 기동하는 경로(base_url 미지정)에서 쓰는 일회용 DB.
+    # base_url 이 주어지면 이 컨테이너는 그냥 쓰이지 않는다.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sr_ci
+          POSTGRES_PASSWORD: sr_ci
+          POSTGRES_DB: sr_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sr_ci -d sr_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # 러너 안에서만 존재하는 일회용 값(ci-cd.yml 의 e2e-test 잡과 동일한 설정).
+      DATABASE_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      DIRECT_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
+      NEXTAUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      AUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      NEXTAUTH_URL: 'http://localhost:3000'
+      NEXT_PUBLIC_APP_URL: 'http://localhost:3000'
+      AUTH_TRUST_HOST: 'true'
+      TEST_MODE: 'true'
+      # CI 는 모든 요청이 127.0.0.1 이라 src/proxy.ts 의 IP 기준 rate limit(기본 1분 100회)에
+      # 스위트가 스스로 걸린다. E2E 가 검증하는 대상이 아니므로 한도를 사실상 해제한다.
+      RATE_LIMIT_MIDDLEWARE_WINDOW_MS: '60000'
+      RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS: '1000000'
+      # 서버는 이 워크플로가 직접 띄운다. playwright.config.ts 의 webServer(3000 포트,
+      # CI 에서 reuseExistingServer=false)와 포트가 충돌하지 않도록 반드시 꺼 둔다.
+      SKIP_WEBSERVER: '1'
+      SEED_DEV_FIXTURES: 'true'
+      SEED_ADMIN_PASSWORD: 'admin123'
+      SEED_ENGINEER_PASSWORD: 'engineer123'
+      SEED_CLIENT_PASSWORD: 'client123'
+      TEST_USER_EMAIL: 'admin@example.com'
+      TEST_USER_PASSWORD: 'admin123'
+      TEST_MANAGER_EMAIL: 'admin@example.com'
+      TEST_MANAGER_PASSWORD: 'admin123'
+      TEST_ENGINEER_EMAIL: 'engineeruser@example.com'
+      TEST_ENGINEER_PASSWORD: 'engineer123'
+      TEST_CLIENT_EMAIL: 'clientuser@example.com'
+      TEST_CLIENT_PASSWORD: 'client123'
+      # 역할 페르소나(role-personas) 계약. e2e/helpers/auth-helpers.ts 의 ROLE_PERSONAS 참고.
+      # prisma/seed.ts 가 이 계정을 MANAGER / CLIENT_ADMIN 으로 만들어야 통과한다.
+      SEED_MANAGER_PASSWORD: 'manager123'
+      SEED_CLIENT_ADMIN_PASSWORD: 'clientadmin123'
+      TEST_MANAGER_ROLE_EMAIL: 'manageruser@example.com'
+      TEST_MANAGER_ROLE_PASSWORD: 'manager123'
+      TEST_CLIENT_ADMIN_EMAIL: 'clientadminuser@example.com'
+      TEST_CLIENT_ADMIN_PASSWORD: 'clientadmin123'
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       # pnpm을 먼저 설치해야 setup-node의 cache:'pnpm'이 pnpm store를 찾을 수 있다.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
           version: 10
+
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: 'pnpm'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
-      - name: Start dev server (if BASE_URL not provided)
+        run: pnpm exec playwright install --with-deps chromium
+        timeout-minutes: 5
+
+      # 마이그레이션/시드는 base_url 유무와 무관하게 항상 실행한다.
+      # e2e/sr-permissions.spec.ts 는 테스트 러너 프로세스에서 직접 prisma 를 import 하므로
+      # DATABASE_URL 이 가리키는 DB에 스키마가 없으면 스펙이 곧바로 터진다.
+      # (다만 base_url 로 외부 환경을 지정한 실행은 러너 로컬 DB를 보게 되므로 완전한
+      #  게이트가 아니다 — 배포 게이트는 ci-cd.yml 의 e2e-test 잡이다)
+      - name: Apply database migrations
+        run: pnpm exec prisma migrate deploy
+
+      - name: Seed database
+        run: pnpm db:seed
+
+      # 빌드/기동은 러너 안에서 앱을 띄우는 경로에서만 필요하다.
+      - name: Build application
+        if: ${{ inputs.base_url == '' }}
+        run: pnpm build
+
+      # 과거: `pnpm dev &` 로 3000 포트를 점유한 채 SKIP_WEBSERVER 를 비워 두어,
+      # playwright 의 webServer 가 같은 3000 포트를 다시 잡으려다 실패하는 구조였다.
+      - name: Start application server
         if: ${{ inputs.base_url == '' }}
         run: |
-          pnpm dev &
-          npx wait-on http://localhost:3000
+          pnpm start > server.log 2>&1 &
+          echo $! > server.pid
+          if ! timeout 120 bash -c 'until curl -sf http://localhost:3000/login > /dev/null; do sleep 2; done'; then
+            echo "::error::앱 서버가 120초 안에 준비되지 않았습니다."
+            cat server.log
+            exit 1
+          fi
+          echo "✓ 앱 서버 준비 완료"
+
+      # 실행 대상 프로젝트와 제외 사유는 ci-cd.yml 의 e2e-test 잡 주석과 동일하다.
+      # (firefox/webkit/Mobile Chrome 은 testIgnore 가 없어 멀티유저 스펙을 단일 인증
+      #  상태로 중복 실행하고, 비주얼 스냅샷은 *-win32.png 뿐이라 리눅스에서 실패한다)
       - name: Run E2E tests
         env:
-          BASE_URL: ${{ inputs.base_url }}
-          SKIP_WEBSERVER: ${{ inputs.base_url != '' && '1' || '' }}
-        run: pnpm run test:e2e
+          BASE_URL: ${{ inputs.base_url != '' && inputs.base_url || 'http://localhost:3000' }}
+        run: |
+          pnpm exec playwright test \
+            --project=chromium \
+            --project=multi-user \
+            --project=role-personas \
+            --project=permissions \
+            --grep-invert "Dashboard Visual & Performance|Manual Screen Captures"
+
+      # playwright.config.ts 의 리포터 출력 경로는 test-results/ 다.
+      # (기존 설정은 존재하지 않는 playwright-report/ 를 올려 항상 빈 아티팩트만 남겼다)
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: playwright-report
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload application server log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-server-log
+          path: server.log
+          if-no-files-found: warn
+          retention-days: 7
