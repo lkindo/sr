@@ -126,22 +126,33 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       const registration = await navigator.serviceWorker.register('/sw.js');
       await navigator.serviceWorker.ready;
 
-      // Get VAPID public key from API (Vercel 환경 변수 문제 우회)
+      // Get VAPID public key from API (빌드 시 환경 변수가 주입되지 않은 경우 대비)
       let vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
       if (!vapidPublicKey || vapidPublicKey.length < 20) {
         // Fallback: API에서 가져오기
         const vapidResponse = await fetch('/api/push/vapid-key');
-        if (vapidResponse.ok) {
-          const vapidData = await vapidResponse.json();
-          vapidPublicKey = vapidData.vapidPublicKey;
+        if (!vapidResponse.ok) {
+          // 서버에 푸시가 설정되지 않은 경우(503 등). 사용자에게 상태로 알린다.
+          setState((prev) => ({
+            ...prev,
+            isLoading: false,
+            error: '서버에 푸시 알림이 설정되어 있지 않습니다. 관리자에게 문의해주세요.',
+          }));
+          return false;
         }
+
+        const vapidData = await vapidResponse.json();
+        vapidPublicKey = vapidData.vapidPublicKey;
       }
 
       if (!vapidPublicKey || vapidPublicKey.length < 20) {
-        throw new Error(
-          'VAPID public key is not configured. Please check your environment variables.'
-        );
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: '푸시 알림 키가 올바르게 설정되지 않았습니다. 관리자에게 문의해주세요.',
+        }));
+        return false;
       }
 
       // Subscribe to push

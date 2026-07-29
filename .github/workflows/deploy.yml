@@ -138,8 +138,11 @@ jobs:
             umask 077
             if [ "$BRANCH_NAME" = "main" ]; then
               printf '%s' "$ENV_DOCKER_B64"  | base64 -d > .env.docker
-              printf '%s' "$COMPOSE_ENV_B64" | base64 -d > .env
-              COMPOSE_ARGS="--env-file .env -f docker-compose.prod.yml"
+              # 주의: `.env` 를 쓰지 않는다. 서버의 `/home/opc/sr/.env` 는 Docker 이전
+              # 배포에서 남은 파일로, 실제 EMAIL/VAPID 자격증명의 유일한 사본을 담고 있다.
+              # 덮어쓰면 복구할 수 없으므로 보간 전용 파일을 따로 둔다.
+              printf '%s' "$COMPOSE_ENV_B64" | base64 -d > .env.prod
+              COMPOSE_ARGS="--env-file .env.prod -f docker-compose.prod.yml"
             else
               printf '%s' "$ENV_DOCKER_B64"  | base64 -d > .env.docker.test
               printf '%s' "$COMPOSE_ENV_B64" | base64 -d > .env.staging
@@ -147,7 +150,7 @@ jobs:
               # 스테이징에 딸려 들어가지 않도록 `--env-file` 을 반드시 명시한다.
               COMPOSE_ARGS="--env-file .env.staging -p sr-test -f docker-compose.test.yml"
             fi
-            chmod 600 .env .env.staging .env.docker .env.docker.test 2>/dev/null || true
+            chmod 600 .env.prod .env.staging .env.docker .env.docker.test 2>/dev/null || true
 
             # 보간이 성립하는지 먼저 확인한다. 여기서 실패하면 아직 아무것도 내리지 않은
             # 상태이므로 현재 서비스는 계속 살아 있다.
