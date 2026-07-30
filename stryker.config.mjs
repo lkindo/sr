@@ -7,6 +7,35 @@ const config = {
   plugins: ['@stryker-mutator/vitest-runner'],
   vitest: {
     configFile: 'vitest.stryker.config.ts',
+    // ── related 모드는 반드시 꺼야 한다 (실측 2026-07-30) ──────────────────────
+    // 기본값 true. 켜져 있으면 initial dry run이 아래 경로로 **반드시** 죽는다.
+    //
+    //   ERROR DryRunExecutor Test runner crashed.
+    //     Error: ERR_LOAD_URL Failed to load url <sandbox 루트>
+    //     (resolved id: <sandbox 루트>). Does the file exist?
+    //
+    // 원인 사슬(전부 로컬에서 재현·계측했다):
+    //  1. push.service.ts:153 `await import('web-push')` — 동적 import 의 인자는
+    //     문자열 리터럴이므로 Stryker StringLiteral 뮤테이터가 `""` 뮤턴트를 만든다.
+    //     계측된 코드에는 삼항의 양쪽 가지로 두 호출이 **동시에** 남는다:
+    //       stryMutAct(...) ? __vite_ssr_dynamic_import__("") : __vite_ssr_dynamic_import__("web-push")
+    //  2. Vite 는 그 `""` 를 transformResult.dynamicDeps 에 그대로 담는다.
+    //  3. vitest 4 의 related 필터(TestSpecifications#getTestDependencies)가 각 dep 을
+    //       fsPath = dep.startsWith('/@fs/') ? ... : path.join(project.config.root, dep)
+    //     로 되돌린다. dep 이 빈 문자열이면 join 결과가 **프로젝트 루트 디렉터리**가 되고,
+    //     디렉터리이므로 existsSync 가 통과해 transformRequest(<루트>) 까지 간다.
+    //  4. Vite 가 디렉터리를 모듈로 로드하려다 ERR_LOAD_URL → 워커 크래시 → 2회 재시도 후 사망.
+    //
+    // 즉 sandbox 경로/`__dirname`/alias 문제가 아니다(그 가설은 반증했다 — sandbox 안에서
+    // alias 는 `/src/__tests__/mocks/server-only.ts` 로 정상 해석된다). `inPlace: true` 로
+    // 바꿔도 루트만 실제 작업트리로 바뀔 뿐 join('') 결과가 여전히 존재하는 디렉터리라 동일하게 죽는다.
+    // 동적 import 를 가진 파일(push.service.ts, user.service.ts)이 mutate 대상에 들어가는
+    // 순간 재현되므로, 파일 1개짜리 좁은 실행에서는 우연히 통과할 수 있다.
+    //
+    // related 를 끄는 비용은 dry run 이 "변경 파일과 관련된 테스트"가 아니라 include 전체를
+    // 도는 것뿐이다. 뮤턴트 실행 자체는 perTest 커버리지로 여전히 좁혀지므로(mutantRun 은
+    // testFilter 로 테스트를 직접 지정한다) 2796개 뮤턴트 실행 시간에는 영향이 없다.
+    related: false,
   },
   coverageAnalysis: 'perTest',
   mutate: [

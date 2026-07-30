@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 
 /**
@@ -206,6 +206,9 @@ function run() {
   const mutatePatterns = filesToMutate.map(escapeGlob);
   const strykerCmd = `npx stryker run --mutate "${mutatePatterns.join(',')}"`;
 
+  // reportFailure() 가 "이번 실행이 리포트를 만들었는가"를 mtime 으로 판정하므로 시작 시각을 남긴다.
+  const startedAt = Date.now();
+
   try {
     log('Starting Stryker...');
     log(`  ${strykerCmd}`);
@@ -213,9 +216,64 @@ function run() {
     log('Mutation testing completed successfully.');
   } catch {
     // Stryker 는 thresholds.break 미달 시에도 non-zero 로 끝난다. 여기서 삼키면 게이트가 사라진다.
-    log('Mutation testing failed (실행 오류 또는 thresholds.break 미달).');
+    // 다만 "점수가 낮아서 빨간불"과 "Stryker 가 점수를 내기도 전에 죽음"은 완전히 다른 사건이고
+    // 대응도 다르다(전자는 테스트를 더 써야 하고, 후자는 설정/툴체인을 고쳐야 한다).
+    // 예전에는 두 경우가 같은 한 줄로 뭉개져서, 로그를 보고도 어느 쪽인지 알 수 없었다.
+    // 실제로 2026-07-30 에 mutation-test 잡이 dry run 크래시로 죽었는데 "임계값 미달"로 읽혔다.
+    reportFailure(startedAt);
     process.exit(1);
   }
+}
+
+/**
+ * Stryker 종료 원인을 로그에서 되짚어 "점수 미달"과 "실행 실패"를 갈라 준다.
+ *
+ * Stryker 는 stdio: 'inherit' 로 이미 자기 로그를 다 뱉었으므로 여기서 원인을 다시 찍는 게
+ * 중복처럼 보일 수 있다. 그러나 CI 로그는 수천 줄이고 실패 요약만 보는 경우가 많으므로,
+ * 마지막 줄에 판정을 남기는 것이 실제 디버깅 시간을 좌우한다.
+ */
+function reportFailure(startedAt: number) {
+  // 판정 근거: Stryker 는 dry run 단계에서 죽으면 리포트를 아예 만들지 않는다
+  // (실측 2026-07-30: dry run 크래시 후 reports/ 디렉터리 자체가 없었다).
+  // 반대로 thresholds.break 미달은 뮤턴트를 다 돌린 뒤의 판정이므로 리포트가 남는다.
+  // 점수를 직접 파싱하지 않는 이유: reporters 설정(html/json 유무)에 결합되기 때문이다.
+  //
+  // mtime 을 함께 보는 이유: 로컬에서 `pnpm test:mutation` 을 먼저 돌려 둔 상태라면
+  // 예전 리포트가 남아 있어 "크래시"를 "점수 미달"로 오진할 수 있다. CI 는 워크스페이스가
+  // 깨끗하지만 로컬 재현 시 정확히 이 함수가 헷갈리게 만들면 존재 이유가 없어진다.
+  const reportWrittenByThisRun = [
+    'reports/mutation/mutation.html',
+    'reports/mutation/mutation.json',
+  ].some((p) => {
+    const abs = resolve(process.cwd(), p);
+    if (!existsSync(abs)) return false;
+    // 파일시스템 mtime 해상도(FAT/일부 네트워크 FS 는 최대 2초)를 감안해 여유를 둔다.
+    return statSync(abs).mtimeMs >= startedAt - 2000;
+  });
+
+  if (reportWrittenByThisRun) {
+    log('FAILED: 뮤테이션 점수가 thresholds.break 미달입니다.');
+    log(
+      '  대응: 위 clear-text 리포터 출력의 Survived / NoCoverage 뮤턴트에 대응하는 테스트를 추가하세요.'
+    );
+    log('  리포트: reports/mutation/mutation.html (CI 아티팩트로 올라갑니다).');
+    return;
+  }
+
+  log('FAILED: Stryker 가 뮤테이션 점수를 내기 전에 죽었습니다 (임계값 문제가 아닙니다).');
+  log('  뮤테이션 리포트가 생성되지 않았습니다 = 뮤턴트를 한 개도 실행하지 못했습니다.');
+  log('  위 로그에서 다음 순서로 확인하세요:');
+  log('   1) "Instrumented N source file(s)" 가 있는지 — 없으면 --mutate 패턴/파일 선별 문제.');
+  log('   2) "Initial test run" 이후의 에러 — dry run 실패다. 자주 나오는 두 가지:');
+  log('      - "Failed to resolve import \\"\\"" / ERR_LOAD_URL <sandbox 루트>');
+  log('        → 동적 import 를 가진 파일을 계측할 때 나오는 알려진 Stryker×Vite 충돌.');
+  log('          vitest.stryker.config.ts 의 stryker-empty-dynamic-import 플러그인이 담당한다.');
+  log('      - "There were failed tests in the initial test run."');
+  log(
+    '        → 계측 전에도 깨지는 테스트가 있다. 먼저 `pnpm test` 로 스위트를 초록으로 만들어야 한다.'
+  );
+  log('   3) "No tests were executed" — 선별된 파일에 닿는 테스트가 없다.');
+  log('  로컬 재현: npx stryker run --mutate "<위에 나열된 파일들>" --dryRunOnly');
 }
 
 run();
