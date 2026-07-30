@@ -139,10 +139,42 @@ export class TooManyRequestsError extends ServiceError {
 }
 
 /**
+ * Prisma 알려진 요청 오류(P####)를 도메인 에러로 변환합니다.
+ * 매핑 대상이 아니면 null 을 반환하므로 호출측에서 원본 오류를 그대로 전파하면 됩니다.
+ *
+ * - P2003(외래키 제약 위반): 존재하지 않는 ID를 참조한 잘못된 입력이므로 400 으로 내린다.
+ *   (매핑이 없으면 원시 Prisma 오류가 그대로 500 으로 노출되어, 사용자는 서버 장애로 오인하고
+ *    로그에는 스택만 남는다.)
+ *
+ * Prisma 런타임 타입을 import 하지 않고 code 속성으로만 판정한다.
+ * (errors.ts 는 서버/클라이언트 양쪽에서 import 되므로 런타임 의존성을 늘리지 않는다.)
+ */
+export function mapPrismaError(error: unknown): ServiceError | null {
+  // 이미 도메인 에러로 변환된 경우는 그대로 둔다. (ServiceError.code 도 문자열이므로 먼저 걸러낸다.)
+  if (error instanceof ServiceError) {
+    return null;
+  }
+
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+
+  if (code === 'P2003') {
+    return new BadRequestError('존재하지 않는 대상을 참조했습니다. 입력값을 다시 확인해주세요.');
+  }
+
+  return null;
+}
+
+/**
  * ServiceError를 Result 타입으로 변환하는 헬퍼 함수
  */
 
 export function errorToResult(error: unknown): { success: false; error: string; code?: string } {
+  // Prisma 제약 위반은 도메인 에러로 정규화한 뒤 처리한다. (500 → 400)
+  const mapped = mapPrismaError(error);
+  if (mapped) {
+    error = mapped;
+  }
+
   if (error instanceof ServiceError) {
     // ServiceError는 비즈니스 로직상의 예외이므로 warn 레벨로 로깅 (시스템 에러인 경우 error 레벨)
     if (error.statusCode >= 500) {

@@ -325,21 +325,34 @@ describe('UserService - coverage2 (uncovered methods)', () => {
   });
 
   describe('getUsersWithSRHandlingPermission', () => {
-    it('delegates to permissionService.getUsersWithPermissions with SR handling permissions', async () => {
-      const fakePermissionService = {
-        getUsersWithPermissions: vi
-          .fn()
-          .mockResolvedValue([{ id: 'u1', name: 'Eng', email: 'e@test.com' }]),
-      } as any;
+    // 반전된 테스트: 예전에는 SR:CREATE / SR:ASSIGN 까지 AND 조건으로 요구하는 것을 고정했는데,
+    // 그 조건 때문에 ENGINEER(SR:READ/UPDATE/STATUS_CHANGE 만 보유)는 담당자 목록에 오를 수
+    // 없었다. 배정을 "받는" 사람에게 요구해서는 안 되는 권한이므로 요구하지 않는 것을 고정한다.
+    // (역할별 자격 매트릭스는 user.service.coverage.test.ts 가 담당한다.)
+    it('배정 대상에게 SR:CREATE / SR:ASSIGN / SR:DELETE 를 요구하지 않는다', async () => {
+      vi.mocked(prisma.user.findMany).mockResolvedValue([
+        { id: 'u1', name: 'Eng', email: 'e@test.com' },
+      ] as any);
 
-      const result = await userService.getUsersWithSRHandlingPermission(fakePermissionService);
+      const result = await userService.getUsersWithSRHandlingPermission();
 
       expect(result).toEqual([{ id: 'u1', name: 'Eng', email: 'e@test.com' }]);
-      expect(fakePermissionService.getUsersWithPermissions).toHaveBeenCalledTimes(1);
-      const passedPerms = fakePermissionService.getUsersWithPermissions.mock.calls[0][0];
-      expect(passedPerms).toContain('SR:CREATE');
-      expect(passedPerms).toContain('SR:ASSIGN');
-      expect(passedPerms).toContain('COMMENT:CREATE');
+
+      const where = (vi.mocked(prisma.user.findMany).mock.calls[0][0] as any).where;
+      const requested: string[] = (where.AND ?? []).map((filter: any) => {
+        const permission = filter.roles.some.role.OR[1].permissions.some.permission;
+        return `${permission.resource}:${permission.action}`;
+      });
+
+      expect(requested).not.toContain('SR:CREATE');
+      expect(requested).not.toContain('SR:ASSIGN');
+      expect(requested).not.toContain('SR:DELETE');
+      // 양성 대조군: 담당자가 실제로 필요한 권한은 그대로 요구한다.
+      expect(requested).toContain('SR:UPDATE');
+      expect(requested).toContain('SR:STATUS_CHANGE');
+      expect(requested).toContain('COMMENT:CREATE');
+      // 그리고 내부 역할(ADMIN/MANAGER/ENGINEER)만 담당자가 될 수 있다.
+      expect(where.roles.some.role.name.in).toEqual(['ADMIN', 'MANAGER', 'ENGINEER']);
     });
   });
 

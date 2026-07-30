@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
@@ -13,6 +13,9 @@ vi.mock('@/lib/prisma', () => ({
     client: { findUnique: vi.fn() },
     serviceCategory: { findUnique: vi.fn() },
     sRActivity: { create: vi.fn() },
+    // 담당자 배정 검증(assertAssignable) 및 배정 가능 사용자 목록 조회에 사용된다.
+    user: { findUnique: vi.fn(), findMany: vi.fn() },
+    role: { findMany: vi.fn() },
   },
 }));
 
@@ -43,6 +46,9 @@ describe('SRService.updateSR Branches', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // 배정 가능 사용자 목록 기본값(권한 카탈로그/사용자 조회) — 필요한 테스트에서만 덮어쓴다.
+    vi.mocked(prisma.role.findMany).mockResolvedValue([] as any);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([] as any);
     srService = new SRService();
   });
 
@@ -215,5 +221,109 @@ describe('SRService.updateSR Branches', () => {
     expect(updateData.dueDate).toBeDefined();
     // 24 * 0.5 = 12 hours added to intakeAt
     expect(updateData.dueDate.toISOString()).toBe('2023-10-10T12:00:00.000Z');
+  });
+
+  // 접수(트리아지) 필드는 운영 전용이다. 외부 사용자가 SLA 기한/우선순위/담당자를
+  // 직접 바꿀 수 있으면 SLA 준수율 지표가 위조되고 담당자가 조용히 재배정된다.
+  describe('운영 전용 필드 인가 및 담당자 검증', () => {
+    const intakedSR = {
+      id: 'sr-1',
+      srNumber: 'SR-001',
+      title: '제목',
+      status: 'IN_PROGRESS',
+      clientId: 'own-c',
+      requesterId: 'u2',
+      assigneeId: 'eng-1',
+      serviceCategoryId: 'cat-1',
+      actualPriority: 'LOW',
+      dueDate: new Date('2023-10-20T00:00:00.000Z'),
+      intakeAt: new Date('2023-10-10T00:00:00.000Z'),
+    };
+
+    let txMock: {
+      sR: { updateMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+      sRActivity: { create: ReturnType<typeof vi.fn> };
+    };
+
+    beforeEach(() => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(intakedSR as any);
+      vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
+
+      txMock = {
+        sR: {
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+          update: vi.fn().mockResolvedValue({ ...intakedSR }),
+        },
+        sRActivity: { create: vi.fn() },
+      };
+      vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
+    });
+
+    it('외부 사용자가 dueDate를 바꾸면 ForbiddenError이며 갱신이 실행되지 않는다', async () => {
+      await expect(
+        srService.updateSR('sr-1', { dueDate: '2030-01-01' }, externalUser)
+      ).rejects.toThrow(ForbiddenError);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(txMock.sR.update).not.toHaveBeenCalled();
+    });
+
+    it('POSITIVE: 외부 사용자는 본인 고객사 SR의 제목/설명을 계속 수정할 수 있다', async () => {
+      await srService.updateSR(
+        'sr-1',
+        { title: '수정된 제목', description: '수정된 설명입니다.' },
+        externalUser
+      );
+
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      expect(updateData.title).toBe('수정된 제목');
+      expect(updateData.description).toBe('수정된 설명입니다.');
+      // 운영 전용 필드는 요청에 없었으므로 그대로 남는다.
+      expect(updateData.dueDate).toBeUndefined();
+      expect(updateData.assigneeId).toBeUndefined();
+    });
+
+    it('내부 사용자라도 비활성 사용자에게는 담당자를 배정할 수 없다', async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'inactive-1',
+        name: '퇴사자',
+        email: 'gone@example.com',
+        isActive: false,
+      } as any);
+
+      await expect(
+        srService.updateSR('sr-1', { assigneeId: 'inactive-1' }, internalUser)
+      ).rejects.toThrow(BadRequestError);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(txMock.sR.update).not.toHaveBeenCalled();
+    });
+
+    it('내부 사용자라도 존재하지 않는 담당자는 배정할 수 없다', async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+
+      await expect(
+        srService.updateSR('sr-1', { assigneeId: 'ghost' }, internalUser)
+      ).rejects.toThrow(NotFoundError);
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('POSITIVE: 내부 사용자는 활성 SR 처리자에게 담당자를 배정할 수 있다', async () => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'eng-2',
+        name: 'Engineer 2',
+        email: 'eng2@example.com',
+        isActive: true,
+      } as any);
+      vi.mocked(prisma.user.findMany).mockResolvedValue([
+        { id: 'eng-2', name: 'Engineer 2', email: 'eng2@example.com' },
+      ] as any);
+
+      await srService.updateSR('sr-1', { assigneeId: 'eng-2' }, internalUser);
+
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      expect(updateData.assigneeId).toBe('eng-2');
+    });
   });
 });

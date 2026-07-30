@@ -9,9 +9,34 @@ import { userUpdateSchema } from '@/lib/schemas';
 import { excludePassword } from '@/lib/user-helpers';
 
 import { auditService } from './audit.service';
-import { PermissionService } from './permission.service';
 
 type UserUpdateData = z.infer<typeof userUpdateSchema>;
+
+/**
+ * SR 담당자로 배정될 사용자에게 실제로 필요한 최소 권한.
+ *
+ * 배정을 "받는" 쪽이 하는 일은 SR 조회 → 처리 → 상태 변경 → 댓글 응대다.
+ * 과거에는 SR:CREATE / SR:DELETE / SR:ASSIGN / COMMENT:UPDATE 까지 AND 조건으로 요구했다.
+ * 그 결과 시드 기준으로 ADMIN/MANAGER 만 통과했고, SR:READ/UPDATE/STATUS_CHANGE 만 가진
+ * ENGINEER 는 담당자 선택 목록에 아예 오르지 못했다(= 엔지니어에게 배정 불가). 배정을 받는
+ * 사람에게 삭제·배정 권한을 요구하는 것 자체가 업무 성격과 맞지 않으므로 요구 권한을
+ * "담당자가 실제로 필요한 것"으로 좁힌다.
+ */
+const SR_HANDLING_REQUIRED_PERMISSIONS = [
+  'SR:READ',
+  'SR:UPDATE',
+  'SR:STATUS_CHANGE',
+  'COMMENT:CREATE',
+  'COMMENT:READ',
+];
+
+/**
+ * SR 담당자가 될 수 있는 내부 역할. (lib/policies 의 INTERNAL_ROLES = isInternalUser 기준과 동일)
+ *
+ * DB 쿼리 조건으로 써야 해서 역할명 목록 자체가 필요하므로 여기서 선언한다. 두 정의가 조용히
+ * 어긋나지 않도록 user.service.coverage.test.ts 가 isInternalUser 와의 일치를 검증한다.
+ */
+export const SR_HANDLER_INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
 /**
  * 사용자 서비스 (User Service)
@@ -714,21 +739,57 @@ export class UserService {
     });
   }
 
-  async getUsersWithSRHandlingPermission(
-    permissionService: PermissionService = new PermissionService()
-  ): Promise<Array<{ id: string; name: string; email: string }>> {
-    const requiredPermissions = [
-      'SR:CREATE',
-      'SR:READ',
-      'SR:UPDATE',
-      'SR:DELETE',
-      'SR:ASSIGN',
-      'SR:STATUS_CHANGE',
-      'COMMENT:CREATE',
-      'COMMENT:READ',
-      'COMMENT:UPDATE',
-    ];
-    return permissionService.getUsersWithPermissions(requiredPermissions);
+  /**
+   * SR 담당자로 배정 가능한 사용자 목록. (담당자 선택 드롭다운과 서버측 배정 가드의 공통 기준)
+   *
+   * 두 축을 모두 만족해야 배정 가능하다.
+   *  1) 권한: SR_HANDLING_REQUIRED_PERMISSIONS 전부 보유 (AND 판정, ADMIN 은 암묵적 전체 보유)
+   *  2) 역할: 내부 사용자(ADMIN/MANAGER/ENGINEER)
+   *
+   * 2)가 반드시 필요한 이유: 시드(prisma/seed.ts)의 CLIENT_ADMIN 권한 집합은 ENGINEER 의
+   * 상위집합이다(SR:READ/UPDATE/STATUS_CHANGE + COMMENT 전체 보유). 즉 ENGINEER 를 통과시키는
+   * 어떤 권한 조합도 CLIENT_ADMIN 을 함께 통과시킨다. 고객사 측 관리자가 SR 담당자가 되어서는
+   * 안 되므로 권한만으로 판정할 수 없고 내부/외부 역할 축이 함께 있어야 한다.
+   *
+   * 한 번의 쿼리로 두 축을 모두 DB 에서 평가한다. 권한 조건의 형태는
+   * PermissionService.checkPermission 과 동일한 관용구(ADMIN 이거나 해당 권한을 부여하는 역할 보유)다.
+   */
+  async getUsersWithSRHandlingPermission(): Promise<
+    Array<{ id: string; name: string; email: string }>
+  > {
+    // 권한 축: 각 권한마다 "그 권한을 주는 역할을 하나 이상 보유" 조건을 만들고 AND 로 묶는다.
+    const permissionFilters: Prisma.UserWhereInput[] = SR_HANDLING_REQUIRED_PERMISSIONS.map(
+      (permission) => {
+        const [resource, action] = permission.split(':');
+        return {
+          roles: {
+            some: {
+              role: {
+                OR: [
+                  // ADMIN 은 모든 권한을 암묵적으로 보유한다.
+                  { name: 'ADMIN' },
+                  { permissions: { some: { permission: { resource, action } } } },
+                ],
+              },
+            },
+          },
+        };
+      }
+    );
+
+    return prisma.user.findMany({
+      where: {
+        isActive: true,
+        // 역할 축: 내부 사용자만 담당자가 될 수 있다.
+        roles: { some: { role: { name: { in: SR_HANDLER_INTERNAL_ROLES } } } },
+        AND: permissionFilters,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    });
   }
 
   async changePassword(

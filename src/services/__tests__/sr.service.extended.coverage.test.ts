@@ -48,10 +48,32 @@ const { mockPrisma } = vi.hoisted(() => {
   return { mockPrisma: mock };
 });
 
-vi.mock('@/lib/policies', () => ({
-  ensureCanUpdateSR: vi.fn(),
-  ensureCanCreateSR: vi.fn(),
-  ensureCanDeleteSR: vi.fn(),
+// ensure* 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 사용한다.
+// (전체 대체(wholesale mock)를 쓰면 서비스가 사용하는 isInternalUser 가 사라져
+//  "No isInternalUser export is defined on the mock" 로 테스트가 죽는다.
+//  또한 내부/외부 판정을 mock 으로 조작하면 필드 단위 인가 검증이 무력화된다.)
+vi.mock('@/lib/policies', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/policies')>();
+  return {
+    ...actual,
+    ensureCanUpdateSR: vi.fn(),
+    ensureCanCreateSR: vi.fn(),
+    ensureCanDeleteSR: vi.fn(),
+  };
+});
+
+// 담당자 배정 가능 여부 판정은 이 스위트의 검증 대상이 아니므로 목록만 스텁한다.
+// (권한/역할 기준으로 누가 배정 가능한지에 대한 실제 검증은
+//  user.service.coverage.test.ts 의 "SR 담당자 자격 매트릭스" 스위트가 담당한다.)
+vi.mock('@/services/user.service', () => ({
+  UserService: class {
+    async getUsersWithSRHandlingPermission() {
+      return [
+        { id: 'a1', name: 'A1', email: 'a1@test.com' },
+        { id: 'a2', name: 'A2', email: 'a2@test.com' },
+      ];
+    }
+  },
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -127,6 +149,14 @@ describe('SRService Extended Branches', () => {
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
 
+      // assertAssignable 의 후보 조회(존재/활성 확인)
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'a1',
+        name: 'A1',
+        email: 'a1@test.com',
+        isActive: true,
+      } as any);
+
       await srService.updateSR('sr-1', { status: 'IN_PROGRESS', assigneeId: 'a1' }, {
         id: 'u1',
         roles: ['ADMIN'],
@@ -179,7 +209,17 @@ describe('SRService Extended Branches', () => {
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
 
+      // assertAssignable 의 후보 조회(존재/활성 확인)
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({
+        id: 'a2',
+        name: 'A2',
+        email: 'a2@test.com',
+        isActive: true,
+      } as any);
+
       // Use assignedToId and number estimatedHours
+      // estimatedHours/assignedToId 는 운영 소유 필드이므로 내부 사용자(MANAGER)로 호출한다.
+      // (외부 사용자가 이 필드를 바꾸면 거부되는지는 sr.service.test.ts 의 필드 인가 스위트가 검증)
       await srService.updateSR(
         'sr-1',
         {
@@ -187,7 +227,7 @@ describe('SRService Extended Branches', () => {
           estimatedHours: 12.5,
           assignedToId: 'a2',
         },
-        { id: 'u1' } as any
+        { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as any
       );
 
       let updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
@@ -206,6 +246,7 @@ describe('SRService Extended Branches', () => {
       );
 
       updateData = vi.mocked(txMock.sR.update).mock.calls[1][0].data;
+      // (두 번째 호출은 운영 소유 필드를 바꾸지 않으므로 역할 제약과 무관하다)
       expect(updateData.expectedCompletionDate).toBeNull();
       expect(updateData.intakeNotes).toBeNull();
     });
@@ -233,7 +274,13 @@ describe('SRService Extended Branches', () => {
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
 
-      await srService.updateSR('sr-1', { actualPriority: 'HIGH' }, { id: 'u1' } as any);
+      // actualPriority 는 운영 소유 필드이므로 내부 사용자(MANAGER)로 호출한다.
+      await srService.updateSR('sr-1', { actualPriority: 'HIGH' }, {
+        id: 'u1',
+        roles: ['MANAGER'],
+        permissions: [],
+        clientIds: [],
+      } as any);
       const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
       expect(updateData.dueDate).toBeInstanceOf(Date);
     });

@@ -10,6 +10,7 @@ import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
+import { assertAssignable } from '@/services/sr.service';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -45,32 +46,21 @@ export const POST = withAuthAndRateLimit(
     // 1. 요청 바디 검증
     const validated = await validateRequestBody(request, intakeSchema);
 
-    // 2. SR 조회 및 상태 확인, 담당자 조회를 하나의 쿼리로 병합
-    const [sr, assignee] = await prisma.$transaction([
-      prisma.sR.findUnique({
-        where: { id },
-        include: {
-          serviceCategory: true,
-          client: true,
-          requester: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+    // 2. SR 조회 및 상태 확인
+    const sr = await prisma.sR.findUnique({
+      where: { id },
+      include: {
+        serviceCategory: true,
+        client: true,
+        requester: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
-      }),
-      prisma.user.findUnique({
-        where: { id: validated.assigneeId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          isActive: true,
-        },
-      }),
-    ]);
+      },
+    });
 
     if (!sr) {
       throw new NotFoundError('SR');
@@ -88,14 +78,11 @@ export const POST = withAuthAndRateLimit(
       throw new BadRequestError('이미 접수된 SR입니다');
     }
 
-    if (!assignee) {
-      throw new NotFoundError('담당자');
-    }
-
-    // 비활성 사용자에게는 담당자를 배정할 수 없음 (비활성 담당자에게 orphan SR 방지)
-    if (!assignee.isActive) {
-      throw new BadRequestError('비활성 상태의 사용자에게는 담당자를 배정할 수 없습니다.');
-    }
+    // 3. 담당자 검증: 존재 / 활성 / SR 처리 권한(내부 담당자)을 한 규칙으로 판정한다.
+    //    배정 경로가 세 곳(intake POST · intake PATCH · updateSR)이므로 규칙은 assertAssignable
+    //    한 곳에만 두고 모두 공유한다. (과거: POST 는 존재·활성만 확인해 CLIENT_USER 도
+    //    담당자로 지정될 수 있었다.)
+    const assignee = await assertAssignable(validated.assigneeId);
 
     // 4. SLA 기반 마감일 자동 계산
     const slaHours = sr.serviceCategory.slaHours;
@@ -393,24 +380,16 @@ export const PATCH = withAuthAndRateLimit(
       dueDate.setHours(dueDate.getHours() + adjustedHours);
     }
 
-    // 6. 담당자 조회 (변경 시)
-    let newAssignee = null;
+    // 6. 담당자 검증 및 조회 (변경 시)
+    //    존재 여부만 확인하면 비활성 사용자에게도 배정되어, 로그인할 수 없는 담당자에게
+    //    묶인 orphan SR 이 생기고 이후 그 사용자를 정상적으로 비활성화할 수도 없다.
+    //    (updateSR 과 동일한 규칙을 쓰도록 assertAssignable 를 공유한다.)
+    let newAssignee: { id: string; name: string; email: string } | null = null;
     const isAssigneeChanged =
       validated.assigneeId !== undefined && validated.assigneeId !== sr.assigneeId;
 
     if (isAssigneeChanged && validated.assigneeId) {
-      newAssignee = await prisma.user.findUnique({
-        where: { id: validated.assigneeId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      });
-
-      if (!newAssignee) {
-        throw new NotFoundError('담당자');
-      }
+      newAssignee = await assertAssignable(validated.assigneeId);
     }
 
     // 7. SR 업데이트
