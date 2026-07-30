@@ -5,6 +5,16 @@ import { expect, test } from '@playwright/test';
  * - 내가 요청한 SR만 필터링
  * - API 응답 검증
  * - 필터링 및 정렬 기능
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (본문/테이블 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * isVisible() 은 대기하지 않으므로(timeout 옵션 무시) 조건부 요소는
+ * waitFor({ state: 'visible' }).catch(() => {}) 로 기다린 뒤 판단한다.
  */
 
 // 테스트 타임아웃 증가 (90초)
@@ -72,13 +82,20 @@ test.describe('My Requests 페이지', () => {
   });
 
   test('SR 목록 테이블 확인', async ({ page }) => {
-    await page.goto('/my-requests');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/my-requests', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 테이블 또는 리스트 확인
     const table = page.locator('table, [role="table"]');
-    const tableVisible = await table.isVisible({ timeout: 3000 }).catch(() => false);
+    // 목록 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await table
+      .first()
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .catch(() => {});
+    const tableVisible = await table.isVisible().catch(() => false);
 
     if (!tableVisible) {
       console.log('⚠️ SR 목록 테이블을 찾을 수 없습니다. 테스트 스킵.');
@@ -98,16 +115,20 @@ test.describe('My Requests 페이지', () => {
   });
 
   test('상태별 필터링 기능', async ({ page }) => {
-    await page.goto('/my-requests');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/my-requests', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 필터 Select 또는 버튼 찾기
     const statusFilter = page
       .locator('select[name*="status"], [role="combobox"]')
       .filter({ hasText: /상태|Status/i })
       .first();
-    const filterVisible = await statusFilter.isVisible({ timeout: 3000 }).catch(() => false);
+    // 필터 UI 렌더링을 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await statusFilter.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const filterVisible = await statusFilter.isVisible().catch(() => false);
 
     if (!filterVisible) {
       console.log('⚠️ 상태 필터를 찾을 수 없습니다. 테스트 스킵.');
@@ -140,16 +161,20 @@ test.describe('My Requests 페이지', () => {
   });
 
   test('정렬 기능 확인', async ({ page }) => {
-    await page.goto('/my-requests');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/my-requests', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 정렬 가능한 컬럼 헤더 찾기
     const sortableHeader = page
       .locator('th[role="columnheader"], th')
       .filter({ hasText: /생성일|우선순위|상태/ })
       .first();
-    const headerVisible = await sortableHeader.isVisible({ timeout: 3000 }).catch(() => false);
+    // 테이블 헤더 렌더링을 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await sortableHeader.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const headerVisible = await sortableHeader.isVisible().catch(() => false);
 
     if (!headerVisible) {
       console.log('⚠️ 정렬 가능한 헤더를 찾을 수 없습니다. 테스트 스킵.');
@@ -175,13 +200,17 @@ test.describe('My Requests 페이지', () => {
   });
 
   test('SR 상세 페이지 이동', async ({ page }) => {
-    await page.goto('/my-requests');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/my-requests', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 첫 번째 SR 행 찾기
     const firstRow = page.locator('tbody tr, [role="row"]').first();
-    const rowVisible = await firstRow.isVisible({ timeout: 3000 }).catch(() => false);
+    // 목록 로드를 실제로 기다린다 (SR 이 없을 수도 있으므로 판단은 아래에서)
+    await firstRow.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const rowVisible = await firstRow.isVisible().catch(() => false);
 
     if (!rowVisible) {
       console.log('⚠️ SR이 없습니다. 테스트 스킵.');

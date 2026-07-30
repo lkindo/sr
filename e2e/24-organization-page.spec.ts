@@ -5,12 +5,21 @@ import { expect, test } from '@playwright/test';
  * - 조직도 뷰 확인
  * - 고객사별 사용자 트리 구조
  * - 사용자 Drag & Drop 재배정 (구현되어 있을 경우)
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (본문/트리 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * isVisible() 은 대기하지 않으므로(timeout 옵션 무시) 조건부 요소는
+ * waitFor({ state: 'visible' }).catch(() => {}) 로 기다린 뒤 판단한다.
  */
 
 test.describe('Organization 페이지', () => {
   test('Organization 페이지 접근', async ({ page }) => {
-    await page.goto('/organization');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/organization', { waitUntil: 'domcontentloaded' });
 
     // 페이지 콘텐츠 확인
     const mainContent = page.locator('main, [role="main"]');
@@ -20,15 +29,16 @@ test.describe('Organization 페이지', () => {
   });
 
   test('조직도 트리 구조 확인', async ({ page }) => {
-    await page.goto('/organization');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/organization', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
 
     // 트리 구조 또는 카드 레이아웃 확인
     // OrganizationTree renders a list of cards with class "space-y-2" wrapper
     // We look for client card headers which contain "사용자 추가" button or client name
     const treeOrCards = page.locator('.space-y-2 > .border, .sr-card-template').first();
-    const structureVisible = await treeOrCards.isVisible({ timeout: 5000 }).catch(() => false);
+    // 조직도 데이터 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await treeOrCards.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const structureVisible = await treeOrCards.isVisible().catch(() => false);
 
     if (!structureVisible) {
       console.log('⚠️ 조직도 구조를 찾을 수 없습니다. 테스트 스킵.');
@@ -47,14 +57,15 @@ test.describe('Organization 페이지', () => {
   });
 
   test('고객사별 사용자 목록 확인', async ({ page }) => {
-    await page.goto('/organization');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/organization', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
 
     // 첫 번째 고객사 찾기
     // We assume client rows are div.border.rounded-lg
     const firstClient = page.locator('.space-y-2 > .border').first();
-    const clientVisible = await firstClient.isVisible({ timeout: 3000 }).catch(() => false);
+    // 조직도 데이터 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await firstClient.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const clientVisible = await firstClient.isVisible().catch(() => false);
 
     if (!clientVisible) {
       console.log('⚠️ 고객사를 찾을 수 없습니다. 테스트 스킵.');
@@ -86,12 +97,13 @@ test.describe('Organization 페이지', () => {
     expect(userCount).toBeGreaterThanOrEqual(0);
   });
   test('사용자 Drag & Drop 재배정 (기능 존재 시)', async ({ page }) => {
-    await page.goto('/organization');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/organization', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
 
     // 1. Ensure at least one client is expanded and has users
     const firstClient = page.locator('.space-y-2 > .border').first();
+    // 조직도 데이터 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await firstClient.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
 
     if (!(await firstClient.isVisible())) {
       console.log('⚠️ 고객사가 없습니다. 테스트 스킵');

@@ -7,6 +7,14 @@ import { expect, test } from '@playwright/test';
  * - 댓글 및 첨부파일 기본 기능
  *
  * 복잡한 다중 사용자 시나리오는 17-multi-user-collaboration.spec.ts 참조
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 test.use({ storageState: './playwright/.auth/user.json' });
@@ -25,7 +33,7 @@ test.describe('SR 워크플로우 통합', () => {
     srTitle = `통합 테스트 SR ${timestamp}`;
 
     // SR 생성
-    await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.getByRole('button', { name: '등록' }).click();
     await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible();
 
@@ -73,7 +81,11 @@ test.describe('SR 워크플로우 통합', () => {
 
     // 목록에서 SR 찾기
     // 목록 페이지로 이동 (이미 있다면 새로고침 효과)
-    await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+    // isVisible() 은 대기하지 않고 즉시 현재 상태를 반환하므로,
+    // 목록이 렌더링되기 전에 물어보면 검색 필드가 있어도 없다고 판단한다.
+    await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
     // 검색 필터가 있다면 사용하여 검색
     const searchInput = page.getByPlaceholder(/검색|Search/i);
@@ -142,7 +154,7 @@ test.describe('SR 워크플로우 통합', () => {
   });
 
   test('2. SR 상태 변경 및 댓글 작성', async ({ page }) => {
-    await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // 접수 완료 확인 (INTAKE 상태)
     const intakeStatus = page.locator('text=/접수|INTAKE/i').first();
@@ -200,8 +212,7 @@ test.describe('SR 워크플로우 통합', () => {
         await submitBtn.click();
         await page.waitForTimeout(2000);
 
-        // COMPLETED 상태 확인
-        await page.waitForLoadState('networkidle');
+        // COMPLETED 상태 확인 (아래 toBeVisible 이 자동 재시도하므로 별도 대기 불필요)
         const completedStatus = page.locator('text=/완료|COMPLETED/i').first();
         await expect(completedStatus).toBeVisible({ timeout: 5000 });
         console.log(`✅ 완료 처리 성공 (IN_PROGRESS → COMPLETED)`);
@@ -215,7 +226,7 @@ test.describe('SR 워크플로우 통합', () => {
   });
 
   test('3. 댓글 및 첨부파일 섹션 확인', async ({ page }) => {
-    await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // 댓글 섹션 확인
     const commentSection = page

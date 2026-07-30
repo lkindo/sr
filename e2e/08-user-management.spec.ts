@@ -167,29 +167,61 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('사용자 비활성/활성 상태 전환 (신규 UI)', async ({ page }) => {
-    await page.goto('/users', { waitUntil: 'domcontentloaded' });
+    // 대상은 앞 테스트가 만든 전용 계정으로 고정한다(describe 가 serial 이므로 반드시 존재한다).
+    // "첫 번째 행"에 의존하면 안 된다: /api/users 는 sortBy 미지정 시 orderBy 없이 조회하므로
+    // (src/lib/pagination.ts getPrismaOrderBy → undefined) 행 순서가 보장되지 않고,
+    // 시드 계정이 늘어나면 첫 행과 그 상태가 같이 바뀐다.
+    expect(testUserEmail, '앞선 사용자 생성 테스트에서 대상 계정이 준비되어야 함').toBeTruthy();
 
-    // 검색 등으로 대상 사용자 식별 시도 (없으면 첫 번째)
-    const firstRow = page.locator('tbody tr').first();
-    await expect(firstRow).toBeVisible();
+    // q=<이메일> 로 대상만 남기고, isActive=all 로 활성/비활성 어느 상태든 목록에 남게 한다.
+    // (기본 상태 필터는 'true' 여서 비활성으로 바꾸는 순간 행이 목록에서 사라진다.)
+    await page.goto(`/users?q=${encodeURIComponent(testUserEmail)}&isActive=all`, {
+      waitUntil: 'domcontentloaded',
+    });
 
-    // 이 사용자의 현재 상태 확인 (Badge 텍스트)
-    const statusBadge = firstRow.locator('td').last().locator('div, span').first();
-    const isCurrentlyActive = (await statusBadge.innerText()).includes('활성');
+    // 행을 이메일로 특정한다. 목록 로딩 중에는 tbody 에 '로딩 중...' 플레이스홀더 행 하나만
+    // 있는데(UserTable.tsx colSpan=7), 예전 코드는 그 행을 "첫 번째 사용자"로 잡아 상태를
+    // 잘못 읽었다. 이메일 필터는 플레이스홀더와 절대 겹치지 않아 고정 대기 없이 경합이 사라진다.
+    const targetRow = page.locator('tbody tr').filter({ hasText: testUserEmail });
+    await expect(targetRow).toBeVisible({ timeout: 15000 });
 
-    // 체크박스 클릭
-    await firstRow.locator('button').first().click();
+    // 상태 Badge 는 정확히 '활성' 또는 '비활성' 이다(UserTable.tsx:173-175).
+    // '비활성'.includes('활성') === true 이므로 부분 문자열 비교는 금지, 완전 일치로 읽는다.
+    // 상태 필터 탭에도 같은 라벨이 있어서 반드시 마지막 td(상태 열) 안으로 범위를 좁힌다.
+    const statusBadge = targetRow
+      .locator('td')
+      .last()
+      .getByText(/^(활성|비활성)$/)
+      .first();
+    await expect(statusBadge).toHaveText(/^(활성|비활성)$/, { timeout: 10000 });
+    const isCurrentlyActive = (await statusBadge.innerText()).trim() === '활성';
 
-    // 상태에 따른 버튼 선택
+    // 체크박스(행의 첫 번째 버튼) 클릭 → 일괄 작업 바로 선택 반영을 먼저 확정한다.
+    await targetRow.locator('button').first().click();
+    await expect(page.getByText('1명 선택')).toBeVisible({ timeout: 5000 });
+
+    // 1) 현재 상태의 반대 방향으로 전환
     const actionButtonText = isCurrentlyActive ? '일괄 비활성화' : '일괄 활성화';
-    const actionButton = page.locator('button').filter({ hasText: actionButtonText });
-
+    const actionButton = page.getByRole('button', { name: actionButtonText, exact: true });
     await expect(actionButton).toBeVisible({ timeout: 5000 });
     await actionButton.click();
 
-    // 토스트 메시지 대기 및 확인
-    await expect(page.locator('text=/완료|성공/')).toBeVisible({ timeout: 5000 });
+    // 토스트 메시지 대기 및 확인 (UsersClient handleToggleActive → title: '상태 변경 완료')
+    await expect(page.getByText('상태 변경 완료').first()).toBeVisible({ timeout: 5000 });
+
+    // 토스트만 믿지 않고 목록 갱신 후 상태 Badge 가 실제로 뒤집혔는지 확인한다.
+    await expect(statusBadge).toHaveText(isCurrentlyActive ? '비활성' : '활성', { timeout: 10000 });
     console.log(`✅ ADMIN: 사용자 상태 전환 확인 (${isCurrentlyActive ? '비활성화' : '활성화'})`);
+
+    // 2) 반대 버튼까지 실제로 검증하고 계정 상태를 원래대로 되돌린다.
+    // 선택은 유지되므로(selectedUserIds 는 id 기준) 일괄 작업 바가 그대로 남아 있다.
+    const revertButtonText = isCurrentlyActive ? '일괄 활성화' : '일괄 비활성화';
+    const revertButton = page.getByRole('button', { name: revertButtonText, exact: true });
+    await expect(revertButton).toBeVisible({ timeout: 10000 });
+    await revertButton.click();
+
+    await expect(statusBadge).toHaveText(isCurrentlyActive ? '활성' : '비활성', { timeout: 10000 });
+    console.log(`✅ ADMIN: 사용자 상태 원복 확인 (${isCurrentlyActive ? '활성화' : '비활성화'})`);
   });
 });
 

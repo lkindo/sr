@@ -4,12 +4,19 @@ import { expect, test } from '@playwright/test';
  * SR 필터링 및 검색 테스트
  *
  * 모든 사용자에게 SR 목록 및 필터링 기능이 제공됨
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 test.describe('SR 필터링 및 검색', () => {
   test('SR 목록 페이지 로드', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
     // SR 목록 테이블이 반드시 보여야 함
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
@@ -17,8 +24,10 @@ test.describe('SR 필터링 및 검색', () => {
   });
 
   test('검색 기능 테스트', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    // 목록이 렌더링된 뒤에 검색 필드를 탐색해야 한다.
+    // (렌더 전에 isVisible 로 확인하면 검색 필드가 있어도 없는 쪽 분기로 빠진다)
+    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
 
     // 검색 입력 필드 찾기 (다양한 셀렉터 시도)
     const searchInput = page
@@ -44,9 +53,9 @@ test.describe('SR 필터링 및 검색', () => {
   });
 
   test('상태 필터 테스트', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    // 목록 렌더링을 기다린 뒤 필터 UI 를 탐색한다 (고정 sleep 대체)
+    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
 
     // 고급 필터 버튼 찾기
     const advancedFilterButton = page
@@ -89,9 +98,9 @@ test.describe('SR 필터링 및 검색', () => {
   });
 
   test('우선순위 필터 테스트', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    // 목록 렌더링을 기다린 뒤 필터 UI 를 탐색한다 (고정 sleep 대체)
+    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
 
     // 고급 필터 버튼 찾기
     const advancedFilterButton = page
@@ -134,8 +143,8 @@ test.describe('SR 필터링 및 검색', () => {
   });
 
   test('필터 초기화 테스트', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
 
     // 고급 필터 열기
     const advancedFilterButton = page

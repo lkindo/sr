@@ -300,9 +300,13 @@ export default function UsersClient() {
                           variant="outline"
                           className="h-7 text-xs text-green-600 hover:bg-green-50"
                           onClick={() => {
+                            // handleToggleActive 는 "현재 상태"를 받아 반대로 뒤집는다.
+                            // 원하는 상태(true)를 넘기면 isActive: !true = false 가 전송되어
+                            // 비활성 사용자가 그대로 비활성으로 남는다(무동작). 단일 행 호출부
+                            // (UserActions.tsx:59)와 동일하게 u.isActive 를 넘겨야 한다.
                             selectedUsers
                               .filter((u) => !u.isActive)
-                              .forEach((u) => handleToggleActive(u.id, true));
+                              .forEach((u) => handleToggleActive(u.id, u.isActive));
                           }}
                         >
                           일괄 활성화
@@ -316,9 +320,11 @@ export default function UsersClient() {
                           variant="outline"
                           className="h-7 text-xs text-orange-600 hover:bg-orange-50"
                           onClick={() => {
+                            // 위와 동일한 이유. 원하는 상태(false)를 넘기면
+                            // isActive: !false = true 가 전송되어 활성 사용자가 활성으로 남는다.
                             selectedUsers
                               .filter((u) => u.isActive)
-                              .forEach((u) => handleToggleActive(u.id, false));
+                              .forEach((u) => handleToggleActive(u.id, u.isActive));
                           }}
                         >
                           일괄 비활성화

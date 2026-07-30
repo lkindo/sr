@@ -6,13 +6,27 @@ import { expect, test } from '@playwright/test';
  * - Profile 설정
  * - Notification 설정
  * - System 설정 (ADMIN 전용)
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (본문/입력 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * isVisible() 은 대기하지 않으므로(timeout 옵션 무시) 조건부 요소는
+ * waitFor({ state: 'visible' }).catch(() => {}) 로 기다린 뒤 판단한다.
  */
 
 test.describe('Settings 페이지', () => {
   test('Settings 메인 페이지 접근', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+    // 리디렉션 여부를 판단하기 전에 본문 렌더링을 기다린다 (고정 sleep 대체).
+    // 리디렉션 대상에 main 이 없을 수도 있으므로 실패는 무시하고 아래 URL 분기가 판단한다.
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // URL 확인 (리디렉션 가능)
     const url = page.url();
@@ -27,9 +41,11 @@ test.describe('Settings 페이지', () => {
   });
 
   test('Profile 설정 페이지 접근', async ({ page }) => {
-    await page.goto('/settings/profile');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/settings/profile', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // URL 확인
     const url = page.url();
@@ -40,13 +56,17 @@ test.describe('Settings 페이지', () => {
   });
 
   test('프로필 정보 수정', async ({ page }) => {
-    await page.goto('/settings/profile');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/settings/profile', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 이름 입력 필드 찾기
     const nameInput = page.locator('input[name="name"], input[placeholder*="이름"]').first();
-    const nameVisible = await nameInput.isVisible({ timeout: 3000 }).catch(() => false);
+    // 프로필 폼 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await nameInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const nameVisible = await nameInput.isVisible().catch(() => false);
 
     if (!nameVisible) {
       console.log('⚠️ 이름 입력 필드를 찾을 수 없습니다. 테스트 스킵.');
@@ -96,20 +116,18 @@ test.describe('Settings 페이지', () => {
   });
 
   test('비밀번호 변경 기능', async ({ page }) => {
-    await page.goto('/settings/profile');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings/profile', { waitUntil: 'domcontentloaded' });
 
     // 프로필 로딩이 완료될 때까지 기다림 (로딩 스피너가 사라지고 프로필 헤더가 나타날 때까지)
+    // 이 waitFor 가 실제 로드 대기이므로 별도의 고정 sleep 은 필요 없다.
     const profileHeader = page.locator('h1:has-text("프로필")');
     await profileHeader.waitFor({ state: 'visible', timeout: 15000 }).catch(() => null);
-
-    // 추가 대기 후 페이지 안정화
-    await page.waitForTimeout(1000);
 
     // 비밀번호 변경 관련 요소 찾기 (버튼 또는 입력 필드)
     // 보안 탭 또는 비밀번호 변경 관련 텍스트
     const securityTab = page.locator('button:has-text("보안")');
-    const securityTabVisible = await securityTab.isVisible({ timeout: 3000 }).catch(() => false);
+    await securityTab.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    const securityTabVisible = await securityTab.isVisible().catch(() => false);
 
     if (securityTabVisible) {
       console.log('✅ 보안 탭 발견 - 클릭');
@@ -118,7 +136,8 @@ test.describe('Settings 페이지', () => {
     }
 
     const passwordElements = page.locator('text=/비밀번호|Password/i').first();
-    const elementVisible = await passwordElements.isVisible({ timeout: 5000 }).catch(() => false);
+    await passwordElements.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const elementVisible = await passwordElements.isVisible().catch(() => false);
 
     if (!elementVisible) {
       console.log('⚠️ 비밀번호 관련 요소를 찾을 수 없습니다. 테스트 스킵.');
@@ -129,11 +148,15 @@ test.describe('Settings 페이지', () => {
   });
 
   test('Notification 설정 페이지 접근', async ({ page }) => {
-    await page.goto('/settings/notifications');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings/notifications', { waitUntil: 'domcontentloaded' });
 
     const mainContent = page.locator('main, [role="main"]');
-    const contentVisible = await mainContent.isVisible({ timeout: 3000 }).catch(() => false);
+    // 본문 렌더링을 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await mainContent
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
+    const contentVisible = await mainContent.isVisible().catch(() => false);
 
     if (!contentVisible) {
       console.log('⚠️ Notification 페이지를 찾을 수 없습니다. 테스트 스킵.');
@@ -146,13 +169,17 @@ test.describe('Settings 페이지', () => {
   });
 
   test('알림 설정 토글', async ({ page }) => {
-    await page.goto('/settings/notifications');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/settings/notifications', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 알림 토글 스위치 찾기
     const toggleSwitch = page.locator('input[type="checkbox"], [role="switch"]').first();
-    const switchVisible = await toggleSwitch.isVisible({ timeout: 3000 }).catch(() => false);
+    // 설정 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await toggleSwitch.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const switchVisible = await toggleSwitch.isVisible().catch(() => false);
 
     if (!switchVisible) {
       console.log('⚠️ 알림 설정 토글을 찾을 수 없습니다. 테스트 스킵.');
@@ -181,9 +208,13 @@ test.describe('Settings 페이지', () => {
   });
 
   test('System 설정 페이지 (ADMIN 전용)', async ({ page }) => {
-    await page.goto('/settings/system');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/settings/system', { waitUntil: 'domcontentloaded' });
+    // 리디렉션/차단 여부를 판단하기 전에 본문 렌더링을 기다린다 (고정 sleep 대체).
+    // 권한 차단 화면에는 main 이 없을 수도 있으므로 실패는 무시하고 아래 URL 분기가 판단한다.
+    await page
+      .locator('main')
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
 
     // 권한이 없으면 접근 차단되거나 리다이렉트될 수 있음
     const url = page.url();

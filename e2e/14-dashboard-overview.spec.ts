@@ -5,12 +5,19 @@ import { expect, test } from '@playwright/test';
  * - 기본 UI 확인
  * - Dashboard 통계 확인
  * - 빠른 액션 동작
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 test.describe('대시보드', () => {
   test('대시보드 페이지 접근', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     // 대시보드 콘텐츠가 반드시 보여야 함
     const dashboardContent = page.locator('main, [role="main"]');
@@ -19,8 +26,7 @@ test.describe('대시보드', () => {
   });
 
   test('SR 통계 카드 확인', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     // 통계 카드가 반드시 있어야 함
     const statCards = page.locator('[class*="card"], [class*="Card"]');
@@ -40,8 +46,7 @@ test.describe('대시보드', () => {
       )
       .catch(() => null);
 
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     // API 응답 대기
     const response = await statsResponsePromise;
@@ -74,8 +79,7 @@ test.describe('대시보드', () => {
   });
 
   test('통계 요소 화면 표시 확인', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     // 대시보드 메인 콘텐츠 확인
     await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
@@ -98,8 +102,10 @@ test.describe('대시보드', () => {
   });
 
   test('최근 SR 또는 활동 섹션 확인', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+
+    // 섹션 탐색 전에 대시보드 본문 렌더링을 기다린다
+    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
 
     // 최근 SR, 활동, 테이블 등 찾기
     const recentSection = page
@@ -120,8 +126,10 @@ test.describe('대시보드', () => {
   });
 
   test('빠른 액션 버튼 확인', async ({ page }) => {
-    await page.goto('/dashboard');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+
+    // 버튼 탐색 전에 대시보드 본문 렌더링을 기다린다
+    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
 
     // 빠른 액션 버튼 찾기
     const quickActions = page

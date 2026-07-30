@@ -11,6 +11,16 @@ import path from 'path';
  * 4. MANAGER: HIGH → CRITICAL 긴급 에스컬레이션
  * 5. ENGINEER B: 에스컬레이션된 SR 확인 및 처리
  * 6. 예상 시간 초과 시뮬레이션 (선택)
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 조건부 UI 를 탐색하는 자리(존재하지 않아도 통과해야 하는 분기)에서는
+ * waitFor({ state: 'visible' }).catch(() => {}) 로 기다린다. isVisible() 은 대기하지 않는다.
  */
 
 const authFiles = {
@@ -37,7 +47,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // SR 생성 버튼 클릭
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
@@ -82,18 +92,19 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       await page.waitForTimeout(3000);
 
       // 목록에서 생성된 SR 찾기
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
 
       // SR이 목록에 보이지 않으면 여러 번 새로고침 시도
       let retryCount = 0;
-      while (!(await srRow.isVisible({ timeout: 3000 }).catch(() => false)) && retryCount < 3) {
+      while (!(await srRow.isVisible().catch(() => false)) && retryCount < 3) {
         console.log(`⚠️ SR이 목록에 없음. 새로고침 시도 ${retryCount + 1}/3`);
-        await page.reload();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1000);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        // 고정 sleep 대신 목록이 다시 그려졌는지를 기다린다
+        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+        await srRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         retryCount++;
       }
 
@@ -160,10 +171,10 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 담당자 재배정 UI 찾기
       // 1) 수정 버튼으로 접수 페이지 재진입
@@ -182,8 +193,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
       // URL이 intake가 아니면 직접 이동
       if (!page.url().includes('/intake')) {
-        await page.goto(`/srs/${srId}/intake`);
-        await page.waitForLoadState('networkidle');
+        await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded' });
       }
 
       // 담당자 변경
@@ -193,7 +203,11 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         .locator('..')
         .locator('[role="combobox"]');
 
-      if (await assigneeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // 접수 폼 렌더링을 기다린다. 권한/상태에 따라 폼이 없을 수도 있으므로
+      // 실패는 아래 분기가 판단한다 (기존 tolerant 동작 유지).
+      await assigneeSelect.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+      if (await assigneeSelect.isVisible().catch(() => false)) {
         await assigneeSelect.click();
         await page.waitForTimeout(500);
 
@@ -239,7 +253,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
     try {
       // 접수 페이지로 이동
-      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 우선순위 변경: HIGH
       const prioritySelect = page
@@ -248,7 +262,10 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         .locator('..')
         .locator('[role="combobox"]');
 
-      if (await prioritySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // 접수 폼 렌더링 대기 (없을 수도 있으므로 판단은 아래 분기에 맡긴다)
+      await prioritySelect.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+      if (await prioritySelect.isVisible().catch(() => false)) {
         await prioritySelect.click();
         await page
           .getByRole('option', { name: /높음|HIGH/i })
@@ -268,11 +285,11 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         console.log(`✅ 우선순위 상향 조정 완료: LOW → HIGH`);
 
         // 상세 페이지에서 우선순위 확인
-        await page.goto(`/srs/${srId}`);
-        await page.waitForLoadState('networkidle');
+        await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded' });
 
         const priorityBadge = page.locator('text=/높음|HIGH/i').first();
-        if (await priorityBadge.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await priorityBadge.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await priorityBadge.isVisible().catch(() => false)) {
           await expect(priorityBadge).toBeVisible();
           console.log(`✅ 우선순위 HIGH 확인 완료`);
         }
@@ -290,7 +307,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
     try {
       // 접수 페이지로 이동
-      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 우선순위 변경: CRITICAL
       const prioritySelect = page
@@ -299,7 +316,10 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         .locator('..')
         .locator('[role="combobox"]');
 
-      if (await prioritySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // 접수 폼 렌더링 대기 (없을 수도 있으므로 판단은 아래 분기에 맡긴다)
+      await prioritySelect.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+      if (await prioritySelect.isVisible().catch(() => false)) {
         await prioritySelect.click();
         await page
           .getByRole('option', { name: /긴급|CRITICAL/i })
@@ -325,11 +345,11 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         console.log(`✅ 긴급 에스컬레이션 완료: HIGH → CRITICAL`);
 
         // 상세 페이지에서 우선순위 확인
-        await page.goto(`/srs/${srId}`);
-        await page.waitForLoadState('networkidle');
+        await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded' });
 
         const priorityBadge = page.locator('text=/긴급|CRITICAL/i').first();
-        if (await priorityBadge.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await priorityBadge.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await priorityBadge.isVisible().catch(() => false)) {
           await expect(priorityBadge).toBeVisible();
           console.log(`✅ 우선순위 CRITICAL 확인 완료`);
         }
@@ -347,7 +367,8 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
     try {
       // SR 목록 페이지로 이동
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
       // CRITICAL 우선순위 SR 필터링 (있다면)
       const filterButton = page.getByRole('button', { name: /필터|Filter/i });
