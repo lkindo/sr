@@ -6,6 +6,14 @@ import path from 'path';
  *
  * ADMIN/MANAGER: 사용자 CRUD 전체 권한
  * CLIENT: 읽기 전용 (사용자 페이지 접근 불가 또는 제한)
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 const authFiles = {
@@ -25,8 +33,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   let testUserName: string;
 
   test('사용자 목록 페이지 접근', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // ADMIN은 사용자 목록 테이블이 보여야 함
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
@@ -34,8 +41,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('사용자 검색 기능', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // 검색 입력 필드가 있어야 함
     const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]').first();
@@ -48,8 +54,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('사용자 등록 버튼이 보여야 함', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // ADMIN은 사용자 등록 버튼이 반드시 보여야 함
     const createButton = page
@@ -61,8 +66,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('사용자 생성 전체 플로우', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // 등록 버튼 클릭
     const createButton = page
@@ -116,14 +120,13 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
     await page.waitForTimeout(2000);
 
     // 목록 새로고침 및 확인
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // 생성된 사용자 확인 (재시도 로직)
     let userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first();
     for (let retry = 0; retry < 3; retry++) {
       if (await userRow.isVisible({ timeout: 3000 }).catch(() => false)) break;
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
       userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first();
     }
 
@@ -132,8 +135,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('역할 관리 플로우 (신규 UI)', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // 첫 번째 사용자 선택 (체크박스 클릭)
     const firstRow = page.locator('tbody tr').first();
@@ -165,8 +167,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('사용자 비활성/활성 상태 전환 (신규 UI)', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // 검색 등으로 대상 사용자 식별 시도 (없으면 첫 번째)
     const firstRow = page.locator('tbody tr').first();
@@ -199,8 +200,17 @@ test.describe('사용자 관리 - CLIENT 권한', () => {
   test.use({ storageState: authFiles.client });
 
   test('사용자 목록 페이지 접근 제한 확인', async ({ page }) => {
-    await page.goto('/users');
-    await page.waitForLoadState('networkidle');
+    // 아래 분기 판정은 관용적(isVisible 프로브)이므로, 화면이 확정되기 전에 프로브하면
+    // 어떤 분기도 타지 않고 조용히 통과한다. 그래서 목록 API 응답(403 이든 200 이든)까지
+    // 기다린다. 응답이 오지 않는 경우(클라이언트 리다이렉트 등)는 null 로 흘려 보낸다.
+    const usersApiResponse = page
+      .waitForResponse(
+        (resp) => resp.url().includes('/api/users') && resp.request().method() === 'GET',
+        { timeout: 15000 }
+      )
+      .catch(() => null);
+    await page.goto('/users', { waitUntil: 'domcontentloaded' });
+    await usersApiResponse;
 
     // CLIENT는 사용자 페이지에 접근 제한될 수 있음
     // 1) 403/Unauthorized 페이지 표시

@@ -300,10 +300,22 @@ test.describe('역할 할당 UI 테스트', () => {
     // src/components/users/UserTable.tsx 의 isSystemTeam 분기 검증.
     // 이 분기가 사라지면 ADMIN 계정에도 '고객사 할당' 드롭다운이 노출되어
     // 서버가 막고 있는 상호 배타성 규칙을 UI 가 유도하게 된다.
+    // networkidle 은 쓰지 않는다: 로그인 상태의 모든 페이지가 루트 레이아웃
+    // (src/app/layout.tsx → ClientLayout → RealtimeProvider → use-realtime-status.ts)에서
+    // /api/realtime SSE 스트림을 계속 열어 두므로 "네트워크 유휴" 상태가 오지 않고
+    // goto 가 항상 30초 뒤 타임아웃난다. 내비게이션은 domcontentloaded 로 확정하고,
+    // 실제로 필요한 목록 데이터는 GET /api/users 응답으로 기다린다.
+    const usersApiResponse = page
+      .waitForResponse(
+        (resp) => resp.url().includes('/api/users') && resp.request().method() === 'GET',
+        { timeout: 20000 }
+      )
+      .catch(() => null);
     await page.goto('/users?q=admin%40example.com', {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
+    await usersApiResponse;
 
     const table = page.locator('table');
     await expect(table).toBeVisible({ timeout: 15000 });

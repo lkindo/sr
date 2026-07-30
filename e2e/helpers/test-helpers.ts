@@ -14,6 +14,15 @@ import {
  * E2E 테스트 헬퍼 함수
  *
  * 재사용 가능한 테스트 유틸리티를 제공하여 안정적이고 유지보수하기 쉬운 테스트 작성을 지원합니다.
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건이 영원히
+ * 성립하지 않으므로 waitForLoadState('networkidle') / waitUntil: 'networkidle' 은
+ * 항상 타임아웃난다(비인증 페이지에서만 우연히 통과한다).
+ * 대기는 항상 (1) load / domcontentloaded 같은 확정 가능한 로드 상태나
+ * (2) 실제로 필요한 응답·요소(expect().toBeVisible() 는 자동 재시도)로 표현한다.
  */
 
 /**
@@ -23,8 +32,10 @@ import {
  */
 export async function checkA11y(page: Page, name: string): Promise<void> {
   console.log(`♿ Accessibility Check: ${name}`);
-  // 타임아웃을 넉넉히 주어 복잡한 페이지 로드 대기
-  await page.waitForLoadState('networkidle');
+  // 'load' 를 쓴다: networkidle 은 SSE 때문에 절대 발생하지 않아 인증된 페이지에서
+  // 무조건 30초 타임아웃이었다. 'load' 는 async 청크 실행까지 포함하므로
+  // axe 가 빈 DOM 을 검사해 위반 0건으로 통과하는 일도 막는다.
+  await page.waitForLoadState('load');
   const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
 
   if (accessibilityScanResults.violations.length > 0) {
@@ -386,7 +397,7 @@ export async function gotoAndWaitForData(
   url: string,
   apiPattern?: string | RegExp
 ): Promise<void> {
-  const navigatePromise = page.goto(url, { waitUntil: 'networkidle' });
+  const navigatePromise = page.goto(url, { waitUntil: 'domcontentloaded' });
 
   if (apiPattern) {
     const apiPromise = waitForAPIResponse(page, apiPattern, 'GET', { timeout: 15000 });
@@ -478,7 +489,7 @@ export async function createAndIntakeSR(
 
   // Step 2: MANAGER로 접수 처리
   await withAuthContext(browser, 'manager', async (page) => {
-    await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // 접수 폼이 실제로 렌더링되어야 한다. (권한이 없거나 상태가 맞지 않으면 여기서 실패)
     await expect(
@@ -569,7 +580,7 @@ export async function changeSRStatus(
   action: SRStatusAction,
   options?: { reason?: string; resolutionDescription?: string }
 ): Promise<void> {
-  await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
   const trigger = page.getByRole('button', { name: SR_ACTION_TRIGGERS[action] });
 
