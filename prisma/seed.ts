@@ -105,8 +105,50 @@ const roles = [
 ];
 
 /**
+ * 역할에 기본 권한을 부여한다.
+ *
+ * **기본 동작은 비파괴다.** 해당 역할에 이미 권한이 하나라도 배정되어 있으면 손대지 않는다.
+ *
+ * 이유: 이 시드는 컨테이너가 뜰 때마다 실행된다(`docker-entrypoint.sh`). 예전처럼
+ * `deleteMany` + `createMany` 로 매번 초기화하면, 운영자가 `/roles` 화면
+ * (`PermissionBoard`)에서 조정한 권한이 **배포·재시작마다 조용히 되돌아간다.**
+ * 감사 3.2 가 지적한 "무조건 reseed 가 운영자의 변경을 무효화한다"와 같은 종류의 사고다.
+ *
+ * 기본값으로 되돌리고 싶으면 `SEED_FORCE_ROLE_PERMISSIONS=true` 로 명시한다
+ * (로컬 개발 초기화용. 프로덕션 부팅 경로에서는 설정하지 않는다).
+ */
+async function assignRolePermissions(
+  roleName: string,
+  permissionIds: string[],
+  roleId: string
+): Promise<void> {
+  const force = process.env.SEED_FORCE_ROLE_PERMISSIONS === 'true';
+  const existingCount = await prisma.rolePermission.count({ where: { roleId } });
+
+  if (existingCount > 0 && !force) {
+    console.log(
+      `${roleName} 역할에 이미 권한 ${existingCount}개가 배정되어 있어 그대로 둡니다. ` +
+        '(기본값으로 되돌리려면 SEED_FORCE_ROLE_PERMISSIONS=true)'
+    );
+    return;
+  }
+
+  if (force && existingCount > 0) {
+    await prisma.rolePermission.deleteMany({ where: { roleId } });
+  }
+
+  await prisma.rolePermission.createMany({
+    data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+    skipDuplicates: true,
+  });
+  console.log(`Assigned ${permissionIds.length} permissions to ${roleName} role`);
+}
+
+/**
  * 기준 데이터(권한/역할/역할-권한 매핑) 시딩.
- * 멱등하며 사용자 데이터를 건드리지 않으므로 프로덕션에서도 안전하게 실행할 수 있다.
+ *
+ * 멱등하며 사용자 데이터를 건드리지 않으므로 프로덕션 부팅 시에도 안전하게 실행할 수 있다.
+ * 역할-권한은 **이미 배정된 역할을 덮어쓰지 않는다**(`assignRolePermissions` 참고).
  */
 async function seedReferenceData() {
   // Create permissions
@@ -145,19 +187,11 @@ async function seedReferenceData() {
   if (adminRole) {
     const allPermissions = await prisma.permission.findMany();
 
-    // Delete existing role permissions
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: adminRole.id },
-    });
-
-    // Create new role permissions
-    await prisma.rolePermission.createMany({
-      data: allPermissions.map((permission) => ({
-        roleId: adminRole.id,
-        permissionId: permission.id,
-      })),
-    });
-    console.log(`Assigned ${allPermissions.length} permissions to ADMIN role`);
+    await assignRolePermissions(
+      'ADMIN',
+      allPermissions.map((permission) => permission.id),
+      adminRole.id
+    );
   }
 
   // Assign permissions to MANAGER role
@@ -180,18 +214,11 @@ async function seedReferenceData() {
         ],
       },
     });
-
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: managerRole.id },
-    });
-
-    await prisma.rolePermission.createMany({
-      data: managerPermissions.map((permission) => ({
-        roleId: managerRole.id,
-        permissionId: permission.id,
-      })),
-    });
-    console.log(`Assigned ${managerPermissions.length} permissions to MANAGER role`);
+    await assignRolePermissions(
+      'MANAGER',
+      managerPermissions.map((permission) => permission.id),
+      managerRole.id
+    );
   }
 
   // Assign permissions to ENGINEER role
@@ -213,18 +240,11 @@ async function seedReferenceData() {
         ],
       },
     });
-
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: engineerRole.id },
-    });
-
-    await prisma.rolePermission.createMany({
-      data: engineerPermissions.map((permission) => ({
-        roleId: engineerRole.id,
-        permissionId: permission.id,
-      })),
-    });
-    console.log(`Assigned ${engineerPermissions.length} permissions to ENGINEER role`);
+    await assignRolePermissions(
+      'ENGINEER',
+      engineerPermissions.map((permission) => permission.id),
+      engineerRole.id
+    );
   }
 
   // Assign permissions to CLIENT_ADMIN role
@@ -247,18 +267,11 @@ async function seedReferenceData() {
         ],
       },
     });
-
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: clientAdminRole.id },
-    });
-
-    await prisma.rolePermission.createMany({
-      data: clientAdminPermissions.map((permission) => ({
-        roleId: clientAdminRole.id,
-        permissionId: permission.id,
-      })),
-    });
-    console.log(`Assigned ${clientAdminPermissions.length} permissions to CLIENT_ADMIN role`);
+    await assignRolePermissions(
+      'CLIENT_ADMIN',
+      clientAdminPermissions.map((permission) => permission.id),
+      clientAdminRole.id
+    );
   }
 
   // Assign permissions to CLIENT_USER role
@@ -279,18 +292,11 @@ async function seedReferenceData() {
         ],
       },
     });
-
-    await prisma.rolePermission.deleteMany({
-      where: { roleId: clientUserRole.id },
-    });
-
-    await prisma.rolePermission.createMany({
-      data: clientUserPermissions.map((permission) => ({
-        roleId: clientUserRole.id,
-        permissionId: permission.id,
-      })),
-    });
-    console.log(`Assigned ${clientUserPermissions.length} permissions to CLIENT_USER role`);
+    await assignRolePermissions(
+      'CLIENT_USER',
+      clientUserPermissions.map((permission) => permission.id),
+      clientUserRole.id
+    );
   }
 }
 
