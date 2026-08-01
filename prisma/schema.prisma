@@ -56,6 +56,8 @@ model User {
 
   @@index([email])
   @@index([isActive])
+  // SR 검색이 요청자·담당자 이름으로도 조인 검색한다(감사 4.2).
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_name_trgm_idx")
   @@map("users")
 }
 
@@ -143,6 +145,9 @@ model Client {
   @@index([name])
   @@index([code])
   @@index([isActive])
+  // SR 검색이 고객사명으로도 조인 검색한다(감사 4.2).
+  // 위 `@@index([name])` 과 기본 이름이 겹치므로 map 을 명시한다.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "clients_name_trgm_idx")
   @@map("clients")
 }
 
@@ -303,6 +308,10 @@ model SR {
   @@index([createdAt(sort: Desc)])
   @@index([clientId, createdAt(sort: Desc)])
   @@index([assigneeId, createdAt(sort: Desc)])
+  // 검색용 pg_trgm GIN 인덱스 (감사 4.2).
+  // 목록 검색은 앵커 없는 ILIKE '%term%' 이라 B-tree 를 쓸 수 없어 전부 순차 스캔이었다.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "srs_title_trgm_idx")
+  @@index([srNumber(ops: raw("gin_trgm_ops"))], type: Gin, map: "srs_sr_number_trgm_idx")
   @@map("srs")
 }
 
