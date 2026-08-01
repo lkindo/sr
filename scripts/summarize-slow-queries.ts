@@ -49,7 +49,7 @@ function percentile(nums: number[], p: number): number {
   if (nums.length === 0) return 0;
   const arr = nums.slice().sort((a, b) => a - b);
   const idx = Math.ceil((p / 100) * arr.length) - 1;
-  return arr[Math.max(0, Math.min(idx, arr.length - 1))];
+  return arr[Math.max(0, Math.min(idx, arr.length - 1))] ?? 0;
 }
 
 main();

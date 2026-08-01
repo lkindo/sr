@@ -303,7 +303,7 @@ describe('UserService Coverage', () => {
       );
 
       expect(result.data).toHaveLength(1);
-      expect(result.data[0].id).toBe('u1');
+      expect(result.data[0]!.id).toBe('u1');
     });
 
     it('filters by UserType ENGINEER', async () => {
@@ -324,7 +324,7 @@ describe('UserService Coverage', () => {
       );
 
       expect(result.data).toHaveLength(1);
-      expect(result.data[0].id).toBe('u2');
+      expect(result.data[0]!.id).toBe('u2');
     });
   });
 
@@ -366,7 +366,7 @@ describe('UserService Coverage', () => {
       const result = await userService.getUsersWithSRHandlingPermission();
       expect(result).toHaveLength(1);
 
-      const where = (vi.mocked(prisma.user.findMany).mock.calls[0][0] as any).where;
+      const where = (vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any).where;
       expect(where.isActive).toBe(true);
       // 역할 축: 내부 역할만 담당자가 될 수 있다.
       expect(where.roles.some.role.name.in).toEqual(['ADMIN', 'MANAGER', 'ENGINEER']);
@@ -378,7 +378,7 @@ describe('UserService Coverage', () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([] as any);
       await userService.getUsersWithSRHandlingPermission();
 
-      const where = (vi.mocked(prisma.user.findMany).mock.calls[0][0] as any).where;
+      const where = (vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any).where;
       const permissions = requestedPermissions(where);
 
       expect(permissions).toEqual([
@@ -516,7 +516,7 @@ describe('UserService Coverage', () => {
       it('권한 축도 살아있다: ENGINEER 에게서 SR:UPDATE 를 회수하면 제외된다', async () => {
         const stripped = {
           ...ROLE_PERMISSIONS,
-          ENGINEER: ROLE_PERMISSIONS.ENGINEER.filter((perm) => perm !== 'SR:UPDATE'),
+          ENGINEER: ROLE_PERMISSIONS.ENGINEER!.filter((perm) => perm !== 'SR:UPDATE'),
         };
         const ids = await assignableIds(stripped);
         expect(ids).not.toContain('u-engineer');

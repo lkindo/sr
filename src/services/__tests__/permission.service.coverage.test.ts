@@ -63,7 +63,7 @@ describe('PermissionService Coverage', () => {
       ] as any);
       const roles = await permissionService.getUserRoles('u1');
       expect(roles).toHaveLength(1);
-      expect(roles[0].name).toBe('ADMIN');
+      expect(roles[0]!.name).toBe('ADMIN');
       expect(prisma.userRole.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: 'u1' },
@@ -115,7 +115,7 @@ describe('PermissionService Coverage', () => {
 
       const permissions = await permissionService.getUserPermissions('u1');
       expect(permissions).toHaveLength(1);
-      expect(permissions[0].id).toBe('p1');
+      expect(permissions[0]!.id).toBe('p1');
     });
   });
 
@@ -162,7 +162,7 @@ describe('PermissionService Coverage', () => {
 
       const result = await permissionService.getUsersWithPermissions(['SR:CREATE', 'SR:READ']);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('u1');
+      expect(result[0]!.id).toBe('u1');
 
       // Verify that the query was constructed correctly (optional, but good for coverage)
       expect(prisma.user.findMany).toHaveBeenCalledWith(

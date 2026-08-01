@@ -102,7 +102,7 @@ describe('API Route Security: /api/srs', () => {
     await (GET as any)(req, { session: mockSession });
 
     // Assert: clientId filter should be undefined (no restriction)
-    const callArgs = mocks.getAllSRs.mock.calls[0][0];
+    const callArgs = mocks.getAllSRs.mock.calls[0]![0];
     const where = callArgs.where || {};
     expect(where.clientId).toBeUndefined();
   });

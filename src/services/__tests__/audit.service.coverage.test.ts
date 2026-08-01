@@ -70,7 +70,7 @@ describe('AuditService.createLog', () => {
     });
 
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
-    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0][0] as any;
+    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0]![0] as any;
     expect(callArg.data.changes).toEqual({ field: 'value', n: 42 });
     // not the raw string
     expect(typeof callArg.data.changes).toBe('object');
@@ -85,7 +85,7 @@ describe('AuditService.createLog', () => {
       changes: invalid,
     });
 
-    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0][0] as any;
+    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0]![0] as any;
     expect(callArg.data.changes).toBe(invalid);
   });
 
@@ -96,7 +96,7 @@ describe('AuditService.createLog', () => {
       changes: { removed: true },
     });
 
-    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0][0] as any;
+    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0]![0] as any;
     expect(callArg.data.userId).toBeNull();
     expect(callArg.data.targetId).toBeNull();
     expect(callArg.data.ipAddress).toBeNull();
@@ -181,7 +181,7 @@ describe('AuditService.createLog', () => {
       })
     ).rejects.toThrow('fail');
 
-    const ctx = vi.mocked(logger.error).mock.calls[0][2] as any;
+    const ctx = vi.mocked(logger.error).mock.calls[0]![2] as any;
     expect(ctx.targetId).toBeUndefined();
   });
 });

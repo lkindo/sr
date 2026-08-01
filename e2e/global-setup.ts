@@ -10,7 +10,7 @@ async function globalSetup(config: FullConfig) {
 
   try {
     // 개발 서버 URL
-    const baseURL = config.projects[0].use.baseURL || 'http://localhost:3000';
+    const baseURL = config.projects[0]?.use.baseURL || 'http://localhost:3000';
 
     // 로그인 페이지로 이동
     await page.goto(`${baseURL}/login`);

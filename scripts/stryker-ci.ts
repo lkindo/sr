@@ -45,7 +45,7 @@ const GLOB_ESCAPES: Record<string, string> = {
 };
 
 function escapeGlob(filePath: string): string {
-  return filePath.replace(/[[\]*?{}()]/g, (ch) => GLOB_ESCAPES[ch]);
+  return filePath.replace(/[[\]*?{}()]/g, (ch) => GLOB_ESCAPES[ch] ?? ch);
 }
 
 /**

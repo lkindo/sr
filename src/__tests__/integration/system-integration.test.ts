@@ -69,10 +69,10 @@ describe('Integration Tests', () => {
       activities.push({ type: 'STATUS_CHANGED', from: 'INTAKE', to: 'IN_PROGRESS' });
 
       expect(activities).toHaveLength(2);
-      expect(activities[0].from).toBe('REQUESTED');
-      expect(activities[0].to).toBe('INTAKE');
-      expect(activities[1].from).toBe('INTAKE');
-      expect(activities[1].to).toBe('IN_PROGRESS');
+      expect(activities[0]!.from).toBe('REQUESTED');
+      expect(activities[0]!.to).toBe('INTAKE');
+      expect(activities[1]!.from).toBe('INTAKE');
+      expect(activities[1]!.to).toBe('IN_PROGRESS');
     });
   });
 

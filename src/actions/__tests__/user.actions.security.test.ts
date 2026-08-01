@@ -193,7 +193,7 @@ describe('User Actions Security', () => {
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('SR:UPDATE');
       if (result.success) {
         expect(result.data).toHaveLength(1);
-        expect(result.data[0].email).toBe('handler@example.com');
+        expect(result.data[0]!.email).toBe('handler@example.com');
       }
     });
   });

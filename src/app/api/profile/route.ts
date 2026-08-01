@@ -4,7 +4,12 @@ import { z } from 'zod';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
+import {
+  firstZodIssueMessage,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/errors';
 import prisma from '@/lib/prisma';
 
 const updateProfileSchema = z.object({
@@ -76,7 +81,7 @@ export const PATCH = withAuthAndRateLimit(
       validated = updateProfileSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(error));
       }
       throw error;
     }

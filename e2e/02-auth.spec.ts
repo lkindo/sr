@@ -105,9 +105,9 @@ test.describe('인증 플로우', () => {
     const errorAlerts = await page.locator('[role="alert"]').all();
     console.log(`총 ${errorAlerts.length}개의 alert 발견`);
 
-    for (let i = 0; i < errorAlerts.length; i++) {
-      const text = await errorAlerts[i].textContent();
-      const classes = await errorAlerts[i].getAttribute('class');
+    for (const [i, alert] of errorAlerts.entries()) {
+      const text = await alert.textContent();
+      const classes = await alert.getAttribute('class');
       console.log(`Alert ${i + 1}:`, text?.substring(0, 100), 'Classes:', classes);
     }
 

@@ -144,7 +144,7 @@ describe('SRsDataTable Pagination', () => {
     fireEvent.click(nextBtn);
 
     expect(mockRouter.push).toHaveBeenCalled();
-    const callArg = mockRouter.push.mock.calls[0][0];
+    const callArg = mockRouter.push.mock.calls[0]![0];
     expect(callArg).toContain('page=2');
   });
 

@@ -39,7 +39,7 @@ describe('serialization utility', () => {
       const date = new Date('2025-01-01T12:00:00Z');
       const input = [{ d: date }, { d: date }];
       const result = serializeMany(input);
-      expect(result[0].d).toBe(date.toISOString());
+      expect(result[0]!.d).toBe(date.toISOString());
     });
 
     // Prisma BigInt 컬럼(SRAttachment.fileSize) 은 JSON.stringify 가 TypeError 를 던지므로
@@ -62,9 +62,9 @@ describe('serialization utility', () => {
       };
 
       const result = serializeResponse(input);
-      expect(result.attachments[0].fileSize).toBe(1024);
-      expect(result.attachments[0].createdAt).toBe(date.toISOString());
-      expect(result.attachments[1].fileSize).toBe(10 * 1024 * 1024);
+      expect(result.attachments[0]!.fileSize).toBe(1024);
+      expect(result.attachments[0]!.createdAt).toBe(date.toISOString());
+      expect(result.attachments[1]!.fileSize).toBe(10 * 1024 * 1024);
       expect(result.meta.totalSize).toBe(10485760);
       // 변환 후에는 JSON.stringify 가 더 이상 throw 하지 않아야 한다.
       expect(() => JSON.stringify(result)).not.toThrow();

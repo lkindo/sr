@@ -141,7 +141,7 @@ export function useEditSRForm({
     setStatus(sr.status);
     setRequestedCompletionDate(
       sr.requestedCompletionDate
-        ? new Date(sr.requestedCompletionDate).toISOString().split('T')[0]
+        ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
         : ''
     );
     setFiles([]);

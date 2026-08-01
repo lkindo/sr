@@ -170,7 +170,7 @@ describe('PushService', () => {
 
       const results = await pushService.sendToUser('u1', { title: 'T', body: 'B' });
       expect(results).toHaveLength(1);
-      expect(results[0].statusCode).toBe(201);
+      expect(results[0]!.statusCode).toBe(201);
     });
 
     it('removes invalid subscription on 410 error', async () => {

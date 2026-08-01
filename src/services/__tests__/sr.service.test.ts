@@ -656,6 +656,8 @@ describe('SRService', () => {
           if (typeof callback === 'function') {
             return await callback(prisma);
           }
+          // 배열 형태 $transaction 은 이 테스트가 쓰지 않는다.
+          throw new Error('배열 형태 $transaction 은 이 목이 지원하지 않습니다.');
         });
       });
 
@@ -873,7 +875,7 @@ describe('SRService', () => {
         clientAdmin
       );
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.title).toBe('변경된 제목');
       // 동일 값 재전송은 no-op 이므로 값이 바뀌지 않는다.
       expect(updateData.actualPriority).toBe('MEDIUM');
@@ -892,7 +894,7 @@ describe('SRService', () => {
         clientUser
       );
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.title).toBe('새 제목입니다');
       expect(updateData.description).toBe('새 설명입니다. 충분히 깁니다.');
       expect(updateData.satisfactionRating).toBe(5);
@@ -924,7 +926,7 @@ describe('SRService', () => {
         managerUser
       );
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.actualPriority).toBe('CRITICAL');
       expect(updateData.estimatedHours).toBe(12);
       expect(updateData.estimatedCompletionDate).toBeInstanceOf(Date);
@@ -939,7 +941,7 @@ describe('SRService', () => {
 
       await srService.updateSR('sr-1', { intakeNotes: '관리자 메모' }, adminUser);
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.intakeNotes).toBe('관리자 메모');
     });
   });
@@ -1048,7 +1050,7 @@ describe('SRService', () => {
 
       await srService.updateSR('sr-1', { assigneeId: 'eng-2' }, managerUser);
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.assigneeId).toBe('eng-2');
       expect(updateData.activities?.create).toEqual(
         expect.arrayContaining([expect.objectContaining({ type: 'ASSIGNED' })])
@@ -1059,7 +1061,7 @@ describe('SRService', () => {
       await srService.updateSR('sr-1', { assignedToId: null }, managerUser);
 
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.assigneeId).toBeNull();
     });
   });

@@ -55,7 +55,7 @@ describe('GET /api/srs/my-requests', () => {
   it('페이지네이션 없이도 take/skip 을 걸어 전체 이력을 힙에 올리지 않는다', async () => {
     await call();
 
-    const args = mocks.findMany.mock.calls[0][0];
+    const args = mocks.findMany.mock.calls[0]![0];
     expect(args.take).toBe(20);
     expect(args.skip).toBe(0);
   });
@@ -63,7 +63,7 @@ describe('GET /api/srs/my-requests', () => {
   it('page/pageSize 를 반영한다', async () => {
     await call('?page=3&pageSize=50');
 
-    const args = mocks.findMany.mock.calls[0][0];
+    const args = mocks.findMany.mock.calls[0]![0];
     expect(args.skip).toBe(100);
     expect(args.take).toBe(50);
   });
@@ -72,13 +72,13 @@ describe('GET /api/srs/my-requests', () => {
     await call('?pageSize=100000');
 
     // 상한을 넘는 값은 스키마가 기본값으로 되돌린다 — 무제한 조회는 불가능해야 한다.
-    expect(mocks.findMany.mock.calls[0][0].take).toBeLessThanOrEqual(100);
+    expect(mocks.findMany.mock.calls[0]![0].take).toBeLessThanOrEqual(100);
   });
 
   it('무제한 TEXT 인 description 을 select 하지 않는다', async () => {
     await call();
 
-    const select = mocks.findMany.mock.calls[0][0].select;
+    const select = mocks.findMany.mock.calls[0]![0].select;
     expect(select.description).toBeUndefined();
     expect(select.title).toBe(true);
   });
@@ -97,13 +97,13 @@ describe('GET /api/srs/my-requests', () => {
   it('요청자 본인의 SR 로만 범위를 제한한다', async () => {
     await call();
 
-    expect(mocks.findMany.mock.calls[0][0].where).toEqual({ requesterId: 'user-1' });
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({ requesterId: 'user-1' });
   });
 
   it('유효한 상태 필터를 where 에 반영한다', async () => {
     await call('?status=IN_PROGRESS');
 
-    expect(mocks.findMany.mock.calls[0][0].where).toEqual({
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
       requesterId: 'user-1',
       status: 'IN_PROGRESS',
     });
@@ -112,7 +112,7 @@ describe('GET /api/srs/my-requests', () => {
   it('알 수 없는 상태 값은 필터로 쓰지 않는다', async () => {
     await call('?status=NOT_A_STATUS');
 
-    expect(mocks.findMany.mock.calls[0][0].where).toEqual({ requesterId: 'user-1' });
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({ requesterId: 'user-1' });
   });
 
   it.each(['client', 'constructor', '__proto__', 'toString'])(
@@ -120,14 +120,14 @@ describe('GET /api/srs/my-requests', () => {
     async (sortBy) => {
       await call(`?sortBy=${encodeURIComponent(sortBy)}`);
 
-      expect(mocks.findMany.mock.calls[0][0].orderBy).toEqual({ createdAt: 'desc' });
+      expect(mocks.findMany.mock.calls[0]![0].orderBy).toEqual({ createdAt: 'desc' });
     }
   );
 
   it('허용된 sortBy 는 그대로 사용한다', async () => {
     await call('?sortBy=updatedAt');
 
-    expect(mocks.findMany.mock.calls[0][0].orderBy).toEqual({ updatedAt: 'desc' });
+    expect(mocks.findMany.mock.calls[0]![0].orderBy).toEqual({ updatedAt: 'desc' });
   });
 
   it('통계는 현재 페이지가 아니라 요청자 전체 SR 기준으로 집계한다', async () => {

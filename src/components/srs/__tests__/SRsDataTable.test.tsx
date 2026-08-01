@@ -136,7 +136,7 @@ describe('SRsDataTable Search Component', () => {
 
     // Should verify router.push was called to remove 'search' param
     expect(mockRouter.push).toHaveBeenCalled();
-    const callArg = mockRouter.push.mock.calls[0][0];
+    const callArg = mockRouter.push.mock.calls[0]![0];
     expect(callArg).toContain('page=1');
     expect(callArg).not.toContain('search=existing');
   });

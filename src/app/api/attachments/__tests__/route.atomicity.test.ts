@@ -131,7 +131,7 @@ describe('POST /api/attachments — 단일 업로드', () => {
     expect(mocks.txAttachmentCreate).toHaveBeenCalledTimes(1);
     expect(mocks.txAttachmentUpdate).toHaveBeenCalledTimes(1);
     expect(mocks.txActivityCreate).toHaveBeenCalledTimes(1);
-    expect(mocks.txActivityCreate.mock.calls[0][0].data.type).toBe('ATTACHMENT_ADDED');
+    expect(mocks.txActivityCreate.mock.calls[0]![0].data.type).toBe('ATTACHMENT_ADDED');
   });
 
   it('트랜잭션이 실패하면 이미 올라간 blob 을 되돌린다', async () => {
@@ -176,7 +176,7 @@ describe('DELETE /api/attachments/[id]', () => {
     // 예전 순서(blob 먼저)에서는 행 삭제가 실패하면 없는 파일을 가리키는 행이 남았다.
     expect(order).toEqual(['tx', 'deleteBlob']);
     expect(mocks.txAttachmentDelete).toHaveBeenCalledTimes(1);
-    expect(mocks.txActivityCreate.mock.calls[0][0].data.type).toBe('ATTACHMENT_REMOVED');
+    expect(mocks.txActivityCreate.mock.calls[0]![0].data.type).toBe('ATTACHMENT_REMOVED');
   });
 
   it('커밋 후 blob 삭제가 실패해도 요청은 성공한다', async () => {

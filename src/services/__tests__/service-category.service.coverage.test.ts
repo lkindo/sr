@@ -107,7 +107,7 @@ describe('ServiceCategoryService', () => {
 
       await service.getForSelection();
 
-      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0][0];
+      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0];
       expect(call?.where).toEqual({ isActive: true });
     });
 
@@ -119,7 +119,7 @@ describe('ServiceCategoryService', () => {
       // 해당 고객사 전용 + 전역(clientId=null) 카테고리를 함께 돌려준다.
       // 정확히 일치만 걸면 전역 카테고리만 있는 신규 고객사의 선택지가 0개가 된다.
       // (SRService.ensureCategoryBelongsToClient 가 허용하는 범위와 동일)
-      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0][0];
+      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0];
       expect(call?.where).toEqual({
         isActive: true,
         OR: [{ clientId: 'client-9' }, { clientId: null }],
@@ -131,7 +131,7 @@ describe('ServiceCategoryService', () => {
 
       await service.getForSelection('client-9');
 
-      const where = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0][0]?.where as {
+      const where = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0]?.where as {
         OR?: { clientId: string | null }[];
       };
       const allowed = (where.OR ?? []).map((c) => c.clientId);
@@ -145,7 +145,7 @@ describe('ServiceCategoryService', () => {
 
       await service.getAllWithStats();
 
-      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0][0];
+      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0];
       expect(call?.include).toHaveProperty('_count');
     });
   });

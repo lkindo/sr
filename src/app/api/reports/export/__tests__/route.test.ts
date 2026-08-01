@@ -148,14 +148,14 @@ describe('GET /api/reports/export', () => {
 
     await call();
 
-    expect(mocks.getAllSRs.mock.calls[0][0].where).toEqual({ assigneeId: 'eng-1' });
+    expect(mocks.getAllSRs.mock.calls[0]![0].where).toEqual({ assigneeId: 'eng-1' });
   });
 
   it('ADMIN 은 전체를 대상으로 한다', async () => {
     seedRows(1);
     await call();
 
-    expect(mocks.getAllSRs.mock.calls[0][0].where).toEqual({});
+    expect(mocks.getAllSRs.mock.calls[0]![0].where).toEqual({});
   });
 
   it('권한 없는 역할은 403', async () => {

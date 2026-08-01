@@ -5,7 +5,12 @@ import { z } from 'zod';
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SECURITY } from '@/lib/constants';
-import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
+import {
+  firstZodIssueMessage,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import { passwordSchema } from '@/lib/schemas';
 
@@ -34,7 +39,7 @@ export const POST = withAuthAndRateLimit(
       validated = changePasswordSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(error));
       }
       throw error;
     }

@@ -100,7 +100,7 @@ describe('PushService', () => {
       await pushService.sendForEvent('SR_CREATED', userIds, payload);
 
       expect(sendToUsersSpy).toHaveBeenCalled();
-      const calledUids = sendToUsersSpy.mock.calls[0][0];
+      const calledUids = sendToUsersSpy.mock.calls[0]![0];
       expect(calledUids).toContain('user-2');
       expect(calledUids).not.toContain('user-1');
     });
@@ -117,7 +117,7 @@ describe('PushService', () => {
       // SR_CREATED default is true
       await pushService.sendForEvent('SR_CREATED', userIds, payload);
       expect(sendToUsersSpy).toHaveBeenCalled();
-      expect(sendToUsersSpy.mock.calls[0][0]).toContain('user-3');
+      expect(sendToUsersSpy.mock.calls[0]![0]).toContain('user-3');
 
       // SR_STATUS_CHANGED default is false
       sendToUsersSpy.mockClear();

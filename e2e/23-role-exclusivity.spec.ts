@@ -135,7 +135,7 @@ test.describe('역할 상호 배타성 테스트', () => {
       '고객사 픽스처가 없으면 "고객사 할당 여부"에 따른 규칙을 검증할 수 없습니다. ' +
         'prisma/seed.ts 의 TEST001/TEST002 고객사를 먼저 생성하세요.'
     ).toBeGreaterThan(0);
-    testClientId = clients[0].id;
+    testClientId = clients[0]!.id;
 
     // 테스트 전용 사용자 생성 (역할/고객사 모두 없는 상태로 시작)
     // 주의: /api/auth/register 라우트는 존재하지 않는다. 사용자 생성은 POST /api/users 뿐이다.

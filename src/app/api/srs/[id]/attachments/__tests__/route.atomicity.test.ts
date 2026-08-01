@@ -136,7 +136,7 @@ describe('POST /api/srs/[id]/attachments — 배치 업로드', () => {
 
     // 예전에는 이 경로만 활동 로그가 없어 배치 업로드가 감사 추적에서 통째로 빠졌다.
     expect(mocks.txActivityCreateMany).toHaveBeenCalledTimes(1);
-    const rows = mocks.txActivityCreateMany.mock.calls[0][0].data;
+    const rows = mocks.txActivityCreateMany.mock.calls[0]![0].data;
     expect(rows).toHaveLength(2);
     expect(rows.every((r: any) => r.type === 'ATTACHMENT_ADDED')).toBe(true);
     expect(rows.map((r: any) => r.description)).toEqual(['파일 추가: a.txt', '파일 추가: b.txt']);

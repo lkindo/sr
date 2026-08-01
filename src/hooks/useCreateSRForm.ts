@@ -110,8 +110,9 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
   }, [open, isClientUser, fetchClients]);
 
   useEffect(() => {
-    if (open && isClientUser && clients.length > 0 && !clientId) {
-      setClientId(clients[0].id);
+    const firstClient = clients[0];
+    if (open && isClientUser && firstClient && !clientId) {
+      setClientId(firstClient.id);
     }
   }, [open, isClientUser, clients, clientId]);
 

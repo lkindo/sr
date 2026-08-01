@@ -147,7 +147,7 @@ describe('SRService.updateSR Branches', () => {
     await srService.updateSR('sr-1', { clientId: 'own-c' }, externalUser);
 
     expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { id: 'own-c' } });
-    expect(vi.mocked(txMock.sR.update).mock.calls[0][0].data.clientId).toBe('own-c');
+    expect(vi.mocked(txMock.sR.update).mock.calls[0]![0].data.clientId).toBe('own-c');
   });
 
   it('타 고객사 전용 서비스 카테고리로 변경하면 ForbiddenError', async () => {
@@ -217,7 +217,7 @@ describe('SRService.updateSR Branches', () => {
 
     await srService.updateSR('sr-1', { actualPriority: 'CRITICAL' }, internalUser);
 
-    const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+    const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
     expect(updateData.dueDate).toBeDefined();
     // 24 * 0.5 = 12 hours added to intakeAt
     expect(updateData.dueDate.toISOString()).toBe('2023-10-10T12:00:00.000Z');
@@ -275,7 +275,7 @@ describe('SRService.updateSR Branches', () => {
         externalUser
       );
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.title).toBe('수정된 제목');
       expect(updateData.description).toBe('수정된 설명입니다.');
       // 운영 전용 필드는 요청에 없었으므로 그대로 남는다.
@@ -322,7 +322,7 @@ describe('SRService.updateSR Branches', () => {
 
       await srService.updateSR('sr-1', { assigneeId: 'eng-2' }, internalUser);
 
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.assigneeId).toBe('eng-2');
     });
   });

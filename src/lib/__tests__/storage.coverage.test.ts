@@ -168,12 +168,12 @@ describe('uploadAttachmentBlob', () => {
     const result = await uploadAttachmentBlob('sr-100', file);
 
     expect(mockMkdir).toHaveBeenCalledTimes(1);
-    const mkdirArg = mockMkdir.mock.calls[0][0] as string;
+    const mkdirArg = mockMkdir.mock.calls[0]![0] as string;
     expect(mkdirArg).toBe(path.join(resolvedStorageRoot, 'attachments', 'sr-100'));
-    expect(mockMkdir.mock.calls[0][1]).toEqual({ recursive: true });
+    expect(mockMkdir.mock.calls[0]![1]).toEqual({ recursive: true });
 
     expect(mockWriteFile).toHaveBeenCalledTimes(1);
-    const writeBuf = mockWriteFile.mock.calls[0][1] as Buffer;
+    const writeBuf = mockWriteFile.mock.calls[0]![1] as Buffer;
     expect(Buffer.isBuffer(writeBuf)).toBe(true);
     expect(Array.from(writeBuf)).toEqual([1, 2, 3]);
 
@@ -214,7 +214,7 @@ describe('uploadAttachmentBlob', () => {
     const result = await uploadAttachmentBlob('../../evil', file);
     // path.basename('../../evil') === 'evil'
     expect(result.pathname).toMatch(/^attachments\/evil\/\d+-doc\.txt$/);
-    const mkdirArg = mockMkdir.mock.calls[0][0] as string;
+    const mkdirArg = mockMkdir.mock.calls[0]![0] as string;
     expect(mkdirArg).toBe(path.join(resolvedStorageRoot, 'attachments', 'evil'));
   });
 
@@ -282,7 +282,7 @@ describe('deleteAttachmentBlob', () => {
 
     await expect(deleteAttachmentBlob(rel)).resolves.toBeUndefined();
     expect(mockLogger.error).toHaveBeenCalled();
-    const errArg = mockLogger.error.mock.calls[0][1];
+    const errArg = mockLogger.error.mock.calls[0]![1];
     expect(errArg).toBeInstanceOf(Error);
   });
 
@@ -294,7 +294,7 @@ describe('deleteAttachmentBlob', () => {
 
     await expect(deleteAttachmentBlob(rel)).resolves.toBeUndefined();
     expect(mockLogger.error).toHaveBeenCalled();
-    expect(mockLogger.error.mock.calls[0][1]).toBeUndefined();
+    expect(mockLogger.error.mock.calls[0]![1]).toBeUndefined();
   });
 });
 

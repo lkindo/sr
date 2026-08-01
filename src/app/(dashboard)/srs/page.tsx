@@ -19,6 +19,26 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
 // 페이지 번호 상한 (과도한 OFFSET으로 인한 DB 부하 방지)
 const MAX_PAGE = 10000;
 
+/**
+ * 이 화면이 제공하는 정렬 필드. 관계형 3개는 아래에서 중첩 객체로 따로 처리한다.
+ */
+const SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'srNumber',
+  'title',
+  'status',
+  'actualPriority',
+  'requestedPriority',
+  'dueDate',
+  'completedAt',
+  'client',
+  'requester',
+  'assignee',
+] as const;
+
+type SortableField = (typeof SORTABLE_FIELDS)[number];
+
 export default async function SRsPage({ searchParams }: Props) {
   const resolvedSearchParams = (await searchParams) || {};
 
@@ -35,7 +55,13 @@ export default async function SRsPage({ searchParams }: Props) {
   const page = Math.min(parsedPagination.page, MAX_PAGE);
   const itemsPerPage = parsedPagination.pageSize;
   const sort = getSearchParam(resolvedSearchParams.sort) ?? 'createdAt.desc';
-  const [sortField, sortOrder] = sort.split('.');
+  const [rawSortField, sortOrder] = sort.split('.');
+  // 임의의 컬럼명이 그대로 Prisma orderBy 로 들어가면 정렬 순서가 오라클이 된다
+  // (감사 4.1 이 API 경로에서 지적한 것과 같은 결함이 이 SSR 페이지에도 있었다).
+  // 화면이 실제로 제공하는 정렬만 허용하고, 나머지는 기본값으로 떨어뜨린다.
+  const sortField = SORTABLE_FIELDS.includes(rawSortField as SortableField)
+    ? (rawSortField as SortableField)
+    : 'createdAt';
 
   const status = getSearchParam(resolvedSearchParams.status);
   const priority = getSearchParam(resolvedSearchParams.priority);
@@ -135,7 +161,7 @@ export default async function SRsPage({ searchParams }: Props) {
       return { assignee: { name: order } };
     }
 
-    // 일반 필드는 직접 정렬
+    // 일반 필드는 직접 정렬(위 allowlist 를 통과한 값만 도달한다)
     return { [sortField]: order } as Prisma.SROrderByWithRelationInput;
   };
 

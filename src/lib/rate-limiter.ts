@@ -166,6 +166,7 @@ export class MemoryRateLimiter {
       for (let i = 0; i < sampleSize; i++) {
         const randomIndex = Math.floor(Math.random() * keys.length);
         const randomKey = keys[randomIndex];
+        if (!randomKey) continue;
         const bucket = this.buckets.get(randomKey);
         if (bucket && now - bucket.lastRefill >= this.config.windowMs) {
           this.buckets.delete(randomKey);
@@ -327,7 +328,7 @@ export function getClientIp(headers: { get(name: string): string | null }): stri
       .filter(Boolean);
     if (parts.length > 0) {
       // 신뢰 프록시가 추가한 "마지막" 항목이 실제 클라이언트 IP다.
-      return parts[parts.length - 1];
+      return parts[parts.length - 1] ?? 'unknown';
     }
   }
 

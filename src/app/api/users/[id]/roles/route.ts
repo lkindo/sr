@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { firstZodIssueMessage, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 
 const roleAssignSchema = z.object({
@@ -32,7 +32,7 @@ export const POST = withAuthAndRateLimit(
       validated = roleAssignSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(error));
       }
       throw error;
     }

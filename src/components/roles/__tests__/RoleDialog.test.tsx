@@ -98,7 +98,7 @@ describe('RoleDialog Component', () => {
     await waitFor(() => {
       expect(createRoleAction).toHaveBeenCalled();
       // FormData 검증
-      const calledFormData = vi.mocked(createRoleAction).mock.calls[0][0];
+      const calledFormData = vi.mocked(createRoleAction).mock.calls[0]![0];
       expect(calledFormData.get('name')).toBe('NEW_ROLE');
       expect(calledFormData.get('description')).toBe('Description');
 
@@ -133,7 +133,7 @@ describe('RoleDialog Component', () => {
 
     await waitFor(() => {
       expect(updateRoleAction).toHaveBeenCalledWith('r1', expect.any(FormData));
-      const calledFormData = vi.mocked(updateRoleAction).mock.calls[0][1];
+      const calledFormData = vi.mocked(updateRoleAction).mock.calls[0]![1];
       expect(calledFormData.get('name')).toBe('ADMIN');
       expect(calledFormData.get('description')).toBe('Updated description');
 

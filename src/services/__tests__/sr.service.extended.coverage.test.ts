@@ -174,6 +174,8 @@ describe('SRService Extended Branches', () => {
         if (typeof callback === 'function') {
           return await callback(prisma);
         }
+        // 배열 형태 $transaction 은 이 테스트가 쓰지 않는다.
+        throw new Error('배열 형태 $transaction 은 이 목이 지원하지 않습니다.');
       });
     });
 
@@ -230,7 +232,7 @@ describe('SRService Extended Branches', () => {
         { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as any
       );
 
-      let updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      let updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.expectedCompletionDate).toBeInstanceOf(Date);
       expect(updateData.estimatedHours).toBe(12.5);
       expect(updateData.assigneeId).toBe('a2');
@@ -245,7 +247,7 @@ describe('SRService Extended Branches', () => {
         { id: 'u1' } as any
       );
 
-      updateData = vi.mocked(txMock.sR.update).mock.calls[1][0].data;
+      updateData = vi.mocked(txMock.sR.update).mock.calls[1]![0].data;
       // (두 번째 호출은 운영 소유 필드를 바꾸지 않으므로 역할 제약과 무관하다)
       expect(updateData.expectedCompletionDate).toBeNull();
       expect(updateData.intakeNotes).toBeNull();
@@ -281,7 +283,7 @@ describe('SRService Extended Branches', () => {
         permissions: [],
         clientIds: [],
       } as any);
-      const updateData = vi.mocked(txMock.sR.update).mock.calls[0][0].data;
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.dueDate).toBeInstanceOf(Date);
     });
   });

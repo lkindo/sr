@@ -17,6 +17,8 @@ function FilePreview({ file }: { file: File }) {
       return () => URL.revokeObjectURL(url);
     }
     setPreview(null);
+    // 이미지가 아니면 해제할 objectURL 이 없다(noImplicitReturns).
+    return undefined;
   }, [file]);
 
   if (preview) {

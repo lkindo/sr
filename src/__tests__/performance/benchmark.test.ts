@@ -71,8 +71,8 @@ describe('Performance Benchmarks', () => {
 
       // 5,000개 항목 정렬이 30ms 이내에 완료되어야 함
       expect(duration).toBeLessThan(30);
-      expect(sorted[0].createdAt.getTime()).toBeGreaterThan(
-        sorted[sorted.length - 1].createdAt.getTime()
+      expect(sorted[0]!.createdAt.getTime()).toBeGreaterThan(
+        sorted[sorted.length - 1]!.createdAt.getTime()
       );
     });
   });

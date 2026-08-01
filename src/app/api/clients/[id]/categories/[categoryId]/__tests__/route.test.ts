@@ -95,7 +95,7 @@ describe('PATCH/DELETE /api/clients/[id]/categories/[categoryId]', () => {
   it('바디의 clientId 는 무시한다 (카테고리를 타 고객사로 옮길 수 없다)', async () => {
     await patch({ categoryName: 'x', clientId: 'other-client' });
 
-    const passed = mocks.update.mock.calls[0][1];
+    const passed = mocks.update.mock.calls[0]![1];
     expect(passed.clientId).toBeUndefined();
   });
 

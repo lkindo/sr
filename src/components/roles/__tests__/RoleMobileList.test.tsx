@@ -80,15 +80,15 @@ describe('RoleMobileList Component', () => {
     );
 
     const editButtons = screen.getAllByText('수정');
-    fireEvent.click(editButtons[0]);
+    fireEvent.click(editButtons[0]!);
     expect(onEdit).toHaveBeenCalledWith(mockRoles[0]);
 
     const permButtons = screen.getAllByText('권한');
-    fireEvent.click(permButtons[1]);
+    fireEvent.click(permButtons[1]!);
     expect(onManagePermissions).toHaveBeenCalledWith(mockRoles[1]);
 
     const deleteButtons = screen.getAllByText('삭제');
-    fireEvent.click(deleteButtons[1]);
+    fireEvent.click(deleteButtons[1]!);
     expect(onDelete).toHaveBeenCalledWith(mockRoles[1]);
   });
 

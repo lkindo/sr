@@ -124,8 +124,8 @@ export function PermissionBoard({ open, onOpenChange, role, onSaved }: Permissio
         return;
       }
 
-      if (!groups[p.resource]) groups[p.resource] = [];
-      groups[p.resource].push(p);
+      const bucket = (groups[p.resource] ??= []);
+      bucket.push(p);
     });
 
     return groups;

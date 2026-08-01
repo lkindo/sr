@@ -210,9 +210,9 @@ export default function ProfilePage() {
   const initials =
     profile.name
       ?.split(' ')
-      .map((n) => n[0])
+      .map((n) => n[0] ?? '')
       .join('')
-      .toUpperCase() || profile.email[0].toUpperCase();
+      .toUpperCase() || (profile.email[0] ?? '?').toUpperCase();
 
   return (
     <div className="space-y-6">

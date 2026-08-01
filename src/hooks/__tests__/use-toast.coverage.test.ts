@@ -26,12 +26,12 @@ describe('use-toast reducer', () => {
 
     const afterFirst = reducer({ toasts: [] }, { type: 'ADD_TOAST', toast: a });
     expect(afterFirst.toasts).toHaveLength(1);
-    expect(afterFirst.toasts[0].id).toBe('a');
+    expect(afterFirst.toasts[0]!.id).toBe('a');
 
     // adding a second one keeps only newest due to TOAST_LIMIT
     const afterSecond = reducer(afterFirst, { type: 'ADD_TOAST', toast: b });
     expect(afterSecond.toasts).toHaveLength(1);
-    expect(afterSecond.toasts[0].id).toBe('b');
+    expect(afterSecond.toasts[0]!.id).toBe('b');
   });
 
   it('UPDATE_TOAST는 일치하는 id만 갱신하고 다른 토스트는 유지한다', async () => {
@@ -56,7 +56,7 @@ describe('use-toast reducer', () => {
     const state = { toasts: [{ id: 'd', title: 'D', open: true } as any] };
 
     const dismissed = reducer(state, { type: 'DISMISS_TOAST', toastId: 'd' });
-    expect(dismissed.toasts[0].open).toBe(false);
+    expect(dismissed.toasts[0]!.open).toBe(false);
 
     // The remove queue was scheduled; advancing timers triggers REMOVE_TOAST via dispatch.
     act(() => {
@@ -89,7 +89,7 @@ describe('use-toast reducer', () => {
 
     const removedOne = reducer(state, { type: 'REMOVE_TOAST', toastId: 'r1' });
     expect(removedOne.toasts).toHaveLength(1);
-    expect(removedOne.toasts[0].id).toBe('r2');
+    expect(removedOne.toasts[0]!.id).toBe('r2');
 
     const removedAll = reducer(state, { type: 'REMOVE_TOAST', toastId: undefined });
     expect(removedAll.toasts).toHaveLength(0);
@@ -108,20 +108,20 @@ describe('toast() helper and useToast hook', () => {
 
     expect(handle?.id).toBeTruthy();
     expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0].title).toBe('제목');
-    expect(result.current.toasts[0].open).toBe(true);
+    expect(result.current.toasts[0]!.title).toBe('제목');
+    expect(result.current.toasts[0]!.open).toBe(true);
 
     // update via returned helper
     act(() => {
       handle?.update({ id: handle.id, title: '수정된 제목' } as any);
     });
-    expect(result.current.toasts[0].title).toBe('수정된 제목');
+    expect(result.current.toasts[0]!.title).toBe('수정된 제목');
 
     // dismiss via returned helper
     act(() => {
       handle?.dismiss();
     });
-    expect(result.current.toasts[0].open).toBe(false);
+    expect(result.current.toasts[0]!.open).toBe(false);
   });
 
   it('onOpenChange(false)는 dismiss를 호출하여 토스트를 닫는다', async () => {
@@ -131,20 +131,20 @@ describe('toast() helper and useToast hook', () => {
     act(() => {
       toast({ title: 'open-change' });
     });
-    expect(result.current.toasts[0].open).toBe(true);
+    expect(result.current.toasts[0]!.open).toBe(true);
 
     act(() => {
       const onOpenChange = (result.current.toasts[0] as any).onOpenChange;
       onOpenChange(false);
     });
-    expect(result.current.toasts[0].open).toBe(false);
+    expect(result.current.toasts[0]!.open).toBe(false);
 
     // open=true branch should be a no-op
     act(() => {
       const onOpenChange = (result.current.toasts[0] as any).onOpenChange;
       onOpenChange(true);
     });
-    expect(result.current.toasts[0].open).toBe(false);
+    expect(result.current.toasts[0]!.open).toBe(false);
   });
 
   it('dismiss 후 TOAST_REMOVE_DELAY가 지나면 토스트가 제거된다', async () => {
@@ -160,7 +160,7 @@ describe('toast() helper and useToast hook', () => {
     act(() => {
       result.current.dismiss(id);
     });
-    expect(result.current.toasts[0].open).toBe(false);
+    expect(result.current.toasts[0]!.open).toBe(false);
 
     act(() => {
       vi.runAllTimers();

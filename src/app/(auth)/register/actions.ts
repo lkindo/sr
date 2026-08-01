@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { requireRateLimit } from '@/lib/action-helpers';
 import { SECURITY } from '@/lib/constants';
+import { firstZodIssueMessage } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import { UserService } from '@/services/user.service';
 
@@ -130,7 +131,7 @@ export async function registerUser(formData: FormData) {
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: error.issues?.[0].message,
+        error: firstZodIssueMessage(error),
       };
     }
 

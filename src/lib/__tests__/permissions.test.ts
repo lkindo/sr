@@ -155,7 +155,7 @@ describe('permissions utility', () => {
         action: 'CREATE',
         description: 'Create SR',
       });
-      expect(result[1].description).toBeUndefined();
+      expect(result[1]!.description).toBeUndefined();
     });
   });
 

@@ -185,7 +185,14 @@ export class SRService {
         RETURNING "seq"
       `;
 
-      const sequenceSeq = sequences[0].seq;
+      // RETURNING 이 있는 INSERT ... ON CONFLICT DO UPDATE 는 정상 경로에서 반드시 한 행을
+      // 돌려주지만, 타입은 그것을 보장하지 않는다. 빈 배열을 그냥 인덱싱하면
+      // `undefined.seq` 로 죽으면서 원인을 알 수 없는 500 이 되므로, 무슨 일이 있었는지
+      // 말해 주는 오류로 바꾼다(트랜잭션은 어차피 롤백된다).
+      const sequenceSeq = sequences[0]?.seq;
+      if (sequenceSeq === undefined) {
+        throw new Error(`SR 번호 채번에 실패했습니다. (date=${dateStr})`);
+      }
       const srNumber = `SR-${dateStr}-${String(sequenceSeq).padStart(4, '0')}`;
 
       // SR 생성
@@ -914,7 +921,7 @@ export class SRService {
 
     const hasMore = activities.length > limit;
     const items = hasMore ? activities.slice(0, limit) : activities;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return { activities: items, nextCursor };
   }
@@ -955,7 +962,7 @@ export class SRService {
 
     const hasMore = comments.length > limit;
     const items = hasMore ? comments.slice(0, limit) : comments;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return { comments: items, nextCursor };
   }

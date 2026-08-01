@@ -23,23 +23,23 @@ describe('useToast', () => {
 
     const afterAdd = reducer({ toasts: [] }, { type: 'ADD_TOAST', toast: toastA });
     expect(afterAdd.toasts).toHaveLength(1);
-    expect(afterAdd.toasts[0].id).toBe('a');
+    expect(afterAdd.toasts[0]!.id).toBe('a');
 
     const limited = reducer(afterAdd, { type: 'ADD_TOAST', toast: toastB });
     expect(limited.toasts).toHaveLength(1);
-    expect(limited.toasts[0].id).toBe('b');
+    expect(limited.toasts[0]!.id).toBe('b');
 
     const afterUpdate = reducer(limited, {
       type: 'UPDATE_TOAST',
       toast: { id: 'b', title: 'B updated' },
     });
-    expect(afterUpdate.toasts[0].title).toBe('B updated');
+    expect(afterUpdate.toasts[0]!.title).toBe('B updated');
 
     const afterDismiss = reducer(afterUpdate, {
       type: 'DISMISS_TOAST',
       toastId: 'b',
     });
-    expect(afterDismiss.toasts[0].open).toBe(false);
+    expect(afterDismiss.toasts[0]!.open).toBe(false);
 
     const afterRemove = reducer(afterDismiss, { type: 'REMOVE_TOAST', toastId: 'b' });
     expect(afterRemove.toasts).toHaveLength(0);
@@ -56,13 +56,13 @@ describe('useToast', () => {
     });
 
     expect(result.current.toasts).toHaveLength(1);
-    expect(result.current.toasts[0].title).toBe('알림');
-    expect(result.current.toasts[0].open).toBe(true);
+    expect(result.current.toasts[0]!.title).toBe('알림');
+    expect(result.current.toasts[0]!.open).toBe(true);
 
     act(() => {
       result.current.dismiss(createdId);
     });
 
-    expect(result.current.toasts[0].open).toBe(false);
+    expect(result.current.toasts[0]!.open).toBe(false);
   });
 });

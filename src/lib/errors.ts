@@ -222,3 +222,21 @@ export function errorToResult(error: unknown): { success: false; error: string; 
     code: 'UNKNOWN_ERROR',
   };
 }
+
+/**
+ * ZodError 에서 사용자에게 보여 줄 첫 메시지를 꺼낸다.
+ *
+ * 13곳이 `error.issues[0].message` 를 직접 읽고 있었다. Zod 는 실패 시 항상 최소 한 건의
+ * issue 를 담지만 **타입은 그것을 보장하지 않으므로**, `noUncheckedIndexedAccess` 를 켜면
+ * 전부 `Object is possibly 'undefined'` 가 된다. 각 자리에 `?.` 를 뿌리면 폴백 문구가
+ * 제각각이 되므로(실제로 일부는 폴백이 있고 일부는 없었다) 한 곳으로 모은다.
+ *
+ * issue 가 비어 있는 경우는 Zod 사용법이 잘못된 것에 가깝지만, 사용자에게 빈 문자열이
+ * 가는 것보다는 일반 문구가 낫다.
+ */
+export function firstZodIssueMessage(
+  error: { issues?: Array<{ message?: string }> },
+  fallback = '입력값 검증에 실패했습니다.'
+): string {
+  return error.issues?.[0]?.message || fallback;
+}

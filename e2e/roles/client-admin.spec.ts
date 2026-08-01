@@ -137,7 +137,7 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
       ).toBe(1);
 
       selfUserId = user.id;
-      ownClientId = user.clientIds[0];
+      ownClientId = user.clientIds[0]!;
       expect(selfUserId, 'CLIENT_ADMIN 세션에서 사용자 ID를 얻지 못했습니다.').toBeTruthy();
     } finally {
       await clientAdminContext.close();
@@ -192,8 +192,8 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
     const existingOtherSrs = ((await otherSrsResponse.json()) as Paginated<SrListItem>).data ?? [];
 
     if (existingOtherSrs.length > 0) {
-      otherTenantSrId = existingOtherSrs[0].id;
-      otherTenantSrNumber = existingOtherSrs[0].srNumber;
+      otherTenantSrId = existingOtherSrs[0]!.id;
+      otherTenantSrNumber = existingOtherSrs[0]!.srNumber;
     } else {
       const categoriesResponse = await apiRequestWithRateLimitRetry(
         managerRequest,
@@ -220,7 +220,7 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
             title: `타 테넌트 격리 검증용 SR ${Date.now()}`,
             description: 'CLIENT_ADMIN 테넌트 경계 검증을 위해 MANAGER 가 생성한 SR 입니다.',
             clientId: otherClientId,
-            serviceCategoryId: categories[0].id,
+            serviceCategoryId: categories[0]!.id,
             requestedPriority: 'MEDIUM',
           },
         }

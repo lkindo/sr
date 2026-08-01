@@ -66,6 +66,7 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
     if (!files || files.length === 0) return;
 
     const file = files[0];
+    if (!file) return;
 
     // 파일 크기 검증 (10MB)
     if (file.size > 10 * 1024 * 1024) {

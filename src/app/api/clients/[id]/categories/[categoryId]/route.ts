@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { firstZodIssueMessage, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanUpdateClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serviceCategoryUpdateSchema } from '@/lib/schemas';
@@ -69,7 +69,7 @@ export const PATCH = withAuthAndRateLimit(
     } catch (error) {
       if (error instanceof Error && 'issues' in error) {
         const zodError = error as { issues: Array<{ message: string }> };
-        throw new ValidationError(zodError.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(zodError));
       }
       throw error;
     }

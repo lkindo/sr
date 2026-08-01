@@ -116,7 +116,7 @@ describe('client.actions coverage', () => {
       const result = await createClientAction(fd);
 
       expect(result.success).toBe(true);
-      const arg = mockClientService.createClient.mock.calls[0][0];
+      const arg = mockClientService.createClient.mock.calls[0]![0];
       expect(arg.industry).toBeUndefined();
       expect(arg.contactEmail).toBeUndefined();
     });

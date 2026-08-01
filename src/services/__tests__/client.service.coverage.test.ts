@@ -83,7 +83,7 @@ describe('ClientService Coverage', () => {
       vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
       await clientService.getClientDetailsById('c1');
 
-      const args = vi.mocked(prisma.client.findUnique).mock.calls[0][0] as any;
+      const args = vi.mocked(prisma.client.findUnique).mock.calls[0]![0] as any;
       const srs = args.include.srs;
 
       // `srs: true`(전체 행 덤프)가 아니라 옵션 객체여야 한다.
@@ -103,7 +103,7 @@ describe('ClientService Coverage', () => {
       vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
       await clientService.getClientDetailsById('c1');
 
-      const args = vi.mocked(prisma.client.findUnique).mock.calls[0][0] as any;
+      const args = vi.mocked(prisma.client.findUnique).mock.calls[0]![0] as any;
       const selectedKeys = Object.keys(args.include.srs.select);
 
       const sensitiveKeys = [

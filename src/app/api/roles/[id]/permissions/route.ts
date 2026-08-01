@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError, ValidationError } from '@/lib/errors';
+import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanUpdateRole } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
@@ -25,7 +25,7 @@ export const POST = withAuthAndRateLimit(
       validated = permissionAssignSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(error));
       }
       throw error;
     }

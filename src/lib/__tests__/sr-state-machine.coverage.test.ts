@@ -368,10 +368,10 @@ describe('validateTransition - ordering of checks', () => {
 
 describe('TRANSITION_ROLES table integrity', () => {
   it('every role-mapped transition is also a valid flow transition', () => {
-    for (const from of Object.keys(TRANSITION_ROLES)) {
-      for (const to of Object.keys(TRANSITION_ROLES[from])) {
+    for (const [from, toMap] of Object.entries(TRANSITION_ROLES)) {
+      for (const [to, allowedRoles] of Object.entries(toMap)) {
         expect(VALID_TRANSITIONS[from as SRStatus]).toContain(to);
-        expect(TRANSITION_ROLES[from][to].length).toBeGreaterThan(0);
+        expect(allowedRoles.length).toBeGreaterThan(0);
       }
     }
   });

@@ -7,7 +7,7 @@ import { headers } from 'next/headers';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
-import { TooManyRequestsError, UnauthorizedError } from '@/lib/errors';
+import { firstZodIssueMessage, TooManyRequestsError, UnauthorizedError } from '@/lib/errors';
 import { getClientIp, rateLimiters } from '@/lib/rate-limiter';
 import { fail, Result } from '@/lib/result';
 import { PermissionService } from '@/services/permission.service';
@@ -52,7 +52,7 @@ export function validateWithSchema<T>(data: unknown, schema: z.ZodSchema<T>): Re
     return { success: true, data: validated };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return fail(error.issues?.[0].message || '입력값 검증에 실패했습니다.', 'VALIDATION_ERROR');
+      return fail(firstZodIssueMessage(error, '입력값 검증에 실패했습니다.'), 'VALIDATION_ERROR');
     }
     throw error;
   }
@@ -64,7 +64,7 @@ export function validateWithSchema<T>(data: unknown, schema: z.ZodSchema<T>): Re
 export function withActionErrorHandling<T>(action: () => Promise<Result<T>>): Promise<Result<T>> {
   return action().catch((error) => {
     if (error instanceof z.ZodError) {
-      return fail(error.issues?.[0].message || '입력값 검증에 실패했습니다.', 'VALIDATION_ERROR');
+      return fail(firstZodIssueMessage(error, '입력값 검증에 실패했습니다.'), 'VALIDATION_ERROR');
     }
     throw error;
   });

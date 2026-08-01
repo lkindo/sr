@@ -202,8 +202,8 @@ describe('CreateSRDialog Component', () => {
     });
 
     const selects = screen.getAllByTestId('mock-select');
-    fireEvent.change(selects[0], { target: { value: 'client-1' } }); // Client
-    fireEvent.change(selects[1], { target: { value: 'cat-1' } }); // Category
+    fireEvent.change(selects[0]!, { target: { value: 'client-1' } }); // Client
+    fireEvent.change(selects[1]!, { target: { value: 'cat-1' } }); // Category
 
     fireEvent.submit(screen.getByTestId('sr-form'));
 
@@ -233,8 +233,8 @@ describe('CreateSRDialog Component', () => {
     });
 
     const selects = screen.getAllByTestId('mock-select');
-    fireEvent.change(selects[0], { target: { value: 'client-1' } });
-    fireEvent.change(selects[1], { target: { value: 'cat-1' } });
+    fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
+    fireEvent.change(selects[1]!, { target: { value: 'cat-1' } });
 
     fireEvent.submit(screen.getByTestId('sr-form'));
 
@@ -277,7 +277,7 @@ describe('CreateSRDialog Component', () => {
     fireEvent.change(descInput, { target: { value: 'This is a valid description.' } });
     // Don't select a client, but select a category
     const selects = screen.getAllByTestId('mock-select');
-    fireEvent.change(selects[1], { target: { value: 'cat-1' } });
+    fireEvent.change(selects[1]!, { target: { value: 'cat-1' } });
 
     fireEvent.submit(screen.getByTestId('sr-form'));
 
@@ -300,7 +300,7 @@ describe('CreateSRDialog Component', () => {
     fireEvent.change(descInput, { target: { value: 'This is a valid description.' } });
     // Select client but not category
     const selects = screen.getAllByTestId('mock-select');
-    fireEvent.change(selects[0], { target: { value: 'client-1' } });
+    fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
 
     fireEvent.submit(screen.getByTestId('sr-form'));
 

@@ -5,7 +5,7 @@
 
 import { z } from 'zod';
 
-import { BadRequestError, ValidationError } from '@/lib/errors';
+import { BadRequestError, firstZodIssueMessage, ValidationError } from '@/lib/errors';
 
 /**
  * 요청 본문을 JSON 으로 파싱한다.
@@ -52,7 +52,7 @@ export async function validateRequestBody<T>(request: Request, schema: z.ZodSche
     return schema.parse(body);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new ValidationError(error.issues[0].message);
+      throw new ValidationError(firstZodIssueMessage(error));
     }
     throw error;
   }

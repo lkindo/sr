@@ -154,7 +154,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
         { skip: 0, take: 10 }
       );
 
-      const call = vi.mocked(prisma.user.findMany).mock.calls[0][0] as any;
+      const call = vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any;
       expect(call.where.isActive).toBe(true);
       expect(call.where.roles).toEqual({ some: { roleId: 'r1' } });
       expect(call.where.AND).toEqual([{ clients: { some: {} } }]);
@@ -168,7 +168,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
         userType: 'ENGINEER',
       });
 
-      const call = vi.mocked(prisma.user.findMany).mock.calls[0][0] as any;
+      const call = vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any;
       expect(call.where.isActive).toBe(false);
       expect(call.where.roles).toEqual({ none: {} });
       expect(call.where.clients).toEqual({ none: {} });
@@ -181,7 +181,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
         clientId: { in: ['c1', 'c2'] },
       });
 
-      const call = vi.mocked(prisma.user.findMany).mock.calls[0][0] as any;
+      const call = vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any;
       expect(call.where.roles).toEqual({ some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } });
       expect(call.where.clients).toEqual({ some: { clientId: { in: ['c1', 'c2'] } } });
     });
@@ -195,7 +195,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
 
       const result = await userService.getAllUsers({ clientId: 'c1' });
 
-      const call = vi.mocked(prisma.user.findMany).mock.calls[0][0] as any;
+      const call = vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any;
       expect(call.where.clients).toEqual({ some: { clientId: 'c1' } });
       expect(result.total).toBe(2);
       expect((result.data[0] as any).userType).toBe('CLIENT');
@@ -338,7 +338,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
 
       expect(result).toEqual([{ id: 'u1', name: 'Eng', email: 'e@test.com' }]);
 
-      const where = (vi.mocked(prisma.user.findMany).mock.calls[0][0] as any).where;
+      const where = (vi.mocked(prisma.user.findMany).mock.calls[0]![0] as any).where;
       const requested: string[] = (where.AND ?? []).map((filter: any) => {
         const permission = filter.roles.some.role.OR[1].permissions.some.permission;
         return `${permission.resource}:${permission.action}`;

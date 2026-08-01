@@ -226,7 +226,7 @@ describe('logger (production environment branches)', () => {
 
     logger.warn('edge warn');
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toContain('edge warn');
+    expect(warnSpy.mock.calls[0]![0]).toContain('edge warn');
 
     logger.error('edge error', new Error('e'));
     expect(errorSpy).toHaveBeenCalledTimes(1);
@@ -253,6 +253,6 @@ describe('logger (production environment branches)', () => {
     const { logger } = await import('@/lib/logger');
     logger.error('browser prod error');
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(errorSpy.mock.calls[0][0]).toContain('browser prod error');
+    expect(errorSpy.mock.calls[0]![0]).toContain('browser prod error');
   });
 });
