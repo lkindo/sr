@@ -540,6 +540,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ── 이 스텝은 게이트다 ────────────────────────────────────────────────
+      # `.gitleaks.toml` 은 잘 작성되어 있었지만 **어떤 워크플로도 실행하지 않았다**.
+      # 설정 파일 자신이 "예전 설정이 망가져 커밋된 NEXTAUTH_SECRET 이 한 번도 탐지되지
+      # 않았다"고 적고 있는데, 정작 스캐너가 돌지 않아 재발을 막을 수 없는 상태였다(감사 4.6).
+      #
+      # **install 이전에 둔다.** 이 시점의 작업트리는 정확히 "커밋된 파일" 과 같아서
+      # node_modules / .next / .env 같은 비추적 파일이 존재하지 않는다. 별도 필터 없이
+      # "커밋된 시크릿" 만 정확히 검사하게 된다.
+      #
+      # `--no-git`(작업트리 스캔)을 쓰고 이력은 스캔하지 않는다. 과거 커밋에 이미 유출된
+      # 시크릿이 남아 있어 이력 스캔은 영구히 실패하고, 그러면 게이트를 꺼 버리게 된다.
+      # 이력 정리는 별도 작업이며, 이 게이트의 목적은 **재발 차단**이다.
+      - name: Scan for committed secrets (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.28.0 \
+            detect --source=/repo --no-git --config=/repo/.gitleaks.toml \
+            --redact --exit-code=1 --no-banner
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:

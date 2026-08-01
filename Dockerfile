@@ -2,8 +2,13 @@
 FROM node:22 AS deps
 WORKDIR /app
 
-# Corepack 활성화하여 pnpm 사용 준비
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Corepack 활성화하여 pnpm 사용 준비.
+#
+# `pnpm@latest` 를 고정하지 않는다 — package.json 의 `packageManager` 필드가 버전을
+# 결정하게 둔다. 예전에는 Docker(`latest`) / CI(`10`) / 로컬이 각각 다른 pnpm 을 써서
+# 같은 커밋의 빌드가 시점에 따라 달라졌고, `.npmrc` 설정이 실제로 적용되는지도
+# 환경마다 달랐다(감사 4.6). `latest` 는 언젠가 pnpm 11 로 넘어가 빌드를 깨뜨린다.
+RUN corepack enable
 
 # 의존성 파일 복사
 COPY package.json pnpm-lock.yaml .npmrc ./
@@ -19,7 +24,8 @@ RUN pnpm config set registry https://registry.npmjs.org/ && pnpm install --froze
 FROM node:22 AS builder
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# 버전은 package.json 의 packageManager 가 결정한다(위 deps 스테이지 주석 참고).
+RUN corepack enable
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

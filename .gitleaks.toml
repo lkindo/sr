@@ -45,11 +45,34 @@ description = "Common test fixtures and examples"
 paths = [
   '''\.env\.example$''',
   '''(^|/)tests?/''',
+  # `__tests__/` 는 위 `tests?/` 에 매칭되지 않는다("tests" 와 "__tests__" 는 다른 문자열).
+  # 이 저장소의 단위 테스트는 전부 `__tests__/` 아래에 있어 그동안 전부 오탐이었다.
+  '''(^|/)__tests__/''',
   '''(^|/)e2e/''',
-  '''(^|/)docs?/'''
+  '''(^|/)docs?/''',
+  # 시크릿의 "이름"과 형식을 설명하는 문서. 값은 전부 예시다.
+  '''(^|/)\.github/SECRETS_SETUP\.md$''',
+  # 빌드 산출물 — 커밋되지 않으므로 게이트 대상이 아니다.
+  # (CI 는 깨끗한 체크아웃이라 존재하지 않지만, 로컬 실행 시 노이즈를 없앤다.)
+  '''(^|/)\.next/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)coverage/''',
+  '''(^|/)test-results/''',
+  '''(^|/)playwright-report/'''
 ]
+# 아래 regexes 를 **줄 전체**에 대해 평가한다.
+# 기본값("secret")이면 규칙이 캡처한 조각(연결 문자열 규칙의 경우 비밀번호 부분)만 보게 되어,
+# `postgresql://...@localhost/...` 같은 "문맥으로 판별해야 하는" 예외를 쓸 수 없다.
+regexTarget = "line"
+
 # 실제 값이 아닌 플레이스홀더는 노이즈이므로 제외한다.
 regexes = [
   '''your_[a-z0-9_]*_here''',
-  '''change_me[a-z0-9_]*'''
+  '''change_me[a-z0-9_]*''',
+  # 로컬 전용 연결 문자열은 시크릿이 아니다.
+  # CI 의 일회용 Postgres(러너 안에서만 존재), vitest 플레이스홀더, 테스트 픽스처가 여기 해당한다.
+  # 실제 운영 자격증명은 localhost 를 가리키지 않으므로 이 예외가 진짜 유출을 가려 주지 않는다.
+  '''postgres(?:ql)?://[^@\s'"]+@(?:localhost|127\.0\.0\.1|db|db-test)[:/]''',
+  # CI 러너 안에서만 존재하는 일회용 DB 계정. 잡이 끝나면 DB 째로 사라진다.
+  '''\bsr_ci\b'''
 ]
