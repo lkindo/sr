@@ -180,8 +180,10 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
     // 상세 페이지 도착 대기 (waitForURL 로 내비게이션이 확정되며, 이후 단정이 렌더를 기다린다)
     await page.waitForURL(/\/clients\/[a-zA-Z0-9-]+/, { timeout: 10000 });
 
-    // 상세 페이지에서 수정 버튼 클릭
-    const editButton = page.getByRole('button', { name: /수정/i });
+    // 상세 페이지에서 고객사 수정 버튼 클릭.
+    // /수정/ 로 느슨하게 잡으면 서비스 분류마다 있는 '<분류명> 수정' 버튼까지 걸려
+    // strict mode violation 이 난다(분류 관리 UI 가 추가된 뒤 실제로 8개에 걸렸다).
+    const editButton = page.getByRole('button', { name: '고객사 정보 수정' });
     await expect(editButton).toBeVisible({ timeout: 5000 });
     await editButton.click();
     await page.waitForTimeout(500);

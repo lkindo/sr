@@ -288,8 +288,18 @@ export default function ClientDetailPage() {
             <p className="text-sm text-muted-foreground mt-1">고객사 코드: {client.code}</p>
           </div>
         </div>
+        {/*
+          이 페이지에는 서비스 분류마다 '<분류명> 수정' / '<분류명> 삭제' 버튼이 따로 있다.
+          그래서 접근성 이름이 그냥 '수정'/'삭제'이면 스크린리더 사용자에게도, 셀렉터에도
+          어느 것을 가리키는지 모호하다. 실제로 E2E 의 getByRole('button', {name:/수정/})
+          이 8개에 걸려 실패했다. 고객사 자체를 대상으로 한다는 것을 이름에 명시한다.
+        */}
         <div className="flex gap-2">
-          <Button onClick={() => setIsEditDialogOpen(true)} className="sr-btn-template">
+          <Button
+            onClick={() => setIsEditDialogOpen(true)}
+            className="sr-btn-template"
+            aria-label="고객사 정보 수정"
+          >
             <Pencil className="mr-2 h-4 w-4" />
             수정
           </Button>
@@ -297,6 +307,7 @@ export default function ClientDetailPage() {
             onClick={() => setIsDeleteDialogOpen(true)}
             disabled={client.users.length > 0 || client.srs.length > 0}
             variant="destructive"
+            aria-label="고객사 삭제"
           >
             <Trash2 className="mr-2 h-4 w-4" />
             삭제
