@@ -1171,22 +1171,27 @@ const permissions = [
 권한 카탈로그는 `(resource, action)` 유니크 키로 upsert 하고, 역할별 매핑은
 `role_permissions` 에 생성한다. 역할별 부여 범위 요약:
 
-| 역할         | 부여 범위 (요약)                                                                                                                    |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| ADMIN        | 전체 권한                                                                                                                           |
-| MANAGER      | `SR` 전체, `CLIENT` READ/UPDATE, `USER` READ/UPDATE/ASSIGN_ROLE, `COMMENT`, `ATTACHMENT`, `DASHBOARD`, `NOTIFICATION`               |
-| ENGINEER     | `SR` READ/UPDATE/STATUS_CHANGE, `CLIENT` READ, `COMMENT`, `ATTACHMENT`, `NOTIFICATION` READ, `DASHBOARD` READ                       |
-| CLIENT_ADMIN | `SR` CREATE/READ/UPDATE/STATUS_CHANGE, `CLIENT` READ, `USER` READ/UPDATE, `COMMENT`, `ATTACHMENT`, `NOTIFICATION`, `DASHBOARD` READ |
-| CLIENT_USER  | `SR` CREATE/READ/**UPDATE_SELF**, `COMMENT` CREATE/READ, `ATTACHMENT` CREATE/READ, `NOTIFICATION` READ, `DASHBOARD` READ            |
+| 역할         | 부여 범위 (요약)                                                                                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ADMIN        | 전체 권한                                                                                                                                               |
+| MANAGER      | `SR` CONFIRM 을 제외한 전체, `CLIENT` READ/UPDATE, `USER` READ/UPDATE/UPDATE_SELF/ASSIGN_ROLE, `COMMENT`, `ATTACHMENT`, `DASHBOARD`, `NOTIFICATION`     |
+| ENGINEER     | `SR` READ/UPDATE/STATUS_CHANGE/INTAKE, `CLIENT` READ, `USER` UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION` READ, `DASHBOARD` READ                |
+| CLIENT_ADMIN | `SR` CREATE/READ/UPDATE/STATUS_CHANGE/CONFIRM, `CLIENT` READ, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION`, `DASHBOARD` READ |
+| CLIENT_USER  | `SR` CREATE/READ/UPDATE_SELF/CONFIRM, `USER` UPDATE_SELF, `COMMENT` CREATE/READ, `ATTACHMENT` CREATE/READ, `NOTIFICATION` READ, `DASHBOARD` READ        |
 
-정확한 매핑은 항상 `prisma/seed.ts` 가 원본이다.
+카탈로그의 원본은 `prisma/permission-catalog.ts`, 역할별 매핑의 원본은 `prisma/seed.ts` 다.
 
-> **⚠️ 알려진 불일치.** CLIENT_USER 매핑은 `SR:UPDATE_SELF` 를 조회하지만, 권한 카탈로그
-> (`permissions` 배열)에는 `UPDATE_SELF` 액션이 **정의되어 있지 않다.** 따라서 시드가
-> 만드는 DB 에서는 이 권한 행이 생성되지 않고, `src/lib/policies.ts` 가 검사하는
-> `SR:UPDATE_SELF` / `USER:UPDATE_SELF` 를 어떤 역할도 보유하지 못한다.
-> 스키마가 아니라 시드/권한 카탈로그 쪽 결함으로 보이며, 본 문서에서는 수정하지 않고
-> 사실만 기록한다.
+> **해소됨(2026-08-01).** 이전 판에는 CLIENT_USER 매핑이 `SR:UPDATE_SELF` 를 조회하지만
+> 카탈로그에 그 액션 행이 없다는 불일치가 기록돼 있었다. `SR:UPDATE_SELF`,
+> `USER:UPDATE_SELF`, `ROLE:ASSIGN` 세 행이 없어 정책이 검사하는 권한을 어떤 역할도
+> 보유하지 못했고, 그 결과 고객 사용자는 자기가 올린 SR 을 수정할 수 없었다. 세 행과
+> 함께 상태 전이가 요구하는 `SR:INTAKE` / `SR:CONFIRM` 을 카탈로그에 추가했다.
+> `src/lib/__tests__/permission-catalog.test.ts` 가 `PERMISSIONS` 와
+> `TRANSITION_PERMISSIONS` 의 모든 문자열에 대응 행이 있음을 단언해 재발을 막는다.
+>
+> MANAGER 는 예전에 `{ resource: 'SR' }` 와일드카드로 부여받았으나, 확인(CONFIRM)은
+> 고객의 인수 행위이고 `TRANSITION_ROLES` 가 MANAGER 를 의도적으로 제외하므로
+> 와일드카드를 명시 목록으로 바꿔 `SR:CONFIRM` 만 제외했다.
 
 ### 실행
 

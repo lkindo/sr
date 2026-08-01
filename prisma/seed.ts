@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
 
+import { PERMISSION_CATALOG, permissionKey } from './permission-catalog';
+
 // 환경 변수 명시적 로드 (로컬 개발 시에만 dotenv 활용, 프로덕션은 시스템 환경변수 우선 적용)
 try {
   const { config } = require('dotenv');
@@ -32,54 +34,15 @@ const CLIENT_DEV_HASH = '$2b$10$b5TgWLUPy8AgUvjjwGdHYOg2QPsj9thL9BNSZ1GB/ZNCoPR9
 const MANAGER_DEV_HASH = '$2b$12$KVxZuS/KJhY1JmZw7Cb4kORat7TQYg2Ec941O1M7bbe.r.wfT9/IC';
 const CLIENT_ADMIN_DEV_HASH = '$2b$12$Xr5qU2Jjx1yL4/HD/kmAyOGDmaqfZUIldEQifY0Tj9kS9Txcx4aN.';
 
-const permissions = [
-  // SR 관련 권한
-  { resource: 'SR', action: 'CREATE', description: 'SR 생성' },
-  { resource: 'SR', action: 'READ', description: 'SR 조회' },
-  { resource: 'SR', action: 'UPDATE', description: 'SR 수정' },
-  { resource: 'SR', action: 'DELETE', description: 'SR 삭제' },
-  { resource: 'SR', action: 'ASSIGN', description: 'SR 담당자 할당' },
-  { resource: 'SR', action: 'STATUS_CHANGE', description: 'SR 상태 변경' },
+// 카탈로그는 prisma/permission-catalog.ts 가 원천이다.
+// 앱 정책이 검사하는 문자열과의 대조는 permission-catalog.test.ts 가 강제한다.
+const permissions = PERMISSION_CATALOG;
 
-  // 고객사 관련 권한
-  { resource: 'CLIENT', action: 'CREATE', description: '고객사 생성' },
-  { resource: 'CLIENT', action: 'READ', description: '고객사 조회' },
-  { resource: 'CLIENT', action: 'UPDATE', description: '고객사 수정' },
-  { resource: 'CLIENT', action: 'DELETE', description: '고객사 삭제' },
-
-  // 사용자 관련 권한
-  { resource: 'USER', action: 'CREATE', description: '사용자 생성' },
-  { resource: 'USER', action: 'READ', description: '사용자 조회' },
-  { resource: 'USER', action: 'UPDATE', description: '사용자 수정' },
-  { resource: 'USER', action: 'DELETE', description: '사용자 삭제' },
-  { resource: 'USER', action: 'ASSIGN_ROLE', description: '역할 할당' },
-
-  // 역할 관련 권한
-  { resource: 'ROLE', action: 'CREATE', description: '역할 생성' },
-  { resource: 'ROLE', action: 'READ', description: '역할 조회' },
-  { resource: 'ROLE', action: 'UPDATE', description: '역할 수정' },
-  { resource: 'ROLE', action: 'DELETE', description: '역할 삭제' },
-  { resource: 'ROLE', action: 'ASSIGN_PERMISSION', description: '권한 할당' },
-
-  // 댓글 관련 권한
-  { resource: 'COMMENT', action: 'CREATE', description: '댓글 생성' },
-  { resource: 'COMMENT', action: 'READ', description: '댓글 조회' },
-  { resource: 'COMMENT', action: 'UPDATE', description: '댓글 수정' },
-  { resource: 'COMMENT', action: 'DELETE', description: '댓글 삭제' },
-
-  // 첨부파일 관련 권한
-  { resource: 'ATTACHMENT', action: 'CREATE', description: '첨부파일 업로드' },
-  { resource: 'ATTACHMENT', action: 'READ', description: '첨부파일 조회' },
-  { resource: 'ATTACHMENT', action: 'DELETE', description: '첨부파일 삭제' },
-
-  // 알림 관련 권한
-  { resource: 'NOTIFICATION', action: 'READ', description: '알림 조회' },
-  { resource: 'NOTIFICATION', action: 'UPDATE', description: '알림 상태 변경' },
-
-  // 대시보드 관련 권한
-  { resource: 'DASHBOARD', action: 'READ', description: '대시보드 조회' },
-  { resource: 'DASHBOARD', action: 'ANALYTICS', description: '분석 데이터 조회' },
-];
+/**
+ * 이번 시드 실행에서 처음 만들어진 `Permission.id` 집합.
+ * `assignRolePermissions` 가 운영자 편집을 보존하면서도 신규 권한만 부착하는 데 쓴다.
+ */
+const permissionsCreatedThisRun = new Set<string>();
 
 const roles = [
   {
@@ -107,7 +70,8 @@ const roles = [
 /**
  * 역할에 기본 권한을 부여한다.
  *
- * **기본 동작은 비파괴다.** 해당 역할에 이미 권한이 하나라도 배정되어 있으면 손대지 않는다.
+ * **기본 동작은 비파괴다.** 해당 역할에 이미 권한이 배정되어 있으면 기존 배정을 건드리지
+ * 않고, 이번 실행에서 카탈로그에 처음 추가된 권한만 덧붙인다.
  *
  * 이유: 이 시드는 컨테이너가 뜰 때마다 실행된다(`docker-entrypoint.sh`). 예전처럼
  * `deleteMany` + `createMany` 로 매번 초기화하면, 운영자가 `/roles` 화면
@@ -126,6 +90,28 @@ async function assignRolePermissions(
   const existingCount = await prisma.rolePermission.count({ where: { roleId } });
 
   if (existingCount > 0 && !force) {
+    // 운영자 편집을 보존하되, **이번 실행에서 처음 생긴 권한**은 부착한다.
+    //
+    // 이 가드만 있던 시절에는 카탈로그에 권한을 새로 추가해도 이미 배정이 있는 역할은
+    // 전부 건너뛰어, 새 권한이 어떤 역할에도 붙지 않았다 — 기존 배포에서는 추가 자체가
+    // 무효였다. 반대로 목록 전체를 무조건 부착하면 운영자가 일부러 회수한 권한이
+    // 배포 때마다 되살아난다.
+    //
+    // 방금 생성된 행은 운영자가 회수했을 수 없으므로 그 교집합만 부착하면 둘 다 지킨다.
+    const freshIds = permissionIds.filter((id) => permissionsCreatedThisRun.has(id));
+
+    if (freshIds.length > 0) {
+      await prisma.rolePermission.createMany({
+        data: freshIds.map((permissionId) => ({ roleId, permissionId })),
+        skipDuplicates: true,
+      });
+      console.log(
+        `${roleName} 역할에 이번 실행에서 새로 도입된 권한 ${freshIds.length}개를 추가했습니다. ` +
+          `(기존 ${existingCount}개 배정은 그대로)`
+      );
+      return;
+    }
+
     console.log(
       `${roleName} 역할에 이미 권한 ${existingCount}개가 배정되어 있어 그대로 둡니다. ` +
         '(기본값으로 되돌리려면 SEED_FORCE_ROLE_PERMISSIONS=true)'
@@ -153,8 +139,15 @@ async function assignRolePermissions(
 async function seedReferenceData() {
   // Create permissions
   console.log('Creating permissions...');
+  permissionsCreatedThisRun.clear();
+  const knownBefore = new Set(
+    (await prisma.permission.findMany({ select: { resource: true, action: true } })).map(
+      permissionKey
+    )
+  );
+
   for (const permission of permissions) {
-    await prisma.permission.upsert({
+    const row = await prisma.permission.upsert({
       where: {
         resource_action: {
           resource: permission.resource,
@@ -164,8 +157,16 @@ async function seedReferenceData() {
       update: {},
       create: permission,
     });
+
+    // 기존 배포에 권한을 추가할 때 역할 부착까지 이어지도록 신규 행을 기록한다.
+    // (assignRolePermissions 의 비파괴 가드 참고)
+    if (!knownBefore.has(permissionKey(permission))) {
+      permissionsCreatedThisRun.add(row.id);
+    }
   }
-  console.log(`Created ${permissions.length} permissions`);
+  console.log(
+    `Created ${permissions.length} permissions ` + `(신규 ${permissionsCreatedThisRun.size}개)`
+  );
 
   // Create roles
   console.log('Creating roles...');
@@ -204,9 +205,27 @@ async function seedReferenceData() {
     const managerPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: 'SR' },
+          // 예전엔 `{ resource: 'SR' }` 와일드카드였다. 카탈로그에 SR:CONFIRM 이 생기면서
+          // 와일드카드가 그것까지 집어가는데, 확인(CONFIRMED)은 고객의 인수 행위라
+          // TRANSITION_ROLES 가 MANAGER 를 의도적으로 제외한다. 와일드카드를 두면 권한
+          // 경로로 그 규칙이 우회되므로 액션을 명시한다.
+          {
+            resource: 'SR',
+            action: {
+              in: [
+                'CREATE',
+                'READ',
+                'UPDATE',
+                'UPDATE_SELF',
+                'DELETE',
+                'ASSIGN',
+                'STATUS_CHANGE',
+                'INTAKE',
+              ],
+            },
+          },
           { resource: 'CLIENT', action: { in: ['READ', 'UPDATE'] } },
-          { resource: 'USER', action: { in: ['READ', 'UPDATE', 'ASSIGN_ROLE'] } },
+          { resource: 'USER', action: { in: ['READ', 'UPDATE', 'UPDATE_SELF', 'ASSIGN_ROLE'] } },
           { resource: 'COMMENT' },
           { resource: 'ATTACHMENT' },
           { resource: 'DASHBOARD' },
@@ -231,8 +250,10 @@ async function seedReferenceData() {
     const engineerPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: 'SR', action: { in: ['READ', 'UPDATE', 'STATUS_CHANGE'] } },
+          // INTAKE 는 TRANSITION_ROLES.REQUESTED.INTAKE 가 ENGINEER 를 포함하는 것과 맞춘다.
+          { resource: 'SR', action: { in: ['READ', 'UPDATE', 'STATUS_CHANGE', 'INTAKE'] } },
           { resource: 'CLIENT', action: 'READ' },
+          { resource: 'USER', action: 'UPDATE_SELF' },
           { resource: 'COMMENT' },
           { resource: 'ATTACHMENT' },
           { resource: 'NOTIFICATION', action: 'READ' },
@@ -257,9 +278,12 @@ async function seedReferenceData() {
     const clientAdminPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: 'SR', action: { in: ['CREATE', 'READ', 'UPDATE', 'STATUS_CHANGE'] } },
+          {
+            resource: 'SR',
+            action: { in: ['CREATE', 'READ', 'UPDATE', 'STATUS_CHANGE', 'CONFIRM'] },
+          },
           { resource: 'CLIENT', action: 'READ' },
-          { resource: 'USER', action: { in: ['READ', 'UPDATE'] } },
+          { resource: 'USER', action: { in: ['READ', 'UPDATE', 'UPDATE_SELF'] } },
           { resource: 'COMMENT' },
           { resource: 'ATTACHMENT' },
           { resource: 'NOTIFICATION' },
@@ -284,7 +308,10 @@ async function seedReferenceData() {
     const clientUserPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          { resource: 'SR', action: { in: ['CREATE', 'READ', 'UPDATE_SELF'] } },
+          // UPDATE_SELF 와 CONFIRM 은 예전부터 의도된 부여였지만 카탈로그에 행이 없어
+          // findMany 에서 조용히 탈락했다 — 고객 사용자가 자기 SR 을 수정할 수 없던 원인.
+          { resource: 'SR', action: { in: ['CREATE', 'READ', 'UPDATE_SELF', 'CONFIRM'] } },
+          { resource: 'USER', action: 'UPDATE_SELF' },
           { resource: 'COMMENT', action: { in: ['CREATE', 'READ'] } },
           { resource: 'ATTACHMENT', action: { in: ['CREATE', 'READ'] } },
           { resource: 'NOTIFICATION', action: 'READ' },

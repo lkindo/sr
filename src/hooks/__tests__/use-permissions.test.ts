@@ -10,6 +10,12 @@ vi.mock('next-auth/react', () => ({
 
 const mockedUseSession = vi.mocked(useSession);
 
+/**
+ * 이 테스트는 원래 `permissions: ['sr.view', ...]` 라는 **실제로는 존재하지 않는 형태**를
+ * 세션에 넣고 `hasPermission` 이 점(.)으로 조립하는 동작을 정상으로 못 박고 있었다.
+ * `src/auth.ts` 는 `${resource}:${action}` 를 대문자로 담으므로, 프로덕션 세션에서는
+ * 이 헬퍼가 **항상 false** 였다. 픽스처를 실제 세션 형태로 바꾼다.
+ */
 describe('usePermissions', () => {
   beforeEach(() => {
     mockedUseSession.mockReset();
@@ -19,7 +25,7 @@ describe('usePermissions', () => {
     mockedUseSession.mockReturnValue({
       data: {
         user: {
-          permissions: ['sr.view', 'sr.edit', 'user.manage'],
+          permissions: ['SR:READ', 'SR:UPDATE', 'USER:UPDATE'],
           roles: ['ADMIN', 'MANAGER'],
         },
       },
@@ -27,20 +33,22 @@ describe('usePermissions', () => {
 
     const { result } = renderHook(() => usePermissions());
 
-    expect(result.current.permissions).toEqual(['sr.view', 'sr.edit', 'user.manage']);
+    expect(result.current.permissions).toEqual(['SR:READ', 'SR:UPDATE', 'USER:UPDATE']);
     expect(result.current.roles).toEqual(['ADMIN', 'MANAGER']);
-    expect(result.current.hasPermission('sr', 'view')).toBe(true);
-    expect(result.current.hasPermission('sr', 'delete')).toBe(false);
+    expect(result.current.hasPermission('SR', 'READ')).toBe(true);
+    expect(result.current.hasPermission('SR', 'DELETE')).toBe(false);
+    // 호출부가 소문자로 넘겨도 세션 값과 매칭돼야 한다(비교는 대소문자 무시).
+    expect(result.current.hasPermission('sr', 'read')).toBe(true);
     expect(
       result.current.hasAnyPermission([
-        { resource: 'sr', action: 'delete' },
-        { resource: 'user', action: 'manage' },
+        { resource: 'SR', action: 'DELETE' },
+        { resource: 'USER', action: 'UPDATE' },
       ])
     ).toBe(true);
     expect(
       result.current.hasAllPermissions([
-        { resource: 'sr', action: 'view' },
-        { resource: 'sr', action: 'edit' },
+        { resource: 'SR', action: 'READ' },
+        { resource: 'SR', action: 'UPDATE' },
       ])
     ).toBe(true);
     expect(result.current.hasRole('ADMIN')).toBe(true);
@@ -55,8 +63,8 @@ describe('usePermissions', () => {
 
     expect(result.current.permissions).toEqual([]);
     expect(result.current.roles).toEqual([]);
-    expect(result.current.hasPermission('sr', 'view')).toBe(false);
-    expect(result.current.hasAnyPermission([{ resource: 'sr', action: 'view' }])).toBe(false);
+    expect(result.current.hasPermission('SR', 'READ')).toBe(false);
+    expect(result.current.hasAnyPermission([{ resource: 'SR', action: 'READ' }])).toBe(false);
     expect(result.current.hasAllPermissions([])).toBe(false);
     expect(result.current.hasRole('ADMIN')).toBe(false);
     expect(result.current.hasAnyRole(['USER'])).toBe(false);

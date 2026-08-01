@@ -172,13 +172,18 @@ describe('validateTransition - step 2: role gating', () => {
     expect(validateTransition('COMPLETED', 'CONFIRMED', ['ADMIN']).valid).toBe(true);
   });
 
-  it('enforces client-only roles on CONFIRMED -> IN_PROGRESS reopen', () => {
-    const denied = validateTransition('CONFIRMED', 'IN_PROGRESS', ['MANAGER']);
-    expect(denied.valid).toBe(false);
-    expect(denied.message).toContain('ADMIN, CLIENT_USER, CLIENT_ADMIN');
+  // 이 테스트는 원래 MANAGER 거부를 단언했고, 그건 당시 규칙을 정확히 기록한 것이었다.
+  // 정책이 바뀌었다: UI 는 MANAGER 에게 재오픈 버튼을 보여 주는데 규칙에는 MANAGER 가
+  // 없어서 눌러도 항상 거부되는 발산이 있었다(감사 4.3). 둘 중 하나를 맞춰야 했고,
+  // 재오픈은 운영자가 실제로 수행하는 일이라 규칙 쪽을 넓혔다.
+  // ENGINEER 는 여전히 재오픈할 수 없다 — 넓힌 건 MANAGER 하나뿐이다.
+  it('재오픈은 운영자(ADMIN·MANAGER)와 고객에게 열려 있다', () => {
+    expect(validateTransition('CONFIRMED', 'IN_PROGRESS', ['MANAGER']).valid).toBe(true);
+    expect(validateTransition('CONFIRMED', 'IN_PROGRESS', ['CLIENT_USER']).valid).toBe(true);
 
-    const allowed = validateTransition('CONFIRMED', 'IN_PROGRESS', ['CLIENT_USER']);
-    expect(allowed.valid).toBe(true);
+    const denied = validateTransition('CONFIRMED', 'IN_PROGRESS', ['ENGINEER']);
+    expect(denied.valid).toBe(false);
+    expect(denied.message).toContain('ADMIN, MANAGER, CLIENT_USER, CLIENT_ADMIN');
   });
 
   // 아래 두 테스트는 원래 "역할 게이트를 건너뛴다 → valid: true" 를 기대했다.

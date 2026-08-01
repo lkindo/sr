@@ -822,9 +822,9 @@ function validateStateTransition(
     INTAKE: ['IN_PROGRESS', 'REJECTED'], // 접수 → 진행 중 또는 거절
     IN_PROGRESS: ['COMPLETED', 'ON_HOLD'], // 진행 중 → 완료 또는 보류
     ON_HOLD: ['IN_PROGRESS', 'REJECTED'], // 보류 → 진행 중 또는 거절
-    COMPLETED: ['CONFIRMED'], // 완료 → 확인 완료
-    CONFIRMED: ['IN_PROGRESS', 'REJECTED'], // 확인 완료 → 재오픈(진행 중) 또는 거절
-    REJECTED: ['INTAKE'], // 거절 → 재오픈(접수)
+    COMPLETED: ['CONFIRMED', 'IN_PROGRESS'], // 완료 → 확인 완료 또는 재오픈
+    CONFIRMED: ['IN_PROGRESS'], // 확인 완료 → 재오픈(진행 중)
+    REJECTED: [], // 거절은 종단 상태다
   };
 
   if (!SR_STATE_TRANSITIONS[currentStatus]?.includes(targetStatus)) {

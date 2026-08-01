@@ -114,6 +114,43 @@ describe('validateTransition — 커스텀 역할(권한 경로)', () => {
     ).toBe(true);
   });
 
+  it('SR:STATUS_CHANGE 만으로는 재오픈할 수 없다', () => {
+    // 재오픈 엣지에 SR:STATUS_CHANGE 를 함께 두었더니, 그 권한을 보유한 시드 ENGINEER 가
+    // TRANSITION_ROLES 의 제외를 권한 경로로 우회했다. 역할 표와 권한 표가 서로 다른 답을
+    // 내면 어느 쪽이 진짜인지 알 수 없게 된다.
+    const engineerSession = ['ENGINEER'];
+    const engineerPermissions = ['SR:READ', 'SR:UPDATE', 'SR:STATUS_CHANGE', 'SR:INTAKE'];
+
+    expect(
+      validateTransition(
+        'CONFIRMED',
+        'IN_PROGRESS',
+        engineerSession,
+        undefined,
+        undefined,
+        engineerPermissions
+      ).valid
+    ).toBe(false);
+
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'IN_PROGRESS',
+        engineerSession,
+        undefined,
+        undefined,
+        engineerPermissions
+      ).valid
+    ).toBe(false);
+
+    // MANAGER 는 역할 경로로 통과한다 — 권한을 넓히지 않고도 소유자 결정이 지켜진다.
+    expect(
+      validateTransition('CONFIRMED', 'IN_PROGRESS', ['MANAGER'], undefined, undefined, [
+        'SR:STATUS_CHANGE',
+      ]).valid
+    ).toBe(true);
+  });
+
   it('권한 비교는 대소문자를 가리지 않는다', () => {
     expect(
       validateTransition('REQUESTED', 'INTAKE', customRole, undefined, undefined, ['sr:intake'])
