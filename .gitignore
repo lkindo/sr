@@ -108,3 +108,11 @@ next-env.d.ts
 # 빌드 시 esbuild 가 생성하는 기준 데이터 시드 번들(Dockerfile).
 # 소스는 prisma/seed.ts 이며 산출물은 커밋하지 않는다.
 prisma/seed.bundle.cjs
+
+# 커밋 메시지·리포트 등 작업 중 만드는 임시 파일.
+# `git add -A` 에 딸려 들어가 커밋된 적이 있어 패턴으로 막는다.
+*.tmp
+*.tmp.mjs
+*.tmp.json
+*.tmp.sh
+*.tmp.log
