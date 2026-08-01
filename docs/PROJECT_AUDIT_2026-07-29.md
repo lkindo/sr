@@ -103,6 +103,30 @@ ESLint, `tsc --noEmit`, vitest 커버리지 임계값, 빌드 검증 — 보고�
 
 ### 3.4 [CRITICAL] 신규 프로덕션 인스턴스에 부트스트랩 경로 부재 — 아무도 로그인할 수 없음
 
+> **✅ 해결됨 (2026-08-01).** 수정방안 3개를 모두 적용했다.
+>
+> 1. **기준 데이터 자동 시딩** — `prisma/seed.ts` 는 이미 `seedReferenceData()` /
+>    `seedDevFixtures()` 로 분리되어 있었다(픽스처는 `NODE_ENV!==production` +
+>    `SEED_DEV_FIXTURES=true` 이중 가드). 남은 것은 호출 경로였다.
+>    러너 이미지에는 tsx 도 devDependencies 도 없으므로 **빌더 스테이지에서 esbuild 로
+>    단일 CJS 번들**(`prisma/seed.bundle.cjs`)을 만들고, `docker-entrypoint.sh` 가
+>    `prisma migrate deploy` **직후** `node` 로 실행한다. 시딩 실패는 부팅을 막지 않는다 —
+>    DB 일시 오류로 앱 전체가 뜨지 못하는 쪽이 더 나쁘다.
+> 2. **부트스트랩 관리자** — `BOOTSTRAP_ADMIN_EMAIL`/`BOOTSTRAP_ADMIN_PASSWORD` 가
+>    설정되고 **ADMIN 이 하나도 없을 때만** 1명 생성한다.
+>    감사가 제시한 두 안 중 "최초 등록자 자동 승격" 이 아니라 **env 방식**을 택했다 —
+>    최초 가입자 승격은 인스턴스가 인터넷에 노출된 상태에서 소유자보다 먼저 가입한 사람이
+>    관리자가 되는 경쟁 조건을 만든다. env 로 명시하면 그 창이 없다.
+>    안전장치: 멱등(ADMIN 존재 시 무동작), 기존 사용자 비밀번호 미변경(역할만 부여),
+>    12자 미만 비밀번호 거부.
+> 3. **`START_SERVER.md` 정정** — Prisma Studio 수동 역할 할당 안내를 제거했다.
+>    그 절차는 역할 행이 이미 있을 때만 성립하는데, 시딩 전에는 `roles` 가 비어 있어
+>    **복사할 ID 자체가 없다**. 실제 동작하는 로컬/Docker 절차로 교체.
+>
+> `.env.example` 에 부트스트랩 변수와 "로그인 후 제거" 안내를 추가했다.
+> 회귀 테스트: `src/__tests__/bootstrap-admin.test.ts` (14건) — 번들 생성·CJS 파싱·
+> 픽스처 가드 잔존·entrypoint 호출 순서·부트스트랩 계약(멱등/비밀번호 보존/길이 가드)을 고정한다.
+
 **파일**: `docker-entrypoint.sh:4-10`, `src/app/(auth)/register/actions.ts:70-81`
 
 **문제**
@@ -341,6 +365,19 @@ REQUESTED/INTAKE/IN_PROGRESS/ON_HOLD 상태 SR에 요청자·담당자·접수�
 
 ### 3.17 [HIGH] 관리자 비밀번호 재설정이 스키마에서 조용히 탈락하는 무동작
 
+> **✅ 해결됨 (2026-08-01).** `userUpdateSchema` 에 `password: passwordSchema.optional()` 추가,
+> `UserService.updateUser` 가 prisma update 전에 bcrypt(work factor 12)로 해싱한다.
+> 서비스 계층에서 처리하므로 API 라우트와 서버 액션이 함께 보호된다.
+> 타인의 비밀번호 변경은 `USER:UPDATE` 보유자로 게이트하고, 권한 없는 요청은 **조용히 버리지 않고
+> 403** 으로 거부한다(본인 변경은 현재 비밀번호를 요구하는 `changePasswordAction` 을 거쳐야 하며,
+> 이 라우트로 우회하면 그 확인 절차가 무력해진다).
+> 감사 로그에는 해시도 남기지 않고 `passwordReset: true` 플래그만 남긴다.
+> 다이얼로그의 클라이언트 검증·힌트를 `passwordSchema` 실제 규칙과 일치시켰다.
+> **셀프 서비스 재설정 플로우는 소유자 결정(2026-08-01)으로 이번 범위에서 제외**하고,
+> 로그인 화면에 관리자 문의 안내를 노출해 막다른 길을 없앴다.
+> 회귀 테스트: `src/services/__tests__/user.service.password-reset.test.ts` (12건),
+> `src/app/api/users/[id]/__tests__/route.password-reset.test.ts` (4건).
+
 **파일**: `src/lib/schemas.ts:156-162`, `src/components/users/UserDialog.tsx:256-257, 428`
 
 **문제**
@@ -359,6 +396,23 @@ REQUESTED/INTAKE/IN_PROGRESS/ON_HOLD 상태 SR에 요청자·담당자·접수�
 
 ### 3.18 [HIGH] 서비스 카테고리 생성 UI 부재 — 신규 고객사는 SR을 한 건도 받을 수 없음
 
+> **✅ 해결됨 (2026-08-01).** 수정방안 3개를 모두 적용했다.
+>
+> 1. `src/components/clients/ServiceCategoryDialog.tsx` 추가 + 고객사 상세 탭에
+>    "카테고리 추가" 버튼 연결. 빈 상태에도 "카테고리가 없으면 SR을 접수할 수 없습니다"
+>    안내와 생성 버튼을 넣어 막다른 길을 없앴다.
+> 2. `PATCH`/`DELETE /api/clients/[id]/categories/[categoryId]` 추가 + 행 단위 편집·삭제 액션.
+>    경로 파라미터가 둘이라 **IDOR 표면**이 생기므로 카테고리가 실제로 그 고객사의 것인지
+>    검증하고, 바디의 `clientId` 는 무시한다(카테고리를 타 고객사로 옮기는 경로 차단).
+>    SR 이 연결된 카테고리는 서비스 계층이 막고, UI 는 그 사유("비활성화를 사용하세요")를
+>    그대로 노출한다.
+> 3. `ClientService.createClient` 가 **같은 트랜잭션에서** 기본 카테고리
+>    (`일반 요청`, SLA 24h, MEDIUM)를 시드한다. 트랜잭션 밖이면 카테고리 생성만 실패해도
+>    "SR 을 받을 수 없는 고객사"가 남는다.
+>
+> 회귀 테스트: `categories/[categoryId]/__tests__/route.test.ts` (10건, IDOR 포함),
+> `client.service.default-category.test.ts` (5건).
+
 **파일**: `src/app/(dashboard)/clients/[id]/page.tsx:399-458`, `src/hooks/useCreateSRForm.ts:143`
 
 **문제**
@@ -376,6 +430,21 @@ ADMIN이 ClientDialog(유일한 클라이언트 생성 경로)로 신규 클라�
 ---
 
 ### 3.19 [HIGH] SR 카테고리 드롭다운이 클라이언트로 스코프되지 않고, 서버도 소속을 검증하지 않음
+
+> **✅ 해결됨 (2026-08-01).** 서버 측 검증(`SRService.ensureCategoryBelongsToClient`)은
+> 앞선 작업에서 이미 `createSR`/`updateSR` 양쪽에 걸려 있었다. 이번에 남은 클라이언트 측을 닫았다.
+>
+> - `getServiceCategoriesForSelection(clientId?)` 로 스코프 인자를 받고,
+>   외부 사용자가 임의 clientId 를 넣지 못하도록 `ensureCanReadClient` 로 소속을 검증한다.
+> - `getForSelection` 의 where 를 `OR: [{ clientId }, { clientId: null }]` 로 바꿨다.
+>   정확히 일치만 걸면 **전역 카테고리가 사라져 신규 고객사의 선택지가 0개**가 된다
+>   (서버의 `ensureCategoryBelongsToClient` 가 허용하는 범위와 정확히 일치시킨 것).
+> - `useCreateSRForm`/`useEditSRForm` 이 고객사 선택 이후에만 카테고리를 조회하고,
+>   고객사가 바뀌면 이전 선택(`categoryId`)을 비운다 — 바뀐 고객사에 없는 id 가
+>   그대로 제출되는 것을 막는다.
+>
+> 회귀 테스트: `service-category.actions.security.test.ts`(테넌트 거부 포함),
+> `service-category.service.coverage.test.ts`, `CreateSRDialog.test.tsx`.
 
 **파일**: `src/actions/service-category.actions.ts:15-17`, `src/services/service-category.service.ts:105-121`, `src/services/sr.service.ts:78, 244-245`
 
@@ -416,6 +485,14 @@ srService.getAllSRs({ where, orderBy, skip: (page - 1) * itemsPerPage, take: ite
 ---
 
 ### 3.21 [HIGH] intake POST가 도메인/실시간 이벤트를 발행하지 않아 담당자가 알림을 못 받음
+
+> **✅ 해결됨 (2026-08-01).** POST 는 트랜잭션 커밋 후 `sr:status_changed`(요청자 알림) +
+> `sr:assigned`(담당자 알림) + `SR_UPDATED` 실시간 이벤트를 발행한다.
+> PATCH 에는 "새 담당자에게만 메일 발송" 이라는 **주석만 있고 구현이 없었다** — 재배정 시
+> `sr:assigned` 를 발행하도록 채우고, 변경이 있으면 `SR_UPDATED` 도 발행한다.
+> 발행은 모두 커밋 이후다(롤백된 트랜잭션에 대해 알림이 나가면 안 된다).
+> 회귀 테스트: `src/app/api/srs/[id]/intake/__tests__/route.events.test.ts` (6건).
+> 수정 전 구현에 대해 4건이 실패함을 확인했다.
 
 **파일**: `src/app/api/srs/[id]/intake/route.ts:1-11, 119-143, 211-213`
 
@@ -464,6 +541,12 @@ POST 핸들러가 REQUESTED → INTAKE 전이를 수행하고 `assignee: { conne
 
 ### 3.24 [HIGH] 유휴 타임아웃 자동 로그아웃이 자기 effect에 의해 취소되어 절대 실행되지 않음
 
+> **✅ 해결됨 (2026-08-01).** `showWarningRef` 도입으로 `resetTimer` 를 안정화하고, 타이머 정리를
+> 리스너 effect 의 cleanup 에서 분리(세션 종료·언마운트 전용 effect 로 이동)했다.
+> 회귀 테스트: `src/components/providers/__tests__/IdleTimeoutProvider.test.tsx` (9건).
+> 수정 전 구현에 대해 "경고 후 1분 뒤 로그아웃", "모달 중 활동이 로그아웃을 연기하지 못함",
+> "모달 중 라우트 이동에도 로그아웃 유지" 3건이 실패함을 확인했다.
+
 **파일**: `src/components/providers/IdleTimeoutProvider.tsx:33, 38-46, 61-68`
 
 **문제**
@@ -478,6 +561,16 @@ POST 핸들러가 REQUESTED → INTAKE 전이를 수행하고 `assignee: { conne
 ---
 
 ### 3.25 [HIGH] 컨테이너 UTC와 브라우저 KST 불일치 — SR 목록 날짜·마감 배지가 하이드레이션마다 달라짐
+
+> **✅ 해결됨 (2026-08-01).** 공용 모듈 `src/lib/timezone.ts` 를 추가하고 날짜 경계 계산을
+> 전부 KST 명시로 바꿨다 — `getDaysUntilDue`(일 경계), `SRListItem` 포맷터,
+> SR 번호 채번(`appZoneDateStamp`), CSV 내보내기 날짜·파일명, 대시보드 30일 추이
+> (`DATE(created_at AT TIME ZONE 'Asia/Seoul')` + 채움 루프 키 일치).
+> 포맷터는 모듈 스코프에 1회만 생성해 기존의 "수동 포맷이 빠르다"는 성능 의도도 유지한다.
+> 인프라: Dockerfile 런타임 스테이지에 `ENV TZ=Asia/Seoul` + tzdata, prod/staging compose 에
+> `TZ`, Postgres 에 `PGTZ`/`TZ`.
+> 회귀 테스트: `src/lib/__tests__/timezone.test.ts` (17건) — 2026-07-29T23:00Z(= KST 07-30)
+> 시나리오로 UTC/KST 갈림을 직접 고정한다.
 
 **파일**: `src/components/srs/SRListItem.tsx:18-33, 64`, `src/lib/date-utils.ts:1-13`, `Dockerfile`
 
@@ -499,6 +592,15 @@ POST 핸들러가 REQUESTED → INTAKE 전이를 수행하고 `assignee: { conne
 
 ### 3.26 [HIGH] SSE 무효화 키가 어떤 쿼리에도 등록되어 있지 않아 실시간 갱신이 동작하지 않음
 
+> **✅ 해결됨 (2026-08-01).** SR 목록·대시보드는 **서버 컴포넌트가 데이터를 가져오는 SSR
+> 화면**이라 React Query 캐시에 아예 들어 있지 않다. 따라서
+> `invalidateQueries({ queryKey: ['srs'] })` / `['dashboard-stats']` 는 어떤 쿼리와도
+> 매칭되지 않는 무동작이었다(토스트만 뜨고 목록은 그대로였던 이유).
+>
+> 죽은 키를 제거하고, 실제로 등록된 키(`['sr', srId]`, `[..., 'comments']`,
+> `[..., 'activities']`)만 무효화한 뒤 `router.refresh()` 로 서버 렌더를 다시 받는다.
+> 이벤트가 몰아칠 때 서버를 때리지 않도록 300ms 로 묶었고, 언마운트 시 타이머를 정리한다.
+
 **파일**: `src/hooks/use-realtime-status.ts:31, 33, 54, 55, 75, 76, 104`
 
 **문제**
@@ -514,6 +616,22 @@ SSE 핸들러들이 `queryClient.invalidateQueries({ queryKey: ['srs'] })`와 `{
 
 ### 3.27 [HIGH] Edit SR 다이얼로그가 희망 우선순위·희망 완료일을 조용히 폐기
 
+> **✅ 해결됨 (2026-08-01).** `srUpdateSchema` 에 `requestedPriority`(빈 문자열 → undefined)와
+> `requestedCompletionDate`(빈 문자열 → null, 값 지우기 지원)를 추가하고,
+> `SRService.updateSR` 이 이를 `updateData` 에 매핑한다(날짜는 `new Date()` 변환).
+>
+> **필드 소유권 판단:** 이 둘은 요청자가 표명하는 희망값이므로 3.22 에서 만든
+> **운영자 소유 필드 게이트에 넣지 않았다**. 게이트하면 고객이 자기 희망 기한조차 바꿀 수 없다.
+> 반대로 SLA 마감일(`dueDate`)·실제 우선순위(`actualPriority`)와 섞이지 않는지도 테스트로 고정했다 —
+> 섞이면 SLA 준수율 지표가 요청자에 의해 위조된다.
+>
+> 회귀 테스트: `schemas.coverage.test.ts`(왕복 6건, EditSRDialog 실제 전송 형태 포함),
+> `sr.service.requested-fields.test.ts`(6건). 수정 전 구현에 대해 10건이 실패함을 확인했다.
+>
+> **정정:** 이 항목은 2026-08-01 중간 점검에서 "이전 세션 완료"로 잘못 표시됐었다.
+> 당시 확인한 `requestedPriority`/`requestedCompletionDate` 선언은 `srCreateSchema` 의 것이었고,
+> `srUpdateSchema` 에는 없었다.
+
 **파일**: `src/lib/schemas.ts:96-143`, `src/hooks/useEditSRForm.ts:224-227`, `src/components/srs/EditSRDialog.tsx:222-249`
 
 **문제**
@@ -528,6 +646,11 @@ SSE 핸들러들이 `queryClient.invalidateQueries({ queryKey: ['srs'] })`와 `{
 ---
 
 ### 3.28 [HIGH] 조직도 검색이 원시 입력으로 RegExp를 생성 — '(' 입력 시 페이지 전체 크래시
+
+> **✅ 해결됨 (2026-08-01).** `src/lib/utils.ts` 에 `escapeRegExp()` 를 추가하고
+> `highlightText` 가 이를 거쳐 RegExp 를 만들도록 했다.
+> 회귀 테스트: `src/lib/__tests__/utils.test.ts`, `src/components/organization/__tests__/OrganizationTree.highlight.test.tsx`.
+> 수정 전 구현에서 `(`, `)`, `[`, `*`, `+`, `?`, `\` 입력 시 렌더가 throw 함을 확인했다.
 
 **파일**: `src/components/organization/OrganizationTree.tsx:66-81, 133, 140, 238, 242`
 
@@ -553,6 +676,17 @@ function highlightText(text, query) {
 
 ### 3.29 [HIGH] Let's Encrypt 인증서 갱신 자동화 부재 — 마지막 main 배포로부터 90일 후 TLS 만료
 
+> **✅ 해결됨 (2026-08-01).** 배포와 무관한 갱신 경로를 만들었다.
+>
+> - `scripts/renew-letsencrypt.sh` — `certbot renew`(만기 30일 전이 아니면 no-op 이라
+>   매일 돌려도 안전) 후 **인증서 지문이 실제로 바뀐 경우에만** 복사하고
+>   `nginx -s reload`(restart 아님 — 무중단).
+> - `deploy.yml` 이 호스트 crontab 에 일일 03:00 항목을 **멱등하게** 설치한다.
+> - 자가 서명 폴백이 조용히 성공하지 않도록 `::warning::` + 배너를 출력한다.
+>   certs 디렉터리 유실이 "동작하지만 신뢰되지 않는 사이트"를 만드는 경로였다.
+>
+> **주의:** cron 설치와 갱신 동작은 서버에서 실제로 배포가 돌아야 검증된다.
+
 **파일**: `scripts/setup-letsencrypt.sh:22-43`, `.github/workflows/deploy.yml:161`
 
 **문제**
@@ -568,6 +702,19 @@ Let's Encrypt 인증서는 90일 유효다. 유지보수 모드의 시스템에�
 
 ### 3.30 [HIGH] 관측성 전무 — 에러 추적·메트릭·업타임 감시·알림이 하나도 없음
 
+> **부분 해결 (2026-08-01).** pino 종료 플러시와 앱 헬스체크를 구현했다.
+>
+> - 종료 훅(`beforeExit`/`SIGTERM`/`SIGINT`/`uncaughtException`/`unhandledRejection`)에서
+>   destination 을 `flushSync()` 한다. 감사가 제안한 `pino.final()` 은 **pino 10 에서 제거되어**
+>   현재 API 인 destination 의 `flushSync()` 를 쓴다.
+> - Dockerfile `HEALTHCHECK` + compose `healthcheck`(prod/staging)로 `/api/health` 를 실제로
+>   호출한다. 이제 "프로세스는 살아 있지만 wedge 된" 상태가 감지되고, nginx 가
+>   `condition: service_healthy` 로 앱을 기다린다.
+>
+> 회귀 테스트: `src/lib/__tests__/logger.flush.test.ts` (9건, node 환경).
+> **남은 것:** uptime-kuma 에 `/api/health` 가 실제로 등록되어 있는지 확인(서버 측 작업)과
+> 호스트 밖 로그 수집. Sentry 는 소유자 결정으로 제외.
+
 **파일**: `src/lib/logger.ts:4, 75`, `src/app/api/health/route.ts:12-25`
 
 **문제**
@@ -579,14 +726,63 @@ Let's Encrypt 인증서는 90일 유효다. 유지보수 모드의 시스템에�
 **수정 방안**
 비용 순으로 3단계:
 
-1. 외부 업타임 모니터(UptimeRobot/BetterStack 무료 티어)를 `https://sr.lkindo.kr/api/health`에 연결 + 알림 — 엔드포인트는 이미 있고 503도 올바르게 반환한다.
-2. `src/instrumentation.ts`(이미 부팅 훅으로 존재)를 통해 Sentry 등 에러 추적기 도입.
+1. 외부 업타임 모니터를 `https://sr.lkindo.kr/api/health`에 연결 + 알림 — 엔드포인트는 이미 있고
+   503도 올바르게 반환한다. **정정**: 서버에 `uptime-kuma` 컨테이너가 이미 4주 이상 구동 중임을
+   SSH 로 확인했다(저장소의 어떤 compose 파일에도 없어 정적 분석으로는 보이지 않았다).
+   따라서 남은 것은 "업타임 감시 도입"이 아니라 "이 엔드포인트가 실제로 그 감시에 등록되어
+   있는지 확인"이다.
+2. ~~`src/instrumentation.ts`를 통해 Sentry 등 에러 추적기 도입.~~
+   **결정(2026-07-30, 소유자): Sentry 는 사용하지 않는다.** 따라서 이 항목은 폐기한다.
+   에러 추적 공백은 유효하나 해법이 달라야 한다 — 실용적인 대안은 (a) `logger.ts` 의 error 레벨
+   출력을 호스트 밖 수집기로 보내거나(자체 호스팅 가능한 Loki/Vector 등),
+   (b) 이미 구동 중인 `uptime-kuma` 의 알림 채널을 활용해 `/api/health` 실패와 컨테이너 재시작을
+   통보받는 선에서 최소 탐지력을 확보하는 것이다. 어느 쪽도 외부 SaaS 를 요구하지 않는다.
 3. `logger.ts`에 `const finalHandler = pino.final(this.pinoLogger); process.on('SIGTERM', () => finalHandler.flushSync())` 등록.
 4. Dockerfile에 `HEALTHCHECK --interval=10s --timeout=3s --start-period=40s --retries=5 CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"` + compose `app` 서비스에 대응 `healthcheck:` + nginx `depends_on`을 `condition: service_healthy`로.
 
 ---
 
 ### 3.31 [HIGH] 백업이 프로덕션 동일 디스크에만 존재 — 오프사이트·암호화 미구성, 복구 리허설 무기록
+
+> **부분 해결 (2026-08-01).** 코드 경로 4개를 만들었고, **값 등록은 소유자 작업으로 남는다.**
+>
+> - **배포 전 백업**(수정방안 2): `deploy.yml` 이 pull 앞에서 `scripts/backup.sh` 를 실행한다.
+>   백업 실패가 배포를 막지는 않되 경고한다(운영 중단이 더 큰 손해).
+> - **암호화**(수정방안 1): `BACKUP_ENCRYPT_RECIPIENT` 설정 시 age/gpg **공개키**로 암호화하고
+>   평문을 삭제한다. 공개키 방식이라 서버에 복호화 키가 없다 — 서버가 침해돼도 과거 백업을
+>   읽을 수 없다. 수신자가 설정됐는데 도구가 없으면 **평문을 남기지 않고 실패**한다.
+>   부수 수정: prune 글롭이 `.age`/`.gpg` 를 포함하도록(안 그러면 암호화 파일이 영원히 쌓인다),
+>   크기 리포트가 삭제된 평문을 참조하지 않도록.
+> - **복구 리허설**(수정방안 3): `scripts/restore-rehearsal.sh` +
+>   `.github/workflows/restore-rehearsal.yml`(매월). **일회용 Postgres 컨테이너**에 복구해
+>   스키마·행 수를 단언한다. 프로덕션 DB 는 건드리지 않는다.
+>   암호화 백업은 복호화 신원이 없으면 "검증 불가"로 **실패** 처리한다(성공으로 넘기지 않는다).
+> - **실패 알림**(수정방안 4): `backup.yml` 에 `if: failure()` 스텝 추가.
+>
+> ### 오프사이트 복제: **수용된 위험 (2026-08-01, 소유자 결정)**
+>
+> 소유자가 **오프사이트 복제를 도입하지 않고 운영 서버 동일 디스크 백업을 유지**하기로 결정했다.
+> 이 항목은 "해결됨"이 아니라 **명시적으로 수용된 위험**으로 기록한다.
+>
+> 그대로 남는 노출:
+>
+> - 디스크 물리 장애 / VM 삭제 / 랜섬웨어가 **DB·첨부파일·전체 백업을 한 번에** 파괴한다.
+>   백업이 보호해 주지 못하는 유일한 시나리오가 정확히 이것이다.
+> - 즉 현재 백업은 **실수 삭제·잘못된 마이그레이션·논리적 손상**에는 유효하지만,
+>   저장 매체 자체를 잃는 경우에는 무력하다.
+>
+> 완화되어 있는 부분: 배포 전 백업, 14일 보존, `pg_restore -l` 검증, 월간 복구 리허설은
+> 모두 동작하므로 "되돌릴 수 있는 사고"의 범위는 여전히 넓다.
+>
+> 되돌리려면: `BACKUP_OFFSITE_CMD` 시크릿만 등록하면 코드 경로는 이미 준비되어 있다.
+>
+> ### 남은 것 (소유자 작업)
+>
+> - `BACKUP_ENCRYPT_RECIPIENT` / `BACKUP_AGE_IDENTITY_FILE` 등록 + 서버에 age(또는 gnupg) 설치.
+>   오프사이트를 하지 않더라도 암호화는 여전히 의미가 있다 — 호스트 침해나 디스크 폐기 시
+>   평문 PII(사용자·고객사·SR 본문) 유출을 막는다. 미설정 시 백업은 평문으로 남는다.
+> - 수정방안 5(마이그레이션을 entrypoint → 배포 게이트로 이동)는 감사가 '장기적으로' 로
+>   분류해 범위 밖.
 
 **파일**: `scripts/backup.sh:16, 34, 67-70`, `.github/workflows/backup.yml:48-61`
 
@@ -609,6 +805,35 @@ Let's Encrypt 인증서는 90일 유효다. 유지보수 모드의 시스템에�
 ---
 
 ### 3.32 [HIGH] deploy가 DB·nginx까지 내리고 헬스체크·롤백 경로가 없음
+
+> **✅ 해결됨 (2026-08-01).** 수정 방안 5단계를 모두 적용했다.
+>
+> 1. SSH 스크립트 첫 줄에 `set -euo pipefail`. `set -u` 아래에서도 시크릿 누락 메시지가 나오도록
+>    해당 검사는 `${VAR:-}` 로 참조한다.
+> 2. Dockerfile `HEALTHCHECK` + prod/staging compose `healthcheck`,
+>    nginx `depends_on: app: condition: service_healthy`.
+> 3. `sleep 5` + "running 인가" 검사를 `wait_healthy()` 폴링으로 교체(최대 240초).
+>    HEALTHCHECK 가 없는 구버전 이미지로 롤백한 경우에는 20초 후 running 으로 판정해 무한 대기를 피한다.
+> 4. 전면 `down` 제거. `up -d` (변경분만) + `up -d --force-recreate --no-deps app` 으로
+>    **앱만 교체**한다. nginx·DB 가 살아 있으므로 배포 중 connection-refused 가 사라지고,
+>    prod 배포가 스테이징을 부수적으로 죽이지 않는다.
+> 5. 이미지에 커밋 SHA 태그를 함께 push 하고, compose 가 `${APP_IMAGE_TAG:-latest}` 로 읽는다.
+>    헬스 게이트 실패 시 **이전 컨테이너의 이미지 ID(sha256)** 로 자동 롤백한다 —
+>    태그가 아니라 ID 를 잡는 이유는, 돌고 있던 컨테이너가 `:latest` 였다면 그 태그는 방금
+>    새(불량) 이미지로 덮어써졌기 때문이다.
+>
+> 부수 수정:
+>
+> - `docker compose image prune` 은 **유효한 하위 명령이 아니라 항상 실패**했고, 뒤따르던
+>   `docker image prune -af` 가 직전 SHA 이미지까지 지워 롤백 경로를 없앴다.
+>   `docker image prune -af --filter until=168h` 로 교체해 7일치를 보존한다.
+> - 배포 전 `scripts/backup.sh` 실행(마이그레이션 사고 대비 복구 지점). 백업 실패가 배포를
+>   막지는 않되 경고를 남긴다 — 운영 중단이 더 큰 손해이기 때문이다.
+> - `mem_limit`: app 768m, nginx 128m. DB 는 잘못 조이면 쿼리가 실패하므로 두지 않았다.
+>
+> 검증: YAML 파싱 + 추출한 셸 스크립트 `bash -n` 통과, 두 compose 파일 `docker compose config` 통과.
+> **주의:** 이 워크플로는 `workflow_run` 이라 **main 에 병합된 정의**가 실행된다. 병합 후 첫 배포가
+> 실제 첫 검증이다.
 
 **파일**: `.github/workflows/deploy.yml:86, 148-157, 171`
 
@@ -651,6 +876,22 @@ coverage: { provider: 'v8', reporter: [...], thresholds: { lines: 80, statements
 ---
 
 ### 3.34 [HIGH] 모든 RBAC/권한상승 E2E가 단언 대신 console.log를 사용 — 통제가 없어도 통과
+
+> **✅ 해결됨.** 앞부분(보안 E2E 의 `console.log` → `expect` 치환)은 이전 세션에서 완료됐고,
+> **후반부(“`expect` 없는 테스트를 실패시키는 CI 검사”)는 2026-08-01 에 구현했다.**
+>
+> `scripts/check-e2e-assertions.ts` — 각 `test(...)` 본문에 `expect(` 호출이 있는지
+> **TypeScript AST 로** 검사한다(정규식이면 주석·문자열 속 'expect' 를 세게 된다).
+> `test.fixme`/`test.skip` 은 "의도적으로 안 돈다"는 명시이므로 면제한다.
+> `pnpm check:e2e-assertions` 로 실행하며 CI 의 code-quality 잡에 게이트로 걸려 있다.
+>
+> **범위:** 도입 시점에 스펙 34개 전부가 통과하므로 **전체를 게이트한다**(일부만 막으면
+> 그 밖에서 새로 생기는 것을 못 잡는다). 단언 없는 테스트를 넣으면 CI 가 실패하는 것을
+> 실제 프로브 스펙으로 확인했다.
+>
+> **이 검사의 한계:** `expect(x).toBeGreaterThanOrEqual(0)` 같은 **항상-참 단언은 통과한다**
+> (단언이 "있기는" 하다). 그런 공허한 단언과 `if (!visible) test.skip()` 패턴은 5절의
+> 별도 항목이며 사람 리뷰가 필요하다 — 이 게이트가 그것까지 막아 준다고 읽으면 안 된다.
 
 **파일**: `e2e/23-role-exclusivity.spec.ts:86, 134-138, 174-178, 215-219, 265-269`, `e2e/22-sr-intake-process.spec.ts:426-439`, `e2e/21-sr-status-transitions.spec.ts:355-366`
 
@@ -733,6 +974,42 @@ Stryker가 실행하는 스위트가 CI가 실행하는 스위트가 아니다. 
 
 ### 3.37 [HIGH] 실제 Prisma 쿼리를 실행하는 테스트가 하나도 없고, CI가 마이그레이션을 검증하지 않음
 
+> **✅ 해결됨 (2026-08-01).** 수정방안 3개가 모두 반영됐다.
+>
+> 1. **CI 마이그레이션 검증** — 이전 세션에서 완료. test 잡에 `postgres:16-alpine` 서비스 +
+>    `prisma migrate deploy` + `prisma migrate diff --exit-code` 드리프트 검사가 있다.
+> 2. **DB 기반 통합 프로젝트** — 이번에 추가했다. `vitest --project=integration`,
+>    `tests/integration/` 아래 14건.
+> 3. **같은 Postgres 로 e2e** — 이전 세션에서 완료(e2e 잡은 자체 postgres 서비스를 갖는다).
+>
+> **커버 범위(목으로는 구조적으로 불가능한 것만):**
+>
+> - `sr-numbering.test.ts` — 동시 12건 생성의 `srNumber` 유일성, 시퀀스 연속성, KST 채번,
+>   `srs.sr_number` UNIQUE 제약이 실제로 살아 있는지. 기존 "동시성" 테스트는 **mock 안에**
+>   원자적 시퀀스 생성기를 구현해 두고 그 mock 을 검증하는 순환 구조였다.
+> - `transaction-atomicity.test.ts` — 트랜잭션 중간 throw / 자식 FK 위반 시 부모까지
+>   롤백되는지. 패스스루 스텁(`$transaction: vi.fn(cb => cb(mock))`)은 각 호출을 독립 커밋으로
+>   다루므로 이 부류를 절대 잡지 못한다.
+> - `tenant-isolation.test.ts` — 테넌트 `where` 가 **실제로 무엇을 걸러내는지**.
+>   기존 격리 테스트는 mock 에 전달된 where 객체를 구조적으로만 단언해, 필터가 의미상 틀려도
+>   통과했다. 대조군(필터 없으면 2건 보임)까지 넣어 필터가 실제로 일하고 있음을 보인다.
+>
+> **설계 판단:**
+>
+> - 감사는 "각 테스트를 롤백되는 `$transaction` 으로 감싸기"를 제안했지만, 서비스가 전역
+>   `prisma` 싱글턴을 직접 import 하므로 트랜잭션 클라이언트를 주입할 경로가 없다.
+>   프로덕션 코드를 테스트를 위해 뒤집는 대신 **TRUNCATE 로 격리**한다(참조 데이터는 보존).
+> - `tests/` 디렉터리로 분리했다. 루트 `test.include` 가 `src/**/*.test.ts` 라
+>   `src/` 안에 두면 unit 프로젝트가 jsdom + 가짜 DATABASE_URL 로 함께 집어간다.
+>   integration 프로젝트에는 `exclude: ['src/**']` 도 명시했다.
+> - **기본값이 "실행"이다.** 건너뛰려면 `SKIP_DB_TESTS=true` 를 명시해야 하고, DB 에 붙지
+>   못하면 **스킵이 아니라 실패**한다. 반대 방향(있으면 실행)으로 만들면 CI 설정이 어긋났을 때
+>   아무것도 안 돌면서 초록불이 되는데, 그게 이 항목이 지적한 실패 방식 그 자체다.
+>
+> **주의 — 아직 실 DB 로 실행된 적이 없다.** 로컬에 Docker 데몬이 없어 이 14건은
+> `SKIP_DB_TESTS=true` 로 수집·스킵까지만 확인했고, DB 미연결 시 명확히 실패하는 것도 확인했다.
+> **실제 통과 여부는 CI 의 test 잡이 첫 검증이다.**
+
 **파일**: `src/services/__tests__/sr.service.concurrency.test.ts:6`, `.github/workflows/ci-cd.yml:88`
 
 **문제**
@@ -770,6 +1047,13 @@ MANAGER로 라벨된 모든 e2e 시나리오가 MANAGER 역할에 대해 아무�
 
 ### 3.39 [HIGH] CSV 내보내기가 50k행 전체를 힙에서 조립, 레이트리밋 없음
 
+> **✅ 해결됨 (2026-08-01).** `withAuthAndRateLimit(..., { preset: 'strict' })` 로 감싸고,
+> CSV 를 `ReadableStream` 으로 1000행 배치씩 흘려보낸다(피크 힙이 O(배치)로 고정).
+> 빈 결과는 404 가 아니라 헤더 행만 담은 200 이고,
+> `Cache-Control: private, no-store` + `X-Content-Type-Options: nosniff` 를 설정한다.
+> 날짜는 KST 명시(3.25 와 함께). UI 는 429 를 "실패"가 아니라 "잠시 후 다시"로 안내한다.
+> 회귀 테스트: `src/app/api/reports/export/__tests__/route.test.ts` (11건).
+
 **파일**: `src/app/api/reports/export/route.ts:9, 22, 41-100`
 
 **문제**
@@ -800,6 +1084,16 @@ export async function GET() {            // ← withAuthAndRateLimit 아님
 
 ### 3.40 [HIGH] /api/srs/my-requests에 페이지네이션이 전혀 없고 description 전문을 반환
 
+> **✅ 해결됨 (2026-08-01).** 라우트를 `withAuthAndRateLimit` + `usePagination` 기반으로 재작성했다.
+> `skip`/`take`(상한 `MAX_PAGE_SIZE=100`), `select` 에서 `description` 제거,
+> `total` 을 실제 `prisma.sR.count()` 로, 통계 카드는 `groupBy('status')` 로 요청자 전체 기준 집계.
+> `sortBy` 는 Map 기반 allowlist 로 제한했다(객체 인덱싱이면 `?sortBy=constructor` 가
+> 프로토타입 체인에서 값을 찾아 기본값 분기를 건너뛴다).
+> 페이지에는 페이지네이션 컨트롤을 추가하고, 5절에서 지적한 낡은 상태 필터
+> (스키마에 없는 `RESOLVED`/`CANCELLED` 노출, `INTAKE`/`ON_HOLD`/`REJECTED` 누락)를
+> `SRStatus` enum 에서 도출하도록 함께 고쳤다.
+> 회귀 테스트: `src/app/api/srs/my-requests/__tests__/route.test.ts` (15건).
+
 **파일**: `src/app/api/srs/my-requests/route.ts:49-103, 149`
 
 **문제**
@@ -825,6 +1119,20 @@ return NextResponse.json({ srs: srsWithExtras, total: srsWithExtras.length });
 ---
 
 ### 3.41 [HIGH] 다중 파일 업로드가 최대 100MB 본문을 힙에 물질화
+
+> **✅ 해결됨 (2026-08-01).** 상한을 **50MB 로 통일**했다(소유자 결정 — 감사 권고 25MB 와
+> 기존 100MB 사이의 절충).
+>
+> - `MAX_UPLOAD_FILE_SIZE` / `MAX_UPLOAD_TOTAL_SIZE` / `MAX_UPLOAD_FILE_COUNT` 를
+>   `file-validator.ts` 한 곳에 두고 zip/rar/7z `maxSize` 와 nginx `client_max_body_size 50m` 을 맞췄다.
+> - `assertUploadSizeWithinLimit()` 가 **`formData()` 호출 전에** Content-Length 를 검사해
+>   413(`PayloadTooLargeError`)으로 거부한다.
+> - 두 라우트의 계약을 통일했다(예전엔 10MB / 100MB 로 갈렸다). 배치 라우트는 파싱 후
+>   총합도 한 번 더 확인한다(chunked 전송 대비).
+>
+> **남은 것:** busboy 증분 파싱은 감사가 '장기적으로' 로 분류한 항목이라 이번 범위 밖이다.
+> 50MB 는 동시 2건 기준 ~100~200MB 로, 450MB 힙 안에서 견디지만 여유가 크지는 않다.
+> 회귀 테스트: `src/lib/__tests__/upload-guard.test.ts` (10건).
 
 **파일**: `src/app/api/srs/[id]/attachments/route.ts:55, 63-65, 78, 87`, `nginx/nginx.conf:78`, `src/lib/file-validator.ts:35-38`
 
@@ -1086,7 +1394,7 @@ async getClientDetailsById(id: string) {
 - `src/app/api/push/test/route.ts`에 호출자가 없다(`grep 'push/test'` 무결과). 알림 설정 페이지에 `'테스트 알림 보내기'` 버튼을 추가해 사용자가 자가 검증하게 하거나(웹 푸시의 최다 실패 지점이 OS 차단·브라우저 포커스 규칙·VAPID 오설정이므로 가치가 크다) 라우트를 삭제.
 - `src/app/(dashboard)/srs/[id]/page.tsx:182-193`의 수정 버튼은 `disabled` prop과 설명 토스트가 정확히 상보 조건이라 **토스트가 도달 불가능한 죽은 코드**다. 모바일에서 아이콘 전용(`:194`)이므로 레이블조차 없어 단순히 고장난 것처럼 보인다. disabled를 제거해 토스트가 발화하게 하거나 설명을 title/aria-describedby로 옮긴다.
 - `HoldSRDialog.tsx:109-125`가 보류 사유만 수집하는데 `GEMINI.md` 2절 44행은 **보류 사유와 예상 해제일**을 명시한다. `status/route.ts:9-13`의 스키마도 expectedResumeDate를 받지 않는다. 보류된 SR의 재개 예정일을 조회할 방법이 없고 SLA 마감일도 조정되지 않는다.
-- `src/app/(dashboard)/my-requests/page.tsx:231, 234`의 상태 필터가 스키마에 없는 `RESOLVED`/`CANCELLED`를 제공하고(선택 시 `my-requests/route.ts:31`의 `status as any`가 Prisma에 도달해 500) `INTAKE`/`ON_HOLD`/`REJECTED`를 누락한다. `:63-81`의 라벨/색상 맵도 동일하게 낡아 REJECTED SR이 이름 없는 배지로 렌더링된다. `src/lib/constants/sr.ts`의 공유 상수에서 도출하고 `z.nativeEnum(SRStatus)`로 검증.
+- ~~`src/app/(dashboard)/my-requests/page.tsx:231, 234`의 상태 필터가 스키마에 없는 `RESOLVED`/`CANCELLED`를 제공하고(선택 시 `my-requests/route.ts:31`의 `status as any`가 Prisma에 도달해 500) `INTAKE`/`ON_HOLD`/`REJECTED`를 누락한다. `:63-81`의 라벨/색상 맵도 동일하게 낡아 REJECTED SR이 이름 없는 배지로 렌더링된다.~~ **✅ 해결됨 (2026-08-01, 3.40과 함께).** 필터 항목과 라벨/색상 맵을 `SRStatus` enum 에서 도출하고, 라우트는 알 수 없는 상태 값을 필터 없음으로 취급한다(`status as any` 제거).
 - `dashboard/page.tsx:279`의 ENGINEER '전체 보기'가 `/srs?assignee=me`로 이동하는데 SR 목록은 `assigneeId`만 읽고(`srs/page.tsx:33`) `'me'` 처리가 없어 파라미터가 통째로 버려진다. `:373`, `:433`, `:453`의 세 카드는 반복 파라미터(`?priority=CRITICAL&priority=HIGH`)를 넘기는데 목록은 첫 값만 취한다(`srs/page.tsx:14-16`) — 카드의 숫자와 드릴다운 결과가 설명 없이 불일치한다.
 - `src/app/(dashboard)/srs/[id]/intake/page.tsx:11-62`에 역할/권한 검사가 전혀 없어 CLIENT_USER가 URL로 접근하면 담당자 Select(내부 직원 명단 포함)와 우선순위·예상시간·접수 노트가 담긴 완전한 트리아지 폼을 보고 제출 시점에야 403을 받는다. 대시보드가 이 URL로 직접 링크한다(`dashboard/page.tsx:236`).
 - `public/sw.js:96`의 오프라인 폴백 `return cachedResponse || cache.match('/dashboard') || cache.match('/login');`에서 `cache.match()`가 Promise(항상 truthy)이므로 `/login` 분기가 도달 불가능하고, `/dashboard`가 캐시에 없으면 await 값이 undefined가 되어 `respondWith(undefined)`가 reject한다. `/offline` 페이지도 없다. `:157`은 `public/icons/icon-192x192.png`가 존재함에도 `// icon: data.icon, // 아이콘 파일 없음`으로 알림 아이콘을 비활성화했다. `:86-88`이 인증된 HTML을 공유 캐시에 넣고 로그아웃 시 purge하지 않는다.
@@ -1233,27 +1541,27 @@ async getClientDetailsById(id: string) {
 
 ### Phase 2 — 1개월 내 (기능 결함 · 안전망 복구)
 
-| 작업                                                                                                                                                        | 영역          | 공수 | 기대 효과                                                         |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | :--: | ----------------------------------------------------------------- |
-| `vitest.config.ts`에 `coverage.include` 추가 후 실측 재기준화, Stryker `thresholds.break` 설정, `vitest.stryker.config.ts` 정합화 (3.33, 3.36)              | 테스트        |  M   | 커버리지·뮤테이션 게이트가 실제 신호를 내기 시작                  |
-| 보안 E2E의 `console.log`를 `expect`로 치환 + `expect` 없는 테스트를 실패시키는 CI 검사 (3.34)                                                               | 테스트        |  M   | RBAC·권한상승 회귀가 CI에서 잡힘                                  |
-| CI에 Postgres 서비스 + migrate + seed 추가, e2e 포트 충돌 해소, PR에서 e2e 실행 (3.35, 3.37)                                                                | 테스트/DevOps |  M   | 마이그레이션 검증 + e2e 실행 가능 + DB 기반 통합 테스트 기반 확보 |
-| MANAGER/CLIENT_ADMIN seed 사용자 추가 + e2e 페르소나 4개로 확장 + 세션 역할 단언 (3.38)                                                                     | 테스트        |  S   | 5개 역할 중 검증되지 않던 2개 커버                                |
-| 부트스트랩 경로 구현 — seed 분리 + entrypoint에서 참조 데이터 seed + first-run ADMIN 승격 (3.4)                                                             | UX/DevOps     |  M   | 신규 인스턴스가 사용 가능해짐                                     |
-| 서비스 카테고리 생성/편집/삭제 UI + 신규 클라이언트 기본 카테고리 시드 (3.18)                                                                               | UX            |  M   | 신규 고객사 온보딩 경로 개통                                      |
-| 카테고리 선택을 clientId로 스코프 + 서버 측 소속 검증 (3.19)                                                                                                | 도메인/보안   |  S   | 교차 테넌트 카탈로그 유출 + SLA 오염 차단                         |
-| 관리자 비밀번호 재설정 구현(`userUpdateSchema`에 password 추가 + 해싱) + 로그인 페이지 복구 안내 (3.17)                                                     | UX/보안       |  S   | 유일한 계정 복구 수단 복구                                        |
-| `TZ=Asia/Seoul` 설정 + 날짜 포맷 타임존 명시 + SR 번호/대시보드 그룹핑 KST 정렬 (3.25)                                                                      | 프론트/데이터 |  M   | 하이드레이션 불일치·마감 배지 오류·CSV 날짜 밀림 동시 해결        |
-| intake POST/PATCH에서 도메인·실시간 이벤트 발행 (3.21)                                                                                                      | 도메인        |  S   | 접수·배정·재배정 알림 복구                                        |
-| SSE 핸들러에 `router.refresh()` 추가 + 죽은 쿼리 키 정리 (3.26)                                                                                             | 프론트        |  S   | 실시간 갱신 실제 동작                                             |
-| `updateSR` 필드 단위 인가 분리 (3.22) + 담당자 존재/활성 검증 (3.23)                                                                                        | 도메인        |  M   | SLA·우선순위·배정 위조 차단, 고아 SR 방지                         |
-| `useEditSRForm`의 희망 우선순위/완료일을 스키마에 추가 (3.27)                                                                                               | 프론트/API    |  S   | 조용한 데이터 소실 제거                                           |
-| `highlightText` 정규식 이스케이프 (3.28) + 유휴 타임아웃 ref 리팩터 (3.24)                                                                                  | 프론트        |  S   | 조직도 크래시 제거, 자동 로그아웃 실동작                          |
-| `/api/srs/my-requests` 페이지네이션 + CSV 스트리밍 + 레이트리밋 + 업로드 Content-Length 선검사 (3.39, 3.40, 3.41) + 클라이언트 상세 `srs: true` 제거 (3.42) | 성능          |  M   | 남은 4개 OOM 경로 봉쇄                                            |
-| 앱 HEALTHCHECK + compose healthcheck + nginx `service_healthy` + `mem_limit` + SHA 태깅 + 롤백 경로 + 배포 전 백업 (3.31, 3.32)                             | DevOps        |  M   | 배포 아웃티지 축소, 롤백 가능, 마이그레이션 사고 복구 지점 확보   |
-| certbot 갱신 자동화 (3.29)                                                                                                                                  | DevOps        |  S   | 90일 후 전면 TLS 만료 방지                                        |
-| 외부 업타임 모니터를 `/api/health`에 연결 + Sentry 도입 + pino SIGTERM 플러시 (3.30)                                                                        | DevOps        |  S   | 탐지 시간(MTTD) 확보                                              |
-| 백업 오프사이트 복제 + 암호화 + 월간 복구 리허설 워크플로 (3.31)                                                                                            | DevOps        |  M   | 디스크·VM 유실 시나리오에 대한 실제 보호                          |
+| 작업                                                                                                                                                                              | 영역          | 공수 | 기대 효과                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | :--: | ----------------------------------------------------------------- |
+| ✅ `coverage.include` + Stryker `thresholds.break` (3.33, 3.36) — 완료(이전 세션)                                                                                                 | 테스트        |  M   | 커버리지·뮤테이션 게이트가 실제 신호를 내기 시작                  |
+| ✅ 보안 E2E의 `console.log`를 `expect`로 치환(이전 세션) + `expect` 없는 테스트를 실패시키는 CI 검사 (3.34) — **완료 2026-08-01**                                                 | 테스트        |  M   | RBAC·권한상승 회귀가 CI에서 잡힘                                  |
+| ✅ CI에 Postgres 서비스 + migrate + seed + e2e 실행 (3.35) + DB 통합 테스트 이식 (3.37) — **완료 2026-08-01**                                                                     | 테스트/DevOps |  M   | 마이그레이션 검증 + e2e 실행 가능 + DB 기반 통합 테스트 기반 확보 |
+| ✅ MANAGER/CLIENT_ADMIN 페르소나 추가 + 세션 역할 단언 (3.38) — 완료(이전 세션)                                                                                                   | 테스트        |  S   | 5개 역할 중 검증되지 않던 2개 커버                                |
+| ✅ 부트스트랩 경로 구현 — entrypoint 기준 데이터 seed + env 기반 ADMIN 부트스트랩 (3.4) — **완료 2026-08-01**                                                                     | UX/DevOps     |  M   | 신규 인스턴스가 사용 가능해짐                                     |
+| ✅ 서비스 카테고리 생성/편집/삭제 UI + 신규 클라이언트 기본 카테고리 시드 (3.18) — **완료 2026-08-01**                                                                            | UX            |  M   | 신규 고객사 온보딩 경로 개통                                      |
+| ✅ 카테고리 선택을 clientId로 스코프 + 서버 측 소속 검증 (3.19) — **완료 2026-08-01**                                                                                             | 도메인/보안   |  S   | 교차 테넌트 카탈로그 유출 + SLA 오염 차단                         |
+| ✅ 관리자 비밀번호 재설정 구현 + 로그인 페이지 복구 안내 (3.17) — **완료 2026-08-01**                                                                                             | UX/보안       |  S   | 유일한 계정 복구 수단 복구                                        |
+| ✅ `TZ=Asia/Seoul` + 날짜 포맷 타임존 명시 + SR 번호/대시보드 그룹핑 KST 정렬 (3.25) — **완료 2026-08-01**                                                                        | 프론트/데이터 |  M   | 하이드레이션 불일치·마감 배지 오류·CSV 날짜 밀림 동시 해결        |
+| ✅ intake POST/PATCH에서 도메인·실시간 이벤트 발행 (3.21) — **완료 2026-08-01**                                                                                                   | 도메인        |  S   | 접수·배정·재배정 알림 복구                                        |
+| ✅ SSE 핸들러에 `router.refresh()` 추가 + 죽은 쿼리 키 정리 (3.26) — **완료 2026-08-01**                                                                                          | 프론트        |  S   | 실시간 갱신 실제 동작                                             |
+| ✅ `updateSR` 필드 단위 인가 분리 (3.22) + 담당자 존재/활성 검증 (3.23) — 완료(이전 세션)                                                                                         | 도메인        |  M   | SLA·우선순위·배정 위조 차단, 고아 SR 방지                         |
+| ✅ `useEditSRForm`의 희망 우선순위/완료일을 `srUpdateSchema`에 추가 (3.27) — **완료 2026-08-01**                                                                                  | 프론트/API    |  S   | 조용한 데이터 소실 제거                                           |
+| ✅ `highlightText` 정규식 이스케이프 (3.28) + 유휴 타임아웃 ref 리팩터 (3.24) — **완료 2026-08-01**                                                                               | 프론트        |  S   | 조직도 크래시 제거, 자동 로그아웃 실동작                          |
+| ✅ `/api/srs/my-requests` 페이지네이션 + CSV 스트리밍·레이트리밋 + 업로드 Content-Length 선검사 + 클라이언트 상세 `srs: true` 제거 (3.39, 3.40, 3.41, 3.42) — **완료 2026-08-01** | 성능          |  M   | 4개 OOM 경로 전부 봉쇄                                            |
+| ✅ 앱 HEALTHCHECK + compose healthcheck + nginx `service_healthy` + `mem_limit` + SHA 태깅 + 롤백 경로 + 배포 전 백업 (3.32) — **완료 2026-08-01**                                | DevOps        |  M   | 배포 아웃티지 축소, 롤백 가능, 마이그레이션 사고 복구 지점 확보   |
+| ✅ certbot 갱신 자동화 (3.29) — **완료 2026-08-01**                                                                                                                               | DevOps        |  S   | 90일 후 전면 TLS 만료 방지                                        |
+| pino 종료 플러시 ✅ **완료 2026-08-01** / `/api/health` 를 기존 uptime-kuma 감시에 등록 (3.30, 서버 측 작업 남음) — Sentry 는 소유자 결정으로 제외                                | DevOps        |  S   | 탐지 시간(MTTD) 확보                                              |
+| 백업 암호화·리허설 워크플로 ✅ **완료 2026-08-01** / 오프사이트 복제는 **수용된 위험**(소유자 결정 2026-08-01) (3.31)                                                             | DevOps        |  M   | 논리적 손상 복구는 확보. **디스크·VM 유실은 여전히 미보호**       |
 
 ### Phase 3 — 분기 내 (구조 개선 · 재발 방지)
 
@@ -1269,7 +1577,7 @@ async getClientDetailsById(id: string) {
 | 상태 전이 인가를 permission 기반으로 전환 + fail-closed + UI를 `getAvailableTransitions`에서 도출 (4.3)                                 | 도메인      |  M   | 커스텀 역할 사용 가능, UI-백엔드 발산 재발 방지        |
 | 레이트리미터·SSE 에미터·첨부 저장소를 프로세스 외부로(Redis/Postgres LISTEN-NOTIFY/S3) (4.5)                                            | 성능        |  L   | 복제본 증설 가능, 레이트리밋 실효화                    |
 | 모든 텍스트 필드 `.max()` + 쿼리 파라미터 zod 검증 + `sortBy` allowlist + 응답 봉투 통일 (4.3)                                          | API         |  M   | DB 팽창·스키마 유출·페이지네이션 불안정 동시 해결      |
-| DB 기반 통합 테스트 ~10건 이식(교차 테넌트 필터, 트랜잭션 원자성, 동시 채번) (3.37)                                                     | 테스트      |  M   | 목 기반으로는 잡을 수 없는 결함 클래스 커버            |
+| ✅ DB 기반 통합 테스트 14건 이식(교차 테넌트 필터, 트랜잭션 원자성, 동시 채번) (3.37) — **완료 2026-08-01**                             | 테스트      |  M   | 목 기반으로는 잡을 수 없는 결함 클래스 커버            |
 | `NEXT_PUBLIC_APP_URL`/`STORAGE_DIR`/VAPID/EMAIL을 `ENV_VARIABLES`에 등록 + 플레이스홀더 거부 validate (4.6)                             | 설정        |  S   | 알림 링크 오도메인·푸시 무동작·업로드 유실 방지        |
 | 죽은 코드 정리 — `permissions.ts`, `recharts`, `tsconfig.full.json`, `ProfileDialog`, 45개 에이전트 스크래치, 6개 테스트 아티팩트 (5절) | 설정        |  S   | 리뷰 노이즈 제거, mock/스키마 드리프트 차단            |
 | 인앱 알림 채널 구현 또는 GEMINI.md 정정, 만족도 평가 UI, 댓글 편집/삭제, 리포트 필터 (5절)                                              | UX          |  L   | PRD-구현 격차 해소                                     |

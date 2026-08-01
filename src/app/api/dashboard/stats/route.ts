@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
 import prisma from '@/lib/prisma';
+import { formatISODateInAppZone } from '@/lib/timezone';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -206,7 +207,7 @@ export const GET = withAuthAndRateLimit(
           : Promise.resolve([]),
         // 8. Get SR trend (last 30 days) - Optimized: Group by date in DB using raw SQL
         prisma.$queryRaw<Array<{ date: Date | string; count: bigint }>>`
-          SELECT DATE(created_at) as date, COUNT(id) as count
+          SELECT DATE(created_at AT TIME ZONE 'Asia/Seoul') as date, COUNT(id) as count
           FROM srs
           WHERE created_at >= ${thirtyDaysAgo}
           ${
@@ -216,7 +217,7 @@ export const GET = withAuthAndRateLimit(
                 : Prisma.sql`AND 1=0`
               : Prisma.empty
           }
-          GROUP BY DATE(created_at)
+          GROUP BY DATE(created_at AT TIME ZONE 'Asia/Seoul')
         `,
         // 9. 성능 지표 계산 - DB Aggregation
         prisma.$queryRaw<
@@ -333,12 +334,18 @@ export const GET = withAuthAndRateLimit(
           ? waitingTimes.reduce((sum, hours) => sum + hours, 0) / waitingTimes.length
           : 0;
 
-      // Group by date (YYYY-MM-DD)
+      // Group by date (YYYY-MM-DD, KST 달력 기준)
+      //
+      // SQL 이 `AT TIME ZONE 'Asia/Seoul'` 로 이미 KST 달력일을 돌려주므로, 여기서는
+      // 그 값을 타임존 변환 없이 그대로 읽어야 한다. `toISOString()` 을 다시 태우면
+      // 드라이버가 만든 Date(자정)가 UTC 로 되밀려 하루가 어긋난다.
       const trendByDate = srTrendRaw.reduce(
         (acc, item) => {
           // item.date can be Date object (Postgres) or string (other drivers)
           const dateStr =
-            item.date instanceof Date ? item.date.toISOString().split('T')[0] : String(item.date);
+            item.date instanceof Date
+              ? `${item.date.getUTCFullYear()}-${String(item.date.getUTCMonth() + 1).padStart(2, '0')}-${String(item.date.getUTCDate()).padStart(2, '0')}`
+              : String(item.date).slice(0, 10);
           acc[dateStr] = Number(item.count);
           return acc;
         },
@@ -348,9 +355,8 @@ export const GET = withAuthAndRateLimit(
       // Fill in missing dates
       const trendData = [];
       for (let i = 29; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
+        // 채움 루프도 KST 달력일로 만들어야 GROUP BY 결과와 키가 맞는다.
+        const dateStr = formatISODateInAppZone(Date.now() - i * 24 * 60 * 60 * 1000);
         trendData.push({
           date: dateStr,
           count: trendByDate[dateStr] || 0,

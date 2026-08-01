@@ -113,6 +113,33 @@ export default defineConfig({
         },
       },
       {
+        // 실제 Postgres 에 붙는 통합 테스트(감사 3.37).
+        //
+        // 목 기반 테스트가 구조적으로 잡을 수 없는 세 부류만 다룬다:
+        //   트랜잭션 롤백 / 테넌트 필터의 실제 실행 / 동시 채번 경쟁.
+        //
+        // **`tests/` 아래 두는 이유:** 루트 `test.include` 가 `src/**/*.test.ts` 라
+        // 통합 테스트를 `src/` 안에 두면 unit 프로젝트가 jsdom + 가짜 DATABASE_URL 로
+        // 함께 집어간다. 디렉터리를 분리하고 아래에서 `src/**` 를 명시 제외해
+        // 두 프로젝트가 서로의 파일을 절대 집지 않게 한다.
+        //
+        // CI 의 test 잡은 이미 Postgres 서비스 + migrate deploy + seed 를 갖추고 있으므로
+        // `pnpm test:coverage` 가 이 프로젝트도 함께 실행한다.
+        extends: true,
+        test: {
+          name: 'integration',
+          globals: true,
+          environment: 'node',
+          include: ['tests/integration/**/*.test.ts'],
+          exclude: ['src/**', '**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
+          setupFiles: ['./vitest.integration.setup.ts'],
+          // 같은 DB 를 공유하므로 파일 간 병렬 실행은 TRUNCATE 가 서로를 지우게 만든다.
+          fileParallelism: false,
+          testTimeout: 30_000,
+          hookTimeout: 60_000,
+        },
+      },
+      {
         plugins: [
           storybookTest({
             configDir: path.join(dirname, '.storybook'),

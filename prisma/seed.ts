@@ -829,10 +829,82 @@ async function seedDevFixtures() {
   }
 }
 
+/**
+ * 프로덕션 부트스트랩 관리자 생성 (감사 3.4).
+ *
+ * 깨끗한 DB 로 배포하면 마이그레이션은 성공하고 앱도 정상 부팅하지만, **admin 이 없어
+ * 아무도 로그인할 수 없고** `/register` 도 기본 역할을 못 찾아 실패한다. 인스턴스가
+ * 영구히 사용 불가 상태가 되는데 문서화된 복구 절차도 없었다.
+ *
+ * **왜 "최초 등록자 자동 승격" 이 아니라 env 방식인가:**
+ * 최초 가입자를 ADMIN 으로 올리는 방식은 인스턴스가 인터넷에 노출된 상태에서 소유자보다
+ * 먼저 가입한 사람이 관리자가 되는 경쟁 조건을 만든다. env 로 명시하면 그 창이 없다.
+ *
+ * 안전장치:
+ * - ADMIN 역할을 가진 사용자가 **이미 하나라도 있으면 아무것도 하지 않는다.**
+ * - 같은 이메일의 기존 사용자가 있으면 비밀번호를 덮어쓰지 않는다(역할만 보강).
+ * - 두 env 가 모두 있어야 동작한다.
+ */
+async function bootstrapAdmin() {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL;
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+
+  if (!email || !password) return;
+
+  const adminRole = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
+  if (!adminRole) {
+    console.log('ADMIN 역할이 없어 부트스트랩을 건너뜁니다(기준 데이터 시딩 실패?).');
+    return;
+  }
+
+  const existingAdminCount = await prisma.userRole.count({
+    where: { roleId: adminRole.id },
+  });
+  if (existingAdminCount > 0) {
+    console.log(`ADMIN 이 이미 ${existingAdminCount}명 있어 부트스트랩을 건너뜁니다.`);
+    return;
+  }
+
+  if (password.length < 12) {
+    console.log('BOOTSTRAP_ADMIN_PASSWORD 가 12자 미만이라 부트스트랩을 중단합니다.');
+    return;
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+
+  if (existingUser) {
+    // 비밀번호는 건드리지 않는다 — 운영자가 바꿔 둔 값을 되돌리면 안 된다.
+    await prisma.userRole.create({
+      data: { userId: existingUser.id, roleId: adminRole.id },
+    });
+    console.log(`기존 사용자 ${email} 에게 ADMIN 역할을 부여했습니다(비밀번호는 유지).`);
+    return;
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      email,
+      name: process.env.BOOTSTRAP_ADMIN_NAME || '시스템 관리자',
+      password: await hash(password, BCRYPT_WORK_FACTOR),
+      isActive: true,
+      notificationPreference: { create: {} },
+      roles: { create: { roleId: adminRole.id } },
+    },
+  });
+
+  console.log(`부트스트랩 ADMIN 을 생성했습니다: ${user.email}`);
+  console.log(
+    '보안: 로그인 후 비밀번호를 변경하고, BOOTSTRAP_ADMIN_PASSWORD 환경변수를 제거하세요.'
+  );
+}
+
 async function main() {
   console.log('Starting seed...');
 
   await seedReferenceData();
+
+  // 기준 데이터 이후에 실행해야 ADMIN 역할이 존재한다.
+  await bootstrapAdmin();
 
   if (!shouldSeedDevFixtures) {
     console.log(

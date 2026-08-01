@@ -58,6 +58,19 @@ export class BadRequestError extends ServiceError {
 }
 
 /**
+ * 요청 본문이 허용 상한을 초과했을 때(413).
+ *
+ * 업로드 본문을 힙에 물질화하기 **전에** 던져야 의미가 있다(감사 3.41).
+ */
+export class PayloadTooLargeError extends ServiceError {
+  constructor(message: string) {
+    super(message, 'PAYLOAD_TOO_LARGE', 413);
+    this.name = 'PayloadTooLargeError';
+    Object.setPrototypeOf(this, PayloadTooLargeError.prototype);
+  }
+}
+
+/**
  * 권한 없음 에러
  */
 export class UnauthorizedError extends ServiceError {

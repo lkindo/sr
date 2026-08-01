@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { SRStatus } from '@prisma/client';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, Clock, FileText, Filter } from 'lucide-react';
@@ -18,8 +19,8 @@ interface MySR {
   id: string;
   srNumber: string;
   title: string;
-  description: string;
-  status: string;
+  // description(무제한 TEXT)은 목록 응답에 포함되지 않는다 — 상세 페이지에서 조회한다.
+  status: SRStatus;
   requestedPriority: string;
   actualPriority?: string | null;
   requestedCompletionDate?: string | null;
@@ -60,24 +61,48 @@ interface MySR {
   };
 }
 
-const statusLabels: Record<string, string> = {
+interface MyRequestStats {
+  total: number;
+  requested: number;
+  inProgress: number;
+  completed: number;
+}
+
+/**
+ * 상태 목록은 Prisma `SRStatus` enum 에서 도출한다.
+ *
+ * 이전에는 스키마에 없는 RESOLVED/CANCELLED 를 필터에 노출하고
+ * 실재하는 INTAKE/ON_HOLD/REJECTED 는 빠뜨려, 선택 시 Prisma 가 알 수 없는 enum 값을
+ * 받아 500 이 났고 REJECTED SR 은 이름 없는 배지로 렌더링됐다.
+ */
+const STATUS_ORDER = [
+  SRStatus.REQUESTED,
+  SRStatus.INTAKE,
+  SRStatus.IN_PROGRESS,
+  SRStatus.ON_HOLD,
+  SRStatus.COMPLETED,
+  SRStatus.CONFIRMED,
+  SRStatus.REJECTED,
+] as const;
+
+const statusLabels: Record<SRStatus, string> = {
   REQUESTED: '접수 대기',
+  INTAKE: '접수',
   IN_PROGRESS: '진행 중',
-  RESOLVED: '해결됨',
+  ON_HOLD: '보류',
   COMPLETED: '완료',
   CONFIRMED: '확인됨',
-  CANCELLED: '취소됨',
-  ON_HOLD: '보류',
+  REJECTED: '거부됨',
 };
 
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusColors: Record<SRStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   REQUESTED: 'secondary',
+  INTAKE: 'secondary',
   IN_PROGRESS: 'default',
-  RESOLVED: 'default',
+  ON_HOLD: 'secondary',
   COMPLETED: 'outline',
   CONFIRMED: 'outline',
-  CANCELLED: 'destructive',
-  ON_HOLD: 'secondary',
+  REJECTED: 'destructive',
 };
 
 const priorityLabels: Record<string, string> = {
@@ -94,11 +119,20 @@ const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = 
   LOW: 'secondary',
 };
 
+const PAGE_SIZE = 20;
+
+const EMPTY_STATS: MyRequestStats = { total: 0, requested: 0, inProgress: 0, completed: 0 };
+
 export default function MyRequestsPage() {
   const [srs, setSrs] = useState<MySR[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  // 통계는 페이지가 아니라 서버가 요청자 전체 SR 기준으로 계산해 내려준다.
+  const [stats, setStats] = useState<MyRequestStats>(EMPTY_STATS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -108,12 +142,17 @@ export default function MyRequestsPage() {
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.append('status', statusFilter);
       params.append('sortBy', sortBy);
+      params.append('page', String(page));
+      params.append('pageSize', String(PAGE_SIZE));
 
       const response = await fetch(`/api/srs/my-requests?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch my requests');
 
-      const data = await response.json();
-      setSrs(data.srs || []);
+      const body = await response.json();
+      setSrs(body.data ?? []);
+      setStats(body.stats ?? EMPTY_STATS);
+      setTotalPages(body.meta?.totalPages ?? 1);
+      setTotalItems(body.meta?.totalItems ?? 0);
     } catch {
       // 에러는 toast로 사용자에게 표시
       toast({
@@ -124,19 +163,16 @@ export default function MyRequestsPage() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, sortBy, toast]); // Add toast to dependencies as well
+  }, [statusFilter, sortBy, page, toast]);
 
   useEffect(() => {
     fetchMyRequests();
   }, [fetchMyRequests]);
 
-  // 상태별 통계
-  const stats = {
-    total: srs.length,
-    requested: srs.filter((sr) => sr.status === 'REQUESTED').length,
-    inProgress: srs.filter((sr) => sr.status === 'IN_PROGRESS').length,
-    completed: srs.filter((sr) => ['COMPLETED', 'CONFIRMED'].includes(sr.status)).length,
-  };
+  // 필터·정렬이 바뀌면 첫 페이지로 되돌린다. 그렇지 않으면 결과가 없는 페이지에 머무를 수 있다.
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, sortBy]);
 
   if (loading) {
     return (
@@ -226,12 +262,12 @@ export default function MyRequestsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">전체 상태</SelectItem>
-                  <SelectItem value="REQUESTED">접수 대기</SelectItem>
-                  <SelectItem value="IN_PROGRESS">진행 중</SelectItem>
-                  <SelectItem value="RESOLVED">해결됨</SelectItem>
-                  <SelectItem value="COMPLETED">완료</SelectItem>
-                  <SelectItem value="CONFIRMED">확인됨</SelectItem>
-                  <SelectItem value="CANCELLED">취소됨</SelectItem>
+                  {STATUS_ORDER.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {/* eslint-disable-next-line security/detect-object-injection -- 키는 SRStatus enum 상수 튜플에서만 온다 */}
+                      {statusLabels[status]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -288,7 +324,6 @@ export default function MyRequestsPage() {
                       </Badge>
                     </div>
                     <p className="text-lg font-medium text-foreground">{sr.title}</p>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{sr.description}</p>
                   </div>
                 </div>
               </CardHeader>
@@ -391,6 +426,40 @@ export default function MyRequestsPage() {
           ))
         )}
       </div>
+
+      {/* 페이지네이션 */}
+      {totalPages > 1 && (
+        <nav
+          aria-label="내 요청 SR 페이지네이션"
+          className="flex items-center justify-between gap-4 pt-2"
+        >
+          <p className="text-sm text-muted-foreground">
+            전체 {totalItems}건 중 {(page - 1) * PAGE_SIZE + 1}–
+            {Math.min(page * PAGE_SIZE, totalItems)}건
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              이전
+            </Button>
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              다음
+            </Button>
+          </div>
+        </nav>
+      )}
 
       {/* SR 생성 다이얼로그 */}
       <CreateSRDialog

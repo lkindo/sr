@@ -107,7 +107,11 @@ export class ServiceCategoryService {
     return prisma.serviceCategory.findMany({
       where: {
         isActive: true,
-        ...(clientId && { clientId }),
+        // 해당 고객사 전용 + 전역(clientId=null) 카테고리를 함께 보여준다.
+        // `{ clientId }` 로 정확히 일치만 걸면 전역 카테고리가 목록에서 사라져,
+        // 전역 카테고리만 있는 신규 고객사는 선택지가 0개가 된다.
+        // (SRService.ensureCategoryBelongsToClient 가 허용하는 범위와 정확히 같다)
+        ...(clientId && { OR: [{ clientId }, { clientId: null }] }),
       },
       select: {
         id: true,

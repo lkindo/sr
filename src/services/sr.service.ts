@@ -25,6 +25,7 @@ import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
+import { appZoneDateStamp } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { UserService } from '@/services/user.service';
@@ -173,8 +174,9 @@ export class SRService {
 
     // SR 생성 (트랜잭션으로 SR 번호 생성 및 SR 생성을 원자적으로 수행)
     const sr = await prisma.$transaction(async (tx) => {
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+      // KST 달력 기준. `toISOString()` 이면 09:00 KST 에 날짜가 롤오버해서
+      // 하루의 앞 9시간에 만든 SR 이 전날 번호를 받는다(감사 3.25).
+      const dateStr = appZoneDateStamp();
 
       // 원자적 시퀀스 채번 (PostgreSQL native upsert)
       const sequences = await tx.$queryRaw<{ seq: number }[]>`
@@ -409,6 +411,15 @@ export class SRService {
       if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
       if (validated.priority !== undefined) updateData.priority = validated.priority;
       if (validated.status !== undefined) updateData.status = validated.status;
+
+      // 요청자가 표명한 희망 긴급도·기한. 운영자 소유 필드가 아니므로 게이트하지 않는다.
+      // (스키마에 선언이 없어 zod 가 조용히 버리던 값들 — 감사 3.27)
+      if (validated.requestedPriority !== undefined)
+        updateData.requestedPriority = validated.requestedPriority;
+      if (validated.requestedCompletionDate !== undefined)
+        updateData.requestedCompletionDate = validated.requestedCompletionDate
+          ? new Date(validated.requestedCompletionDate)
+          : null;
       if (validated.actualPriority !== undefined)
         updateData.actualPriority = validated.actualPriority;
       if (validated.estimatedHours !== undefined)

@@ -137,6 +137,14 @@ export default function LoginForm() {
               회원가입
             </Link>
           </p>
+          {/*
+            셀프 서비스 재설정 플로우는 아직 없다. 안내가 없으면 잠긴 사용자는
+            복구 수단이 존재한다는 사실 자체를 알 수 없어 막다른 길에 놓인다.
+            (관리자 재설정 경로는 사용자 관리 화면에 있다)
+          */}
+          <p className="text-sm text-muted-foreground text-center">
+            비밀번호를 잊으셨나요? 시스템 관리자에게 재설정을 요청하세요.
+          </p>
         </CardFooter>
       </form>
     </Card>

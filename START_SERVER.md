@@ -128,24 +128,43 @@ pnpm dev
 - 이메일
 - 비밀번호 (최소 8자)
 
-### 2. 역할 할당
+### 2. 관리자 권한 부여
 
-첫 사용자는 역할이 없으므로 **Prisma Studio**에서 수동 할당:
+> **정정 (2026-08-01)**: 이전 판은 Prisma Studio 에서 `user_roles` 행을 손으로 넣으라고
+> 안내했다. 그 절차는 **역할·권한 행이 이미 존재할 때만** 성립하는데, 시딩 전에는
+> `roles` 테이블 자체가 비어 있어 복사할 ID 가 없다. 아래가 실제로 동작하는 절차다.
+
+**로컬 개발** — 기준 데이터(역할·권한)를 먼저 시딩한다:
 
 ```powershell
-# 새 터미널에서
-npx prisma studio
+pnpm db:seed
 ```
 
-브라우저가 자동으로 열리면:
+그런 다음 부트스트랩 관리자를 만든다(이미 ADMIN 이 있으면 아무것도 하지 않는다):
 
-1. `users` 테이블 → 생성된 사용자 ID 복사
-2. `roles` 테이블 → ADMIN 역할 ID 복사
-3. `user_roles` 테이블 → **Add record** 클릭
-4. 필드 입력:
-   - `userId`: 사용자 ID 붙여넣기
-   - `roleId`: ADMIN 역할 ID 붙여넣기
-5. **Save 1 change** 클릭
+```powershell
+$env:BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
+$env:BOOTSTRAP_ADMIN_PASSWORD="충분히-긴-임시-비밀번호"
+pnpm db:seed
+```
+
+테스트 계정(engineer/client/manager 등)까지 함께 필요하면:
+
+```powershell
+$env:SEED_DEV_FIXTURES="true"
+$env:SEED_ADMIN_PASSWORD="충분히-긴-임시-비밀번호"
+pnpm db:seed
+```
+
+**Docker / 프로덕션** — 컨테이너 `docker-entrypoint.sh` 가 마이그레이션 직후
+기준 데이터를 자동 시딩한다. 관리자 계정만 `.env.docker` 에 지정하면 된다:
+
+```bash
+BOOTSTRAP_ADMIN_EMAIL=admin@your-domain.com
+BOOTSTRAP_ADMIN_PASSWORD=충분히-긴-임시-비밀번호
+```
+
+⚠️ 로그인해서 비밀번호를 바꾼 뒤에는 `BOOTSTRAP_ADMIN_PASSWORD` 를 환경에서 제거할 것.
 
 ### 3. 로그인
 

@@ -47,15 +47,32 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           RETENTION_DAYS: ${{ github.event.inputs.retention_days || '14' }}
+          # 백업 암호화 수신자(age 공개키 또는 gpg 키 ID). 미설정 시 평문으로 저장되고
+          # 스크립트가 경고한다. 오프사이트로 내보내기 전에 반드시 등록할 것(감사 3.31).
+          BACKUP_ENCRYPT_RECIPIENT: ${{ secrets.BACKUP_ENCRYPT_RECIPIENT }}
+          # 오프호스트 복제 명령. 예: rclone copy /home/opc/sr/backups remote:sr-backups
+          # 이 값이 없으면 백업은 프로덕션과 같은 디스크에만 남아 디스크·VM 유실에 무력하다.
+          OFFSITE_CMD: ${{ secrets.BACKUP_OFFSITE_CMD }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          envs: RETENTION_DAYS
+          envs: RETENTION_DAYS, BACKUP_ENCRYPT_RECIPIENT, OFFSITE_CMD
           script: |
-            set -e
+            set -euo pipefail
             cd /home/opc/sr
             sed -i 's/\r$//' scripts/backup.sh scripts/restore.sh
             chmod +x scripts/backup.sh scripts/restore.sh
-            RETENTION_DAYS="$RETENTION_DAYS" bash scripts/backup.sh
+            RETENTION_DAYS="$RETENTION_DAYS" \
+            BACKUP_ENCRYPT_RECIPIENT="${BACKUP_ENCRYPT_RECIPIENT:-}" \
+            OFFSITE_CMD="${OFFSITE_CMD:-}" \
+              bash scripts/backup.sh
+
+      # 백업 실패는 조용히 지나가면 안 된다. 알아채는 시점이 "복구가 필요한 날" 이면 늦다.
+      - name: Report backup failure
+        if: failure()
+        run: |
+          echo "::error::야간 백업이 실패했습니다. 서버의 /home/opc/sr/backups 와 워크플로 로그를 확인하세요."
+          echo "복구 절차: docs/backup-and-restore.md"
+          exit 1

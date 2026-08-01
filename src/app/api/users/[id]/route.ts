@@ -60,6 +60,16 @@ export const PATCH = withAuthAndRateLimit(
       session.user.roles.includes('ADMIN') ||
       hasPermissionFlag(session.user, PERMISSIONS.USER.UPDATE);
 
+    // 비밀번호 재설정은 관리자 전용 경로다.
+    // 본인 변경은 현재 비밀번호를 요구하는 changePasswordAction 을 거쳐야 하므로,
+    // 이 라우트로 자기 비밀번호를 바꿀 수 있으면 그 확인 절차를 우회하게 된다.
+    // 조용히 버리면 호출자가 성공(200)으로 읽고 바뀐 줄 알기 때문에 명시적으로 거부한다.
+    if (validated.password !== undefined && !canManageOthers) {
+      throw new ForbiddenError(
+        '비밀번호를 변경할 권한이 없습니다. 본인 비밀번호는 프로필 > 비밀번호 변경에서 현재 비밀번호와 함께 변경하세요.'
+      );
+    }
+
     const updateData: typeof validated = canManageOthers
       ? { ...validated }
       : { name: validated.name, image: validated.image };

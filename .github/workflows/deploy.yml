@@ -84,8 +84,12 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          # 이동 태그(latest/dev)와 불변 SHA 태그를 함께 민다.
+          # SHA 태그가 있어야 `latest` 가 덮어써진 뒤에도 이전 빌드를 지목할 수 있다
+          # (= 재빌드 없는 롤백, 감사 3.32).
           tags: |
             ghcr.io/${{ steps.string.outputs.image_name_lc }}:${{ steps.tags.outputs.tag }}
+            ghcr.io/${{ steps.string.outputs.image_name_lc }}:${{ github.event.workflow_run.head_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -98,7 +102,7 @@ jobs:
           port: 22
           # `.env.docker*` 는 더 이상 저장소에 없다(시크릿 커밋 제거).
           # 런타임 env 파일은 아래 SSH 스텝에서 GitHub Secrets 로부터 서버에 직접 기록한다.
-          source: 'docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh,scripts/backup.sh,scripts/restore.sh'
+          source: 'docker-compose.test.yml,docker-compose.prod.yml,nginx/nginx.conf,scripts/setup-letsencrypt.sh,scripts/renew-letsencrypt.sh,scripts/backup.sh,scripts/restore.sh'
           target: '/home/opc/sr'
 
       # SSH를 이용해 대상 서버로 배포 원격 실행
@@ -108,6 +112,8 @@ jobs:
           BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 이번 배포가 올릴 불변 이미지 태그. compose 의 `${APP_IMAGE_TAG:-latest}` 로 들어간다.
+          APP_IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
           # 컨테이너 런타임 env(.env.docker / .env.docker.test) 전체를 base64 로 담은 시크릿.
           ENV_DOCKER_B64: ${{ github.event.workflow_run.head_branch == 'main' && secrets.PROD_ENV_DOCKER_B64 || secrets.STAGING_ENV_DOCKER_B64 }}
           # compose 보간용 env(POSTGRES_USER/PASSWORD/DB) 를 base64 로 담은 시크릿.
@@ -117,16 +123,47 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          envs: BRANCH_NAME, GITHUB_ACTOR, GITHUB_TOKEN, ENV_DOCKER_B64, COMPOSE_ENV_B64
+          envs: BRANCH_NAME, GITHUB_ACTOR, GITHUB_TOKEN, ENV_DOCKER_B64, COMPOSE_ENV_B64, APP_IMAGE_TAG
           script: |
+            # 실패를 조용히 넘기지 않는다. 이 스크립트는 과거 `set -e` 가 없어
+            # 이미지 pull 실패가 이전 이미지 재배포(= 성공으로 보고되는 no-op)로 이어졌다.
+            # 의도적으로 실패를 허용하는 명령에는 개별적으로 `|| true` 가 붙어 있다.
+            set -euo pipefail
+
             mkdir -p /home/opc/sr/nginx/certs /home/opc/sr/scripts
             cd /home/opc/sr || exit 1
+
+            # ── 배포 공통 헬퍼 ─────────────────────────────────────────────────
+            # 컨테이너가 healthy 가 될 때까지 폴링한다. `sleep 5` 뒤 "running 인가"만
+            # 보던 검사는, 부팅에는 성공했지만 마이그레이션/env 문제로 요청을 못 받는
+            # 컨테이너를 통과시켰다(감사 3.32).
+            wait_healthy() {
+              container="$1"; timeout_s="${2:-180}"; waited=0
+              while [ "$waited" -lt "$timeout_s" ]; do
+                state="$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null || echo missing)"
+                health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container" 2>/dev/null || echo none)"
+                if [ "$state" = "running" ] && [ "$health" = "healthy" ]; then
+                  echo "  -> $container healthy (${waited}s)"; return 0
+                fi
+                if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then
+                  echo "  -> $container 가 $state 상태로 종료됨"; return 1
+                fi
+                # 이미지에 HEALTHCHECK 가 없으면(구버전 이미지로 롤백한 경우 등)
+                # running 만으로 판정한다 — 무한 대기보다 낫다.
+                if [ "$health" = "none" ] && [ "$state" = "running" ] && [ "$waited" -ge 20 ]; then
+                  echo "  -> $container 에 HEALTHCHECK 가 없어 running 으로 판정 (${waited}s)"; return 0
+                fi
+                sleep 3; waited=$((waited + 3))
+              done
+              echo "  -> $container 가 ${timeout_s}s 안에 healthy 가 되지 못함"; return 1
+            }
 
             # ── 런타임 시크릿 배치 ──────────────────────────────────────────────
             # 저장소에는 자격증명이 없다. 배포 시 GitHub Secrets 에서 서버에 기록한다.
             # 컨테이너를 내리기 전에 먼저 검증해, 시크릿 미등록 상태에서 서비스가
             # down 된 채로 멈추는 사고를 막는다.
-            if [ -z "$ENV_DOCKER_B64" ] || [ -z "$COMPOSE_ENV_B64" ]; then
+            # `set -u` 아래에서도 친절한 메시지를 내도록 기본값을 붙여 참조한다.
+            if [ -z "${ENV_DOCKER_B64:-}" ] || [ -z "${COMPOSE_ENV_B64:-}" ]; then
               echo "ERROR: 배포 시크릿이 비어 있습니다. 컨테이너를 건드리지 않고 중단합니다."
               echo "  필요한 Secrets: PROD_ENV_DOCKER_B64 / PROD_COMPOSE_ENV_B64 (main)"
               echo "                  STAGING_ENV_DOCKER_B64 / STAGING_COMPOSE_ENV_B64 (dev)"
@@ -142,6 +179,9 @@ jobs:
               # 배포에서 남은 파일로, 실제 EMAIL/VAPID 자격증명의 유일한 사본을 담고 있다.
               # 덮어쓰면 복구할 수 없으므로 보간 전용 파일을 따로 둔다.
               printf '%s' "$COMPOSE_ENV_B64" | base64 -d > .env.prod
+              # 이번에 올릴 불변 이미지 태그를 compose env 에 덧붙인다.
+              # (compose 는 `${APP_IMAGE_TAG:-latest}` 로 읽는다)
+              printf '\nAPP_IMAGE_TAG=%s\n' "${APP_IMAGE_TAG:-latest}" >> .env.prod
               COMPOSE_ARGS="--env-file .env.prod -f docker-compose.prod.yml"
             else
               printf '%s' "$ENV_DOCKER_B64"  | base64 -d > .env.docker.test
@@ -182,10 +222,12 @@ jobs:
               docker rm -f sr-app-test sr-db-test 2>/dev/null || true
               docker compose $COMPOSE_ARGS up -d --force-recreate --remove-orphans
 
-              # 1-1. 재생성 검증: app 컨테이너가 실제로 실행 중이 아니면 배포를 실패로 처리
-              sleep 5
-              if [ -z "$(docker ps -q -f name=sr-app-test -f status=running)" ]; then
-                echo "ERROR: sr-app-test failed to start"; docker logs sr-app-test --tail 40 2>&1 || true; exit 1
+              # 1-1. 재생성 검증: running 이 아니라 healthy 를 기다린다.
+              #      `sleep 5` + running 검사는 부팅했지만 요청을 못 받는 컨테이너를 통과시켰다.
+              if ! wait_healthy sr-app-test 240; then
+                echo "ERROR: sr-app-test failed to become healthy"
+                docker logs sr-app-test --tail 80 2>&1 || true
+                exit 1
               fi
 
               # 2. DB 시딩은 배포 파이프라인에서 수행하지 않는다.
@@ -199,8 +241,8 @@ jobs:
               #    이 이미지는 NODE_ENV=production 이므로 테스트 계정/샘플 데이터 픽스처는
               #    실행되지 않는다(의도된 동작). 스테이징 계정은 앱에서 직접 생성한다.
 
-              # 3. 미사용 이미지 prune
-              docker compose $COMPOSE_ARGS image prune -af || docker image prune -af
+              # 3. 미사용 이미지 prune (최근 7일 이미지는 롤백용으로 남긴다)
+              docker image prune -af --filter "until=168h" || true
 
             else
               echo "Deploying Production (main branch)..."
@@ -210,8 +252,13 @@ jobs:
               sudo firewall-cmd --reload || true
 
               # 2. 자가 서명 인증서 자동 생성 (certs 하위에 파일 없을 때만 발급)
+              #    이 경로는 "동작하지만 신뢰되지 않는 사이트"를 만든다. certs 디렉터리가
+              #    유실됐을 때 조용히 성공하면 아무도 눈치채지 못하므로 크게 경고한다(감사 3.29).
               if [ ! -f nginx/certs/server.crt ]; then
-                echo "Generating self-signed SSL certificate..."
+                echo "::warning::신뢰할 수 없는 자가 서명 인증서를 생성합니다. nginx/certs 가 유실됐을 수 있습니다 — Let's Encrypt 발급 상태를 확인하세요."
+                echo "############################################################"
+                echo "# WARNING: 자가 서명 인증서 생성 — 브라우저가 경고를 띄웁니다 #"
+                echo "############################################################"
                 sudo openssl req -x509 -nodes -days 730 -newkey rsa:2048 \
                   -keyout nginx/certs/server.key \
                   -out nginx/certs/server.crt \
@@ -220,32 +267,100 @@ jobs:
                 sudo chmod 600 nginx/certs/server.key
               fi
 
-              # 3. 최신 이미지 Pull 및 재구동
-              #    동명 컨테이너(프로젝트 밖 생성분) 강제 정리 후 재생성하여 이름 충돌로 인한
-              #    "성공 보고 + 미교체" 문제를 방지한다. DB(sr_db_data)/업로드(sr_uploads)는
-              #    named volume 이므로 데이터는 보존되고, nginx 인증서는 bind-mount 로 유지된다.
-              docker compose $COMPOSE_ARGS pull
-              docker compose $COMPOSE_ARGS down --remove-orphans || true
-              docker rm -f sr-nginx sr-app sr-db 2>/dev/null || true
-              docker compose $COMPOSE_ARGS up -d --force-recreate --remove-orphans
-
-              # 3-1. 재생성 검증: app 컨테이너가 실행 중이 아니면 배포를 실패로 처리
-              sleep 5
-              if [ -z "$(docker ps -q -f name=sr-app -f status=running)" ]; then
-                echo "ERROR: sr-app failed to start"; docker logs sr-app --tail 40 2>&1 || true; exit 1
+              # 3. 롤백 지점 기록.
+              #    **태그가 아니라 이미지 ID(sha256)를 잡는다.** 컨테이너가 `:latest` 로
+              #    떠 있었다면 그 태그는 방금 GHCR 에서 새 이미지로 덮어써졌으므로,
+              #    태그로 되돌리면 같은 불량 이미지를 다시 배포하게 된다.
+              #    이미지 ID 는 로컬에 남아 있는 한(아래 prune 이 7일은 보존) 불변이다.
+              PREVIOUS_IMAGE_REF="$(docker inspect -f '{{.Config.Image}}' sr-app 2>/dev/null || echo '')"
+              PREVIOUS_IMAGE_ID="$(docker inspect -f '{{.Image}}' sr-app 2>/dev/null || echo '')"
+              if [ -n "$PREVIOUS_IMAGE_ID" ]; then
+                printf '%s\n%s\n' "$PREVIOUS_IMAGE_ID" "$PREVIOUS_IMAGE_REF" > .previous-image
+                echo "Rollback point: $PREVIOUS_IMAGE_REF ($PREVIOUS_IMAGE_ID)"
               fi
 
-              # 4. Let's Encrypt 발급 스크립트 실행
+              # 4. 마이그레이션 사고 대비 백업.
+              #    앱이 뜨면서 `prisma migrate deploy` 가 도는데, 그 전에 복구 지점을 만든다.
+              #    백업 실패로 배포를 막지는 않되(운영 중단이 더 크다) 눈에 띄게 경고한다.
+              if [ -x scripts/backup.sh ]; then
+                echo "Pre-deploy backup..."
+                if ! (set -a; . ./.env.prod; set +a; ./scripts/backup.sh); then
+                  echo "WARNING: 배포 전 백업 실패. 마이그레이션 사고 시 복구 지점이 없습니다."
+                fi
+              fi
+
+              # 5. 이미지 Pull 및 앱만 교체
+              #    과거에는 `down` 으로 nginx·DB 까지 내려 매 배포가 30~90초 하드 아웃티지였고
+              #    (nginx 도 내려가 사용자는 connection-refused 를 받았다), prod 배포가
+              #    스테이징까지 부수적으로 죽였다. 이제 앱 컨테이너만 재생성한다.
+              #    DB(sr_db_data)/업로드(sr_uploads)는 named volume 이라 어느 쪽이든 보존된다.
+              docker compose $COMPOSE_ARGS pull
+
+              # nginx·db 는 설정이 바뀐 경우에만 compose 가 알아서 재생성한다(대개 no-op).
+              docker compose $COMPOSE_ARGS up -d --remove-orphans
+
+              # 앱은 이미지가 바뀌었으므로 명시적으로 재생성한다.
+              docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app
+
+              # 5-1. 헬스 게이트 — running 이 아니라 healthy 를 기다린다.
+              if ! wait_healthy sr-app 240; then
+                echo "ERROR: 새 이미지가 healthy 상태에 도달하지 못했습니다."
+                docker logs sr-app --tail 80 2>&1 || true
+
+                if [ -n "${PREVIOUS_IMAGE_ID:-}" ]; then
+                  # 이전 이미지 ID 에 고정 태그를 붙여 compose 가 지목할 수 있게 한다.
+                  IMAGE_REPO="${PREVIOUS_IMAGE_REF%:*}"
+                  [ -n "$IMAGE_REPO" ] || IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_LC:-lkindo/sr}"
+                  echo "Rolling back to $PREVIOUS_IMAGE_ID ($PREVIOUS_IMAGE_REF) ..."
+
+                  if docker tag "$PREVIOUS_IMAGE_ID" "${IMAGE_REPO}:rollback"; then
+                    sed -i '/^APP_IMAGE_TAG=/d' .env.prod
+                    printf '\nAPP_IMAGE_TAG=rollback\n' >> .env.prod
+                    docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || true
+                    if wait_healthy sr-app 240; then
+                      echo "롤백 성공 — 이전 이미지로 서비스가 복구되었습니다."
+                      echo "주의: 다음 배포가 다시 새 이미지로 덮어씁니다. 원인을 먼저 고치세요."
+                    else
+                      echo "롤백도 healthy 에 도달하지 못했습니다. 수동 확인이 필요합니다."
+                    fi
+                  else
+                    echo "이전 이미지에 태그를 붙이지 못했습니다(로컬에서 이미 정리됨?)."
+                  fi
+                else
+                  echo "롤백 지점이 없어 자동 복구를 시도하지 못했습니다."
+                fi
+                exit 1
+              fi
+
+              # 6. Let's Encrypt 발급 스크립트 실행
               chmod +x scripts/setup-letsencrypt.sh
               ./scripts/setup-letsencrypt.sh
 
-              # 5. 데이터베이스 마이그레이션
+              # 6-1. 배포와 무관한 갱신 타이머 설치(멱등).
+              #      인증서는 90일 유효한데 갱신 경로가 배포뿐이라, 90일 무배포 시
+              #      전 도메인에서 TLS 가 만료됐다(감사 3.29).
+              #      `certbot renew` 는 만기 30일 전이 아니면 no-op 이라 매일 돌려도 안전하다.
+              sed -i 's/\r$//' scripts/renew-letsencrypt.sh 2>/dev/null || true
+              chmod +x scripts/renew-letsencrypt.sh
+              mkdir -p /home/opc/sr/var
+              CRON_LINE="0 3 * * * /home/opc/sr/scripts/renew-letsencrypt.sh >> /home/opc/sr/var/certbot-renew.log 2>&1"
+              if ! crontab -l 2>/dev/null | grep -Fq 'renew-letsencrypt.sh'; then
+                (crontab -l 2>/dev/null || true; echo "$CRON_LINE") | crontab -
+                echo "certbot 갱신 cron 을 설치했습니다."
+              else
+                echo "certbot 갱신 cron 이 이미 설치되어 있습니다."
+              fi
+
+              # 7. 데이터베이스 마이그레이션
               #    스키마 마이그레이션은 컨테이너 시작 시 docker-entrypoint.sh의
               #    `prisma migrate deploy`가 자동 수행한다.
               #    (과거의 `db push --accept-data-loss` + 무조건 reseed 는 프로덕션
               #     데이터 유실 및 운영 계정 비밀번호 초기화 위험이 있어 제거.
               #     운영 초기 시딩이 필요하면 1회성 수동 작업으로만 수행한다.)
 
-              # 6. 미사용 이미지 정리
-              docker compose $COMPOSE_ARGS image prune -af || docker image prune -af
+              # 8. 미사용 이미지 정리
+              #    `docker compose image prune` 은 유효한 하위 명령이 아니라 항상 실패했고
+              #    뒤의 `docker image prune -af` 가 **직전 SHA 이미지까지** 지워 롤백 경로를
+              #    없앴다. 최근 7일 이미지는 남긴다.
+              docker image prune -af --filter "until=168h" || true
             fi

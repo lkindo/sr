@@ -4,10 +4,12 @@ import { $Enums, Prisma } from '@prisma/client';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SLA } from '@/lib/constants';
+import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { assertAssignable } from '@/services/sr.service';
@@ -196,6 +198,39 @@ export const POST = withAuthAndRateLimit(
       });
 
       return result;
+    });
+
+    // 8. 트랜잭션 커밋 후 사이드 이펙트 발행.
+    //    접수는 "요청자에게는 상태 변경, 담당자에게는 신규 배정"이라는 두 가지 사실을 만든다.
+    //    이 라우트에는 그동안 어떤 이벤트도 없어서, 접수·배정 알림이 아예 발송되지 않았고
+    //    다른 세션의 목록도 갱신되지 않았다(감사 3.21). SRService.updateSR 과 같은 패턴이다.
+    domainEvents.emit('sr:status_changed', {
+      srId: updatedSR.id,
+      srNumber: updatedSR.srNumber,
+      title: updatedSR.title,
+      requesterId: updatedSR.requesterId,
+      previousStatus: 'REQUESTED',
+      currentStatus: updatedSR.status,
+    });
+
+    domainEvents.emit('sr:assigned', {
+      srId: updatedSR.id,
+      srNumber: updatedSR.srNumber,
+      title: updatedSR.title,
+      assigneeId: assignee.id,
+      assigneeName: assignee.name,
+    });
+
+    emitRealtimeEvent(REALTIME_EVENTS.SR_UPDATED, {
+      id: updatedSR.id,
+      srNumber: updatedSR.srNumber,
+      title: updatedSR.title,
+      status: updatedSR.status,
+      // 권한 필터링용 키: SSE 연결별 테넌트/역할 격리 및 본인 에코(중복 토스트) 방지
+      clientId: updatedSR.clientId,
+      requesterId: updatedSR.requesterId,
+      assigneeId: updatedSR.assigneeId,
+      actorId: session.user.id,
     });
 
     return NextResponse.json(
@@ -552,7 +587,31 @@ export const PATCH = withAuthAndRateLimit(
         },
       });
 
-      // 새 담당자에게만 메일 발송 (담당자가 배정된 경우만)
+      // 배정 이벤트 발행 — 알림 리스너가 새 담당자에게 메일/푸시를 보낸다.
+      // 이 자리에는 "새 담당자에게만 메일 발송" 이라는 주석만 있고 구현이 없어서,
+      // 재배정된 담당자가 자기에게 일이 왔다는 사실을 전혀 통보받지 못했다(감사 3.21).
+      // 배정 해제(null)도 발행한다 — 이전 담당자 화면의 상태를 정리해야 한다.
+      domainEvents.emit('sr:assigned', {
+        srId: updatedSR.id,
+        srNumber: updatedSR.srNumber,
+        title: updatedSR.title,
+        assigneeId: validated.assigneeId || null,
+        assigneeName: validated.assigneeId ? newAssignee?.name || '알 수 없음' : null,
+      });
+    }
+
+    // 변경이 하나라도 있으면 다른 세션의 목록·상세를 갱신시킨다.
+    if (changes.length > 0) {
+      emitRealtimeEvent(REALTIME_EVENTS.SR_UPDATED, {
+        id: updatedSR.id,
+        srNumber: updatedSR.srNumber,
+        title: updatedSR.title,
+        status: updatedSR.status,
+        clientId: updatedSR.clientId,
+        requesterId: updatedSR.requesterId,
+        assigneeId: updatedSR.assigneeId,
+        actorId: session.user.id,
+      });
     }
 
     return NextResponse.json(

@@ -8,11 +8,18 @@ import { pipeline } from 'stream/promises';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BadRequestError, NotFoundError } from '@/lib/errors';
-import { FileValidationError, validateFile } from '@/lib/file-validator';
+import {
+  FileValidationError,
+  formatBytes,
+  MAX_UPLOAD_FILE_COUNT,
+  MAX_UPLOAD_TOTAL_SIZE,
+  validateFile,
+} from '@/lib/file-validator';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeMany, serializeResponse } from '@/lib/serialization';
 import { STORAGE_DIR } from '@/lib/storage';
+import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';
@@ -41,6 +48,11 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id: srId } = await params;
 
+    // 본문을 힙에 물질화하기 전에 크기를 먼저 막는다.
+    // `formData()` 는 모든 파트를 인메모리 Blob 으로 파싱하므로, 그 뒤에 하는
+    // 타입별 크기 검증은 메모리 보호에 아무 역할도 하지 못한다(감사 3.41).
+    assertUploadSizeWithinLimit(req);
+
     // SR 존재 확인
     const sr = await prisma.sR.findUnique({
       where: { id: srId },
@@ -61,8 +73,19 @@ export const POST = withAuthAndRateLimit(
     }
 
     // 파일 개수 제한 (한 번에 최대 10개)
-    if (files.length > 10) {
-      throw new BadRequestError('한 번에 최대 10개의 파일만 업로드할 수 있습니다.');
+    if (files.length > MAX_UPLOAD_FILE_COUNT) {
+      throw new BadRequestError(
+        `한 번에 최대 ${MAX_UPLOAD_FILE_COUNT}개의 파일만 업로드할 수 있습니다.`
+      );
+    }
+
+    // 총합 가드. Content-Length 가 없는 요청(chunked)이나 헤더가 실제 크기와
+    // 어긋나는 경우를 대비해, 파싱 후에도 합계를 한 번 더 확인한다.
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > MAX_UPLOAD_TOTAL_SIZE) {
+      throw new BadRequestError(
+        `전체 업로드 용량이 너무 큽니다. 한 번에 최대 ${formatBytes(MAX_UPLOAD_TOTAL_SIZE)}까지 업로드할 수 있습니다.`
+      );
     }
 
     // 업로드 디렉토리 생성 (웹루트 밖 STORAGE_DIR 기준 — 정적 서빙 차단)

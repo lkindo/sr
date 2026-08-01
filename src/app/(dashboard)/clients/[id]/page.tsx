@@ -8,6 +8,7 @@ import {
   FileText,
   FolderTree,
   Pencil,
+  Plus,
   Trash2,
   UserMinus,
   UserPlus,
@@ -16,6 +17,7 @@ import {
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import { DeleteClientDialog } from '@/components/clients/DeleteClientDialog';
+import { ServiceCategoryDialog } from '@/components/clients/ServiceCategoryDialog';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Separator } from '@/components/ui';
@@ -117,6 +119,9 @@ export default function ClientDetailPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  // null = 생성 모드
+  const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
   const { toast } = useToast();
 
   const fetchClient = async () => {
@@ -169,6 +174,48 @@ export default function ClientDetailPage() {
   const handleUserSaved = () => {
     fetchClient();
     setIsUserDialogOpen(false);
+  };
+
+  const openCreateCategory = () => {
+    setEditingCategory(null);
+    setIsCategoryDialogOpen(true);
+  };
+
+  const openEditCategory = (category: ServiceCategory) => {
+    setEditingCategory(category);
+    setIsCategoryDialogOpen(true);
+  };
+
+  const handleCategorySaved = () => {
+    fetchClient();
+    setIsCategoryDialogOpen(false);
+    setEditingCategory(null);
+  };
+
+  const handleDeleteCategory = async (category: ServiceCategory) => {
+    if (!confirm(`'${category.categoryName}' 카테고리를 삭제하시겠습니까?`)) return;
+
+    try {
+      const response = await fetch(`/api/clients/${params.id}/categories/${category.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        // SR 이 연결된 카테고리는 서버가 막는다(참조 무결성). 그 이유를 그대로 보여준다 —
+        // "삭제 실패"로 뭉뚱그리면 사용자는 비활성화하라는 안내를 볼 수 없다.
+        throw new Error(body.error || '카테고리 삭제에 실패했습니다.');
+      }
+
+      toast({ title: '성공', description: '서비스 카테고리가 삭제되었습니다.' });
+      fetchClient();
+    } catch (error) {
+      toast({
+        title: '오류',
+        description: error instanceof Error ? error.message : '카테고리 삭제에 실패했습니다.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleRemoveUser = async (userId: string) => {
@@ -399,21 +446,35 @@ export default function ClientDetailPage() {
         <TabsContent value="categories" className="mt-6">
           <div className="sr-card-template">
             {/* 카드 헤더 */}
-            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
-                서비스 카테고리
-              </h3>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                이 고객사에 등록된 서비스 카테고리 목록입니다.
-              </p>
+            <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+                  서비스 카테고리
+                </h3>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  이 고객사에 등록된 서비스 카테고리 목록입니다.
+                </p>
+              </div>
+              <Button size="sm" onClick={openCreateCategory}>
+                <Plus className="mr-2 h-4 w-4" />
+                카테고리 추가
+              </Button>
             </div>
 
             {/* 카드 내용 */}
             <div className="px-6 py-5">
               {client.serviceCategories.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">
-                  등록된 서비스 카테고리가 없습니다.
-                </p>
+                <div className="text-center py-8 space-y-3">
+                  <p className="text-muted-foreground">등록된 서비스 카테고리가 없습니다.</p>
+                  {/* 카테고리가 0개면 이 고객사는 SR 을 한 건도 받을 수 없다 — 막다른 길이
+                      되지 않도록 여기서 바로 만들 수 있게 한다(감사 3.18). */}
+                  <p className="text-sm text-muted-foreground">
+                    카테고리가 없으면 이 고객사는 SR을 접수할 수 없습니다.
+                  </p>
+                  <Button size="sm" onClick={openCreateCategory}>
+                    <Plus className="mr-2 h-4 w-4" />첫 카테고리 추가
+                  </Button>
+                </div>
               ) : (
                 <Table>
                   <TableHeader>
@@ -423,6 +484,7 @@ export default function ClientDetailPage() {
                       <TableHead>SLA (시간)</TableHead>
                       <TableHead>우선순위</TableHead>
                       <TableHead>담당자</TableHead>
+                      <TableHead className="text-right">작업</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -447,6 +509,26 @@ export default function ClientDetailPage() {
                           ) : (
                             '-'
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditCategory(category)}
+                              aria-label={`${category.categoryName} 수정`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteCategory(category)}
+                              aria-label={`${category.categoryName} 삭제`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -587,6 +669,14 @@ export default function ClientDetailPage() {
         user={null}
         onSaved={handleUserSaved}
         defaultClientId={client?.id}
+      />
+
+      <ServiceCategoryDialog
+        open={isCategoryDialogOpen}
+        onOpenChange={setIsCategoryDialogOpen}
+        clientId={client.id}
+        category={editingCategory}
+        onSaved={handleCategorySaved}
       />
     </div>
   );

@@ -108,6 +108,22 @@ export const srUpdateSchema = z.object({
     emptyStringToUndefined,
     z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional()
   ),
+  /**
+   * 요청자가 표명하는 희망 긴급도·기한 (감사 3.27).
+   *
+   * EditSRDialog 는 이 두 값을 별표(필수)로 렌더링하고 전송까지 하는데, 이 스키마에
+   * 선언이 없어 zod 가 미지 키로 **조용히 제거**했다. 사용자는 "SR이 수정되었습니다"
+   * 성공 토스트를 받지만 어느 값도 저장되지 않았고, 다이얼로그를 다시 열면 이전 값이
+   * 그대로 보였다.
+   *
+   * 운영자 소유 필드(dueDate/actualPriority/assigneeId 등)와 달리 이 둘은 **요청자가
+   * 소유**하므로 필드 단위 인가에서 제한하지 않는다.
+   */
+  requestedPriority: z.preprocess(
+    emptyStringToUndefined,
+    z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional()
+  ),
+  requestedCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
   status: z.preprocess(
     emptyStringToUndefined,
     z
@@ -159,6 +175,14 @@ export const userUpdateSchema = z.object({
   image: z.string().url('유효한 이미지 URL을 입력해주세요.').optional(),
   isActive: z.boolean().optional(),
   clientIds: z.array(z.string()).optional(),
+  /**
+   * 관리자에 의한 비밀번호 재설정.
+   *
+   * 이 키가 없으면 zod 가 알 수 없는 키로 조용히 제거해, UI 는 성공 토스트를 띄우지만
+   * 비밀번호는 바뀌지 않는다(감사 3.17). 평문으로 받아 서비스 계층에서 해싱한다.
+   * 타인의 비밀번호 변경은 `USER:UPDATE` 보유자만 가능하도록 라우트에서 게이트한다.
+   */
+  password: passwordSchema.optional(),
 });
 
 // Role Schemas

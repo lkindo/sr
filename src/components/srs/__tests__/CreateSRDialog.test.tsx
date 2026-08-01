@@ -125,7 +125,29 @@ describe('CreateSRDialog Component', () => {
     });
 
     expect(getClientsForSelection).toHaveBeenCalled();
-    expect(getServiceCategoriesForSelection).toHaveBeenCalled();
+  });
+
+  // 감사 3.19: 카테고리는 반드시 선택된 고객사로 스코프해야 한다.
+  // 스코프 없이 전체를 부르면 드롭다운에 다른 고객사의 서비스 카탈로그가 노출된다.
+  it('고객사가 선택되기 전에는 카테고리를 조회하지 않는다', async () => {
+    render(<CreateSRDialog {...defaultProps} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('새 SR 요청')).toBeInTheDocument();
+    });
+
+    expect(getServiceCategoriesForSelection).not.toHaveBeenCalled();
+  });
+
+  it('고객사를 선택하면 그 clientId 로 스코프해 카테고리를 조회한다', async () => {
+    render(<CreateSRDialog {...defaultProps} />);
+
+    const selects = await screen.findAllByTestId('mock-select');
+    fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
+
+    await waitFor(() => {
+      expect(getServiceCategoriesForSelection).toHaveBeenCalledWith('client-1');
+    });
   });
 
   it('shows validation error for short title', async () => {
@@ -316,6 +338,10 @@ describe('CreateSRDialog Component', () => {
     });
 
     render(<CreateSRDialog {...defaultProps} />);
+
+    // 카테고리 조회는 고객사 선택 이후에만 일어난다(감사 3.19).
+    const selects = await screen.findAllByTestId('mock-select');
+    fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
 
     await waitFor(() => {
       expect(mockToast).toHaveBeenCalledWith(

@@ -42,7 +42,9 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "verify": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1",
-    "verify:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1 -fast"
+    "verify:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1 -fast",
+    "check:e2e-assertions": "tsx scripts/check-e2e-assertions.ts",
+    "test:integration": "vitest run --project=integration"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

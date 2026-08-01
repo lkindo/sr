@@ -1,6 +1,28 @@
 import { fileTypeFromBuffer } from 'file-type';
 
 /**
+ * 파일 1개의 절대 상한.
+ *
+ * Node 런타임의 `Request.formData()` 는 모든 파트를 인메모리 Blob 으로 파싱하므로,
+ * 업로드 크기는 그대로 힙 점유가 된다. 앱 컨테이너 힙 상한이 450MB 라
+ * 예전 상한(100MB)에서는 동시 2건만으로 OOM-kill 이 가능했다(감사 3.41).
+ *
+ * 이 값은 nginx `client_max_body_size` 와 반드시 함께 움직여야 한다.
+ * 지금은 양쪽 다 50MB 다.
+ */
+export const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
+
+/**
+ * 한 요청(다중 업로드)의 총합 상한.
+ *
+ * 파일당 상한만으로는 부족하다 — 50MB × 10개 = 500MB 요청이 여전히 가능했다.
+ */
+export const MAX_UPLOAD_TOTAL_SIZE = MAX_UPLOAD_FILE_SIZE;
+
+/** 한 요청에 담을 수 있는 파일 개수. */
+export const MAX_UPLOAD_FILE_COUNT = 10;
+
+/**
  * 허용된 파일 MIME 타입 목록
  */
 export const ALLOWED_FILE_TYPES = {
@@ -32,10 +54,10 @@ export const ALLOWED_FILE_TYPES = {
   'text/plain': { ext: ['.txt'], maxSize: 5 * 1024 * 1024 }, // 5MB
   'text/csv': { ext: ['.csv'], maxSize: 10 * 1024 * 1024 }, // 10MB
 
-  // 압축
-  'application/zip': { ext: ['.zip'], maxSize: 100 * 1024 * 1024 }, // 100MB
-  'application/x-rar-compressed': { ext: ['.rar'], maxSize: 100 * 1024 * 1024 }, // 100MB
-  'application/x-7z-compressed': { ext: ['.7z'], maxSize: 100 * 1024 * 1024 }, // 100MB
+  // 압축 (nginx client_max_body_size 와 동일한 50MB. 위 MAX_UPLOAD_FILE_SIZE 주석 참고)
+  'application/zip': { ext: ['.zip'], maxSize: MAX_UPLOAD_FILE_SIZE },
+  'application/x-rar-compressed': { ext: ['.rar'], maxSize: MAX_UPLOAD_FILE_SIZE },
+  'application/x-7z-compressed': { ext: ['.7z'], maxSize: MAX_UPLOAD_FILE_SIZE },
 } as const;
 
 /**

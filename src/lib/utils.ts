@@ -11,6 +11,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * 문자열을 정규식 리터럴로 안전하게 쓸 수 있도록 메타문자를 이스케이프한다.
+ *
+ * 사용자 입력을 그대로 `new RegExp()` 에 넣으면 `(` 한 글자만으로도
+ * `SyntaxError: Invalid regular expression` 이 발생해 렌더 중 예외가 던져진다.
+ *
+ * @param input - 이스케이프할 원본 문자열
+ * @returns 정규식 안에서 리터럴로 해석되는 문자열
+ */
+export function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export type PlainObject<T> = T extends Date
   ? string
   : T extends (infer U)[]

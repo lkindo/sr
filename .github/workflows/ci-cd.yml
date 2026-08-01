@@ -63,6 +63,12 @@ jobs:
       - name: Run TypeScript type check
         run: pnpm type-check
 
+      # 단언 없는 E2E 테스트를 막는다(감사 3.34).
+      # 보안·권한상승 스펙이 expect 대신 console.log 를 쓰던 시기가 있었는데,
+      # 그런 테스트는 통제가 완전히 사라져도 초록불이라 회귀를 전혀 못 잡는다.
+      - name: Check E2E tests have assertions
+        run: pnpm check:e2e-assertions
+
   # 단위 테스트 및 통합 테스트
   test:
     name: Unit & Integration Tests

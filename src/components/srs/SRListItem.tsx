@@ -8,29 +8,21 @@ import { Button } from '@/components/ui';
 import { TableCell, TableRow } from '@/components/ui';
 import { CopyButton } from '@/components/ui/copy-button';
 import { getDueDateStatus } from '@/lib/date-utils';
+import { formatAppZoneDate, formatAppZoneShortDate } from '@/lib/timezone';
 import { SRListItem } from '@/types/sr.types';
 
 import { priorityColors, priorityLabels, statusColors, statusLabels } from './constants';
 
 // ⚡ Bolt: Fast date formatting for lists
 // toLocaleDateString() initializes Intl.DateTimeFormat on every call which is slow.
-// Manual string formatting is ~10x faster for frequently rendered list items.
-const formatFastDate = (dateString: string | Date) => {
-  const d = new Date(dateString);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}. ${month}. ${day}.`;
-};
+// `@/lib/timezone` 은 포맷터를 모듈 스코프에 한 번만 만들어 그 비용을 없앤다.
+//
+// 로컬 타임존 접근자(getFullYear/getMonth/getDate)를 쓰던 시절에는 UTC 컨테이너의 SSR 과
+// KST 브라우저의 하이드레이션이 서로 다른 날짜를 렌더해 목록이 깜빡였다(감사 3.25).
+const formatFastDate = formatAppZoneDate;
 
 // ⚡ Bolt: Fast short date formatting
-const formatFastShortDate = (dateString: string | Date) => {
-  const d = new Date(dateString);
-  const year = String(d.getFullYear()).slice(2);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
-  return `${year}. ${month}. ${day}.`;
-};
+const formatFastShortDate = formatAppZoneShortDate;
 
 interface SRListItemProps {
   sr: SRListItem;

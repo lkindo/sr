@@ -2,20 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BadRequestError, NotFoundError } from '@/lib/errors';
-import { FileValidationError, validateFile } from '@/lib/file-validator';
+import {
+  FileValidationError,
+  formatBytes,
+  MAX_UPLOAD_FILE_SIZE,
+  validateFile,
+} from '@/lib/file-validator';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
 import { uploadAttachmentBlob } from '@/lib/storage';
+import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
 // POST /api/attachments - 파일 업로드 (Rate Limit: 파일 업로드 전용)
 export const POST = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
+    // 본문 파싱 전 선검사. 상한은 배치 업로드 라우트와 같은 상수를 쓴다 —
+    // 예전에는 같은 논리적 작업이 URL 에 따라 10MB / 100MB 두 계약을 가졌다(감사 3.41).
+    assertUploadSizeWithinLimit(request);
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const srId = formData.get('srId') as string;
@@ -25,8 +33,10 @@ export const POST = withAuthAndRateLimit(
     }
 
     // 파일 크기 검증
-    if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestError('파일 크기는 10MB를 초과할 수 없습니다.');
+    if (file.size > MAX_UPLOAD_FILE_SIZE) {
+      throw new BadRequestError(
+        `파일 크기는 ${formatBytes(MAX_UPLOAD_FILE_SIZE)}를 초과할 수 없습니다.`
+      );
     }
 
     // SR 존재 + 접근 권한 체크 (IDOR 방지 — 임의 SR 에 첨부 금지)

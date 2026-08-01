@@ -1,0 +1,74 @@
+name: Monthly Restore Rehearsal
+
+# 최신 백업이 **실제로 복구 가능한지** 매월 확인한다(감사 3.31).
+#
+# `backup.sh` 의 `pg_restore -l` 은 덤프의 목차만 읽는다. 목차가 멀쩡해도 전체 복구는
+# 깨질 수 있고, 이 프로젝트는 그동안 복구를 한 번도 실행해 본 적이 없었다.
+# 이 워크플로는 일회용 Postgres 컨테이너에 복구하고 스키마·행 수를 단언한다.
+# **프로덕션 DB 는 건드리지 않는다.**
+
+on:
+  schedule:
+    # 매월 1일 UTC 19:00 = KST 익일 04:00 (야간 백업 03:00 KST 직후)
+    - cron: '0 19 1 * *'
+  workflow_dispatch:
+    inputs:
+      dump_file:
+        description: '검증할 덤프 경로(생략 시 최신 백업 자동 선택)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: restore-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  rehearsal:
+    name: Restore latest backup into a throwaway DB
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Copy rehearsal script to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_KEY }}
+          port: 22
+          source: 'scripts/restore-rehearsal.sh'
+          target: '/home/opc/sr'
+
+      - name: Run restore rehearsal
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DUMP_FILE: ${{ github.event.inputs.dump_file || '' }}
+          # 암호화된 백업을 검증하려면 복호화 신원 파일 경로가 필요하다.
+          # 미설정 + 암호화 백업이면 스크립트가 "검증 불가"로 실패한다(의도된 동작).
+          BACKUP_AGE_IDENTITY_FILE: ${{ secrets.BACKUP_AGE_IDENTITY_FILE }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_KEY }}
+          port: 22
+          envs: DUMP_FILE, BACKUP_AGE_IDENTITY_FILE
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd /home/opc/sr
+            sed -i 's/\r$//' scripts/restore-rehearsal.sh
+            chmod +x scripts/restore-rehearsal.sh
+            BACKUP_AGE_IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-}" \
+              bash scripts/restore-rehearsal.sh ${DUMP_FILE:-}
+
+      - name: Report rehearsal failure
+        if: failure()
+        run: |
+          echo "::error::복구 리허설이 실패했습니다 — 최신 백업으로 복구할 수 없습니다."
+          echo "백업이 존재한다는 사실과 복구가 가능하다는 사실은 다릅니다. 즉시 확인하세요."
+          echo "절차: docs/backup-and-restore.md"
+          exit 1

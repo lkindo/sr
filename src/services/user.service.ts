@@ -260,7 +260,14 @@ export class UserService {
     ipAddress?: string | null
   ): Promise<Omit<User, 'password'>> {
     const validated = userUpdateSchema.parse(data);
-    const { clientIds, ...updateData } = validated;
+    const { clientIds, password, ...rest } = validated;
+
+    // 비밀번호는 평문으로 들어오므로 여기서 해싱한다. 서비스 계층에서 처리해야
+    // API 라우트와 서버 액션 양쪽이 동시에 보호된다.
+    // 빈 문자열은 스키마가 이미 걸러내므로(min 8) 여기 도달하면 실제 변경 의도다.
+    const updateData: Prisma.UserUpdateInput = password
+      ? { ...rest, password: await hash(password, SECURITY.BCRYPT_WORK_FACTOR) }
+      : { ...rest };
 
     const includeConfig = {
       roles: { include: { role: true } },
@@ -360,6 +367,8 @@ export class UserService {
         changes: {
           before: excludePassword(beforeUser),
           after: excludePassword(afterUser),
+          // 해시조차 감사 로그에 남기지 않는다. 재설정이 있었다는 사실만 기록한다.
+          ...(password ? { passwordReset: true } : {}),
         },
         ipAddress,
       });
