@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import { Building2, Plus, Search, Users } from 'lucide-react';
 
@@ -43,11 +43,8 @@ export default function OrganizationPage() {
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchClients();
-  }, []);
-
-  const fetchClients = async () => {
+  // useCallback 으로 신원을 고정해야 아래 effect 의 deps 에 넣을 수 있다.
+  const fetchClients = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch('/api/clients?pageSize=1000');
@@ -64,7 +61,11 @@ export default function OrganizationPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [fetchClients]);
 
   const toggleClient = async (clientId: string) => {
     const newExpanded = new Set(expandedClients);

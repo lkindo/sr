@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Calendar, Mail, Trash2, Users } from 'lucide-react';
 
@@ -44,13 +44,9 @@ export function ClientUsersSheet({
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (open && clientId) {
-      fetchUsers();
-    }
-  }, [open, clientId]);
-
-  const fetchUsers = async () => {
+  // useCallback 으로 신원을 고정해야 아래 effect 의 deps 에 넣을 수 있다.
+  // (매 렌더 새 함수였던 탓에 deps 에서 빠져 있었다)
+  const fetchUsers = useCallback(async () => {
     if (!clientId) return;
 
     setLoading(true);
@@ -71,7 +67,13 @@ export function ClientUsersSheet({
     } finally {
       setLoading(false);
     }
-  };
+  }, [clientId, toast]);
+
+  useEffect(() => {
+    if (open && clientId) {
+      fetchUsers();
+    }
+  }, [open, clientId, fetchUsers]);
 
   const handleUserDeleted = () => {
     fetchUsers();

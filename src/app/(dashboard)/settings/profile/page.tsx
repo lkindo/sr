@@ -84,7 +84,10 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, []); // toast 의존성 제거 - 무한 루프 방지
+    // 마운트 시 프로필을 한 번 읽는 용도이므로 빈 deps 가 의도된 동작이다.
+    // (toast 를 넣었을 때 무한 루프가 관측되어 제외했다는 기존 주석을 유지한다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchProfile();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -124,7 +124,8 @@ export default function ClientDetailPage() {
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
   const { toast } = useToast();
 
-  const fetchClient = async () => {
+  // useCallback 으로 신원을 고정해야 아래 effect 의 deps 에 넣을 수 있다.
+  const fetchClient = useCallback(async () => {
     try {
       const response = await fetch(`/api/clients/${params.id}`);
       if (!response.ok) {
@@ -150,13 +151,13 @@ export default function ClientDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id, toast, router]);
 
   useEffect(() => {
     if (params.id) {
       fetchClient();
     }
-  }, [params.id, toast, router]);
+  }, [params.id, fetchClient]);
 
   const handleClientUpdated = () => {
     fetchClient();

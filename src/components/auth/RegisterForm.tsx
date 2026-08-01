@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -98,7 +98,9 @@ export default function RegisterForm() {
   const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(''));
 
   // 고객사 목록 로드 (CLIENT 선택 시)
-  const fetchClients = async () => {
+  // useCallback 으로 신원을 고정해야 아래 effect 의 의존성 배열에 넣을 수 있다.
+  // (매 렌더 새 함수였기 때문에 그동안 deps 에서 빠져 있었다)
+  const fetchClients = useCallback(async () => {
     if (clients.length > 0) return; // 이미 로드됨
 
     setLoadingClients(true);
@@ -113,12 +115,12 @@ export default function RegisterForm() {
     } finally {
       setLoadingClients(false);
     }
-  };
+  }, [clients.length]);
 
   // 컴포넌트 마운트 시 고객사 목록 로드 (기본값이 CLIENT이므로)
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [fetchClients]);
 
   const handleAccountTypeChange = (value: 'ENGINEER' | 'CLIENT') => {
     setAccountType(value);

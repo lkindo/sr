@@ -153,6 +153,10 @@ export function useEditSRForm({
     }
     fetchClients();
     fetchCategories(sr.clientId || sr.client?.id || '');
+    // 다이얼로그가 열릴 때 폼을 SR 값으로 한 번 채우는 초기화다.
+    // sr 객체나 fetcher 를 deps 에 넣으면 사용자가 입력 중일 때 부모 리렌더마다
+    // 폼이 서버 값으로 되돌아간다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, srId]);
 
   // 고객사를 바꾸면 카테고리를 다시 불러온다.
