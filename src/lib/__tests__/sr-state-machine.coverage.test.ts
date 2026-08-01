@@ -130,10 +130,19 @@ describe('validateTransition - step 1: state flow validity', () => {
     expect(result.message).toContain('직접 전환할 수 없습니다');
   });
 
-  it('allows a valid flow with no roles/data provided', () => {
-    expect(validateTransition('REQUESTED', 'INTAKE')).toEqual({ valid: true });
-    expect(validateTransition('ON_HOLD', 'IN_PROGRESS')).toEqual({ valid: true });
-    expect(validateTransition('CONFIRMED', 'IN_PROGRESS')).toEqual({ valid: true });
+  // 이 테스트는 원래 "인가 정보 없이도 통과한다"를 기대값으로 고정하고 있었다.
+  // 그게 바로 감사 4.3 이 지적한 fail-open 이며, 테스트가 그것을 정상 동작으로
+  // 못 박고 있었기 때문에 결함이 살아남았다. 이제 fail-closed 를 기대한다.
+  it('인가 정보가 없으면 흐름이 유효해도 거부한다 (fail-closed)', () => {
+    expect(validateTransition('REQUESTED', 'INTAKE').valid).toBe(false);
+    expect(validateTransition('ON_HOLD', 'IN_PROGRESS').valid).toBe(false);
+    expect(validateTransition('CONFIRMED', 'IN_PROGRESS').valid).toBe(false);
+  });
+
+  it('흐름 자체가 불가능하면 인가와 무관하게 거부한다', () => {
+    const r = validateTransition('REQUESTED', 'COMPLETED', ['ADMIN']);
+    expect(r.valid).toBe(false);
+    expect(r.message).toContain('전환할 수 없습니다');
   });
 });
 
@@ -151,9 +160,10 @@ describe('validateTransition - step 2: role gating', () => {
   it('fails when user has no allowed role, with required-roles message', () => {
     const result = validateTransition('REQUESTED', 'INTAKE', ['CLIENT_USER']);
     expect(result.valid).toBe(false);
-    expect(result.message).toBe(
-      '이 상태 변경을 수행할 권한이 없습니다. (필요 역할: ADMIN, MANAGER, ENGINEER)'
-    );
+    // 메시지는 이제 역할과 권한 두 경로를 모두 안내한다(커스텀 역할이 무엇을 받아야
+    // 하는지 알 수 있어야 하므로).
+    expect(result.message).toContain('필요 역할: ADMIN, MANAGER, ENGINEER');
+    expect(result.message).toContain('SR:INTAKE');
   });
 
   it('enforces client-only roles on COMPLETED -> CONFIRMED', () => {
@@ -171,14 +181,28 @@ describe('validateTransition - step 2: role gating', () => {
     expect(allowed.valid).toBe(true);
   });
 
-  it('skips role check when userRoles is an empty array', () => {
-    // empty array -> userRoles.length > 0 is false, so role gate skipped
+  // 아래 두 테스트는 원래 "역할 게이트를 건너뛴다 → valid: true" 를 기대했다.
+  // src/auth.ts 는 사용자 조회 실패 시 token.roles = [] 로 세션을 만들므로,
+  // 그 동작은 인가 정보를 읽지 못한 세션에게 모든 전이를 허용한다는 뜻이었다.
+  it('빈 역할 배열은 통과가 아니라 거부다', () => {
     const result = validateTransition('REQUESTED', 'INTAKE', []);
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
   });
 
-  it('skips role check when userRoles is undefined', () => {
+  it('역할이 undefined 여도 거부한다', () => {
     const result = validateTransition('REQUESTED', 'INTAKE', undefined);
+    expect(result.valid).toBe(false);
+  });
+
+  it('권한만 있어도 통과한다 (커스텀 역할 경로)', () => {
+    const result = validateTransition(
+      'REQUESTED',
+      'INTAKE',
+      ['SUPPORT_LEAD'],
+      undefined,
+      undefined,
+      ['SR:INTAKE']
+    );
     expect(result.valid).toBe(true);
   });
 

@@ -308,7 +308,8 @@ export class SRService {
           validated.status as SRStatus,
           sessionUser.roles,
           existingSR,
-          validated
+          validated,
+          sessionUser.permissions
         );
 
         if (!transitionResult.valid) {
