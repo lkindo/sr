@@ -1,9 +1,17 @@
 # SR(Service Request) 관리 시스템 PRD
 
-**문서 버전:** 1.1
+**문서 버전:** 1.3
 **작성일:** 2025년 11월
-**최종 수정일:** 2025-11-07
+**최종 수정일:** 2026-07-30
 **작성자:** Product Team
+
+> **읽기 전 주의**: 이 문서의 초기 판(1.0~1.2)은 실제로 채택되지 않은 스택
+> (Vercel / Supabase / Upstash Redis / Resend / Inngest / Vercel Blob / Sentry / Axiom /
+> 매터모스트 / Python·Celery)을 사실처럼 기술하고 있었다. 1.3 에서 기술·운영 관련 서술을
+> 2026-07-30 기준 실제 구현으로 정정했다. 되돌릴 수 없는 값(비용 추정·초기 환경 구성 계획)은
+> 삭제하지 않고 **초기 설계안 이력**으로 표시해 배너 안에 남겼다.
+> 현재 스택의 단일 기준은 [TRD.md](./TRD.md) 이며, 배포 절차는
+> `.github/workflows/deploy.yml`, `docker-compose.prod.yml`, [SECRET_ROTATION.md](./SECRET_ROTATION.md) 이다.
 
 ---
 
@@ -480,7 +488,7 @@ SR 신청 → 자동 알림 발송 → 담당자 확인 및 검토 →
 #### 4.8 SR 첨부파일 관리
 
 - 지원 파일: 이미지, 문서, 압축파일 등 (설정 가능)
-- 파일 크기 제한: 100MB 이하
+- 파일 크기 제한: 50MB 이하 (파일 1개 기준이자 요청 총합 기준)
 - 최대 첨부파일 개수: 10개
 - 바이러스 검사: 자동 수행
 - 파일 보안: 암호화 저장
@@ -1005,6 +1013,10 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 ## 성능 요구사항
 
+> **주의**: 아래 1~5절의 수치는 **초기 설계 목표치**이며 부하 시험으로 검증된 값이 아니다(미확인).
+> 실제 배포는 단일 VM · 앱 컨테이너 1개 · nginx 리버스 프록시 구성이므로, 이 목표치를
+> 현재 구성의 처리 능력으로 읽어서는 안 된다. 6~7절은 실제 구성에 맞게 정정했다.
+
 ### 1. 응답 시간
 
 | 기능          | 목표 응답 시간 |
@@ -1017,9 +1029,10 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 ### 2. 동시 사용자
 
-- 예상 동시 사용자: 1,000명
+- 예상 동시 사용자: 1,000명 (초기 설계 목표, 미검증)
 - 피크 시간 예상: 업무 시간 (09:00 ~ 18:00)
-- 부하 분산: 로드 밸런서 사용
+- 부하 분산: **미구성.** 실제로는 nginx 리버스 프록시 뒤에 앱 컨테이너 1개(`sr-app`)만 있으며,
+  로드 밸런서도 수평 확장(다중 인스턴스)도 없다.
 
 ### 3. 처리량
 
@@ -1040,20 +1053,28 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 ### 6. 캐싱 전략
 
-- 정적 컨텐츠: Vercel Edge CDN 캐싱 (자동)
-- 이미지: Next.js Image Optimization + CDN
-- API 응답: Upstash Redis 캐싱 (1시간)
-- 사용자 세션: Database 또는 Redis (7일)
-- 고객사 정보: React Query 캐싱 + Redis (1일)
+- 정적 컨텐츠: Next.js 정적 자산을 nginx 리버스 프록시가 gzip 압축해 전달. **CDN 없음**
+- 이미지: Next.js Image Optimization (앱 컨테이너에서 처리, CDN 없음)
+- API 응답: 별도 응답 캐시 **없음**
+- 사용자 세션: NextAuth/Auth.js JWT 세션 전략(`src/auth.config.ts`, `strategy: 'jwt'`).
+  서버측 세션 스토어(DB/Redis) 없음
+- 서버 조회 캐시: Next.js `unstable_cache` — 사용자·고객사 목록 등 (`src/lib/cache.ts`, `revalidate: 300`)
+- 고객사 정보: React Query 클라이언트 캐싱
 - Server Components: Next.js 자동 캐싱
 
-### 7. Vercel Serverless 제약사항 고려
+> 초기 설계안의 Vercel Edge CDN 과 Upstash Redis 는 **채택되지 않았다.** Redis 자체가 없고,
+> 캐시는 앱 프로세스 내부(Next.js 캐시)에만 존재한다. 따라서 인스턴스를 늘리면 캐시가
+> 공유되지 않는다는 제약이 있다.
 
-**함수 실행 시간:**
+### 7. 실행 환경 제약사항
 
-- Hobby 플랜: 10초 제한
-- Pro 플랜: 60초 제한
-- Edge Functions: 30초 제한
+**실행 모델:**
+
+- 상시 구동 Node 프로세스(Docker 컨테이너 1개). 서버리스 함수 실행 시간 제한이 **적용되지 않는다.**
+- 앱 컨테이너 메모리 상한: `NODE_OPTIONS=--max-old-space-size=450` (`docker-compose.prod.yml`)
+- 업로드 크기 상한: nginx `client_max_body_size 50m` (`nginx/nginx.conf`) — 앱의 `MAX_UPLOAD_FILE_SIZE` 와 동일
+- 초기 설계안의 Vercel 함수 실행 시간 제한(Hobby 10초 / Pro 60초 / Edge 30초)은 **해당되지 않는다** —
+  Vercel 은 채택되지 않았다.
 
 **대응 방안:**
 
@@ -1064,24 +1085,37 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 **Connection Pooling:**
 
-- Prisma Data Proxy 또는 Neon의 내장 풀링 사용
-- 최대 연결 수 제한 고려
+- 외부 커넥션 풀러 **없음** (PgBouncer / Supabase Pooler / Prisma Data Proxy 모두 미사용).
+  Prisma Client 의 내장 풀만 사용한다(`src/lib/prisma.ts`).
+- 앱 컨테이너와 PostgreSQL 16 컨테이너가 같은 호스트의 브리지 네트워크(`sr-net`)로 직접 연결된다.
+  DB 포트는 호스트에 공개하지 않는다.
+- 초기 설계안의 Prisma Data Proxy / Neon 내장 풀링은 **채택되지 않았다.**
 
 ---
 
-> **⚠️ 이 절은 실제 배포와 일치하지 않는다.**
-> 아래 내용은 Vercel + Supabase + Upstash Redis + Resend + Inngest 를 전제로 작성된
+> **⚠️ 이 절의 초기 판은 실제 배포와 일치하지 않았다.**
+> 원문은 Vercel + Supabase + Upstash Redis + Resend + Inngest 를 전제로 작성된
 > 초기 설계안이며, 그중 어느 것도 채택되지 않았다. 실제 운영 구성은 다음과 같다.
 >
-> - 호스팅: 자체 서버(Oracle Cloud VM) + Docker Compose + nginx 리버스 프록시
-> - DB: 같은 호스트의 PostgreSQL 16 컨테이너 (named volume 영속화)
-> - 파일 저장: 컨테이너 볼륨 (`STORAGE_DIR`), 오브젝트 스토리지 미사용
+> - 호스팅: 자체 서버(Oracle Cloud VM) + Docker Compose + nginx:alpine 리버스 프록시
+> - 이미지/레지스트리: `ghcr.io/lkindo/sr` (GitHub Container Registry)
+> - DB: 같은 호스트의 PostgreSQL 16 컨테이너 (named volume `sr_db_data` 로 영속화)
+> - 파일 저장: 컨테이너 볼륨 `sr_uploads` → `STORAGE_DIR=/app/var/uploads`, 오브젝트 스토리지·CDN 미사용
 > - 이메일: nodemailer(SMTP)
-> - 캐시/큐: Redis 및 외부 큐 미사용 (프로세스 내 캐시 + backgroundTask)
-> - 푸시: web-push(VAPID)
+> - 캐시/큐: Redis 및 외부 큐 미사용 (Next.js 프로세스 내 캐시 + `backgroundTask`)
+> - 푸시: web-push(VAPID) / 실시간: 자체 SSE(`/api/realtime`)
+> - TLS: Let's Encrypt (certbot, 갱신 자동화는 아직 없음)
+> - **에러 추적 서비스 없음. Sentry 는 2026-07-30 소유자 결정으로 사용하지 않으며, Axiom 도 미채택이다.**
+>   (아래 본문에 남은 Sentry/Axiom 언급은 모두 초기 설계안 이력이다. 에러 추적 공백 자체는
+>   여전히 유효한 과제이며, 해법은 자체 호스팅 방향으로 검토한다.)
+> - 관측성: uptime-kuma 컨테이너가 서버에서 구동 중(저장소의 어떤 compose 파일에도 없어
+>   정적 분석으로는 보이지 않는다) + pino 로그 → stdout → Docker json-file 드라이버(3 × 10MB 로테이션),
+>   호스트 밖 전송 없음
 >
-> 따라서 아래의 비용 추정과 환경 구성은 참고용 이력으로만 읽어야 한다.
-> 실제 배포 절차는 `docs/SECRET_ROTATION.md` 와 `.github/workflows/deploy.yml` 을 참조한다.
+> 아래 1~3절과 4.3절은 실제 구성으로 정정했다. **4.1(비용 추정)과 4.2(환경별 설정)는 근거 있는
+> 실측값이 없어 다시 쓰지 않고 초기 설계안 이력으로 남겨 두었다** — 현재 배포에 대한 서술로 읽지 말라.
+> 실제 배포 절차는 `docs/SECRET_ROTATION.md`, `.github/workflows/ci-cd.yml`,
+> `.github/workflows/deploy.yml`, `docker-compose.prod.yml` 을 참조한다.
 
 ## 마이그레이션 및 운영
 
@@ -1089,24 +1123,25 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 **Phase 1: 기초 구축 (1~2개월)**
 
-- Next.js 프로젝트 초기 설정
-- Supabase 프로젝트 생성 및 설정
-- Prisma 스키마 설계 (Supabase PostgreSQL 연결)
-- Prisma 마이그레이션 설정 및 실행
-- NextAuth.js 인증 시스템 구축 (Prisma Adapter)
-- Vercel Blob 설정 (파일 업로드용)
+- Next.js 프로젝트 초기 설정 (App Router)
+- PostgreSQL 16 컨테이너 구성 (`postgres:16-alpine`, named volume)
+- Prisma 스키마 설계 및 마이그레이션 설정/실행 (`prisma migrate deploy`, 컨테이너 시작 시 자동)
+- NextAuth/Auth.js 인증 시스템 구축 (JWT 세션 전략, bcryptjs)
+- 파일 저장소 구성: 서버 디스크(`STORAGE_DIR`, 웹루트 밖) + 컨테이너 볼륨
 - 기본 사용자/고객사 관리 기능 개발
 - 권한 관리 시스템 개발 (RBAC)
 - Shadcn/ui 기반 UI 컴포넌트 구축
-- Vercel 배포 파이프라인 구축
+- 배포 파이프라인 구축: GitHub Actions → GHCR 이미지 → 자체 서버 Docker Compose
+
+> 초기 설계안의 Supabase 프로젝트와 Vercel Blob, Vercel 배포 파이프라인은 **채택되지 않았다.**
 
 **Phase 2: SR 관리 핵심 (2~3개월)**
 
 - SR 신청/접수/처리 Server Actions 개발
 - SR 상태 관리 시스템 개발
-- 댓글 및 첨부파일 관리 (Vercel Blob)
+- 댓글 및 첨부파일 관리 (서버 디스크 저장, 오브젝트 스토리지 미사용)
   - 파일 업로드 API 구현
-  - 파일 접근 권한 제어
+  - 파일 접근 권한 제어 (인증된 라우트로만 스트리밍)
 - TanStack Table 기반 SR 목록 개발
 - 대시보드 개발 (Recharts)
 - React Query로 실시간 데이터 동기화
@@ -1125,23 +1160,26 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 - PDF 보고서 생성 (@react-pdf/renderer)
 - Excel export 기능 (xlsx)
 - 대시보드 차트 고도화
-- 캐싱 최적화 (React Query + Redis)
+- 캐싱 최적화 (React Query + Next.js `unstable_cache`) — Redis 는 채택되지 않았다
 
 **Phase 5: 보안 및 최적화 (1개월)**
 
-- NextAuth.js 보안 강화 (2FA, Rate Limiting)
-- Sentry 에러 모니터링 통합
+- NextAuth/Auth.js 보안 강화 (2FA, Rate Limiting)
+- 에러 모니터링 — **미도입.** 계획 당시의 Sentry 는 2026-07-30 소유자 결정으로 **사용하지 않는다.**
+  현재는 pino 로그(stdout → Docker json-file)만 있고 에러 추적 시스템이 없다.
+  대체는 자체 호스팅 방향으로 검토 중이며 도입 제품은 미정이다.
 - Lighthouse 성능 최적화
 - E2E 테스트 작성 (Playwright)
 - 보안 감사 (OWASP 체크리스트)
 
 **Phase 6: 배포 및 운영 (진행 중)**
 
-- Preview 환경 테스트 (Vercel Preview Deployments)
-- Production 환경 설정 및 환경 변수 구성
-- 데이터 마이그레이션 (Prisma Migrate)
-- Vercel Production 배포
-- 모니터링 대시보드 설정 (Sentry, Axiom)
+- 스테이징 환경 테스트: `dev` 브랜치 → `docker-compose.test.yml` (compose 프로젝트 `sr-test`,
+  `test.lkindo.kr`). Vercel Preview Deployments 는 채택되지 않았다.
+- Production 환경 설정 및 환경 변수 구성 (GitHub Secrets → 서버의 `.env.docker`)
+- 데이터 마이그레이션 (`prisma migrate deploy`, 컨테이너 엔트리포인트에서 자동 실행)
+- Production 배포: GHCR 이미지 pull → 자체 서버 Docker Compose 재생성 (`.github/workflows/deploy.yml`)
+- 모니터링: uptime-kuma(서버 구동 중)로 가동률 감시. Sentry/Axiom 대시보드는 채택되지 않았다.
 - 성능 모니터링 및 최적화
 
 ### 2. 데이터 마이그레이션
@@ -1156,42 +1194,55 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 1. Prisma 스키마 설계 및 검증
 2. 마이그레이션 스크립트 작성 (TypeScript)
-3. Preview 환경에서 테스트 마이그레이션
+3. 스테이징 환경(`dev` 브랜치 / `sr-test`)에서 테스트 마이그레이션
 4. 데이터 검증 및 무결성 체크
 5. Production 마이그레이션 실행 (`prisma migrate deploy`)
 6. 사후 검증 및 롤백 준비
 
 **롤백 계획:**
 
-- PostgreSQL 스냅샷 백업 (마이그레이션 전)
+- PostgreSQL 논리 백업 (`pg_dump -Fc`, `scripts/backup.sh`) — 마이그레이션 전 수동 실행
 - Prisma 마이그레이션 롤백 가능 (`prisma migrate resolve`)
-- Vercel Deployment Rollback 기능 활용
+- 애플리케이션 롤백: **자동 롤백 기능 없음.** 이미지 태그가 `latest`(main) / `dev` 두 개뿐이고
+  배포 시 미사용 이미지를 prune 하므로 이전 이미지로 즉시 되돌릴 경로가 없다.
+  현재 방법은 revert 커밋을 푸시해 CI/CD 파이프라인을 다시 통과시키는 것이다.
+  (초기 설계안의 Vercel Deployment Rollback 은 채택되지 않았다.)
 
 ### 3. 운영 계획
 
-**모니터링 (Vercel + Sentry + Axiom):**
+**모니터링 (현재 구성):**
 
-- Vercel Analytics: 실시간 성능 모니터링
-- Sentry: 에러 추적 및 알림 (24/7)
-- Axiom: 로그 수집 및 분석
-- Vercel Functions: Serverless 함수 실행 시간 모니터링
-- PostgreSQL: 쿼리 성능 및 연결 수 모니터링
-- BetterUptime: 가동률 모니터링 및 알림
+- uptime-kuma: 서버에서 구동 중인 컨테이너로 가동률 감시.
+  저장소의 어떤 compose 파일에도 정의되어 있지 않아(수동 기동) 코드만 봐서는 보이지 않는다.
+- 애플리케이션 로그: pino → stdout → Docker `json-file` 드라이버 (`max-size 10m`, `max-file 3`).
+  **호스트 밖으로 전송되지 않으며, 검색·집계 도구도 없다.**
+- 느린 쿼리: 개발 환경에서만 Prisma 미들웨어로 기록 (`PRISMA_SLOW_MS`, `pnpm report:slow-queries`).
+  프로덕션 쿼리 성능·연결 수 상시 모니터링은 **미구성**.
+- CI 상시 점검: `Code Quality & Security` 워크플로가 매일 의존성/보안 감사를 실행한다.
 
-**백업 (Supabase):**
+> **미채택/공백**: Vercel Analytics·Vercel Functions 지표(Vercel 미사용), Axiom(미채택),
+> BetterUptime(미채택 — uptime-kuma 로 대체됨), Sentry(2026-07-30 소유자 결정으로 사용하지 않음).
+> **에러 추적 시스템이 없다는 공백은 실재하며**, 대체 수단은 자체 호스팅 방향으로 검토한다.
 
-- Supabase PostgreSQL:
-  - Free tier: 자동 일일 백업 (7일 보관)
-  - Pro tier: Point-in-time Recovery (7일)
-  - Team tier: Point-in-time Recovery (30일)
-- Vercel Blob: 파일 버전 관리 (자동 지원)
-- 수동 백업:
-  - 주간 전체 데이터베이스 덤프 (`pg_dump`)
-  - 오프라인 백업 파일 보관 (AWS S3 등)
+**백업 (현재 구성):**
+
+- 일일 자동 백업: `Scheduled Backup` 워크플로(`.github/workflows/backup.yml`)가 매일 KST 03:00 에
+  서버에서 `scripts/backup.sh` 를 실행한다.
+  - DB: `docker exec sr-db pg_dump -Fc` (custom format, `pg_restore` 용). 덤프 후 `pg_restore -l` 로 검증
+  - 첨부파일: `STORAGE_DIR`(`/app/var/uploads`) 를 `tar.gz`
+  - 기본 보존 기간: 14일 (`RETENTION_DAYS`)
+- 저장 위치: **서버 로컬 디스크**(`/home/opc/sr/backups`). 오프호스트 복제는 **미구성**이며
+  `scripts/backup.sh` 의 `OFFSITE_CMD` 훅으로 확장할 수 있다([backup-and-restore.md](./backup-and-restore.md) 참조).
+- Point-in-time Recovery **없음** (WAL 아카이빙 미구성). 복구 지점은 마지막 일일 덤프 시점이다.
+- 파일 버전 관리 **없음** (오브젝트 스토리지 미사용).
+
+> **요구사항 불일치**: 위 「데이터 보안 > 백업 및 복구」는 "최소 30일 보관 · 이중 백업(로컬 + 원격)"을
+> 요구하지만, 실제는 보존 14일 · 로컬 단일 저장이다. 미충족 항목으로 관리한다.
+> (초기 설계안의 Supabase 자동 백업/PITR 티어와 Vercel Blob 버전 관리는 채택되지 않았다.)
 
 **정기 유지보수:**
 
-- 주간: 의존성 보안 업데이트 (Dependabot)
+- 주간: 의존성 보안 업데이트 (Dependabot — `.github/dependabot.yml`)
 - 월간: Next.js/Prisma 버전 업데이트
 - 분기별: Lighthouse 성능 감사 및 최적화
 - 반기별: 보안 감사 (OWASP 체크리스트)
@@ -1199,15 +1250,21 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 **지원 체계:**
 
 - GitHub Issues: 버그 추적 및 기능 요청
-- 사용자 가이드: Next.js 기반 문서 사이트
-- 장애 대응: Vercel Status Page 활용
+- 사용자 가이드: 저장소 내 문서 (`docs/system_manual.md`)
+- 장애 대응: uptime-kuma 알림 + `docker logs` / `docker compose` 로 직접 진단.
+  외부 상태 페이지는 없다(자체 호스팅이므로 Vercel Status Page 는 해당 없음).
 - 커뮤니티: 사용자 피드백 채널
 
 ### 4. 배포 환경 및 예상 비용
 
-#### 4.1 추천 호스팅 옵션 (규모별)
+#### 4.1 추천 호스팅 옵션 (규모별) — 초기 설계안 이력 / 미채택
 
-**소규모/MVP (무료~월 $25)**
+> **아래는 2025-11 시점 계획이며 현재 구성이 아니다.** 실제로는 Oracle Cloud VM 1대에서
+> Docker Compose 로 nginx + 앱 + PostgreSQL 컨테이너를 직접 운영한다. 아래 서비스(Vercel,
+> Supabase, Upstash Redis, Resend, Inngest)는 하나도 사용하지 않으므로 그 무료 티어 한도와
+> 예상 비용은 현재 비용과 무관하다. **실제 비용은 측정된 값이 없어(미확인) 다시 쓰지 않았다.**
+
+**소규모/MVP (무료~월 $25) — 당시 추정**
 
 ```
 ├─ Vercel: Hobby Plan (무료)
@@ -1228,9 +1285,20 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 적합 규모: 사용자 100명 이하, SR 1,000건/월
 ```
 
-#### 4.2 환경별 설정
+#### 4.2 환경별 설정 — 초기 설계안 이력 / 미채택
 
-**Development (로컬)**
+> **아래 세 블록은 계획 당시의 구성이며 현재와 다르다.** 실제 환경은 다음과 같다.
+>
+> | 환경        | 실제 구성                                                                                                            |
+> | ----------- | -------------------------------------------------------------------------------------------------------------------- |
+> | Development | 로컬 PostgreSQL (Docker) + `next dev`, 파일은 로컬 `STORAGE_DIR`, Redis·외부 큐 없음                                 |
+> | Staging     | `dev` 브랜치 → `docker-compose.test.yml` (프로젝트 `sr-test`, 컨테이너 `sr-app-test`/`sr-db-test`), `test.lkindo.kr` |
+> | Production  | `main` 브랜치 → `docker-compose.prod.yml` (`sr-nginx`/`sr-app`/`sr-db`), `lkindo.kr`·`sr.lkindo.kr`                  |
+>
+> 두 환경 모두 같은 서버·같은 Docker 데몬을 공유하며, 런타임 시크릿은 GitHub Secrets 에서
+> 배포 시 서버의 `.env.docker` / `.env.docker.test` 로 기록된다([SECRET_ROTATION.md](./SECRET_ROTATION.md)).
+
+**Development (로컬) — 당시 계획**
 
 ```bash
 - PostgreSQL:
@@ -1242,7 +1310,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 - Inngest: Dev Server
 ```
 
-**Preview (Vercel Preview Deployments)**
+**Preview (Vercel Preview Deployments) — 당시 계획**
 
 ```bash
 - PostgreSQL: Supabase Preview/Staging 프로젝트
@@ -1253,7 +1321,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 - 도메인: auto-generated-preview-url.vercel.app
 ```
 
-**Production (Vercel Production)**
+**Production (Vercel Production) — 당시 계획**
 
 ```bash
 - PostgreSQL: Supabase Production 프로젝트
@@ -1268,27 +1336,43 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 - 백업: Supabase 자동 백업 + 수동 백업
 ```
 
-#### 4.3 CI/CD 파이프라인
+#### 4.3 CI/CD 파이프라인 (실제 구성)
+
+`.github/workflows/ci-cd.yml`(CI) 와 `.github/workflows/deploy.yml`(배포)로 나뉘며,
+배포는 CI 성공을 `workflow_run` 으로 받아서만 시작된다.
 
 ```
-GitHub Push → Vercel 자동 감지
+main/dev 브랜치 push
     ↓
-빌드 시작 (Next.js build)
+[CI/CD Pipeline]  ── 병렬 잡
+  ├─ Code Quality Checks (ESLint + tsc --noEmit)
+  ├─ Unit & Integration Tests (Vitest + 커버리지 → Codecov)
+  ├─ Mutation Testing (Stryker, 변경 파일만)
+  ├─ Build Verification (next build)
+  ├─ E2E Tests (Playwright / Chromium)
+  └─ Security Scan (pnpm audit --prod --audit-level=critical = 게이트, Trivy SARIF = 리포트)
+    ↓  CI 성공(conclusion == success, event == push) 인 경우에만
+[Deploy to Self-Hosted Docker Server]  (workflow_run 트리거)
     ↓
-타입 체크 (TypeScript)
+CI를 통과한 커밋 체크아웃 → Docker 이미지 빌드 → GHCR push
+   (main → :latest, dev → :dev)
     ↓
-린트 검사 (ESLint)
+compose 파일·nginx 설정·백업 스크립트를 서버로 scp
     ↓
-유닛 테스트 (Vitest)
+SSH 원격 실행: GitHub Secrets → .env.docker 기록 → `compose config -q` 검증
     ↓
-빌드 완료
+docker compose pull → down → up -d --force-recreate
     ↓
-Preview/Production 배포
+컨테이너 실행 확인(실패 시 배포 실패) → 마이그레이션은 엔트리포인트의 `prisma migrate deploy`
     ↓
-Sentry Source Maps 업로드
-    ↓
-배포 완료 알림 (Slack/Email)
+Let's Encrypt 인증서 스크립트(prod) → 미사용 이미지 prune
 ```
+
+- 문서만 수정한 커밋은 CI 의 `paths-ignore`(`**.md`, `docs/**`)로 인해 파이프라인 자체가 돌지 않으므로
+  배포도 트리거되지 않는다.
+- 단일 서버를 main/dev 배포가 공유하므로 `concurrency` 로 직렬화한다.
+- 초기 설계안의 Vercel 자동 감지 배포, Sentry Source Maps 업로드, 배포 완료 Slack/Email 알림은
+  **구현되지 않았다.**
 
 ### 5. 추가 개발 로드맵 (우선순위)
 
@@ -1296,13 +1380,17 @@ Sentry Source Maps 업로드
 
 1. 모바일 반응형 최적화 (PWA)
 2. 고급 검색 필터 및 저장된 필터
-3. 자동화 규칙 엔진 (Inngest Workflows)
-4. Slack 통합
-5. 다크 모드 완전 지원
+3. 알림 전달 신뢰성 확보: `notifications` 테이블을 outbox 로 실제 사용하고 재시도/dead-letter 추가
+   (현재는 영속 큐가 없어 프로세스 종료 시 발송이 유실된다)
+4. 자동화 규칙 엔진: 도메인 이벤트 + 스케줄 트리거 기반으로 자체 구현
+   (초기 설계안의 Inngest Workflows 는 채택되지 않았으므로 외부 워크플로 서비스에 의존하지 않는다)
+5. 에러 추적 도입 — 자체 호스팅 방향으로 검토. 제품은 미정이며 Sentry 는 사용하지 않기로 결정되었다.
+6. Slack 통합
+7. 다크 모드 완전 지원
 
 **Mid-term (6~12개월)**
 
-1. AI 챗봇 통합 (SR 자동 분류 - Vercel AI SDK)
+1. AI 챗봇 통합 (SR 자동 분류) — 사용할 SDK/모델은 미정
 2. 워크플로우 커스터마이징 (drag-and-drop)
 3. 고급 분석 대시보드 (예측 분석)
 4. 공개 API 및 개발자 포털
@@ -1310,11 +1398,11 @@ Sentry Source Maps 업로드
 
 **Long-term (1년 이상)**
 
-1. 머신러닝 기반 예측 분석 (Vercel AI)
+1. 머신러닝 기반 예측 분석 — 실행 환경/도구 미정
 2. 음성 지원 (SR 음성 신청 - Web Speech API)
 3. 다국어 지원 (i18n)
 4. 고급 권한 관리 (ABAC)
-5. 온프레미스 배포 옵션
+5. 온프레미스 배포 옵션 (현재 운영도 자체 서버이므로, 고객사 설치용 패키징 관점의 항목)
 
 ---
 
@@ -1344,34 +1432,36 @@ Sentry Source Maps 업로드
 
 - Next.js: https://nextjs.org/docs
 - Prisma: https://www.prisma.io/docs
-- Supabase: https://supabase.com/docs
-  - PostgreSQL: https://supabase.com/docs/guides/database
-  - Storage: https://supabase.com/docs/guides/storage
-  - Connection Pooler: https://supabase.com/docs/guides/database/connecting-to-postgres#connection-pooler
-- NextAuth.js: https://next-auth.js.org
+- PostgreSQL 16: https://www.postgresql.org/docs/16/
+- Auth.js (NextAuth v5): https://authjs.dev
 - Shadcn/ui: https://ui.shadcn.com
 - TanStack Query: https://tanstack.com/query
-- Vercel: https://vercel.com/docs
+- Nodemailer: https://nodemailer.com
+- Docker Compose: https://docs.docker.com/compose/
+- Vitest: https://vitest.dev / Playwright: https://playwright.dev
 
-**추가 참고 문서:**
+> Supabase·Vercel 공식 문서 링크는 해당 서비스를 사용하지 않으므로 제거했다.
 
-- Database Design Document (Prisma Schema + Supabase PostgreSQL)
-- Security & Compliance Document
-- API Specification Document (Server Actions)
-- Vercel Blob Integration Guide
-- UI/UX Design Specification (Shadcn Components)
-- Testing Plan & Test Cases (Vitest, Playwright)
-- Deployment Guide (Vercel + Supabase)
+**추가 참고 문서(저장소 내):**
+
+- [DB.md](./DB.md) — 데이터베이스 설계 (Prisma Schema + PostgreSQL 16)
+- [TRD.md](./TRD.md) — 기술 스택 및 아키텍처의 단일 기준
+- [LLD.md](./LLD.md) — 구현 상세 및 테스트 전략 (Vitest, Playwright, Stryker)
+- [SECRET_ROTATION.md](./SECRET_ROTATION.md) — 배포 시크릿 등록·교체 절차
+- [backup-and-restore.md](./backup-and-restore.md) — 백업/복구 운영 절차
+- [PROJECT_AUDIT_2026-07-29.md](./PROJECT_AUDIT_2026-07-29.md) — 문서-구현 격차 감사
+- [system_manual.md](./system_manual.md) — 사용자 매뉴얼
 
 ---
 
 **문서 버전 관리:**
 
-| 버전 | 작성자       | 변경 사항                                                       | 작성일     |
-| ---- | ------------ | --------------------------------------------------------------- | ---------- |
-| 1.0  | Product Team | 초안 작성                                                       | 2025-11-06 |
-| 1.1  | Product Team | 기술 스택 업데이트 (Next.js + Vercel + PostgreSQL)              | 2025-11-06 |
-| 1.2  | Product Team | 데이터베이스를 Supabase PostgreSQL로 변경 (기본 DB 기능만 사용) | 2025-11-06 |
+| 버전 | 작성자       | 변경 사항                                                                                                                                                                                                                                                                           | 작성일     |
+| ---- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 1.0  | Product Team | 초안 작성                                                                                                                                                                                                                                                                           | 2025-11-06 |
+| 1.1  | Product Team | 기술 스택 업데이트 (Next.js + Vercel + PostgreSQL)                                                                                                                                                                                                                                  | 2025-11-06 |
+| 1.2  | Product Team | 데이터베이스를 Supabase PostgreSQL로 변경 (기본 DB 기능만 사용)                                                                                                                                                                                                                     | 2025-11-06 |
+| 1.3  | Product Team | 미채택 스택 서술 정정: 알림(매터모스트→웹 푸시), 알림 아키텍처(Celery→도메인 이벤트+backgroundTask), 캐싱·실행 환경·커넥션 풀링, 구현 단계, 운영 계획(모니터링·백업), CI/CD 파이프라인, 로드맵, 부록. 비용(4.1)·환경 구성(4.2)은 초기 설계안 이력으로 보존. Sentry 미사용 결정 명시 | 2026-07-30 |
 
 ---
 
