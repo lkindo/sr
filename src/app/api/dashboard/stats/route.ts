@@ -12,8 +12,6 @@ export const runtime = 'nodejs';
 // GET /api/dashboard/stats - 대시보드 통계 조회 (Rate Limit: 느슨함)
 export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
-    const url = new URL(request.url);
-    const noCache = url.searchParams.get('nocache') === '1';
     const userId = session.user.id;
     const userRoles = session.user.roles || [];
     const isAdminManagerEngineer = userRoles.some((role: string) =>
@@ -21,13 +19,19 @@ export const GET = withAuthAndRateLimit(
     );
     const isEngineer = userRoles.includes('ENGINEER');
 
-    // 사용자별 캐시 키 생성 (역할별로 다른 데이터 표시)
-    const baseCacheKey = `dashboard:stats:${userId}:${isAdminManagerEngineer ? 'admin' : 'client'}`;
-    // nocache=1 이면 캐시 미스 유도(새 키)로 실시간 계산 강제
-    const cacheKey = noCache ? `${baseCacheKey}:nocache:${Date.now()}` : baseCacheKey;
-
-    // 캐시된 통계 데이터 조회 또는 생성
-    // 캐시된 통계 데이터 조회 또는 생성
+    /**
+     * 이 응답은 캐시하지 않는다 — 매 요청마다 계산한다.
+     *
+     * 예전에는 `baseCacheKey` / `cacheKey` / `?nocache=1` 를 계산해 두고 **한 번도 읽지
+     * 않았다**. 주석은 캐싱을 한다고 적혀 있고(중복까지 되어 있었다) 실제 본문은 평범한
+     * async IIFE 였다. 존재하지 않는 통제를 코드가 주장하고 있었으므로 지웠다(감사 4.5).
+     *
+     * 캐시를 붙이지 않은 이유: 이 엔드포인트는 SSE 무효화로 실시간 갱신되는 대시보드가
+     * 소비한다. 서버에 TTL 캐시를 두면 사용자가 SR 을 바꾼 직후 재조회해도 옛 수치를
+     * 보게 되어, 실시간 갱신을 다시 깨뜨린다. `?nocache=1` 탈출구도 호출하는 곳이 없다
+     * (src 전역 grep 0건). 비용이 문제가 되면 스테일 응답이 아니라 집계 쿼리 자체를
+     * 손봐야 한다.
+     */
     const stats = await (async () => {
       // 역할별 필터링 조건 설정
       const baseWhere: Prisma.SRWhereInput = {};
@@ -422,7 +426,6 @@ export const GET = withAuthAndRateLimit(
           roleScope: isAdminManagerEngineer ? 'admin' : 'client',
           byStatusKeys: Object.keys(stats?.byStatus ?? {}).length,
           byPriorityKeys: Object.keys(stats?.byPriority ?? {}).length,
-          noCache,
         });
       }
     } catch {

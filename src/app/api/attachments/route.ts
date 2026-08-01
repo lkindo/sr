@@ -11,7 +11,7 @@ import {
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
-import { uploadAttachmentBlob } from '@/lib/storage';
+import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -65,33 +65,52 @@ export const POST = withAuthAndRateLimit(
     // 파일 저장 (웹루트 밖 STORAGE_DIR)
     const uploadResult = await uploadAttachmentBlob(srId, file);
 
-    // DB에 첨부파일 정보 저장 (fileUrl 은 생성 후 id 기반 인증 다운로드 경로로 갱신)
-    const attachment = await prisma.sRAttachment.create({
-      data: {
-        srId,
-        fileName: file.name,
-        fileSize: size,
-        fileType: mimeType, // 검증된 MIME 타입 사용
-        fileUrl: '',
-        storagePath: uploadResult.pathname,
-        uploadedBy: session.user.id,
-      },
-    });
+    /**
+     * 행 생성 · fileUrl 채움 · 활동 로그를 한 트랜잭션에 묶는다.
+     *
+     * 예전에는 세 문장이 각각 독립 실행됐다(감사 4.2). 중간에 실패하면
+     * `fileUrl = ''` 인 죽은 링크가 남거나, 감사 추적 없는 첨부가 남았다.
+     * 파일 업로드는 트랜잭션 밖이므로, 실패 시 방금 올린 blob 을 되돌린다 —
+     * 그러지 않으면 참조 없는 파일이 디스크에 영구히 쌓인다.
+     */
+    let attachment;
+    try {
+      attachment = await prisma.$transaction(async (tx) => {
+        const created = await tx.sRAttachment.create({
+          data: {
+            srId,
+            fileName: file.name,
+            fileSize: size,
+            fileType: mimeType, // 검증된 MIME 타입 사용
+            fileUrl: '',
+            storagePath: uploadResult.pathname,
+            uploadedBy: session.user.id,
+          },
+        });
 
-    // fileUrl 을 인증 다운로드 라우트로 설정 (attachment id 필요)
-    const fileUrl = `/api/attachments/${attachment.id}/download`;
-    await prisma.sRAttachment.update({ where: { id: attachment.id }, data: { fileUrl } });
-    attachment.fileUrl = fileUrl;
+        // fileUrl 은 인증 다운로드 라우트이고 id 가 필요하므로 생성 후에 채운다.
+        const withUrl = await tx.sRAttachment.update({
+          where: { id: created.id },
+          data: { fileUrl: `/api/attachments/${created.id}/download` },
+        });
 
-    // 활동 내역 추가
-    await prisma.sRActivity.create({
-      data: {
-        srId,
-        userId: session.user.id,
-        type: 'ATTACHMENT_ADDED',
-        description: `파일 추가: ${file.name}`,
-      },
-    });
+        await tx.sRActivity.create({
+          data: {
+            srId,
+            userId: session.user.id,
+            type: 'ATTACHMENT_ADDED',
+            description: `파일 추가: ${file.name}`,
+          },
+        });
+
+        return withUrl;
+      });
+    } catch (error) {
+      await deleteAttachmentBlob(uploadResult.pathname).catch(() => {
+        // 정리 실패는 원래 오류를 가리지 않는다. 고아 blob 은 남지만 요청은 실패로 끝난다.
+      });
+      throw error;
+    }
 
     // 첨부 개수는 조회 시 _count 로 계산하므로 별도 스칼라 컬럼을 유지하지 않는다.
 

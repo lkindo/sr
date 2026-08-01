@@ -18,7 +18,7 @@ import {
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeMany, serializeResponse } from '@/lib/serialization';
-import { STORAGE_DIR } from '@/lib/storage';
+import { deleteAttachmentBlob, STORAGE_DIR } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
 
 // Force Node.js runtime (file system operations require Node.js)
@@ -146,23 +146,52 @@ export const POST = withAuthAndRateLimit(
 
     let createdAttachments: any[] = [];
     if (attachmentsToInsert.length > 0) {
-      createdAttachments = await prisma.sRAttachment.createManyAndReturn({
-        data: attachmentsToInsert,
-      });
+      /**
+       * 삽입 · fileUrl 갱신 · 활동 로그를 한 트랜잭션에 묶는다.
+       *
+       * 예전에는 `createManyAndReturn` 뒤에 N 개 update 를 `Promise.all` 로 돌리고
+       * 활동 로그는 아예 없었다(감사 4.2). 중간에 실패하면 `fileUrl = ''` 인 죽은
+       * 링크가 남았고, 성공해도 배치 업로드만 감사 추적에서 빠졌다 — 단일 업로드
+       * 경로는 `ATTACHMENT_ADDED` 를 남기는데 배치는 남기지 않아 같은 행위가
+       * 경로에 따라 다르게 기록됐다.
+       */
+      try {
+        createdAttachments = await prisma.$transaction(async (tx) => {
+          const created = await tx.sRAttachment.createManyAndReturn({
+            data: attachmentsToInsert,
+          });
 
-      // fileUrl 을 인증 다운로드 라우트로 설정 (attachment id 가 필요하므로 생성 후 갱신)
-      await Promise.all(
-        createdAttachments.map((a) =>
-          prisma.sRAttachment.update({
-            where: { id: a.id },
-            data: { fileUrl: `/api/attachments/${a.id}/download` },
-          })
-        )
-      );
-      createdAttachments = createdAttachments.map((a) => ({
-        ...a,
-        fileUrl: `/api/attachments/${a.id}/download`,
-      }));
+          // fileUrl 은 attachment id 가 필요하므로 생성 후에 채운다.
+          for (const a of created) {
+            await tx.sRAttachment.update({
+              where: { id: a.id },
+              data: { fileUrl: `/api/attachments/${a.id}/download` },
+            });
+          }
+
+          await tx.sRActivity.createMany({
+            data: created.map((a) => ({
+              srId,
+              userId: session.user.id,
+              type: 'ATTACHMENT_ADDED' as const,
+              description: `파일 추가: ${a.fileName}`,
+            })),
+          });
+
+          return created.map((a) => ({ ...a, fileUrl: `/api/attachments/${a.id}/download` }));
+        });
+      } catch (error) {
+        // 파일은 트랜잭션 밖에서 이미 디스크에 쓰였다. 롤백되면 참조 없는 파일이
+        // 남으므로 되돌린다.
+        await Promise.all(
+          attachmentsToInsert.map((a) =>
+            deleteAttachmentBlob(a.storagePath).catch(() => {
+              // 정리 실패가 원래 오류를 가리지 않도록 한다.
+            })
+          )
+        );
+        throw error;
+      }
     }
 
     // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음

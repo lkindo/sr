@@ -1,0 +1,152 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+/**
+ * 감사 4.2 회귀 테스트 — 배치 첨부 업로드의 원자성과 감사 추적.
+ *
+ * 이 경로는 `createManyAndReturn` 후 N 개 update 를 `Promise.all` 로 실행했고,
+ * 활동 로그는 **아예 없었다**. 단일 업로드 경로(`/api/attachments`)는 매번
+ * `ATTACHMENT_ADDED` 를 남기므로, 같은 행위가 어느 URL 로 들어왔느냐에 따라
+ * 감사 추적에 남기도 하고 안 남기도 했다.
+ */
+
+const mocks = vi.hoisted(() => ({
+  transaction: vi.fn(),
+  srFindUnique: vi.fn(),
+  deleteBlob: vi.fn(),
+  validateFile: vi.fn(),
+  txCreateManyAndReturn: vi.fn(),
+  txAttachmentUpdate: vi.fn(),
+  txActivityCreateMany: vi.fn(),
+  mkdir: vi.fn(),
+}));
+
+vi.mock('@/lib/prisma', () => ({
+  default: {
+    $transaction: mocks.transaction,
+    sR: { findUnique: mocks.srFindUnique },
+  },
+}));
+
+vi.mock('@/lib/auth-wrapper', () => ({
+  withAuthAndRateLimit: (handler: any) => (request: any, ctx: any) =>
+    handler(request, { ...ctx, session: { user: { id: 'user-1', roles: ['ADMIN'] } } }),
+}));
+
+vi.mock('@/lib/policies', () => ({
+  ensureCanReadSR: vi.fn(),
+  ensureCanUpdateSR: vi.fn(),
+}));
+
+vi.mock('@/lib/serialization', () => ({
+  serializeResponse: (data: any) => data,
+  serializeMany: (data: any) => data,
+}));
+
+vi.mock('@/lib/storage', () => ({
+  deleteAttachmentBlob: mocks.deleteBlob,
+  STORAGE_DIR: '/tmp/storage',
+}));
+
+vi.mock('@/lib/upload-guard', () => ({ assertUploadSizeWithinLimit: vi.fn() }));
+
+// fs 는 default export 도 요구된다(Node 내장 모듈을 통째로 대체하므로).
+vi.mock('fs/promises', () => ({ default: { mkdir: mocks.mkdir }, mkdir: mocks.mkdir }));
+vi.mock('fs', () => {
+  const createWriteStream = vi.fn(() => ({}));
+  return { default: { createWriteStream }, createWriteStream };
+});
+vi.mock('stream/promises', () => {
+  const pipeline = vi.fn(async () => undefined);
+  return { default: { pipeline }, pipeline };
+});
+
+vi.mock('@/lib/file-validator', async () => {
+  const actual = await vi.importActual<any>('@/lib/file-validator');
+  return { ...actual, validateFile: mocks.validateFile };
+});
+
+import { POST } from '../route';
+
+const tx = {
+  sRAttachment: {
+    createManyAndReturn: mocks.txCreateManyAndReturn,
+    update: mocks.txAttachmentUpdate,
+  },
+  sRActivity: { createMany: mocks.txActivityCreateMany },
+};
+
+/** jsdom 의 File 에는 stream() 이 없어 라우트의 파이프라인이 바로 죽는다. 최소한만 채운다. */
+const streamableFile = (name: string) => {
+  const file = new File(['x'], name, { type: 'text/plain' });
+  Object.defineProperty(file, 'stream', {
+    value: () =>
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array([120]));
+          controller.close();
+        },
+      }),
+  });
+  return file;
+};
+
+const request = (names: string[]) => {
+  const form = new FormData();
+  for (const n of names) form.append('files', streamableFile(n));
+  return {
+    formData: async () => form,
+    url: 'http://localhost:3000/api/srs/sr-1/attachments',
+    headers: new Headers(),
+  } as any;
+};
+
+const call = (names: string[]) =>
+  (POST as any)(request(names), { params: Promise.resolve({ id: 'sr-1' }) });
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.transaction.mockImplementation(async (cb: any) => cb(tx));
+  mocks.srFindUnique.mockResolvedValue({ id: 'sr-1', clientId: 'c-1' });
+  mocks.validateFile.mockResolvedValue({ mimeType: 'text/plain', size: 1 });
+  mocks.txCreateManyAndReturn.mockImplementation(async ({ data }: any) =>
+    data.map((d: any, i: number) => ({
+      ...d,
+      id: `att-${i}`,
+      fileSize: 1,
+      createdAt: new Date(),
+    }))
+  );
+  mocks.txAttachmentUpdate.mockResolvedValue({});
+  mocks.txActivityCreateMany.mockResolvedValue({ count: 2 });
+  mocks.deleteBlob.mockResolvedValue(undefined);
+});
+
+describe('POST /api/srs/[id]/attachments — 배치 업로드', () => {
+  it('삽입·fileUrl 갱신·활동 로그가 한 트랜잭션 안에서 일어난다', async () => {
+    await call(['a.txt', 'b.txt']);
+
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.txCreateManyAndReturn).toHaveBeenCalledTimes(1);
+    expect(mocks.txAttachmentUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('배치도 파일마다 ATTACHMENT_ADDED 를 남긴다', async () => {
+    await call(['a.txt', 'b.txt']);
+
+    // 예전에는 이 경로만 활동 로그가 없어 배치 업로드가 감사 추적에서 통째로 빠졌다.
+    expect(mocks.txActivityCreateMany).toHaveBeenCalledTimes(1);
+    const rows = mocks.txActivityCreateMany.mock.calls[0][0].data;
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r: any) => r.type === 'ATTACHMENT_ADDED')).toBe(true);
+    expect(rows.map((r: any) => r.description)).toEqual(['파일 추가: a.txt', '파일 추가: b.txt']);
+  });
+
+  it('트랜잭션이 실패하면 디스크에 쓴 파일을 모두 되돌린다', async () => {
+    mocks.transaction.mockRejectedValue(new Error('db down'));
+
+    await expect(call(['a.txt', 'b.txt'])).rejects.toThrow('db down');
+
+    expect(mocks.deleteBlob).toHaveBeenCalledTimes(2);
+  });
+});
