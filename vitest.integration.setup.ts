@@ -37,6 +37,16 @@ beforeAll(async () => {
     return;
   }
 
+  // `vitest.setup.ts` 의 플레이스홀더가 다시 새어 들어오면 즉시 알아채도록 막는다.
+  // 이 값으로는 인증 실패만 반복되므로, 원인을 "DB 가 없다"로 오해하기 쉽다.
+  if (process.env.DATABASE_URL?.includes('://test:test@localhost:5432/test')) {
+    throw new Error(
+      'DATABASE_URL 이 vitest.setup.ts 의 플레이스홀더입니다.\n' +
+        '  루트 셋업이 실제 값을 덮어썼다는 뜻입니다(setupFiles 상속).\n' +
+        '  vitest.setup.ts 는 DATABASE_URL 을 `??=` 로만 설정해야 합니다.'
+    );
+  }
+
   try {
     await integrationPrisma.$queryRaw`SELECT 1`;
   } catch (error) {
