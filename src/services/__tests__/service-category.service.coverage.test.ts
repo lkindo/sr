@@ -1,3 +1,4 @@
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
@@ -195,6 +196,32 @@ describe('ServiceCategoryService', () => {
 
       await expect(service.create(validData)).rejects.toThrow(DuplicateError);
       expect(prisma.serviceCategory.create).not.toHaveBeenCalled();
+    });
+
+    /**
+     * 감사 4.2 — 사전 확인은 TOCTOU 라 중복 방지 수단이 못 된다.
+     *
+     * 더블 클릭이나 재시도로 두 요청이 findFirst 를 동시에 통과하면 같은 이름 카테고리가
+     * 둘 생기고, SLA 시간이 다른 항목 두 개가 드롭다운에 나타나 SR 이 갈라진다.
+     * 실제 보장은 DB 의 부분 unique 인덱스가 하며, 서비스는 그 위반을 사용자에게
+     * 이해되는 오류로 번역해야 한다(그대로 두면 raw Prisma 오류가 500 이 된다).
+     */
+    it('경쟁에서 진 요청의 P2002 를 DuplicateError 로 변환한다', async () => {
+      vi.mocked(prisma.serviceCategory.findFirst).mockResolvedValue(null as never);
+      const p2002 = new PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+      });
+      vi.mocked(prisma.serviceCategory.create).mockRejectedValue(p2002 as never);
+
+      await expect(service.create(validData)).rejects.toThrow(DuplicateError);
+    });
+
+    it('P2002 가 아닌 오류는 그대로 전파한다', async () => {
+      vi.mocked(prisma.serviceCategory.findFirst).mockResolvedValue(null as never);
+      vi.mocked(prisma.serviceCategory.create).mockRejectedValue(new Error('db down') as never);
+
+      await expect(service.create(validData)).rejects.toThrow('db down');
     });
 
     it('throws on invalid data (zod validation)', async () => {
