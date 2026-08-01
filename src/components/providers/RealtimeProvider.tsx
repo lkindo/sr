@@ -1,7 +1,5 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-
 import { useRealtimeStatus } from '@/hooks/use-realtime-status';
 
 /**

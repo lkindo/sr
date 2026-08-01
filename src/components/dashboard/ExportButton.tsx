@@ -52,7 +52,7 @@ export function ExportButton() {
         title: '다운로드 완료',
         description: '리스포트를 성공적으로 다운로드했습니다.',
       });
-    } catch (error) {
+    } catch {
       toast({
         title: '내보내기 실패',
         description: '파일을 다운로드하는 중 오류가 발생했습니다.',

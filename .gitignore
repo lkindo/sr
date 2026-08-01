@@ -102,7 +102,7 @@ nul
 # ------------------------------------------------------------------------------
 actions_runs.json
 output.css
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 next-env.d.ts
 
 # 빌드 시 esbuild 가 생성하는 기준 데이터 시드 번들(Dockerfile).

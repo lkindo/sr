@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui';
+import { logger } from '@/lib/logger';
 
 export default function Error({
   error,
@@ -13,7 +14,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    logger.error('처리되지 않은 페이지 오류', error);
   }, [error]);
 
   return (

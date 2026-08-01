@@ -145,7 +145,7 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
           defaultDate.setHours(defaultDate.getHours() + srData.serviceCategory.slaHours);
           form.setValue('estimatedCompletionDate', defaultDate);
         }
-      } catch (error) {
+      } catch {
         toast({
           title: '오류',
           description: '데이터를 불러오는데 실패했습니다.',

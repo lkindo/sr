@@ -16,19 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui';
 import { useCreateSRForm } from '@/hooks/useCreateSRForm';
 
-const MIN_TITLE_LENGTH = 5;
-const MIN_DESCRIPTION_LENGTH = 10;
-
-interface Client {
-  id: string;
-  code: string;
-  name: string;
-  categories?: {
-    id: string;
-    name: string;
-  }[];
-}
-
 interface CreateSRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;

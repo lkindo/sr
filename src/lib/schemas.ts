@@ -2,8 +2,6 @@ import { z } from 'zod';
 
 const emptyStringToUndefined = (val: unknown) => (val === '' ? undefined : val);
 const emptyStringToNull = (val: unknown) => (val === '' ? null : val);
-const emptyStringAndNullToUndefined = (val: unknown) =>
-  val === '' || val === null ? undefined : val;
 
 /**
  * 문자열 필드 길이 상한 (감사 4.3).

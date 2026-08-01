@@ -5,7 +5,7 @@ import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
-import { ensureCanReadSR } from '@/lib/policies';
+import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { FIELD_LIMITS } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
@@ -37,8 +37,20 @@ export const GET = withAuthAndRateLimit(
 
     ensureCanReadSR(session.user, sr);
 
+    /**
+     * `isInternal` 은 선언만 되어 있고 어디서도 읽히거나 쓰이지 않았다(감사 4.2).
+     * 지금은 아무도 이 플래그를 세우지 않으므로 새는 것이 없지만, 누군가 세우는 순간
+     * 이 조회에 필터가 없어 내부 노트가 고객에게 그대로 나간다 — 선언된 통제가 실제로는
+     * 없는 상태였고, 그건 없느니만 못하다. 여기서 필터를 걸어 함정을 없앤다.
+     *
+     * 부수 효과로 `@@index([srId, isInternal, createdAt])` 가 비로소 쓰이게 된다.
+     * 내부 사용자는 `[srId, createdAt]` 를, 외부 사용자는 3열 인덱스를 탄다.
+     */
     const comments = await prisma.sRComment.findMany({
-      where: { srId: id },
+      where: {
+        srId: id,
+        ...(isInternalUser(session.user) ? {} : { isInternal: false }),
+      },
       include: {
         user: {
           select: {

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Separator } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
-import { SystemSettings } from '@/types/settings';
+import { logger } from '@/lib/logger';
 
 export default function SystemSettingsPage() {
   const { toast } = useToast();
@@ -37,7 +37,7 @@ export default function SystemSettingsPage() {
         setSiteDescription(data.siteDescription || '');
         setAdminEmail(data.adminEmail || '');
       } catch (error) {
-        console.error(error);
+        logger.error('시스템 설정 조회 오류', error instanceof Error ? error : undefined);
         toast({
           title: '오류',
           description: '시스템 설정을 불러오는데 실패했습니다.',

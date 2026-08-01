@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { auth } from '@/auth';
 import { parseJsonBody } from '@/lib/api-helpers';
+import { logger } from '@/lib/logger';
 import { pushService } from '@/services/push.service';
 
 const preferencesSchema = z.object({
@@ -30,7 +31,7 @@ export async function GET() {
 
     return NextResponse.json(preferences);
   } catch (error) {
-    console.error('[API] Get notification preferences error:', error);
+    logger.error('알림 설정 조회 오류', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: '알림 설정 조회에 실패했습니다.' }, { status: 500 });
   }
 }
@@ -62,7 +63,7 @@ export async function PUT(request: NextRequest) {
       preferences,
     });
   } catch (error) {
-    console.error('[API] Update notification preferences error:', error);
+    logger.error('알림 설정 변경 오류', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: '알림 설정 저장에 실패했습니다.' }, { status: 500 });
   }
 }

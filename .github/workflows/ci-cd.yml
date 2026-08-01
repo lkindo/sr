@@ -57,6 +57,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # `pnpm lint` 에는 --max-warnings 래칫이 걸려 있다(package.json).
+      # ESLint 는 경고만 있으면 0 으로 종료하므로, 래칫이 없던 시절에는 경고가
+      # 몇 개로 불어나도 CI 가 영원히 초록이었다(감사 4.6). 새 경고는 이제 실패다.
+      # 숫자를 올려서 통과시키지 말 것 — 경고를 없애고 숫자를 내리는 방향으로만 쓴다.
       - name: Run ESLint
         run: pnpm lint
 

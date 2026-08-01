@@ -62,7 +62,7 @@ export function UserDialog({
   onSaved,
   defaultClientId,
   clients: propClients,
-  roles,
+  roles: _roles,
 }: UserDialogProps) {
   // ... (state definitions)
   const [name, setName] = useState('');

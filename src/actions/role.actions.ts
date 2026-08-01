@@ -8,7 +8,6 @@ import { getFormDataValue } from '@/lib/form-data-parser';
 import { PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
 import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
-import type { RoleService } from '@/services/role.service';
 import { services } from '@/services/service-registry';
 
 export async function createRoleAction(formData: FormData): Promise<Result<Role>> {

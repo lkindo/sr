@@ -27,7 +27,7 @@ export const GET = withAuthAndRateLimit(
 
     try {
       ensureCanReadSR(session.user, sr);
-    } catch (error) {
+    } catch {
       return NextResponse.json({ error: 'SR 조회 권한이 없습니다.' }, { status: 403 });
     }
 

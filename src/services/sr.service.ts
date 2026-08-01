@@ -1,8 +1,6 @@
 import { Prisma, SR, SRStatus } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
-import { getSRUrl } from '@/lib/app-url';
 import { domainEvents } from '@/lib/domain-events';
 import {
   BadRequestError,
@@ -24,7 +22,7 @@ import {
 import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
-import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
+import { validateTransition } from '@/lib/sr-state-machine';
 import { appZoneDateStamp } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
@@ -479,7 +477,7 @@ export class SRService {
             existingSR.intakeAt || new Date()
           );
           updateData.dueDate = dueDate;
-        } catch (error) {
+        } catch {
           // 카테고리를 찾지 못해도 SR 업데이트는 계속 진행
           logger.warn('SLA 기한 계산 실패', { categoryId: existingSR.serviceCategoryId });
         }

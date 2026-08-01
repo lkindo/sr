@@ -10,7 +10,7 @@ import {
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
-import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadUser } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { changePasswordSchema, userUpdateSchema } from '@/lib/schemas';

@@ -82,7 +82,7 @@ export async function requireRateLimit(
     const headersList = await headers();
     // 신뢰 프록시 기반 IP 해석 (조작 가능한 XFF 첫 항목 사용 금지)
     ip = getClientIp(headersList);
-  } catch (error) {
+  } catch {
     // 테스트 환경 등 Request Context가 없는 경우 예외 처리 및 127.0.0.1로 폴백
   }
 

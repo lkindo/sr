@@ -28,12 +28,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui';
 import { useEditSRForm } from '@/hooks/useEditSRForm';
 
-interface Client {
-  id: string;
-  code: string;
-  name: string;
-}
-
 interface Attachment {
   id: string;
   fileName: string;
@@ -73,11 +67,6 @@ interface SR {
     categoryName: string;
   } | null;
   attachments?: Attachment[];
-}
-
-interface ServiceCategory {
-  id: string;
-  categoryName: string;
 }
 
 interface EditSRDialogProps {

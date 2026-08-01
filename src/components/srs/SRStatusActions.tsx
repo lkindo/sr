@@ -8,6 +8,7 @@ import { CheckCircle, Clock, Loader2, PauseCircle, Play, RotateCcw, XCircle } fr
 import { Button } from '@/components/ui';
 import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 import { canPerformTransition } from '@/lib/sr-state-machine';
 
 import { CompleteSRDialog } from './CompleteSRDialog';
@@ -51,7 +52,6 @@ export function SRStatusActions({
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   const { mutateAsync: changeStatus } = useChangeSRStatus(srId);
 
@@ -87,7 +87,7 @@ export function SRStatusActions({
         description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
         variant: 'destructive',
       });
-      console.error(error);
+      logger.error('SR 상태 변경 실패', error instanceof Error ? error : undefined);
     } finally {
       setLoadingAction(null);
     }

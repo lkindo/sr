@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { BarChart3, CheckCircle2, ClipboardList, Loader2, Shield, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui';

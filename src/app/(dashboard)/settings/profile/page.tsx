@@ -12,6 +12,7 @@ import { Label } from '@/components/ui';
 import { Separator } from '@/components/ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface Role {
   role: {
@@ -61,7 +62,7 @@ export default function ProfilePage() {
     try {
       const response = await fetch('/api/profile');
       if (!response.ok) {
-        console.error('Profile fetch failed:', response.status);
+        logger.error('프로필 조회 실패', undefined, { status: response.status });
         throw new Error('Failed to fetch profile');
       }
       const data = await response.json();
@@ -70,7 +71,7 @@ export default function ProfilePage() {
       setImage(data.image || '');
       setError(null);
     } catch (err) {
-      console.error('Profile error:', err);
+      logger.error('프로필 조회 오류', err instanceof Error ? err : undefined);
       const errorMessage = '프로필 정보를 불러오는데 실패했습니다.';
       setError(errorMessage);
       setProfile(null);

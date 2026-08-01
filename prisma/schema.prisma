@@ -54,7 +54,6 @@ model User {
   pushSubscriptions      PushSubscription[]
   notificationPreference NotificationPreference?
 
-  @@index([email])
   @@index([isActive])
   // SR 검색이 요청자·담당자 이름으로도 조인 검색한다(감사 4.2).
   @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_name_trgm_idx")
@@ -143,7 +142,6 @@ model Client {
   clientHandlers    ClientHandler[]
 
   @@index([name])
-  @@index([code])
   @@index([isActive])
   // SR 검색이 고객사명으로도 조인 검색한다(감사 4.2).
   // 위 `@@index([name])` 과 기본 이름이 겹치므로 map 을 명시한다.
@@ -411,7 +409,6 @@ model Notification {
   createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([status, createdAt])
-  @@index([recipient])
   @@index([recipient, createdAt])
   @@map("notifications")
 }
