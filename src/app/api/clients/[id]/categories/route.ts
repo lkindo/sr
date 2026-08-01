@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanReadClient, ensureCanUpdateClient, isInternalUser } from '@/lib/policies';
@@ -67,11 +67,11 @@ export const POST = withAuthAndRateLimit(
       }
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     let validated;
     try {
       validated = serviceCategoryCreateSchema.parse({
-        ...body,
+        ...((body ?? {}) as Record<string, unknown>),
         clientId: id,
       });
     } catch (error) {

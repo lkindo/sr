@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanUpdateRole } from '@/lib/policies';
@@ -19,7 +19,7 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     let validated;
     try {
       validated = permissionAssignSchema.parse(body);

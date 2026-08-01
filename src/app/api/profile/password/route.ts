@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
+import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SECURITY } from '@/lib/constants';
 import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
@@ -26,7 +27,7 @@ export const POST = withAuthAndRateLimit(
       throw new UnauthorizedError('유효하지 않은 세션입니다. 다시 로그인해주세요.');
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     let validated;
     try {

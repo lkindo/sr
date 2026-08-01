@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 
+import { validateRequestBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { usePagination } from '@/lib/pagination';
 import { ensureCanCreateClient, ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { clientCreateSchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -76,7 +78,9 @@ export const POST = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     ensureCanCreateClient(session.user);
 
-    const body = await request.json();
+    // 여기서 검증하면 zod 오류가 ValidationError(400)로 매핑된다.
+    // 서비스도 같은 스키마로 다시 파싱하므로(멱등) 계약은 그대로다.
+    const body = await validateRequestBody(request, clientCreateSchema);
 
     const clientService = new ClientService();
     const client = await clientService.createClient(body);

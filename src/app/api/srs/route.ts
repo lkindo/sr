@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SRPriority, SRStatus } from '@prisma/client';
 
+import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { usePagination } from '@/lib/pagination';
 import { ensureCanCreateSR, isInternalUser } from '@/lib/policies';
@@ -78,7 +79,7 @@ export const POST = withAuthAndRateLimit(
     // Optimize: Use in-memory check via policy function instead of DB query
     ensureCanCreateSR(session.user);
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     // Zod validation을 먼저 수행하여 잘못된 페이로드에 대해 400 Bad Request 유도
     const validated = srCreateSchema.parse(body);

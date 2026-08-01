@@ -1,6 +1,7 @@
 // src/app/api/settings/system/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
+import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
@@ -42,7 +43,7 @@ export const PUT = withAuthAndRateLimit(
       throw new ForbiddenError('관리자 권한이 필요합니다.');
     }
 
-    const settings: SystemSettings = await request.json();
+    const settings = (await parseJsonBody(request)) as SystemSettings;
 
     // 실제 설정 저장 로직은 여기에 구현해야 합니다.
     logger.debug('Updating system settings', { custom_siteName: settings.siteName });

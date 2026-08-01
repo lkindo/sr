@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ensureCanCreateRole, ensureCanReadRole } from '@/lib/policies';
+import { roleCreateSchema } from '@/lib/schemas';
 import { RoleService } from '@/services/role.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -27,7 +29,9 @@ export const POST = withAuthAndRateLimit(
     // 권한 체크: 역할 생성 권한(ADMIN 또는 ROLE:CREATE)
     ensureCanCreateRole(session.user);
 
-    const body = await request.json();
+    // 여기서 검증하면 zod 오류가 ValidationError(400)로 매핑된다.
+    // 서비스도 같은 스키마로 다시 파싱하므로(멱등) 계약은 그대로다.
+    const body = await validateRequestBody(request, roleCreateSchema);
 
     const roleService = new RoleService();
     const role = await roleService.createRole(body);

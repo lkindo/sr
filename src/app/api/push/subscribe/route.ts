@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
+import { parseJsonBody } from '@/lib/api-helpers';
 import { pushService, PushSubscriptionData } from '@/services/push.service';
 
 const subscriptionSchema = z.object({
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     const result = subscriptionSchema.safeParse(body);
 
     if (!result.success) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanUpdateClient, isInternalUser } from '@/lib/policies';
@@ -58,13 +58,13 @@ export const PATCH = withAuthAndRateLimit(
     await ensureCategoryOfClient(id, categoryId);
     ensureCanManageCategories(session.user, id);
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     let validated;
     try {
       // clientId 는 URL 이 결정한다. 바디로 넘어온 값은 무시해야
       // 카테고리를 다른 고객사로 옮기는 경로가 생기지 않는다.
-      const { clientId: _ignored, ...rest } = body ?? {};
+      const { clientId: _ignored, ...rest } = (body ?? {}) as Record<string, unknown>;
       validated = serviceCategoryUpdateSchema.parse(rest);
     } catch (error) {
       if (error instanceof Error && 'issues' in error) {

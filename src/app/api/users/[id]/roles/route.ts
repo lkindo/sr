@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
@@ -26,7 +26,7 @@ export const POST = withAuthAndRateLimit(
       throw new ForbiddenError('역할을 할당할 권한이 없습니다.');
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     let validated;
     try {
       validated = roleAssignSchema.parse(body);
