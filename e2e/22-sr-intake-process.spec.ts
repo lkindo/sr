@@ -86,7 +86,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
       });
 
       // SR 찾기 (Polling 강화)
-      let srRow = page.locator('tr', { hasText: srTitle }).first();
+      let srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
       let found = false;
 
       for (let i = 0; i < 5; i++) {
@@ -101,7 +101,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
         await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
           timeout: 15000,
         });
-        srRow = page.locator('tr', { hasText: srTitle }).first();
+        srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
       }
 
       if (!found) {
@@ -130,7 +130,9 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인 (상세 데이터 로드를 이 단정으로 기다린다)
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // REQUESTED 상태 확인
       const requestedStatus = page.locator('text=/요청됨|REQUESTED/i').first();
@@ -221,7 +223,10 @@ test.describe('SR 접수 프로세스 테스트', () => {
       console.log(`✅ SR 상태 변경 확인: REQUESTED → INTAKE`);
 
       // 담당자 표시 확인
-      const assigneeDisplay = page.locator(`text=${assigneeName || 'Engineer'}`).first();
+      const assigneeDisplay = page
+        .locator(`text=${assigneeName || 'Engineer'}`)
+        .filter({ visible: true })
+        .first();
       await assigneeDisplay.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
       if (await assigneeDisplay.isVisible().catch(() => false)) {
         console.log(`✅ 담당자 표시 확인: ${assigneeName}`);
@@ -429,7 +434,7 @@ test.describe('SR 접수 권한 테스트', () => {
         timeout: 15000,
       });
 
-      let srRow = page.locator('tr', { hasText: title }).first();
+      let srRow = page.locator('tr', { hasText: title }).filter({ visible: true }).first();
       let found = false;
       for (let i = 0; i < 5; i++) {
         // 고정 sleep 대신 행이 나타나는 것을 기다린다. 없으면 새로고침하고 다시 본다.
@@ -442,7 +447,7 @@ test.describe('SR 접수 권한 테스트', () => {
         await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
           timeout: 15000,
         });
-        srRow = page.locator('tr', { hasText: title }).first();
+        srRow = page.locator('tr', { hasText: title }).filter({ visible: true }).first();
       }
 
       if (!found) throw new Error(`생성된 SR을 찾을 수 없습니다: ${title}`);
@@ -452,7 +457,9 @@ test.describe('SR 접수 권한 테스트', () => {
 
       // "접수 버튼이 없다"를 확인하려면 먼저 상세 화면이 실제로 렌더링되었음을 단정해야 한다.
       // 렌더 전에 물어보면 어떤 경우에도 '없음'이 되어 아무것도 검증하지 못한다.
-      await expect(page.locator(`text=${title}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${title}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       const intakeButton = page.getByRole('button', { name: /접수|Intake/i });
       if (!(await intakeButton.isVisible().catch(() => false))) {
@@ -509,7 +516,7 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       await clientPage.goto('/srs', { waitUntil: 'domcontentloaded' });
 
       // 새 행이 보이는 것 자체가 목록 갱신의 관측 가능한 결과다 (toBeVisible 이 재시도)
-      const srRow = clientPage.locator('tr', { hasText: title }).first();
+      const srRow = clientPage.locator('tr', { hasText: title }).filter({ visible: true }).first();
       await expect(srRow).toBeVisible({ timeout: 15000 });
       await srRow.click();
       await clientPage.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);

@@ -135,7 +135,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await listRefreshPromise;
 
       // 목록 갱신의 관측 가능한 결과: 새로 만든 SR 행이 나타난다
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
+      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
       await expect(srRow).toBeVisible({ timeout: 15000 });
 
       // SR ID 추출 (상세 페이지 이동)
@@ -162,7 +162,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 접수 버튼 클릭
       const intakeButton = page.getByRole('button', { name: /접수|Accept/i });
@@ -247,7 +249,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 상태 확인 (INTAKE 또는 IN_PROGRESS)
       // Manager가 접수하면 INTAKE 상태임
@@ -294,7 +298,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 엔지니어 댓글 확인
       const engineerComment = page.locator('text=/문제를 파악하였습니다/i');
@@ -341,7 +347,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
       // 댓글 탐색 전에 상세 페이지 렌더링을 확정한다
       // (isVisible 은 대기하지 않으므로 렌더 전에 물어보면 무조건 '없음'이 된다)
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // CLIENT 댓글 확인
       const clientComment = page.locator('text=/로그 파일을 첨부/i');
@@ -411,7 +419,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 엔지니어 완료 댓글 확인
       const completeComment = page.locator('text=/작업이 완료되었습니다/i');
@@ -488,7 +498,9 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 종료 상태 확인
       const statusBadge = page.locator('text=/종료|CLOSED|완료|COMPLETED/i').first();

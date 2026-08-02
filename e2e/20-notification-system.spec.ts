@@ -90,7 +90,7 @@ test.describe('알림 시스템 통합 테스트', () => {
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
       // 새 행이 보이는 것 자체가 목록 갱신의 관측 가능한 결과다 (toBeVisible 이 재시도)
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
+      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
       await expect(srRow).toBeVisible({ timeout: 15000 });
 
       await srRow.click();

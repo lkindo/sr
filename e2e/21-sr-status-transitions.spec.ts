@@ -88,7 +88,7 @@ test.describe('SR 상태 전이 테스트', () => {
         timeout: 15000,
       });
 
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
+      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
 
       // SR이 목록에 보이지 않으면 여러 번 새로고침 시도
       let retryCount = 0;
@@ -474,7 +474,7 @@ test.describe('SR 상태 전이 제약 조건 테스트', () => {
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
       // click() 은 요소가 나타날 때까지 자동 대기하므로 별도 로드 대기가 필요 없다
-      const srRow = page.locator('tr', { hasText: title }).first();
+      const srRow = page.locator('tr', { hasText: title }).filter({ visible: true }).first();
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       const rejectSrId = page.url().split('/').pop()!;
@@ -563,7 +563,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
       await clientPage.goto('/srs', { waitUntil: 'domcontentloaded' });
 
       // click() 은 요소가 나타날 때까지 자동 대기하므로 별도 로드 대기가 필요 없다
-      const srRow = clientPage.locator('tr', { hasText: title }).first();
+      const srRow = clientPage.locator('tr', { hasText: title }).filter({ visible: true }).first();
       await srRow.click();
       await clientPage.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       srId = clientPage.url().split('/').pop()!;

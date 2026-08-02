@@ -100,7 +100,7 @@ test.describe('SR 워크플로우 통합', () => {
       await page.waitForTimeout(3000);
     }
 
-    const srRow = page.locator('tr', { hasText: srTitle }).first();
+    const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
     // 타임아웃을 30초로 증가
     await expect(srRow).toBeVisible({ timeout: 30000 });
 

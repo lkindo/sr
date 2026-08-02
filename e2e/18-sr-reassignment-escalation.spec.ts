@@ -97,7 +97,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         timeout: 15000,
       });
 
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
+      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
 
       // SR이 목록에 보이지 않으면 여러 번 새로고침 시도
       let retryCount = 0;
@@ -178,7 +178,9 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 담당자 재배정 UI 찾기
       // 1) 수정 버튼으로 접수 페이지 재진입
@@ -397,7 +399,7 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
       }
 
       // 에스컬레이션된 SR 찾기
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
+      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
       if (await srRow.isVisible({ timeout: 5000 }).catch(() => false)) {
         await expect(srRow).toBeVisible();
         console.log(`✅ ENGINEER가 CRITICAL SR 확인`);

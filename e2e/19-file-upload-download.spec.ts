@@ -159,7 +159,7 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
       // 새 행이 보이는 것 자체가 목록 갱신의 관측 가능한 결과다 (toBeVisible 이 재시도)
-      const srRow = page.locator('tr', { hasText: srTitle }).first();
+      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
       await expect(srRow).toBeVisible({ timeout: 15000 });
 
       // SR ID 추출
@@ -181,7 +181,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터 렌더링 대기
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 첨부파일 섹션 확인
       const attachmentSection = page
@@ -218,7 +220,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await managerPage.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터가 렌더링된 뒤에 접수 버튼 유무를 판단한다
-      await expect(managerPage.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(
+        managerPage.locator(`text=${srTitle}`).filter({ visible: true }).first()
+      ).toBeVisible({ timeout: 15000 });
 
       const intakeButton = managerPage.getByRole('button', { name: /접수|Accept/i });
       if (await intakeButton.isVisible().catch(() => false)) {
@@ -265,7 +269,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await engineerPage.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터 렌더링 대기 (이후 탭/댓글 탐색이 유효해진다)
-      await expect(engineerPage.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(
+        engineerPage.locator(`text=${srTitle}`).filter({ visible: true }).first()
+      ).toBeVisible({ timeout: 15000 });
 
       // 댓글 탭으로 이동 (탭 UI가 있는 경우)
       const commentTab = engineerPage.getByRole('tab', { name: /댓글/i });
@@ -322,7 +328,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터 렌더링 대기
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 첨부파일 링크 찾기
       const downloadLink = page
@@ -375,7 +383,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터 렌더링 대기
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 삭제 버튼 찾기
       const deleteButton = page.locator('button').filter({ hasText: /삭제|Delete|Remove/i });
@@ -418,7 +428,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터 렌더링 대기
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 파일 업로드 영역 찾기 (댓글 또는 첨부파일 섹션)
       const fileInput = page.locator('input[type="file"]').first();
@@ -453,7 +465,9 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상세 데이터 렌더링 대기
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
+        timeout: 15000,
+      });
 
       // 파일 업로드 영역 찾기
       const fileInput = page.locator('input[type="file"]').first();
