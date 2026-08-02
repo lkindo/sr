@@ -165,7 +165,8 @@ export class UserService {
     params?: {
       skip?: number;
       take?: number;
-      orderBy?: Prisma.UserOrderByWithRelationInput;
+      // 배열을 받는다 — 정렬 키가 같은 행들의 순서를 정하는 tiebreaker 가 항상 따라온다.
+      orderBy?: Prisma.UserOrderByWithRelationInput | Prisma.UserOrderByWithRelationInput[];
     }
   ): Promise<{ data: Omit<User, 'password'>[]; total: number }> {
     const where: Prisma.UserWhereInput = {};
@@ -227,7 +228,7 @@ export class UserService {
         where,
         skip,
         take,
-        orderBy: orderBy || { createdAt: 'desc' },
+        orderBy: orderBy || [{ createdAt: 'desc' }, { id: 'desc' }],
         // Optimize: Use select to fetch only necessary fields and avoid fetching password hash
         select: {
           id: true,

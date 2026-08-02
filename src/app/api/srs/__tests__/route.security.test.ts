@@ -44,7 +44,11 @@ vi.mock('@/lib/serialization', () => ({
   serializeResponse: (data: any) => data,
 }));
 
-vi.mock('@/lib/pagination', () => ({
+// 정렬 허용목록(SORTABLE_FIELDS)은 실제 값을 그대로 쓴다. 여기서 가짜로 덮으면
+// 라우트가 어떤 필드를 정렬에 허용하는지가 테스트 안에서 뒤바뀌어, 허용목록이
+// 통째로 빠져도 이 파일은 통과해 버린다.
+vi.mock('@/lib/pagination', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/pagination')>()),
   usePagination: () => ({
     skip: 0,
     take: 10,

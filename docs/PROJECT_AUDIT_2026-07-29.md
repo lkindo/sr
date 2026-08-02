@@ -243,7 +243,37 @@ CLIENT_ADMIN(또는 USER:READ를 가진 커스텀 역할)이 시스템 내 임�
 
 ---
 
-### 3.11 [HIGH] ROLE:UPDATE 보유자가 자기 역할에 모든 권한 부여 가능 + 서버 액션 경로는 ADMIN 가드 자체가 없음
+### 3.11 [HIGH] ~~ROLE:UPDATE 보유자가 자기 역할에 모든 권한 부여 가능 + 서버 액션 경로는 ADMIN 가드 자체가 없음~~ — 해소(2026-08-02)
+
+**해소 방식**: 권장안 1번(가드를 `RoleService` 로 이동)을 택했다. 라우트에 두면 이번처럼
+서버 액션이 우회하고, 두 곳에 복사하면 세 번째 진입점이 생길 때 또 벌어진다.
+`updateRole` / `deleteRole` / `updateRolePermissions` 가 `actor` 를 받아 직접 판정한다.
+`actor` 가 없으면 시스템 호출(시드 등)로 간주해 통과시킨다.
+
+네 가지 규칙을 `src/lib/policies.ts` 에 추가했다.
+
+| 규칙                           | 함수                                             | 없으면 생기는 일                                  |
+| ------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
+| 보유하지 않은 권한 부여 금지   | `ensureNoPrivilegeEscalation`                    | `ROLE:UPDATE` 하나가 모든 권한과 등가             |
+| 자기 역할을 대상으로 삼기 금지 | `ensureNotActorsOwnRole`                         | 보유자가 자기 역할에 전권을 얹음                  |
+| `ADMIN` 으로의 개명 금지       | `ensureRoleNameNotReserved`                      | 이름만 바꿔도 전역 `roles.includes('ADMIN')` 통과 |
+| ADMIN·시스템 역할 보호         | 기존 `ensureCanUpdateRole`/`ensureCanDeleteRole` | (있었으나 REST 에서만 강제됨)                     |
+
+권한 상승 판정은 **대상 역할이 이미 갖고 있던 권한을 제외**한다. 권한 교체는 전체 목록을
+다시 보내는 방식이라, 기존 권한을 함께 보냈다고 상승으로 막으면 정상 편집이 전부 불가능해진다.
+**회수는 막지 않는다** — 자기가 못 가진 권한을 빼는 것은 상승이 아니라 축소다.
+
+`POST /api/roles/[id]/permissions` 는 직접 트랜잭션을 돌리던 것을 서비스 위임으로 바꿨다.
+그러지 않으면 라우트만 상승 검사를 건너뛴다.
+
+**회귀 테스트 18건**:
+
+- `src/services/__tests__/role.service.escalation.test.ts` (14) — 차단과 **과잉 차단 방지**를 함께 단언한다. 막는 것만 테스트하면 운영을 마비시키는 수정을 놓친다.
+- `src/actions/__tests__/role.actions.escalation.test.ts` (4) — 서버 액션이 `actor` 를 실제로 넘기는지. **안 넘기면 서비스가 시스템 호출로 간주해 전부 통과시킨다** — 겉보기엔 고쳐졌는데 실제로는 열려 있는 상태가 된다.
+
+가드를 제거해 정확히 3건이 실패하는 것을 확인했다.
+
+**원문**: [HIGH] ROLE:UPDATE 보유자가 자기 역할에 모든 권한 부여 가능 + 서버 액션 경로는 ADMIN 가드 자체가 없음
 
 **파일**: `src/app/api/roles/[id]/permissions/route.ts:43-69`, `src/actions/role.actions.ts:38-73, 113-127`
 

@@ -25,7 +25,6 @@ const UserNav = dynamic(() => import('./UserNav').then((mod) => ({ default: mod.
   ssr: false,
   loading: () => <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />,
 });
-import { usePermissions } from '@/hooks/use-permissions';
 import type { AuthenticatedUser } from '@/types/session';
 
 interface HeaderProps {
@@ -36,7 +35,6 @@ export function Header({ user: initialUser }: HeaderProps) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { data: session, status } = useSession();
-  const { hasAnyRole } = usePermissions();
 
   // 경로 변경 시 모바일 메뉴 자동 닫기
   useEffect(() => {
@@ -112,7 +110,13 @@ export function Header({ user: initialUser }: HeaderProps) {
           <nav aria-label="주 메뉴" className="hidden md:flex items-center gap-1">
             {NAVIGATION_CONFIG.filter((item) => {
               if (item.roles && item.roles.length > 0) {
-                return hasAnyRole(item.roles);
+                // 위에서 서버 props 와 병합해 둔 `user` 를 쓴다.
+                // 예전에는 `hasAnyRole()` 을 직접 불렀는데, 그 훅은 클라이언트 세션만 보므로
+                // 세션이 도착하기 전에는 서버가 이미 알고 있는 역할을 무시하고 false 를
+                // 돌려줬다. 그래서 ADMIN 으로 로그인해도 '조직 관리'·'권한 관리' 가
+                // 사라졌다가 뒤늦게 나타났고, 세션 요청이 실패하면 영영 안 나타났다.
+                const currentRoles = user?.roles ?? [];
+                return item.roles.some((role) => currentRoles.includes(role));
               }
               return true;
             }).map((item) => (

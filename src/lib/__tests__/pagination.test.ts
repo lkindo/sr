@@ -145,35 +145,46 @@ describe('Pagination Utils', () => {
     });
   });
 
+  // 이 블록은 원래 "임의의 sortBy 가 그대로 orderBy 가 된다"를 사양으로 못 박고 있었다.
+  // 그게 감사 4.1 이 지적한 결함이다 — `?sortBy=password` 가 bcrypt 해시로 정렬하는
+  // 순서 오라클이 되고, 없는 컬럼은 500 + 스키마 유출이 됐다.
+  // 이제 allowlist 를 통과한 필드만 나가고, tiebreaker 가 항상 따라붙는다.
   describe('getPrismaOrderBy', () => {
-    it('should create orderBy object with descending order', () => {
-      const orderBy = getPrismaOrderBy('createdAt', 'desc');
+    const allowed = ['createdAt', 'name', 'updatedAt'] as const;
 
-      expect(orderBy).toEqual({
-        createdAt: 'desc',
-      });
+    it('allowlist 를 통과한 필드로 정렬한다', () => {
+      expect(getPrismaOrderBy('createdAt', 'desc', allowed)).toEqual([
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]);
+      expect(getPrismaOrderBy('name', 'asc', allowed)).toEqual([{ name: 'asc' }, { id: 'asc' }]);
     });
 
-    it('should create orderBy object with ascending order', () => {
-      const orderBy = getPrismaOrderBy('name', 'asc');
-
-      expect(orderBy).toEqual({
-        name: 'asc',
-      });
+    it('allowlist 에 없는 필드는 기본 정렬로 떨어뜨린다', () => {
+      // 예전에는 이 값이 그대로 Prisma orderBy 가 됐다.
+      expect(getPrismaOrderBy('password', 'asc', allowed)).toEqual([
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]);
     });
 
-    it('should return undefined when no sortBy provided', () => {
-      const orderBy = getPrismaOrderBy(undefined, 'desc');
-
-      expect(orderBy).toBeUndefined();
+    it('allowlist 를 주지 않으면 정렬을 무시한다', () => {
+      // 호출부가 실수로 빠뜨렸을 때 임의 컬럼을 통과시키는 것보다 안전한 기본값이다.
+      expect(getPrismaOrderBy('name', 'asc')).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
     });
 
-    it('should default to desc when no sortOrder provided', () => {
-      const orderBy = getPrismaOrderBy('updatedAt');
+    it('sortBy 가 없으면 기본 정렬을 돌려준다', () => {
+      // 예전에는 undefined 를 돌려줘 ORDER BY 없이 OFFSET 페이징이 실행됐고,
+      // 그래서 페이지 간 행 중복·누락이 생겼다.
+      expect(getPrismaOrderBy(undefined, 'desc', allowed)).toEqual([
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]);
+    });
 
-      expect(orderBy).toEqual({
-        updatedAt: 'desc',
-      });
+    it('정렬 키가 같은 행의 순서를 고정하는 tiebreaker 가 항상 붙는다', () => {
+      const orderBy = getPrismaOrderBy('updatedAt', 'desc', allowed);
+      expect(orderBy[orderBy.length - 1]).toEqual({ id: 'desc' });
     });
   });
 

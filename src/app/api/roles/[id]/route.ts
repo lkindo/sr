@@ -53,7 +53,8 @@ export const PATCH = withAuthAndRateLimit(
     // 권한 체크: 역할 수정 권한(ADMIN 또는 ROLE:UPDATE), ADMIN 역할은 수정 불가
     ensureCanUpdateRole(session.user, existingRole);
 
-    const role = await roleService.updateRole(id, validated, session.user.id);
+    // actor 를 넘겨야 서비스 계층의 불변식(자기 역할 수정 금지, 'ADMIN' 개명 금지)이 작동한다.
+    const role = await roleService.updateRole(id, validated, session.user.id, null, session.user);
 
     return NextResponse.json(role);
   },
@@ -77,7 +78,7 @@ export const DELETE = withAuthAndRateLimit(
     // 권한 체크: 역할 삭제 권한(ADMIN 또는 ROLE:DELETE), 시스템 역할은 삭제 불가
     ensureCanDeleteRole(session.user, existingRole);
 
-    await roleService.deleteRole(id, session.user.id);
+    await roleService.deleteRole(id, session.user.id, null, session.user);
 
     return NextResponse.json({ message: '역할이 삭제되었습니다.' });
   },

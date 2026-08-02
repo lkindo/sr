@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { validateRequestBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { usePagination } from '@/lib/pagination';
+import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
 import { ensureCanCreateClient, ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { clientCreateSchema } from '@/lib/schemas';
@@ -21,7 +21,7 @@ export const GET = withAuthAndRateLimit(
     ensureCanReadClient(session.user);
 
     const { searchParams } = new URL(request.url);
-    const { skip, take, orderBy, createResponse } = usePagination(request);
+    const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.clients);
 
     const search = searchParams.get('search');
     const industry = searchParams.get('industry');

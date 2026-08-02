@@ -215,6 +215,28 @@ export function extractPaginationParams(request: Request): PaginationParams {
 }
 
 /**
+ * 리소스별 정렬 허용 필드.
+ *
+ * 목록 화면이 실제로 제공하는 정렬만 넣는다. 여기 없는 값은 조용히 무시되고 기본 정렬로
+ * 떨어진다 — 400 을 돌려주면 링크를 공유하다 필드명이 바뀐 경우 화면이 깨지기만 한다.
+ */
+export const SORTABLE_FIELDS = {
+  users: ['name', 'email', 'createdAt', 'updatedAt', 'isActive'],
+  clients: ['name', 'code', 'createdAt', 'updatedAt', 'isActive'],
+  srs: [
+    'srNumber',
+    'title',
+    'status',
+    'actualPriority',
+    'requestedPriority',
+    'dueDate',
+    'completedAt',
+    'createdAt',
+    'updatedAt',
+  ],
+} as const;
+
+/**
  * Prisma orderBy 객체 생성
  *
  * @param sortBy - 정렬 필드
@@ -232,16 +254,26 @@ export function extractPaginationParams(request: Request): PaginationParams {
  * ```
  */
 export function getPrismaOrderBy(
-  sortBy?: string,
-  sortOrder: 'asc' | 'desc' = 'desc'
-): Record<string, 'asc' | 'desc'> | undefined {
-  if (!sortBy) {
-    return undefined;
-  }
+  sortBy: string | undefined,
+  sortOrder: 'asc' | 'desc' = 'desc',
+  allowedFields?: readonly string[]
+): Array<Record<string, 'asc' | 'desc'>> {
+  // allowlist 를 통과한 필드만 orderBy 로 나간다.
+  //
+  // 예전에는 `{ [sortBy]: sortOrder }` 를 검증 없이 만들었고 스키마도
+  // `sortBy: z.string().optional()` 이었다(감사 4.1). 그래서
+  //   - `/api/users?sortBy=password` 가 bcrypt 해시로 정렬하는 **순서 오라클**이 되고,
+  //   - 존재하지 않는 컬럼은 Prisma 검증 오류로 500 + 스키마 유출이 됐다.
+  //
+  // allowlist 를 주지 않은 호출은 정렬을 무시한다 — 실수로 빠뜨린 호출이 예전처럼
+  // 임의 컬럼을 통과시키는 것보다, 기본 정렬로 떨어지는 편이 안전하다.
+  const field = sortBy && allowedFields?.includes(sortBy) ? sortBy : undefined;
 
-  return {
-    [sortBy]: sortOrder,
-  };
+  // tiebreaker 를 항상 붙인다. 정렬 키가 같은 행들의 순서가 정해지지 않으면
+  // OFFSET 페이징에서 페이지 간 행 중복·누락이 생긴다.
+  return field
+    ? [{ [field]: sortOrder }, { id: sortOrder }]
+    : [{ createdAt: 'desc' }, { id: 'desc' }];
 }
 
 /**
@@ -264,10 +296,10 @@ export function getPrismaOrderBy(
  * }
  * ```
  */
-export function usePagination(request: Request) {
+export function usePagination(request: Request, allowedSortFields?: readonly string[]) {
   const params = extractPaginationParams(request);
   const { skip, take } = getPrismaSkipTake(params.page, params.pageSize);
-  const orderBy = getPrismaOrderBy(params.sortBy, params.sortOrder);
+  const orderBy = getPrismaOrderBy(params.sortBy, params.sortOrder, allowedSortFields);
 
   return {
     params,

@@ -3,7 +3,7 @@ import { SRPriority, SRStatus } from '@prisma/client';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { usePagination } from '@/lib/pagination';
+import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
 import { ensureCanCreateSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { srCreateSchema } from '@/lib/schemas';
@@ -20,7 +20,7 @@ export const revalidate = 0;
 export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     const { searchParams } = new URL(request.url);
-    const { skip, take, orderBy, createResponse } = usePagination(request);
+    const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.srs);
 
     let clientIdFilter: string | { in: string[] } | undefined =
       searchParams.get('clientId') || undefined;
