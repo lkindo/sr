@@ -495,7 +495,7 @@ test.describe('파일 업로드 추가 시나리오', () => {
     try {
       // SR 목록 페이지 이동
       await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
 
       // 등록 버튼 클릭
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();

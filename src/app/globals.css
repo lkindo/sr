@@ -30,6 +30,9 @@
     --accent: 204 100% 50%; /* Accent Blue #0099ff */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
+    /* 채움용. 흰 글씨를 얹었을 때 WCAG AA(4.5:1)를 넘도록 --destructive 보다 어둡다.
+       --destructive 자체를 어둡게 하면 어두운 표면 위 텍스트 대비가 무너진다. */
+    --destructive-solid: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 14.9%; /* Hairline #262626 */
     --input: 0 0% 14.9%;
@@ -71,6 +74,9 @@
     --accent: 204 100% 50%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
+    /* 채움용. 흰 글씨를 얹었을 때 WCAG AA(4.5:1)를 넘도록 --destructive 보다 어둡다.
+       --destructive 자체를 어둡게 하면 어두운 표면 위 텍스트 대비가 무너진다. */
+    --destructive-solid: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;

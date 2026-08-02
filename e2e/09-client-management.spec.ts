@@ -36,7 +36,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
     await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // ADMIN은 고객사 목록 테이블이 보여야 함
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
     console.log('✅ ADMIN: 고객사 목록 테이블 확인');
   });
 
@@ -276,7 +276,7 @@ test.describe('고객사 관리 - CLIENT 권한', () => {
     // 3) 등록/수정 버튼 없음
 
     const unauthorizedMessage = page.locator('text=/권한|unauthorized|forbidden|접근 거부/i');
-    const table = page.locator('table');
+    const table = page.locator('table:not([data-skeleton])');
 
     const isUnauthorized = await unauthorizedMessage
       .isVisible({ timeout: 3000 })

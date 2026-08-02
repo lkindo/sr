@@ -9,7 +9,10 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default: 'border-transparent bg-primary/10 text-primary shadow-none',
-        secondary: 'border-transparent bg-secondary text-[#475569]',
+        // 전경색을 하드코딩하면 테마 토큰이 무시된다. `--secondary` 는 #141414(어두운
+        // 표면)인데 #475569(어두운 슬레이트)를 얹어 대비가 2.43:1 이었다 — 상태 배지가
+        // 사실상 판독 불가였다(axe color-contrast). 토큰 짝(흰색)으로 되돌린다.
+        secondary: 'border-transparent bg-secondary text-secondary-foreground',
         destructive: 'border-transparent bg-destructive text-destructive',
         outline: 'border-input text-foreground bg-transparent',
         success: 'border-transparent bg-emerald-500 text-emerald-700',

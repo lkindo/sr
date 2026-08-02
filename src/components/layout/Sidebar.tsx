@@ -109,7 +109,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
           'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-border hidden md:block'
       )}
     >
-      <nav className="flex flex-col pt-5 pb-20">
+      <nav aria-label="사이드바 메뉴" className="flex flex-col pt-5 pb-20">
         {showAllSections ? (
           /* Mobile / Full Mode: Render Top Level Items with Subsections */
           <div className="space-y-1">

@@ -84,7 +84,7 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.waitForTimeout(3000);
 
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
 
@@ -94,7 +94,7 @@ test.describe('SR 상태 전이 테스트', () => {
         console.log(`⚠️ SR이 목록에 없음. 새로고침 시도 ${retryCount + 1}/3`);
         await page.reload({ waitUntil: 'domcontentloaded' });
         // 고정 sleep 대신 목록이 다시 그려졌는지를 기다린다
-        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
         await srRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         retryCount++;
       }

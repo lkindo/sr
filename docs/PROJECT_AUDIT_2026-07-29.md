@@ -1311,6 +1311,17 @@ async getClientDetailsById(id: string) {
 
 ### 4.4 프론트엔드
 
+- **E2E 가 처음 실제로 돌면서 드러난 접근성 결함 — 해소(2026-08-02).** CI 복구 후 main 에서 chromium E2E 가 처음 완주했고 27건이 실패했다. 원인을 분류한 결과 **진짜 앱 결함은 3건이고 전부 접근성**이었다(나머지 17건은 낡은 테스트, 4건은 인증 연쇄).
+  - **상태 배지가 사실상 판독 불가(대비 2.43:1)** — `src/components/ui/badge.tsx` 의 secondary 변형이 `text-[#475569]` 를 하드코딩했는데 배경 `--secondary` 는 #141414 다. 토큰을 쓰지 않고 색을 박아 넣은 것이 원인이라 토큰 짝(`text-secondary-foreground`)으로 되돌렸다.
+  - **대비 미달 버튼 2종** — 대시보드 "접수하기"(#0099ff 위 흰 글씨, 2.99:1)는 검은 글씨로 바꿔 약 7:1 이 됐다. `destructive` 버튼(3.76:1)은 `--destructive-solid` 토큰을 새로 뒀다 — `--destructive` 자체를 어둡게 하면 어두운 표면 위 **텍스트** 대비가 반대로 4.74 → 3.47 로 무너져서, 채움용과 텍스트용을 나눴다.
+  - **이름 없는 요소들** — `<nav>` 3개(Header 2, Sidebar 1)가 전부 무명이라 랜드마크가 구분되지 않았고, SR 상세의 뒤로가기는 아이콘만 있어 낭독기에 빈 링크였다. 진행바 4개도 이름이 없었다. 페이지 최상위 제목이 `h2`/`h3` 라 `h1` 이 없었다. 각각 `aria-label` 부여와 제목 승격으로 해결했다.
+
+  낡은 테스트 17건은 원인이 하나였다 — `/srs` 의 로딩 스켈레톤도 `<table>` 이라 스트리밍 중 실 테이블과 둘이 잡혀 `page.locator('table')` 이 strict mode violation 으로 **즉시** 죽었다(재시도 없이). 39개 호출부를 각각 고치는 대신 스켈레톤에 `aria-hidden="true"`(보조기술에 헤더 빈 표를 읽어 주지 않도록 — axe 의 `empty-table-header` 도 함께 해소) + `data-skeleton="true"` 를 달고 셀렉터를 `table:not([data-skeleton])` 로 통일했다.
+
+  인증 연쇄 4건은 **인증 플로우 스펙이 인증된 채로 돌던 모순**이었다. `playwright.config.ts` 의 chromium 프로젝트가 로그인된 ADMIN storageState 로 시작하는데, 그 상태로 `/register` 를 열면 `src/auth.config.ts` 의 `authorized()` 가 `/dashboard` 로 리다이렉트해 회원가입 폼이 영영 나타나지 않는다. 해당 스펙에 익명 storageState 를 적용했다.
+
+  **배포 게이트는 좁히지 않았다.** 실패 27건 중 실제 결함이 3건뿐이었고 그것도 고쳤으므로, 게이트를 완화할 근거가 없다. 감사 3.3(배포가 CI 에 의존하지 않음) 수정을 되돌리는 셈이 되기 때문이다.
+
 - ~~**클라이언트 `hasPermission` 이 세션과 다른 구분자로 키를 조립해 항상 false**~~ — **감사 이후 발견·해소됨(2026-08-01).** `src/hooks/use-permissions.ts` 가 `` `${resource}.${action}` `` 로 조립하는데 `src/auth.ts:146` 은 세션 토큰에 `` `${resource}:${action}` `` 를 담는다. 따라서 `hasPermission`/`hasAnyPermission`/`hasAllPermissions` 가 어떤 입력에도 false 였다. 현재 호출부(`PermissionGuard`, `Sidebar`)가 모두 `roles` 를 쓰고 있어 증상이 드러나지 않았을 뿐, 권한으로 게이트하는 순간 조용히 막히는 지뢰였다. 구분자를 맞추고 비교를 대소문자 무시로 바꿨다. 기존 테스트 두 개가 `permissions: ['sr.view', ...]` 라는 프로덕션에 존재하지 않는 형태를 픽스처로 써서 점 조립을 정상 동작으로 못 박고 있었으므로 실제 세션 형태로 교체했다.
 
 - **`SessionProvider`에 서버 해석 세션을 전달하지 않음** — `src/components/providers/ClientLayout.tsx:43`의 `<SessionProvider>`가 `session` prop을 받지 않는데, `src/app/(dashboard)/layout.tsx:10`은 이미 `auth()`를 서버에서 await해 Header에만 전달한다. `usePermissions`(`use-permissions.ts:9, 25, 30`)가 `session?.user`가 undefined면 모든 검사에 false를 반환하므로 SSR 동안과 `/api/auth/session` 해석 전까지 사이드바 전체(`Sidebar.tsx:34-52, 66-77`), 상단 nav 필터(`Header.tsx:113-118`), `ExportButton`(`:16-18`)이 비어 있다가 팝인한다. `SRsDataTable.tsx:114`의 `isClientUser = !hasAnyRole([...])`는 더 나쁘다 — 로딩 창 동안 ADMIN이 클라이언트 사용자로 취급되어 퀵필터 바와 상세 필터 버튼(`:315`)이 숨겨졌다가 주입되어 테이블이 밀린다. → `const session = await auth()`를 레이아웃에서 `<SessionProvider session={session}>`로 전달하고, `usePermissions`가 `status`를 노출해 호출자가 'loading'과 'denied'를 구분(스켈레톤 렌더)하게 한다.

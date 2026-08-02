@@ -187,9 +187,9 @@ export default function DashboardPage() {
     <div className="sr-content-area space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
             대시보드
-          </h2>
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
             SR 현황을 한눈에 확인하고 관리합니다.
           </p>
@@ -214,9 +214,11 @@ export default function DashboardPage() {
                   </CardDescription>
                 </div>
               </div>
+              {/* 밝은 액센트(#0099ff) 위의 흰 글씨는 2.99:1 로 WCAG AA(4.5:1)에 못 미쳤다.
+                  같은 배경에 검은 글씨는 약 7:1 이라 색을 바꾸지 않고 대비만 올릴 수 있다. */}
               <Button
                 variant="default"
-                className="bg-[hsl(var(--sr-accent-orange))] hover:bg-[hsl(var(--sr-accent-orange))]/90 text-white"
+                className="bg-[hsl(var(--sr-accent-orange))] hover:bg-[hsl(var(--sr-accent-orange))]/90 text-black"
                 onClick={() => router.push('/srs?status=REQUESTED')}
               >
                 접수하기
@@ -422,6 +424,7 @@ export default function DashboardPage() {
             {stats.summary.total > 0 && (
               <Progress
                 value={(stats.summary.inProgress / stats.summary.total) * 100}
+                aria-label="전체 SR 중 진행 중 비율"
                 className="mt-2 h-1.5"
               />
             )}
@@ -442,6 +445,7 @@ export default function DashboardPage() {
             {stats.summary.total > 0 && (
               <Progress
                 value={(stats.summary.completed / stats.summary.total) * 100}
+                aria-label="전체 SR 중 완료 비율"
                 className="mt-2 h-1.5"
               />
             )}
@@ -464,6 +468,7 @@ export default function DashboardPage() {
             {stats.summary.total > 0 && (
               <Progress
                 value={(stats.summary.pending / stats.summary.total) * 100}
+                aria-label="전체 SR 중 대기 중 비율"
                 className="mt-2 h-1.5"
               />
             )}
@@ -502,7 +507,11 @@ export default function DashboardPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">마감일 준수율</p>
               {stats.performance.slaComplianceRate > 0 && (
-                <Progress value={stats.performance.slaComplianceRate} className="mt-2 h-1.5" />
+                <Progress
+                  value={stats.performance.slaComplianceRate}
+                  aria-label="마감일 준수율"
+                  className="mt-2 h-1.5"
+                />
               )}
             </CardContent>
           </Card>

@@ -11,7 +11,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground shadow hover:opacity-80',
-        destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:opacity-80',
+        // 채움 배경에는 --destructive-solid 를 쓴다. --destructive(#ef4444) 위 흰 글씨는
+        // 3.76:1 로 AA 미달이었다(axe color-contrast).
+        destructive: 'bg-destructive-solid text-destructive-foreground shadow-sm hover:opacity-80',
         outline:
           'border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground',
         secondary:

@@ -109,7 +109,7 @@ export function Header({ user: initialUser }: HeaderProps) {
 
         {/* 메뉴 및 사용자 정보 영역 */}
         <div className="flex items-center justify-end md:justify-between px-4 md:px-8 flex-1 md:flex-[1]">
-          <nav className="hidden md:flex items-center gap-1">
+          <nav aria-label="주 메뉴" className="hidden md:flex items-center gap-1">
             {NAVIGATION_CONFIG.filter((item) => {
               if (item.roles && item.roles.length > 0) {
                 return hasAnyRole(item.roles);
@@ -131,7 +131,7 @@ export function Header({ user: initialUser }: HeaderProps) {
             ))}
           </nav>
 
-          <nav className="flex items-center gap-3">
+          <nav aria-label="사용자 메뉴" className="flex items-center gap-3">
             {isLoading ? (
               <div className="flex gap-2">
                 <div className="h-9 w-16 rounded bg-muted animate-pulse" />

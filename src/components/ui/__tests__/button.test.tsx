@@ -20,7 +20,10 @@ describe('Button', () => {
         expect(button).toBeInTheDocument();
         // 각 variant별 클래스 확인은 shadcn 구현에 의존적이므로 렌더링 여부와 기본 동작 위주로 확인
         if (variant === 'destructive') {
-          expect(button).toHaveClass('bg-destructive');
+          // 채움 배경은 --destructive-solid 를 쓴다. --destructive(#ef4444) 위 흰 글씨는
+          // 3.76:1 로 WCAG AA 미달이었다. 토큰 자체를 어둡게 하면 어두운 표면 위 텍스트
+          // 대비가 반대로 깨져서(4.74 → 3.47) 채움용 토큰을 따로 뒀다.
+          expect(button).toHaveClass('bg-destructive-solid');
         }
       });
     });

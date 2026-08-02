@@ -38,6 +38,7 @@ export default {
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
+          solid: 'hsl(var(--destructive-solid))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
         border: 'hsl(var(--border))',
