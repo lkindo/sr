@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import {
   APIRequestContext,
+  APIResponse,
   Browser,
   BrowserContext,
   expect,
@@ -13,6 +14,15 @@ import {
  * E2E 테스트 헬퍼 함수
  *
  * 재사용 가능한 테스트 유틸리티를 제공하여 안정적이고 유지보수하기 쉬운 테스트 작성을 지원합니다.
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건이 영원히
+ * 성립하지 않으므로 waitForLoadState('networkidle') / waitUntil: 'networkidle' 은
+ * 항상 타임아웃난다(비인증 페이지에서만 우연히 통과한다).
+ * 대기는 항상 (1) load / domcontentloaded 같은 확정 가능한 로드 상태나
+ * (2) 실제로 필요한 응답·요소(expect().toBeVisible() 는 자동 재시도)로 표현한다.
  */
 
 /**
@@ -22,8 +32,10 @@ import {
  */
 export async function checkA11y(page: Page, name: string): Promise<void> {
   console.log(`♿ Accessibility Check: ${name}`);
-  // 타임아웃을 넉넉히 주어 복잡한 페이지 로드 대기
-  await page.waitForLoadState('networkidle');
+  // 'load' 를 쓴다: networkidle 은 SSE 때문에 절대 발생하지 않아 인증된 페이지에서
+  // 무조건 30초 타임아웃이었다. 'load' 는 async 청크 실행까지 포함하므로
+  // axe 가 빈 DOM 을 검사해 위반 0건으로 통과하는 일도 막는다.
+  await page.waitForLoadState('load');
   const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
 
   if (accessibilityScanResults.violations.length > 0) {
@@ -214,7 +226,8 @@ export async function createTestSR(
   await saveButton.click();
   console.log('Clicked Save button');
 
-  const response = await createPromise;
+  // waitForAPIResponse 가 상태 코드를 검증하므로 응답 객체 자체는 사용하지 않는다.
+  await createPromise;
 
   // Server Action 응답은 HTML일 수 있으므로 JSON 파싱 생략
   // ID 추출: 리디렉션된 URL 또는 목록에서 찾기
@@ -299,6 +312,56 @@ export async function deleteSRViaAPI(request: APIRequestContext, srId: string): 
 }
 
 /**
+ * Rate Limit(429) 를 만나면 윈도우가 끝날 때까지 기다렸다가 재시도하는 API 요청 헬퍼.
+ *
+ * 보안 단정(assertion)을 지키기 위한 장치다. 민감 라우트는 STRICT 프리셋(1분당 5회,
+ * src/lib/rate-limiter.ts 의 RateLimitPresets.STRICT)을 쓰고 그 버킷은 IP 단위로
+ * 모든 STRICT 라우트가 공유한다. 429 를 그대로 통과시키면 "인가 거부(400/403)"와
+ * "요청 과다(429)"를 구분할 수 없어, 보안 통제가 사라져도 테스트가 초록으로 남는다.
+ *
+ * X-RateLimit-Reset 헤더는 남은 윈도우 시간(ms)이다 (rate-limiter.ts 의 resetTime).
+ *
+ * @param request - Playwright APIRequestContext
+ * @param method - HTTP 메서드
+ * @param url - 요청 URL
+ * @param options - 요청 바디(data) 및 최대 시도 횟수(maxAttempts, 기본 3)
+ * @returns 429 가 아닌 최종 응답
+ */
+export async function apiRequestWithRateLimitRetry(
+  request: APIRequestContext,
+  method: 'get' | 'post' | 'patch' | 'delete',
+  url: string,
+  options: { data?: unknown; maxAttempts?: number } = {}
+): Promise<APIResponse> {
+  const { data, maxAttempts = 3 } = options;
+  const send = () => request[method](url, data === undefined ? undefined : { data });
+
+  let response = await send();
+
+  for (let attempt = 1; attempt < maxAttempts && response.status() === 429; attempt++) {
+    const resetMs = Number(response.headers()['x-ratelimit-reset']);
+    const waitMs = Math.min(
+      Math.max(Number.isFinite(resetMs) ? resetMs : 60_000, 1000) + 1000,
+      65_000
+    );
+    console.log(
+      `⏳ 429 수신 (${method.toUpperCase()} ${url}) - ${waitMs}ms 대기 후 재시도 ${attempt}/${maxAttempts - 1}`
+    );
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    response = await send();
+  }
+
+  // 429 로 끝났다면 검증 자체가 성립하지 않으므로 침묵하지 않고 실패시킨다.
+  expect(
+    response.status(),
+    `${method.toUpperCase()} ${url} 가 rate limit(429)에 막혀 권한 검증을 수행할 수 없었습니다. ` +
+      `RATE_LIMIT_STRICT_MAX_REQUESTS 를 올리거나 테스트를 분리하세요.`
+  ).not.toBe(429);
+
+  return response;
+}
+
+/**
  * 폼 제출 후 API 응답 대기
  *
  * 폼을 제출하고 관련 API 호출이 완료될 때까지 대기합니다.
@@ -334,7 +397,7 @@ export async function gotoAndWaitForData(
   url: string,
   apiPattern?: string | RegExp
 ): Promise<void> {
-  const navigatePromise = page.goto(url, { waitUntil: 'networkidle' });
+  const navigatePromise = page.goto(url, { waitUntil: 'domcontentloaded' });
 
   if (apiPattern) {
     const apiPromise = waitForAPIResponse(page, apiPattern, 'GET', { timeout: 15000 });
@@ -426,30 +489,85 @@ export async function createAndIntakeSR(
 
   // Step 2: MANAGER로 접수 처리
   await withAuthContext(browser, 'manager', async (page) => {
-    await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // 담당자 선택
-    const assigneeSelect = page
-      .locator('[role="combobox"]')
-      .filter({ hasText: /담당자|Assignee/i })
-      .first();
-    if (await assigneeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await assigneeSelect.click();
-      await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
-      await page.getByRole('option').first().click();
-    }
+    // 접수 폼이 실제로 렌더링되어야 한다. (권한이 없거나 상태가 맞지 않으면 여기서 실패)
+    await expect(
+      page.getByRole('heading', { name: 'SR 접수 처리' }),
+      `SR ${srId}: MANAGER 로 접수 폼을 열지 못했습니다.`
+    ).toBeVisible({ timeout: 15000 });
 
-    // 저장
+    // 담당자 선택 (필수 입력이므로 건너뛰면 접수가 성립하지 않는다)
+    const assigneeSelect = page.getByRole('combobox', { name: '담당자 *' });
+    await expect(assigneeSelect, `SR ${srId}: 담당자 선택 콤보박스를 찾지 못했습니다.`).toBeVisible(
+      { timeout: 10000 }
+    );
+    await assigneeSelect.click();
+    await page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByRole('option').first().click();
+
+    // 저장 → POST /api/srs/{id}/intake 응답을 반드시 확인한다.
+    const intakeResponsePromise = page.waitForResponse(
+      (resp) =>
+        resp.url().includes(`/api/srs/${srId}/intake`) && resp.request().method() === 'POST',
+      { timeout: 20000 }
+    );
     await page.getByRole('button', { name: /저장/i }).click();
-    await page.waitForTimeout(2000);
+
+    const intakeResponse = await intakeResponsePromise;
+    const body = await intakeResponse.text().catch(() => '(본문 없음)');
+    expect(
+      intakeResponse.ok(),
+      `SR ${srId}: 접수 처리가 실패했습니다 (${intakeResponse.status()}). 응답: ${body.substring(0, 200)}`
+    ).toBeTruthy();
   });
 
   console.log(`✅ SR 접수 완료: ${srId} (상태: INTAKE)`);
   return srId;
 }
 
+export type SRStatusAction =
+  | 'start'
+  | 'complete'
+  | 'hold'
+  | 'resume'
+  | 'reject'
+  | 'confirm'
+  | 'reopen';
+
+/**
+ * SR 상세 화면의 액션 트리거 버튼 이름 (src/components/srs/SRStatusActions.tsx 의 aria-label)
+ */
+const SR_ACTION_TRIGGERS: Record<SRStatusAction, RegExp> = {
+  start: /^진행 시작$/,
+  complete: /^완료 처리$/,
+  hold: /^보류$/,
+  resume: /^진행 재개$/,
+  reject: /^거절$/,
+  confirm: /^확인 완료$/,
+  reopen: /^재오픈$/,
+};
+
+/**
+ * 다이얼로그가 열리는 액션의 제출 버튼 이름
+ * (CompleteSRDialog / HoldSRDialog / RejectSRDialog / ReopenSRDialog 의 submit 버튼 라벨)
+ * 여기에 없는 액션(start / resume / confirm)은 다이얼로그 없이 즉시 전환된다.
+ */
+const SR_ACTION_DIALOG_SUBMIT: Partial<Record<SRStatusAction, RegExp>> = {
+  complete: /^완료 처리$/,
+  hold: /^보류 처리$/,
+  reject: /^거절 처리$/,
+  reopen: /^재오픈$/,
+};
+
 /**
  * SR 상태 변경 헬퍼
+ *
+ * 계약: 이 함수가 정상 반환하면 상태 전환이 **실제로 서버에 반영된 것**이다.
+ * 액션 버튼이 없거나(권한/현재 상태상 불가), 다이얼로그가 뜨지 않거나,
+ * PATCH /api/srs/{id}/status 가 200 이 아니면 예외를 던져 테스트를 실패시킨다.
+ * (이전 구현은 버튼이 없으면 console.log 만 남기고 성공으로 반환했기 때문에,
+ *  전환이 전혀 일어나지 않아도 상태 전환 테스트가 통과했다.)
  *
  * @param page - Playwright Page 객체
  * @param srId - SR ID
@@ -459,46 +577,54 @@ export async function createAndIntakeSR(
 export async function changeSRStatus(
   page: Page,
   srId: string,
-  action: 'start' | 'complete' | 'hold' | 'resume' | 'reject' | 'confirm' | 'reopen',
+  action: SRStatusAction,
   options?: { reason?: string; resolutionDescription?: string }
 ): Promise<void> {
-  await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  const actionButtons: Record<string, RegExp> = {
-    start: /진행 시작|Start/i,
-    complete: /완료 처리|Complete/i,
-    hold: /보류|Hold/i,
-    resume: /진행 재개|Resume/i,
-    reject: /거절|Reject/i,
-    confirm: /확인 완료|Confirm/i,
-    reopen: /재오픈|Reopen/i,
-  };
+  const trigger = page.getByRole('button', { name: SR_ACTION_TRIGGERS[action] });
 
-  const button = page.getByRole('button', { name: actionButtons[action] });
+  await expect(
+    trigger,
+    `SR ${srId}: '${action}' 액션 버튼이 없습니다. ` +
+      `현재 상태 또는 로그인 사용자의 권한으로는 이 전환이 불가능합니다.`
+  ).toBeVisible({ timeout: 10000 });
 
-  if (await button.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await button.click();
+  // 상태 변경은 반드시 PATCH /api/srs/{id}/status 를 거친다 (src/hooks/use-sr.ts).
+  // 응답을 관찰해야 "버튼만 눌리고 아무 일도 없었다"를 성공으로 오인하지 않는다.
+  const statusResponsePromise = page.waitForResponse(
+    (resp) => resp.url().includes(`/api/srs/${srId}/status`) && resp.request().method() === 'PATCH',
+    { timeout: 20000 }
+  );
 
-    // 다이얼로그가 나타나면 입력 처리
-    const dialog = page.locator('[role="dialog"]').first();
-    if (await dialog.isVisible({ timeout: 2000 }).catch(() => false)) {
-      if (options?.reason) {
-        const reasonInput = dialog.locator('textarea').first();
-        await reasonInput.fill(options.reason);
-      }
-      if (options?.resolutionDescription) {
-        const descInput = dialog.locator('textarea').first();
-        await descInput.fill(options.resolutionDescription);
-      }
+  await trigger.click();
 
-      // 확인 버튼 클릭
-      const confirmButton = dialog.getByRole('button', { name: /확인|저장|완료|Submit/i });
-      await confirmButton.click();
+  const submitPattern = SR_ACTION_DIALOG_SUBMIT[action];
+  if (submitPattern) {
+    const dialog = page.getByRole('dialog');
+    await expect(dialog, `SR ${srId}: '${action}' 다이얼로그가 열리지 않았습니다.`).toBeVisible({
+      timeout: 5000,
+    });
+
+    const reasonText = options?.resolutionDescription ?? options?.reason;
+    if (reasonText) {
+      await dialog.locator('textarea').first().fill(reasonText);
     }
 
-    await page.waitForTimeout(2000);
-    console.log(`✅ SR 상태 변경: ${action}`);
-  } else {
-    console.log(`⚠️ ${action} 버튼을 찾을 수 없습니다`);
+    const submitButton = dialog.getByRole('button', { name: submitPattern });
+    await expect(
+      submitButton,
+      `SR ${srId}: '${action}' 다이얼로그의 제출 버튼이 비활성 상태입니다.`
+    ).toBeEnabled({ timeout: 5000 });
+    await submitButton.click();
   }
+
+  const response = await statusResponsePromise;
+  const body = await response.text().catch(() => '(본문 없음)');
+  expect(
+    response.status(),
+    `SR ${srId}: '${action}' 상태 전환이 서버에서 거부되었습니다. 응답: ${body.substring(0, 200)}`
+  ).toBe(200);
+
+  console.log(`✅ SR 상태 변경 완료: ${action} (${srId})`);
 }

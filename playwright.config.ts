@@ -80,19 +80,35 @@ export default defineConfig({
 
   /* 테스트할 브라우저 설정 */
   projects: [
-    // Setup project - 로그인 상태 저장 (단일 사용자)
+    // Setup project - 로그인 상태 저장 (단일 관리자)
+    // 이전에는 testMatch가 global-setup.ts를 가리켰는데 그 파일에는 test()가 없어
+    // 아무것도 실행되지 않는 빈 프로젝트였다. 역할 단언이 있는 auth.setup.ts로 교체한다.
     {
       name: 'setup',
-      testMatch: /global-setup\.ts/,
+      testMatch: /auth\.setup\.ts$/,
       use: {
         storageState: { cookies: [], origins: [] },
       },
     },
 
-    // Multi-user setup - 다중 사용자 인증 상태 저장 (CLIENT, MANAGER, ENGINEER)
+    // Multi-user setup - 기존 페르소나 인증 상태 저장 (CLIENT, legacy-manager=ADMIN, ENGINEER)
+    // @role-persona 태그가 붙은 신규 역할 페르소나는 제외한다 (아래 role-persona-setup 담당).
     {
       name: 'multi-user-setup',
       testMatch: /auth-multi-user\.setup\.ts/,
+      grepInvert: /@role-persona/,
+      use: {
+        storageState: { cookies: [], origins: [] },
+      },
+    },
+
+    // Role-persona setup - MANAGER / CLIENT_ADMIN 전용 인증 상태 저장
+    // 시드에 해당 계정이 없으면 이 프로젝트만 실패하고 기존 스위트는 계속 돈다.
+    // 이 프로젝트 자체가 게이트다: 페르소나가 기대한 역할이 아니면 여기서 빨갛게 죽는다.
+    {
+      name: 'role-persona-setup',
+      testMatch: /auth-multi-user\.setup\.ts/,
+      grep: /@role-persona/,
       use: {
         storageState: { cookies: [], origins: [] },
       },
@@ -105,9 +121,15 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: './playwright/.auth/user.json',
       },
-      dependencies: ['setup'],
+      // 이 프로젝트가 수집하는 스펙은 user.json(setup) 외에 manager.json / engineer.json 도 읽는다.
+      //   - 06-sr-update.spec.ts: test.use({ storageState: manager.json })
+      //   - sr-permissions.spec.ts: beforeAll 이 manager.json, ENGINEER describe 가 engineer.json
+      // 두 파일은 multi-user-setup 이 만든다. 의존을 적지 않으면 순서 보장이 없어
+      // 없거나 만료된 인증 파일로 돌 수 있다.
+      dependencies: ['setup', 'multi-user-setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
       testIgnore: [
+        '**/roles/**',
         '**/08-*.spec.ts',
         '**/09-*.spec.ts',
         '**/17-*.spec.ts',
@@ -130,7 +152,26 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         // 다중 사용자 테스트는 각 테스트 내에서 storageState를 동적으로 설정
       },
-      dependencies: ['multi-user-setup'],
+      // 08 / 09 / 23 은 test.use({ storageState: user.json }) 로 ADMIN 세션을 쓴다.
+      // user.json 은 multi-user-setup 이 아니라 setup 이 만들므로 둘 다 의존해야 한다.
+      dependencies: ['setup', 'multi-user-setup'],
+    },
+
+    // 역할 페르소나 테스트 - MANAGER / CLIENT_ADMIN 전용 스펙 (e2e/roles/*.spec.ts)
+    // 스펙은 helpers/auth-helpers.ts의 PERSONA_AUTH_FILES.manager / .clientAdmin를 사용한다.
+    {
+      name: 'role-personas',
+      testMatch: /roles[\\/].*\.spec\.ts/,
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      // 스펙이 test.use 로 페르소나 파일을 지정하지 않으면 설정 최상단의 기본값
+      // './playwright/.auth/user.json'(= setup 이 만드는 ADMIN 세션)으로 떨어진다.
+      // 그 파일의 생성 순서를 보장하려면 setup 에도 의존해야 한다.
+      // 주의: 그 폴백은 ADMIN 세션이므로, test.use 를 빠뜨린 MANAGER/CLIENT_ADMIN 스펙은
+      //       "권한이 있다"는 쪽으로 조용히 통과할 수 있다. 스펙은 반드시
+      //       PERSONA_AUTH_FILES.manager / .clientAdmin 를 명시할 것.
+      dependencies: ['setup', 'role-persona-setup'],
     },
 
     // 권한 테스트 (단독 실행 가능)
@@ -140,10 +181,22 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
       },
-      dependencies: ['multi-user-setup'],
+      // sr-permissions.spec.ts 의 첫 describe 는 storageState 를 지정하지 않아
+      // 설정 최상단 기본값 './playwright/.auth/user.json'(setup 산출물)으로 동작하고,
+      // beforeAll 은 manager.json, 두 번째 describe 는 engineer.json(multi-user-setup 산출물)을 쓴다.
+      // 기존에는 multi-user-setup 만 의존해 user.json 의 생성 순서가 전혀 보장되지 않았다.
+      dependencies: ['setup', 'multi-user-setup'],
     },
 
-    /* 추가 브라우저 테스트 (선택사항) */
+    /* 추가 브라우저 테스트 (선택사항)
+     *
+     * 아래 세 프로젝트는 testIgnore 가 없어 멀티유저 스펙(08/09/17~23)까지 수집하며,
+     * 그 스펙들은 manager/engineer/client.json(multi-user-setup 산출물)을 읽는다.
+     * 즉 여기에도 같은 종류의 의존 누락이 있지만 의존만 추가해도 초록불이 되지는 않는다
+     * (단일 인증 상태로 멀티유저 스펙을 중복 실행하는 구조적 결함이 먼저다).
+     * 그래서 ci-cd.yml 의 --project 선택에서 제외되어 있고, 여기서는 사실만 기록한다.
+     * 고칠 때는 dependencies 가 아니라 testIgnore 부터 맞춰야 한다.
+     */
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },

@@ -36,9 +36,9 @@ export function UserNav({ user }: UserNavProps) {
   const initials =
     user.name
       ?.split(' ')
-      .map((n) => n[0])
+      .map((n) => n[0] ?? '')
       .join('')
-      .toUpperCase() || user.email[0].toUpperCase();
+      .toUpperCase() || (user.email[0] ?? '?').toUpperCase();
 
   return (
     <DropdownMenu>

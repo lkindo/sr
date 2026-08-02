@@ -106,7 +106,7 @@ describe('SR Actions - Details and Pagination', () => {
         const limit = options?.limit || 20;
         const hasMore = mockActivities.length > limit;
         const items = hasMore ? mockActivities.slice(0, limit) : mockActivities;
-        const nextCursor = hasMore ? items[items.length - 1].id : null;
+        const nextCursor = hasMore ? items[items.length - 1]!.id : null;
         return { activities: items, nextCursor };
       });
 
@@ -143,7 +143,7 @@ describe('SR Actions - Details and Pagination', () => {
         const limit = options?.limit || 20;
         const hasMore = mockComments.length > limit;
         const items = hasMore ? mockComments.slice(0, limit) : mockComments;
-        const nextCursor = hasMore ? items[items.length - 1].id : null;
+        const nextCursor = hasMore ? items[items.length - 1]!.id : null;
         return { comments: items, nextCursor };
       });
 

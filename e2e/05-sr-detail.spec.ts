@@ -1,5 +1,13 @@
 import { expect, test } from '@playwright/test';
 
+/**
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. "500ms 동안 네트워크 요청 0건" 조건이 성립하지 않으므로
+ * networkidle 은 항상 30초 뒤 타임아웃난다. domcontentloaded 를 쓰고, 실제로
+ * 필요한 대상은 expect(...).toBeVisible() 의 자동 재시도로 기다린다.
+ */
 import { createSRViaAPI, createTestSR, deleteSRViaAPI } from './helpers/test-helpers';
 
 /**
@@ -71,7 +79,7 @@ test.describe('SR 상세 페이지', () => {
   test('SR 상세 페이지 접근', async ({ page }) => {
     test.skip(!testSRId, 'SR ID가 없습니다');
 
-    await page.goto(`/srs/${testSRId}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${testSRId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // 상세 정보 섹션 확인 (여러 가능한 셀렉터)
     const detailSection = page
@@ -86,7 +94,7 @@ test.describe('SR 상세 페이지', () => {
   test('SR 탭 네비게이션', async ({ page }) => {
     test.skip(!testSRId, 'SR ID가 없습니다');
 
-    await page.goto(`/srs/${testSRId}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${testSRId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // 탭 확인 (더 유연한 셀렉터 사용)
     // 탭 버튼은 role="tab" 또는 data-state 속성을 가질 수 있음
@@ -125,7 +133,7 @@ test.describe('SR 상세 페이지', () => {
   test('SR 코멘트 추가', async ({ page }) => {
     test.skip(!testSRId, 'SR ID가 없습니다');
 
-    await page.goto(`/srs/${testSRId}`, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(`/srs/${testSRId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // 댓글 탭 클릭 (있다면)
     const commentTab = page

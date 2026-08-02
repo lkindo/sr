@@ -34,9 +34,17 @@ function deepSerialize(value: any): any {
     return value;
   }
 
+  // Handle BigInt (Prisma BigInt columns, e.g. SRAttachment.fileSize)
+  // JSON.stringify throws a TypeError on bigint, so it must be converted before
+  // it ever reaches NextResponse.json. Number() is lossless for every bigint the
+  // schema can produce (fileSize is capped at 10MB, far below Number.MAX_SAFE_INTEGER).
+  if (typeof value === 'bigint') {
+    return Number(value);
+  }
+
   if (typeof value !== 'object') {
-    // Primitives (string, boolean, symbol, bigint, etc.)
-    // Note: JSON.stringify ignores symbols, throws on bigint.
+    // Primitives (string, boolean, symbol, etc.)
+    // Note: JSON.stringify ignores symbols.
     // We preserve them here if they are passed directly, but they might be handled differently in objects/arrays.
     // For direct calls, we return as is.
     return value;

@@ -8,7 +8,7 @@ import {
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
 import { logger } from '@/lib/logger';
-import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';

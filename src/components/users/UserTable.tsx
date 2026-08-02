@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ClientApprovalActions } from '@/components/users/ClientApprovalActions';
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
-import { UserActions } from '@/components/users/UserActions';
 import { getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
 
 interface UserTableProps {
@@ -34,9 +33,9 @@ export function UserTable({
   clients,
   onToggleAll,
   onToggleUser,
-  onAssignRoles,
-  onToggleActive,
-  onDelete,
+  onAssignRoles: _onAssignRoles,
+  onToggleActive: _onToggleActive,
+  onDelete: _onDelete,
   onRefresh,
 }: UserTableProps) {
   return (

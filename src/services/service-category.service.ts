@@ -1,4 +1,5 @@
 import { SRPriority } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
@@ -107,7 +108,11 @@ export class ServiceCategoryService {
     return prisma.serviceCategory.findMany({
       where: {
         isActive: true,
-        ...(clientId && { clientId }),
+        // 해당 고객사 전용 + 전역(clientId=null) 카테고리를 함께 보여준다.
+        // `{ clientId }` 로 정확히 일치만 걸면 전역 카테고리가 목록에서 사라져,
+        // 전역 카테고리만 있는 신규 고객사는 선택지가 0개가 된다.
+        // (SRService.ensureCategoryBelongsToClient 가 허용하는 범위와 정확히 같다)
+        ...(clientId && { OR: [{ clientId }, { clientId: null }] }),
       },
       select: {
         id: true,
@@ -130,7 +135,9 @@ export class ServiceCategoryService {
   async create(data: ServiceCategoryCreateData) {
     const validated = serviceCategoryCreateSchema.parse(data);
 
-    // 동일 고객사 내 카테고리명 중복 확인
+    // 사전 확인은 사용자에게 빠른 피드백을 주기 위한 것이지 중복 방지 수단이 아니다.
+    // 확인과 생성 사이에 다른 요청이 끼어들 수 있으므로(TOCTOU), 실제 보장은
+    // DB 의 부분 unique 인덱스가 한다 — 아래 P2002 처리 참고(감사 4.2).
     const existing = await prisma.serviceCategory.findFirst({
       where: {
         categoryName: validated.categoryName,
@@ -142,23 +149,31 @@ export class ServiceCategoryService {
       throw new DuplicateError('서비스 카테고리', 'categoryName', validated.categoryName);
     }
 
-    return prisma.serviceCategory.create({
-      data: {
-        categoryName: validated.categoryName,
-        description: validated.description,
-        slaHours: validated.slaHours,
-        priority: validated.priority,
-        clientId: validated.clientId,
-        handlerId: validated.handlerId,
-        backupHandlerId: validated.backupHandlerId,
-        isActive: true,
-      },
-      include: {
-        client: { select: { id: true, code: true, name: true } },
-        handler: { select: { id: true, name: true, email: true } },
-        backupHandler: { select: { id: true, name: true, email: true } },
-      },
-    });
+    try {
+      return await prisma.serviceCategory.create({
+        data: {
+          categoryName: validated.categoryName,
+          description: validated.description,
+          slaHours: validated.slaHours,
+          priority: validated.priority,
+          clientId: validated.clientId,
+          handlerId: validated.handlerId,
+          backupHandlerId: validated.backupHandlerId,
+          isActive: true,
+        },
+        include: {
+          client: { select: { id: true, code: true, name: true } },
+          handler: { select: { id: true, name: true, email: true } },
+          backupHandler: { select: { id: true, name: true, email: true } },
+        },
+      });
+    } catch (error) {
+      // 경쟁에서 진 쪽. 그대로 두면 raw Prisma 오류가 500 으로 표면화된다.
+      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new DuplicateError('서비스 카테고리', 'categoryName', validated.categoryName);
+      }
+      throw error;
+    }
   }
 
   /**
@@ -187,23 +202,36 @@ export class ServiceCategoryService {
       }
     }
 
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: {
-        categoryName: validated.categoryName,
-        description: validated.description,
-        slaHours: validated.slaHours,
-        priority: validated.priority,
-        clientId: validated.clientId,
-        handlerId: validated.handlerId,
-        backupHandlerId: validated.backupHandlerId,
-      },
-      include: {
-        client: { select: { id: true, code: true, name: true } },
-        handler: { select: { id: true, name: true, email: true } },
-        backupHandler: { select: { id: true, name: true, email: true } },
-      },
-    });
+    try {
+      return await prisma.serviceCategory.update({
+        where: { id },
+        data: {
+          categoryName: validated.categoryName,
+          description: validated.description,
+          slaHours: validated.slaHours,
+          priority: validated.priority,
+          clientId: validated.clientId,
+          handlerId: validated.handlerId,
+          backupHandlerId: validated.backupHandlerId,
+        },
+        include: {
+          client: { select: { id: true, code: true, name: true } },
+          handler: { select: { id: true, name: true, email: true } },
+          backupHandler: { select: { id: true, name: true, email: true } },
+        },
+      });
+    } catch (error) {
+      // 위 중복 확인도 create 와 같은 TOCTOU 다. 이름을 바꾸는 두 요청이 동시에
+      // 통과하면 여기서 부분 unique 인덱스에 걸린다.
+      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new DuplicateError(
+          '서비스 카테고리',
+          'categoryName',
+          validated.categoryName ?? existing.categoryName
+        );
+      }
+      throw error;
+    }
   }
 
   /**

@@ -6,6 +6,7 @@ import tseslint from 'typescript-eslint';
 import security from 'eslint-plugin-security';
 
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 const eslintConfig = [
   {
@@ -38,8 +39,23 @@ const eslintConfig = [
     plugins: {
       security: security,
       'simple-import-sort': simpleImportSort,
+      'react-hooks': reactHooks,
     },
     rules: {
+      // React 훅 규칙 (감사 4.4).
+      //
+      // 플러그인은 이미 설치되어 있었지만 이 설정에 연결되지 않아 한 번도 실행되지 않았다.
+      // 실제로 이 규칙이 잡았어야 할 버그가 있었다 — IdleTimeoutProvider 의 자동 로그아웃이
+      // 동작하지 않던 원인이 정확히 exhaustive-deps 위반이었다(감사 3.24).
+      // effect 가 의존하는 값이 deps 에서 빠지면 그 effect 는 낡은 클로저를 붙들거나
+      // 자기 자신을 취소한다 — 조용히 동작만 사라지므로 테스트 없이는 드러나지 않는다.
+      //
+      // 도입 시점 위반은 8건이었고, 4건은 useCallback 으로 실제 수정했으며
+      // 나머지 4건은 의도된 동작이라 사유를 적은 disable 주석을 달았다.
+      // 규칙의 값어치는 "그 판단을 눈에 보이게 만드는 것"이다.
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'error',
+
       'no-console': 'warn',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [

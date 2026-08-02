@@ -12,6 +12,7 @@ import { Label } from '@/components/ui';
 import { Separator } from '@/components/ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 
 interface Role {
   role: {
@@ -61,7 +62,7 @@ export default function ProfilePage() {
     try {
       const response = await fetch('/api/profile');
       if (!response.ok) {
-        console.error('Profile fetch failed:', response.status);
+        logger.error('프로필 조회 실패', undefined, { status: response.status });
         throw new Error('Failed to fetch profile');
       }
       const data = await response.json();
@@ -70,7 +71,7 @@ export default function ProfilePage() {
       setImage(data.image || '');
       setError(null);
     } catch (err) {
-      console.error('Profile error:', err);
+      logger.error('프로필 조회 오류', err instanceof Error ? err : undefined);
       const errorMessage = '프로필 정보를 불러오는데 실패했습니다.';
       setError(errorMessage);
       setProfile(null);
@@ -84,7 +85,10 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, []); // toast 의존성 제거 - 무한 루프 방지
+    // 마운트 시 프로필을 한 번 읽는 용도이므로 빈 deps 가 의도된 동작이다.
+    // (toast 를 넣었을 때 무한 루프가 관측되어 제외했다는 기존 주석을 유지한다)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     fetchProfile();
@@ -206,9 +210,9 @@ export default function ProfilePage() {
   const initials =
     profile.name
       ?.split(' ')
-      .map((n) => n[0])
+      .map((n) => n[0] ?? '')
       .join('')
-      .toUpperCase() || profile.email[0].toUpperCase();
+      .toUpperCase() || (profile.email[0] ?? '?').toUpperCase();
 
   return (
     <div className="space-y-6">

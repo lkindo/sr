@@ -3,6 +3,18 @@ import path from 'path';
 
 /**
  * SR 접수 프로세스 E2E 테스트
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') / waitUntil: 'networkidle' 은
+ * 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록/상세 요소 표시)을 기다린다. expect().toBeVisible() 과 click() 은 자동 대기한다.
+ * 주의: locator.isVisible() 은 대기하지 않고 즉시 반환한다(timeout 옵션은 무시됨).
+ * 특히 "버튼이 없어야 정상"을 확인하는 자리에서는, 먼저 화면이 렌더링되었음을
+ * 단정한 뒤에 부재를 확인해야 한다. 그러지 않으면 아무것도 검증하지 못한다.
  */
 
 const authFiles = {
@@ -30,7 +42,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
       await expect(createButton).toBeVisible({ timeout: 10000 });
@@ -68,21 +80,23 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.waitForTimeout(2000);
 
       // 목록 페이지로 이동
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
       // SR 찾기 (Polling 강화)
       let srRow = page.locator('tr', { hasText: srTitle }).first();
       let found = false;
 
       for (let i = 0; i < 5; i++) {
+        // 고정 sleep 대신 행이 나타나는 것을 기다린다. 없으면 새로고침하고 다시 본다.
+        await srRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         if (await srRow.isVisible().catch(() => false)) {
           found = true;
           break;
         }
         console.log(`⚠️ SR을 찾을 수 없습니다. 목록 새로고침 중... (${i + 1}/5)`);
-        await page.reload({ waitUntil: 'networkidle' });
-        await page.waitForTimeout(2000);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
         srRow = page.locator('tr', { hasText: srTitle }).first();
       }
 
@@ -93,9 +107,9 @@ test.describe('SR 접수 프로세스 테스트', () => {
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       srId = page.url().split('/').pop()!;
 
-      // REQUESTED 상태 확인
+      // REQUESTED 상태 확인 (상세는 클라이언트 로드이므로 이 단정이 로드 게이트다)
       const requestedStatus = page.locator('text=/요청됨|REQUESTED/i').first();
-      await expect(requestedStatus).toBeVisible({ timeout: 5000 });
+      await expect(requestedStatus).toBeVisible({ timeout: 15000 });
 
       console.log(`✅ SR 생성 완료: ${srId} (상태: REQUESTED)`);
     } finally {
@@ -109,10 +123,10 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-      // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 5000 });
+      // 제목 확인 (상세 데이터 로드를 이 단정으로 기다린다)
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // REQUESTED 상태 확인
       const requestedStatus = page.locator('text=/요청됨|REQUESTED/i').first();
@@ -204,7 +218,8 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
       // 담당자 표시 확인
       const assigneeDisplay = page.locator(`text=${assigneeName || 'Engineer'}`).first();
-      if (await assigneeDisplay.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await assigneeDisplay.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await assigneeDisplay.isVisible().catch(() => false)) {
         console.log(`✅ 담당자 표시 확인: ${assigneeName}`);
       }
     } finally {
@@ -218,7 +233,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 접수 페이지 접근 확인 (URL 기반 + heading 또는 폼 존재 여부)
       await expect(page).toHaveURL(/\/srs\/[^/]+\/intake/);
@@ -254,7 +269,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await expect(page.getByRole('heading', { name: /SR 접수/i }).first()).toBeVisible({
         timeout: 10000,
       });
@@ -321,10 +336,11 @@ test.describe('SR 접수 프로세스 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
+      // 접수 폼 로드를 이 단정으로 기다린다
       const priorityValue = page.locator('text=/긴급|CRITICAL/i').first();
-      await expect(priorityValue).toBeVisible({ timeout: 5000 });
+      await expect(priorityValue).toBeVisible({ timeout: 15000 });
 
       const hoursInput = page.getByLabel(/예상 작업 시간/i);
       const hoursValue = await hoursInput.inputValue();
@@ -346,13 +362,14 @@ test.describe('SR 접수 프로세스 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       const activitySection = page
         .locator('section, div')
         .filter({ hasText: /활동|Activity|이력/i })
         .first();
-      if (await activitySection.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await activitySection.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await activitySection.isVisible().catch(() => false)) {
         const intakeActivity = activitySection
           .locator('div, li, tr')
           .filter({ hasText: /접수|배정|ASSIGNED|INTAKE/i });
@@ -374,7 +391,7 @@ test.describe('SR 접수 권한 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
       await createButton.click();
 
@@ -403,18 +420,20 @@ test.describe('SR 접수 권한 테스트', () => {
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
 
       await page.waitForTimeout(2000);
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
       let srRow = page.locator('tr', { hasText: title }).first();
       let found = false;
       for (let i = 0; i < 5; i++) {
+        // 고정 sleep 대신 행이 나타나는 것을 기다린다. 없으면 새로고침하고 다시 본다.
+        await srRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         if (await srRow.isVisible().catch(() => false)) {
           found = true;
           break;
         }
-        await page.reload({ waitUntil: 'networkidle' });
-        await page.waitForTimeout(1500);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
         srRow = page.locator('tr', { hasText: title }).first();
       }
 
@@ -423,12 +442,19 @@ test.describe('SR 접수 권한 테스트', () => {
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
       const clientSrId = page.url().split('/').pop()!;
 
+      // "접수 버튼이 없다"를 확인하려면 먼저 상세 화면이 실제로 렌더링되었음을 단정해야 한다.
+      // 렌더 전에 물어보면 어떤 경우에도 '없음'이 되어 아무것도 검증하지 못한다.
+      await expect(page.locator(`text=${title}`).first()).toBeVisible({ timeout: 15000 });
+
       const intakeButton = page.getByRole('button', { name: /접수|Intake/i });
-      if (!(await intakeButton.isVisible({ timeout: 3000 }).catch(() => false))) {
+      if (!(await intakeButton.isVisible().catch(() => false))) {
         console.log(`✅ CLIENT에게 접수 버튼이 표시되지 않음 (정상)`);
       }
 
-      await page.goto(`/srs/${clientSrId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${clientSrId}/intake`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
       const is403 = page.url().includes('/403') || page.url().includes('/unauthorized');
       const isBackToDetail =
         page.url().includes(`/srs/${clientSrId}`) && !page.url().includes('/intake');
@@ -451,7 +477,7 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       const clientContext = await browser.newContext({ storageState: authFiles.client });
       const clientPage = await clientContext.newPage();
 
-      await clientPage.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await clientPage.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
       await clientPage
         .getByRole('button', { name: /등록|새 SR|Create/i })
         .first()
@@ -472,9 +498,9 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       await clientPage.getByRole('button', { name: /저장|생성|Create/i }).click();
 
       await clientPage.waitForTimeout(2000);
-      await clientPage.goto('/srs');
-      await clientPage.waitForLoadState('networkidle');
+      await clientPage.goto('/srs', { waitUntil: 'domcontentloaded' });
 
+      // 새 행이 보이는 것 자체가 목록 갱신의 관측 가능한 결과다 (toBeVisible 이 재시도)
       const srRow = clientPage.locator('tr', { hasText: title }).first();
       await expect(srRow).toBeVisible({ timeout: 15000 });
       await srRow.click();
@@ -483,7 +509,7 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       await clientContext.close();
 
       await managerPage.goto(`/srs/${slaSrId}/intake`, {
-        waitUntil: 'networkidle',
+        waitUntil: 'domcontentloaded',
         timeout: 30000,
       });
 
@@ -524,7 +550,8 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
       await managerPage.waitForLoadState('domcontentloaded');
 
       const dueDateLabel = managerPage.locator('text=/마감일|Due Date/i').first();
-      if (await dueDateLabel.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await dueDateLabel.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await dueDateLabel.isVisible().catch(() => false)) {
         console.log(`✅ 마감일 자동 계산 및 표시 확인`);
       } else {
         console.log(`⚠️ 마감일 표시를 찾을 수 없습니다. (UI에 미구현 가능성)`);

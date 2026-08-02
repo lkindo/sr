@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
+import { parseJsonBody } from '@/lib/api-helpers';
+import { logger } from '@/lib/logger';
 import { pushService, PushSubscriptionData } from '@/services/push.service';
 
 const subscriptionSchema = z.object({
@@ -22,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     const result = subscriptionSchema.safeParse(body);
 
     if (!result.success) {
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ message: '푸시 알림이 활성화되었습니다.' }, { status: 201 });
   } catch (error) {
-    console.error('[API] Push subscribe error:', error);
+    logger.error('푸시 구독 오류', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: '푸시 구독 등록에 실패했습니다.' }, { status: 500 });
   }
 }
@@ -67,7 +69,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: '푸시 알림이 비활성화되었습니다.' }, { status: 200 });
   } catch (error) {
-    console.error('[API] Push unsubscribe error:', error);
+    logger.error('푸시 구독 해제 오류', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: '푸시 구독 해제에 실패했습니다.' }, { status: 500 });
   }
 }
@@ -89,7 +91,7 @@ export async function GET() {
       subscriptionCount: subscriptions.length,
     });
   } catch (error) {
-    console.error('[API] Push status error:', error);
+    logger.error('푸시 상태 조회 오류', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: '구독 상태 조회에 실패했습니다.' }, { status: 500 });
   }
 }

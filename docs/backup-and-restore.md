@@ -56,17 +56,65 @@ docker restart sr-app
 
 복구는 파괴적이므로 `RESTORE` 입력 확인을 요구한다. 자동화 시 `FORCE=1` 로 생략 가능.
 
-### 복구 리허설(권장)
+### 복구 리허설 (자동화됨)
 
-분기 1회, **별도 테스트 DB/컨테이너**에 최신 백업을 복구해 실제로 열리는지 검증하라.
-"백업이 있다"와 "복구된다"는 다르다.
+`scripts/restore-rehearsal.sh` 가 **일회용 Postgres 컨테이너**에 최신 백업을 복구하고
+스키마·행 수를 단언한다. **프로덕션 DB 는 건드리지 않는다.**
 
-## ⚠️ 오프호스트 복제 (아직 미구성 — 반드시 추가 권장)
+`.github/workflows/restore-rehearsal.yml` 이 매월 1일(KST 04:00) 자동 실행하며,
+`workflow_dispatch` 로 수동 실행도 가능하다.
 
-현재 백업은 **운영 서버와 같은 디스크**에 저장된다. 실수 삭제/잘못된 마이그레이션/논리적
-손상에는 충분하지만 **디스크 물리 장애·VM 소실**에는 무력하다. 오프호스트 복사를 추가하라.
+```bash
+# 서버에서 수동 실행 (최신 백업 자동 선택)
+bash scripts/restore-rehearsal.sh
 
-`scripts/backup.sh` 는 `OFFSITE_CMD` 훅을 제공한다. 예(rclone → S3/B2/GCS):
+# 특정 덤프 지정
+bash scripts/restore-rehearsal.sh /home/opc/sr/backups/db_20260801_030000.dump
+```
+
+`backup.sh` 의 `pg_restore -l` 은 덤프의 **목차만** 읽는다. 목차가 멀쩡해도 전체 복구는
+깨질 수 있으므로, "백업이 있다"가 아니라 "복구된다"를 확인하는 것이 이 리허설의 목적이다.
+
+## 백업 암호화
+
+덤프는 사용자·고객사·SR 본문이 담긴 **평문 PII** 다. 오프호스트로 내보내기 전에 반드시
+암호화해야 한다.
+
+`BACKUP_ENCRYPT_RECIPIENT` 를 설정하면 `backup.sh` 가 산출물을 암호화하고 평문을 삭제한다.
+
+```bash
+# age 공개키 (권장 — 단일 바이너리, 키링 관리 불필요)
+BACKUP_ENCRYPT_RECIPIENT='age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p' \
+  bash scripts/backup.sh
+
+# 또는 gpg 키 ID/이메일
+BACKUP_ENCRYPT_RECIPIENT='backup@example.com' bash scripts/backup.sh
+```
+
+**공개키 방식을 쓰는 이유**: 서버에는 암호화 키만 두고 복호화 키(개인키)는 두지 않는다.
+서버가 침해되어도 과거 백업을 읽을 수 없다. 대칭키(passphrase)였다면 호스트에 있는 그
+값 하나로 모든 백업이 열린다.
+
+수신자가 설정됐는데 `age`/`gpg` 가 없으면 스크립트는 **평문을 남기지 않고 실패한다** —
+"암호화하려 했는데 안 됐다"를 성공으로 보고하지 않는다.
+
+> **암호화하면 리허설은?** 호스트에 복호화 키가 없는 것이 정상이므로,
+> `restore-rehearsal.sh` 에 `BACKUP_AGE_IDENTITY_FILE`(또는 `BACKUP_GPG_HOME`)을 줘야 한다.
+> 주지 않으면 "검증 불가"로 **실패** 처리된다(성공으로 넘기지 않는다).
+
+## 오프호스트 복제 — 현재 **미사용 (수용된 위험)**
+
+> **결정 (2026-08-01, 소유자):** 오프사이트 복제를 도입하지 않고 운영 서버 동일 디스크
+> 백업을 유지한다. 아래 절차는 나중에 도입할 때를 위해 남겨 둔다.
+>
+> **그대로 남는 노출:** 디스크 물리 장애 · VM 삭제 · 랜섬웨어는 DB·첨부파일·전체 백업을
+> **한 번에** 파괴한다. 실수 삭제나 잘못된 마이그레이션 같은 논리적 사고는 현재 백업으로
+> 복구되지만, 저장 매체 자체를 잃는 경우는 복구 수단이 없다.
+
+현재 백업은 **운영 서버와 같은 디스크**에 저장된다. 실수 삭제/잘못된
+마이그레이션/논리적 손상에는 충분하지만 **디스크 물리 장애·VM 소실**에는 무력하다.
+
+`scripts/backup.sh` 의 `OFFSITE_CMD` 훅으로 복사한다. 예(rclone → S3/B2/GCS):
 
 ```bash
 # 서버에 rclone 구성(remote 이름 'sr-backups') 후:
@@ -74,5 +122,13 @@ OFFSITE_CMD='rclone copy /home/opc/sr/backups sr-backups:sr/backups --max-age 25
   bash scripts/backup.sh
 ```
 
-민감 데이터이므로 오프호스트 대상은 **비공개 + 서버측 암호화**를 사용하고, 전송 전
-`gpg`/`age` 로 암호화하는 것을 권장한다.
+`.github/workflows/backup.yml` 이 다음 두 시크릿을 서버로 전달한다.
+
+| GitHub Secret              | 용도                                           |
+| -------------------------- | ---------------------------------------------- |
+| `BACKUP_ENCRYPT_RECIPIENT` | age 공개키 또는 gpg 키 ID. 미설정 시 평문 저장 |
+| `BACKUP_OFFSITE_CMD`       | 오프호스트 복제 명령. 미설정 시 복제 안 함     |
+| `BACKUP_AGE_IDENTITY_FILE` | (리허설용) 서버상의 age 개인키 파일 경로       |
+
+> **두 시크릿 모두 등록해야 3.31 이 실제로 닫힌다.** 코드 경로는 준비되어 있지만,
+> 값이 없으면 백업은 여전히 평문으로 같은 디스크에만 남는다.

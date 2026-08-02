@@ -32,7 +32,7 @@ describe('getClientAction Security', () => {
     (ClientService.prototype.getClientById as any).mockResolvedValue(mockClient);
   });
 
-  it('should deny access to unauthorized user', async () => {
+  it('should deny access to unauthorized user (no permission, no membership)', async () => {
     // Mock session for a user with NO permissions and NO client association
     (getAuthenticatedSession as any).mockResolvedValue({
       user: {
@@ -50,14 +50,17 @@ describe('getClientAction Security', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toMatch(/권한이 없습니다/);
+      // ForbiddenError('@/lib/errors') 가 Result 로 변환된 코드
+      expect(result.code).toBe('FORBIDDEN');
     }
+    expect((result as any).data).toBeUndefined();
   });
 
-  it('should allow access to user with CLIENT.READ permission', async () => {
+  it('should ALLOW an INTERNAL user holding CLIENT.READ to read any client', async () => {
     (getAuthenticatedSession as any).mockResolvedValue({
       user: {
-        id: 'admin-1',
-        roles: [],
+        id: 'manager-1',
+        roles: ['MANAGER'], // 내부 사용자
         permissions: [PERMISSIONS.CLIENT.READ],
         clientIds: [],
       },
@@ -69,6 +72,47 @@ describe('getClientAction Security', () => {
     if (result.success) {
       expect(result.data).toEqual(mockClient);
     }
+  });
+
+  it('should DENY an EXTERNAL user holding CLIENT.READ who is NOT a member (cross-tenant isolation)', async () => {
+    (getAuthenticatedSession as any).mockResolvedValue({
+      user: {
+        id: 'external-1',
+        roles: [], // 내부 역할 없음 = 외부(고객사) 사용자
+        permissions: [PERMISSIONS.CLIENT.READ],
+        clientIds: ['other-client'], // 조회 대상 client-1 에 소속되지 않음
+      },
+    });
+
+    const result = await getClientAction('client-1');
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/권한이 없습니다/);
+      // ForbiddenError('@/lib/errors') 가 Result 로 변환된 코드
+      expect(result.code).toBe('FORBIDDEN');
+    }
+    // 타 고객사 데이터가 절대 유출되지 않아야 한다
+    expect((result as any).data).toBeUndefined();
+  });
+
+  it('should DENY an EXTERNAL user with CLIENT.READ and no membership info at all', async () => {
+    (getAuthenticatedSession as any).mockResolvedValue({
+      user: {
+        id: 'external-2',
+        roles: [],
+        permissions: [PERMISSIONS.CLIENT.READ],
+        clientIds: [],
+      },
+    });
+
+    const result = await getClientAction('client-1');
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.code).toBe('FORBIDDEN');
+    }
+    expect((result as any).data).toBeUndefined();
   });
 
   it('should allow access to user belonging to the client', async () => {

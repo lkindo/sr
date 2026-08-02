@@ -11,6 +11,19 @@ type ClientCreateData = z.infer<typeof clientCreateSchema>;
 type ClientUpdateData = z.infer<typeof clientUpdateSchema>;
 
 /**
+ * 신규 고객사에 자동 생성되는 기본 서비스 카테고리.
+ *
+ * SR 의 serviceCategoryId 는 필수라, 카테고리가 하나도 없으면 그 고객사는 SR 을
+ * 접수할 수 없다. 온보딩 직후 막다른 길이 되지 않도록 최소 한 개를 보장한다(감사 3.18).
+ */
+const DEFAULT_SERVICE_CATEGORY = {
+  categoryName: '일반 요청',
+  description: '분류되지 않은 일반 서비스 요청',
+  slaHours: 24,
+  priority: 'MEDIUM',
+} as const;
+
+/**
  * 고객사 서비스
  *
  * 고객사 관리 및 관련 비즈니스 로직을 처리합니다.
@@ -57,7 +70,27 @@ export class ClientService {
             },
           },
         },
-        srs: true,
+        // 테넌트 노출 최소화: 고객사 상세 응답에 전체 SR 본문(설명/처리결과/반려사유)이
+        // 실려나가지 않도록 상세 화면에 필요한 최근 SR 요약만 제한적으로 조회한다.
+        srs: {
+          select: {
+            id: true,
+            srNumber: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        // 통계/삭제 가능 여부 판정을 위한 실제 전체 건수
+        _count: {
+          select: {
+            srs: true,
+            users: true,
+          },
+        },
         serviceCategories: true,
         clientHandlers: {
           include: {
@@ -160,21 +193,42 @@ export class ClientService {
       throw new DuplicateError('고객사 코드', 'code', validated.code);
     }
 
-    const result = await prisma.client.create({
-      data: {
-        code: validated.code,
-        name: validated.name,
-        industry: validated.industry,
-        contactPerson: validated.contactPerson,
-        contactEmail: validated.contactEmail,
-        contactPhone: validated.contactPhone,
-        address: validated.address,
-        contractStartDate: validated.contractStartDate
-          ? new Date(validated.contractStartDate)
-          : null,
-        contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
-        isActive: true,
-      },
+    // 기본 서비스 카테고리를 같은 트랜잭션에서 함께 만든다.
+    //
+    // SR 은 serviceCategoryId 가 필수(스키마 non-nullable)라, 카테고리가 0개인 고객사는
+    // **구조적으로 SR 을 한 건도 받을 수 없다**. 서류상 온보딩은 끝났는데 실제로는
+    // 막다른 길이 되는 상태였다(감사 3.18). 안전망으로 기본 카테고리 하나를 시드한다.
+    // 필요 없으면 고객사 상세 화면에서 수정·삭제할 수 있다.
+    const result = await prisma.$transaction(async (tx) => {
+      const client = await tx.client.create({
+        data: {
+          code: validated.code,
+          name: validated.name,
+          industry: validated.industry,
+          contactPerson: validated.contactPerson,
+          contactEmail: validated.contactEmail,
+          contactPhone: validated.contactPhone,
+          address: validated.address,
+          contractStartDate: validated.contractStartDate
+            ? new Date(validated.contractStartDate)
+            : null,
+          contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+          isActive: true,
+        },
+      });
+
+      await tx.serviceCategory.create({
+        data: {
+          clientId: client.id,
+          categoryName: DEFAULT_SERVICE_CATEGORY.categoryName,
+          description: DEFAULT_SERVICE_CATEGORY.description,
+          slaHours: DEFAULT_SERVICE_CATEGORY.slaHours,
+          priority: DEFAULT_SERVICE_CATEGORY.priority,
+          isActive: true,
+        },
+      });
+
+      return client;
     });
 
     return result;

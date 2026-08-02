@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { formatDate, formatDateTime, getDaysUntilDue, getDueDateStatus } from '@/lib/date-utils';
+import { formatISODateInAppZone } from '@/lib/timezone';
 
 describe('date-utils', () => {
   describe('getDaysUntilDue', () => {
@@ -10,18 +11,27 @@ describe('date-utils', () => {
     });
 
     it('should calculate accurate days remaining', () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      /**
+       * 픽스처를 앱 타임존(KST) 달력으로 만든다.
+       *
+       * 예전에는 `new Date()` + `setHours(0,0,0,0)` 로 만들었는데, 그건 **러너의 로컬
+       * 타임존** 자정이다. `getDaysUntilDue` 는 의도적으로 KST 달력으로 일 경계를 잡으므로
+       * (감사 3.25), 로컬이 KST 가 아닌 환경에서는 두 기준이 어긋나 실패한다.
+       * 실제로 UTC 러너의 16:09(=KST 익일 01:09)에서 "내일"이 KST 로는 오늘이 되어 깨졌다.
+       * 개발자 노트북이 KST 라 로컬에서는 항상 통과하던, 환경에 숨어 있던 결함이다.
+       *
+       * 정오를 쓰는 이유: KST 달력일 안에서 UTC 로 환산해도 날짜가 넘어가지 않는 시각이라
+       * 경계에 걸리지 않는다.
+       */
+      const appZoneNoonUTC = (dayOffset: number) => {
+        const [year, month, day] = formatISODateInAppZone().split('-').map(Number);
+        const utc = new Date(Date.UTC(year!, month! - 1, day! + dayOffset, 12, 0, 0));
+        return utc.toISOString();
+      };
 
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
-
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-
-      expect(getDaysUntilDue(tomorrow.toISOString())).toBe(1);
-      expect(getDaysUntilDue(yesterday.toISOString())).toBe(-1);
-      expect(getDaysUntilDue(today.toISOString())).toBe(0);
+      expect(getDaysUntilDue(appZoneNoonUTC(1))).toBe(1);
+      expect(getDaysUntilDue(appZoneNoonUTC(-1))).toBe(-1);
+      expect(getDaysUntilDue(appZoneNoonUTC(0))).toBe(0);
     });
   });
 

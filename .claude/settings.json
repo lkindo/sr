@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "allow": ["Bash(gh secret set:*)", "Bash(gh secret set *)", "Bash(ssh:*)", "Bash(scp:*)"]
+  }
+}

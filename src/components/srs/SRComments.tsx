@@ -34,7 +34,7 @@ export function SRComments({ srId }: SRCommentsProps) {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        if (entries[0]?.isIntersecting) {
           fetchNextPage();
         }
       },

@@ -5,6 +5,16 @@ import { expect, test } from '@playwright/test';
  * - 서비스 카테고리 목록 조회
  * - SR 생성 시 카테고리 선택
  * - 고객사별 카테고리 관리
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (해당 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * isVisible() 은 대기하지 않으므로(timeout 옵션 무시) 조건부 요소는
+ * waitFor({ state: 'visible' }).catch(() => {}) 로 기다린 뒤 판단한다.
  */
 
 test.describe('서비스 카테고리', () => {
@@ -23,9 +33,16 @@ test.describe('서비스 카테고리', () => {
     });
 
     // SR 생성 페이지로 이동 (카테고리 API 호출 유도)
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
+    // 고정 sleep 대신 해당 API 응답 자체를 기다린다. 호출이 없으면 아래에서 스킵 판단.
+    const categoriesCall = page
+      .waitForResponse((resp) => resp.url().includes('/api/service-categories'), {
+        timeout: 15000,
+      })
+      .catch(() => null);
+
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+    await categoriesCall;
 
     if (!categoriesResponse) {
       console.log('⚠️ Service Categories API 응답을 캡처하지 못했습니다. 테스트 스킵.');
@@ -53,15 +70,16 @@ test.describe('서비스 카테고리', () => {
   });
 
   test('SR 생성 시 서비스 카테고리 선택', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
     // SR 생성 버튼 클릭
     const createButton = page
       .locator('button')
       .filter({ hasText: /SR 요청|등록|생성|New SR/i })
       .first();
-    const buttonVisible = await createButton.isVisible({ timeout: 3000 }).catch(() => false);
+    await createButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const buttonVisible = await createButton.isVisible().catch(() => false);
 
     if (!buttonVisible) {
       console.log('⚠️ SR 생성 버튼을 찾을 수 없습니다. 테스트 스킵.');
@@ -132,13 +150,14 @@ test.describe('서비스 카테고리', () => {
 
   test('고객사별 서비스 카테고리 관리 API', async ({ page }) => {
     // 고객사 상세 페이지로 이동
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
     // 첫 번째 고객사 클릭
     const firstClient = page.locator('tbody tr, [role="row"]').first();
-    const clientVisible = await firstClient.isVisible({ timeout: 3000 }).catch(() => false);
+    // 목록 로드를 실제로 기다린다 (고객사가 없을 수도 있으므로 판단은 아래에서)
+    await firstClient.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const clientVisible = await firstClient.isVisible().catch(() => false);
 
     if (!clientVisible) {
       console.log('⚠️ 고객사가 없습니다. 테스트 스킵.');
@@ -191,16 +210,17 @@ test.describe('서비스 카테고리', () => {
   });
 
   test('서비스 카테고리 필터링', async ({ page }) => {
-    await page.goto('/srs');
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
     // 카테고리 필터 Select 찾기
     const categoryFilter = page
       .locator('select[name*="category"], [role="combobox"]')
       .filter({ hasText: /카테고리|Category/i })
       .first();
-    const filterVisible = await categoryFilter.isVisible({ timeout: 3000 }).catch(() => false);
+    // 필터 UI 렌더링을 실제로 기다린다 (없으면 아래에서 스킵 판단)
+    await categoryFilter.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    const filterVisible = await categoryFilter.isVisible().catch(() => false);
 
     if (!filterVisible) {
       console.log('⚠️ 카테고리 필터를 찾을 수 없습니다. 테스트 스킵.');

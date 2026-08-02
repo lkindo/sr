@@ -1,25 +1,31 @@
-import { expect, test as setup } from '@playwright/test';
+import { test as setup } from '@playwright/test';
+import fs from 'fs';
 import path from 'path';
 
-const authFile = path.join(__dirname, '../playwright/.auth/user.json');
+import { ADMIN_PERSONA, assertSessionRoles, loginAs } from './helpers/auth-helpers';
 
-setup('authenticate', async ({ page }) => {
-  // 로그인 페이지로 이동
-  await page.goto('/login');
+/**
+ * 단일 사용자(관리자) 인증 설정 — playwright/.auth/user.json 생성.
+ *
+ * 이전 버전은 `input[name="email"]` 셀렉터를 썼는데 로그인 폼에는 name 속성이 없고
+ * id만 있어(#email/#password) 절대 매칭되지 않았다. 게다가 어떤 프로젝트의 testMatch에도
+ * 걸리지 않아 실행조차 되지 않는 죽은 파일이었다.
+ * 이제 `setup` 프로젝트가 이 파일을 실행하며, 로그인 후 세션 역할까지 검증한다.
+ */
 
-  // 로그인 폼 입력
-  await page.fill('input[name="email"]', process.env.TEST_USER_EMAIL || 'admin@example.com');
-  await page.fill('input[name="password"]', process.env.TEST_USER_PASSWORD || 'admin123');
+const authDir = path.join(__dirname, '../playwright/.auth');
 
-  // 로그인 버튼 클릭
-  await page.click('button[type="submit"]');
+if (!fs.existsSync(authDir)) {
+  fs.mkdirSync(authDir, { recursive: true });
+}
 
-  // 로그인 성공 후 대시보드로 리디렉션 대기
-  await page.waitForURL('/dashboard');
+setup('authenticate as admin', async ({ page }) => {
+  await loginAs(page, ADMIN_PERSONA);
 
-  // 로그인 상태 확인
-  await expect(page.locator('text=대시보드')).toBeVisible();
+  // 로그인이 조용히 실패한 채(익명 세션) 통과하는 것을 막는다.
+  await assertSessionRoles(page, ADMIN_PERSONA);
 
-  // 인증 상태 저장
-  await page.context().storageState({ path: authFile });
+  await page.context().storageState({ path: ADMIN_PERSONA.authFile });
+
+  console.log(`✅ admin 인증 상태 저장 완료: ${ADMIN_PERSONA.authFile}`);
 });

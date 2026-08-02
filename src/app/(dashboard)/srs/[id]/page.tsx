@@ -60,7 +60,7 @@ export default function SRDetailPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const { toast } = useToast();
-  const { hasAnyRole, roles } = usePermissions();
+  const { hasAnyRole, roles, permissions } = usePermissions();
   const { data: session } = useSession();
 
   // React Query를 사용한 SR 상세 조회
@@ -172,6 +172,7 @@ export default function SRDetailPage() {
                   status={sr.status as any}
                   completedAt={sr.completedAt}
                   userRoles={roles || []}
+                  userPermissions={permissions}
                   isRequestor={session.user.id === sr.requesterId}
                 />
               </div>

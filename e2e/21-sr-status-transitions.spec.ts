@@ -12,6 +12,18 @@ import path from 'path';
  * 5. 상태 이력 (Status History) 생성 확인
  *
  * API 엔드포인트: PATCH /api/srs/[id]/status
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (상태 배지 / 액션 버튼 표시)을 기다린다. expect().toBeVisible() 과 click() 은
+ * 자동 재시도/자동 대기한다.
+ * 주의: locator.isVisible() 은 대기하지 않고 즉시 반환한다(timeout 옵션은 무시됨).
+ * 조건부 액션 버튼을 묻기 전에는 waitFor({ state: 'visible' }).catch(() => {}) 로
+ * 실제 대기를 만든다. 버튼이 없어도 통과하는 기존 분기 동작은 그대로 둔다.
  */
 
 const authFiles = {
@@ -33,7 +45,7 @@ test.describe('SR 상태 전이 테스트', () => {
 
     try {
       // SR 생성
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
       await expect(createButton).toBeVisible({ timeout: 10000 });
       await createButton.click();
@@ -71,18 +83,19 @@ test.describe('SR 상태 전이 테스트', () => {
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(3000);
 
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
 
       // SR이 목록에 보이지 않으면 여러 번 새로고침 시도
       let retryCount = 0;
-      while (!(await srRow.isVisible({ timeout: 3000 }).catch(() => false)) && retryCount < 3) {
+      while (!(await srRow.isVisible().catch(() => false)) && retryCount < 3) {
         console.log(`⚠️ SR이 목록에 없음. 새로고침 시도 ${retryCount + 1}/3`);
-        await page.reload();
-        await page.waitForLoadState('networkidle');
-        await page.waitForTimeout(1000);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        // 고정 sleep 대신 목록이 다시 그려졌는지를 기다린다
+        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+        await srRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         retryCount++;
       }
 
@@ -101,7 +114,10 @@ test.describe('SR 상태 전이 테스트', () => {
     const managerPage = await managerContext.newPage();
 
     try {
-      await managerPage.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${srId}/intake`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
 
       const prioritySelect = managerPage
         .locator('label', { hasText: '실제 우선순위' })
@@ -143,15 +159,15 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-      // INTAKE 상태 확인
+      // INTAKE 상태 확인 (상세 데이터는 클라이언트에서 로드되므로 이 단정이 로드 게이트다)
       const intakeStatus = page.locator('text=/접수|INTAKE/i').first();
-      await expect(intakeStatus).toBeVisible({ timeout: 5000 });
+      await expect(intakeStatus).toBeVisible({ timeout: 15000 });
 
       // 진행 시작 버튼 클릭
       const startButton = page.getByRole('button', { name: /진행 시작|Start/i });
-      await expect(startButton).toBeVisible({ timeout: 5000 });
+      await expect(startButton).toBeVisible({ timeout: 15000 });
       await startButton.click();
       await page.waitForTimeout(2000);
 
@@ -170,15 +186,16 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-      // IN_PROGRESS 상태 확인
+      // IN_PROGRESS 상태 확인 (상세 데이터 로드를 이 단정으로 기다린다)
       const inProgressStatus = page.locator('text=/진행중|IN_PROGRESS/i').first();
-      await expect(inProgressStatus).toBeVisible({ timeout: 5000 });
+      await expect(inProgressStatus).toBeVisible({ timeout: 15000 });
 
       // 보류 버튼 클릭 (있다면)
       const holdButton = page.getByRole('button', { name: /보류|Hold/i });
-      if (await holdButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await holdButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await holdButton.isVisible().catch(() => false)) {
         await holdButton.click();
 
         // 보류 사유 입력 다이얼로그
@@ -212,16 +229,20 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // ON_HOLD 상태 확인 (이전 테스트에서 보류된 경우만)
       const onHoldStatus = page.locator('text=/보류|ON_HOLD/i').first();
-      const isOnHold = await onHoldStatus.isVisible({ timeout: 3000 }).catch(() => false);
+      // 상세 로드를 실제로 기다린다. ON_HOLD 가 아니면 나타나지 않으므로 실패는 무시하고
+      // 아래 분기가 판단한다 (기존 tolerant 동작 유지).
+      await onHoldStatus.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      const isOnHold = await onHoldStatus.isVisible().catch(() => false);
 
       if (isOnHold) {
         // 재개 버튼 클릭
         const resumeButton = page.getByRole('button', { name: /재개|Resume/i });
-        if (await resumeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await resumeButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await resumeButton.isVisible().catch(() => false)) {
           await resumeButton.click();
           await page.waitForTimeout(2000);
 
@@ -246,11 +267,11 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-      // IN_PROGRESS 상태 확인
+      // IN_PROGRESS 상태 확인 (상세 데이터 로드를 이 단정으로 기다린다)
       const inProgressStatus = page.locator('text=/진행중|IN_PROGRESS/i').first();
-      await expect(inProgressStatus).toBeVisible({ timeout: 5000 });
+      await expect(inProgressStatus).toBeVisible({ timeout: 15000 });
 
       // 완료 처리 버튼 클릭
       const completeButton = page.getByRole('button', { name: /완료 처리|Complete/i });
@@ -283,15 +304,16 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-      // COMPLETED 상태 확인
+      // COMPLETED 상태 확인 (상세 데이터 로드를 이 단정으로 기다린다)
       const completedStatus = page.locator('text=/완료|COMPLETED/i').first();
-      await expect(completedStatus).toBeVisible({ timeout: 5000 });
+      await expect(completedStatus).toBeVisible({ timeout: 15000 });
 
       // 확인 완료 버튼 클릭 (신청자만 가능)
       const confirmButton = page.getByRole('button', { name: /확인 완료|확인완료|Confirm/i });
-      if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await confirmButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await confirmButton.isVisible().catch(() => false)) {
         // API 응답 모니터링
         const responsePromise = page.waitForResponse(
           (response) =>
@@ -343,20 +365,17 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // CONFIRMED 상태에서는 완료 처리 버튼이 표시되지 않아야 함
-      const completedOrConfirmed = await page
-        .locator('text=/완료|COMPLETED|확인완료|CONFIRMED/i')
-        .first()
-        .isVisible({ timeout: 3000 })
-        .catch(() => false);
+      const statusText = page.locator('text=/완료|COMPLETED|확인완료|CONFIRMED/i').first();
+      // 상세 로드를 실제로 기다린다 (해당 상태가 아니면 나타나지 않으므로 실패는 아래 분기가 판단)
+      await statusText.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      const completedOrConfirmed = await statusText.isVisible().catch(() => false);
 
       if (completedOrConfirmed) {
         const completeButton = page.getByRole('button', { name: /완료 처리|Complete/i });
-        const isCompleteVisible = await completeButton
-          .isVisible({ timeout: 2000 })
-          .catch(() => false);
+        const isCompleteVisible = await completeButton.isVisible().catch(() => false);
 
         if (!isCompleteVisible) {
           console.log(`✅ 잘못된 상태 전이 버튼이 표시되지 않음 (정상)`);
@@ -374,14 +393,15 @@ test.describe('SR 상태 전이 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상태 이력 섹션 찾기
       const historySection = page
         .locator('section, div')
         .filter({ hasText: /이력|History|변경 내역/i })
         .first();
-      if (await historySection.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await historySection.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await historySection.isVisible().catch(() => false)) {
         await expect(historySection).toBeVisible();
 
         // 상태 이력 항목 확인 (최소 3개 이상: REQUESTED→INTAKE→IN_PROGRESS→COMPLETED)
@@ -415,7 +435,7 @@ test.describe('SR 상태 전이 제약 조건 테스트', () => {
 
     try {
       // 새 SR 생성
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
       await createButton.click();
 
@@ -447,9 +467,9 @@ test.describe('SR 상태 전이 제약 조건 테스트', () => {
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(2000);
 
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
+      // click() 은 요소가 나타날 때까지 자동 대기하므로 별도 로드 대기가 필요 없다
       const srRow = page.locator('tr', { hasText: title }).first();
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
@@ -461,15 +481,19 @@ test.describe('SR 상태 전이 제약 조건 테스트', () => {
       const managerContext = await browser.newContext({ storageState: authFiles.manager });
       const managerPage = await managerContext.newPage();
 
-      await managerPage.goto(`/srs/${rejectSrId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${rejectSrId}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
 
       // REQUESTED 상태 확인
       const requestedStatus = managerPage.locator('text=/요청됨|REQUESTED/i').first();
-      await expect(requestedStatus).toBeVisible({ timeout: 5000 });
+      await expect(requestedStatus).toBeVisible({ timeout: 15000 });
 
       // 거절 버튼 클릭
       const rejectButton = managerPage.getByRole('button', { name: /거절|Reject/i });
-      if (await rejectButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await rejectButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await rejectButton.isVisible().catch(() => false)) {
         await rejectButton.click();
 
         const dialog = managerPage.locator('[role="dialog"], dialog').first();
@@ -517,7 +541,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
     let srId: string;
 
     try {
-      await clientPage.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await clientPage.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
       await clientPage.getByRole('button', { name: /등록/i }).first().click();
 
       await clientPage.getByRole('textbox', { name: '제목 *' }).fill(title);
@@ -532,9 +556,9 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
       await clientPage.getByRole('button', { name: /저장/i }).click();
       await clientPage.waitForTimeout(2000);
 
-      await clientPage.goto('/srs');
-      await clientPage.waitForLoadState('networkidle');
+      await clientPage.goto('/srs', { waitUntil: 'domcontentloaded' });
 
+      // click() 은 요소가 나타날 때까지 자동 대기하므로 별도 로드 대기가 필요 없다
       const srRow = clientPage.locator('tr', { hasText: title }).first();
       await srRow.click();
       await clientPage.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
@@ -553,13 +577,17 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
 
     try {
       // 접수 처리
-      await managerPage.goto(`/srs/${srId}/intake`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${srId}/intake`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
 
       const assigneeSelect = managerPage
         .locator('[role="combobox"]')
         .filter({ hasText: /담당자/i })
         .first();
-      if (await assigneeSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await assigneeSelect.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await assigneeSelect.isVisible().catch(() => false)) {
         await assigneeSelect.click();
         await managerPage.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 });
         await managerPage.getByRole('option').first().click();
@@ -570,18 +598,20 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
       console.log(`✅ SR 접수 완료`);
 
       // 진행 시작
-      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const startButton = managerPage.getByRole('button', { name: /진행 시작/i });
-      if (await startButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await startButton.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await startButton.isVisible().catch(() => false)) {
         await startButton.click();
         await managerPage.waitForTimeout(2000);
         console.log(`✅ 진행 시작 완료`);
       }
 
       // 완료 처리
-      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const completeButton = managerPage.getByRole('button', { name: /완료 처리/i });
-      if (await completeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await completeButton.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await completeButton.isVisible().catch(() => false)) {
         await completeButton.click();
         const dialog = managerPage.locator('[role="dialog"]').first();
         if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -605,21 +635,23 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
     const client2Page = await client2Context.newPage();
 
     try {
-      await client2Page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await client2Page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 확인 완료
       const confirmButton = client2Page.getByRole('button', { name: /확인 완료|확인완료/i });
-      if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await confirmButton.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await confirmButton.isVisible().catch(() => false)) {
         await confirmButton.click();
         await client2Page.waitForTimeout(2000);
         console.log(`✅ 확인 완료 처리`);
       }
 
       // 재오픈 (CONFIRMED 상태에서)
-      await client2Page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await client2Page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
       const reopenButton = client2Page.getByRole('button', { name: /재오픈|Reopen/i });
 
-      if (await reopenButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await reopenButton.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await reopenButton.isVisible().catch(() => false)) {
         await reopenButton.click();
 
         // 재오픈 사유 입력 다이얼로그
@@ -661,7 +693,7 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
 
     try {
       // 완료된 SR이 있다면 재오픈 다이얼로그의 7일 제한 안내 확인
-      await page.goto('/my-requests', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/my-requests', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // COMPLETED 또는 CONFIRMED 상태의 SR 찾기
       const completedSR = page
@@ -669,7 +701,9 @@ test.describe('SR 재오픈 (Reopen) 테스트', () => {
         .filter({ hasText: /완료|COMPLETED|확인완료|CONFIRMED/i })
         .first();
 
-      if (await completedSR.isVisible({ timeout: 5000 }).catch(() => false)) {
+      // 목록 렌더링을 실제로 기다린다 (해당 상태의 SR 이 없을 수도 있으므로 판단은 분기에 맡긴다)
+      await completedSR.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await completedSR.isVisible().catch(() => false)) {
         await completedSR.click();
         await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
 

@@ -6,6 +6,14 @@ import path from 'path';
  *
  * ADMIN/MANAGER: 고객사 CRUD 전체 권한
  * CLIENT: 본인 고객사 정보 조회만 가능
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 const authFiles = {
@@ -25,8 +33,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   let testClientCode: string;
 
   test('고객사 목록 페이지 접근', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // ADMIN은 고객사 목록 테이블이 보여야 함
     await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
@@ -34,8 +41,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('고객사 등록 버튼이 보여야 함', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // ADMIN은 고객사 등록 버튼이 반드시 보여야 함
     const registerButton = page.getByRole('button', { name: /등록/i });
@@ -44,8 +50,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('고객사 검색 기능', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // 검색 입력 필드가 있어야 함 (없으면 테스트 실패)
     const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]').first();
@@ -58,8 +63,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('고객사 생성 전체 플로우', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // 등록 버튼 클릭
     const createButton = page
@@ -110,14 +114,13 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
     await page.waitForTimeout(2000);
 
     // 목록 새로고침 및 확인
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // 생성된 고객사 확인 (재시도 로직)
     let clientRow = page.locator('tbody tr').filter({ hasText: testClientName }).first();
     for (let retry = 0; retry < 3; retry++) {
       if (await clientRow.isVisible({ timeout: 3000 }).catch(() => false)) break;
-      await page.reload({ waitUntil: 'networkidle' });
+      await page.reload({ waitUntil: 'domcontentloaded' });
       clientRow = page.locator('tbody tr').filter({ hasText: testClientName }).first();
     }
 
@@ -126,8 +129,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('고객사 상세 페이지 접근', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // 첫 번째 고객사 행 찾기
     const firstClientRow = page.locator('tbody tr').first();
@@ -168,20 +170,20 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('고객사 수정 플로우', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // 첫 번째 고객사 행에서 링크 클릭하여 상세 페이지로 이동
     const firstClientLink = page.locator('tbody tr').first().locator('a').first();
     await expect(firstClientLink).toBeVisible({ timeout: 10000 });
     await firstClientLink.click();
 
-    // 상세 페이지 도착 대기
+    // 상세 페이지 도착 대기 (waitForURL 로 내비게이션이 확정되며, 이후 단정이 렌더를 기다린다)
     await page.waitForURL(/\/clients\/[a-zA-Z0-9-]+/, { timeout: 10000 });
-    await page.waitForLoadState('networkidle');
 
-    // 상세 페이지에서 수정 버튼 클릭
-    const editButton = page.getByRole('button', { name: /수정/i });
+    // 상세 페이지에서 고객사 수정 버튼 클릭.
+    // /수정/ 로 느슨하게 잡으면 서비스 분류마다 있는 '<분류명> 수정' 버튼까지 걸려
+    // strict mode violation 이 난다(분류 관리 UI 가 추가된 뒤 실제로 8개에 걸렸다).
+    const editButton = page.getByRole('button', { name: '고객사 정보 수정' });
     await expect(editButton).toBeVisible({ timeout: 5000 });
     await editButton.click();
     await page.waitForTimeout(500);
@@ -209,8 +211,7 @@ test.describe('고객사 관리 - ADMIN/MANAGER 권한', () => {
   });
 
   test('고객사 비활성화 플로우', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // E2E 테스트 고객사 찾기
     let targetRow = page
@@ -257,8 +258,17 @@ test.describe('고객사 관리 - CLIENT 권한', () => {
   test.use({ storageState: authFiles.client });
 
   test('고객사 목록 페이지 접근 시 본인 고객사만 보이거나 제한됨', async ({ page }) => {
-    await page.goto('/clients');
-    await page.waitForLoadState('networkidle');
+    // 아래 분기 판정은 관용적(isVisible 프로브)이므로, 화면이 확정되기 전에 프로브하면
+    // 어떤 분기도 타지 않고 조용히 통과한다. 그래서 목록 API 응답(403 이든 200 이든)까지
+    // 기다린다. 응답이 오지 않는 경우(클라이언트 리다이렉트 등)는 null 로 흘려 보낸다.
+    const clientsApiResponse = page
+      .waitForResponse(
+        (resp) => resp.url().includes('/api/clients') && resp.request().method() === 'GET',
+        { timeout: 15000 }
+      )
+      .catch(() => null);
+    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
+    await clientsApiResponse;
 
     // CLIENT는 다음 중 하나의 상태여야 함:
     // 1) 접근 거부 메시지

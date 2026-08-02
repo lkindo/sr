@@ -10,7 +10,7 @@ import {
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
-import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadUser } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { changePasswordSchema, userUpdateSchema } from '@/lib/schemas';
@@ -84,7 +84,8 @@ export async function getUserAction(id: string): Promise<Result<UserWithDetails>
     }
 
     // 공통 Policy 검증 적용
-    ensureCanReadUser(session.user, user as any);
+    // (user.clients 를 함께 전달하여 테넌트 격리 판정까지 수행한다)
+    ensureCanReadUser(session.user, user);
 
     return ok(user);
   } catch (error) {

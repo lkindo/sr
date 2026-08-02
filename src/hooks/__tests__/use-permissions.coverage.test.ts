@@ -19,7 +19,7 @@ describe('usePermissions (coverage)', () => {
     mockedUseSession.mockReturnValue({
       data: {
         user: {
-          permissions: ['sr.view', 'sr.edit'],
+          permissions: ['SR:READ', 'SR:UPDATE'],
           roles: ['OPERATOR'],
         },
       },
@@ -28,33 +28,33 @@ describe('usePermissions (coverage)', () => {
     const { result } = renderHook(() => usePermissions());
 
     // returned arrays
-    expect(result.current.permissions).toEqual(['sr.view', 'sr.edit']);
+    expect(result.current.permissions).toEqual(['SR:READ', 'SR:UPDATE']);
     expect(result.current.roles).toEqual(['OPERATOR']);
 
     // hasPermission true + false
-    expect(result.current.hasPermission('sr', 'view')).toBe(true);
-    expect(result.current.hasPermission('sr', 'delete')).toBe(false);
+    expect(result.current.hasPermission('SR', 'READ')).toBe(true);
+    expect(result.current.hasPermission('SR', 'DELETE')).toBe(false);
 
     // hasAnyPermission true + false
     expect(
       result.current.hasAnyPermission([
-        { resource: 'sr', action: 'delete' },
-        { resource: 'sr', action: 'edit' },
+        { resource: 'SR', action: 'DELETE' },
+        { resource: 'SR', action: 'UPDATE' },
       ])
     ).toBe(true);
-    expect(result.current.hasAnyPermission([{ resource: 'user', action: 'manage' }])).toBe(false);
+    expect(result.current.hasAnyPermission([{ resource: 'USER', action: 'UPDATE' }])).toBe(false);
 
     // hasAllPermissions true + false
     expect(
       result.current.hasAllPermissions([
-        { resource: 'sr', action: 'view' },
-        { resource: 'sr', action: 'edit' },
+        { resource: 'SR', action: 'READ' },
+        { resource: 'SR', action: 'UPDATE' },
       ])
     ).toBe(true);
     expect(
       result.current.hasAllPermissions([
-        { resource: 'sr', action: 'view' },
-        { resource: 'sr', action: 'delete' },
+        { resource: 'SR', action: 'READ' },
+        { resource: 'SR', action: 'DELETE' },
       ])
     ).toBe(false);
 

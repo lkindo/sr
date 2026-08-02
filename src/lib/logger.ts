@@ -41,6 +41,12 @@ class Logger {
 
   private pinoLogger: ReturnType<typeof pino> | null = null;
 
+  /**
+   * 비동기 destination 참조. 종료 시 `flushSync()` 를 부르기 위해 들고 있는다.
+   * 동기 destination 이나 초기화 실패 시에는 null.
+   */
+  private pinoDestination: { flushSync: () => void } | null = null;
+
   constructor() {
     this.initPino();
   }
@@ -63,6 +69,9 @@ class Logger {
       const pinoDestination = pinoModule.destination;
 
       if (typeof pinoDestination === 'function') {
+        const destination = pinoDestination({ sync: false, minLength: 4096 });
+        this.pinoDestination = destination as unknown as { flushSync: () => void };
+
         this.pinoLogger = pinoModule(
           {
             timestamp: false,
@@ -72,8 +81,11 @@ class Logger {
             },
             base: undefined,
           },
-          pinoDestination({ sync: false, minLength: 4096 })
+          destination
         );
+
+        // 비동기 destination 은 최대 4KB 를 버퍼링하므로 종료 시 플러시가 필요하다.
+        this.registerFlushHandlers();
       } else {
         // pino.destination이 없는 경우 기본 출력 사용
         this.pinoLogger = pinoModule({
@@ -87,6 +99,66 @@ class Logger {
       console.error('[Logger] Failed to initialize Pino, falling back to console:', error);
       this.pinoLogger = null;
     }
+  }
+
+  /**
+   * 프로세스 종료 시 버퍼에 남은 로그를 동기적으로 밀어낸다.
+   *
+   * destination 이 `{ sync: false, minLength: 4096 }` 이라 최대 4KB 가 버퍼에 머문다.
+   * 플러시 훅이 없으면 크래시나 배포 SIGTERM 직전에 기록된 — 진단 가치가 가장 높은 —
+   * 출력이 그대로 버려진다(감사 3.30).
+   *
+   * 참고: 예전 `pino.final()` 헬퍼는 pino 10 에서 제거됐다. 현재 API 는
+   * destination 의 `flushSync()` 다.
+   *
+   * 종료 경로별로:
+   * - SIGTERM/SIGINT: 배포·재시작. 플러시 후 그대로 종료한다.
+   * - uncaughtException/unhandledRejection: 원인을 남기고 나서 종료해야 사후 분석이 된다.
+   * - beforeExit: 정상 종료 경로.
+   *
+   * 리스너는 프로세스당 한 번만 등록한다(HMR 이나 모듈 재평가로 같은 핸들러가 누적되면
+   * MaxListenersExceededWarning 이 난다).
+   */
+  private registerFlushHandlers(): void {
+    const globalScope = globalThis as typeof globalThis & {
+      __srLoggerFlushHandlersRegistered?: boolean;
+    };
+    if (globalScope.__srLoggerFlushHandlersRegistered) return;
+
+    const destination = this.pinoDestination;
+    if (!destination || typeof destination.flushSync !== 'function') return;
+
+    globalScope.__srLoggerFlushHandlersRegistered = true;
+
+    const flush = () => {
+      try {
+        destination.flushSync();
+      } catch {
+        // 플러시 실패가 종료 자체를 막아서는 안 된다.
+      }
+    };
+
+    process.on('beforeExit', flush);
+
+    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+      process.on(signal, () => {
+        flush();
+        process.exit(0);
+      });
+    }
+
+    const logFatal = (label: string, cause: unknown) => {
+      try {
+        this.pinoLogger?.error({ err: cause }, label);
+      } catch {
+        // 로깅 실패로 종료 경로를 막지 않는다.
+      }
+      flush();
+      process.exit(1);
+    };
+
+    process.on('uncaughtException', (error) => logFatal('uncaughtException', error));
+    process.on('unhandledRejection', (reason) => logFatal('unhandledRejection', reason));
   }
 
   /**

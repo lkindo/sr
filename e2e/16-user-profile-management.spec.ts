@@ -4,12 +4,19 @@ import { expect, test } from '@playwright/test';
  * 사용자 프로필 관리 테스트
  *
  * 설정 페이지에서 프로필 정보 확인 및 수정 기능 검증
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 test.describe('사용자 프로필 관리', () => {
   test('프로필/설정 페이지 접근', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
 
     // 설정 페이지 메인 콘텐츠가 반드시 보여야 함
     await expect(page.locator('main, [role="main"]')).toBeVisible({ timeout: 10000 });
@@ -17,8 +24,10 @@ test.describe('사용자 프로필 관리', () => {
   });
 
   test('프로필 섹션 확인', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+
+    // 섹션 탐색 전에 설정 본문 렌더링을 기다린다
+    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
 
     // 프로필 관련 섹션 또는 콘텐츠 찾기
     const profileSection = page
@@ -39,8 +48,10 @@ test.describe('사용자 프로필 관리', () => {
   });
 
   test('프로필 수정 기능 확인', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+
+    // 버튼/필드 탐색 전에 설정 본문 렌더링을 기다린다
+    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
 
     // 수정 버튼 또는 입력 필드 찾기
     const editButton = page
@@ -66,8 +77,10 @@ test.describe('사용자 프로필 관리', () => {
   });
 
   test('비밀번호 변경 섹션 확인', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+
+    // 섹션 탐색 전에 설정 본문 렌더링을 기다린다
+    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
 
     // 비밀번호 관련 섹션 찾기
     const passwordSection = page
@@ -87,8 +100,10 @@ test.describe('사용자 프로필 관리', () => {
   });
 
   test('사용자 정보 표시 확인', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/settings', { waitUntil: 'domcontentloaded' });
+
+    // body 텍스트는 1회성으로 읽으므로(재시도 없음) 본문 렌더링을 먼저 확정한다
+    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
 
     // 사용자 이름 또는 이메일 표시 확인
     const pageText = (await page.locator('body').textContent()) || '';

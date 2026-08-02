@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -27,7 +28,7 @@ export async function GET() {
 
     return NextResponse.json(clients);
   } catch (error) {
-    console.error('공개 고객사 목록 조회 오류:', error);
+    logger.error('공개 고객사 목록 조회 오류', error instanceof Error ? error : undefined);
     return NextResponse.json({ error: '고객사 목록을 불러올 수 없습니다.' }, { status: 500 });
   }
 }

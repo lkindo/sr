@@ -182,8 +182,8 @@ describe('PermissionService', () => {
       const result = await permissionService.getUserPermissions('user1');
 
       expect(result).toHaveLength(2);
-      expect(result[0].id).toBe('perm1');
-      expect(result[1].id).toBe('perm2');
+      expect(result[0]!.id).toBe('perm1');
+      expect(result[1]!.id).toBe('perm2');
       expect(prisma.userRole.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { userId: 'user1' },

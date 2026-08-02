@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -81,18 +81,28 @@ export function useEditSRForm({
     }
   }, [isClientUser, sr?.clientId]);
 
-  const fetchCategories = useCallback(async () => {
-    const result = await getServiceCategoriesForSelection();
-    if (result.success && result.data) {
-      setCategories(result.data.map((cat) => ({ id: cat.id, categoryName: cat.categoryName })));
-    } else {
-      toast({
-        title: '오류',
-        description: '서비스 카테고리 목록을 불러오지 못했습니다.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+  // 생성 폼과 동일하게 선택된 고객사로 스코프한다(감사 3.19).
+  const fetchCategories = useCallback(
+    async (targetClientId: string) => {
+      if (!targetClientId) {
+        setCategories([]);
+        return;
+      }
+
+      const result = await getServiceCategoriesForSelection(targetClientId);
+      if (result.success && result.data) {
+        setCategories(result.data.map((cat) => ({ id: cat.id, categoryName: cat.categoryName })));
+      } else {
+        setCategories([]);
+        toast({
+          title: '오류',
+          description: '서비스 카테고리 목록을 불러오지 못했습니다.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast]
+  );
 
   const fetchExistingAttachments = useCallback(async (srId: string) => {
     try {
@@ -131,7 +141,7 @@ export function useEditSRForm({
     setStatus(sr.status);
     setRequestedCompletionDate(
       sr.requestedCompletionDate
-        ? new Date(sr.requestedCompletionDate).toISOString().split('T')[0]
+        ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
         : ''
     );
     setFiles([]);
@@ -142,8 +152,32 @@ export function useEditSRForm({
       fetchExistingAttachments(sr.id);
     }
     fetchClients();
-    fetchCategories();
+    fetchCategories(sr.clientId || sr.client?.id || '');
+    // 다이얼로그가 열릴 때 폼을 SR 값으로 한 번 채우는 초기화다.
+    // sr 객체나 fetcher 를 deps 에 넣으면 사용자가 입력 중일 때 부모 리렌더마다
+    // 폼이 서버 값으로 되돌아간다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, srId]);
+
+  // 고객사를 바꾸면 카테고리를 다시 불러온다.
+  // 초기 로드는 위 effect 가 처리하므로, 여기서는 "실제로 바뀐 경우"만 다룬다.
+  const previousClientIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) {
+      previousClientIdRef.current = null;
+      return;
+    }
+    if (previousClientIdRef.current === null) {
+      previousClientIdRef.current = clientId;
+      return;
+    }
+    if (previousClientIdRef.current === clientId) return;
+
+    previousClientIdRef.current = clientId;
+    // 바뀐 고객사에 없는 카테고리 id 가 그대로 제출되지 않도록 선택을 비운다.
+    setCategoryId('');
+    fetchCategories(clientId);
+  }, [open, clientId, fetchCategories]);
 
   const handleDeleteAttachmentClick = (attachmentId: string) => setFileToDelete(attachmentId);
 

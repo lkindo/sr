@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 import { BarChart3, CheckCircle2, ClipboardList, Loader2, Shield, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui';
@@ -166,18 +166,16 @@ function LoginCard() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 컴포넌트 마운트 시 저장된 로그인 정보 불러오기
+  // 컴포넌트 마운트 시 저장된 이메일 불러오기
   useEffect(() => {
+    // 과거 버전이 평문으로 저장한 비밀번호를 무조건 제거합니다 (보안).
+    localStorage.removeItem('sr-remembered-password');
+
     const savedEmail = localStorage.getItem('sr-remembered-email');
-    const savedPassword = localStorage.getItem('sr-remembered-password');
 
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
-    }
-
-    if (savedPassword) {
-      setPassword(savedPassword);
     }
   }, []);
 
@@ -196,13 +194,11 @@ function LoginCard() {
       if (result?.error) {
         setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       } else {
-        // 로그인 성공 시 로그인 정보 저장 또는 삭제
+        // 로그인 성공 시 이메일만 저장 또는 삭제 (비밀번호는 저장하지 않음)
         if (rememberMe) {
           localStorage.setItem('sr-remembered-email', email);
-          localStorage.setItem('sr-remembered-password', password);
         } else {
           localStorage.removeItem('sr-remembered-email');
-          localStorage.removeItem('sr-remembered-password');
         }
 
         router.push('/dashboard');
@@ -260,7 +256,7 @@ function LoginCard() {
               htmlFor="remember"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
-              로그인 정보 저장
+              이메일 저장
             </Label>
           </div>
         </CardContent>

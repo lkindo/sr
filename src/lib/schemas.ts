@@ -2,8 +2,45 @@ import { z } from 'zod';
 
 const emptyStringToUndefined = (val: unknown) => (val === '' ? undefined : val);
 const emptyStringToNull = (val: unknown) => (val === '' ? null : val);
-const emptyStringAndNullToUndefined = (val: unknown) =>
-  val === '' || val === null ? undefined : val;
+
+/**
+ * 문자열 필드 길이 상한 (감사 4.3).
+ *
+ * 대부분의 텍스트 필드에 `min` 만 있고 `max` 가 없어, 인증된 단일 POST 로 거대한 텍스트를
+ * Postgres 에 영속시킬 수 있었다.
+ *
+ * **값은 `prisma/schema.prisma` 의 컬럼 폭에서 도출한다.** zod 상한이 컬럼보다 크면
+ * 검증은 통과하고 DB 가 거부해, 사용자에게는 원인을 알 수 없는 500 으로 보인다.
+ * (실제로 `registerSchema.name` / `userCreateSchema.name` 이 `.max(100)` 인데
+ *  `users.name` 은 varchar(50) 이라 51~100자 이름이 정확히 그 경로를 밟고 있었다.)
+ *
+ * 컬럼이 무제한 TEXT 인 필드(description, 코멘트, 메모 등)는 DB 제약이 없으므로
+ * 여기서 정하는 값이 유일한 상한이다.
+ */
+export const FIELD_LIMITS = {
+  // varchar(50) — users.name, roles.name, clients.contactPerson
+  NAME: 50,
+  // varchar(100) — clients.name, clients.industry, service_categories.categoryName
+  DISPLAY_NAME: 100,
+  // varchar(50) — clients.code, permissions.resource/action
+  CODE: 50,
+  // varchar(255) — users.email, clients.contactEmail
+  EMAIL: 255,
+  // varchar(30) — clients.contactPhone
+  PHONE: 30,
+  // varchar(500) — clients.address
+  ADDRESS: 500,
+  // varchar(255) — roles.description, service_categories.description
+  SHORT_TEXT: 255,
+  // varchar(255) — srs.title (여유를 두고 200)
+  TITLE: 200,
+  // varchar(1024) — users.image
+  URL: 1024,
+  // TEXT (DB 무제한) — srs.description
+  LONG_TEXT: 10_000,
+  // TEXT (DB 무제한) — sr_comments.content, intake_notes, resolution/rejection 등
+  NOTE: 5_000,
+} as const;
 
 /**
  * 비밀번호 복잡도 검증 스키마
@@ -29,7 +66,10 @@ export const passwordSchema = z
  */
 export const registerSchema = z
   .object({
-    name: z.string().min(1, '이름을 입력해주세요.').max(100, '이름은 100자를 초과할 수 없습니다.'),
+    name: z
+      .string()
+      .min(1, '이름을 입력해주세요.')
+      .max(FIELD_LIMITS.NAME, `이름은 ${FIELD_LIMITS.NAME}자를 초과할 수 없습니다.`),
     email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
     password: passwordSchema,
     confirmPassword: z.string(),
@@ -67,16 +107,28 @@ export const changePasswordSchema = z
 
 // Client Schemas
 export const clientCreateSchema = z.object({
-  code: z.string().min(2, '고객사 코드는 최소 2자 이상이어야 합니다.'),
-  name: z.string().min(1, '고객사 이름을 입력해주세요.'),
-  industry: z.preprocess(emptyStringToUndefined, z.string().optional()),
-  contactPerson: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  code: z
+    .string()
+    .min(2, '고객사 코드는 최소 2자 이상이어야 합니다.')
+    .max(FIELD_LIMITS.CODE, `고객사 코드는 ${FIELD_LIMITS.CODE}자를 초과할 수 없습니다.`),
+  name: z
+    .string()
+    .min(1, '고객사 이름을 입력해주세요.')
+    .max(
+      FIELD_LIMITS.DISPLAY_NAME,
+      `고객사 이름은 ${FIELD_LIMITS.DISPLAY_NAME}자를 초과할 수 없습니다.`
+    ),
+  industry: z.preprocess(
+    emptyStringToUndefined,
+    z.string().max(FIELD_LIMITS.DISPLAY_NAME).optional()
+  ),
+  contactPerson: z.preprocess(emptyStringToUndefined, z.string().max(FIELD_LIMITS.NAME).optional()),
   contactEmail: z.preprocess(
     emptyStringToUndefined,
-    z.string().email('유효한 이메일 주소를 입력해주세요.').optional()
+    z.string().email('유효한 이메일 주소를 입력해주세요.').max(FIELD_LIMITS.EMAIL).optional()
   ),
-  contactPhone: z.preprocess(emptyStringToUndefined, z.string().optional()),
-  address: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  contactPhone: z.preprocess(emptyStringToUndefined, z.string().max(FIELD_LIMITS.PHONE).optional()),
+  address: z.preprocess(emptyStringToUndefined, z.string().max(FIELD_LIMITS.ADDRESS).optional()),
   contractStartDate: z.preprocess(emptyStringToUndefined, z.string().optional()),
   contractEndDate: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
@@ -85,8 +137,14 @@ export const clientUpdateSchema = clientCreateSchema.omit({ code: true }).partia
 
 // SR Schemas
 export const srCreateSchema = z.object({
-  title: z.string().min(5, '제목은 최소 5자 이상이어야 합니다.'),
-  description: z.string().min(10, '설명은 최소 10자 이상이어야 합니다.'),
+  title: z
+    .string()
+    .min(5, '제목은 최소 5자 이상이어야 합니다.')
+    .max(FIELD_LIMITS.TITLE, `제목은 ${FIELD_LIMITS.TITLE}자를 초과할 수 없습니다.`),
+  description: z
+    .string()
+    .min(10, '설명은 최소 10자 이상이어야 합니다.')
+    .max(FIELD_LIMITS.LONG_TEXT, `설명은 ${FIELD_LIMITS.LONG_TEXT}자를 초과할 수 없습니다.`),
   clientId: z.string().min(1, '고객사를 선택해주세요.'),
   serviceCategoryId: z.string().min(1, '서비스 카테고리를 선택해주세요.'),
   requestedPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
@@ -96,11 +154,19 @@ export const srCreateSchema = z.object({
 export const srUpdateSchema = z.object({
   title: z.preprocess(
     emptyStringToUndefined,
-    z.string().min(5, '제목은 최소 5자 이상이어야 합니다.').optional()
+    z
+      .string()
+      .min(5, '제목은 최소 5자 이상이어야 합니다.')
+      .max(FIELD_LIMITS.TITLE, `제목은 ${FIELD_LIMITS.TITLE}자를 초과할 수 없습니다.`)
+      .optional()
   ),
   description: z.preprocess(
     emptyStringToUndefined,
-    z.string().min(10, '설명은 최소 10자 이상이어야 합니다.').optional()
+    z
+      .string()
+      .min(10, '설명은 최소 10자 이상이어야 합니다.')
+      .max(FIELD_LIMITS.LONG_TEXT, `설명은 ${FIELD_LIMITS.LONG_TEXT}자를 초과할 수 없습니다.`)
+      .optional()
   ),
   clientId: z.preprocess(emptyStringToUndefined, z.string().optional()),
   serviceCategoryId: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
@@ -108,6 +174,22 @@ export const srUpdateSchema = z.object({
     emptyStringToUndefined,
     z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional()
   ),
+  /**
+   * 요청자가 표명하는 희망 긴급도·기한 (감사 3.27).
+   *
+   * EditSRDialog 는 이 두 값을 별표(필수)로 렌더링하고 전송까지 하는데, 이 스키마에
+   * 선언이 없어 zod 가 미지 키로 **조용히 제거**했다. 사용자는 "SR이 수정되었습니다"
+   * 성공 토스트를 받지만 어느 값도 저장되지 않았고, 다이얼로그를 다시 열면 이전 값이
+   * 그대로 보였다.
+   *
+   * 운영자 소유 필드(dueDate/actualPriority/assigneeId 등)와 달리 이 둘은 **요청자가
+   * 소유**하므로 필드 단위 인가에서 제한하지 않는다.
+   */
+  requestedPriority: z.preprocess(
+    emptyStringToUndefined,
+    z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional()
+  ),
+  requestedCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
   status: z.preprocess(
     emptyStringToUndefined,
     z
@@ -118,13 +200,22 @@ export const srUpdateSchema = z.object({
   expectedCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
   dueDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
   actualCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
-  resolutionDescription: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
-  rejectionReason: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+  resolutionDescription: z.preprocess(
+    emptyStringToNull,
+    z.string().max(FIELD_LIMITS.NOTE).optional().nullable()
+  ),
+  rejectionReason: z.preprocess(
+    emptyStringToNull,
+    z.string().max(FIELD_LIMITS.NOTE).optional().nullable()
+  ),
   satisfactionRating: z.preprocess(
     (val) => (val === '' ? null : typeof val === 'string' ? parseInt(val, 10) : val),
     z.number().min(1).max(5).optional().nullable()
   ),
-  additionalFeedback: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+  additionalFeedback: z.preprocess(
+    emptyStringToNull,
+    z.string().max(FIELD_LIMITS.NOTE).optional().nullable()
+  ),
   actualPriority: z.preprocess(
     emptyStringToUndefined,
     z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional()
@@ -134,17 +225,26 @@ export const srUpdateSchema = z.object({
     z.number().positive('예상 작업 시간은 0보다 커야 합니다').optional().nullable()
   ),
   estimatedCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
-  intakeNotes: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+  intakeNotes: z.preprocess(
+    emptyStringToNull,
+    z.string().max(FIELD_LIMITS.NOTE).optional().nullable()
+  ),
   assigneeId: z.preprocess(
     emptyStringToUndefined,
     z.string().min(1, '담당자를 선택해주세요').optional()
   ),
-  changeReason: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  changeReason: z.preprocess(
+    emptyStringToUndefined,
+    z.string().max(FIELD_LIMITS.SHORT_TEXT).optional()
+  ),
 });
 
 // User Schemas
 export const userCreateSchema = z.object({
-  name: z.string().min(1, '이름을 입력해주세요.').max(100, '이름은 100자를 초과할 수 없습니다.'),
+  name: z
+    .string()
+    .min(1, '이름을 입력해주세요.')
+    .max(FIELD_LIMITS.NAME, `이름은 ${FIELD_LIMITS.NAME}자를 초과할 수 없습니다.`),
   email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
   password: passwordSchema,
   userType: z.enum(['ENGINEER', 'CLIENT']).optional(),
@@ -154,17 +254,28 @@ export const userCreateSchema = z.object({
 });
 
 export const userUpdateSchema = z.object({
-  name: z.string().min(1, '이름을 입력해주세요.').optional(),
+  name: z.string().min(1, '이름을 입력해주세요.').max(FIELD_LIMITS.NAME).optional(),
   email: z.string().email('유효한 이메일 주소를 입력해주세요.').optional(),
-  image: z.string().url('유효한 이미지 URL을 입력해주세요.').optional(),
+  image: z.string().url('유효한 이미지 URL을 입력해주세요.').max(FIELD_LIMITS.URL).optional(),
   isActive: z.boolean().optional(),
   clientIds: z.array(z.string()).optional(),
+  /**
+   * 관리자에 의한 비밀번호 재설정.
+   *
+   * 이 키가 없으면 zod 가 알 수 없는 키로 조용히 제거해, UI 는 성공 토스트를 띄우지만
+   * 비밀번호는 바뀌지 않는다(감사 3.17). 평문으로 받아 서비스 계층에서 해싱한다.
+   * 타인의 비밀번호 변경은 `USER:UPDATE` 보유자만 가능하도록 라우트에서 게이트한다.
+   */
+  password: passwordSchema.optional(),
 });
 
 // Role Schemas
 export const roleCreateSchema = z.object({
-  name: z.string().min(1, '역할 이름을 입력해주세요.'),
-  description: z.string().optional(),
+  name: z
+    .string()
+    .min(1, '역할 이름을 입력해주세요.')
+    .max(FIELD_LIMITS.NAME, `역할 이름은 ${FIELD_LIMITS.NAME}자를 초과할 수 없습니다.`),
+  description: z.string().max(FIELD_LIMITS.SHORT_TEXT).optional(),
 });
 
 export const roleUpdateSchema = roleCreateSchema.partial();
@@ -174,7 +285,7 @@ export const intakeSchema = z.object({
   actualPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
   estimatedHours: z.number().positive('예상 작업 시간은 0보다 커야 합니다'),
   estimatedCompletionDate: z.string(),
-  intakeNotes: z.string().optional(),
+  intakeNotes: z.string().max(FIELD_LIMITS.NOTE).optional(),
   assigneeId: z.string().min(1, '담당자를 선택해주세요'),
 });
 
@@ -187,14 +298,23 @@ export const intakeUpdateSchema = z.object({
     .max(1000, '예상 작업 시간은 1000시간을 초과할 수 없습니다')
     .optional(),
   estimatedCompletionDate: z.string().optional(),
-  intakeNotes: z.string().optional().nullable(),
+  intakeNotes: z.string().max(FIELD_LIMITS.NOTE).optional().nullable(),
   assigneeId: z.string().min(1, '담당자를 선택해주세요').optional(),
 });
 
 // ServiceCategory Schemas
 export const serviceCategoryCreateSchema = z.object({
-  categoryName: z.string().min(1, '카테고리 이름을 입력해주세요.'),
-  description: z.preprocess(emptyStringToUndefined, z.string().optional()),
+  categoryName: z
+    .string()
+    .min(1, '카테고리 이름을 입력해주세요.')
+    .max(
+      FIELD_LIMITS.DISPLAY_NAME,
+      `카테고리 이름은 ${FIELD_LIMITS.DISPLAY_NAME}자를 초과할 수 없습니다.`
+    ),
+  description: z.preprocess(
+    emptyStringToUndefined,
+    z.string().max(FIELD_LIMITS.SHORT_TEXT).optional()
+  ),
   slaHours: z.number().int().positive('SLA 시간은 0보다 커야 합니다.'),
   priority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).default('MEDIUM'),
   clientId: z.preprocess(emptyStringToNull, z.string().optional().nullable()),

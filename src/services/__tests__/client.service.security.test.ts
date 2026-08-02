@@ -38,7 +38,7 @@ describe('ClientService Security', () => {
       const findUniqueCalls = vi.mocked(prisma.client.findUnique).mock.calls;
       expect(findUniqueCalls.length).toBeGreaterThan(0);
 
-      const args = findUniqueCalls[0][0];
+      const args = findUniqueCalls[0]![0];
       expect(args).toBeDefined();
 
       // Verify users relation selection

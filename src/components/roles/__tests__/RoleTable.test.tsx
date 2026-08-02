@@ -83,11 +83,11 @@ describe('RoleTable Component', () => {
     );
 
     const editButtons = screen.getAllByText('수정');
-    fireEvent.click(editButtons[0]);
+    fireEvent.click(editButtons[0]!);
     expect(onEdit).toHaveBeenCalledWith(mockRoles[0]);
 
     const permissionButtons = screen.getAllByText('권한 관리');
-    fireEvent.click(permissionButtons[1]);
+    fireEvent.click(permissionButtons[1]!);
     expect(onManagePermissions).toHaveBeenCalledWith(mockRoles[1]);
   });
 
@@ -104,7 +104,7 @@ describe('RoleTable Component', () => {
     render(<RoleTable {...defaultProps} roles={mockRoles} onDelete={onDelete} />);
 
     const deleteButtons = screen.getAllByText('삭제');
-    fireEvent.click(deleteButtons[1]); // 일반사용자 클릭
+    fireEvent.click(deleteButtons[1]!); // 일반사용자 클릭
     expect(onDelete).toHaveBeenCalledWith(mockRoles[1]);
   });
 });

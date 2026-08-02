@@ -63,11 +63,13 @@ export function ClientDialog({ open, onOpenChange, client, onSaved }: ClientDial
       setAddress(client.address || '');
       setContractStartDate(
         client.contractStartDate
-          ? new Date(client.contractStartDate).toISOString().split('T')[0]
+          ? (new Date(client.contractStartDate).toISOString().split('T')[0] ?? '')
           : ''
       );
       setContractEndDate(
-        client.contractEndDate ? new Date(client.contractEndDate).toISOString().split('T')[0] : ''
+        client.contractEndDate
+          ? (new Date(client.contractEndDate).toISOString().split('T')[0] ?? '')
+          : ''
       );
       setIsActive(client.isActive);
     } else {

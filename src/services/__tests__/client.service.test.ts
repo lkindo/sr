@@ -18,6 +18,9 @@ vi.mock('@/lib/prisma', () => ({
     serviceCategory: {
       findMany: vi.fn(),
       count: vi.fn(),
+      // 신규 고객사는 기본 카테고리를 함께 시드한다(감사 3.18).
+      // 카테고리가 0개면 그 고객사는 SR 을 한 건도 받을 수 없기 때문이다.
+      create: vi.fn(),
     },
     userClient: {
       count: vi.fn(),
@@ -28,6 +31,8 @@ vi.mock('@/lib/prisma', () => ({
     clientHandler: {
       count: vi.fn(),
     },
+    // 고객사 생성은 기본 카테고리와 한 트랜잭션으로 묶여 있다.
+    $transaction: vi.fn(),
   },
 }));
 
@@ -37,6 +42,9 @@ describe('ClientService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clientService = new ClientService();
+    // 트랜잭션 콜백에 같은 prisma 스텁을 넘겨 실제 호출을 관찰할 수 있게 한다.
+    vi.mocked(prisma.$transaction).mockImplementation(((cb: unknown) =>
+      (cb as (tx: typeof prisma) => unknown)(prisma)) as never);
   });
 
   describe('getClientById', () => {

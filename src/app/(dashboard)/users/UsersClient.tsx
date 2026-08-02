@@ -14,6 +14,7 @@ import { UserDialog } from '@/components/users/UserDialog';
 import { UserMobileList } from '@/components/users/UserMobileList';
 import { UserTable } from '@/components/users/UserTable';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
 import { User } from '@/types/user';
 
 interface PaginationData {
@@ -98,17 +99,17 @@ export default function UsersClient() {
       });
 
       const url = `/api/users?${params}`;
-      console.log(`[DEBUG] Fetching users: ${url}`);
+      logger.debug('사용자 목록 조회', { url });
       const response = await fetch(url);
 
       if (!response.ok) {
         let errorData = '';
         try {
           errorData = await response.text();
-        } catch (e) {
+        } catch {
           errorData = 'Failed to read error body';
         }
-        console.error(`[DEBUG] Fetch users failed. Status: ${response.status}`, errorData);
+        logger.error('사용자 목록 조회 실패', undefined, { status: response.status, errorData });
         throw new Error(`Failed to fetch users: ${response.status}`);
       }
 
@@ -123,7 +124,10 @@ export default function UsersClient() {
         setUsers(result);
       }
     } catch (err) {
-      console.error('사용자 목록을 불러오는데 실패했습니다.', err);
+      logger.error(
+        '사용자 목록을 불러오는데 실패했습니다.',
+        err instanceof Error ? err : undefined
+      );
     } finally {
       setLoading(false);
     }
@@ -152,7 +156,7 @@ export default function UsersClient() {
         setRoles(Array.isArray(rolesData) ? rolesData : []);
       }
     } catch (error) {
-      console.error('Failed to fetch metadata', error);
+      logger.error('메타데이터 조회 실패', error instanceof Error ? error : undefined);
     }
   }, []);
 
@@ -211,7 +215,7 @@ export default function UsersClient() {
         description: `사용자 계정이 ${!currentStatus ? '활성화' : '비활성화'} 되었습니다.`,
       });
       fetchUsers();
-    } catch (error) {
+    } catch {
       toast({
         title: '오류 발생',
         description: '상태 변경 중 오류가 발생했습니다.',
@@ -300,9 +304,13 @@ export default function UsersClient() {
                           variant="outline"
                           className="h-7 text-xs text-green-600 hover:bg-green-50"
                           onClick={() => {
+                            // handleToggleActive 는 "현재 상태"를 받아 반대로 뒤집는다.
+                            // 원하는 상태(true)를 넘기면 isActive: !true = false 가 전송되어
+                            // 비활성 사용자가 그대로 비활성으로 남는다(무동작). 단일 행 호출부
+                            // (UserActions.tsx:59)와 동일하게 u.isActive 를 넘겨야 한다.
                             selectedUsers
                               .filter((u) => !u.isActive)
-                              .forEach((u) => handleToggleActive(u.id, true));
+                              .forEach((u) => handleToggleActive(u.id, u.isActive));
                           }}
                         >
                           일괄 활성화
@@ -316,9 +324,11 @@ export default function UsersClient() {
                           variant="outline"
                           className="h-7 text-xs text-orange-600 hover:bg-orange-50"
                           onClick={() => {
+                            // 위와 동일한 이유. 원하는 상태(false)를 넘기면
+                            // isActive: !false = true 가 전송되어 활성 사용자가 활성으로 남는다.
                             selectedUsers
                               .filter((u) => u.isActive)
-                              .forEach((u) => handleToggleActive(u.id, false));
+                              .forEach((u) => handleToggleActive(u.id, u.isActive));
                           }}
                         >
                           일괄 비활성화

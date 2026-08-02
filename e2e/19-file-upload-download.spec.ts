@@ -13,6 +13,16 @@ import path from 'path';
  * 5. 첨부파일 삭제 (권한 확인)
  * 6. 대용량 파일 업로드 에러 핸들링
  * 7. 허용되지 않은 파일 형식 업로드 차단
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (SR 제목 표시 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 상세 페이지 데이터는 클라이언트에서 로드되므로, 조건부 UI 를 탐색하기 전에
+ * SR 제목이 렌더링되었는지 먼저 확인한다 (isVisible() 은 대기하지 않는다).
  */
 
 const authFiles = {
@@ -82,7 +92,7 @@ test.describe('파일 업로드/다운로드 플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // SR 생성 버튼 클릭
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
@@ -146,11 +156,11 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       await page.waitForTimeout(2000);
 
       // 목록에서 생성된 SR 찾기
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
+      // 새 행이 보이는 것 자체가 목록 갱신의 관측 가능한 결과다 (toBeVisible 이 재시도)
       const srRow = page.locator('tr', { hasText: srTitle }).first();
-      await expect(srRow).toBeVisible({ timeout: 10000 });
+      await expect(srRow).toBeVisible({ timeout: 15000 });
 
       // SR ID 추출
       await srRow.click();
@@ -168,7 +178,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터 렌더링 대기
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 첨부파일 섹션 확인
       const attachmentSection = page
@@ -202,10 +215,13 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       const managerContext = await browser.newContext({ storageState: authFiles.manager });
       const managerPage = await managerContext.newPage();
 
-      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await managerPage.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터가 렌더링된 뒤에 접수 버튼 유무를 판단한다
+      await expect(managerPage.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       const intakeButton = managerPage.getByRole('button', { name: /접수|Accept/i });
-      if (await intakeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (await intakeButton.isVisible().catch(() => false)) {
         await intakeButton.click();
         await managerPage.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 10000 });
 
@@ -246,7 +262,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
       const engineerContext = await browser.newContext({ storageState: authFiles.engineer });
       const engineerPage = await engineerContext.newPage();
 
-      await engineerPage.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await engineerPage.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터 렌더링 대기 (이후 탭/댓글 탐색이 유효해진다)
+      await expect(engineerPage.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 댓글 탭으로 이동 (탭 UI가 있는 경우)
       const commentTab = engineerPage.getByRole('tab', { name: /댓글/i });
@@ -300,7 +319,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터 렌더링 대기
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 첨부파일 링크 찾기
       const downloadLink = page
@@ -350,7 +372,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터 렌더링 대기
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 삭제 버튼 찾기
       const deleteButton = page.locator('button').filter({ hasText: /삭제|Delete|Remove/i });
@@ -390,7 +415,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터 렌더링 대기
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 파일 업로드 영역 찾기 (댓글 또는 첨부파일 섹션)
       const fileInput = page.locator('input[type="file"]').first();
@@ -422,7 +450,10 @@ test.describe('파일 업로드/다운로드 플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 상세 데이터 렌더링 대기
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // 파일 업로드 영역 찾기
       const fileInput = page.locator('input[type="file"]').first();
@@ -463,11 +494,12 @@ test.describe('파일 업로드 추가 시나리오', () => {
 
     try {
       // SR 목록 페이지 이동
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
 
       // 등록 버튼 클릭
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
-      if (await createButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (await createButton.isVisible().catch(() => false)) {
         await createButton.click();
         await page.waitForTimeout(500);
 

@@ -4,6 +4,7 @@ import { Prisma } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
 import prisma from '@/lib/prisma';
+import { formatISODateInAppZone } from '@/lib/timezone';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -11,8 +12,6 @@ export const runtime = 'nodejs';
 // GET /api/dashboard/stats - 대시보드 통계 조회 (Rate Limit: 느슨함)
 export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
-    const url = new URL(request.url);
-    const noCache = url.searchParams.get('nocache') === '1';
     const userId = session.user.id;
     const userRoles = session.user.roles || [];
     const isAdminManagerEngineer = userRoles.some((role: string) =>
@@ -20,13 +19,19 @@ export const GET = withAuthAndRateLimit(
     );
     const isEngineer = userRoles.includes('ENGINEER');
 
-    // 사용자별 캐시 키 생성 (역할별로 다른 데이터 표시)
-    const baseCacheKey = `dashboard:stats:${userId}:${isAdminManagerEngineer ? 'admin' : 'client'}`;
-    // nocache=1 이면 캐시 미스 유도(새 키)로 실시간 계산 강제
-    const cacheKey = noCache ? `${baseCacheKey}:nocache:${Date.now()}` : baseCacheKey;
-
-    // 캐시된 통계 데이터 조회 또는 생성
-    // 캐시된 통계 데이터 조회 또는 생성
+    /**
+     * 이 응답은 캐시하지 않는다 — 매 요청마다 계산한다.
+     *
+     * 예전에는 `baseCacheKey` / `cacheKey` / `?nocache=1` 를 계산해 두고 **한 번도 읽지
+     * 않았다**. 주석은 캐싱을 한다고 적혀 있고(중복까지 되어 있었다) 실제 본문은 평범한
+     * async IIFE 였다. 존재하지 않는 통제를 코드가 주장하고 있었으므로 지웠다(감사 4.5).
+     *
+     * 캐시를 붙이지 않은 이유: 이 엔드포인트는 SSE 무효화로 실시간 갱신되는 대시보드가
+     * 소비한다. 서버에 TTL 캐시를 두면 사용자가 SR 을 바꾼 직후 재조회해도 옛 수치를
+     * 보게 되어, 실시간 갱신을 다시 깨뜨린다. `?nocache=1` 탈출구도 호출하는 곳이 없다
+     * (src 전역 grep 0건). 비용이 문제가 되면 스테일 응답이 아니라 집계 쿼리 자체를
+     * 손봐야 한다.
+     */
     const stats = await (async () => {
       // 역할별 필터링 조건 설정
       const baseWhere: Prisma.SRWhereInput = {};
@@ -206,7 +211,7 @@ export const GET = withAuthAndRateLimit(
           : Promise.resolve([]),
         // 8. Get SR trend (last 30 days) - Optimized: Group by date in DB using raw SQL
         prisma.$queryRaw<Array<{ date: Date | string; count: bigint }>>`
-          SELECT DATE(created_at) as date, COUNT(id) as count
+          SELECT DATE(created_at AT TIME ZONE 'Asia/Seoul') as date, COUNT(id) as count
           FROM srs
           WHERE created_at >= ${thirtyDaysAgo}
           ${
@@ -216,7 +221,7 @@ export const GET = withAuthAndRateLimit(
                 : Prisma.sql`AND 1=0`
               : Prisma.empty
           }
-          GROUP BY DATE(created_at)
+          GROUP BY DATE(created_at AT TIME ZONE 'Asia/Seoul')
         `,
         // 9. 성능 지표 계산 - DB Aggregation
         prisma.$queryRaw<
@@ -333,12 +338,18 @@ export const GET = withAuthAndRateLimit(
           ? waitingTimes.reduce((sum, hours) => sum + hours, 0) / waitingTimes.length
           : 0;
 
-      // Group by date (YYYY-MM-DD)
+      // Group by date (YYYY-MM-DD, KST 달력 기준)
+      //
+      // SQL 이 `AT TIME ZONE 'Asia/Seoul'` 로 이미 KST 달력일을 돌려주므로, 여기서는
+      // 그 값을 타임존 변환 없이 그대로 읽어야 한다. `toISOString()` 을 다시 태우면
+      // 드라이버가 만든 Date(자정)가 UTC 로 되밀려 하루가 어긋난다.
       const trendByDate = srTrendRaw.reduce(
         (acc, item) => {
           // item.date can be Date object (Postgres) or string (other drivers)
           const dateStr =
-            item.date instanceof Date ? item.date.toISOString().split('T')[0] : String(item.date);
+            item.date instanceof Date
+              ? `${item.date.getUTCFullYear()}-${String(item.date.getUTCMonth() + 1).padStart(2, '0')}-${String(item.date.getUTCDate()).padStart(2, '0')}`
+              : String(item.date).slice(0, 10);
           acc[dateStr] = Number(item.count);
           return acc;
         },
@@ -348,9 +359,8 @@ export const GET = withAuthAndRateLimit(
       // Fill in missing dates
       const trendData = [];
       for (let i = 29; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
+        // 채움 루프도 KST 달력일로 만들어야 GROUP BY 결과와 키가 맞는다.
+        const dateStr = formatISODateInAppZone(Date.now() - i * 24 * 60 * 60 * 1000);
         trendData.push({
           date: dateStr,
           count: trendByDate[dateStr] || 0,
@@ -416,7 +426,6 @@ export const GET = withAuthAndRateLimit(
           roleScope: isAdminManagerEngineer ? 'admin' : 'client',
           byStatusKeys: Object.keys(stats?.byStatus ?? {}).length,
           byPriorityKeys: Object.keys(stats?.byPriority ?? {}).length,
-          noCache,
         });
       }
     } catch {

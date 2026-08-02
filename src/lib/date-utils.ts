@@ -1,16 +1,12 @@
+import { diffCalendarDaysInAppZone } from './timezone';
+
 export function getDaysUntilDue(dueDate: string | Date | null | undefined): number | null {
   if (!dueDate) return null;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const due = new Date(dueDate);
-  due.setHours(0, 0, 0, 0);
-
-  const diffTime = due.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  return diffDays;
+  // 일 경계를 앰비언트 로컬 타임존이 아니라 KST 달력으로 잡는다.
+  // `setHours(0,0,0,0)` 는 UTC 컨테이너에서는 UTC 자정, 브라우저에서는 KST 자정을 뜻해
+  // 같은 dueDate 가 서버에서 '오늘 마감', 클라이언트에서 'D-1' 로 갈렸다(감사 3.25).
+  return diffCalendarDaysInAppZone(dueDate);
 }
 
 export function getDueDateStatus(

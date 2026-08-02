@@ -17,6 +17,10 @@ import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { passwordSchema } from '@/lib/schemas';
+
+/** 서버 `passwordSchema` 가 실제로 요구하는 규칙. 입력 힌트와 검증을 한 곳에서 맞춘다. */
+const PASSWORD_RULE_HINT = '8자 이상, 대문자·소문자·숫자·특수문자 각 1개 이상';
 
 interface Client {
   id: string;
@@ -58,7 +62,7 @@ export function UserDialog({
   onSaved,
   defaultClientId,
   clients: propClients,
-  roles,
+  roles: _roles,
 }: UserDialogProps) {
   // ... (state definitions)
   const [name, setName] = useState('');
@@ -197,22 +201,18 @@ export function UserDialog({
       return;
     }
 
-    if (!isEditMode && password.length < 8) {
-      toast({
-        title: '오류',
-        description: '비밀번호는 최소 8자 이상이어야 합니다.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (isEditMode && password && password.length < 8) {
-      toast({
-        title: '오류',
-        description: '비밀번호는 최소 8자 이상이어야 합니다.',
-        variant: 'destructive',
-      });
-      return;
+    // 서버(`passwordSchema`)와 같은 규칙으로 미리 걸러 준다.
+    // 예전에는 여기서 "최소 8자"만 보고 통과시켜, 서버 거절 사유를 사용자가 알 수 없었다.
+    if (!isEditMode || password) {
+      const passwordCheck = passwordSchema.safeParse(password);
+      if (!passwordCheck.success) {
+        toast({
+          title: '오류',
+          description: passwordCheck.error.issues[0]?.message ?? PASSWORD_RULE_HINT,
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     if (password !== confirmPassword) {
@@ -432,10 +432,14 @@ export function UserDialog({
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="최소 8자 이상"
+                placeholder={PASSWORD_RULE_HINT}
                 required={!isEditMode}
                 disabled={loading}
+                aria-describedby="password-rule"
               />
+              <p id="password-rule" className="text-xs text-muted-foreground">
+                {PASSWORD_RULE_HINT}
+              </p>
             </div>
 
             <div className="space-y-2">

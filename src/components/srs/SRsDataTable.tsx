@@ -162,6 +162,9 @@ export function SRsDataTable({
     }, 500);
 
     return () => clearTimeout(timer);
+    // 검색어 입력에만 반응하는 디바운스다. searchParams 를 넣으면 URL 이 갱신될 때마다
+    // 타이머가 다시 걸려 아래 동기화 effect 와 서로를 끝없이 재발화시킨다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   // 외부(필터 초기화 등)에서 search 필터가 갱신되었을 때 로컬 searchQuery 상태도 동기화
@@ -170,6 +173,9 @@ export function SRsDataTable({
     if (searchQuery !== currentSearch) {
       setSearchQuery(currentSearch);
     }
+    // URL → 로컬 상태 단방향 동기화다.
+    // searchQuery 를 넣으면 위 디바운스 effect 와 왕복하며 서로를 재발화시킨다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const createQueryString = useCallback(

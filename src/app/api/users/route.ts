@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { parseJsonBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { ensureCanCreateUser, ensureCanReadUser, isInternalUser } from '@/lib/policies';
@@ -62,7 +63,7 @@ export const POST = withAuthAndRateLimit(
   async (request: NextRequest, { session }: AuthenticatedContext) => {
     ensureCanCreateUser(session.user);
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     const validatedBody = userCreateSchema.parse(body);
 
     // Security Check: Prevent privilege escalation via role assignment

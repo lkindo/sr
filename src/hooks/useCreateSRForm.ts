@@ -70,18 +70,30 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     }
   }, [toast, isClientUser]);
 
-  const fetchCategories = useCallback(async () => {
-    const result = await getServiceCategoriesForSelection();
-    if (result.success && result.data) {
-      setCategories(result.data.map((cat) => ({ id: cat.id, name: cat.categoryName })));
-    } else {
-      toast({
-        title: '오류',
-        description: '서비스 카테고리 목록을 불러오지 못했습니다.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
+  // 카테고리는 반드시 선택된 고객사로 스코프한다.
+  // 스코프가 없으면 드롭다운에 **다른 고객사의 서비스 카탈로그**가 그대로 나오고,
+  // 잘못 고르면 그 카테고리의 SLA 가 이 SR 의 마감일 계산에 쓰인다(감사 3.19).
+  const fetchCategories = useCallback(
+    async (targetClientId: string) => {
+      if (!targetClientId) {
+        setCategories([]);
+        return;
+      }
+
+      const result = await getServiceCategoriesForSelection(targetClientId);
+      if (result.success && result.data) {
+        setCategories(result.data.map((cat) => ({ id: cat.id, name: cat.categoryName })));
+      } else {
+        setCategories([]);
+        toast({
+          title: '오류',
+          description: '서비스 카테고리 목록을 불러오지 못했습니다.',
+          variant: 'destructive',
+        });
+      }
+    },
+    [toast]
+  );
 
   useEffect(() => {
     if (open) {
@@ -92,16 +104,25 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       setRequestedPriority('MEDIUM');
       setRequestedCompletionDate('');
       setFiles([]);
+      setCategories([]);
       fetchClients();
-      fetchCategories();
     }
-  }, [open, isClientUser, fetchClients, fetchCategories]);
+  }, [open, isClientUser, fetchClients]);
 
   useEffect(() => {
-    if (open && isClientUser && clients.length > 0 && !clientId) {
-      setClientId(clients[0].id);
+    const firstClient = clients[0];
+    if (open && isClientUser && firstClient && !clientId) {
+      setClientId(firstClient.id);
     }
   }, [open, isClientUser, clients, clientId]);
+
+  // 고객사가 정해지거나 바뀌면 카테고리를 다시 불러오고, 이전 선택은 버린다.
+  // (바뀐 고객사에 존재하지 않는 카테고리 id 가 그대로 제출되는 것을 막는다)
+  useEffect(() => {
+    if (!open) return;
+    setCategoryId('');
+    fetchCategories(clientId);
+  }, [open, clientId, fetchCategories]);
 
   const uploadAttachments = async (srId: string, filesToUpload: File[]) => {
     const formData = new FormData();

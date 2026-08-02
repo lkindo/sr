@@ -58,6 +58,19 @@ export class BadRequestError extends ServiceError {
 }
 
 /**
+ * 요청 본문이 허용 상한을 초과했을 때(413).
+ *
+ * 업로드 본문을 힙에 물질화하기 **전에** 던져야 의미가 있다(감사 3.41).
+ */
+export class PayloadTooLargeError extends ServiceError {
+  constructor(message: string) {
+    super(message, 'PAYLOAD_TOO_LARGE', 413);
+    this.name = 'PayloadTooLargeError';
+    Object.setPrototypeOf(this, PayloadTooLargeError.prototype);
+  }
+}
+
+/**
  * 권한 없음 에러
  */
 export class UnauthorizedError extends ServiceError {
@@ -139,10 +152,42 @@ export class TooManyRequestsError extends ServiceError {
 }
 
 /**
+ * Prisma 알려진 요청 오류(P####)를 도메인 에러로 변환합니다.
+ * 매핑 대상이 아니면 null 을 반환하므로 호출측에서 원본 오류를 그대로 전파하면 됩니다.
+ *
+ * - P2003(외래키 제약 위반): 존재하지 않는 ID를 참조한 잘못된 입력이므로 400 으로 내린다.
+ *   (매핑이 없으면 원시 Prisma 오류가 그대로 500 으로 노출되어, 사용자는 서버 장애로 오인하고
+ *    로그에는 스택만 남는다.)
+ *
+ * Prisma 런타임 타입을 import 하지 않고 code 속성으로만 판정한다.
+ * (errors.ts 는 서버/클라이언트 양쪽에서 import 되므로 런타임 의존성을 늘리지 않는다.)
+ */
+export function mapPrismaError(error: unknown): ServiceError | null {
+  // 이미 도메인 에러로 변환된 경우는 그대로 둔다. (ServiceError.code 도 문자열이므로 먼저 걸러낸다.)
+  if (error instanceof ServiceError) {
+    return null;
+  }
+
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+
+  if (code === 'P2003') {
+    return new BadRequestError('존재하지 않는 대상을 참조했습니다. 입력값을 다시 확인해주세요.');
+  }
+
+  return null;
+}
+
+/**
  * ServiceError를 Result 타입으로 변환하는 헬퍼 함수
  */
 
 export function errorToResult(error: unknown): { success: false; error: string; code?: string } {
+  // Prisma 제약 위반은 도메인 에러로 정규화한 뒤 처리한다. (500 → 400)
+  const mapped = mapPrismaError(error);
+  if (mapped) {
+    error = mapped;
+  }
+
   if (error instanceof ServiceError) {
     // ServiceError는 비즈니스 로직상의 예외이므로 warn 레벨로 로깅 (시스템 에러인 경우 error 레벨)
     if (error.statusCode >= 500) {
@@ -176,4 +221,22 @@ export function errorToResult(error: unknown): { success: false; error: string; 
     error: '알 수 없는 오류가 발생했습니다.',
     code: 'UNKNOWN_ERROR',
   };
+}
+
+/**
+ * ZodError 에서 사용자에게 보여 줄 첫 메시지를 꺼낸다.
+ *
+ * 13곳이 `error.issues[0].message` 를 직접 읽고 있었다. Zod 는 실패 시 항상 최소 한 건의
+ * issue 를 담지만 **타입은 그것을 보장하지 않으므로**, `noUncheckedIndexedAccess` 를 켜면
+ * 전부 `Object is possibly 'undefined'` 가 된다. 각 자리에 `?.` 를 뿌리면 폴백 문구가
+ * 제각각이 되므로(실제로 일부는 폴백이 있고 일부는 없었다) 한 곳으로 모은다.
+ *
+ * issue 가 비어 있는 경우는 Zod 사용법이 잘못된 것에 가깝지만, 사용자에게 빈 문자열이
+ * 가는 것보다는 일반 문구가 낫다.
+ */
+export function firstZodIssueMessage(
+  error: { issues?: Array<{ message?: string }> },
+  fallback = '입력값 검증에 실패했습니다.'
+): string {
+  return error.issues?.[0]?.message || fallback;
 }

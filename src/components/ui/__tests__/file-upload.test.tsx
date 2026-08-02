@@ -44,7 +44,7 @@ describe('FileUpload', () => {
     fireEvent.paste(container!, { clipboardData });
 
     expect(onChange).toHaveBeenCalled();
-    const callArgs = onChange.mock.calls[0][0];
+    const callArgs = onChange.mock.calls[0]![0];
     expect(callArgs).toHaveLength(1);
     expect(callArgs[0].name).toBe('paste.png');
   });

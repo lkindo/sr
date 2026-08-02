@@ -7,7 +7,7 @@ import { headers } from 'next/headers';
 import { z } from 'zod';
 
 import { auth } from '@/auth';
-import { TooManyRequestsError, UnauthorizedError } from '@/lib/errors';
+import { firstZodIssueMessage, TooManyRequestsError, UnauthorizedError } from '@/lib/errors';
 import { getClientIp, rateLimiters } from '@/lib/rate-limiter';
 import { fail, Result } from '@/lib/result';
 import { PermissionService } from '@/services/permission.service';
@@ -52,7 +52,7 @@ export function validateWithSchema<T>(data: unknown, schema: z.ZodSchema<T>): Re
     return { success: true, data: validated };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return fail(error.issues?.[0].message || '입력값 검증에 실패했습니다.', 'VALIDATION_ERROR');
+      return fail(firstZodIssueMessage(error, '입력값 검증에 실패했습니다.'), 'VALIDATION_ERROR');
     }
     throw error;
   }
@@ -64,7 +64,7 @@ export function validateWithSchema<T>(data: unknown, schema: z.ZodSchema<T>): Re
 export function withActionErrorHandling<T>(action: () => Promise<Result<T>>): Promise<Result<T>> {
   return action().catch((error) => {
     if (error instanceof z.ZodError) {
-      return fail(error.issues?.[0].message || '입력값 검증에 실패했습니다.', 'VALIDATION_ERROR');
+      return fail(firstZodIssueMessage(error, '입력값 검증에 실패했습니다.'), 'VALIDATION_ERROR');
     }
     throw error;
   });
@@ -82,7 +82,7 @@ export async function requireRateLimit(
     const headersList = await headers();
     // 신뢰 프록시 기반 IP 해석 (조작 가능한 XFF 첫 항목 사용 금지)
     ip = getClientIp(headersList);
-  } catch (error) {
+  } catch {
     // 테스트 환경 등 Request Context가 없는 경우 예외 처리 및 127.0.0.1로 폴백
   }
 

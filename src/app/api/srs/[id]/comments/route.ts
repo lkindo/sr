@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError, ValidationError } from '@/lib/errors';
-import { ensureCanReadSR } from '@/lib/policies';
+import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { FIELD_LIMITS } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
 
 const commentSchema = z.object({
-  content: z.string().min(1, '댓글 내용을 입력해주세요.'),
+  // 상한이 없으면 인증된 단일 POST 로 거대한 텍스트를 sr_comments.content(무제한 TEXT)에
+  // 영속시킬 수 있다(감사 4.3). 공용 상수를 써서 다른 자유 텍스트 필드와 기준을 맞춘다.
+  content: z
+    .string()
+    .min(1, '댓글 내용을 입력해주세요.')
+    .max(FIELD_LIMITS.NOTE, `댓글은 ${FIELD_LIMITS.NOTE}자를 초과할 수 없습니다.`),
 });
 
 // GET /api/srs/[id]/comments - SR 댓글 목록 조회 (Rate Limit: 표준)
@@ -31,8 +37,20 @@ export const GET = withAuthAndRateLimit(
 
     ensureCanReadSR(session.user, sr);
 
+    /**
+     * `isInternal` 은 선언만 되어 있고 어디서도 읽히거나 쓰이지 않았다(감사 4.2).
+     * 지금은 아무도 이 플래그를 세우지 않으므로 새는 것이 없지만, 누군가 세우는 순간
+     * 이 조회에 필터가 없어 내부 노트가 고객에게 그대로 나간다 — 선언된 통제가 실제로는
+     * 없는 상태였고, 그건 없느니만 못하다. 여기서 필터를 걸어 함정을 없앤다.
+     *
+     * 부수 효과로 `@@index([srId, isInternal, createdAt])` 가 비로소 쓰이게 된다.
+     * 내부 사용자는 `[srId, createdAt]` 를, 외부 사용자는 3열 인덱스를 탄다.
+     */
     const comments = await prisma.sRComment.findMany({
-      where: { srId: id },
+      where: {
+        srId: id,
+        ...(isInternalUser(session.user) ? {} : { isInternal: false }),
+      },
       include: {
         user: {
           select: {
@@ -60,13 +78,13 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     let validated;
     try {
       validated = commentSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(error));
       }
       throw error;
     }

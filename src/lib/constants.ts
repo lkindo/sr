@@ -96,12 +96,15 @@ export const SLA = {
    * - MEDIUM: 기본 SLA의 100% (기준)
    * - LOW: 기본 SLA의 150%
    */
+  // `as Record<string, number>` 를 붙이면 키가 string 으로 넓어져 인덱스 접근이
+  // `number | undefined` 가 되고, 호출부마다 폴백을 붙여야 한다. 키는 실제로
+  // 우선순위 4개뿐이고 호출부도 zod enum 으로 검증된 값을 넘기므로 좁게 둔다.
   PRIORITY_MULTIPLIER: {
     CRITICAL: 0.5,
     HIGH: 0.75,
     MEDIUM: 1.0,
     LOW: 1.5,
-  } as Record<string, number>,
+  },
 } as const;
 
 /**

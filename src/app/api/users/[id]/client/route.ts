@@ -1,31 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 
-import { auth } from '@/auth';
+import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
+import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { ForbiddenError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 
+/**
+ * 고객사 할당/변경 요청 바디 스키마
+ * force: 진행 중인 SR이 있어도 강제로 소속을 변경할지 여부
+ */
+const clientAssignSchema = z.object({
+  clientId: z.string().min(1, '고객사 ID가 필요합니다'),
+  force: z.boolean().optional(),
+});
+
+/**
+ * 고객사 소속 관리 권한 판정 (ADMIN, MANAGER만 가능)
+ */
+async function ensureCanManageUserClient(actorId: string): Promise<void> {
+  const userRoles = await prisma.userRole.findMany({
+    where: { userId: actorId },
+    include: { role: true },
+  });
+
+  const hasPermission = userRoles.some((ur) => ['ADMIN', 'MANAGER'].includes(ur.role.name));
+
+  if (!hasPermission) {
+    throw new ForbiddenError('권한이 없습니다');
+  }
+}
+
 // DELETE /api/users/[id]/client - 사용자 소속 고객사 해제
-export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const params = await context.params;
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-    }
-
-    const { id: userId } = params;
+export const DELETE = withAuthAndRateLimit(
+  async (
+    request: NextRequest,
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+  ) => {
+    const { id: userId } = await params;
 
     // 권한 확인 (ADMIN, MANAGER만 가능)
-    const userRoles = await prisma.userRole.findMany({
-      where: { userId: session.user.id },
-      include: { role: true },
-    });
-
-    const hasPermission = userRoles.some((ur) => ['ADMIN', 'MANAGER'].includes(ur.role.name));
-
-    if (!hasPermission) {
-      return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
-    }
+    await ensureCanManageUserClient(session.user.id);
 
     // 기존 UserClient 관계 확인 및 삭제
     const existingRelation = await prisma.userClient.findFirst({
@@ -70,52 +85,21 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
       success: true,
       message: '고객사 소속이 해제되었습니다',
     });
-  } catch (error) {
-    console.error('[DELETE /api/users/[id]/client] Error:', error);
-    return NextResponse.json(
-      {
-        error: '고객사 소속 해제 중 오류가 발생했습니다',
-        details:
-          process.env.NODE_ENV === 'development'
-            ? error instanceof Error
-              ? error.message
-              : String(error)
-            : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { preset: 'standard' }
+);
 
 // PATCH /api/users/[id]/client - 사용자 소속 고객사 변경
-export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  try {
-    const params = await context.params;
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-    }
-
-    const { id: userId } = params;
-    const body = await request.json();
-    const { clientId } = body;
-
-    if (!clientId) {
-      return NextResponse.json({ error: '고객사 ID가 필요합니다' }, { status: 400 });
-    }
+export const PATCH = withAuthAndRateLimit(
+  async (
+    request: NextRequest,
+    { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
+  ) => {
+    const { id: userId } = await params;
+    const { clientId, force } = await validateRequestBody(request, clientAssignSchema);
 
     // 권한 확인 (ADMIN, MANAGER만 가능)
-    const userRoles = await prisma.userRole.findMany({
-      where: { userId: session.user.id },
-      include: { role: true },
-    });
-
-    const hasPermission = userRoles.some((ur) => ['ADMIN', 'MANAGER'].includes(ur.role.name));
-
-    if (!hasPermission) {
-      return NextResponse.json({ error: '권한이 없습니다' }, { status: 403 });
-    }
+    await ensureCanManageUserClient(session.user.id);
 
     // 고객사 존재 확인
     const client = await prisma.client.findUnique({
@@ -186,16 +170,13 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
       orderBy: { createdAt: 'desc' },
     });
 
-    // 강제 이동 플래그 확인
-    const { force } = body;
-
-    // 진행 중인 SR이 있고 강제 이동이 아니면 경고 반환
+    // 진행 중인 SR이 있고 강제 이동이 아니면 409로 거부 (소속은 변경되지 않음)
+    // 호출자는 사용자 확인 후 force: true로 재요청해야 합니다.
     if (ongoingSRs.length > 0 && !force) {
       return NextResponse.json(
         {
-          success: false,
-          warning: true,
-          message: '진행 중인 SR이 있습니다',
+          error: '진행 중인 SR이 있습니다',
+          code: 'ONGOING_SRS',
           data: {
             ongoingSRs: ongoingSRs.map((sr) => ({
               id: sr.id,
@@ -211,7 +192,7 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
             targetClient: { id: client.id, name: client.name },
           },
         },
-        { status: 200 }
+        { status: 409 }
       );
     }
 
@@ -242,19 +223,6 @@ export async function PATCH(request: NextRequest, context: { params: Promise<{ i
         ongoingSRsHandled: ongoingSRs.length,
       },
     });
-  } catch (error) {
-    console.error('[PATCH /api/users/[id]/client] Error:', error);
-    return NextResponse.json(
-      {
-        error: '사용자 소속 변경 중 오류가 발생했습니다',
-        details:
-          process.env.NODE_ENV === 'development'
-            ? error instanceof Error
-              ? error.message
-              : String(error)
-            : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { preset: 'standard' }
+);

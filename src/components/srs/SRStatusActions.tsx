@@ -8,6 +8,8 @@ import { CheckCircle, Clock, Loader2, PauseCircle, Play, RotateCcw, XCircle } fr
 import { Button } from '@/components/ui';
 import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
+import { canPerformTransition } from '@/lib/sr-state-machine';
 
 import { CompleteSRDialog } from './CompleteSRDialog';
 import { HoldSRDialog } from './HoldSRDialog';
@@ -29,6 +31,8 @@ interface SRStatusActionsProps {
   status: SRStatus;
   completedAt: Date | null;
   userRoles: string[];
+  /** 커스텀 역할도 전이할 수 있으므로 권한도 함께 넘긴다(감사 4.3). */
+  userPermissions?: string[];
   isRequestor: boolean;
 }
 
@@ -38,6 +42,7 @@ export function SRStatusActions({
   status,
   completedAt,
   userRoles,
+  userPermissions,
   isRequestor,
 }: SRStatusActionsProps) {
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
@@ -47,7 +52,6 @@ export function SRStatusActions({
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const queryClient = useQueryClient();
 
   const { mutateAsync: changeStatus } = useChangeSRStatus(srId);
 
@@ -55,7 +59,16 @@ export function SRStatusActions({
   const hasRole = (roles: string[]) => roles.some((role) => userRoles.includes(role));
   const canManage = hasRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const canAccept = hasRole(['ADMIN', 'MANAGER']);
-  const isManager = hasRole(['ADMIN', 'MANAGER']);
+
+  /**
+   * 전이 가능 여부는 상태 머신에서 도출한다.
+   *
+   * 예전에는 `isManager = hasRole(['ADMIN','MANAGER'])` 로 여기서 독립 판단했는데,
+   * 재오픈 규칙에는 MANAGER 가 없어서 버튼은 보이고 서버는 항상 거부하는 막다른 길이
+   * 생겼다(감사 4.3). 규칙을 바꿀 때 UI 가 따라오지 않으면 같은 발산이 반복된다.
+   */
+  const can = (to: SRStatus) => canPerformTransition(status, to, userRoles, userPermissions);
+  const canReopen = can('IN_PROGRESS');
 
   // 간단한 상태 변경 (다이얼로그 없음)
   const handleSimpleStatusChange = async (action: string) => {
@@ -74,7 +87,7 @@ export function SRStatusActions({
         description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
         variant: 'destructive',
       });
-      console.error(error);
+      logger.error('SR 상태 변경 실패', error instanceof Error ? error : undefined);
     } finally {
       setLoadingAction(null);
     }
@@ -223,7 +236,7 @@ export function SRStatusActions({
                 <span className="hidden md:inline">확인 완료</span>
               </Button>
             )}
-            {(isRequestor || isManager) && (
+            {(isRequestor || canReopen) && (
               <Button
                 variant="outline"
                 onClick={() => setReopenDialogOpen(true)}
@@ -241,7 +254,7 @@ export function SRStatusActions({
 
       case 'CONFIRMED':
         // 확인완료 상태: 재오픈 (7일 이내, 관리자/신청자)
-        if (!isRequestor && !isManager) return null;
+        if (!isRequestor && !canReopen) return null;
         return (
           <Button
             variant="outline"

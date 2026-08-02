@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
+import { firstZodIssueMessage, ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { ensureCanReadClient, ensureCanUpdateClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serviceCategoryCreateSchema } from '@/lib/schemas';
@@ -67,17 +67,17 @@ export const POST = withAuthAndRateLimit(
       }
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
     let validated;
     try {
       validated = serviceCategoryCreateSchema.parse({
-        ...body,
+        ...((body ?? {}) as Record<string, unknown>),
         clientId: id,
       });
     } catch (error) {
       if (error instanceof Error && 'issues' in error) {
         const zodError = error as { issues: Array<{ message: string }> };
-        throw new ValidationError(zodError.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(zodError));
       }
       throw error;
     }

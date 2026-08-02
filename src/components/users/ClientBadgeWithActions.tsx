@@ -43,6 +43,12 @@ export function ClientBadgeWithActions({
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [showChangePopover, setShowChangePopover] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  // 진행 중인 SR 때문에 서버가 거부한 변경 요청 (확인 후 강제 재시도용)
+  const [pendingChange, setPendingChange] = useState<{
+    clientId: string;
+    clientName: string;
+    ongoingSRCount: number;
+  } | null>(null);
   const { toast } = useToast();
 
   const handleRemove = async () => {
@@ -76,38 +82,48 @@ export function ClientBadgeWithActions({
     }
   };
 
-  const handleChange = async (newClientId: string, newClientName: string) => {
+  const handleChange = async (newClientId: string, newClientName: string, force = false) => {
     setIsProcessing(true);
     try {
       const response = await fetch(`/api/users/${userId}/client`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: newClientId }),
+        body: JSON.stringify(
+          force ? { clientId: newClientId, force: true } : { clientId: newClientId }
+        ),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
+        // 진행 중인 SR이 있어 서버가 거부한 경우 - 확인 후 강제 변경
+        if (response.status === 409 && result.code === 'ONGOING_SRS') {
+          setPendingChange({
+            clientId: newClientId,
+            clientName: newClientName,
+            ongoingSRCount: result.data?.ongoingSRCount || 0,
+          });
+          setShowChangePopover(false);
+          return;
+        }
+
         throw new Error(result.error || 'Failed to change client');
       }
 
-      if (result.warning) {
-        const ongoingSRCount = result.data?.ongoingSRCount || 0;
-        toast({
-          title: '진행 중인 SR 확인',
-          description: `${userName}님에게 진행 중인 SR ${ongoingSRCount}건이 있습니다. 고객사가 변경되었지만, SR 재할당을 권장합니다.`,
-          variant: 'default',
-        });
-      } else {
-        toast({
-          title: '성공',
-          description: `${userName}님의 고객사가 ${newClientName}(으)로 변경되었습니다.`,
-        });
-      }
+      const ongoingSRsHandled = result.data?.ongoingSRsHandled || 0;
+      toast({
+        title: '성공',
+        description:
+          ongoingSRsHandled > 0
+            ? `${userName}님의 고객사가 ${newClientName}(으)로 변경되었습니다. 진행 중인 SR ${ongoingSRsHandled}건은 재할당을 권장합니다.`
+            : `${userName}님의 고객사가 ${newClientName}(으)로 변경되었습니다.`,
+      });
 
+      setPendingChange(null);
       setShowChangePopover(false);
       onChanged?.();
     } catch (error) {
+      setPendingChange(null);
       toast({
         title: '오류',
         description: error instanceof Error ? error.message : '고객사 변경에 실패했습니다.',
@@ -195,6 +211,43 @@ export function ClientBadgeWithActions({
               className="bg-red-600 hover:bg-red-700"
             >
               {isProcessing ? '처리 중...' : '해제'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 진행 중인 SR 확인 다이얼로그 (강제 변경) */}
+      <AlertDialog
+        open={pendingChange !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            setPendingChange(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>진행 중인 SR이 있습니다</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{userName}</strong>님에게 진행 중인 SR {pendingChange?.ongoingSRCount ?? 0}
+              건이 있습니다. 소속을 <strong>{pendingChange?.clientName}</strong>(으)로
+              변경하시겠습니까?
+              <span className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded block">
+                ⚠ 진행 중인 SR은 이동하지 않으므로, 변경 후 SR 재할당이 필요합니다.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingChange) {
+                  handleChange(pendingChange.clientId, pendingChange.clientName, true);
+                }
+              }}
+              disabled={isProcessing}
+            >
+              {isProcessing ? '처리 중...' : '계속 변경'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

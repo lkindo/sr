@@ -25,6 +25,9 @@
 # ------------------------------------------------------------------------------
 .env
 .env*.local
+# Docker 배포용 실제 시크릿(NEXTAUTH_SECRET/AUTH_SECRET, DB 비밀번호) 추적 차단.
+# 플레이스홀더만 담은 .env.example 은 계속 추적한다.
+.env.docker*
 /prisma/.env
 *.pem
 *.key
@@ -99,5 +102,17 @@ nul
 # ------------------------------------------------------------------------------
 actions_runs.json
 output.css
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 next-env.d.ts
+
+# 빌드 시 esbuild 가 생성하는 기준 데이터 시드 번들(Dockerfile).
+# 소스는 prisma/seed.ts 이며 산출물은 커밋하지 않는다.
+prisma/seed.bundle.cjs
+
+# 커밋 메시지·리포트 등 작업 중 만드는 임시 파일.
+# `git add -A` 에 딸려 들어가 커밋된 적이 있어 패턴으로 막는다.
+*.tmp
+*.tmp.mjs
+*.tmp.json
+*.tmp.sh
+*.tmp.log

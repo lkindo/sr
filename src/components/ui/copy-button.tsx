@@ -32,6 +32,8 @@ export function CopyButton({
       const timeout = setTimeout(() => setHasCopied(false), 2000);
       return () => clearTimeout(timeout);
     }
+    // 정리할 것이 없는 분기임을 명시한다(noImplicitReturns).
+    return undefined;
   }, [hasCopied]);
 
   const onCopy = () => {

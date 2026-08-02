@@ -35,13 +35,17 @@ sudo systemctl enable --now docker
 # opc 유저를 docker 그룹에 추가
 sudo usermod -aG docker opc
 
-echo "=== 4. Configure Firewall for Port 3001 ==="
+echo "=== 4. Firewall ==="
+# 보안: 3001(스테이징 앱 직결) 포트는 더 이상 열지 않는다.
+# 해당 경로는 nginx를 우회해 TLS가 없고 X-Real-IP를 클라이언트가 조작할 수 있었다.
+# 외부 트래픽은 nginx(80/443)만 통과하며, 스테이징은 test.lkindo.kr 로 접근한다.
+# (과거 규칙이 남아 있을 수 있으므로 명시적으로 제거한다)
 if systemctl is-active --quiet firewalld; then
-    echo "Opening port 3001 in firewalld..."
-    sudo firewall-cmd --permanent --add-port=3001/tcp
-    sudo firewall-cmd --reload
+    echo "Removing legacy port 3001 rule from firewalld (if present)..."
+    sudo firewall-cmd --permanent --remove-port=3001/tcp || true
+    sudo firewall-cmd --reload || true
 else
-    echo "firewalld is not active, skipping firewall port open."
+    echo "firewalld is not active, skipping firewall configuration."
 fi
 
 echo "=== Setup Completed Successfully ==="

@@ -45,11 +45,17 @@ vi.mock('@/lib/domain-events', () => ({
   },
 }));
 
-vi.mock('@/lib/policies', () => ({
-  ensureCanCreateSR: vi.fn(),
-  ensureCanUpdateSR: vi.fn(),
-  ensureCanDeleteSR: vi.fn(),
-}));
+// ensure* 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 사용한다.
+// (테넌트 판정을 mock 으로 우회하면 경계 검증이 무력화된다.)
+vi.mock('@/lib/policies', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/policies')>();
+  return {
+    ...actual,
+    ensureCanCreateSR: vi.fn(),
+    ensureCanUpdateSR: vi.fn(),
+    ensureCanDeleteSR: vi.fn(),
+  };
+});
 
 vi.mock('@/services/push.service', () => ({
   pushService: {
@@ -81,13 +87,15 @@ vi.mock('@/lib/sr-state-machine', () => ({
 
 describe('SRService Mutation Tests', () => {
   let srService: SRService;
+  // 외부(고객사) 사용자이며 이 스위트가 사용하는 고객사 'c-1' 에 소속되어 있다.
+  // → 테넌트 가드를 통과하므로 각 테스트가 의도한 후속 분기까지 도달한다.
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
     name: 'Test',
     roles: ['USER'],
     permissions: [],
-    clientIds: [],
+    clientIds: ['c-1'],
   };
 
   beforeEach(() => {

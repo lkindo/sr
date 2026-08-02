@@ -13,6 +13,14 @@ import { deleteSRViaAPI } from './helpers/test-helpers';
  * 4. CLIENT: 댓글 확인 및 회신
  * 5. ENGINEER: 완료 처리
  * 6. MANAGER: 검토 및 종료
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
  */
 
 const authFiles = {
@@ -53,7 +61,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // SR 생성 버튼 클릭
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
@@ -110,14 +118,25 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.waitForTimeout(500); // 선택 반영 대기
 
       // SR 생성
+      // 저장 후 다이얼로그가 닫히고 목록이 재조회(GET /api/srs)된다.
+      // networkidle 은 SSE 때문에 절대 발생하지 않으므로, 그 재조회 응답 자체를 기다린다.
+      // 응답을 못 잡아도(캐시 등) 아래 새 행 단정이 최종 게이트 역할을 한다.
+      const listRefreshPromise = page
+        .waitForResponse(
+          (resp) => resp.url().includes('/api/srs') && resp.request().method() === 'GET',
+          { timeout: 15000 }
+        )
+        .catch(() => null);
+
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
 
-      // 다이얼로그 닫힘 대기 및 목록 로드 대기
+      // 다이얼로그 닫힘 대기 및 목록 갱신 대기 (필수)
       await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-      await page.waitForLoadState('networkidle'); // 목록 갱신 대기 (필수)
+      await listRefreshPromise;
 
+      // 목록 갱신의 관측 가능한 결과: 새로 만든 SR 행이 나타난다
       const srRow = page.locator('tr', { hasText: srTitle }).first();
-      await expect(srRow).toBeVisible({ timeout: 10000 });
+      await expect(srRow).toBeVisible({ timeout: 15000 });
 
       // SR ID 추출 (상세 페이지 이동)
       await srRow.click();
@@ -140,7 +159,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
       await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
@@ -203,8 +222,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await page.waitForURL('**/srs', { timeout: 15000 });
 
       // 혹시 목록으로 튕겼을 경우를 대비해 상세 페이지로 명시적 이동
-      await page.goto(`/srs/${srId}`);
-      await page.waitForLoadState('networkidle');
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded' });
 
       // 상태 확인 (INTAKE 또는 IN_PROGRESS)
       // Badge 컴포넌트가 div일 수 있으므로 좀 더 일반적인 선택자 사용
@@ -226,7 +244,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
       await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
@@ -273,7 +291,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
       await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
@@ -319,7 +337,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+
+      // 댓글 탐색 전에 상세 페이지 렌더링을 확정한다
+      // (isVisible 은 대기하지 않으므로 렌더 전에 물어보면 무조건 '없음'이 된다)
+      await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
 
       // CLIENT 댓글 확인
       const clientComment = page.locator('text=/로그 파일을 첨부/i');
@@ -386,7 +408,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
       await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });
@@ -463,7 +485,7 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 
     try {
       // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 제목 확인
       await expect(page.locator(`text=${srTitle}`).first()).toBeVisible({ timeout: 15000 });

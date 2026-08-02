@@ -6,7 +6,11 @@ test.describe('Dashboard Visual & Performance', () => {
   test('Real Dashboard Layout should look correct', async ({ browser }) => {
     await withAuthContext(browser, 'manager', async (page) => {
       await page.goto('/dashboard');
-      await page.waitForLoadState('networkidle');
+      // ⚠️ networkidle 금지: 루트 레이아웃이 /api/realtime SSE 스트림을 계속 열어 두므로
+      // networkidle 은 성립하지 않고 30초 타임아웃난다.
+      // 스크린샷 비교에는 번들·이미지까지 로드된 상태가 필요하므로 'load' 를 쓴다
+      // (domcontentloaded 는 async 스크립트를 기다리지 않아 하이드레이션 전 DOM 을 찍을 수 있다).
+      await page.waitForLoadState('load');
 
       // 스크롤 대기 및 애니메이션 완료 대기
       await page.waitForTimeout(1000);

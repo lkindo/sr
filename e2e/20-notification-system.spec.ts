@@ -12,6 +12,17 @@ import path from 'path';
  * 5. 알림 읽음 처리
  * 6. 알림 배지/카운트 확인
  * 7. 알림 필터링 및 정렬
+ *
+ * ⚠️ networkidle 금지
+ * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
+ * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
+ * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
+ * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
+ * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
+ * (본문/요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 주의: locator.isVisible() 은 대기하지 않고 즉시 반환한다(timeout 옵션은 무시됨).
+ * 그래서 조건부 알림 UI 를 묻기 전에 waitFor({ state: 'visible' }).catch(() => {}) 로
+ * 실제 대기를 만든다. 없어도 통과하는 기존 분기 동작은 그대로 둔다.
  */
 
 const authFiles = {
@@ -31,7 +42,7 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/srs', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // SR 생성
       const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
@@ -76,11 +87,11 @@ test.describe('알림 시스템 통합 테스트', () => {
       await page.getByRole('button', { name: /저장|생성|Create/i }).click();
       await page.waitForTimeout(2000);
 
-      await page.goto('/srs');
-      await page.waitForLoadState('networkidle');
+      await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
+      // 새 행이 보이는 것 자체가 목록 갱신의 관측 가능한 결과다 (toBeVisible 이 재시도)
       const srRow = page.locator('tr', { hasText: srTitle }).first();
-      await expect(srRow).toBeVisible({ timeout: 10000 });
+      await expect(srRow).toBeVisible({ timeout: 15000 });
 
       await srRow.click();
       await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
@@ -97,11 +108,12 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 접수 처리
       const intakeButton = page.getByRole('button', { name: /접수|Accept/i });
-      if (await intakeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await intakeButton.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await intakeButton.isVisible().catch(() => false)) {
         await intakeButton.click();
         await page.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 10000 });
 
@@ -149,16 +161,18 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 알림 벨 아이콘 또는 알림 버튼 찾기
+      await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
       const notificationButton = page
         .locator('button, a')
         .filter({ hasText: /알림|Notification|Bell/i })
         .or(page.locator('[class*="notification"], [class*="bell"]'))
         .first();
 
-      if (await notificationButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await notificationButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await notificationButton.isVisible().catch(() => false)) {
         // 알림 배지 확인 (읽지 않은 알림 개수)
         const badge = page.locator('[class*="badge"], span').filter({ hasText: /\d+/ }).first();
         if (await badge.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -205,7 +219,7 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 댓글 작성
       const commentTextarea = page
@@ -214,7 +228,8 @@ test.describe('알림 시스템 통합 테스트', () => {
         .or(page.locator('textarea[placeholder*="댓글"]'))
         .first();
 
-      if (await commentTextarea.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await commentTextarea.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      if (await commentTextarea.isVisible().catch(() => false)) {
         await commentTextarea.fill('작업을 시작하였습니다. 진행 중입니다.');
 
         const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
@@ -236,16 +251,18 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 알림 벨 아이콘 찾기
+      await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
       const notificationButton = page
         .locator('button, a')
         .filter({ hasText: /알림|Notification|Bell/i })
         .or(page.locator('[class*="notification"], [class*="bell"]'))
         .first();
 
-      if (await notificationButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await notificationButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await notificationButton.isVisible().catch(() => false)) {
         await notificationButton.click();
         await page.waitForTimeout(1000);
 
@@ -270,14 +287,16 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
+      await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
       const notificationButton = page
         .locator('button, a')
         .filter({ hasText: /알림|Notification|Bell/i })
         .first();
 
-      if (await notificationButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await notificationButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await notificationButton.isVisible().catch(() => false)) {
         // 읽지 않은 알림 개수 확인
         const badgeBefore = page
           .locator('[class*="badge"], span')
@@ -310,14 +329,15 @@ test.describe('알림 시스템 통합 테스트', () => {
           }
 
           // 다시 대시보드로 이동하여 배지 확인
-          await page.goto('/dashboard');
-          await page.waitForLoadState('networkidle');
+          await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+          await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
 
           const badgeAfter = page
             .locator('[class*="badge"], span')
             .filter({ hasText: /\d+/ })
             .first();
-          if (await badgeAfter.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await badgeAfter.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+          if (await badgeAfter.isVisible().catch(() => false)) {
             const badgeTextAfter = await badgeAfter.textContent();
             const unreadCountAfter = parseInt(badgeTextAfter || '0');
             console.log(`✅ 읽음 처리 후 알림 개수: ${unreadCountAfter}`);
@@ -345,7 +365,7 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto(`/srs/${srId}`, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       // 상태 변경 UI 찾기
       const statusChangeButton = page.getByRole('button', { name: /완료|Complete|상태 변경/i });
@@ -353,7 +373,12 @@ test.describe('알림 시스템 통합 테스트', () => {
         .locator('select, [role="combobox"]')
         .filter({ hasText: /상태|Status/i });
 
-      if (await statusChangeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // 상세 화면의 액션 영역이 렌더링될 시간을 실제 대기로 확보한다
+      await statusChangeButton
+        .first()
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .catch(() => {});
+      if (await statusChangeButton.isVisible().catch(() => false)) {
         await statusChangeButton.click();
         await page.waitForTimeout(1500);
         console.log(`✅ MANAGER가 상태 변경 (완료) (CLIENT에게 알림 발송 예정)`);
@@ -378,14 +403,16 @@ test.describe('알림 시스템 통합 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/dashboard', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
+      await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
       const notificationButton = page
         .locator('button, a')
         .filter({ hasText: /알림|Notification|Bell/i })
         .first();
 
-      if (await notificationButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await notificationButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+      if (await notificationButton.isVisible().catch(() => false)) {
         await notificationButton.click();
         await page.waitForTimeout(1000);
 
@@ -417,14 +444,18 @@ test.describe('알림 목록 페이지 테스트', () => {
 
     try {
       // 알림 목록 페이지로 직접 이동 (있다면)
-      await page.goto('/notifications', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/notifications', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       if (page.url().includes('/notifications')) {
         console.log(`✅ 알림 목록 페이지 접근 성공`);
 
         // 알림 목록 확인
         const notificationList = page.locator('[class*="notification"], [role="list"], table');
-        if (await notificationList.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await notificationList
+          .first()
+          .waitFor({ state: 'visible', timeout: 15000 })
+          .catch(() => {});
+        if (await notificationList.isVisible().catch(() => false)) {
           await expect(notificationList).toBeVisible();
           console.log(`✅ 알림 목록 표시 확인`);
 
@@ -448,7 +479,7 @@ test.describe('알림 목록 페이지 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/notifications', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/notifications', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       if (page.url().includes('/notifications')) {
         // 필터 버튼 찾기
@@ -457,12 +488,18 @@ test.describe('알림 목록 페이지 테스트', () => {
           .locator('select, [role="combobox"]')
           .filter({ hasText: /읽음|안읽음|Unread/i });
 
-        if (await filterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        // 필터 UI 렌더링을 실제로 기다린다 (없으면 아래 분기가 판단)
+        await filterButton
+          .first()
+          .waitFor({ state: 'visible', timeout: 10000 })
+          .catch(() => {});
+
+        if (await filterButton.isVisible().catch(() => false)) {
           await filterButton.click();
           await page.waitForTimeout(500);
         }
 
-        if (await filterSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await filterSelect.isVisible().catch(() => false)) {
           await filterSelect.click();
           const unreadOption = page.getByRole('option', { name: /안읽음|Unread/i });
           if (await unreadOption.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -484,7 +521,7 @@ test.describe('알림 목록 페이지 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/notifications', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/notifications', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       if (page.url().includes('/notifications')) {
         // 정렬 버튼 찾기
@@ -493,12 +530,18 @@ test.describe('알림 목록 페이지 테스트', () => {
           .locator('select, [role="combobox"]')
           .filter({ hasText: /정렬|Sort/i });
 
-        if (await sortButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+        // 정렬 UI 렌더링을 실제로 기다린다 (없으면 아래 분기가 판단)
+        await sortButton
+          .first()
+          .waitFor({ state: 'visible', timeout: 10000 })
+          .catch(() => {});
+
+        if (await sortButton.isVisible().catch(() => false)) {
           await sortButton.click();
           await page.waitForTimeout(500);
         }
 
-        if (await sortSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await sortSelect.isVisible().catch(() => false)) {
           await sortSelect.click();
           const latestOption = page.getByRole('option', { name: /최신순|Latest/i });
           if (await latestOption.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -520,13 +563,17 @@ test.describe('알림 목록 페이지 테스트', () => {
     const page = await context.newPage();
 
     try {
-      await page.goto('/notifications', { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto('/notifications', { waitUntil: 'domcontentloaded', timeout: 30000 });
 
       if (page.url().includes('/notifications')) {
         // "모두 읽음" 버튼 찾기
         const markAllReadButton = page.getByRole('button', { name: /모두 읽음|Mark all as read/i });
 
-        if (await markAllReadButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await markAllReadButton
+          .first()
+          .waitFor({ state: 'visible', timeout: 15000 })
+          .catch(() => {});
+        if (await markAllReadButton.isVisible().catch(() => false)) {
           await markAllReadButton.click();
           await page.waitForTimeout(1500);
           console.log(`✅ 모든 알림 읽음 처리 완료`);

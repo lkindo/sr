@@ -8,10 +8,18 @@ import { pipeline } from 'stream/promises';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BadRequestError, NotFoundError } from '@/lib/errors';
-import { FileValidationError, validateFile } from '@/lib/file-validator';
+import {
+  FileValidationError,
+  formatBytes,
+  MAX_UPLOAD_FILE_COUNT,
+  MAX_UPLOAD_TOTAL_SIZE,
+  validateFile,
+} from '@/lib/file-validator';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { STORAGE_DIR } from '@/lib/storage';
+import { serializeMany, serializeResponse } from '@/lib/serialization';
+import { deleteAttachmentBlob, STORAGE_DIR } from '@/lib/storage';
+import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';
@@ -40,6 +48,11 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id: srId } = await params;
 
+    // 본문을 힙에 물질화하기 전에 크기를 먼저 막는다.
+    // `formData()` 는 모든 파트를 인메모리 Blob 으로 파싱하므로, 그 뒤에 하는
+    // 타입별 크기 검증은 메모리 보호에 아무 역할도 하지 못한다(감사 3.41).
+    assertUploadSizeWithinLimit(req);
+
     // SR 존재 확인
     const sr = await prisma.sR.findUnique({
       where: { id: srId },
@@ -60,8 +73,19 @@ export const POST = withAuthAndRateLimit(
     }
 
     // 파일 개수 제한 (한 번에 최대 10개)
-    if (files.length > 10) {
-      throw new BadRequestError('한 번에 최대 10개의 파일만 업로드할 수 있습니다.');
+    if (files.length > MAX_UPLOAD_FILE_COUNT) {
+      throw new BadRequestError(
+        `한 번에 최대 ${MAX_UPLOAD_FILE_COUNT}개의 파일만 업로드할 수 있습니다.`
+      );
+    }
+
+    // 총합 가드. Content-Length 가 없는 요청(chunked)이나 헤더가 실제 크기와
+    // 어긋나는 경우를 대비해, 파싱 후에도 합계를 한 번 더 확인한다.
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > MAX_UPLOAD_TOTAL_SIZE) {
+      throw new BadRequestError(
+        `전체 업로드 용량이 너무 큽니다. 한 번에 최대 ${formatBytes(MAX_UPLOAD_TOTAL_SIZE)}까지 업로드할 수 있습니다.`
+      );
     }
 
     // 업로드 디렉토리 생성 (웹루트 밖 STORAGE_DIR 기준 — 정적 서빙 차단)
@@ -122,29 +146,61 @@ export const POST = withAuthAndRateLimit(
 
     let createdAttachments: any[] = [];
     if (attachmentsToInsert.length > 0) {
-      createdAttachments = await prisma.sRAttachment.createManyAndReturn({
-        data: attachmentsToInsert,
-      });
+      /**
+       * 삽입 · fileUrl 갱신 · 활동 로그를 한 트랜잭션에 묶는다.
+       *
+       * 예전에는 `createManyAndReturn` 뒤에 N 개 update 를 `Promise.all` 로 돌리고
+       * 활동 로그는 아예 없었다(감사 4.2). 중간에 실패하면 `fileUrl = ''` 인 죽은
+       * 링크가 남았고, 성공해도 배치 업로드만 감사 추적에서 빠졌다 — 단일 업로드
+       * 경로는 `ATTACHMENT_ADDED` 를 남기는데 배치는 남기지 않아 같은 행위가
+       * 경로에 따라 다르게 기록됐다.
+       */
+      try {
+        createdAttachments = await prisma.$transaction(async (tx) => {
+          const created = await tx.sRAttachment.createManyAndReturn({
+            data: attachmentsToInsert,
+          });
 
-      // fileUrl 을 인증 다운로드 라우트로 설정 (attachment id 가 필요하므로 생성 후 갱신)
-      await Promise.all(
-        createdAttachments.map((a) =>
-          prisma.sRAttachment.update({
-            where: { id: a.id },
-            data: { fileUrl: `/api/attachments/${a.id}/download` },
-          })
-        )
-      );
-      createdAttachments = createdAttachments.map((a) => ({
-        ...a,
-        fileUrl: `/api/attachments/${a.id}/download`,
-      }));
+          // fileUrl 은 attachment id 가 필요하므로 생성 후에 채운다.
+          for (const a of created) {
+            await tx.sRAttachment.update({
+              where: { id: a.id },
+              data: { fileUrl: `/api/attachments/${a.id}/download` },
+            });
+          }
+
+          await tx.sRActivity.createMany({
+            data: created.map((a) => ({
+              srId,
+              userId: session.user.id,
+              type: 'ATTACHMENT_ADDED' as const,
+              description: `파일 추가: ${a.fileName}`,
+            })),
+          });
+
+          return created.map((a) => ({ ...a, fileUrl: `/api/attachments/${a.id}/download` }));
+        });
+      } catch (error) {
+        // 파일은 트랜잭션 밖에서 이미 디스크에 쓰였다. 롤백되면 참조 없는 파일이
+        // 남으므로 되돌린다.
+        await Promise.all(
+          attachmentsToInsert.map((a) =>
+            deleteAttachmentBlob(a.storagePath).catch(() => {
+              // 정리 실패가 원래 오류를 가리지 않도록 한다.
+            })
+          )
+        );
+        throw error;
+      }
     }
 
-    const uploadedAttachments = createdAttachments.map((attachment) => ({
-      ...attachment,
-      createdAt: attachment.createdAt.toISOString(),
-    }));
+    // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
+    const uploadedAttachments = createdAttachments.map(
+      ({ storagePath: _storagePath, ...attachment }) => ({
+        ...attachment,
+        createdAt: attachment.createdAt.toISOString(),
+      })
+    );
 
     const validationErrors = results
       .filter(
@@ -165,15 +221,16 @@ export const POST = withAuthAndRateLimit(
 
     // Invalidate caches: detail and my-requests (첨부 카운트 등 반영)
 
+    // fileSize 는 Prisma BigInt 이므로 직렬화 없이 응답하면 JSON.stringify 가 TypeError 를 던진다.
     return NextResponse.json(
-      {
+      serializeResponse({
         success: true,
         message: `${uploadedAttachments.length}개의 파일이 업로드되었습니다.`,
         data: {
           attachments: uploadedAttachments,
           errors: validationErrors.length > 0 ? validationErrors : undefined,
         },
-      },
+      }),
       { status: 201 }
     );
   },
@@ -205,7 +262,11 @@ export const GET = withAuthAndRateLimit(
       },
     });
 
-    return NextResponse.json(attachments);
+    // storagePath(내부 저장 경로)는 클라이언트에 노출하지 않음
+    const safeAttachments = attachments.map(({ storagePath: _storagePath, ...rest }) => rest);
+
+    // fileSize(BigInt) / createdAt(Date) 직렬화
+    return NextResponse.json(serializeMany(safeAttachments));
   },
   { preset: 'standard' }
 ); // 1분당 100회

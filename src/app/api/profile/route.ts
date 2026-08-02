@@ -2,8 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
+import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { NotFoundError, UnauthorizedError, ValidationError } from '@/lib/errors';
+import {
+  firstZodIssueMessage,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from '@/lib/errors';
 import prisma from '@/lib/prisma';
 
 const updateProfileSchema = z.object({
@@ -68,14 +74,14 @@ export const PATCH = withAuthAndRateLimit(
       throw new UnauthorizedError('유효하지 않은 세션입니다. 다시 로그인해주세요.');
     }
 
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     let validated;
     try {
       validated = updateProfileSchema.parse(body);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(error.issues[0].message);
+        throw new ValidationError(firstZodIssueMessage(error));
       }
       throw error;
     }

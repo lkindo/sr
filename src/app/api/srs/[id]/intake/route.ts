@@ -4,11 +4,14 @@ import { $Enums, Prisma } from '@prisma/client';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SLA } from '@/lib/constants';
+import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
 import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
+import { serializeResponse } from '@/lib/serialization';
+import { assertAssignable } from '@/services/sr.service';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -44,32 +47,21 @@ export const POST = withAuthAndRateLimit(
     // 1. 요청 바디 검증
     const validated = await validateRequestBody(request, intakeSchema);
 
-    // 2. SR 조회 및 상태 확인, 담당자 조회를 하나의 쿼리로 병합
-    const [sr, assignee] = await prisma.$transaction([
-      prisma.sR.findUnique({
-        where: { id },
-        include: {
-          serviceCategory: true,
-          client: true,
-          requester: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
+    // 2. SR 조회 및 상태 확인
+    const sr = await prisma.sR.findUnique({
+      where: { id },
+      include: {
+        serviceCategory: true,
+        client: true,
+        requester: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
           },
         },
-      }),
-      prisma.user.findUnique({
-        where: { id: validated.assigneeId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          isActive: true,
-        },
-      }),
-    ]);
+      },
+    });
 
     if (!sr) {
       throw new NotFoundError('SR');
@@ -87,14 +79,11 @@ export const POST = withAuthAndRateLimit(
       throw new BadRequestError('이미 접수된 SR입니다');
     }
 
-    if (!assignee) {
-      throw new NotFoundError('담당자');
-    }
-
-    // 비활성 사용자에게는 담당자를 배정할 수 없음 (비활성 담당자에게 orphan SR 방지)
-    if (!assignee.isActive) {
-      throw new BadRequestError('비활성 상태의 사용자에게는 담당자를 배정할 수 없습니다.');
-    }
+    // 3. 담당자 검증: 존재 / 활성 / SR 처리 권한(내부 담당자)을 한 규칙으로 판정한다.
+    //    배정 경로가 세 곳(intake POST · intake PATCH · updateSR)이므로 규칙은 assertAssignable
+    //    한 곳에만 두고 모두 공유한다. (과거: POST 는 존재·활성만 확인해 CLIENT_USER 도
+    //    담당자로 지정될 수 있었다.)
+    const assignee = await assertAssignable(validated.assigneeId);
 
     // 4. SLA 기반 마감일 자동 계산
     const slaHours = sr.serviceCategory.slaHours;
@@ -210,6 +199,39 @@ export const POST = withAuthAndRateLimit(
       return result;
     });
 
+    // 8. 트랜잭션 커밋 후 사이드 이펙트 발행.
+    //    접수는 "요청자에게는 상태 변경, 담당자에게는 신규 배정"이라는 두 가지 사실을 만든다.
+    //    이 라우트에는 그동안 어떤 이벤트도 없어서, 접수·배정 알림이 아예 발송되지 않았고
+    //    다른 세션의 목록도 갱신되지 않았다(감사 3.21). SRService.updateSR 과 같은 패턴이다.
+    domainEvents.emit('sr:status_changed', {
+      srId: updatedSR.id,
+      srNumber: updatedSR.srNumber,
+      title: updatedSR.title,
+      requesterId: updatedSR.requesterId,
+      previousStatus: 'REQUESTED',
+      currentStatus: updatedSR.status,
+    });
+
+    domainEvents.emit('sr:assigned', {
+      srId: updatedSR.id,
+      srNumber: updatedSR.srNumber,
+      title: updatedSR.title,
+      assigneeId: assignee.id,
+      assigneeName: assignee.name,
+    });
+
+    emitRealtimeEvent(REALTIME_EVENTS.SR_UPDATED, {
+      id: updatedSR.id,
+      srNumber: updatedSR.srNumber,
+      title: updatedSR.title,
+      status: updatedSR.status,
+      // 권한 필터링용 키: SSE 연결별 테넌트/역할 격리 및 본인 에코(중복 토스트) 방지
+      clientId: updatedSR.clientId,
+      requesterId: updatedSR.requesterId,
+      assigneeId: updatedSR.assigneeId,
+      actorId: session.user.id,
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -310,7 +332,9 @@ export const GET = withAuthAndRateLimit(
 
     ensureCanReadSR(session.user, sr);
 
-    return NextResponse.json(sr);
+    // attachments.fileSize 는 Prisma BigInt 이므로 직렬화 후 응답
+    // (미변환 시 JSON.stringify TypeError → 첨부가 있는 SR 의 접수 정보 조회가 500)
+    return NextResponse.json(serializeResponse(sr));
   },
   { preset: 'standard' }
 ); // 1분당 100회
@@ -390,24 +414,16 @@ export const PATCH = withAuthAndRateLimit(
       dueDate.setHours(dueDate.getHours() + adjustedHours);
     }
 
-    // 6. 담당자 조회 (변경 시)
-    let newAssignee = null;
+    // 6. 담당자 검증 및 조회 (변경 시)
+    //    존재 여부만 확인하면 비활성 사용자에게도 배정되어, 로그인할 수 없는 담당자에게
+    //    묶인 orphan SR 이 생기고 이후 그 사용자를 정상적으로 비활성화할 수도 없다.
+    //    (updateSR 과 동일한 규칙을 쓰도록 assertAssignable 를 공유한다.)
+    let newAssignee: { id: string; name: string; email: string } | null = null;
     const isAssigneeChanged =
       validated.assigneeId !== undefined && validated.assigneeId !== sr.assigneeId;
 
     if (isAssigneeChanged && validated.assigneeId) {
-      newAssignee = await prisma.user.findUnique({
-        where: { id: validated.assigneeId },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-        },
-      });
-
-      if (!newAssignee) {
-        throw new NotFoundError('담당자');
-      }
+      newAssignee = await assertAssignable(validated.assigneeId);
     }
 
     // 7. SR 업데이트
@@ -570,7 +586,31 @@ export const PATCH = withAuthAndRateLimit(
         },
       });
 
-      // 새 담당자에게만 메일 발송 (담당자가 배정된 경우만)
+      // 배정 이벤트 발행 — 알림 리스너가 새 담당자에게 메일/푸시를 보낸다.
+      // 이 자리에는 "새 담당자에게만 메일 발송" 이라는 주석만 있고 구현이 없어서,
+      // 재배정된 담당자가 자기에게 일이 왔다는 사실을 전혀 통보받지 못했다(감사 3.21).
+      // 배정 해제(null)도 발행한다 — 이전 담당자 화면의 상태를 정리해야 한다.
+      domainEvents.emit('sr:assigned', {
+        srId: updatedSR.id,
+        srNumber: updatedSR.srNumber,
+        title: updatedSR.title,
+        assigneeId: validated.assigneeId || null,
+        assigneeName: validated.assigneeId ? newAssignee?.name || '알 수 없음' : null,
+      });
+    }
+
+    // 변경이 하나라도 있으면 다른 세션의 목록·상세를 갱신시킨다.
+    if (changes.length > 0) {
+      emitRealtimeEvent(REALTIME_EVENTS.SR_UPDATED, {
+        id: updatedSR.id,
+        srNumber: updatedSR.srNumber,
+        title: updatedSR.title,
+        status: updatedSR.status,
+        clientId: updatedSR.clientId,
+        requesterId: updatedSR.requesterId,
+        assigneeId: updatedSR.assigneeId,
+        actorId: session.user.id,
+      });
     }
 
     return NextResponse.json(

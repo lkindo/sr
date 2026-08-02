@@ -60,7 +60,7 @@ describe('withAuth', () => {
     const res = await wrapped(req, { params });
 
     expect(handler).toHaveBeenCalledTimes(1);
-    const [passedReq, passedCtx] = handler.mock.calls[0];
+    const [passedReq, passedCtx] = handler.mock.calls[0]!;
     expect(passedReq).toBe(req);
     // params are passed through untouched
     expect(passedCtx.params).toBe(params);
@@ -95,7 +95,7 @@ describe('withAuth', () => {
     const wrapped = withAuth(handler);
     await wrapped(makeRequest(), { params: Promise.resolve({}) });
 
-    const ctx = handler.mock.calls[0][1];
+    const ctx = handler.mock.calls[0]![1];
     expect(ctx.session.user.email).toBe('');
     expect(ctx.session.user.roles).toEqual([]);
     expect(ctx.session.user.permissions).toEqual([]);

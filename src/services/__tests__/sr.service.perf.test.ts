@@ -31,6 +31,10 @@ const { mockPrisma } = vi.hoisted(() => {
     client: {
       findUnique: vi.fn(),
     },
+    serviceCategory: {
+      // null = 카테고리 미존재 → 카테고리 테넌트 검증은 no-op (이 스위트의 원래 의도 유지)
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     user: {
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -42,9 +46,14 @@ vi.mock('@/lib/prisma', () => ({
   default: mockPrisma,
 }));
 
-vi.mock('@/lib/policies', () => ({
-  ensureCanCreateSR: vi.fn(),
-}));
+// ensureCanCreateSR 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 사용한다.
+vi.mock('@/lib/policies', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/policies')>();
+  return {
+    ...actual,
+    ensureCanCreateSR: vi.fn(),
+  };
+});
 
 vi.mock('@/services/push.service', () => ({
   pushService: {
@@ -75,6 +84,8 @@ vi.mock('@/lib/wait-until', () => ({
 describe('SRService Performance', () => {
   let srService: SRService;
 
+  // 외부(고객사) 사용자이며 벤치마크 대상 고객사 'client-1' 에 소속되어 있다.
+  // → 테넌트 가드를 통과해 실제 생성 경로 전체를 측정한다.
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
@@ -82,7 +93,7 @@ describe('SRService Performance', () => {
     image: null,
     roles: ['USER'],
     permissions: [],
-    clientIds: [],
+    clientIds: ['client-1'],
   };
 
   beforeEach(() => {

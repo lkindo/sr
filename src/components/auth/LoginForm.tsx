@@ -26,18 +26,16 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 컴포넌트 마운트 시 저장된 로그인 정보 불러오기
+  // 컴포넌트 마운트 시 저장된 이메일 불러오기
   useEffect(() => {
+    // 과거 버전이 평문으로 저장한 비밀번호를 무조건 제거합니다 (보안).
+    localStorage.removeItem('sr-remembered-password');
+
     const savedEmail = localStorage.getItem('sr-remembered-email');
-    const savedPassword = localStorage.getItem('sr-remembered-password');
 
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
-    }
-
-    if (savedPassword) {
-      setPassword(savedPassword);
     }
   }, []);
 
@@ -56,13 +54,11 @@ export default function LoginForm() {
       if (result?.error) {
         setError('이메일 또는 비밀번호가 올바르지 않습니다.');
       } else {
-        // 로그인 성공 시 로그인 정보 저장 또는 삭제
+        // 로그인 성공 시 이메일만 저장 또는 삭제 (비밀번호는 저장하지 않음)
         if (rememberMe) {
           localStorage.setItem('sr-remembered-email', email);
-          localStorage.setItem('sr-remembered-password', password);
         } else {
           localStorage.removeItem('sr-remembered-email');
-          localStorage.removeItem('sr-remembered-password');
         }
 
         router.push('/dashboard');
@@ -127,7 +123,7 @@ export default function LoginForm() {
               htmlFor="remember"
               className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
             >
-              로그인 정보 저장
+              이메일 저장
             </Label>
           </div>
         </CardContent>
@@ -140,6 +136,14 @@ export default function LoginForm() {
             <Link href="/register" className="text-primary hover:underline">
               회원가입
             </Link>
+          </p>
+          {/*
+            셀프 서비스 재설정 플로우는 아직 없다. 안내가 없으면 잠긴 사용자는
+            복구 수단이 존재한다는 사실 자체를 알 수 없어 막다른 길에 놓인다.
+            (관리자 재설정 경로는 사용자 관리 화면에 있다)
+          */}
+          <p className="text-sm text-muted-foreground text-center">
+            비밀번호를 잊으셨나요? 시스템 관리자에게 재설정을 요청하세요.
           </p>
         </CardFooter>
       </form>

@@ -3,14 +3,18 @@ services:
     image: ghcr.io/lkindo/sr:dev
     container_name: sr-app-test
     restart: always
+    # 보안: 앱 포트를 호스트로 공개하지 않는다(과거 '3001:3000').
+    # 직접 접근 시 nginx(TLS/프록시 헤더 정규화)를 우회해 클라이언트가 X-Real-IP를
+    # 임의로 조작할 수 있었다. 외부 접근은 test.lkindo.kr → nginx → app-test:3000 만 허용한다.
     expose:
       - '3000'
-    ports:
-      - '3001:3000'
     env_file:
       - .env.docker.test
     environment:
       - NODE_OPTIONS=--max-old-space-size=450
+      # 운영과 동일하게 KST 로 고정한다(감사 3.25). 스테이징이 UTC 면 날짜 관련 회귀를
+      # 여기서 재현할 수 없다.
+      - TZ=Asia/Seoul
       # 첨부파일 저장 위치(웹루트 밖). 아래 명명 볼륨이 이 경로에 마운트된다.
       - STORAGE_DIR=/app/var/uploads
     volumes:
@@ -19,6 +23,20 @@ services:
     depends_on:
       db-test:
         condition: service_healthy
+    # 이미지의 HEALTHCHECK 와 동일. 배포 스크립트의 헬스 게이트가 여기에 의존한다.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 60s
+    mem_limit: 768m
     networks:
       - sr-net
     logging:
@@ -32,15 +50,25 @@ services:
     container_name: sr-db-test
     restart: always
     environment:
-      - POSTGRES_USER=lkind
-      - POSTGRES_PASSWORD=sr1234
-      - POSTGRES_DB=sr_db_test
-    ports:
-      - '5433:5432'
+      # 자격증명은 저장소에 두지 않는다. 배포는 `--env-file .env.staging` 으로 보간하며,
+      # 값이 비면 `:?` 문법으로 즉시 실패한다(안전하지 않은 기본값 방지).
+      # 주의: POSTGRES_* 는 데이터 디렉터리가 비어 있는 최초 기동에만 반영된다.
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      # DB 이름은 비밀이 아니므로 기존 볼륨 호환을 위해 현재 값을 기본값으로 남긴다.
+      - POSTGRES_DB=${POSTGRES_DB:-sr_db_test}
+    # 보안: DB 포트를 호스트로 공개하지 않는다(과거 '5433:5432'). app-test 는 내부
+    # 브리지(sr-net)로 접근한다. 호스트에서 직접 붙어야 하면 SSH 터널을 사용한다.
+    #   ssh -L 5433:127.0.0.1:5433 opc@<server>  (아래 loopback 바인딩을 함께 활성화)
+    # ports:
+    #   - '127.0.0.1:5433:5432'
+    expose:
+      - '5432'
     volumes:
       - sr_db_test_data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U lkind -d sr_db_test']
+      # `$$` 는 compose 보간을 회피해 컨테이너 셸이 자신의 POSTGRES_* 환경변수를 읽게 한다.
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 10s
       timeout: 5s
       retries: 5

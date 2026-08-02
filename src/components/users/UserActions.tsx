@@ -6,8 +6,6 @@ import { Shield, UserCheck, UserX } from 'lucide-react';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import { User } from '@/types/user'; // Using shared type if available, otherwise defining minimal interface
 
 interface UserActionsProps {
   user: any; // Using any for now to match page.tsx usage until types are unified

@@ -1,6 +1,9 @@
 // Server-only module - not to be imported in client components
 import 'server-only';
 
+import { createECDH } from 'node:crypto';
+
+import { isPlaceholderValue } from '@/lib/env-validation';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 
@@ -41,12 +44,84 @@ interface WebPushSubscription {
 }
 
 // VAPID configuration
-// Fallback 값 추가 - 환경 변수 인식 문제 우회
-const VAPID_PUBLIC_KEY_FALLBACK =
-  'BMy2SareYpfTG73Ts9NjlQVhbwStorMrw_v2XrZi1JYA_V6vrL4iuVBAoBV1FUOPFLfsa-qsQ5O5Zvggv9DlMc4';
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || VAPID_PUBLIC_KEY_FALLBACK;
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+// 환경 변수가 없으면 "푸시 미설정"으로 취급한다.
+// 예전에는 하드코딩된 공개키로 폴백했지만, 그 공개키에 대응하는 비밀키가 어디에도 없어
+// 브라우저 구독은 성공하고 서버 발송은 전부 조용히 실패하는 함정이었다.
+
+// docker env_file 등을 거치며 따옴표/공백이 섞여 들어오는 경우가 있어 한 번 정규화한다.
+// (검증한 값과 실제 사용 값이 달라지면 안 되므로 정규화된 값을 그대로 사용한다)
+function normalizeKey(value: string | undefined): string {
+  return (value ?? '').trim().replace(/^['"]|['"]$/g, '');
+}
+
+const VAPID_PUBLIC_KEY = normalizeKey(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
+const VAPID_PRIVATE_KEY = normalizeKey(process.env.VAPID_PRIVATE_KEY);
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:lkindo@gmail.com';
+
+// VAPID 키는 base64url 문자로만 구성된다.
+// P-256 공개키(65바이트) = 87자, 비밀키(32바이트) = 43자. padding('=')은 아래에서 제거 후 비교한다.
+const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
+const VAPID_PUBLIC_KEY_LENGTH = 87;
+const VAPID_PRIVATE_KEY_LENGTH = 43;
+
+/**
+ * 값이 "실제로 쓸 수 있는" VAPID 키인지 확인한다.
+ * 비어 있거나, 플레이스홀더이거나, 형식/길이가 맞지 않으면 사용 불가로 본다.
+ */
+function isUsableVapidKey(value: string, expectedLength: number): boolean {
+  if (!value || isPlaceholderValue(value)) {
+    return false;
+  }
+  const normalized = value.replace(/=+$/, '');
+  return normalized.length === expectedLength && BASE64URL_PATTERN.test(normalized);
+}
+
+/**
+ * 비밀키에서 P-256 공개점을 유도해 설정된 공개키와 일치하는지 확인한다.
+ *
+ * 길이/문자셋 검사만으로는 "형식은 멀쩡한데 짝이 안 맞는" 조합을 걸러내지 못한다.
+ * 한쪽만 로테이션하거나 환경 간 키를 섞으면 구독은 성공하고 발송만 403으로 전부
+ * 실패하는데, 이는 하드코딩 폴백이 만들던 것과 정확히 같은 실패 형태다.
+ * base64url이지만 곡선 위의 점이 아닌 값도 여기서 함께 걸러진다.
+ *
+ * 결과는 모듈 수명 동안 캐시한다(키는 프로세스 중에 바뀌지 않는다).
+ */
+let keyPairMatches: boolean | null = null;
+function vapidKeyPairMatches(): boolean {
+  if (keyPairMatches !== null) {
+    return keyPairMatches;
+  }
+
+  try {
+    const ecdh = createECDH('prime256v1');
+    ecdh.setPrivateKey(Buffer.from(VAPID_PRIVATE_KEY, 'base64url'));
+    keyPairMatches = ecdh.getPublicKey().toString('base64url') === VAPID_PUBLIC_KEY;
+  } catch {
+    // 비밀키가 곡선에 올릴 수 없는 값이면 setPrivateKey가 throw한다 = 사용 불가.
+    keyPairMatches = false;
+  }
+
+  if (!keyPairMatches) {
+    logger.error(
+      'VAPID 공개키와 비밀키가 서로 짝이 맞지 않습니다. 푸시 알림을 비활성화합니다. ' +
+        '두 키를 같은 키쌍으로 다시 설정하세요(환경별로 별도 발급).'
+    );
+  }
+
+  return keyPairMatches;
+}
+
+/**
+ * 공개키/비밀키가 모두 실제로 사용 가능한지 확인한다.
+ * "값이 있다"가 아니라 "서명이 가능하다"를 기준으로 판단한다.
+ */
+function hasUsableVapidKeys(): boolean {
+  return (
+    isUsableVapidKey(VAPID_PUBLIC_KEY, VAPID_PUBLIC_KEY_LENGTH) &&
+    isUsableVapidKey(VAPID_PRIVATE_KEY, VAPID_PRIVATE_KEY_LENGTH) &&
+    vapidKeyPairMatches()
+  );
+}
 
 export interface PushPayload {
   title: string;
@@ -76,7 +151,8 @@ let webPushModule: typeof import('web-push') | null = null;
 async function getWebPush() {
   if (!webPushModule) {
     webPushModule = await import('web-push');
-    if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+    // 사용 불가능한 자격 증명으로 web-push를 초기화하지 않는다.
+    if (hasUsableVapidKeys()) {
       webPushModule.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
     }
   }
@@ -86,16 +162,22 @@ async function getWebPush() {
 export class PushService {
   /**
    * Check if VAPID is properly configured
+   *
+   * 값의 존재 여부가 아니라 실제로 발송 가능한 형태인지를 확인한다.
+   * (플레이스홀더/잘못된 길이는 설정되지 않은 것으로 취급)
    */
   static isConfigured(): boolean {
-    return !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+    return hasUsableVapidKeys();
   }
 
   /**
    * Get the public VAPID key for client-side subscription
+   *
+   * 서버가 서명할 수 없는 키는 절대 브라우저에 넘기지 않는다.
+   * 설정이 온전하지 않으면 빈 문자열을 반환한다.
    */
   static getPublicKey(): string {
-    return VAPID_PUBLIC_KEY;
+    return hasUsableVapidKeys() ? VAPID_PUBLIC_KEY : '';
   }
 
   /**

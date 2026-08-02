@@ -5,11 +5,17 @@ import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
-vi.mock('@/lib/policies', () => ({
-  ensureCanCreateSR: vi.fn(),
-  ensureCanUpdateSR: vi.fn(),
-  ensureCanDeleteSR: vi.fn(),
-}));
+// ensure* 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 사용한다.
+// (mockUser 가 ADMIN 이므로 실제 구현상 내부 사용자로 판정되어 테넌트 가드를 통과한다.)
+vi.mock('@/lib/policies', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/policies')>();
+  return {
+    ...actual,
+    ensureCanCreateSR: vi.fn(),
+    ensureCanUpdateSR: vi.fn(),
+    ensureCanDeleteSR: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/wait-until', () => ({
   backgroundTask: vi.fn(async (promise) => {
@@ -74,6 +80,7 @@ vi.mock('@/lib/sr-state-machine', () => ({
 describe('SRService - Expanded Coverage', () => {
   let srService: SRService;
 
+  // 내부(ADMIN) 사용자 — 소속 고객사가 없어도 테넌트 가드를 통과한다.
   const mockUser = {
     id: 'user-1',
     roles: ['ADMIN'],

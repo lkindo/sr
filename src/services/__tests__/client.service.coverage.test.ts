@@ -60,9 +60,71 @@ describe('ClientService Coverage', () => {
           where: { id: 'c1' },
           include: expect.objectContaining({
             users: expect.anything(),
-            srs: true,
+            // 감사 3.6: 전체 SR 본문 덤프(`srs: true`) 대신 제한된 요약만 조회한다.
+            srs: {
+              select: {
+                id: true,
+                srNumber: true,
+                title: true,
+                status: true,
+                priority: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
+            },
           }),
         })
+      );
+    });
+
+    // 회귀 방지: SR 목록이 다시 무제한/전체 컬럼 조회로 되돌아가지 못하도록 고정한다.
+    it('SR 조회는 명시적 select + 정렬 + take 상한으로 제한된다', async () => {
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
+      await clientService.getClientDetailsById('c1');
+
+      const args = vi.mocked(prisma.client.findUnique).mock.calls[0]![0] as any;
+      const srs = args.include.srs;
+
+      // `srs: true`(전체 행 덤프)가 아니라 옵션 객체여야 한다.
+      expect(srs).not.toBe(true);
+      expect(typeof srs).toBe('object');
+
+      // 상한(take)이 반드시 존재하며 유한한 값이어야 한다.
+      expect(srs.take).toBe(10);
+      expect(srs.orderBy).toEqual({ createdAt: 'desc' });
+
+      // 명시적 select 여야 하며, include 로 관계를 끌어오면 안 된다.
+      expect(srs.select).toBeDefined();
+      expect(srs.include).toBeUndefined();
+    });
+
+    it('SR select 에 설명/처리결과/반려사유 등 민감 자유서술 컬럼이 포함되지 않는다', async () => {
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
+      await clientService.getClientDetailsById('c1');
+
+      const args = vi.mocked(prisma.client.findUnique).mock.calls[0]![0] as any;
+      const selectedKeys = Object.keys(args.include.srs.select);
+
+      const sensitiveKeys = [
+        'description',
+        'resolution',
+        'resolutionNote',
+        'rejectionReason',
+        'rejectReason',
+        'holdReason',
+        'attachments',
+        'comments',
+        'activities',
+        'statusHistory',
+      ];
+      for (const key of sensitiveKeys) {
+        expect(selectedKeys).not.toContain(key);
+      }
+
+      // 안전한 요약 컬럼만 선택되었는지도 함께 확인한다(허용 목록 밖 컬럼 차단).
+      expect(selectedKeys.sort()).toEqual(
+        ['createdAt', 'id', 'priority', 'srNumber', 'status', 'title'].sort()
       );
     });
   });

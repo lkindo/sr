@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
-import { RouteContext } from '@/lib/api-helpers';
+import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { srService } from '@/services/sr.service';
 
@@ -24,7 +24,7 @@ export const PATCH = withAuthAndRateLimit(
     { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id: srId } = await params;
-    const body = await request.json();
+    const body = await parseJsonBody(request);
 
     // 검증 실패 시 ZodError 를 던져 handleApiError 가 400 으로 매핑하게 한다.
     const { action, reason, resolutionDescription } = statusActionSchema.parse(body);

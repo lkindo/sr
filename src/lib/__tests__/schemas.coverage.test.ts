@@ -315,6 +315,59 @@ describe('srUpdateSchema', () => {
     expect(srUpdateSchema.safeParse({ title: 'abc' }).success).toBe(false);
   });
 
+  /**
+   * 감사 3.27 — EditSRDialog 는 이 두 값을 별표(필수)로 렌더링하고 전송까지 하는데,
+   * 스키마에 선언이 없어 zod 가 미지 키로 조용히 제거했다. 사용자는 성공 토스트를 받고도
+   * 값이 저장되지 않았고, 다이얼로그를 다시 열면 이전 값이 그대로 보였다.
+   */
+  describe('희망 우선순위·희망 완료일 (감사 3.27)', () => {
+    it('requestedPriority 를 조용히 제거하지 않는다', () => {
+      const r = srUpdateSchema.safeParse({ requestedPriority: 'CRITICAL' });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.requestedPriority).toBe('CRITICAL');
+    });
+
+    it('requestedCompletionDate 를 조용히 제거하지 않는다', () => {
+      const r = srUpdateSchema.safeParse({ requestedCompletionDate: '2026-09-01' });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.requestedCompletionDate).toBe('2026-09-01');
+    });
+
+    it('빈 문자열 requestedCompletionDate 는 null 로 정규화한다 (값 지우기)', () => {
+      const r = srUpdateSchema.safeParse({ requestedCompletionDate: '' });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.requestedCompletionDate).toBeNull();
+    });
+
+    it('빈 문자열 requestedPriority 는 undefined 로 정규화한다 (변경 없음)', () => {
+      const r = srUpdateSchema.safeParse({ requestedPriority: '' });
+      expect(r.success).toBe(true);
+      if (r.success) expect(r.data.requestedPriority).toBeUndefined();
+    });
+
+    it('알 수 없는 우선순위 값은 거부한다', () => {
+      expect(srUpdateSchema.safeParse({ requestedPriority: 'URGENT' }).success).toBe(false);
+    });
+
+    it('EditSRDialog 가 실제로 보내는 형태를 그대로 통과시킨다', () => {
+      // useEditSRForm 이 FormData 로 만들어 보내는 필드 조합.
+      const r = srUpdateSchema.safeParse({
+        title: '수정된 제목입니다',
+        description: '충분히 긴 설명 텍스트입니다',
+        status: 'REQUESTED',
+        serviceCategoryId: 'cat-1',
+        requestedPriority: 'HIGH',
+        requestedCompletionDate: '2026-09-15',
+      });
+
+      expect(r.success).toBe(true);
+      if (r.success) {
+        expect(r.data.requestedPriority).toBe('HIGH');
+        expect(r.data.requestedCompletionDate).toBe('2026-09-15');
+      }
+    });
+  });
+
   it('rejects too-short description when provided non-empty', () => {
     expect(srUpdateSchema.safeParse({ description: 'short' }).success).toBe(false);
   });

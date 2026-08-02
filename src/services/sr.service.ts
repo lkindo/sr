@@ -1,23 +1,112 @@
 import { Prisma, SR, SRStatus } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
-import { getSRUrl } from '@/lib/app-url';
 import { domainEvents } from '@/lib/domain-events';
-import { BusinessRuleError, ConflictError, NotFoundError, ServiceError } from '@/lib/errors';
+import {
+  BadRequestError,
+  BusinessRuleError,
+  ConflictError,
+  ForbiddenError,
+  mapPrismaError,
+  NotFoundError,
+  ServiceError,
+} from '@/lib/errors';
 import { logger } from '@/lib/logger';
-import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import { hasPermissionFlag } from '@/lib/permission-helpers';
+import {
+  ensureCanCreateSR,
+  ensureCanDeleteSR,
+  ensureCanUpdateSR,
+  isInternalUser,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
-import { getRequiredFields, validateTransition } from '@/lib/sr-state-machine';
+import { validateTransition } from '@/lib/sr-state-machine';
+import { appZoneDateStamp } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
+import { UserService } from '@/services/user.service';
 import { AuthenticatedUser } from '@/types/session';
 import { SRCreateResult, SRDetails, SRListItem, SRUpdateResult } from '@/types/sr.types';
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
+
+/**
+ * SR 담당자 할당 권한 키.
+ * prisma/seed.ts 에 실제로 시딩된 권한(SR/ASSIGN)만 사용한다.
+ * (시딩되지 않은 권한명을 쓰면 아무도 보유할 수 없어 ADMIN 까지 조용히 차단된다.)
+ */
+const SR_ASSIGN_PERMISSION = 'SR:ASSIGN';
+
+/**
+ * 접수(트리아지) 결과에 해당하는 운영 전용 필드를 수정할 수 있는지 판정한다.
+ * 내부 사용자(ADMIN/MANAGER/ENGINEER) 또는 SR:ASSIGN 권한 보유자만 허용한다.
+ * (전용 intake 라우트가 같은 필드를 운영팀으로 제한하는 것과 동일한 취지)
+ */
+function canWriteOperatorOwnedFields(user: AuthenticatedUser): boolean {
+  return isInternalUser(user) || hasPermissionFlag(user, SR_ASSIGN_PERMISSION);
+}
+
+/** 날짜 값(문자열/Date/null)을 비교 가능한 밀리초로 정규화한다. 값이 없으면 null. */
+function toTimestampOrNull(value: string | Date | null | undefined): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+/** 숫자 값(number/Decimal/문자열/null)을 비교 가능한 숫자로 정규화한다. 값이 없으면 null. */
+function toNumberOrNull(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const num = typeof value === 'number' ? value : Number(String(value));
+  return Number.isNaN(num) ? null : num;
+}
+
+/** 빈 문자열/undefined 를 null 로 정규화한다. (스키마의 emptyStringToNull 과 동일한 기준) */
+function toStringOrNull(value: string | null | undefined): string | null {
+  if (value === undefined || value === null || value === '') return null;
+  return value;
+}
+
+/**
+ * 담당자로 배정 가능한 사용자인지 검증하고, 검증된 사용자 정보를 반환한다.
+ *
+ * - 존재하지 않으면 NotFoundError (원시 FK 위반이 500 으로 새는 것을 방지)
+ * - 비활성 사용자면 BadRequestError. 비활성 담당자에게 SR 이 남으면 로그인할 수 없는
+ *   담당자에게 묶인 orphan SR 이 되고, 그 사용자는 이후 정상적으로 비활성화할 수도 없다.
+ *   (user.service.ts deactivateUser 가 진행 중 SR 보유자를 차단하며, 그 안전성이
+ *    "배정 경로의 isActive 가드"에 의존한다고 주석에 명시되어 있다.)
+ * - SR 처리 자격이 없으면 BadRequestError. 판정 기준은 담당자 선택 목록과 동일한
+ *   getUsersWithSRHandlingPermission(내부 역할 + 담당자 필수 권한)을 재사용한다.
+ *   → 드롭다운에 보이지 않는 사용자는 어떤 경로로도 담당자가 될 수 없다.
+ *
+ * 세 곳의 배정 경로(updateSR · intake PATCH · intake POST)가 모두 이 함수를 호출한다.
+ */
+export async function assertAssignable(
+  assigneeId: string,
+  userService: UserService = new UserService()
+): Promise<{ id: string; name: string; email: string }> {
+  const candidate = await prisma.user.findUnique({
+    where: { id: assigneeId },
+    select: { id: true, name: true, email: true, isActive: true },
+  });
+
+  if (!candidate) {
+    throw new NotFoundError('담당자');
+  }
+
+  if (!candidate.isActive) {
+    throw new BadRequestError('비활성 상태의 사용자에게는 담당자를 배정할 수 없습니다.');
+  }
+
+  const handlers = await userService.getUsersWithSRHandlingPermission();
+  if (!handlers.some((handler) => handler.id === assigneeId)) {
+    throw new BadRequestError('SR 처리 권한이 없는 사용자는 담당자로 배정할 수 없습니다.');
+  }
+
+  return { id: candidate.id, name: candidate.name, email: candidate.email };
+}
 
 /**
  * SR (Service Request) 서비스
@@ -32,12 +121,40 @@ export class SRService {
   constructor() {}
 
   /**
+   * 서비스 카테고리가 해당 고객사에서 사용 가능한지 검증합니다.
+   * 전역 카테고리(clientId = null)이거나 해당 고객사 전용 카테고리만 허용합니다.
+   */
+  private async ensureCategoryBelongsToClient(
+    serviceCategoryId: string | null | undefined,
+    clientId: string
+  ): Promise<void> {
+    if (!serviceCategoryId) return;
+
+    const category = await prisma.serviceCategory.findUnique({
+      where: { id: serviceCategoryId },
+      select: { clientId: true },
+    });
+    if (category && category.clientId && category.clientId !== clientId) {
+      throw new ForbiddenError('다른 고객사의 서비스 카테고리는 사용할 수 없습니다.');
+    }
+  }
+
   /**
    * SR을 생성합니다.
    */
   async createSR(data: SrCreateData, sessionUser: AuthenticatedUser): Promise<SRCreateResult> {
     ensureCanCreateSR(sessionUser);
     const validated = srCreateSchema.parse(data);
+
+    // 테넌트 경계 검증: 외부 사용자는 본인이 소속된 고객사로만 SR을 생성할 수 있다.
+    // (REST 라우트와 Server Action 이 모두 이 지점을 거치므로 규칙은 여기 한 곳에만 둔다.)
+    // 조회보다 먼저 검증해야 타 고객사의 존재 여부/이름이 오류 메시지로 새지 않는다.
+    if (
+      !isInternalUser(sessionUser) &&
+      !(sessionUser.clientIds ?? []).includes(validated.clientId)
+    ) {
+      throw new ForbiddenError('소속되지 않은 고객사의 SR을 생성할 수 없습니다.');
+    }
 
     // 고객사 활성 상태 확인
     const client = await prisma.client.findUnique({ where: { id: validated.clientId } });
@@ -51,10 +168,13 @@ export class SRService {
       );
     }
 
+    await this.ensureCategoryBelongsToClient(validated.serviceCategoryId, validated.clientId);
+
     // SR 생성 (트랜잭션으로 SR 번호 생성 및 SR 생성을 원자적으로 수행)
     const sr = await prisma.$transaction(async (tx) => {
-      const today = new Date();
-      const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+      // KST 달력 기준. `toISOString()` 이면 09:00 KST 에 날짜가 롤오버해서
+      // 하루의 앞 9시간에 만든 SR 이 전날 번호를 받는다(감사 3.25).
+      const dateStr = appZoneDateStamp();
 
       // 원자적 시퀀스 채번 (PostgreSQL native upsert)
       const sequences = await tx.$queryRaw<{ seq: number }[]>`
@@ -65,7 +185,14 @@ export class SRService {
         RETURNING "seq"
       `;
 
-      const sequenceSeq = sequences[0].seq;
+      // RETURNING 이 있는 INSERT ... ON CONFLICT DO UPDATE 는 정상 경로에서 반드시 한 행을
+      // 돌려주지만, 타입은 그것을 보장하지 않는다. 빈 배열을 그냥 인덱싱하면
+      // `undefined.seq` 로 죽으면서 원인을 알 수 없는 500 이 되므로, 무슨 일이 있었는지
+      // 말해 주는 오류로 바꾼다(트랜잭션은 어차피 롤백된다).
+      const sequenceSeq = sequences[0]?.seq;
+      if (sequenceSeq === undefined) {
+        throw new Error(`SR 번호 채번에 실패했습니다. (date=${dateStr})`);
+      }
       const srNumber = `SR-${dateStr}-${String(sequenceSeq).padStart(4, '0')}`;
 
       // SR 생성
@@ -158,6 +285,15 @@ export class SRService {
           );
         }
 
+        // 테넌트 경계 검증: 외부 사용자는 본인이 소속된 고객사로만 이관할 수 있다.
+        // (검증이 없으면 다른 테넌트의 격리 경계 안으로 SR과 댓글/첨부를 옮길 수 있다.)
+        if (
+          !isInternalUser(sessionUser) &&
+          !(sessionUser.clientIds ?? []).includes(validated.clientId)
+        ) {
+          throw new ForbiddenError('소속되지 않은 고객사로 SR을 이관할 수 없습니다.');
+        }
+
         // 새 고객사가 활성 상태인지 확인
         const newClient = await prisma.client.findUnique({ where: { id: validated.clientId } });
         if (!newClient) {
@@ -177,7 +313,8 @@ export class SRService {
           validated.status as SRStatus,
           sessionUser.roles,
           existingSR,
-          validated
+          validated,
+          sessionUser.permissions
         );
 
         if (!transitionResult.valid) {
@@ -198,6 +335,80 @@ export class SRService {
         );
       }
 
+      // ────────────────────────────────────────────────────────────────────
+      // 필드 단위 인가: 접수(트리아지) 결과는 운영팀이 소유한다.
+      //
+      // ensureCanUpdateSR 는 "이 SR 을 수정할 수 있는가"만 판정하므로, SR:UPDATE 를 가진
+      // 고객사 관리자(CLIENT_ADMIN)나 SR:UPDATE_SELF 를 가진 요청자 본인도 통과한다.
+      // 그 상태에서 dueDate/actualPriority/estimatedHours/estimatedCompletionDate/
+      // intakeNotes/assigneeId 까지
+      // 그대로 기록하면 SLA 기한과 실제 우선순위를 스스로 고쳐 SLA 준수율 지표를 위조하고
+      // 담당 엔지니어를 조용히 재배정할 수 있다. (전용 intake PATCH 라우트는 같은 필드를
+      // ADMIN/MANAGER 로 제한하고 있으므로 동일한 취지를 서비스 계층에 둔다.)
+      //
+      // 값이 실제로 바뀌는 경우에만 차단한다. 수정 다이얼로그가 전체 객체를 다시 전송하는
+      // 형태여도 동일 값 재전송은 no-op 으로 통과시켜야 정상 편집이 깨지지 않는다.
+      // (users/[id] 라우트에서 채택한 "변경 시도만 거부" 방식과 동일)
+      //
+      // REST 라우트(PATCH /api/srs/[id])와 Server Action(updateSRAction)이 모두 이 지점을
+      // 지나므로 규칙은 여기 한 곳에만 둔다.
+      // ────────────────────────────────────────────────────────────────────
+      const operatorFieldChanges: string[] = [];
+      if (
+        validated.dueDate !== undefined &&
+        toTimestampOrNull(validated.dueDate) !== toTimestampOrNull(existingSR.dueDate)
+      ) {
+        operatorFieldChanges.push('dueDate');
+      }
+      if (
+        validated.actualPriority !== undefined &&
+        validated.actualPriority !== existingSR.actualPriority
+      ) {
+        operatorFieldChanges.push('actualPriority');
+      }
+      if (
+        validated.estimatedHours !== undefined &&
+        toNumberOrNull(validated.estimatedHours) !== toNumberOrNull(existingSR.estimatedHours)
+      ) {
+        operatorFieldChanges.push('estimatedHours');
+      }
+      if (
+        validated.intakeNotes !== undefined &&
+        toStringOrNull(validated.intakeNotes) !== toStringOrNull(existingSR.intakeNotes)
+      ) {
+        operatorFieldChanges.push('intakeNotes');
+      }
+      // estimatedCompletionDate(예상 완료일)도 접수 산출물이다. intake PATCH 라우트가
+      // actualPriority/estimatedHours/estimatedCompletionDate/intakeNotes/assigneeId 를 모두
+      // ADMIN/MANAGER 로 제한하고 있으므로 동일하게 운영 소유 필드로 취급한다.
+      // (SR 수정 다이얼로그는 이 필드를 전송하지 않으므로 일반 편집 경로는 영향받지 않는다.)
+      if (
+        validated.estimatedCompletionDate !== undefined &&
+        toTimestampOrNull(validated.estimatedCompletionDate) !==
+          toTimestampOrNull(existingSR.estimatedCompletionDate)
+      ) {
+        operatorFieldChanges.push('estimatedCompletionDate');
+      }
+      if (
+        assigneeId !== undefined &&
+        toStringOrNull(assigneeId) !== toStringOrNull(existingSR.assigneeId)
+      ) {
+        operatorFieldChanges.push('assigneeId');
+      }
+
+      if (operatorFieldChanges.length > 0 && !canWriteOperatorOwnedFields(sessionUser)) {
+        throw new ForbiddenError(
+          `접수 담당자만 변경할 수 있는 항목입니다: ${operatorFieldChanges.join(', ')}. ` +
+            `변경이 필요한 경우 담당자에게 요청하세요.`
+        );
+      }
+
+      // 담당자 유효성 검증: 존재하지 않거나 비활성이거나 SR 처리 권한이 없는 사용자는 거부한다.
+      // (배정 해제(null)는 검증 대상이 아니다.)
+      if (assigneeId && assigneeId !== existingSR.assigneeId) {
+        await assertAssignable(assigneeId);
+      }
+
       const updateData: Prisma.SRUncheckedUpdateInput = {};
 
       // basic fields
@@ -206,6 +417,15 @@ export class SRService {
       if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
       if (validated.priority !== undefined) updateData.priority = validated.priority;
       if (validated.status !== undefined) updateData.status = validated.status;
+
+      // 요청자가 표명한 희망 긴급도·기한. 운영자 소유 필드가 아니므로 게이트하지 않는다.
+      // (스키마에 선언이 없어 zod 가 조용히 버리던 값들 — 감사 3.27)
+      if (validated.requestedPriority !== undefined)
+        updateData.requestedPriority = validated.requestedPriority;
+      if (validated.requestedCompletionDate !== undefined)
+        updateData.requestedCompletionDate = validated.requestedCompletionDate
+          ? new Date(validated.requestedCompletionDate)
+          : null;
       if (validated.actualPriority !== undefined)
         updateData.actualPriority = validated.actualPriority;
       if (validated.estimatedHours !== undefined)
@@ -242,7 +462,15 @@ export class SRService {
 
       // relations
       if (validated.serviceCategoryId !== undefined) {
-        if (validated.serviceCategoryId) updateData.serviceCategoryId = validated.serviceCategoryId;
+        if (validated.serviceCategoryId) {
+          // 생성 경로와 동일한 테넌트 경계를 적용한다.
+          // (없으면 타 고객사 카테고리로 바꿔 이름/SLA를 되읽을 수 있다.)
+          await this.ensureCategoryBelongsToClient(
+            validated.serviceCategoryId,
+            validated.clientId ?? existingSR.clientId
+          );
+          updateData.serviceCategoryId = validated.serviceCategoryId;
+        }
       }
 
       if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
@@ -256,7 +484,7 @@ export class SRService {
             existingSR.intakeAt || new Date()
           );
           updateData.dueDate = dueDate;
-        } catch (error) {
+        } catch {
           // 카테고리를 찾지 못해도 SR 업데이트는 계속 진행
           logger.warn('SLA 기한 계산 실패', { categoryId: existingSR.serviceCategoryId });
         }
@@ -429,7 +657,9 @@ export class SRService {
       logger.error('SR 업데이트 서비스 오류', error instanceof Error ? error : undefined, {
         srId: id,
       });
-      throw error;
+      // 원시 Prisma 제약 위반(P2003 등)은 도메인 에러로 정규화해 400 으로 내린다.
+      // (잘못된 참조 ID 가 500 으로 노출되는 것을 방지)
+      throw mapPrismaError(error) ?? error;
     }
   }
 
@@ -691,7 +921,7 @@ export class SRService {
 
     const hasMore = activities.length > limit;
     const items = hasMore ? activities.slice(0, limit) : activities;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return { activities: items, nextCursor };
   }
@@ -732,7 +962,7 @@ export class SRService {
 
     const hasMore = comments.length > limit;
     const items = hasMore ? comments.slice(0, limit) : comments;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
 
     return { comments: items, nextCursor };
   }

@@ -54,8 +54,9 @@ model User {
   pushSubscriptions      PushSubscription[]
   notificationPreference NotificationPreference?
 
-  @@index([email])
   @@index([isActive])
+  // SR 검색이 요청자·담당자 이름으로도 조인 검색한다(감사 4.2).
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "users_name_trgm_idx")
   @@map("users")
 }
 
@@ -141,8 +142,10 @@ model Client {
   clientHandlers    ClientHandler[]
 
   @@index([name])
-  @@index([code])
   @@index([isActive])
+  // SR 검색이 고객사명으로도 조인 검색한다(감사 4.2).
+  // 위 `@@index([name])` 과 기본 이름이 겹치므로 map 을 명시한다.
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "clients_name_trgm_idx")
   @@map("clients")
 }
 
@@ -294,6 +297,19 @@ model SR {
   // 마감일 기반 큐/대시보드(dueToday, 담당자별 마감 임박) 조회 가속
   @@index([status, dueDate])
   @@index([assigneeId, dueDate])
+  // SR 목록의 기본 정렬(created_at DESC)을 지원한다(감사 4.2).
+  //
+  // 기존 인덱스는 필터는 공급해도 **정렬은 공급하지 못했다.** 예컨대 고객사 사용자의
+  // where 는 `clientId: { in: [...] }` 인데 `srs_client_id_status_idx` 로는 정렬이 안 되어,
+  // Postgres 가 매칭 행 전체를 물질화해 정렬한 뒤에야 OFFSET/LIMIT 을 적용했다.
+  // 목록 첫 페이지를 보는 것만으로 그 고객사의 전체 SR 을 훑는 셈이다.
+  @@index([createdAt(sort: Desc)])
+  @@index([clientId, createdAt(sort: Desc)])
+  @@index([assigneeId, createdAt(sort: Desc)])
+  // 검색용 pg_trgm GIN 인덱스 (감사 4.2).
+  // 목록 검색은 앵커 없는 ILIKE '%term%' 이라 B-tree 를 쓸 수 없어 전부 순차 스캔이었다.
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "srs_title_trgm_idx")
+  @@index([srNumber(ops: raw("gin_trgm_ops"))], type: Gin, map: "srs_sr_number_trgm_idx")
   @@map("srs")
 }
 
@@ -393,7 +409,6 @@ model Notification {
   createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
   @@index([status, createdAt])
-  @@index([recipient])
   @@index([recipient, createdAt])
   @@map("notifications")
 }

@@ -19,7 +19,7 @@ import { Building2, ChevronDown, ChevronRight, GripVertical, Plus, Users } from 
 
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
-import { cn } from '@/lib/utils';
+import { cn, escapeRegExp } from '@/lib/utils';
 
 import { ClientCardContextMenu } from './ClientCardContextMenu';
 import { UserCardContextMenu } from './UserCardContextMenu';
@@ -63,10 +63,13 @@ interface OrganizationTreeProps {
 }
 
 // 검색어 하이라이트 헬퍼 함수
+// 검색어는 사용자 입력이므로 정규식 메타문자를 반드시 이스케이프한다.
+// (이스케이프 없이는 '(' 한 글자만 입력해도 RegExp 생성이 throw 되어 조직도 전체가 크래시한다)
 function highlightText(text: string, query: string) {
   if (!query.trim()) return text;
 
-  const regex = new RegExp(`(${query})`, 'gi');
+  // eslint-disable-next-line security/detect-non-literal-regexp -- escapeRegExp 로 메타문자를 모두 무력화한 뒤 주입한다
+  const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
   const parts = text.split(regex);
 
   return parts.map((part, i) =>

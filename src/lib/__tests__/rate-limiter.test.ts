@@ -140,7 +140,12 @@ describe('MemoryRateLimiter', () => {
   });
 
   describe('OOM 방어 및 점진적 축출', () => {
-    it('임계치 초과 시 오래된 버킷 500개를 방출해야 함 (FIFO)', async () => {
+    // 이 테스트는 원래 "삽입 순서로 앞 500개를 지운다"를 사양으로 못 박고 있었다
+    // (key-0·key-499 는 없고 key-500 은 있어야 한다). 그 정책이 바로 감사 4.1 이 지적한
+    // 우회 경로다 — 축출은 곧 토큰 리셋이므로, 키를 대량 생성할 수 있는 쪽은 자기
+    // 소진 버킷을 밀어내는 것만으로 제한을 무한히 풀 수 있었다.
+    // 이제 "무엇을 먼저 버리는가"가 아니라 "제한이 유지되는가"를 단언한다.
+    it('임계치 초과 시 제한과 무관한 버킷부터 방출해 크기를 줄여야 함', async () => {
       const oomLimiter = new MemoryRateLimiter({
         windowMs: 10000,
         maxRequests: 5,
@@ -153,15 +158,17 @@ describe('MemoryRateLimiter', () => {
           lastRefill: Date.now(),
         });
       }
+      // 소진된(제한에 걸린) 버킷 하나를 섞어 둔다.
+      bucketsMap.set('throttled', { tokens: 0, lastRefill: Date.now() });
 
-      expect(bucketsMap.size).toBe(10005);
+      expect(bucketsMap.size).toBe(10006);
 
       await oomLimiter.check('new-key');
 
       expect(bucketsMap.size).toBeLessThanOrEqual(9506);
-      expect(bucketsMap.has('key-0')).toBe(false);
-      expect(bucketsMap.has('key-499')).toBe(false);
-      expect(bucketsMap.has('key-500')).toBe(true);
+      // 여유 토큰이 있는 버킷이 넘치도록 남아 있으므로 소진 버킷은 버릴 이유가 없다.
+      expect(bucketsMap.has('throttled')).toBe(true);
+      expect(bucketsMap.get('throttled').tokens).toBe(0);
     });
 
     it('랜덤 샘플링을 통해 만료된 데이터를 O(1) 수준으로 지워야 함', async () => {
