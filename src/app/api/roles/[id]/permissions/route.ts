@@ -3,9 +3,9 @@ import { z } from 'zod';
 
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/errors';
-import { ensureCanUpdateRole } from '@/lib/policies';
+import { firstZodIssueMessage, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { RoleService } from '@/services/role.service';
 
 const permissionAssignSchema = z.object({
   permissionIds: z.array(z.string()),
@@ -30,17 +30,15 @@ export const POST = withAuthAndRateLimit(
       throw error;
     }
 
-    // Check if role exists
-    const role = await prisma.role.findUnique({
-      where: { id },
-    });
-
-    if (!role) {
-      throw new NotFoundError('역할');
-    }
-
-    // 권한 체크: 역할 수정 권한(ADMIN 또는 ROLE:UPDATE)이 있어야 하며 ADMIN 역할은 변경 불가
-    ensureCanUpdateRole(session.user, role);
+    // 권한 교체는 RoleService 로 위임한다.
+    //
+    // 예전에는 이 라우트가 직접 트랜잭션을 돌렸고, 인가는 `ensureCanUpdateRole` 한 줄뿐이라
+    // (1) 행위자가 **자기 역할**을 대상으로 삼는 것과 (2) 자기가 보유하지 않은 권한을
+    // 부여하는 것을 막지 않았다. 그래서 `ROLE:UPDATE` 하나가 사실상 풀 어드민이었다(감사 3.11).
+    //
+    // 같은 불변식을 라우트와 서버 액션에 각각 복사하면 다음 진입점에서 또 벌어진다.
+    // 서비스 한 곳에서 판정하도록 모은다.
+    const roleService = new RoleService();
 
     // 존재하지 않는 permissionId 사전 차단(잘못된 id 로 교체가 실패해 권한이 전부
     // 사라지는 것을 방지)
@@ -49,36 +47,20 @@ export const POST = withAuthAndRateLimit(
         where: { id: { in: validated.permissionIds } },
         select: { id: true },
       });
-      const foundIds = new Set(existing.map((p) => p.id));
+      const foundIds = new Set(existing.map((perm) => perm.id));
       const missing = validated.permissionIds.filter((pid) => !foundIds.has(pid));
       if (missing.length > 0) {
         throw new ValidationError('존재하지 않는 권한이 포함되어 있습니다.');
       }
     }
 
-    // 권한 교체는 원자적으로 수행한다: 삭제와 생성을 하나의 트랜잭션으로 묶어,
-    // 중간 실패 시 역할의 권한이 전부 사라지는 상태를 방지한다.
-    await prisma.$transaction(async (tx) => {
-      await tx.rolePermission.deleteMany({ where: { roleId: id } });
-      if (validated.permissionIds.length > 0) {
-        await tx.rolePermission.createMany({
-          data: validated.permissionIds.map((permissionId) => ({ roleId: id, permissionId })),
-          skipDuplicates: true,
-        });
-      }
-    });
-
-    // Fetch updated role with permissions
-    const updatedRole = await prisma.role.findUnique({
-      where: { id },
-      include: {
-        permissions: {
-          include: {
-            permission: true,
-          },
-        },
-      },
-    });
+    const updatedRole = await roleService.updateRolePermissions(
+      id,
+      validated.permissionIds,
+      session.user.id,
+      null,
+      session.user
+    );
 
     return NextResponse.json(updatedRole);
   },

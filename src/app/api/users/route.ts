@@ -11,7 +11,7 @@ import { UserService } from '@/services/user.service';
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
 
-import { usePagination } from '@/lib/pagination';
+import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
 
 // GET /api/users - 사용자 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(
@@ -19,7 +19,7 @@ export const GET = withAuthAndRateLimit(
     ensureCanReadUser(session.user);
 
     const { searchParams } = new URL(request.url);
-    const { skip, take, orderBy, createResponse } = usePagination(request);
+    const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.users);
 
     let clientIdFilter: string | { in: string[] } | undefined =
       searchParams.get('clientId') || undefined;

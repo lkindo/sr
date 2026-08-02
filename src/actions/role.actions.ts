@@ -47,10 +47,12 @@ export async function updateRoleAction(id: string, formData: FormData): Promise<
     }
     const validated = validationResult.data;
 
-    await authenticateAndAuthorize('role:update');
+    // 서비스가 불변식을 판정하려면 actor 가 필요하다. 예전에는 넘기지 않아서
+    // ADMIN 역할 불변·자기 역할 수정 금지가 이 경로에서만 통째로 빠져 있었다(감사 3.11).
+    const session = await authenticateAndAuthorize('role:update');
 
     const roleService = services.roleService;
-    const role = await roleService.updateRole(id, validated);
+    const role = await roleService.updateRole(id, validated, session.user.id, null, session.user);
 
     return ok(role);
   } catch (error) {
@@ -60,10 +62,10 @@ export async function updateRoleAction(id: string, formData: FormData): Promise<
 
 export async function deleteRoleAction(id: string): Promise<Result<void>> {
   try {
-    await authenticateAndAuthorize('role:delete');
+    const session = await authenticateAndAuthorize('role:delete');
 
     const roleService = services.roleService;
-    await roleService.deleteRole(id);
+    await roleService.deleteRole(id, session.user.id, null, session.user);
 
     return ok(undefined);
   } catch (error) {
@@ -114,10 +116,16 @@ export async function updateRolePermissionsAction(
   permissionIds: string[]
 ): Promise<Result<void>> {
   try {
-    await authenticateAndAuthorize('role:update_permissions');
+    const session = await authenticateAndAuthorize('role:update_permissions');
 
     const roleService = services.roleService;
-    await roleService.updateRolePermissions(roleId, permissionIds);
+    await roleService.updateRolePermissions(
+      roleId,
+      permissionIds,
+      session.user.id,
+      null,
+      session.user
+    );
 
     return ok(undefined);
   } catch (error) {

@@ -7,6 +7,9 @@ import security from 'eslint-plugin-security';
 
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import reactHooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
+
+const nodeGlobals = globals.node;
 
 const eslintConfig = [
   {
@@ -101,6 +104,14 @@ const eslintConfig = [
       'security/detect-no-csrf-before-method-override': 'error',
       'security/detect-possible-timing-attacks': 'warn',
       'security/detect-pseudoRandomBytes': 'warn',
+    },
+  },
+  {
+    // 순수 Node 스크립트. `.ts` 스크립트는 typescript-eslint 가 no-undef 를 꺼주지만
+    // `.mjs` 는 그렇지 않아 process/console 이 전부 no-undef 로 잡힌다.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: nodeGlobals,
     },
   },
   {

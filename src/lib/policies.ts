@@ -380,6 +380,75 @@ export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
   }
 }
 
+/**
+ * 역할 이름 변경이 시스템 역할을 사칭하지 못하게 한다.
+ *
+ * `ensureCanUpdateRole` 은 **대상 역할이 ADMIN 인지**만 봤다. 그래서 ROLE:UPDATE 보유자가
+ * 평범한 커스텀 역할의 이름을 'ADMIN' 으로 바꾸면, 코드베이스 전역의
+ * `roles.includes('ADMIN')` 검사가 전부 통과한다(감사 3.11).
+ */
+export function ensureRoleNameNotReserved(user: AuthenticatedUser, nextName?: string): void {
+  if (!nextName) return;
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
+  if (isAdmin) return;
+
+  if (SYSTEM_ROLES.some((name) => name.toLowerCase() === nextName.trim().toLowerCase())) {
+    throw new ForbiddenError(`시스템 역할 이름(${nextName})으로 변경할 수 없습니다.`);
+  }
+}
+
+/**
+ * 행위자가 **자기 자신의 역할**을 대상으로 삼는 것을 막는다.
+ *
+ * 막지 않으면 ROLE:UPDATE 보유자가 자기 역할에 모든 권한을 얹어 즉시 풀 어드민이 된다.
+ * ADMIN 은 이미 전권이므로 예외다 — 막아도 얻는 보호가 없고 운영만 불편해진다.
+ */
+export function ensureNotActorsOwnRole(user: AuthenticatedUser, role: Role): void {
+  if (user.roles?.includes('ADMIN')) return;
+
+  if (user.roles?.includes(role.name)) {
+    throw new ForbiddenError(
+      '자신이 보유한 역할은 수정할 수 없습니다. 다른 관리자에게 요청하세요.'
+    );
+  }
+}
+
+/**
+ * 행위자가 **보유하지 않은 권한을 부여하는 것**을 막는다(권한 상승 방지).
+ *
+ * 이것이 없으면 `ROLE:UPDATE` 하나로 `USER:DELETE`·`SR:DELETE`·`ROLE:ASSIGN` 을 만들어
+ * 낼 수 있다. 즉 권한 하나가 모든 권한과 등가가 된다.
+ *
+ * ADMIN 은 예외다. 그리고 **회수는 막지 않는다** — 자기가 못 가진 권한을 빼는 것은
+ * 상승이 아니라 축소이므로 허용해야 운영이 가능하다.
+ *
+ * @param granted 행위자가 이미 보유한 권한 문자열(`RESOURCE:ACTION`)
+ * @param nextPermissions 이번에 부여하려는 권한 문자열
+ * @param currentPermissions 대상 역할이 지금 보유한 권한 문자열
+ */
+export function ensureNoPrivilegeEscalation(
+  user: AuthenticatedUser,
+  nextPermissions: string[],
+  currentPermissions: string[]
+): void {
+  if (user.roles?.includes('ADMIN')) return;
+
+  const held = new Set((user.permissions ?? []).map((entry) => entry.toUpperCase()));
+  const already = new Set(currentPermissions.map((entry) => entry.toUpperCase()));
+
+  const escalating = nextPermissions
+    .map((entry) => entry.toUpperCase())
+    // 이미 대상 역할이 갖고 있던 권한은 이번 요청이 새로 만든 것이 아니다.
+    .filter((entry) => !already.has(entry))
+    .filter((entry) => !held.has(entry));
+
+  if (escalating.length > 0) {
+    throw new ForbiddenError(
+      `본인이 보유하지 않은 권한은 부여할 수 없습니다: ${escalating.join(', ')}`
+    );
+  }
+}
+
 export function ensureCanAssignRole(user: AuthenticatedUser, role: Role): void {
   if (role.name === 'ADMIN' && !user.roles?.includes('ADMIN')) {
     throw new ForbiddenError('ADMIN 역할 할당은 ADMIN만 가능합니다.');

@@ -3,6 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { authenticateAndAuthorize, validateWithSchema } from '@/lib/action-helpers';
 import { services } from '@/services/service-registry';
 
+/**
+ * 역할 액션은 이제 서비스에 `actor` 를 넘긴다(감사 3.11). 서비스가 불변식을 판정하려면
+ * 세션이 필요하므로, 목이 undefined 를 돌려주면 `session.user` 에서 죽는다.
+ */
+const SESSION = {
+  user: {
+    id: 'actor-1',
+    email: 'actor@example.com',
+    name: '행위자',
+    image: null,
+    roles: ['ADMIN'],
+    permissions: [],
+    clientIds: [],
+  },
+};
+
 // Mock dependencies BEFORE importing actions
 vi.mock('@/lib/action-helpers', () => ({
   authenticateAndAuthorize: vi.fn(),
@@ -29,6 +45,7 @@ describe('role.actions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(authenticateAndAuthorize).mockResolvedValue(SESSION as never);
     services.setMockInstance('roleService', mockRoleService);
   });
 
@@ -107,10 +124,13 @@ describe('role.actions', () => {
         expect(result.data).toEqual(mockRole);
       }
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:update');
-      expect(mockRoleService.updateRole).toHaveBeenCalledWith('r1', {
-        name: 'UPDATED_ROLE',
-        description: 'new desc',
-      });
+      expect(mockRoleService.updateRole).toHaveBeenCalledWith(
+        'r1',
+        { name: 'UPDATED_ROLE', description: 'new desc' },
+        SESSION.user.id,
+        null,
+        SESSION.user
+      );
     });
   });
 
@@ -122,7 +142,13 @@ describe('role.actions', () => {
 
       expect(result.success).toBe(true);
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:delete');
-      expect(mockRoleService.deleteRole).toHaveBeenCalledWith('r1');
+      // actor 를 넘겨야 서비스의 불변식이 작동한다(감사 3.11).
+      expect(mockRoleService.deleteRole).toHaveBeenCalledWith(
+        'r1',
+        SESSION.user.id,
+        null,
+        SESSION.user
+      );
     });
   });
 
@@ -159,7 +185,13 @@ describe('role.actions', () => {
 
       expect(result.success).toBe(true);
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:update_permissions');
-      expect(mockRoleService.updateRolePermissions).toHaveBeenCalledWith('r1', ['p1', 'p2']);
+      expect(mockRoleService.updateRolePermissions).toHaveBeenCalledWith(
+        'r1',
+        ['p1', 'p2'],
+        SESSION.user.id,
+        null,
+        SESSION.user
+      );
     });
   });
 });

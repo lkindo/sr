@@ -243,7 +243,37 @@ CLIENT_ADMIN(또는 USER:READ를 가진 커스텀 역할)이 시스템 내 임�
 
 ---
 
-### 3.11 [HIGH] ROLE:UPDATE 보유자가 자기 역할에 모든 권한 부여 가능 + 서버 액션 경로는 ADMIN 가드 자체가 없음
+### 3.11 [HIGH] ~~ROLE:UPDATE 보유자가 자기 역할에 모든 권한 부여 가능 + 서버 액션 경로는 ADMIN 가드 자체가 없음~~ — 해소(2026-08-02)
+
+**해소 방식**: 권장안 1번(가드를 `RoleService` 로 이동)을 택했다. 라우트에 두면 이번처럼
+서버 액션이 우회하고, 두 곳에 복사하면 세 번째 진입점이 생길 때 또 벌어진다.
+`updateRole` / `deleteRole` / `updateRolePermissions` 가 `actor` 를 받아 직접 판정한다.
+`actor` 가 없으면 시스템 호출(시드 등)로 간주해 통과시킨다.
+
+네 가지 규칙을 `src/lib/policies.ts` 에 추가했다.
+
+| 규칙                           | 함수                                             | 없으면 생기는 일                                  |
+| ------------------------------ | ------------------------------------------------ | ------------------------------------------------- |
+| 보유하지 않은 권한 부여 금지   | `ensureNoPrivilegeEscalation`                    | `ROLE:UPDATE` 하나가 모든 권한과 등가             |
+| 자기 역할을 대상으로 삼기 금지 | `ensureNotActorsOwnRole`                         | 보유자가 자기 역할에 전권을 얹음                  |
+| `ADMIN` 으로의 개명 금지       | `ensureRoleNameNotReserved`                      | 이름만 바꿔도 전역 `roles.includes('ADMIN')` 통과 |
+| ADMIN·시스템 역할 보호         | 기존 `ensureCanUpdateRole`/`ensureCanDeleteRole` | (있었으나 REST 에서만 강제됨)                     |
+
+권한 상승 판정은 **대상 역할이 이미 갖고 있던 권한을 제외**한다. 권한 교체는 전체 목록을
+다시 보내는 방식이라, 기존 권한을 함께 보냈다고 상승으로 막으면 정상 편집이 전부 불가능해진다.
+**회수는 막지 않는다** — 자기가 못 가진 권한을 빼는 것은 상승이 아니라 축소다.
+
+`POST /api/roles/[id]/permissions` 는 직접 트랜잭션을 돌리던 것을 서비스 위임으로 바꿨다.
+그러지 않으면 라우트만 상승 검사를 건너뛴다.
+
+**회귀 테스트 18건**:
+
+- `src/services/__tests__/role.service.escalation.test.ts` (14) — 차단과 **과잉 차단 방지**를 함께 단언한다. 막는 것만 테스트하면 운영을 마비시키는 수정을 놓친다.
+- `src/actions/__tests__/role.actions.escalation.test.ts` (4) — 서버 액션이 `actor` 를 실제로 넘기는지. **안 넘기면 서비스가 시스템 호출로 간주해 전부 통과시킨다** — 겉보기엔 고쳐졌는데 실제로는 열려 있는 상태가 된다.
+
+가드를 제거해 정확히 3건이 실패하는 것을 확인했다.
+
+**원문**: [HIGH] ROLE:UPDATE 보유자가 자기 역할에 모든 권한 부여 가능 + 서버 액션 경로는 ADMIN 가드 자체가 없음
 
 **파일**: `src/app/api/roles/[id]/permissions/route.ts:43-69`, `src/actions/role.actions.ts:38-73, 113-127`
 
@@ -1337,7 +1367,8 @@ async getClientDetailsById(id: string) {
 
 - ~~**클라이언트 `hasPermission` 이 세션과 다른 구분자로 키를 조립해 항상 false**~~ — **감사 이후 발견·해소됨(2026-08-01).** `src/hooks/use-permissions.ts` 가 `` `${resource}.${action}` `` 로 조립하는데 `src/auth.ts:146` 은 세션 토큰에 `` `${resource}:${action}` `` 를 담는다. 따라서 `hasPermission`/`hasAnyPermission`/`hasAllPermissions` 가 어떤 입력에도 false 였다. 현재 호출부(`PermissionGuard`, `Sidebar`)가 모두 `roles` 를 쓰고 있어 증상이 드러나지 않았을 뿐, 권한으로 게이트하는 순간 조용히 막히는 지뢰였다. 구분자를 맞추고 비교를 대소문자 무시로 바꿨다. 기존 테스트 두 개가 `permissions: ['sr.view', ...]` 라는 프로덕션에 존재하지 않는 형태를 픽스처로 써서 점 조립을 정상 동작으로 못 박고 있었으므로 실제 세션 형태로 교체했다.
 
-- **`SessionProvider`에 서버 해석 세션을 전달하지 않음** — `src/components/providers/ClientLayout.tsx:43`의 `<SessionProvider>`가 `session` prop을 받지 않는데, `src/app/(dashboard)/layout.tsx:10`은 이미 `auth()`를 서버에서 await해 Header에만 전달한다. `usePermissions`(`use-permissions.ts:9, 25, 30`)가 `session?.user`가 undefined면 모든 검사에 false를 반환하므로 SSR 동안과 `/api/auth/session` 해석 전까지 사이드바 전체(`Sidebar.tsx:34-52, 66-77`), 상단 nav 필터(`Header.tsx:113-118`), `ExportButton`(`:16-18`)이 비어 있다가 팝인한다. `SRsDataTable.tsx:114`의 `isClientUser = !hasAnyRole([...])`는 더 나쁘다 — 로딩 창 동안 ADMIN이 클라이언트 사용자로 취급되어 퀵필터 바와 상세 필터 버튼(`:315`)이 숨겨졌다가 주입되어 테이블이 밀린다. → `const session = await auth()`를 레이아웃에서 `<SessionProvider session={session}>`로 전달하고, `usePermissions`가 `status`를 노출해 호출자가 'loading'과 'denied'를 구분(스켈레톤 렌더)하게 한다.
+- [해소] **`SessionProvider`에 서버 해석 세션을 전달하지 않음** — `src/components/providers/ClientLayout.tsx:43`의 `<SessionProvider>`가 `session` prop을 받지 않는데, `src/app/(dashboard)/layout.tsx:10`은 이미 `auth()`를 서버에서 await해 Header에만 전달한다. `usePermissions`(`use-permissions.ts:9, 25, 30`)가 `session?.user`가 undefined면 모든 검사에 false를 반환하므로 SSR 동안과 `/api/auth/session` 해석 전까지 사이드바 전체(`Sidebar.tsx:34-52, 66-77`), 상단 nav 필터(`Header.tsx:113-118`), `ExportButton`(`:16-18`)이 비어 있다가 팝인한다. `SRsDataTable.tsx:114`의 `isClientUser = !hasAnyRole([...])`는 더 나쁘다 — 로딩 창 동안 ADMIN이 클라이언트 사용자로 취급되어 퀵필터 바와 상세 필터 버튼(`:315`)이 숨겨졌다가 주입되어 테이블이 밀린다. → `const session = await auth()`를 레이아웃에서 `<SessionProvider session={session}>`로 전달하고, `usePermissions`가 `status`를 노출해 호출자가 'loading'과 'denied'를 구분(스켈레톤 렌더)하게 한다.
+  <!-- verified: FIXED — 483c60d — src/app/layout.tsx 가 auth() 를 await 해 ClientLayout → <SessionProvider session={session}> 로 전달. Header 의 nav 필터도 클라이언트 세션만 보는 hasAnyRole() 대신 서버 props 와 병합된 user 를 쓴다. 회귀 테스트 2건(src/app/__tests__/layout.session.test.tsx, src/components/layout/__tests__/Header.nav.test.tsx)은 각 결함을 되돌리면 실패하는 것을 확인했다. 실제 증상: ADMIN 로그인 시 조직 관리·권한 관리 메뉴 미표시 / 남은 일: usePermissions 의 status 노출/스켈레톤 렌더는 미적용. 초기 세션이 심어지면서 첫 렌더의 loading 창이 사라져 실익이 크지 않다고 판단 -->
 
 - **검색 디바운스 타이머가 낡은 `searchParams` 스냅샷으로 발화** — `SRsDataTable.tsx:156-165`의 디바운스 effect가 deps `[searchQuery]`만 갖는데 본문에서 `handleFilterChange`(`:190`)를 호출하고, 이는 `createQueryString`(`useCallback(..., [searchParams])`, `:175-188`)을 클로저로 잡는다. 사용자가 검색어를 입력하고 500ms 내에 상태 필터를 고르면, Select가 내비게이트한 후 대기 중이던 디바운스 타이머가 내비게이션 이전 searchParams로 만든 URL을 push해 **방금 선택한 상태 필터를 조용히 폐기**한다. 반대 순서도 마찬가지다. 게다가 `:168-173`의 동기화 effect가 searchParams 변경마다 `if (searchQuery !== currentSearch) setSearchQuery(currentSearch)`를 무조건 실행하므로, 모든 필터/정렬/페이지 내비게이션이 **입력 중인 검색어를 지운다**(그 내비게이션들이 pending search 값을 URL에 싣지 않으므로 currentSearch가 ''). → URL을 단일 진실 원천으로: `handleFilterChange`가 현재 `searchQuery`를 `createQueryString`에 포함시키고, 동기화 effect를 이 컴포넌트가 시작한 내비게이션의 에코를 무시하는 ref로 게이트(또는 로컬 상태를 버리고 `filters.search`로 입력을 구동).
 
