@@ -26,7 +26,9 @@ test.describe('역할 관리 - ADMIN 권한', () => {
     await page.goto('/roles', { waitUntil: 'domcontentloaded' });
 
     // ADMIN은 역할 목록 테이블이 보여야 함
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 10000,
+    });
     console.log('✅ ADMIN: 역할 목록 테이블 확인');
   });
 

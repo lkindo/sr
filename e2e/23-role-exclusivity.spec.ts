@@ -317,7 +317,7 @@ test.describe('역할 할당 UI 테스트', () => {
     });
     await usersApiResponse;
 
-    const table = page.locator('table:not([data-skeleton])');
+    const table = page.locator('table:not([data-skeleton]):visible');
     await expect(table).toBeVisible({ timeout: 15000 });
     await expect(table.getByRole('columnheader', { name: '역할' })).toBeVisible();
 

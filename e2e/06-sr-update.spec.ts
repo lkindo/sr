@@ -59,8 +59,11 @@ test.describe('SR 수정', () => {
     });
 
     // 7. 수정 결과 확인 (제목이 변경되었는지)
-    // 페이지가 리로드되거나 UI가 갱신될 수 있음. 제목 요소가 새로운 텍스트를 포함하는지 확인
-    const titleLocator = page.locator('h1, h2, h3').filter({ hasText: newTitle });
+    // 이 단언은 `h1, h2, h3` 안에서 제목을 찾고 있었는데, 상세 페이지의 헤딩은 SR 번호이고
+    // 제목은 <p> 로 렌더된다(src/app/(dashboard)/srs/[id]/page.tsx). 즉 구조적으로 절대
+    // 매칭되지 않는 셀렉터였다 — 수정 자체는 성공하는데 검증만 실패하고 있었다.
+    // 마크업 변경에 흔들리지 않도록 testid 로 겨냥한다.
+    const titleLocator = page.getByTestId('sr-title').filter({ hasText: newTitle });
 
     try {
       await expect(titleLocator).toBeVisible({ timeout: 5000 });

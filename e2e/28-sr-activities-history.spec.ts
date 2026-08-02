@@ -19,7 +19,9 @@ import { expect, test } from '@playwright/test';
 test.describe('SR 활동 로그 및 이력', () => {
   test('SR 상세 페이지에서 활동 로그 표시 확인', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     // 첫 번째 SR 클릭
     const firstSR = page.locator('tbody tr, [role="row"]').first();
@@ -78,7 +80,9 @@ test.describe('SR 활동 로그 및 이력', () => {
 
   test('상태 이력 타임라인 확인', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     // 첫 번째 SR 클릭
     const firstSR = page.locator('tbody tr, [role="row"]').first();
@@ -114,7 +118,9 @@ test.describe('SR 활동 로그 및 이력', () => {
   test('활동 유형별 필터링', async ({ page }) => {
     // 이 기능은 현재 UI에 구현되어 있지 않을 수 있음
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     const firstSR = page.locator('tbody tr, [role="row"]').first();
     await firstSR.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});

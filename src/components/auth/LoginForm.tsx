@@ -74,7 +74,10 @@ export default function LoginForm() {
   return (
     <Card>
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold">로그인</CardTitle>
+        {/* CardTitle 은 <div> 라 그대로 두면 페이지에 h1 이 없다(axe: page-has-heading-one). */}
+        <CardTitle asChild className="text-2xl font-bold">
+          <h1>로그인</h1>
+        </CardTitle>
         <CardDescription>SR 관리 시스템에 로그인하세요</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -133,7 +136,7 @@ export default function LoginForm() {
           </Button>
           <p className="text-sm text-muted-foreground text-center">
             계정이 없으신가요?{' '}
-            <Link href="/register" className="text-primary hover:underline">
+            <Link href="/register" className="text-primary underline underline-offset-4">
               회원가입
             </Link>
           </p>

@@ -41,7 +41,9 @@ test.describe('서비스 카테고리', () => {
       .catch(() => null);
 
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
     await categoriesCall;
 
     if (!categoriesResponse) {
@@ -71,7 +73,9 @@ test.describe('서비스 카테고리', () => {
 
   test('SR 생성 시 서비스 카테고리 선택', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     // SR 생성 버튼 클릭
     const createButton = page
@@ -151,7 +155,9 @@ test.describe('서비스 카테고리', () => {
   test('고객사별 서비스 카테고리 관리 API', async ({ page }) => {
     // 고객사 상세 페이지로 이동
     await page.goto('/clients', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     // 첫 번째 고객사 클릭
     const firstClient = page.locator('tbody tr, [role="row"]').first();
@@ -211,7 +217,9 @@ test.describe('서비스 카테고리', () => {
 
   test('서비스 카테고리 필터링', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     // 카테고리 필터 Select 찾기
     const categoryFilter = page

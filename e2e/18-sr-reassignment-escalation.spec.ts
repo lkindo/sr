@@ -93,7 +93,9 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
 
       // 목록에서 생성된 SR 찾기
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+        timeout: 15000,
+      });
 
       const srRow = page.locator('tr', { hasText: srTitle }).first();
 
@@ -103,7 +105,9 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         console.log(`⚠️ SR이 목록에 없음. 새로고침 시도 ${retryCount + 1}/3`);
         await page.reload({ waitUntil: 'domcontentloaded' });
         // 고정 sleep 대신 목록이 다시 그려졌는지를 기다린다
-        await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+          timeout: 15000,
+        });
         await srRow.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         retryCount++;
       }
@@ -368,7 +372,9 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
     try {
       // SR 목록 페이지로 이동
       await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+        timeout: 15000,
+      });
 
       // CRITICAL 우선순위 SR 필터링 (있다면)
       const filterButton = page.getByRole('button', { name: /필터|Filter/i });

@@ -85,7 +85,9 @@ test.describe('SR 워크플로우 통합', () => {
 
     // isVisible() 은 대기하지 않고 즉시 현재 상태를 반환하므로,
     // 목록이 렌더링되기 전에 물어보면 검색 필드가 있어도 없다고 판단한다.
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 15000,
+    });
 
     // 검색 필터가 있다면 사용하여 검색
     const searchInput = page.getByPlaceholder(/검색|Search/i);
