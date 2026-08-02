@@ -59,7 +59,7 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
     await detailResponsePromise;
 
     // 상세 정보 확인
-    await expect(page.locator('h3:has-text("상세 정보")')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: '상세 정보' })).toBeVisible({ timeout: 5000 });
 
     // REQUESTED 상태 + ADMIN 이면 아래 버튼들이 반드시 있어야 한다.
     // (src/components/srs/SRStatusActions.tsx 의 REQUESTED 분기 및
@@ -225,7 +225,7 @@ test.describe('SR 권한 테스트 (ENGINEER)', () => {
     await page.goto(href!);
 
     // 상세 화면이 실제로 렌더링된 뒤에만 '삭제 버튼 부재'가 의미를 갖는다.
-    await expect(page.locator('h3:has-text("상세 정보")')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('heading', { name: '상세 정보' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('button', { name: '삭제' })).toHaveCount(0);
   });
 

@@ -89,7 +89,15 @@ export function useEditSRForm({
         return;
       }
 
-      const result = await getServiceCategoriesForSelection(targetClientId);
+      // 서버 액션이 던지는 경우(네트워크 단절, 5xx)도 사용자에게 보여야 한다.
+      // 예전에는 `result.success === false` 만 처리해서, 실패의 절반이 조용히
+      // 사라지고 카테고리 셀렉트만 비어 있는 채로 남았다.
+      let result;
+      try {
+        result = await getServiceCategoriesForSelection(targetClientId);
+      } catch {
+        result = { success: false as const, data: undefined };
+      }
       if (result.success && result.data) {
         setCategories(result.data.map((cat) => ({ id: cat.id, categoryName: cat.categoryName })));
       } else {

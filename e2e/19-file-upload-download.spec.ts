@@ -2,6 +2,8 @@ import { expect, Page, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
+import { selectAssignee } from './helpers/test-helpers';
+
 /**
  * 파일 업로드/다운로드 전체 플로우 E2E 테스트
  *
@@ -241,18 +243,8 @@ test.describe('파일 업로드/다운로드 플로우', () => {
         const hoursInput = managerPage.getByLabel(/예상 작업 시간/i);
         await hoursInput.fill('4');
 
-        const assigneeSelect = managerPage
-          .locator('label', { hasText: '담당자' })
-          .first()
-          .locator('..')
-          .locator('[role="combobox"]');
-        await assigneeSelect.click();
-        await managerPage.waitForTimeout(500);
-
-        // 옵션 로딩 대기
-        const firstOption = managerPage.getByRole('option').first();
-        await firstOption.waitFor({ state: 'visible', timeout: 10000 });
-        await firstOption.click();
+        // 담당자는 이메일로 지목한다 — 옵션 순서는 보장되지 않는다(test-helpers 참고).
+        await selectAssignee(managerPage);
 
         await managerPage.getByRole('button', { name: /저장/i }).click();
         await managerPage.waitForTimeout(2000);
