@@ -30,12 +30,20 @@ import {
  * @param page - Playwright Page 객체
  * @param name - 테스트 단계 이름 (로그용)
  */
-export async function checkA11y(page: Page, name: string): Promise<void> {
+export async function checkA11y(page: Page, name: string, readySelector?: string): Promise<void> {
   console.log(`♿ Accessibility Check: ${name}`);
   // 'load' 를 쓴다: networkidle 은 SSE 때문에 절대 발생하지 않아 인증된 페이지에서
   // 무조건 30초 타임아웃이었다. 'load' 는 async 청크 실행까지 포함하므로
   // axe 가 빈 DOM 을 검사해 위반 0건으로 통과하는 일도 막는다.
   await page.waitForLoadState('load');
+
+  // 클라이언트 사이드 내비게이션에서는 'load' 가 즉시 resolve 되어 로딩 스켈레톤을 검사하게
+  // 된다. 그러면 실제 콘텐츠의 h1·랜드마크가 아직 없어 "h1 부재" 같은 가짜 위반이 나오고,
+  // 반대로 진짜 위반은 놓친다. 호출부가 "이게 보이면 콘텐츠가 렌더된 것"을 알려 줄 수 있다.
+  if (readySelector) {
+    await page.locator(readySelector).first().waitFor({ state: 'visible', timeout: 15000 });
+  }
+
   const accessibilityScanResults = await new AxeBuilder({ page }).analyze();
 
   if (accessibilityScanResults.violations.length > 0) {
@@ -627,4 +635,37 @@ export async function changeSRStatus(
   ).toBe(200);
 
   console.log(`✅ SR 상태 변경 완료: ${action} (${srId})`);
+}
+
+/**
+ * 담당자 배정 시 쓸 계정. `auth-helpers.ts` 의 engineer 페르소나와 반드시 같아야 한다.
+ * 다르면 그 SR 은 engineer 세션에서 403 이 되어(정책상 ENGINEER 는 자기 배정 SR 만 읽는다)
+ * 뒤따르는 단계가 전부 "요소 없음"으로 실패한다.
+ */
+export const ENGINEER_ASSIGNEE_EMAIL =
+  process.env.TEST_ENGINEER_EMAIL || 'engineeruser@example.com';
+
+/**
+ * 담당자를 **이메일로** 고른다.
+ *
+ * 예전에는 `getByRole('option').first()` 로 위치를 골랐는데, 그 목록은
+ * `getUsersWithSRHandlingPermission()` 의 findMany 결과이고 순서가 보장되지 않았다.
+ * 실제로 첫 옵션은 Admin User 였고, 그래서 ENGINEER 페르소나가 아닌 사람에게 배정된 SR 을
+ * engineer 세션이 열다가 403 을 받아 17·19·21 스펙이 줄줄이 실패했다.
+ * 앱은 정책대로 동작했고, 잘못된 것은 "첫 번째가 엔지니어일 것"이라는 테스트의 가정이었다.
+ */
+export async function selectAssignee(page: Page, email: string = ENGINEER_ASSIGNEE_EMAIL) {
+  const trigger = page
+    .locator('label', { hasText: '담당자' })
+    .first()
+    .locator('..')
+    .locator('[role="combobox"]');
+  await trigger.click({ force: true });
+
+  // 옵션 라벨은 `{name} ({email})` 형태다(IntakeFormCard).
+  // 정규식 대신 부분 문자열 매칭을 쓴다(getByRole 의 name 은 기본이 부분일치가 아니라
+  // 완전일치이므로 exact: false 를 명시한다). 이메일에 정규식 특수문자가 있어도 안전하다.
+  const option = page.getByRole('option', { name: email, exact: false });
+  await option.waitFor({ state: 'visible', timeout: 15000 });
+  await option.click();
 }

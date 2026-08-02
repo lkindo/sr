@@ -57,7 +57,8 @@ test.describe('Accessibility (A11y) 검증', () => {
         if (await firstSRLink.isVisible()) {
           await firstSRLink.click();
           await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
-          await checkA11y(page, 'SR Detail');
+          // 상세 데이터가 렌더된 뒤에 검사한다. 스켈레톤을 검사하면 h1 이 없다고 나온다.
+          await checkA11y(page, 'SR Detail', '[data-testid="sr-title"]');
         } else {
           console.warn('⚠️ 테스트할 SR이 없어 상세 페이지 접근성 테스트를 건너뜁니다.');
         }

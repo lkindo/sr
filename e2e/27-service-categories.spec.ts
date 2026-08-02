@@ -104,6 +104,16 @@ test.describe('서비스 카테고리', () => {
       return;
     }
 
+    // 카테고리는 선택된 고객사로 스코프된다(감사 3.19). 고객사를 고르기 전에는
+    // categories 가 비어 있어 셀렉트가 disabled 다 — 앱의 의도된 계약이므로
+    // 테스트도 고객사 → 카테고리 순서를 지켜야 한다.
+    const clientCombobox = dialog.getByRole('combobox', { name: /고객사/ });
+    if (await clientCombobox.isEnabled().catch(() => false)) {
+      await clientCombobox.click();
+      await page.getByRole('option').first().click();
+      await page.waitForTimeout(300);
+    }
+
     // 서비스 카테고리 Select 찾기
     const categorySelect = dialog
       .locator('select[name*="category"], [role="combobox"]')
@@ -125,6 +135,10 @@ test.describe('서비스 카테고리', () => {
     }
 
     console.log('✅ 서비스 카테고리 Select 발견');
+
+    // 고객사 선택 → 서버 액션 → categories 반영 사이의 레이스를 없앤다.
+    // isVisible() 은 enabled 를 보장하지 않아 예전에는 disabled 버튼을 클릭하다 타임아웃났다.
+    await expect(categorySelect).toBeEnabled({ timeout: 10000 });
 
     // Select 클릭
     await categorySelect.click();

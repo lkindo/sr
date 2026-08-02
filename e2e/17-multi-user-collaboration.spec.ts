@@ -1,7 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
-import { deleteSRViaAPI } from './helpers/test-helpers';
+import { deleteSRViaAPI, selectAssignee } from './helpers/test-helpers';
 
 /**
  * 다중 사용자 협업 시나리오 E2E 테스트
@@ -199,16 +199,8 @@ test.describe('다중 사용자 협업 워크플로우', () => {
       await hoursInput.fill('8');
 
       // 담당자 선택 (첫 번째 사용 가능한 담당자)
-      const assigneeSelect = page
-        .locator('label', { hasText: '담당자' })
-        .first()
-        .locator('..')
-        .locator('[role="combobox"]');
-      await assigneeSelect.click({ force: true });
-      await page.waitForTimeout(500);
-      const firstAssigneeOption = page.getByRole('option').first();
-      await firstAssigneeOption.waitFor({ state: 'visible', timeout: 15000 });
-      await firstAssigneeOption.click();
+      // 담당자는 이메일로 지목한다 — 옵션 순서는 보장되지 않는다(test-helpers 참고).
+      await selectAssignee(page);
 
       // 접수 메모 작성
       await page

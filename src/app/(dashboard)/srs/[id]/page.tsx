@@ -227,9 +227,9 @@ export default function SRDetailPage() {
             <h2 className="text-base md:text-lg font-semibold mb-3">상세 정보</h2>
             <div className="space-y-3 md:space-y-4">
               <div>
-                <h4 className="text-xs md:text-sm font-medium text-muted-foreground mb-1">
+                <h3 className="text-xs md:text-sm font-medium text-muted-foreground mb-1">
                   요청 내용
-                </h4>
+                </h3>
                 <p className="text-sm md:text-base text-foreground whitespace-pre-line leading-relaxed">
                   {sr.description}
                 </p>
@@ -238,40 +238,40 @@ export default function SRDetailPage() {
               {/* Mobile: Use 2 columns for better density */}
               <div className="grid grid-cols-2 gap-x-2 gap-y-3 md:gap-4">
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">고객사</h4>
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">고객사</h3>
                   <p className="text-sm mt-0.5">{sr.client?.name || 'N/A'}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">카테고리</h4>
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">카테고리</h3>
                   <p className="text-sm mt-0.5">{sr.serviceCategory?.categoryName || 'N/A'}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">요청자</h4>
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">요청자</h3>
                   <p className="text-sm mt-0.5">{sr.requester?.name || 'N/A'}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">담당자</h4>
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">담당자</h3>
                   <p className="text-sm mt-0.5">{sr.assignee?.name || '미지정'}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">
                     요청 우선순위
-                  </h4>
+                  </h3>
                   <p className="text-sm mt-0.5">{priorityLabels[sr.requestedPriority]}</p>
                 </div>
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">
                     실제 우선순위
-                  </h4>
+                  </h3>
                   <p className="text-sm mt-0.5">
                     {sr.actualPriority ? priorityLabels[sr.actualPriority] : 'N/A'}
                   </p>
                 </div>
                 {sr.status === 'REQUESTED' && sr.estimatedCompletionDate && (
                   <div>
-                    <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                    <h3 className="text-xs md:text-sm font-medium text-muted-foreground">
                       예상 완료일
-                    </h4>
+                    </h3>
                     <p className="text-sm mt-0.5">
                       {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
                     </p>
@@ -280,9 +280,9 @@ export default function SRDetailPage() {
                 {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) &&
                   sr.estimatedCompletionDate && (
                     <div className="col-span-2 md:col-span-1">
-                      <h4 className="text-xs md:text-sm font-medium text-muted-foreground">
+                      <h3 className="text-xs md:text-sm font-medium text-muted-foreground">
                         SLA 마감일
-                      </h4>
+                      </h3>
                       <div className="mt-0.5 flex items-center gap-2">
                         <span className="text-sm">
                           {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
@@ -317,7 +317,7 @@ export default function SRDetailPage() {
 
                 {/* Attachment Summary Inline for Mobile */}
                 <div>
-                  <h4 className="text-xs md:text-sm font-medium text-muted-foreground">첨부파일</h4>
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground">첨부파일</h3>
                   <div
                     className="mt-0.5 flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-sm"
                     onClick={() => setActiveTab('attachments')}

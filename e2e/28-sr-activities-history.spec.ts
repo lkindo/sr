@@ -60,9 +60,12 @@ test.describe('SR 활동 로그 및 이력', () => {
     // 탭 컨텐츠 로딩 대기
     await page.waitForTimeout(1000);
 
-    // 활동 로그 섹션 확인 (CardTitle 텍스트로 확인)
-    const activityTitle = page.locator('.card-title, h3').filter({ hasText: /활동 이력/ });
-    await expect(activityTitle).toBeVisible();
+    // CardTitle 은 이 저장소에서 <div> 로 렌더되고(src/components/ui/card.tsx),
+    // `.card-title` 클래스는 존재한 적이 없다. 태그가 아니라 텍스트로 겨냥한다.
+    // 활성 탭패널로 스코프해야 같은 문구의 TabsTrigger 와 충돌하지 않고,
+    // 앵커를 걸어야 CardDescription("...활동 이력을 시간순으로...")과 구분된다.
+    const activityPanel = page.locator('[role="tabpanel"][data-state="active"]');
+    await expect(activityPanel.getByText(/^활동 이력 \(\d+\)$/)).toBeVisible({ timeout: 10000 });
 
     // 활동 항목 확인
     const activityContent = page.locator('[role="tabpanel"][data-state="active"]');

@@ -1311,6 +1311,19 @@ async getClientDetailsById(id: string) {
 
 ### 4.4 프론트엔드
 
+- **E2E 를 초록으로 만드는 과정에서 나온 앱 결함 — 해소(2026-08-02).** CI 복구 후 chromium E2E 를 세 라운드 돌리며 27 → 16 → 10 → 처리로 좁혔다. 실패 대부분은 낡은 테스트였지만, 그 분류 과정에서 **앱 쪽 실제 갭 5개**가 드러났다.
+  - **접근성 3건** — 상태 배지 대비 2.43:1(토큰 대신 색 하드코딩), 버튼 2종 대비 미달, `<nav>`·링크·진행바 이름 없음, `h1` 부재와 헤딩 건너뜀. 로그인·회원가입 페이지는 인증된 storageState 때문에 리다이렉트되어 **한 번도 검사된 적이 없었고**, 익명 세션을 적용하자 `<main>` 부재와 색만으로 구분되는 링크(2.84:1)가 새로 드러났다.
+  - **서버 액션 실패가 조용히 사라졌다** — `useCreateSRForm`/`useEditSRForm` 이 `getServiceCategoriesForSelection` 의 `result.success === false` 만 처리했다. 액션이 **던지는** 경우(네트워크 단절, 5xx)는 토스트 없이 카테고리 셀렉트만 빈 채로 남았다. try/catch 로 두 경우를 같은 문구로 합쳤다.
+  - **담당자 드롭다운에 정렬이 없었다** — `getUsersWithSRHandlingPermission()` 의 `findMany` 에 `orderBy` 가 없어 Postgres 가 순서를 보장하지 않는다. 같은 목록이 배포·데이터 변경마다 다른 순서로 보인다. `[{ name: asc }, { id: asc }]` 를 추가했다.
+
+  낡은 테스트 쪽에서도 배울 것이 있었다. **테스트가 앱을 잘못 안 사례**가 반복됐다 —
+  담당자를 `getByRole('option').first()` 로 골랐는데 그게 Admin 이라 ENGINEER 가 403 을 받았고(앱은 정책대로 동작했다),
+  `.card-title` 은 저장소에 존재한 적 없는 클래스였으며,
+  `/api/service-categories` 인터셉트는 브라우저가 그 엔드포인트를 호출하지 않아 **한 번도 발동한 적이 없었다**(카테고리는 서버 액션으로 온다).
+  세 경우 모두 테스트가 초록이었다면 오히려 잘못된 신호였을 것이다.
+
+  그리고 **셀렉터가 숨은 DOM 사본을 집는 문제**가 전 스펙에 걸쳐 있었다. React 스트리밍 중 이전 콘텐츠가 `hidden` 으로 남아 새 콘텐츠와 공존하는데, `page.locator('table')` 은 strict mode violation 으로 즉시 죽고 `.first()` 는 숨은 쪽을 골랐다. 로딩 스켈레톤에 `aria-hidden`+`data-skeleton` 을 달고(보조기술의 `empty-table-header` 도 함께 해소), 표는 `:visible`, 행·텍스트는 `.filter({ visible: true })` 로 좁혔다.
+
 - **E2E 가 처음 실제로 돌면서 드러난 접근성 결함 — 해소(2026-08-02).** CI 복구 후 main 에서 chromium E2E 가 처음 완주했고 27건이 실패했다. 원인을 분류한 결과 **진짜 앱 결함은 3건이고 전부 접근성**이었다(나머지 17건은 낡은 테스트, 4건은 인증 연쇄).
   - **상태 배지가 사실상 판독 불가(대비 2.43:1)** — `src/components/ui/badge.tsx` 의 secondary 변형이 `text-[#475569]` 를 하드코딩했는데 배경 `--secondary` 는 #141414 다. 토큰을 쓰지 않고 색을 박아 넣은 것이 원인이라 토큰 짝(`text-secondary-foreground`)으로 되돌렸다.
   - **대비 미달 버튼 2종** — 대시보드 "접수하기"(#0099ff 위 흰 글씨, 2.99:1)는 검은 글씨로 바꿔 약 7:1 이 됐다. `destructive` 버튼(3.76:1)은 `--destructive-solid` 토큰을 새로 뒀다 — `--destructive` 자체를 어둡게 하면 어두운 표면 위 **텍스트** 대비가 반대로 4.74 → 3.47 로 무너져서, 채움용과 텍스트용을 나눴다.

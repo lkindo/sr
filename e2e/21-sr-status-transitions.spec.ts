@@ -1,6 +1,8 @@
 import { expect, Page, test } from '@playwright/test';
 import path from 'path';
 
+import { selectAssignee } from './helpers/test-helpers';
+
 /**
  * SR 상태 전이 (State Transition) E2E 테스트
  *
@@ -137,16 +139,8 @@ test.describe('SR 상태 전이 테스트', () => {
       const hoursInput = managerPage.getByLabel(/예상 작업 시간/i);
       await hoursInput.fill('4');
 
-      const assigneeSelect = managerPage
-        .locator('label', { hasText: '담당자' })
-        .first()
-        .locator('..')
-        .locator('[role="combobox"]');
-      await assigneeSelect.click();
-      await managerPage.waitForTimeout(500);
-      const firstAssigneeOption = managerPage.getByRole('option').first();
-      await expect(firstAssigneeOption).toBeVisible({ timeout: 5000 });
-      await firstAssigneeOption.click();
+      // 담당자는 이메일로 지목한다 — 옵션 순서는 보장되지 않는다(test-helpers 참고).
+      await selectAssignee(managerPage);
 
       await managerPage.getByLabel(/접수 메모/i).fill('상태 전이 테스트용 접수');
       await managerPage.getByRole('button', { name: /저장/i }).click();

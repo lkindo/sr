@@ -798,6 +798,10 @@ export class UserService {
         name: true,
         email: true,
       },
+      // orderBy 가 없으면 Postgres 는 순서를 보장하지 않는다. 같은 목록이 배포마다,
+      // 데이터가 바뀔 때마다 다른 순서로 보여 사용자가 담당자를 찾기 어렵다.
+      // (E2E 가 "첫 번째 옵션"을 고르다 엉뚱한 사람을 배정한 것도 이 때문이다.)
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
     });
   }
 
