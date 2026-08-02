@@ -39,7 +39,9 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
     await responsePromise;
 
     // 테이블 확인
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 10000,
+    });
 
     // 등록 버튼 확인
     const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();

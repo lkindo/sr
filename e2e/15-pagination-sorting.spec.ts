@@ -38,7 +38,9 @@ test.describe('페이지네이션 및 정렬', () => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
     // 컨트롤 탐색 전에 목록 렌더링을 기다린다
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 10000,
+    });
 
     // 페이지네이션 또는 "더 보기" 버튼 확인
     const pagination = page
@@ -61,7 +63,9 @@ test.describe('페이지네이션 및 정렬', () => {
     await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
     // 테이블이 반드시 있어야 함
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 10000,
+    });
 
     // 테이블 헤더 확인
     const tableHeaders = page.locator('thead th');
@@ -74,7 +78,9 @@ test.describe('페이지네이션 및 정렬', () => {
     await page.goto('/clients', { waitUntil: 'domcontentloaded' });
 
     // 테이블이 반드시 있어야 함
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 10000,
+    });
 
     // 테이블 헤더 확인
     const tableHeaders = page.locator('thead th');
@@ -87,7 +93,9 @@ test.describe('페이지네이션 및 정렬', () => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
     // 선택기 탐색 전에 목록 렌더링을 기다린다
-    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 10000,
+    });
 
     // 페이지 크기 선택기 찾기 (10, 20, 50개 등)
     const pageSizeSelect = page

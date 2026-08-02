@@ -195,7 +195,10 @@ export default function RegisterForm() {
 
       <Card className="w-full">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">회원가입</CardTitle>
+          {/* CardTitle 은 <div> 라 그대로 두면 페이지에 h1 이 없다(axe: page-has-heading-one). */}
+          <CardTitle asChild className="text-2xl font-bold">
+            <h1>회원가입</h1>
+          </CardTitle>
           <CardDescription>새 계정을 만들어 SR 관리 시스템을 사용하세요</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -497,7 +500,7 @@ export default function RegisterForm() {
             </Button>
             <p className="text-sm text-muted-foreground text-center">
               이미 계정이 있으신가요?{' '}
-              <Link href="/login" className="text-primary hover:underline font-medium">
+              <Link href="/login" className="text-primary underline underline-offset-4 font-medium">
                 로그인
               </Link>
             </p>

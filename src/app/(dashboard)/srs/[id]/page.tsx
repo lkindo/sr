@@ -141,7 +141,10 @@ export default function SRDetailPage() {
                   </Badge>
                 </div>
               </div>
-              <p className="text-base md:text-2xl font-semibold truncate leading-tight">
+              <p
+                data-testid="sr-title"
+                className="text-base md:text-2xl font-semibold truncate leading-tight"
+              >
                 {sr.title}
               </p>
             </div>
@@ -219,7 +222,9 @@ export default function SRDetailPage() {
         {/* Details Card */}
         <div className="md:col-span-2 space-y-4 md:space-y-6 flex flex-col">
           <div className="p-4 md:p-6 bg-card rounded-lg shadow border flex-1">
-            <h3 className="text-base md:text-lg font-semibold mb-3">상세 정보</h3>
+            {/* 페이지 제목이 h1 이므로 섹션 제목은 h2 여야 한다. h1 → h3 로 건너뛰면
+                낭독기 사용자가 구조를 잘못 파악한다(axe: heading-order). */}
+            <h2 className="text-base md:text-lg font-semibold mb-3">상세 정보</h2>
             <div className="space-y-3 md:space-y-4">
               <div>
                 <h4 className="text-xs md:text-sm font-medium text-muted-foreground mb-1">
