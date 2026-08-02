@@ -357,6 +357,19 @@ jobs:
       # 않으므로(관련 spec 없음) 한도를 사실상 해제한다. rate limit 자체는 단위 테스트가 검증한다.
       RATE_LIMIT_MIDDLEWARE_WINDOW_MS: '60000'
       RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS: '1000000'
+      # 로그인은 별도로 STRICT(기본 1분 5회)를 `login:${email}:${ip}` 키로 받는다.
+      # 위 미들웨어 한도만 올려두면 이 버킷은 그대로 남는다. setup 이 admin@example.com 으로
+      # 두 번 로그인하고(TEST_USER_EMAIL, TEST_MANAGER_EMAIL 이 같은 계정) retries: 2 가
+      # 붙으면 5회에 근접한다.
+      #
+      # 주의: 이건 **예방 조치이지, 관측된 실패를 고친 것이 아니다.** 로컬에서 setup 이
+      # 반복 실패했을 때 처음엔 이 리미터를 원인으로 지목했지만, 실패한 실행의 Playwright
+      # trace 를 뜯어 보니 로그인 POST 도 세션 GET 도 200 이었고 로그 전체에 429 가 0건이었다.
+      # 실제 원인은 dev 모드에서 워커 3개가 경합해 `router.push('/dashboard')` 가 테스트
+      # 타임아웃(60초)을 넘긴 것이었고, `--workers=1` 이면 그대로 통과한다.
+      # 로그인 스로틀을 검증하는 E2E 는 없고 rate limiter 는 단위 테스트가 검증한다.
+      RATE_LIMIT_STRICT_WINDOW_MS: '60000'
+      RATE_LIMIT_STRICT_MAX_REQUESTS: '1000000'
       # playwright.config.ts 의 webServer 는 쓰지 않는다(아래 "포트 충돌" 주석 참고).
       SKIP_WEBSERVER: '1'
       BASE_URL: 'http://localhost:3000'

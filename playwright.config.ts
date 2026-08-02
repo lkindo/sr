@@ -75,6 +75,24 @@ export default defineConfig({
         timeout: 120 * 1000,
         env: {
           TEST_MODE: 'true',
+          // 로그인은 `login:${email}:${ip}` 키로 STRICT(기본 1분 5회) 제한을 받는다.
+          // 스위트는 페르소나마다 로그인하고 재시도까지 하므로 그 한도를 금방 넘긴다.
+          // 그러면 로그인 폼이 비활성 상태로 굳으면서 setup 이 실패하는데, 증상만 보면
+          // 로그인이 깨진 것처럼 보여 원인을 엉뚱한 데서 찾게 된다.
+          //
+          // 제한 자체는 켜 둔다 — 끄면 로그인 스로틀 회귀를 E2E 가 놓친다.
+          // 한도만 스위트가 정상 동작하는 선까지 올린다.
+          RATE_LIMIT_STRICT_MAX_REQUESTS: process.env.RATE_LIMIT_STRICT_MAX_REQUESTS ?? '100',
+          // STRICT 만 올리면 반쪽이다. src/proxy.ts 는 그와 별개로 `/api/*` 전부에
+          // IP 단위 버킷(RATE_LIMIT_MIDDLEWARE_*, 미설정 시 1분 100회)을 건다.
+          // E2E 트래픽은 전부 127.0.0.1 이라 이 한 버킷을 모든 워커가 나눠 쓴다.
+          // 실측: 갓 띄운 서버에 `/api/auth/session` 을 연속 호출하면 정확히 100번째부터
+          // 429 가 떨어진다. 로그인 상태의 모든 페이지가 /api/realtime SSE 까지 여는 만큼
+          // global-setup 의 워밍업만으로도 이 예산은 쉽게 닿는다.
+          //
+          // 여기서도 제한을 끄지는 않는다 — 끄면 API 스로틀 회귀를 E2E 가 놓친다.
+          RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS:
+            process.env.RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS ?? '2000',
         },
       },
 
