@@ -112,15 +112,16 @@ export default function SRDetailPage() {
               asChild
               className="shrink-0 -ml-2 md:ml-0 h-8 w-8 md:h-9 md:w-9"
             >
-              <Link href="/srs">
+              {/* 아이콘만 있는 링크는 낭독기에 이름 없는 링크로 읽힌다(axe link-name). */}
+              <Link href="/srs" aria-label="SR 목록으로 돌아가기">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg md:text-3xl font-bold tracking-tight leading-none">
+                <h1 className="text-lg md:text-3xl font-bold tracking-tight leading-none">
                   {sr.srNumber}
-                </h2>
+                </h1>
                 <CopyButton
                   value={sr.srNumber}
                   className="text-muted-foreground hover:text-foreground"

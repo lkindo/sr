@@ -1291,7 +1291,9 @@ async getClientDetailsById(id: string) {
 
 - **푸시 알림이 사용자 옵트아웃을 무시** — `src/services/listeners/sr-notification.listener.ts:90-97`이 `requester.notificationPreference` 확인 없이 `pushService.sendToUser`를 호출한다(바로 6줄 아래 이메일 분기는 `emailSRStatusChanged ?? false`를 확인). 동일 패턴이 `:37-43`(sr:created), `:145-151`(sr:assigned)에 있다. `prisma/schema.prisma:453`이 `pushSRStatusChanged Boolean @default(false)`를 선언하고, `push.service.ts:281-340`에 preference 인지 `sendForEvent`가 구현되어 있으나 정의 및 테스트 외에 **프로덕션 호출자가 없다**. `pushCommentAdded`는 이중으로 죽어 있다 — `comments/route.ts:153-190`이 이메일만 보내고 pushService를 전혀 건드리지 않는다. 사용자가 설정을 끄고 저장 성공 토스트를 받아도 푸시가 계속 온다. → 세 직접 호출을 `pushService.sendForEvent(...)`로 교체하고 댓글 경로에 `'COMMENT_ADDED'` 호출 추가(또는 존재할 때까지 설정 UI에서 해당 토글 제거).
 
-- **SMTP 실패가 `sendMail` 내부에서 삼켜져 재시도가 전무** — `src/services/email.service.ts:43-53`이 send를 try/catch로 감싸고 로그만 남긴 뒤 void를 반환하며 절대 재던지지 않는다. 모든 호출자가 `Promise.allSettled`로 감싸므로 결과가 **항상 fulfilled**다. 재시도 루프도, 영속 outbox도, dead-letter도 저장소 어디에도 없다. `Notification` 모델(`prisma/schema.prisma:383-399`)이 `status`(PENDING/SENT/FAILED), `sentAt`, `failReason`, 인덱스 3개로 명백히 outbox로 설계되었는데 src 전역에서 `prisma.notification.` 호출이 0건이다. 일시적 SMTP 장애나 그레이리스팅이 알림을 영구히 잃고, 시스템 내 어떤 것도 알림이 밀렸음을 알지 못한다. `src/lib/wait-until.ts:29-34`가 self-hosted Node에서 `@vercel/functions` waitUntil의 throw를 조용히 삼켜 순수 fire-and-forget으로 열화하며, `docker-compose.prod.yml`에 `stop_grace_period`가 없어 재배포 시 기본 10초 후 SIGKILL이 진행 중 전송을 죽인다. → `sendMail`이 reject하게 하고(호출 지점에서 로깅), 일시 실패에 백오프 재시도 추가, 도메인 이벤트를 생산하는 동일 트랜잭션에서 `Notification` 행을 기록하는 트랜잭셔널 outbox 구현 후 리스너가 SENT/FAILED로 마킹(기존 `@@index([status, createdAt])`이 정확히 retry sweeper가 필요로 하는 인덱스다). `stop_grace_period: 30s` 설정.
+- ~~**SMTP 실패가 `sendMail` 내부에서 삼켜져 재시도가 전무**~~ — **해소(2026-08-02).** 위 `Notification` 아웃박스 항목과 함께 처리했다(같은 결함의 양면).
+
+  원문: **SMTP 실패가 `sendMail` 내부에서 삼켜져 재시도가 전무** — `src/services/email.service.ts:43-53`이 send를 try/catch로 감싸고 로그만 남긴 뒤 void를 반환하며 절대 재던지지 않는다. 모든 호출자가 `Promise.allSettled`로 감싸므로 결과가 **항상 fulfilled**다. 재시도 루프도, 영속 outbox도, dead-letter도 저장소 어디에도 없다. `Notification` 모델(`prisma/schema.prisma:383-399`)이 `status`(PENDING/SENT/FAILED), `sentAt`, `failReason`, 인덱스 3개로 명백히 outbox로 설계되었는데 src 전역에서 `prisma.notification.` 호출이 0건이다. 일시적 SMTP 장애나 그레이리스팅이 알림을 영구히 잃고, 시스템 내 어떤 것도 알림이 밀렸음을 알지 못한다. `src/lib/wait-until.ts:29-34`가 self-hosted Node에서 `@vercel/functions` waitUntil의 throw를 조용히 삼켜 순수 fire-and-forget으로 열화하며, `docker-compose.prod.yml`에 `stop_grace_period`가 없어 재배포 시 기본 10초 후 SIGKILL이 진행 중 전송을 죽인다. → `sendMail`이 reject하게 하고(호출 지점에서 로깅), 일시 실패에 백오프 재시도 추가, 도메인 이벤트를 생산하는 동일 트랜잭션에서 `Notification` 행을 기록하는 트랜잭셔널 outbox 구현 후 리스너가 SENT/FAILED로 마킹(기존 `@@index([status, createdAt])`이 정확히 retry sweeper가 필요로 하는 인덱스다). `stop_grace_period: 30s` 설정.
 
 - **리스너의 DB 조회가 waitUntil 밖에서 실행** — 각 리스너가 `await prisma.user.findMany(...)` 완료 **후에야** `backgroundTask`를 등록한다(`sr-notification.listener.ts:63, 115, 169`). `domainEvents.emit`는 동기이므로 요청이 끝날 수 있는 상태에서 리스너는 아직 첫 쿼리를 await 중이고 waitUntil에는 아무것도 넘겨지지 않았다. `:62`의 주석이 코드가 실제로 제공하지 않는 보장을 단언한다. → 리스너 본문 전체를 감싼다: `domainEvents.on('sr:created', (payload) => backgroundTask(handleSrCreated(payload), 'sr-created'))`.
 
@@ -1308,6 +1310,17 @@ async getClientDetailsById(id: string) {
 - **VAPID 공개키 하드코딩 폴백 + 배포 env의 플레이스홀더 자격증명** — `src/app/api/push/vapid-key/route.ts:8`과 `src/services/push.service.ts:45-47`이 `VAPID_PUBLIC_KEY_FALLBACK = 'BMy2Sare...'`를 하드코딩한다. 배포 env는 리터럴 플레이스홀더를 공급한다: `.env.docker:28-29`의 `"your_vapid_public_key_here"` / `"your_vapid_private_key_here"`, `:23`의 `EMAIL_SERVER_PASSWORD="your_app_password_here"`(`.env.docker.test:16, 20-21`도 동일). `PushService.isConfigured()`(`:89-91`)는 `return !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY)`이므로 플레이스홀더 문자열이 truthy로 **configured를 보고**하고, `getWebPush()`(`:76-84`)가 실제 65바이트 공개키와 플레이스홀더 개인키를 짝지어 `setVapidDetails`를 호출한다. 두 배포 환경 모두 구문상 존재하고 의미상 무효한 자격증명을 로드하며, 브라우저는 구독을 수락하고 DB는 기록하지만 모든 푸시가 서명 에러로 실패한다 — 구독 시점에 에러가 없어 "알림이 안 온다"로만 표면화된다. Gmail SMTP도 동일. → `ENV_VARIABLES`에 VAPID/EMAIL 변수의 `validate` 술어 추가(`/your_.*_here/` 매칭 거부, VAPID 공개키 87-88 base64url 문자 요구)해 `instrumentation.ts`의 fail-fast가 플레이스홀더를 잡게 하고, `push.service.ts:45-47`의 폴백 삭제 + `isConfigured()`를 길이 검증으로 변경.
 
 ### 4.4 프론트엔드
+
+- **E2E 가 처음 실제로 돌면서 드러난 접근성 결함 — 해소(2026-08-02).** CI 복구 후 main 에서 chromium E2E 가 처음 완주했고 27건이 실패했다. 원인을 분류한 결과 **진짜 앱 결함은 3건이고 전부 접근성**이었다(나머지 17건은 낡은 테스트, 4건은 인증 연쇄).
+  - **상태 배지가 사실상 판독 불가(대비 2.43:1)** — `src/components/ui/badge.tsx` 의 secondary 변형이 `text-[#475569]` 를 하드코딩했는데 배경 `--secondary` 는 #141414 다. 토큰을 쓰지 않고 색을 박아 넣은 것이 원인이라 토큰 짝(`text-secondary-foreground`)으로 되돌렸다.
+  - **대비 미달 버튼 2종** — 대시보드 "접수하기"(#0099ff 위 흰 글씨, 2.99:1)는 검은 글씨로 바꿔 약 7:1 이 됐다. `destructive` 버튼(3.76:1)은 `--destructive-solid` 토큰을 새로 뒀다 — `--destructive` 자체를 어둡게 하면 어두운 표면 위 **텍스트** 대비가 반대로 4.74 → 3.47 로 무너져서, 채움용과 텍스트용을 나눴다.
+  - **이름 없는 요소들** — `<nav>` 3개(Header 2, Sidebar 1)가 전부 무명이라 랜드마크가 구분되지 않았고, SR 상세의 뒤로가기는 아이콘만 있어 낭독기에 빈 링크였다. 진행바 4개도 이름이 없었다. 페이지 최상위 제목이 `h2`/`h3` 라 `h1` 이 없었다. 각각 `aria-label` 부여와 제목 승격으로 해결했다.
+
+  낡은 테스트 17건은 원인이 하나였다 — `/srs` 의 로딩 스켈레톤도 `<table>` 이라 스트리밍 중 실 테이블과 둘이 잡혀 `page.locator('table')` 이 strict mode violation 으로 **즉시** 죽었다(재시도 없이). 39개 호출부를 각각 고치는 대신 스켈레톤에 `aria-hidden="true"`(보조기술에 헤더 빈 표를 읽어 주지 않도록 — axe 의 `empty-table-header` 도 함께 해소) + `data-skeleton="true"` 를 달고 셀렉터를 `table:not([data-skeleton])` 로 통일했다.
+
+  인증 연쇄 4건은 **인증 플로우 스펙이 인증된 채로 돌던 모순**이었다. `playwright.config.ts` 의 chromium 프로젝트가 로그인된 ADMIN storageState 로 시작하는데, 그 상태로 `/register` 를 열면 `src/auth.config.ts` 의 `authorized()` 가 `/dashboard` 로 리다이렉트해 회원가입 폼이 영영 나타나지 않는다. 해당 스펙에 익명 storageState 를 적용했다.
+
+  **배포 게이트는 좁히지 않았다.** 실패 27건 중 실제 결함이 3건뿐이었고 그것도 고쳤으므로, 게이트를 완화할 근거가 없다. 감사 3.3(배포가 CI 에 의존하지 않음) 수정을 되돌리는 셈이 되기 때문이다.
 
 - ~~**클라이언트 `hasPermission` 이 세션과 다른 구분자로 키를 조립해 항상 false**~~ — **감사 이후 발견·해소됨(2026-08-01).** `src/hooks/use-permissions.ts` 가 `` `${resource}.${action}` `` 로 조립하는데 `src/auth.ts:146` 은 세션 토큰에 `` `${resource}:${action}` `` 를 담는다. 따라서 `hasPermission`/`hasAnyPermission`/`hasAllPermissions` 가 어떤 입력에도 false 였다. 현재 호출부(`PermissionGuard`, `Sidebar`)가 모두 `roles` 를 쓰고 있어 증상이 드러나지 않았을 뿐, 권한으로 게이트하는 순간 조용히 막히는 지뢰였다. 구분자를 맞추고 비교를 대소문자 무시로 바꿨다. 기존 테스트 두 개가 `permissions: ['sr.view', ...]` 라는 프로덕션에 존재하지 않는 형태를 픽스처로 써서 점 조립을 정상 동작으로 못 박고 있었으므로 실제 세션 형태로 교체했다.
 
@@ -1371,7 +1384,21 @@ async getClientDetailsById(id: string) {
 
   원문: **불필요하거나 사용되지 않는 인덱스 4개** — `User.@@index([email])`(`schema.prisma:57`)가 `@unique`(`:23`)의 `users_email_key`와 중복, `Client.@@index([code])`(`:144`)가 `:125`와 중복, `Notification.@@index([recipient])`(`:396`)가 `[recipient, createdAt]`(`:397`)의 접두사, `SRComment.@@index([srId, isInternal, createdAt(sort: Desc)])`(`:345`)의 `isInternal`은 저장소 전역에서 스키마 정의와 인덱스 자신 외에 참조가 없다(댓글 라우트는 `where: { srId: id }`만 쓴다). 가장 비싼 것은 `sr_comments` — 최고 처닝 자식 테이블에서 댓글 삽입마다 인덱스 3개를 갱신하는데 2개면 충분하다. → 3개 삭제 + 마이그레이션. `sr_comments`는 인덱스를 삭제하거나, 더 낫게는 `isInternal`을 실제로 사용해(클라이언트 사용자에게 내부 노트 숨기기) 원래 의도한 기능을 구현.
 
-- **`Notification` 모델이 완전히 죽어 있음** — `schema.prisma:383-399`가 `status`, `sentAt`, `failReason`과 인덱스 3개로 명백한 outbox를 선언하는데 src 전역 `prisma.notification.` grep이 0건이다. 발송은 `backgroundTask(Promise.allSettled(...))`로 직행한다. `Promise.allSettled`가 모든 rejection을 삼키므로 실패한 SMTP나 만료된 푸시 구독이 DB 행도, 재시도도, 호출자 로그도 남기지 않는다. 운영자가 "담당자에게 알림이 갔는가"에 답할 수 없다. 테이블과 3개 인덱스가 아무것도 아닌 것을 위해 DDL로 유지된다. → 삭제하거나(권장하지 않음, 설계가 이미 옳다) 트랜잭셔널 outbox로 구현.
+- ~~**`Notification` 모델이 완전히 죽어 있음**~~ / ~~**SMTP 실패가 `sendMail` 내부에서 삼켜져 재시도가 전무**~~ — **해소(2026-08-02).** 두 항목은 같은 결함의 양면이라 함께 고쳤다.
+
+  `src/services/notification-outbox.ts` 를 추가했다. 이메일은 이제 `enqueueEmails()` 로 `Notification` 행(PENDING)에 적재되고, 디스패처가 `FOR UPDATE SKIP LOCKED` 로 집어 보낸 뒤 결과를 같은 행에 쓴다. 실패는 `failReason`·`attempts` 로 남고 1·5·15·60분 백오프로 재시도하며, 5회를 넘기면 FAILED 로 고정되어 dead-letter 가 된다.
+
+  `sendMail` 이 **던지도록** 바꾼 것이 핵심이다. 예전에는 오류를 try/catch 로 삼키고 void 를 반환했고, 호출부가 전부 `Promise.allSettled` 로 감쌌으므로 결과가 항상 fulfilled 였다 — 실패 경로가 코드상 존재하지 않는 것과 같았다. 던지지 않으면 디스패처가 실패를 기록할 방법이 없다. 자격증명이 없을 때 경고만 찍고 성공한 척하던 것도 이제 실패로 남는다(환경 변수 하나가 빠지면 알림이 통째로 안 나가는데 앱은 정상으로 보이던 문제).
+
+  템플릿은 `sendX` → `buildX`(렌더 전용)로 분리해 발송 없이 적재할 수 있게 했다. 호출부 5곳(리스너 3, 댓글 라우트 2)이 전부 아웃박스를 거친다.
+
+  **워커 컨테이너는 추가하지 않았다.** `docker-compose.prod.yml` 은 nginx·app·db 셋뿐이고 워커를 넣으면 배포 구성과 운영 절차가 함께 늘어난다. 대신 앱 프로세스에서 30초 간격으로 디스패처를 돌린다(`src/instrumentation.ts`). claim 이 `SKIP LOCKED` 라 인스턴스를 늘려도 중복 발송이 나지 않으므로 지금 단순하게 가도 나중에 막히지 않는다. `NOTIFICATION_DISPATCHER=off` 로 끌 수 있고, 껐을 때는 경고를 남긴다.
+
+  검증: 유닛 10건(적재·성공·실패기록·백오프·dead-letter·부분실패·SKIP LOCKED). 실제 Postgres 에 마이그레이션을 적용해 컬럼·인덱스 생성과 claim 쿼리 동작을 확인했고, 두 세션에서 동시에 집었을 때 잠긴 행을 건너뛰는 것(중복 발송 불가)까지 확인했다.
+
+  **남은 것**: 푸시 알림(`pushService`)은 아직 즉시 발송이다. 이메일과 같은 유실·미기록 문제가 남아 있으나, 만료 구독은 웹푸시 계층이 별도로 다뤄야 해서 이번 범위에서 제외했다.
+
+  원문: **`Notification` 모델이 완전히 죽어 있음** — `schema.prisma:383-399`가 `status`, `sentAt`, `failReason`과 인덱스 3개로 명백한 outbox를 선언하는데 src 전역 `prisma.notification.` grep이 0건이다. 발송은 `backgroundTask(Promise.allSettled(...))`로 직행한다. `Promise.allSettled`가 모든 rejection을 삼키므로 실패한 SMTP나 만료된 푸시 구독이 DB 행도, 재시도도, 호출자 로그도 남기지 않는다. 운영자가 "담당자에게 알림이 갔는가"에 답할 수 없다. 테이블과 3개 인덱스가 아무것도 아닌 것을 위해 DDL로 유지된다. → 삭제하거나(권장하지 않음, 설계가 이미 옳다) 트랜잭셔널 outbox로 구현.
 
 ### 4.6 설정 · 도구 · 운영
 

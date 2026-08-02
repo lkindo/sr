@@ -19,7 +19,7 @@ test.describe('SR 필터링 및 검색', () => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
     // SR 목록 테이블이 반드시 보여야 함
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
     console.log('✅ SR 목록 테이블 확인');
   });
 
@@ -27,7 +27,7 @@ test.describe('SR 필터링 및 검색', () => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
     // 목록이 렌더링된 뒤에 검색 필드를 탐색해야 한다.
     // (렌더 전에 isVisible 로 확인하면 검색 필드가 있어도 없는 쪽 분기로 빠진다)
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
 
     // 검색 입력 필드 찾기 (다양한 셀렉터 시도)
     const searchInput = page
@@ -47,7 +47,7 @@ test.describe('SR 필터링 및 검색', () => {
       console.log(`✅ 검색 결과: ${count}개`);
     } else {
       // 검색 필드가 없는 경우 - 테이블만 확인
-      await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
       console.log('ℹ️ 검색 필드 없음 - SR 목록 테이블 확인됨');
     }
   });
@@ -55,7 +55,7 @@ test.describe('SR 필터링 및 검색', () => {
   test('상태 필터 테스트', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
     // 목록 렌더링을 기다린 뒤 필터 UI 를 탐색한다 (고정 sleep 대체)
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
 
     // 고급 필터 버튼 찾기
     const advancedFilterButton = page
@@ -92,7 +92,7 @@ test.describe('SR 필터링 및 검색', () => {
       }
     } else {
       // 고급 필터가 없는 경우 - 테이블만 확인
-      await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
       console.log('ℹ️ 고급 필터 버튼 없음 - SR 목록 테이블 확인됨');
     }
   });
@@ -100,7 +100,7 @@ test.describe('SR 필터링 및 검색', () => {
   test('우선순위 필터 테스트', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
     // 목록 렌더링을 기다린 뒤 필터 UI 를 탐색한다 (고정 sleep 대체)
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
 
     // 고급 필터 버튼 찾기
     const advancedFilterButton = page
@@ -137,14 +137,14 @@ test.describe('SR 필터링 및 검색', () => {
         }
       }
     } else {
-      await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
       console.log('ℹ️ 고급 필터 버튼 없음 - SR 목록 테이블 확인됨');
     }
   });
 
   test('필터 초기화 테스트', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
 
     // 고급 필터 열기
     const advancedFilterButton = page

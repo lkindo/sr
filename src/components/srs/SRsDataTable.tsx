@@ -290,7 +290,7 @@ export function SRsDataTable({
       <div className="sr-card-template bg-card">
         <div className="px-6 py-5 border-b border-border">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-semibold text-foreground">SR 목록</h3>
+            <h1 className="text-xl font-semibold text-foreground">SR 목록</h1>
             <Button onClick={() => setIsCreateDialogOpen(true)} className="sr-btn-template-primary">
               <Plus className="mr-2 h-4 w-4" /> 등록
             </Button>

@@ -196,7 +196,7 @@ describe('SRService', () => {
       const { pushService } = await import('@/services/push.service');
 
       const sendEmailSpy = vi
-        .spyOn(emailService, 'sendSRStatusChanged')
+        .spyOn(emailService, 'buildSRStatusChanged')
         .mockResolvedValue({} as any);
       const sendPushSpy = vi.spyOn(pushService, 'sendToUser').mockResolvedValue({} as any);
 

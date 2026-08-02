@@ -81,7 +81,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
 
       // 목록 페이지로 이동
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
 
       // SR 찾기 (Polling 강화)
       let srRow = page.locator('tr', { hasText: srTitle }).first();
@@ -96,7 +96,7 @@ test.describe('SR 접수 프로세스 테스트', () => {
         }
         console.log(`⚠️ SR을 찾을 수 없습니다. 목록 새로고침 중... (${i + 1}/5)`);
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
         srRow = page.locator('tr', { hasText: srTitle }).first();
       }
 
@@ -421,7 +421,7 @@ test.describe('SR 접수 권한 테스트', () => {
 
       await page.waitForTimeout(2000);
       await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
 
       let srRow = page.locator('tr', { hasText: title }).first();
       let found = false;
@@ -433,7 +433,7 @@ test.describe('SR 접수 권한 테스트', () => {
           break;
         }
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.locator('table')).toBeVisible({ timeout: 15000 });
+        await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 15000 });
         srRow = page.locator('tr', { hasText: title }).first();
       }
 

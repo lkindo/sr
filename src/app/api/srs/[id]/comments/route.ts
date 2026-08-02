@@ -8,7 +8,6 @@ import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/erro
 import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { FIELD_LIMITS } from '@/lib/schemas';
-import { backgroundTask } from '@/lib/wait-until';
 
 const commentSchema = z.object({
   // 상한이 없으면 인증된 단일 POST 로 거대한 텍스트를 sr_comments.content(무제한 TEXT)에
@@ -167,44 +166,48 @@ export const POST = withAuthAndRateLimit(
       actorId: session.user.id,
     });
 
-    // 이메일 알림(비차단): 서버리스에서 유실되지 않도록 요청 수명(waitUntil)에 연결한다.
+    // 이메일은 아웃박스에 적재한다. 예전에는 여기서 SMTP 로 곧장 쐈고, 실패하면
+    // 기록도 재시도도 없이 사라졌다(감사 4.2). 이제 디스패처가 집어 보내고 결과를 남긴다.
     const { emailService } = await import('@/services/email.service');
-    const emailTasks: Promise<unknown>[] = [];
+    const { enqueueEmails } = await import('@/services/notification-outbox');
+    const outbox = [];
 
     // Requester check (Schema: emailCommentAdded Boolean @default(false))
     const shouldSendRequester = sr.requester.notificationPreference?.emailCommentAdded ?? false;
     if (sr.requester.id !== session.user.id && sr.requester.email && shouldSendRequester) {
-      emailTasks.push(
-        emailService.sendCommentAdded(
+      outbox.push({
+        ...emailService.buildCommentAdded(
           sr.requester.email,
           sr.srNumber,
           sr.title,
           comment.user.name,
           validated.content,
           getSRUrl(sr.id)
-        )
-      );
+        ),
+        metadata: { srId: sr.id, kind: 'comment-added', role: 'requester' },
+      });
     }
 
     // Assignee check
     if (sr.assignee && sr.assignee.id !== session.user.id && sr.assignee.email) {
       const shouldSendAssignee = sr.assignee.notificationPreference?.emailCommentAdded ?? false;
       if (shouldSendAssignee) {
-        emailTasks.push(
-          emailService.sendCommentAdded(
+        outbox.push({
+          ...emailService.buildCommentAdded(
             sr.assignee.email,
             sr.srNumber,
             sr.title,
             comment.user.name,
             validated.content,
             getSRUrl(sr.id)
-          )
-        );
+          ),
+          metadata: { srId: sr.id, kind: 'comment-added', role: 'assignee' },
+        });
       }
     }
 
-    if (emailTasks.length > 0) {
-      backgroundTask(Promise.allSettled(emailTasks), 'comment-email');
+    if (outbox.length > 0) {
+      await enqueueEmails(outbox);
     }
 
     return NextResponse.json(comment, { status: 201 });

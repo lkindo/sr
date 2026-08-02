@@ -4,6 +4,7 @@ import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 import { backgroundTask } from '@/lib/wait-until';
 import { emailService } from '@/services/email.service';
+import { enqueueEmails, type OutboxEmail } from '@/services/notification-outbox';
 import { pushService } from '@/services/push.service';
 
 /**
@@ -43,23 +44,27 @@ export function registerSRNotificationListeners() {
         );
       }
 
-      // 이메일 알림
+      // 이메일은 아웃박스에 적재한다(감사 4.2). 예전에는 여기서 SMTP 로 곧장 쐈고,
+      // Promise.allSettled 가 rejection 을 삼켜 실패가 기록도 재시도도 없이 사라졌다.
+      const outbox: OutboxEmail[] = [];
       admins.forEach((admin) => {
         const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
         if (admin.email && shouldSend) {
-          promises.push(
-            emailService.sendSRCreated(
+          outbox.push({
+            ...emailService.buildSRCreated(
               admin.email,
               payload.srNumber,
               payload.title,
               payload.requesterName,
               getSRUrl(payload.srId)
-            )
-          );
+            ),
+            metadata: { srId: payload.srId, kind: 'sr-created' },
+          });
         }
       });
+      await enqueueEmails(outbox);
 
-      // 서버리스에서 응답 후 함수가 동결되어 알림이 유실되지 않도록 요청 수명에 연결한다.
+      // 푸시는 아직 즉시 발송이다(아웃박스는 이메일부터 적용).
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
@@ -96,22 +101,25 @@ export function registerSRNotificationListeners() {
         })
       );
 
-      // 이메일 알림
+      // 이메일은 아웃박스에 적재한다(감사 4.2).
       const shouldSendStatusEmail = requester.notificationPreference?.emailSRStatusChanged ?? false;
       if (requester.email && shouldSendStatusEmail) {
-        promises.push(
-          emailService.sendSRStatusChanged(
-            requester.email,
-            payload.srNumber,
-            payload.title,
-            payload.previousStatus || '없음',
-            payload.currentStatus,
-            getSRUrl(payload.srId)
-          )
-        );
+        await enqueueEmails([
+          {
+            ...emailService.buildSRStatusChanged(
+              requester.email,
+              payload.srNumber,
+              payload.title,
+              payload.previousStatus || '없음',
+              payload.currentStatus,
+              getSRUrl(payload.srId)
+            ),
+            metadata: { srId: payload.srId, kind: 'sr-status-changed' },
+          },
+        ]);
       }
 
-      // 서버리스에서 응답 후 함수가 동결되어 알림이 유실되지 않도록 요청 수명에 연결한다.
+      // 푸시는 아직 즉시 발송이다(아웃박스는 이메일부터 적용).
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
@@ -151,21 +159,25 @@ export function registerSRNotificationListeners() {
         })
       );
 
-      // 이메일 알림
+      // 이메일은 아웃박스에 적재한다(감사 4.2). 담당 배정 알림이 유실되면 SR 이
+      // 방치된 채 SLA 시계만 도는 형태가 되므로, 여기서의 유실이 가장 비싸다.
       const shouldSendAssignEmail = assignee.notificationPreference?.emailSRAssigned ?? true;
       if (assignee.email && shouldSendAssignEmail) {
-        promises.push(
-          emailService.sendSRAssigned(
-            assignee.email,
-            payload.srNumber,
-            payload.title,
-            payload.assigneeName ?? '알 수 없음',
-            getSRUrl(payload.srId)
-          )
-        );
+        await enqueueEmails([
+          {
+            ...emailService.buildSRAssigned(
+              assignee.email,
+              payload.srNumber,
+              payload.title,
+              payload.assigneeName ?? '알 수 없음',
+              getSRUrl(payload.srId)
+            ),
+            metadata: { srId: payload.srId, kind: 'sr-assigned' },
+          },
+        ]);
       }
 
-      // 서버리스에서 응답 후 함수가 동결되어 알림이 유실되지 않도록 요청 수명에 연결한다.
+      // 푸시는 아직 즉시 발송이다(아웃박스는 이메일부터 적용).
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(

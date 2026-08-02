@@ -5,6 +5,7 @@ import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 import { emailService } from '@/services/email.service';
 import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
+import { enqueueEmails } from '@/services/notification-outbox';
 import { pushService } from '@/services/push.service';
 
 vi.mock('@/lib/prisma', () => ({
@@ -16,12 +17,17 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
+// buildX 는 이제 렌더만 하고, 실제 발송은 아웃박스 디스패처가 맡는다(감사 4.2).
 vi.mock('@/services/email.service', () => ({
   emailService: {
-    sendSRCreated: vi.fn().mockResolvedValue(undefined),
-    sendSRStatusChanged: vi.fn().mockResolvedValue(undefined),
-    sendSRAssigned: vi.fn().mockResolvedValue(undefined),
+    buildSRCreated: vi.fn((to: string) => ({ to, subject: 's', html: 'h' })),
+    buildSRStatusChanged: vi.fn((to: string) => ({ to, subject: 's', html: 'h' })),
+    buildSRAssigned: vi.fn((to: string) => ({ to, subject: 's', html: 'h' })),
   },
+}));
+
+vi.mock('@/services/notification-outbox', () => ({
+  enqueueEmails: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock('@/services/push.service', () => ({
@@ -108,14 +114,23 @@ describe('registerSRNotificationListeners', () => {
         expect.objectContaining({ tag: 'sr-created', url: '/srs/sr-1' })
       );
       // Only admin-1 opted in.
-      expect(emailService.sendSRCreated).toHaveBeenCalledTimes(1);
-      expect(emailService.sendSRCreated).toHaveBeenCalledWith(
+      expect(emailService.buildSRCreated).toHaveBeenCalledTimes(1);
+      expect(emailService.buildSRCreated).toHaveBeenCalledWith(
         'admin1@example.com',
         'SR-001',
         '테스트 제목',
         '요청자',
         expect.stringContaining('/srs/sr-1')
       );
+
+      // 렌더만으로는 부족하다. 실제로 아웃박스 행이 적재돼야 재시작·SMTP 장애에서
+      // 살아남는다 — 예전에는 여기서 곧장 SMTP 로 쏘고 실패를 삼켰다.
+      expect(enqueueEmails).toHaveBeenCalledWith([
+        expect.objectContaining({
+          to: 'admin1@example.com',
+          metadata: expect.objectContaining({ srId: 'sr-1', kind: 'sr-created' }),
+        }),
+      ]);
     });
 
     it('defaults emailSRCreated to true when preference is missing', async () => {
@@ -125,7 +140,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:created', payload);
 
-      expect(emailService.sendSRCreated).toHaveBeenCalledTimes(1);
+      expect(emailService.buildSRCreated).toHaveBeenCalledTimes(1);
     });
 
     it('skips email when admin has no email address', async () => {
@@ -136,7 +151,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:created', payload);
 
       expect(pushService.sendToUsers).toHaveBeenCalledTimes(1);
-      expect(emailService.sendSRCreated).not.toHaveBeenCalled();
+      expect(emailService.buildSRCreated).not.toHaveBeenCalled();
     });
 
     it('does not send push when there are no admins', async () => {
@@ -145,7 +160,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:created', payload);
 
       expect(pushService.sendToUsers).not.toHaveBeenCalled();
-      expect(emailService.sendSRCreated).not.toHaveBeenCalled();
+      expect(emailService.buildSRCreated).not.toHaveBeenCalled();
     });
 
     it('logs an error when prisma throws', async () => {
@@ -184,7 +199,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:status_changed', payload);
 
       expect(pushService.sendToUser).not.toHaveBeenCalled();
-      expect(emailService.sendSRStatusChanged).not.toHaveBeenCalled();
+      expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
     });
 
     it('sends push and email when requester opts in', async () => {
@@ -199,7 +214,7 @@ describe('registerSRNotificationListeners', () => {
         'req-2',
         expect.objectContaining({ tag: 'sr-status-changed' })
       );
-      expect(emailService.sendSRStatusChanged).toHaveBeenCalledWith(
+      expect(emailService.buildSRStatusChanged).toHaveBeenCalledWith(
         'req@example.com',
         'SR-002',
         '상태 제목',
@@ -217,7 +232,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:status_changed', { ...payload, previousStatus: null });
 
-      expect(emailService.sendSRStatusChanged).toHaveBeenCalledWith(
+      expect(emailService.buildSRStatusChanged).toHaveBeenCalledWith(
         'req@example.com',
         'SR-002',
         '상태 제목',
@@ -236,7 +251,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:status_changed', payload);
 
       expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
-      expect(emailService.sendSRStatusChanged).not.toHaveBeenCalled();
+      expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
     });
 
     it('logs an error when prisma throws', async () => {
@@ -275,7 +290,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:assigned', payload);
 
       expect(pushService.sendToUser).not.toHaveBeenCalled();
-      expect(emailService.sendSRAssigned).not.toHaveBeenCalled();
+      expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
     });
 
     it('sends push and email when assignee opts in', async () => {
@@ -290,7 +305,7 @@ describe('registerSRNotificationListeners', () => {
         'assignee-1',
         expect.objectContaining({ tag: 'sr-assigned' })
       );
-      expect(emailService.sendSRAssigned).toHaveBeenCalledWith(
+      expect(emailService.buildSRAssigned).toHaveBeenCalledWith(
         'assignee@example.com',
         'SR-003',
         '할당 제목',
@@ -307,7 +322,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:assigned', { ...payload, assigneeName: null });
 
-      expect(emailService.sendSRAssigned).toHaveBeenCalledWith(
+      expect(emailService.buildSRAssigned).toHaveBeenCalledWith(
         'assignee@example.com',
         'SR-003',
         '할당 제목',
@@ -325,7 +340,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:assigned', payload);
 
       expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
-      expect(emailService.sendSRAssigned).not.toHaveBeenCalled();
+      expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
     });
 
     it('logs an error when prisma throws', async () => {

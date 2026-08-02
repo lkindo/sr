@@ -88,9 +88,9 @@ vi.mock('@/services/push.service', () => ({
 }));
 vi.mock('@/services/email.service', () => ({
   emailService: {
-    sendSRStatusChanged: vi.fn().mockResolvedValue(true),
-    sendSRAssigned: vi.fn().mockResolvedValue(true),
-    sendSRCreated: vi.fn().mockResolvedValue(true),
+    buildSRStatusChanged: vi.fn().mockResolvedValue(true),
+    buildSRAssigned: vi.fn().mockResolvedValue(true),
+    buildSRCreated: vi.fn().mockResolvedValue(true),
   },
 }));
 
@@ -163,8 +163,8 @@ describe('SRService Extended Branches', () => {
       } as any);
 
       const { emailService } = await import('@/services/email.service');
-      expect(emailService.sendSRStatusChanged).not.toHaveBeenCalled();
-      expect(emailService.sendSRAssigned).not.toHaveBeenCalled();
+      expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
+      expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
     });
   });
 

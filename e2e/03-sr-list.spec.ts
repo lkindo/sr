@@ -17,7 +17,7 @@ test.describe('SR 목록 관리', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // 테이블 확인
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
   });
 
   test('SR 필터링', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('SR 목록 관리', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // 테이블이 표시되는지 확인
-    await expect(page.locator('table')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('table:not([data-skeleton])')).toBeVisible({ timeout: 10000 });
   });
 
   test('빈 SR 목록 처리', async ({ page }) => {
