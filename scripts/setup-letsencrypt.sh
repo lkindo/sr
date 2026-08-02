@@ -71,6 +71,11 @@ sudo chmod 644 /home/opc/sr/nginx/certs/server.crt
 sudo chmod 600 /home/opc/sr/nginx/certs/server.key
 
 echo "Restarting Nginx to apply new official SSL certificate..."
-docker compose -f /home/opc/sr/docker-compose.prod.yml restart nginx
+# `--env-file` 을 반드시 붙인다. deploy.yml 의 다른 compose 호출은 전부
+# `$COMPOSE_ARGS`(= --env-file .env.prod) 를 쓰는데 이 줄만 빠져 있었다.
+# 운영 자격증명은 `.env.prod` 에 있고 기본 `.env` 에는 없으므로,
+#   error while interpolating services.db.environment: POSTGRES_USER is missing a value
+# 로 죽으면서 **앱 배포가 이미 끝난 뒤** 배포 잡을 실패로 만들었다(2026-08-02).
+docker compose --env-file /home/opc/sr/.env.prod -f /home/opc/sr/docker-compose.prod.yml restart nginx
 
 echo "SSL Certificate issued and applied successfully!"
