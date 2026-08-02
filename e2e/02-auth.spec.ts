@@ -4,6 +4,19 @@ import { expect, test } from '@playwright/test';
  * 인증 플로우 테스트
  * 주의: 이 테스트를 실행하기 전에 데이터베이스에 테스트 사용자가 있어야 합니다.
  */
+/**
+ * 이 스펙은 **익명 상태**여야 한다.
+ *
+ * `chromium` 프로젝트는 `storageState: './playwright/.auth/user.json'` 로 로그인된 ADMIN
+ * 세션을 들고 시작한다(playwright.config.ts). 그 상태로 `/register` 나 `/login` 에 가면
+ * `src/auth.config.ts` 의 `authorized()` 가 `/dashboard` 로 리다이렉트하므로, 회원가입
+ * 폼이 영영 나타나지 않고 `.text-2xl` 단언과 `page.fill` 이 타임아웃난다.
+ *
+ * CI 에서 E2E 가 오래 실행 불가 상태였기 때문에(감사 3.35) 이 어긋남이 드러나지 않았다.
+ * 인증 플로우를 검증하는 스펙이 인증된 채로 도는 것 자체가 모순이다.
+ */
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe('인증 플로우', () => {
   test('회원가입 플로우 - CLIENT 계정', async ({ page }) => {
     await page.goto('/register');

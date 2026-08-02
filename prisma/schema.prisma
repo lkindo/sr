@@ -408,6 +408,13 @@ model Notification {
   failReason String?            @map("fail_reason") @db.VarChar(255)
   createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz
 
+  /// 발송 시도 횟수. 상한을 넘으면 dead-letter 로 남기고 더 시도하지 않는다.
+  attempts      Int       @default(0)
+  /// 다음 시도 시각(지수 백오프). PENDING 이어도 이 시각 전에는 집지 않는다.
+  nextAttemptAt DateTime? @map("next_attempt_at") @db.Timestamptz
+
+  /// 디스패처의 claim 쿼리(status='PENDING' AND next_attempt_at <= now())를 위한 인덱스.
+  @@index([status, nextAttemptAt])
   @@index([status, createdAt])
   @@index([recipient, createdAt])
   @@map("notifications")

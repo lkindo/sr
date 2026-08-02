@@ -14,14 +14,21 @@ import { checkA11y, withAuthContext } from './helpers/test-helpers';
  */
 
 test.describe('Accessibility (A11y) 검증', () => {
-  test('로그인 페이지 접근성 확인', async ({ page }) => {
-    await page.goto('/login');
-    await checkA11y(page, 'Login Page');
-  });
+  // 로그인·회원가입 페이지는 익명 상태에서만 렌더된다. chromium 프로젝트의 기본
+  // storageState 는 로그인된 세션이라, 그대로 두면 authorized() 가 /dashboard 로
+  // 리다이렉트해 엉뚱한 페이지의 접근성을 검사하게 된다.
+  test.describe('비인증 페이지 접근성 확인', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('회원가입 페이지 접근성 확인', async ({ page }) => {
-    await page.goto('/register');
-    await checkA11y(page, 'Register Page');
+    test('로그인 페이지 접근성 확인', async ({ page }) => {
+      await page.goto('/login');
+      await checkA11y(page, 'Login Page');
+    });
+
+    test('회원가입 페이지 접근성 확인', async ({ page }) => {
+      await page.goto('/register');
+      await checkA11y(page, 'Register Page');
+    });
   });
 
   test.describe('인증된 페이지 접근성 확인', () => {

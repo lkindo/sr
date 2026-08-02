@@ -348,7 +348,7 @@ describe('SRService', () => {
       } as any);
 
       const sendEmailSpy = vi
-        .spyOn(emailService, 'sendSRStatusChanged')
+        .spyOn(emailService, 'buildSRStatusChanged')
         .mockResolvedValue({} as any);
       const sendPushSpy = vi.spyOn(pushService, 'sendToUser').mockResolvedValue({} as any);
 
