@@ -109,8 +109,52 @@ export function canUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): boolea
   return isRequester;
 }
 
-export function canDeleteSR(user: AuthenticatedUser): boolean {
-  return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.SR.DELETE);
+/**
+ * SR 삭제 권한.
+ *
+ * 예전에는 `sr` 인자 자체가 없어 `ADMIN || SR:DELETE` 만 봤다(감사 4.1). 그래서
+ * `SR:DELETE` 를 가진 외부 사용자가 **테넌트를 가리지 않고** 아무 SR 이나 지울 수
+ * 있었다. 삭제는 되돌릴 수 없으므로 조회·수정보다 느슨하면 안 된다.
+ */
+export function canDeleteSR(user: AuthenticatedUser, sr: SRAccessFields): boolean {
+  const isAdmin = user.roles?.includes('ADMIN') ?? false;
+  if (isAdmin) return true;
+
+  if (!hasPermissionFlag(user, PERMISSIONS.SR.DELETE)) {
+    return false;
+  }
+
+  // 내부 사용자(MANAGER/ENGINEER)는 권한 보유만으로 통과한다.
+  // 외부 사용자는 자기 테넌트의 SR 로 제한한다.
+  return isInternalUser(user) || (user.clientIds?.includes(sr.clientId) ?? false);
+}
+
+/**
+ * 종결된 SR. 이 상태의 레코드는 감사 추적 대상이므로 첨부를 붙일 수 없다.
+ */
+const CLOSED_SR_STATUSES: ReadonlySet<string> = new Set(['COMPLETED', 'CONFIRMED', 'REJECTED']);
+
+/**
+ * 첨부 업로드 권한.
+ *
+ * 예전에는 두 업로드 경로가 `ensureCanReadSR` 로 게이트됐다(감사 4.1). 읽기 권한만
+ * 가진 사용자가 파일을 **쓸 수** 있었고, `sr.status` 를 보지 않아 이미 완료·확정·반려된
+ * SR 에도 첨부가 붙었다. 반면 삭제는 `ensureCanUpdateSR` 을 요구해서, 자기가 올린 것을
+ * 자기가 지우지 못하는 비대칭까지 있었다.
+ *
+ * 업로드는 쓰기다. 수정 권한으로 게이트하고 종결 상태를 막는다.
+ */
+export function ensureCanAttachToSR(
+  user: AuthenticatedUser,
+  sr: SRAccessFields & { status: string }
+): void {
+  ensureCanUpdateSR(user, sr);
+
+  if (CLOSED_SR_STATUSES.has(sr.status)) {
+    throw new ForbiddenError(
+      '종결된 SR(완료/확정/반려)에는 첨부파일을 추가할 수 없습니다. 필요하면 SR을 다시 열어주세요.'
+    );
+  }
 }
 
 export function ensureCanCreateSR(user: AuthenticatedUser): void {
@@ -131,8 +175,8 @@ export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): 
   }
 }
 
-export function ensureCanDeleteSR(user: AuthenticatedUser): void {
-  if (!canDeleteSR(user)) {
+export function ensureCanDeleteSR(user: AuthenticatedUser, sr: SRAccessFields): void {
+  if (!canDeleteSR(user, sr)) {
     throw new ForbiddenError('SR 삭제 권한이 없습니다.');
   }
 }
@@ -166,6 +210,25 @@ export function canUpdateClient(user: AuthenticatedUser): boolean {
 
 export function canDeleteClient(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.CLIENT.DELETE);
+}
+
+/**
+ * 고객사 쓰기(수정/삭제)의 테넌트 경계.
+ *
+ * `canUpdateClient`/`canDeleteClient` 는 권한 플래그만 본다. REST 라우트의 PATCH 는
+ * 그 위에 소속 검사를 **직접** 얹어 두었지만, DELETE 와 서버 액션
+ * (`updateClientAction`/`deleteClientAction`)에는 그 검사가 없었다(감사 4.1).
+ * 같은 규칙이 세 곳에 흩어져 하나만 빠진 전형적인 형태라, 술어를 여기로 올린다.
+ *
+ * 외부 사용자는 자기가 소속된 고객사만 건드릴 수 있다.
+ */
+export function ensureCanWriteClient(user: AuthenticatedUser, clientId: string): void {
+  if (isInternalUser(user)) {
+    return;
+  }
+  if (!(user.clientIds ?? []).includes(clientId)) {
+    throw new ForbiddenError('해당 고객사에 대한 권한이 없습니다.');
+  }
 }
 
 export function ensureCanCreateClient(user: AuthenticatedUser): void {

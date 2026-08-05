@@ -8,7 +8,7 @@ import {
   MAX_UPLOAD_FILE_SIZE,
   validateFile,
 } from '@/lib/file-validator';
-import { ensureCanReadSR } from '@/lib/policies';
+import { ensureCanAttachToSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
@@ -39,16 +39,17 @@ export const POST = withAuthAndRateLimit(
       );
     }
 
-    // SR 존재 + 접근 권한 체크 (IDOR 방지 — 임의 SR 에 첨부 금지)
+    // SR 존재 + 쓰기 권한 체크 (IDOR 방지 — 임의 SR 에 첨부 금지)
+    // 업로드는 쓰기이므로 읽기 권한이 아니라 수정 권한으로 게이트한다(감사 4.1).
     const sr = await prisma.sR.findUnique({
       where: { id: srId },
-      select: { id: true, clientId: true, requesterId: true, assigneeId: true },
+      select: { id: true, clientId: true, requesterId: true, assigneeId: true, status: true },
     });
 
     if (!sr) {
       throw new NotFoundError('SR');
     }
-    ensureCanReadSR(session.user, sr);
+    ensureCanAttachToSR(session.user, sr);
 
     // 파일 내용 검증 (확장자 + magic-byte MIME + 타입별 크기) — 저장형 XSS/스푸핑 방지
     let mimeType: string;

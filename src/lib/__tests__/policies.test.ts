@@ -126,17 +126,53 @@ describe('Policy Functions', () => {
     });
 
     it('canDeleteSR: verifies delete permission', () => {
-      const user = { ...userNoPerms, id: 'u-del', permissions: [PERMISSIONS.SR.DELETE] };
-      expect(policies.canDeleteSR(user)).toBe(true);
-      expect(policies.canDeleteSR(adminUser)).toBe(true); // ADMIN implicitly has permission
-      expect(policies.canDeleteSR(userNoPerms)).toBe(false);
+      // 외부 사용자는 권한 + 소속이 **둘 다** 있어야 한다.
+      // (`userNoPerms` 는 clientIds 가 없으므로 권한만 준 상태로는 통과하지 못한다 —
+      //  그것이 이 수정으로 닫힌 구멍이다.)
+      const user = {
+        ...userNoPerms,
+        id: 'u-del',
+        permissions: [PERMISSIONS.SR.DELETE],
+        clientIds: ['c1'],
+      };
+      expect(policies.canDeleteSR(user, sr)).toBe(true);
+      expect(policies.canDeleteSR(adminUser, sr)).toBe(true); // ADMIN implicitly has permission
+      expect(policies.canDeleteSR(userNoPerms, sr)).toBe(false);
+    });
+
+    it('canDeleteSR: 권한은 있으나 소속이 없는 외부 사용자는 거부한다', () => {
+      const orphan = { ...userNoPerms, id: 'u-orphan', permissions: [PERMISSIONS.SR.DELETE] };
+      expect(policies.canDeleteSR(orphan, sr)).toBe(false);
+    });
+
+    it('canDeleteSR: 외부 사용자는 다른 테넌트의 SR 을 지울 수 없다', () => {
+      // 예전에는 `sr` 인자 자체가 없어 SR:DELETE 만 있으면 아무 SR 이나 지울 수 있었다.
+      const outsider = {
+        ...userNoPerms,
+        id: 'u-outsider',
+        roles: ['CLIENT_ADMIN'],
+        permissions: [PERMISSIONS.SR.DELETE],
+        clientIds: ['other-client'],
+      };
+      expect(policies.canDeleteSR(outsider, sr)).toBe(false);
+    });
+
+    it('canDeleteSR: 내부 사용자는 권한만으로 통과한다', () => {
+      const engineer = {
+        ...userNoPerms,
+        id: 'u-eng',
+        roles: ['ENGINEER'],
+        permissions: [PERMISSIONS.SR.DELETE],
+        clientIds: [],
+      };
+      expect(policies.canDeleteSR(engineer, sr)).toBe(true);
     });
 
     it('ensureCan... throws ForbiddenError on failure', () => {
       expect(() => policies.ensureCanCreateSR(userNoPerms)).toThrow(ForbiddenError);
       expect(() => policies.ensureCanReadSR(userNoPerms, sr)).toThrow(ForbiddenError);
       expect(() => policies.ensureCanUpdateSR(userNoPerms, sr)).toThrow(ForbiddenError);
-      expect(() => policies.ensureCanDeleteSR(userNoPerms)).toThrow(ForbiddenError);
+      expect(() => policies.ensureCanDeleteSR(userNoPerms, sr)).toThrow(ForbiddenError);
     });
   });
 

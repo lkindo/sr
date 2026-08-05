@@ -47,26 +47,26 @@ describe('SR Policy Functions', () => {
     expect(canCreateSR(admin)).toBe(true);
     expect(canReadSR(admin, baseSR)).toBe(true);
     expect(canUpdateSR(admin, baseSR)).toBe(true);
-    expect(canDeleteSR(admin)).toBe(true);
+    expect(canDeleteSR(admin, baseSR)).toBe(true);
   });
 
   it('요청자는 자신이 요청한 SR을 읽고 self-update할 수 있다', () => {
     expect(canReadSR(requester, baseSR)).toBe(true);
     expect(canUpdateSR(requester, baseSR)).toBe(true);
-    expect(canDeleteSR(requester)).toBe(false);
+    expect(canDeleteSR(requester, baseSR)).toBe(false);
   });
 
   it('권한 없는 사용자는 거부된다', () => {
     expect(canCreateSR(noPerm)).toBe(false);
     expect(canReadSR(noPerm, baseSR)).toBe(false);
     expect(canUpdateSR(noPerm, baseSR)).toBe(false);
-    expect(canDeleteSR(noPerm)).toBe(false);
+    expect(canDeleteSR(noPerm, baseSR)).toBe(false);
   });
 
   it('ensure 함수는 권한 없을 때 예외를 던진다', () => {
     expect(() => ensureCanCreateSR(noPerm)).toThrowError(/생성/);
     expect(() => ensureCanReadSR(noPerm, baseSR)).toThrowError(/조회/);
     expect(() => ensureCanUpdateSR(noPerm, baseSR)).toThrowError(/수정/);
-    expect(() => ensureCanDeleteSR(noPerm)).toThrowError(/삭제/);
+    expect(() => ensureCanDeleteSR(noPerm, baseSR)).toThrowError(/삭제/);
   });
 });

@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import { NotFoundError } from '@/lib/errors';
 import {
   ensureCanDeleteClient,
   ensureCanReadClient,
   ensureCanUpdateClient,
-  isInternalUser,
+  ensureCanWriteClient,
 } from '@/lib/policies';
 import { clientUpdateSchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
@@ -47,13 +47,10 @@ export const PATCH = withAuthAndRateLimit(
 
     const { id } = await params;
 
-    // Multi-tenant Isolation: External users cannot modify other clients
-    if (!isInternalUser(session.user)) {
-      const userClientIds = session.user.clientIds || [];
-      if (!userClientIds.includes(id)) {
-        throw new ForbiddenError('해당 고객사 수정 권한이 없습니다.');
-      }
-    }
+    // Multi-tenant Isolation: External users cannot modify other clients.
+    // 규칙은 정책 계층 한 곳에 둔다 — 예전에는 이 인라인 검사가 PATCH 에만 있어서
+    // DELETE 와 서버 액션에는 빠져 있었다(감사 4.1).
+    ensureCanWriteClient(session.user, id);
 
     const validated = await validateRequestBody(request, clientUpdateSchema);
 
@@ -78,6 +75,10 @@ export const DELETE = withAuthAndRateLimit(
     ensureCanDeleteClient(session.user);
 
     const { id } = await params;
+
+    // 테넌트 경계 — PATCH 에는 있었는데 여기에는 없었다(감사 4.1).
+    // `CLIENT:DELETE` 를 가진 외부 사용자가 남의 고객사를 지울 수 있었다.
+    ensureCanWriteClient(session.user, id);
 
     // Service 레이어를 통해 고객사 삭제
     const clientService = new ClientService();
