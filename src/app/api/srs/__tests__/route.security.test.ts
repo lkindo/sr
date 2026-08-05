@@ -177,3 +177,56 @@ describe('API Route Security: /api/srs', () => {
     expect(res.status).toBe(200);
   });
 });
+
+/**
+ * 쿼리 파라미터 검증 (감사 4.3).
+ *
+ * 예전에는 `searchParams.get('status') as SRStatus` 로 캐스팅해 Prisma 에 그대로 넘겼다.
+ * `?status=FOO` 는 `PrismaClientValidationError` 를 일으켰고, 그 오류가 500 으로
+ * 매핑되면서 모델명·필드 목록이 담긴 원문 메시지를 응답 본문에 실었다.
+ * 이제는 라우트 진입 시점에 ZodError 로 끝나고 `handleApiError` 가 400 을 만든다.
+ */
+describe('API Route Validation: /api/srs 쿼리 파라미터', () => {
+  const adminSession = {
+    user: { id: 'user-admin', roles: ['ADMIN'], clientIds: [] },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.isInternalUser.mockReturnValue(true);
+  });
+
+  it('알 수 없는 status 는 Prisma 에 도달하지 못한다', async () => {
+    const req = new NextRequest('http://localhost/api/srs?status=BOGUS');
+
+    await expect((GET as any)(req, { session: adminSession })).rejects.toThrow();
+    expect(mocks.getAllSRs).not.toHaveBeenCalled();
+  });
+
+  it('알 수 없는 priority 는 Prisma 에 도달하지 못한다', async () => {
+    const req = new NextRequest('http://localhost/api/srs?priority=SUPER_URGENT');
+
+    await expect((GET as any)(req, { session: adminSession })).rejects.toThrow();
+    expect(mocks.getAllSRs).not.toHaveBeenCalled();
+  });
+
+  it('유효한 status/priority 는 그대로 필터로 전달된다', async () => {
+    const req = new NextRequest('http://localhost/api/srs?status=IN_PROGRESS&priority=HIGH');
+    await (GET as any)(req, { session: adminSession });
+
+    expect(mocks.getAllSRs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'IN_PROGRESS', priority: 'HIGH' }),
+      })
+    );
+  });
+
+  it('빈 문자열은 "필터 없음"으로 취급한다(UI 의 전체 선택)', async () => {
+    const req = new NextRequest('http://localhost/api/srs?status=&priority=');
+    await (GET as any)(req, { session: adminSession });
+
+    const where = mocks.getAllSRs.mock.calls[0]![0].where;
+    expect(where.status).toBeUndefined();
+    expect(where.priority).toBeUndefined();
+  });
+});

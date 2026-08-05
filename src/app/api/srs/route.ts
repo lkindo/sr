@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SRPriority, SRStatus } from '@prisma/client';
+import { z } from 'zod';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
@@ -15,6 +16,23 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+/**
+ * 목록 필터 쿼리 파라미터.
+ *
+ * 예전에는 `searchParams.get('status') as SRStatus` 로 **검증 없이 캐스팅**했다(감사 4.3).
+ * `?status=FOO` 는 그대로 Prisma 에 도달해 `PrismaClientValidationError` 를 일으켰고,
+ * 그 오류는 500 으로 매핑되면서 모델명·필드 목록이 담긴 원문 메시지를 응답에 실었다.
+ * 400 이어야 할 것이 5xx + 스키마 유출이었다.
+ *
+ * 빈 문자열(`?status=`)은 "필터 없음"으로 취급한다 — UI 의 Select 가 전체 선택 시
+ * 빈 값을 붙여 보내는 경우가 있어, 이를 오류로 만들면 정상 사용이 깨진다.
+ */
+const srListQuerySchema = z.object({
+  status: z.preprocess((v) => v || undefined, z.nativeEnum(SRStatus).optional()),
+  priority: z.preprocess((v) => v || undefined, z.nativeEnum(SRPriority).optional()),
+  clientId: z.preprocess((v) => v || undefined, z.string().max(30).optional()),
+});
+
 // GET /api/srs - SR 목록 조회 (Rate Limit: 느슨함 - 자주 조회되는 API)
 // 페이지네이션 지원: ?page=1&pageSize=20&sortBy=createdAt&sortOrder=desc
 export const GET = withAuthAndRateLimit(
@@ -22,8 +40,14 @@ export const GET = withAuthAndRateLimit(
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.srs);
 
-    let clientIdFilter: string | { in: string[] } | undefined =
-      searchParams.get('clientId') || undefined;
+    // 잘못된 값은 여기서 ZodError 로 끝난다. handleApiError 가 400 으로 매핑한다.
+    const query = srListQuerySchema.parse({
+      status: searchParams.get('status'),
+      priority: searchParams.get('priority'),
+      clientId: searchParams.get('clientId'),
+    });
+
+    let clientIdFilter: string | { in: string[] } | undefined = query.clientId;
 
     // Authorization Check: External users must be restricted to their assigned clients
     if (!isInternalUser(session.user)) {
@@ -46,11 +70,11 @@ export const GET = withAuthAndRateLimit(
       }
     }
 
-    // 필터 파라미터
+    // 필터 파라미터 (전부 위 스키마를 통과한 값이다)
     const filters = {
-      status: (searchParams.get('status') as SRStatus) || undefined,
+      status: query.status,
       clientId: clientIdFilter,
-      priority: (searchParams.get('priority') as SRPriority) || undefined,
+      priority: query.priority,
     };
 
     const [srs, totalCount] = await Promise.all([
