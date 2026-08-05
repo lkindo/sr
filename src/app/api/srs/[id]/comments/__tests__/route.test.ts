@@ -72,7 +72,8 @@ const SR = {
 const externalUser = {
   id: 'user-requester',
   roles: ['CLIENT_USER'],
-  permissions: [PERMISSIONS.SR.READ],
+  // 시드의 CLIENT_USER 와 동일하게 COMMENT:CREATE 를 보유한다.
+  permissions: [PERMISSIONS.SR.READ, PERMISSIONS.COMMENT.CREATE],
   clientIds: ['client-A'],
 };
 
@@ -169,6 +170,38 @@ describe('POST — 원자성', () => {
     await expect(
       (POST as any)(postRequest('가'.repeat(100_000)), ctx(internalUser))
     ).rejects.toThrow();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST — 인가', () => {
+  it('SR 을 읽을 수 있어도 COMMENT:CREATE 가 없으면 거부한다', async () => {
+    // 예전에는 `ensureCanReadSR` 만 통과하면 댓글을 쓸 수 있었고,
+    // `COMMENT:CREATE` 는 시드·부여되면서도 검사되지 않았다(감사 4.1).
+    const readOnly = {
+      id: 'user-readonly',
+      roles: ['CLIENT_USER'],
+      permissions: [PERMISSIONS.SR.READ],
+      clientIds: ['client-A'],
+    };
+
+    await expect((POST as any)(postRequest('충분히 긴 댓글 내용'), ctx(readOnly))).rejects.toThrow(
+      /댓글 작성 권한/
+    );
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('SR 을 읽을 수 없으면 권한 보유와 무관하게 거부한다', async () => {
+    const outsider = {
+      id: 'u',
+      roles: ['CLIENT_USER'],
+      permissions: [PERMISSIONS.SR.READ, PERMISSIONS.COMMENT.CREATE],
+      clientIds: ['other-client'],
+    };
+
+    await expect((POST as any)(postRequest('충분히 긴 댓글 내용'), ctx(outsider))).rejects.toThrow(
+      /권한/
+    );
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 });

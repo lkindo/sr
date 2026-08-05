@@ -42,15 +42,25 @@ describe('ensureCanAttachToSR — 쓰기 권한을 요구한다', () => {
     expect(() => ensureCanAttachToSR(readOnly, sr)).toThrow(ForbiddenError);
   });
 
-  it('수정 권한이 있고 소속 테넌트면 허용한다', () => {
-    const editor = user({ permissions: [PERMISSIONS.SR.UPDATE] });
+  it('수정 권한과 ATTACHMENT:CREATE 가 있고 소속 테넌트면 허용한다', () => {
+    const editor = user({
+      permissions: [PERMISSIONS.SR.UPDATE, PERMISSIONS.ATTACHMENT.CREATE],
+    });
 
     expect(() => ensureCanAttachToSR(editor, sr)).not.toThrow();
   });
 
+  it('SR 수정은 되지만 ATTACHMENT:CREATE 가 없으면 거부한다', () => {
+    // 이 권한은 카탈로그에 있고 다섯 역할 모두에 부여되지만 어디서도 검사되지
+    // 않았다(감사 4.1) — 회수해도 아무 일도 일어나지 않는 통제였다.
+    const noAttach = user({ permissions: [PERMISSIONS.SR.UPDATE] });
+
+    expect(() => ensureCanAttachToSR(noAttach, sr)).toThrow(/첨부파일 업로드 권한/);
+  });
+
   it('수정 권한이 있어도 다른 테넌트면 거부한다', () => {
     const outsider = user({
-      permissions: [PERMISSIONS.SR.UPDATE],
+      permissions: [PERMISSIONS.SR.UPDATE, PERMISSIONS.ATTACHMENT.CREATE],
       clientIds: ['client-B'],
     });
 

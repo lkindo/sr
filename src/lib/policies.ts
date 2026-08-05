@@ -150,10 +150,31 @@ export function ensureCanAttachToSR(
 ): void {
   ensureCanUpdateSR(user, sr);
 
+  // `ATTACHMENT:CREATE` 는 카탈로그에 있고 다섯 역할 모두에 부여되지만 어디서도
+  // 검사되지 않았다(감사 4.1). 회수해도 아무 일도 일어나지 않는 통제였다.
+  // 시드 역할은 전부 보유하므로 이 검사가 기존 동작을 바꾸지 않는다.
+  if (!user.roles?.includes('ADMIN') && !hasPermissionFlag(user, PERMISSIONS.ATTACHMENT.CREATE)) {
+    throw new ForbiddenError('첨부파일 업로드 권한이 없습니다.');
+  }
+
   if (CLOSED_SR_STATUSES.has(sr.status)) {
     throw new ForbiddenError(
       '종결된 SR(완료/확정/반려)에는 첨부파일을 추가할 수 없습니다. 필요하면 SR을 다시 열어주세요.'
     );
+  }
+}
+
+/**
+ * 댓글 작성 권한.
+ *
+ * SR 을 읽을 수 있는 것과 거기에 쓸 수 있는 것은 다르다. 예전에는 댓글 POST 가
+ * `ensureCanReadSR` 만 통과하면 됐고 `COMMENT:CREATE` 는 검사되지 않았다(감사 4.1).
+ */
+export function ensureCanCommentOnSR(user: AuthenticatedUser, sr: SRAccessFields): void {
+  ensureCanReadSR(user, sr);
+
+  if (!user.roles?.includes('ADMIN') && !hasPermissionFlag(user, PERMISSIONS.COMMENT.CREATE)) {
+    throw new ForbiddenError('댓글 작성 권한이 없습니다.');
   }
 }
 

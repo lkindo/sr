@@ -5,7 +5,7 @@ import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/errors';
-import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
+import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { FIELD_LIMITS } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
@@ -120,7 +120,9 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    ensureCanReadSR(session.user, sr);
+    // 읽기 권한이 아니라 쓰기 권한으로 게이트한다 —
+    // `ensureCanCommentOnSR` 이 읽기 가능 여부 + `COMMENT:CREATE` 를 함께 본다(감사 4.1).
+    ensureCanCommentOnSR(session.user, sr);
 
     // 댓글 + 활동로그를 하나의 트랜잭션으로 커밋 (중간 실패 시 감사 이력 불일치 방지)
     const comment = await prisma.$transaction(async (tx) => {
