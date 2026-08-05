@@ -11,6 +11,53 @@
     font-size: 1.5rem;
     line-height: 2rem;
   }
+
+  /*
+   * 본문 바로가기 링크 (감사 4.4).
+   *
+   * 평소에는 화면 밖에 있다가 탭으로 포커스되면 나타난다. 이게 없으면 키보드
+   * 사용자는 **매 페이지 로드마다** 상단 내비게이션과 사이드바 링크 전부를 지나야
+   * SR 테이블에 도달한다.
+   *
+   * `display: none` 이나 `visibility: hidden` 을 쓰면 포커스를 받을 수 없으므로
+   * 화면 밖 이동(translate)으로 숨긴다.
+   */
+  .sr-skip-link {
+    @apply absolute left-4 z-50 rounded-md px-4 py-2 text-sm font-medium;
+    @apply bg-primary text-primary-foreground shadow-lg;
+    @apply -translate-y-full opacity-0;
+    top: 0.5rem;
+    transition:
+      transform 150ms ease-out,
+      opacity 150ms ease-out;
+  }
+
+  .sr-skip-link:focus-visible {
+    @apply translate-y-0 opacity-100;
+    @apply outline-none ring-2 ring-ring ring-offset-2;
+  }
+}
+
+/*
+ * 모션 축소 설정 존중 (감사 4.4).
+ *
+ * 이 UI 는 `animate-spin` 스피너와 `transition-all` 에 크게 의존한다.
+ * 전정기관 장애가 있는 사용자에게는 그 움직임 자체가 증상을 유발할 수 있고,
+ * OS 에 "동작 줄이기" 를 켜 두는 것이 그들의 명시적 요청이다.
+ *
+ * 애니메이션을 **제거**하지 않고 사실상 즉시 끝나게 만든다(0.01ms). 완전히 없애면
+ * `animationend`/`transitionend` 를 기다리는 코드가 영원히 멈추기 때문이다.
+ * 스피너처럼 무한 반복하는 것은 1회로 제한해 "로딩 중" 신호는 남기되 회전은 멈춘다.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {
