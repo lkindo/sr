@@ -39,14 +39,35 @@ export class ServiceCategoryService {
   // ============================================================================
 
   /**
-   * 모든 서비스 카테고리 조회
+   * 서비스 카테고리 조회.
+   *
+   * **스코프를 반드시 지정해야 한다(감사 4.1).** 예전에는 인자도 `where` 도 없이
+   * 전 고객사의 카테고리를 SLA·담당자 연락처와 함께 반환했고, `/api/service-categories`
+   * 가 이를 인가 검사 없이 모든 인증 사용자에게 노출했다. 고객사 X 의 사용자가 고객사 Y 의
+   * 서비스 카탈로그와 담당자 이메일을 그대로 읽을 수 있었다.
+   *
+   * @param options.clientIds - `undefined` 면 전 고객사(내부 사용자 전용).
+   *   배열이면 그 고객사들 + 글로벌 카테고리(`clientId: null`)로 제한한다.
+   * @param options.includeHandlerEmail - 담당자 이메일 포함 여부. 외부 사용자에게는
+   *   내부 직원의 연락처를 주지 않는다.
    */
-  async getAll() {
+  async getAll(options?: { clientIds?: string[]; includeHandlerEmail?: boolean }) {
+    const includeEmail = options?.includeHandlerEmail ?? true;
+    const handlerSelect = { id: true, name: true, email: includeEmail };
+
     return prisma.serviceCategory.findMany({
+      where:
+        options?.clientIds === undefined
+          ? undefined
+          : {
+              isActive: true,
+              // 글로벌 카테고리(clientId: null)는 모든 테넌트가 쓰는 공용 항목이다.
+              OR: [{ clientId: null }, { clientId: { in: options.clientIds } }],
+            },
       include: {
         client: { select: { id: true, code: true, name: true } },
-        handler: { select: { id: true, name: true, email: true } },
-        backupHandler: { select: { id: true, name: true, email: true } },
+        handler: { select: handlerSelect },
+        backupHandler: { select: handlerSelect },
       },
       orderBy: { categoryName: 'asc' },
     });
@@ -407,13 +428,8 @@ export class ServiceCategoryService {
       throw new NotFoundError('서비스 카테고리', categoryId);
     }
 
-    const multiplier = this.getSLAMultiplier(priority);
-    const adjustedHours = category.slaHours * multiplier;
-
-    const dueDate = new Date(startDate);
-    dueDate.setHours(dueDate.getHours() + adjustedHours);
-
-    return dueDate;
+    // 계산 자체는 한 곳에만 둔다.
+    return this.calculateDueDateFromHours(category.slaHours, priority, startDate);
   }
 
   /**
@@ -432,10 +448,19 @@ export class ServiceCategoryService {
     const multiplier = this.getSLAMultiplier(priority);
     const adjustedHours = slaHours * multiplier;
 
-    const dueDate = new Date(startDate);
-    dueDate.setHours(dueDate.getHours() + adjustedHours);
-
-    return dueDate;
+    /**
+     * 밀리초로 더한다 — `setHours(getHours() + adjustedHours)` 를 쓰면 안 된다(감사 4.3).
+     *
+     * `Date.prototype.setHours` 는 인자에 `ToIntegerOrInfinity` 를 적용해 **소수를 절삭**한다.
+     * 배율이 0.5 / 0.75 / 1.0 / 1.5 이므로 `adjustedHours` 는 자주 소수다:
+     *   slaHours 5 × CRITICAL(0.5) = 2.5 → 예전에는 2시간. **30분이 조용히 증발**했다.
+     * 홀수 slaHours 와 모든 HIGH 우선순위 SR 이 계약보다 최대 59분 이른 마감일을 받아,
+     * SLA 가 만료되기 전에 지연으로 집계됐다.
+     *
+     * 이 함수가 마감일 계산의 **유일한 구현**이다. 예전에는 같은 구문이 네 곳에
+     * 복제돼 있어 한 곳을 고쳐도 나머지가 계속 절삭했다.
+     */
+    return new Date(startDate.getTime() + adjustedHours * 60 * 60 * 1000);
   }
 
   /**

@@ -31,11 +31,13 @@ export function registerSRNotificationListeners() {
 
       const promises: Promise<unknown>[] = [];
 
-      // 푸시 알림
+      // 푸시 알림 — 사용자 설정을 존중한다(감사 4.3).
+      // 예전에는 `sendToUsers` 를 직접 호출해 `pushSRCreated` 를 보지 않았다.
+      // 설정 화면에서 토글을 끄고 저장 성공 토스트를 받아도 푸시는 계속 왔다.
       const adminIds = admins.map((u) => u.id);
       if (adminIds.length > 0) {
         promises.push(
-          pushService.sendToUsers(adminIds, {
+          pushService.sendForEvent('SR_CREATED', adminIds, {
             title: '새로운 SR 등록',
             body: `${payload.srNumber}: ${payload.title}`,
             url: `/srs/${payload.srId}`,
@@ -91,9 +93,11 @@ export function registerSRNotificationListeners() {
 
       const promises: Promise<unknown>[] = [];
 
-      // 푸시 알림
+      // 푸시 알림 — 사용자 설정을 존중한다(감사 4.3).
+      // `pushSRStatusChanged` 는 스키마 기본값이 false 다. 예전 코드는 이 설정을
+      // 아예 읽지 않아, 기본값이 꺼져 있는데도 전원에게 발송됐다.
       promises.push(
-        pushService.sendToUser(payload.requesterId, {
+        pushService.sendForEvent('SR_STATUS_CHANGED', [payload.requesterId], {
           title: 'SR 상태 변경',
           body: `${payload.srNumber} 상태가 ${payload.currentStatus}로 변경되었습니다.`,
           url: `/srs/${payload.srId}`,
@@ -149,9 +153,9 @@ export function registerSRNotificationListeners() {
 
       const promises: Promise<unknown>[] = [];
 
-      // 푸시 알림
+      // 푸시 알림 — 사용자 설정을 존중한다(감사 4.3).
       promises.push(
-        pushService.sendToUser(payload.assigneeId, {
+        pushService.sendForEvent('SR_ASSIGNED', [payload.assigneeId], {
           title: 'SR 담당 배정',
           body: `${payload.srNumber} 담당자로 배정되었습니다.`,
           url: `/srs/${payload.srId}`,
