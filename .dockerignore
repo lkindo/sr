@@ -21,6 +21,14 @@ build
 *.key
 *.pem
 
+# Legacy attachment directory. Next serves everything under public/ from the URL
+# root, so anything left here is downloadable without passing ensureCanReadSR —
+# and the middleware matcher skips image extensions entirely, so image
+# attachments would not even need a session. Attachments live in STORAGE_DIR
+# (a named volume, outside the web root); this directory must never be baked
+# into an image again.
+public/uploads
+
 # Version control
 .git
 .gitignore
