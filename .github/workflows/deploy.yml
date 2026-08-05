@@ -40,18 +40,18 @@ jobs:
       # workflow_run 은 기본적으로 기본 브랜치를 체크아웃하므로,
       # CI를 통과한 "그 커밋"을 명시적으로 체크아웃한다.
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
       - name: Log in to GitHub Container Registry (GHCR)
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -79,7 +79,7 @@ jobs:
           fi
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./Dockerfile
@@ -94,7 +94,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Copy Config Files to Remote VM
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
@@ -107,7 +107,7 @@ jobs:
 
       # SSH를 이용해 대상 서버로 배포 원격 실행
       - name: Deploy to Remote VM via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
         env:
           BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
           GITHUB_ACTOR: ${{ github.actor }}
@@ -266,6 +266,22 @@ jobs:
                 sudo chmod 644 nginx/certs/server.crt
                 sudo chmod 600 nginx/certs/server.key
               fi
+
+              # 2-1. nginx 설정 검증 — **적용 전에** 문법을 확인한다.
+              #      compose 가 nginx.conf 변경을 감지하면 컨테이너를 재생성하는데,
+              #      설정이 깨져 있으면 nginx 가 아예 뜨지 않아 **사이트 전체가 내려간다**.
+              #      앱은 healthy 폴링과 롤백으로 보호되지만 nginx 에는 그런 그물이 없었다.
+              #      검증은 실행 중인 nginx 를 건드리지 않고 일회용 컨테이너에서 한다.
+              echo "Validating nginx configuration..."
+              if ! docker run --rm \
+                   -v "$PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+                   -v "$PWD/nginx/certs:/etc/nginx/certs:ro" \
+                   --entrypoint nginx nginx:alpine -t 2>&1; then
+                echo "ERROR: nginx.conf 검증 실패 — 배포를 중단합니다."
+                echo "       (이 설정을 적용했다면 nginx 가 기동하지 못해 사이트 전체가 내려갑니다.)"
+                exit 1
+              fi
+              echo "  -> nginx 설정 OK"
 
               # 3. 롤백 지점 기록.
               #    **태그가 아니라 이미지 ID(sha256)를 잡는다.** 컨테이너가 `:latest` 로
