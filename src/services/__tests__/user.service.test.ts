@@ -98,6 +98,10 @@ describe('UserService', () => {
   });
 
   describe('hardDeleteUser', () => {
+    beforeEach(() => {
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1' } as any);
+    });
+
     it('throws BusinessRuleError if related SR data exists', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(1);
 

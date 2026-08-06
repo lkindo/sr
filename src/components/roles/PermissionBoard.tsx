@@ -34,6 +34,9 @@ interface RolePermission {
   permission: Permission;
 }
 
+// permissions 는 여기서 반드시 있어야 한다 — 초기 선택값을 그것으로 만든다.
+// `RoleItem` 은 permissions 가 optional 이라 `?? []` 폴백이 필요해지는데,
+// 그러면 "권한을 못 받았다"가 "권한이 0개다"로 조용히 바뀐다.
 interface Role {
   id: string;
   name: string;

@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
-import { parseJsonBody } from '@/lib/api-helpers';
+import { validateRequestBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SECURITY } from '@/lib/constants';
-import {
-  firstZodIssueMessage,
-  NotFoundError,
-  UnauthorizedError,
-  ValidationError,
-} from '@/lib/errors';
+import { NotFoundError, UnauthorizedError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import { passwordSchema } from '@/lib/schemas';
 
@@ -32,17 +27,7 @@ export const POST = withAuthAndRateLimit(
       throw new UnauthorizedError('유효하지 않은 세션입니다. 다시 로그인해주세요.');
     }
 
-    const body = await parseJsonBody(request);
-
-    let validated;
-    try {
-      validated = changePasswordSchema.parse(body);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(firstZodIssueMessage(error));
-      }
-      throw error;
-    }
+    const validated = await validateRequestBody(request, changePasswordSchema);
 
     // 현재 사용자 조회
     const user = await prisma.user.findUnique({

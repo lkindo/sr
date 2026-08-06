@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { NotFoundError } from '@/lib/errors';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
@@ -12,8 +13,8 @@ export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session, params }: AuthenticatedContext) => {
     const srId = (await params).id;
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '20', 10)));
     const skip = (page - 1) * limit;
 
     // SR 존재 여부 확인 및 권한 검증
@@ -22,14 +23,10 @@ export const GET = withAuthAndRateLimit(
     });
 
     if (!sr) {
-      return NextResponse.json({ error: 'SR을 찾을 수 없습니다' }, { status: 404 });
+      throw new NotFoundError('SR을 찾을 수 없습니다.');
     }
 
-    try {
-      ensureCanReadSR(session.user, sr);
-    } catch {
-      return NextResponse.json({ error: 'SR 조회 권한이 없습니다.' }, { status: 403 });
-    }
+    ensureCanReadSR(session.user, sr);
 
     // 상태 히스토리 조회
     const [items, total] = await Promise.all([

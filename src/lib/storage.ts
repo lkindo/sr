@@ -133,15 +133,3 @@ export async function deleteAttachmentBlob(pathname: string) {
     );
   }
 }
-
-export async function listAttachmentBlobs(
-  prefix: string
-): Promise<{ blobs: { url: string; pathname: string; size: number; uploadedAt: Date }[] } | null> {
-  // 로컬 파일 시스템 리스트 구현은 복잡하고 현재 요구사항에서 필수적이지 않을 수 있어
-  // 간단히 null 반환하거나 필요한 경우 구현.
-  // 기존 Vercel Blob list 반환 타입과 맞추기 위해 간단한 스터브 제공.
-  // 실제 로직이 필요하다면 재귀적 디렉토리 탐색이 필요함.
-  void prefix;
-  logger.warn('[storage] listAttachmentBlobs is not fully implemented for local storage.');
-  return { blobs: [] };
-}

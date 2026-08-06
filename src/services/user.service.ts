@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { SECURITY } from '@/lib/constants';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT, USER_WITH_ROLES_INCLUDE } from '@/lib/prisma-selects';
 import { userUpdateSchema } from '@/lib/schemas';
 import { excludePassword } from '@/lib/user-helpers';
 
@@ -54,8 +55,6 @@ export const SR_HANDLER_INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
  * ```
  */
 export class UserService {
-  constructor() {}
-
   private async runInTransaction<T>(cb: (tx: any) => Promise<T>): Promise<T> {
     if (typeof prisma.$transaction === 'function') {
       const originalTransaction = prisma.$transaction;
@@ -131,26 +130,10 @@ export class UserService {
   async getUserByEmail(email: string) {
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        roles: { include: { role: true } },
-        clients: { include: { client: true } },
-      },
+      include: USER_WITH_ROLES_INCLUDE,
     });
     if (!user) return null;
     return excludePassword(user);
-  }
-
-  async getUserByClientId(clientId: string): Promise<Omit<User, 'password'>[]> {
-    const users = await prisma.user.findMany({
-      where: {
-        clients: { some: { clientId } },
-      },
-      include: {
-        roles: { include: { role: true } },
-        clients: { include: { client: true } },
-      },
-    });
-    return users.map(excludePassword);
   }
 
   async getAllUsers(
@@ -240,7 +223,7 @@ export class UserService {
           createdAt: true,
           updatedAt: true,
           roles: { include: { role: true } },
-          clients: { include: { client: { select: { id: true, name: true, code: true } } } },
+          clients: { include: { client: { select: CLIENT_SUMMARY_SELECT } } },
         },
       }),
       prisma.user.count({ where }),
@@ -270,36 +253,12 @@ export class UserService {
       ? { ...rest, password: await hash(password, SECURITY.BCRYPT_WORK_FACTOR) }
       : { ...rest };
 
-    const includeConfig = {
-      roles: { include: { role: true } },
-      clients: { include: { client: true } },
-    };
+    const includeConfig = USER_WITH_ROLES_INCLUDE;
 
-    const isMock =
-      typeof prisma.user.findUnique === 'function' &&
-      (prisma.user.findUnique as any).mock !== undefined;
-
-    let beforeUser = await prisma.user.findUnique({
+    const beforeUser = await prisma.user.findUnique({
       where: { id },
       include: includeConfig,
     });
-    if (
-      isMock &&
-      !beforeUser &&
-      (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test')
-    ) {
-      beforeUser = {
-        id,
-        email: 'mock-test@example.com',
-        name: 'Mock User',
-        password: 'hashed-password',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        roles: [],
-        clients: [],
-      } as any;
-    }
     if (!beforeUser) {
       throw new NotFoundError('사용자', id);
     }
@@ -380,33 +339,6 @@ export class UserService {
     return excludePassword(updatedUser);
   }
 
-  async updatePassword(
-    userId: string,
-    hashedPassword: string,
-    actorId?: string | null,
-    ipAddress?: string | null
-  ): Promise<Omit<User, 'password'>> {
-    return this.runInTransaction(async (tx) => {
-      const userUpdateFn =
-        tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;
-      const user = await userUpdateFn({
-        where: { id: userId },
-        data: { password: hashedPassword },
-      });
-
-      await auditService.createLog(tx, {
-        userId: actorId,
-        actionType: 'PASSWORD_CHANGE',
-        targetEntity: 'User',
-        targetId: userId,
-        changes: { note: '비밀번호 재설정 완료' },
-        ipAddress,
-      });
-
-      return excludePassword(user);
-    });
-  }
-
   async updateProfile(
     userId: string,
     profileData: {
@@ -420,32 +352,6 @@ export class UserService {
       data: profileData,
     });
     return excludePassword(user);
-  }
-
-  async activateUser(
-    userId: string,
-    actorId?: string | null,
-    ipAddress?: string | null
-  ): Promise<Omit<User, 'password'>> {
-    return this.runInTransaction(async (tx) => {
-      const userUpdateFn =
-        tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;
-      const user = await userUpdateFn({
-        where: { id: userId },
-        data: { isActive: true },
-      });
-
-      await auditService.createLog(tx, {
-        userId: actorId,
-        actionType: 'USER_ACTIVATE',
-        targetEntity: 'User',
-        targetId: userId,
-        changes: { status: 'active' },
-        ipAddress,
-      });
-
-      return excludePassword(user);
-    });
   }
 
   async deactivateUser(
@@ -551,35 +457,10 @@ export class UserService {
       }),
     ]);
 
-    const isMock =
-      typeof prismaInstance.user.findUnique === 'function' &&
-      (prismaInstance.user.findUnique as any).mock !== undefined;
-
-    let existingUser = await userFindUniqueFn({
+    const existingUser = await userFindUniqueFn({
       where: { id: userId },
-      include: {
-        roles: { include: { role: true } },
-        clients: { include: { client: true } },
-      },
+      include: USER_WITH_ROLES_INCLUDE,
     });
-
-    if (
-      isMock &&
-      !existingUser &&
-      (process.env.VITEST === 'true' || process.env.NODE_ENV === 'test')
-    ) {
-      existingUser = {
-        id: userId,
-        email: 'mock-test@example.com',
-        name: 'Mock User',
-        password: 'hashed-password',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        roles: [],
-        clients: [],
-      } as any;
-    }
 
     if (!existingUser) {
       throw new NotFoundError('사용자', userId);

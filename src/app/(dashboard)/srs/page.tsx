@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
+import { INTERNAL_ROLES } from '@/lib/policies';
 import { srService } from '@/services/sr.service';
 
 type Props = {
@@ -49,9 +50,7 @@ export default async function SRsPage({ searchParams }: Props) {
   const userRoles = session?.user?.roles || [];
 
   // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
-  const isAdminManagerEngineer = userRoles.some((role) =>
-    ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
-  );
+  const isAdminManagerEngineer = userRoles.some((role) => INTERNAL_ROLES.includes(role));
 
   // 고객사 사용자인 경우 해당 고객사의 SR만 조회
   // Optimized: Use clientIds from session instead of DB query

@@ -2,18 +2,10 @@
 
 // 모바일 역할 목록 컴포넌트 (정상 파일 재생성)
 
+import { MobileListCard } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
-
-interface Role {
-  id: string;
-  name: string;
-  description?: string;
-  permissions: { id: string; permission: any }[];
-  _count?: {
-    users: number;
-  };
-}
+import { RoleItem as Role } from '@/types/role';
 
 interface RoleMobileListProps {
   roles: Role[];
@@ -36,10 +28,7 @@ export function RoleMobileList({
         </div>
       ) : (
         roles.map((role) => (
-          <div
-            key={role.id}
-            className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
-          >
+          <MobileListCard key={role.id}>
             <div className="p-3.5 space-y-2">
               {/* Header: Name & User Count */}
               <div className="flex justify-between items-start">
@@ -91,7 +80,7 @@ export function RoleMobileList({
                 </Button>
               </div>
             </div>
-          </div>
+          </MobileListCard>
         ))
       )}
     </div>

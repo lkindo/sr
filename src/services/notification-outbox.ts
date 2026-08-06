@@ -72,11 +72,6 @@ export async function enqueueEmails(
   return count;
 }
 
-/** 단건 편의 래퍼. */
-export function enqueueEmail(email: OutboxEmail, client: PrismaLike = prisma): Promise<number> {
-  return enqueueEmails([email], client);
-}
-
 interface ClaimedRow {
   id: string;
   recipient: string;

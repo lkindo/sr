@@ -1,6 +1,7 @@
 import { Prisma, SR, SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
+import { PAGINATION } from '@/lib/constants';
 import { domainEvents } from '@/lib/domain-events';
 import {
   BadRequestError,
@@ -20,6 +21,7 @@ import {
   isInternalUser,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { validateTransition } from '@/lib/sr-state-machine';
@@ -118,8 +120,6 @@ export async function assertAssignable(
  * - 권한 정책 적용
  */
 export class SRService {
-  constructor() {}
-
   /**
    * 서비스 카테고리가 해당 고객사에서 사용 가능한지 검증합니다.
    * 전역 카테고리(clientId = null)이거나 해당 고객사 전용 카테고리만 허용합니다.
@@ -578,7 +578,7 @@ export class SRService {
             where: { id },
             data: updateData,
             include: {
-              client: { select: { id: true, code: true, name: true } },
+              client: { select: CLIENT_SUMMARY_SELECT },
               requester: {
                 select: {
                   id: true,
@@ -682,7 +682,7 @@ export class SRService {
       where: { id },
       include: {
         client: {
-          select: { id: true, code: true, name: true },
+          select: CLIENT_SUMMARY_SELECT,
         },
         requester: {
           select: { id: true, name: true, email: true, image: true },
@@ -770,8 +770,8 @@ export class SRService {
 
         // Relations
         client: { select: { id: true, name: true } },
-        requester: { select: { id: true, name: true, email: true } },
-        assignee: { select: { id: true, name: true, email: true } },
+        requester: { select: USER_SUMMARY_SELECT },
+        assignee: { select: USER_SUMMARY_SELECT },
         serviceCategory: {
           select: {
             id: true,
@@ -838,56 +838,6 @@ export class SRService {
   }
 
   /**
-   * SR 상태 변경 이력 조회 (페이징 지원)
-   */
-  async getStatusHistory(
-    srId: string,
-    options?: {
-      skip?: number;
-      take?: number;
-    }
-  ): Promise<{
-    items: Array<{
-      id: string;
-      previousStatus: string | null;
-      currentStatus: string;
-      changedAt: Date;
-      changeReason: string | null;
-      user: {
-        id: string;
-        name: string;
-        email: string;
-        image: string | null;
-      };
-    }>;
-    total: number;
-  }> {
-    const { skip = 0, take = 20 } = options || {};
-    const [items, total] = await Promise.all([
-      prisma.sRStatusHistory.findMany({
-        where: { srId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: { changedAt: 'desc' },
-        skip,
-        take,
-      }),
-      prisma.sRStatusHistory.count({
-        where: { srId },
-      }),
-    ]);
-    return { items, total };
-  }
-
-  /**
    * SR 활동 내역을 조회합니다. (페이징 지원)
    */
   async getSRActivities(
@@ -903,7 +853,7 @@ export class SRService {
     }>;
     nextCursor: string | null;
   }> {
-    const limit = options?.limit || 20;
+    const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
     const cursor = options?.cursor;
 
     const activities = await prisma.sRActivity.findMany({
@@ -944,7 +894,7 @@ export class SRService {
     }>;
     nextCursor: string | null;
   }> {
-    const limit = options?.limit || 20;
+    const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
     const cursor = options?.cursor;
 
     const comments = await prisma.sRComment.findMany({

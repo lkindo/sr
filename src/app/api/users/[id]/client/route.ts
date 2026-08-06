@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
+import { INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 
 /**
@@ -116,13 +117,11 @@ export const PATCH = withAuthAndRateLimit(
       include: { role: true },
     });
 
-    const isSystemTeam = targetUserRoles.some((ur) =>
-      ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
-    );
+    const isSystemTeam = targetUserRoles.some((ur) => INTERNAL_ROLES.includes(ur.role.name));
 
     if (isSystemTeam) {
       const systemRoles = targetUserRoles
-        .filter((ur) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name))
+        .filter((ur) => INTERNAL_ROLES.includes(ur.role.name))
         .map((ur) => ur.role.name)
         .join(', ');
 

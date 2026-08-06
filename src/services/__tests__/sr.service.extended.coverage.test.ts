@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { NotFoundError } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
@@ -168,32 +167,6 @@ describe('SRService Extended Branches', () => {
     });
   });
 
-  describe('deleteSR', () => {
-    beforeEach(() => {
-      vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
-        if (typeof callback === 'function') {
-          return await callback(prisma);
-        }
-        // 배열 형태 $transaction 은 이 테스트가 쓰지 않는다.
-        throw new Error('배열 형태 $transaction 은 이 목이 지원하지 않습니다.');
-      });
-    });
-
-    it('throws NotFoundError if SR missing', async () => {
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
-      await expect(srService.deleteSR('none', {} as any)).rejects.toThrow(NotFoundError);
-    });
-
-    it('deletes SR and related data', async () => {
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1' } as any);
-      vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
-
-      await srService.deleteSR('sr-1', { id: 'u1' } as any);
-
-      expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
-    });
-  });
-
   describe('updateSR Date and Type Branches', () => {
     it('updates fields to non-null and null, handles assignedToId', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({
@@ -307,11 +280,6 @@ describe('SRService Extended Branches', () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: '1' } as any);
       await srService.getSRById('1');
       expect(prisma.sR.findUnique).toHaveBeenCalledWith({ where: { id: '1' } });
-
-      vi.mocked(prisma.sRStatusHistory.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(0);
-      await srService.getStatusHistory('1');
-      expect(prisma.sRStatusHistory.findMany).toHaveBeenCalled();
     });
   });
 });

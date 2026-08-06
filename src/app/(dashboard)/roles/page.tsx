@@ -10,28 +10,7 @@ import { RoleMobileList } from '@/components/roles/RoleMobileList';
 import { RoleTable } from '@/components/roles/RoleTable';
 import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
-
-interface Permission {
-  id: string;
-  resource: string;
-  action: string;
-  description?: string;
-}
-
-interface RolePermission {
-  id: string;
-  permission: Permission;
-}
-
-interface Role {
-  id: string;
-  name: string;
-  description?: string;
-  permissions: RolePermission[];
-  _count?: {
-    users: number;
-  };
-}
+import { RoleItem as Role } from '@/types/role';
 
 export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { CheckSquare, Square } from 'lucide-react';
 
+import { InlineSpinner } from '@/components/common/InlineSpinner';
+import { MobileListCard } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { ClientApprovalActions } from '@/components/users/ClientApprovalActions';
@@ -42,7 +44,7 @@ export function UserMobileList({
       {loading ? (
         <div className="text-center py-8">
           <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            <InlineSpinner />
             <span className="text-muted-foreground">로딩 중...</span>
           </div>
         </div>
@@ -54,12 +56,9 @@ export function UserMobileList({
         </div>
       ) : (
         users.map((user) => (
-          <div
+          <MobileListCard
             key={user.id}
-            className={cn(
-              'border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden',
-              selectedUserIds.has(user.id) && 'ring-2 ring-primary border-primary'
-            )}
+            className={cn(selectedUserIds.has(user.id) && 'ring-2 ring-primary border-primary')}
           >
             <div className="p-3.5 space-y-2">
               {/* Header: Checkbox, Name, Status */}
@@ -207,7 +206,7 @@ export function UserMobileList({
                 variant="card"
               />
             </div>
-          </div>
+          </MobileListCard>
         ))
       )}
     </div>

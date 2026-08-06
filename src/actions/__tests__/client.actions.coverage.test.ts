@@ -1,14 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { authenticateAndAuthorize, getAuthenticatedSession } from '@/lib/action-helpers';
+import { authenticateAndAuthorize } from '@/lib/action-helpers';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
-import { ensureCanReadClient, isInternalUser } from '@/lib/policies';
-import { services } from '@/services/service-registry';
+import { isInternalUser } from '@/lib/policies';
 
 import {
   createClientAction,
   deleteClientAction,
-  getClientAction,
   getClientsForSelection,
   updateClientAction,
 } from '../client.actions';
@@ -262,67 +260,6 @@ describe('client.actions coverage', () => {
 
       expect(result.success).toBe(false);
       expect(result.code).toBe('NOT_FOUND');
-    });
-  });
-
-  describe('getClientAction', () => {
-    it('returns the client when access is allowed', async () => {
-      const client = { id: 'c1', name: 'Client', code: 'CL' };
-      (getAuthenticatedSession as any).mockResolvedValue({ user: { id: 'u1' } });
-      mockClientService.getClientById.mockResolvedValue(client);
-      (ensureCanReadClient as any).mockReturnValue(undefined);
-
-      const result = await getClientAction('c1');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(client);
-      }
-      expect(ensureCanReadClient).toHaveBeenCalledWith({ id: 'u1' }, client);
-    });
-
-    it('returns NOT_FOUND when access allowed but client is null', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({ user: { id: 'u1' } });
-      mockClientService.getClientById.mockResolvedValue(null);
-      (ensureCanReadClient as any).mockReturnValue(undefined);
-
-      const result = await getClientAction('missing');
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.code).toBe('NOT_FOUND');
-        expect(result.error).toMatch(/찾을 수 없습니다/);
-      }
-      // null is passed as undefined to the policy check.
-      expect(ensureCanReadClient).toHaveBeenCalledWith({ id: 'u1' }, undefined);
-    });
-
-    it('returns a failure result when the policy denies access', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({ user: { id: 'u1' } });
-      mockClientService.getClientById.mockResolvedValue({ id: 'c1', name: 'C', code: 'C' });
-      (ensureCanReadClient as any).mockImplementation(() => {
-        throw new ForbiddenError('고객사 조회 권한이 없습니다.');
-      });
-
-      const result = await getClientAction('c1');
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.code).toBe('FORBIDDEN');
-        expect(result.error).toMatch(/권한이 없습니다/);
-      }
-    });
-
-    it('converts authentication errors into a result', async () => {
-      (getAuthenticatedSession as any).mockRejectedValue(new Error('not authed'));
-
-      const result = await getClientAction('c1');
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('not authed');
-      }
-      expect(mockClientService.getClientById).not.toHaveBeenCalled();
     });
   });
 

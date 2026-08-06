@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  hasAllPermissionFlags,
-  hasAnyPermissionFlag,
-  hasPermissionFlag,
-  PERMISSIONS,
-} from '@/lib/permission-helpers';
+import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { AuthenticatedUser } from '@/types/session';
 
 describe('permission-helpers', () => {
@@ -31,34 +26,6 @@ describe('permission-helpers', () => {
     it('should return false if user has no permissions array', () => {
       const userWithoutPerms = { ...mockUser, permissions: undefined } as any;
       expect(hasPermissionFlag(userWithoutPerms, PERMISSIONS.SR.READ)).toBe(false);
-    });
-  });
-
-  describe('hasAnyPermissionFlag', () => {
-    it('should return true if user has at least one of the permissions', () => {
-      expect(hasAnyPermissionFlag(mockUser, [PERMISSIONS.SR.READ, PERMISSIONS.SR.DELETE])).toBe(
-        true
-      );
-    });
-
-    it('should return false if user has none of the permissions', () => {
-      expect(
-        hasAnyPermissionFlag(mockUser, [PERMISSIONS.SR.DELETE, PERMISSIONS.CLIENT.CREATE])
-      ).toBe(false);
-    });
-  });
-
-  describe('hasAllPermissionFlags', () => {
-    it('should return true if user has all of the permissions', () => {
-      expect(hasAllPermissionFlags(mockUser, [PERMISSIONS.SR.READ, PERMISSIONS.SR.CREATE])).toBe(
-        true
-      );
-    });
-
-    it('should return false if user is missing one of the permissions', () => {
-      expect(hasAllPermissionFlags(mockUser, [PERMISSIONS.SR.READ, PERMISSIONS.SR.DELETE])).toBe(
-        false
-      );
     });
   });
 });

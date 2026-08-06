@@ -124,24 +124,6 @@ describe('UserService - coverage2 (uncovered methods)', () => {
     });
   });
 
-  describe('getUserByClientId', () => {
-    it('returns users scoped to client without passwords', async () => {
-      vi.mocked(prisma.user.findMany).mockResolvedValue([
-        { id: 'u1', password: 's1', roles: [], clients: [] },
-        { id: 'u2', password: 's2', roles: [], clients: [] },
-      ] as any);
-
-      const result = await userService.getUserByClientId('client-1');
-      expect(result).toHaveLength(2);
-      expect((result[0] as any).password).toBeUndefined();
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { clients: { some: { clientId: 'client-1' } } },
-        })
-      );
-    });
-  });
-
   describe('getAllUsers filter branches', () => {
     beforeEach(() => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
@@ -272,22 +254,6 @@ describe('UserService - coverage2 (uncovered methods)', () => {
     });
   });
 
-  describe('updatePassword', () => {
-    it('updates password and returns user without password', async () => {
-      vi.mocked(prisma.user.update).mockResolvedValue({
-        id: 'u1',
-        password: 'newhash',
-      } as any);
-
-      const result: any = await userService.updatePassword('u1', 'newhash', 'actor-1');
-      expect(result.password).toBeUndefined();
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'u1' },
-        data: { password: 'newhash' },
-      });
-    });
-  });
-
   describe('updateProfile', () => {
     it('updates profile data and strips password', async () => {
       vi.mocked(prisma.user.update).mockResolvedValue({
@@ -302,24 +268,6 @@ describe('UserService - coverage2 (uncovered methods)', () => {
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'u1' },
         data: { name: 'Updated' },
-      });
-    });
-  });
-
-  describe('activateUser', () => {
-    it('activates user and returns user without password', async () => {
-      vi.mocked(prisma.user.update).mockResolvedValue({
-        id: 'u1',
-        isActive: true,
-        password: 'secret',
-      } as any);
-
-      const result: any = await userService.activateUser('u1', 'actor-1', '1.2.3.4');
-      expect(result.password).toBeUndefined();
-      expect(result.isActive).toBe(true);
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'u1' },
-        data: { isActive: true },
       });
     });
   });

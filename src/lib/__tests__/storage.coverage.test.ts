@@ -45,7 +45,6 @@ mockExistsSync.mockReturnValue(true);
 
 import {
   deleteAttachmentBlob,
-  listAttachmentBlobs,
   resolveAttachmentFilePath,
   STORAGE_DIR as MOD_STORAGE_DIR,
   uploadAttachmentBlob,
@@ -300,13 +299,5 @@ describe('deleteAttachmentBlob', () => {
     await expect(deleteAttachmentBlob(rel)).resolves.toBeUndefined();
     expect(mockLogger.error).toHaveBeenCalled();
     expect(mockLogger.error.mock.calls[0]![1]).toBeUndefined();
-  });
-});
-
-describe('listAttachmentBlobs', () => {
-  it('returns an empty blobs array stub and warns', async () => {
-    const result = await listAttachmentBlobs('any-prefix');
-    expect(result).toEqual({ blobs: [] });
-    expect(mockLogger.warn).toHaveBeenCalled();
   });
 });

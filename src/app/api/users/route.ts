@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseJsonBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
-import { ensureCanCreateUser, ensureCanReadUser, isInternalUser } from '@/lib/policies';
+import { ensureCanCreateUser, ensureCanReadUser, resolveClientIdFilter } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { userCreateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
@@ -21,24 +21,9 @@ export const GET = withAuthAndRateLimit(
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.users);
 
-    let clientIdFilter: string | { in: string[] } | undefined =
-      searchParams.get('clientId') || undefined;
-
-    // Multi-tenant Isolation: External users must be restricted to their assigned clients' users
-    if (!isInternalUser(session.user)) {
-      const userClientIds = session.user.clientIds || [];
-
-      if (userClientIds.length === 0) {
-        return NextResponse.json(createResponse([], 0));
-      }
-
-      if (typeof clientIdFilter === 'string') {
-        if (!userClientIds.includes(clientIdFilter)) {
-          return NextResponse.json(createResponse([], 0));
-        }
-      } else {
-        clientIdFilter = { in: userClientIds };
-      }
+    const clientIdFilter = resolveClientIdFilter(session.user, searchParams.get('clientId'));
+    if (typeof clientIdFilter === 'object' && clientIdFilter.in.length === 0) {
+      return NextResponse.json(createResponse([], 0));
     }
 
     const filters = {

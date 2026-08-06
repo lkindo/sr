@@ -5,13 +5,26 @@ import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
+import { ensureCanReadSR, INTERNAL_ROLES, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { assertAssignable } from '@/services/sr.service';
+
+// POST(접수)와 PATCH(접수정보 수정)의 응답 include. 두 곳에 31줄이 축자 복제돼 있었다.
+//
+// `client` 는 반드시 select 로 좁힌다 — `client: true` 로 두면 담당자명·이메일·전화번호·
+// 주소·계약 시작/종료일까지 응답에 실린다. 원본이 {id, code, name} 만 고른 것은 의도다.
+const SR_INTAKE_INCLUDE = {
+  client: { select: CLIENT_SUMMARY_SELECT },
+  serviceCategory: true,
+  requester: { select: USER_SUMMARY_SELECT },
+  assignee: { select: USER_SUMMARY_SELECT },
+  intakeBy: { select: USER_SUMMARY_SELECT },
+} as const;
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -28,15 +41,10 @@ export const POST = withAuthAndRateLimit(
     const { id } = await params;
 
     // 권한 체크: 접수(Intake)는 담당 엔지니어 배정·SLA 산정 등 운영팀의 트리아지 행위이므로
-    // ADMIN/MANAGER/ENGINEER 역할 또는 전용 SR:INTAKE 권한이 있어야 한다.
-    // (과거 버그: SR:CREATE 를 접수 권한으로 인정 → SR:CREATE 를 가진 CLIENT_USER 가
-    //  자신의 SR 을 스스로 접수하고 엔지니어까지 배정할 수 있었다.)
     const userRoles = session.user?.roles || [];
     const hasIntakePermission =
       session.user?.permissions?.some((p: string) => p.toUpperCase() === 'SR:INTAKE') ?? false;
-    const hasIntakeRole = userRoles.some((role: string) =>
-      ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
-    );
+    const hasIntakeRole = userRoles.some((role: string) => INTERNAL_ROLES.includes(role));
 
     if (!hasIntakePermission && !hasIntakeRole) {
       throw new ForbiddenError(
@@ -132,37 +140,7 @@ export const POST = withAuthAndRateLimit(
             connect: { id: validated.assigneeId },
           },
         },
-        include: {
-          client: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-            },
-          },
-          serviceCategory: true,
-          requester: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          assignee: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          intakeBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
+        include: SR_INTAKE_INCLUDE,
       });
 
       // 6. Activity 로그 생성 (상태 변경)
@@ -466,37 +444,7 @@ export const PATCH = withAuthAndRateLimit(
       return tx.sR.update({
         where: { id },
         data: updateData,
-        include: {
-          client: {
-            select: {
-              id: true,
-              code: true,
-              name: true,
-            },
-          },
-          serviceCategory: true,
-          requester: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          assignee: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          intakeBy: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
+        include: SR_INTAKE_INCLUDE,
       });
     });
 

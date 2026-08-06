@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDate, formatDateTime, getDaysUntilDue, getDueDateStatus } from '@/lib/date-utils';
+import { getDaysUntilDue, getDueDateStatus } from '@/lib/date-utils';
 import { formatISODateInAppZone } from '@/lib/timezone';
 
 describe('date-utils', () => {
@@ -176,37 +176,6 @@ describe('date-utils', () => {
         isOverdue: false,
         isUrgent: false,
       });
-    });
-  });
-
-  describe('formatDate', () => {
-    it('should format date string in Korean format', () => {
-      const result = formatDate('2024-01-15');
-      expect(result).toContain('2024');
-      expect(result).toContain('1');
-      expect(result).toContain('15');
-    });
-
-    it('should format Date object', () => {
-      const result = formatDate(new Date('2024-06-20'));
-      expect(result).toContain('2024');
-      expect(result).toContain('6');
-      expect(result).toContain('20');
-    });
-  });
-
-  describe('formatDateTime', () => {
-    it('should format date time string in Korean format', () => {
-      const result = formatDateTime('2024-01-15T14:30:00');
-      expect(result).toContain('2024');
-      expect(result).toContain('1');
-      expect(result).toContain('15');
-    });
-
-    it('should format Date object with time', () => {
-      const date = new Date('2024-06-20T10:45:00');
-      const result = formatDateTime(date);
-      expect(result).toContain('2024');
     });
   });
 });

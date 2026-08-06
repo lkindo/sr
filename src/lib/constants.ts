@@ -46,26 +46,6 @@ export const PAGINATION = {
 } as const;
 
 /**
- * 클라이언트 쿼리 캐시 관련 상수 (React Query)
- */
-export const CLIENT_QUERY = {
-  /**
-   * 데이터 신선도 유지 시간 (1분)
-   */
-  STALE_TIME_MS: 60 * 1000,
-
-  /**
-   * 가비지 컬렉션 시간 (5분)
-   */
-  GC_TIME_MS: 5 * 60 * 1000,
-
-  /**
-   * 재시도 횟수
-   */
-  RETRY_COUNT: 1,
-} as const;
-
-/**
  * 통계 및 트렌드 관련 상수
  */
 export const STATS = {
@@ -73,38 +53,6 @@ export const STATS = {
    * 트렌드 분석 기간 (일)
    */
   TREND_DAYS: 30,
-} as const;
-
-/**
- * 시간 단위 상수 (밀리초)
- */
-export const TIME_MS = {
-  SECOND: 1000,
-  MINUTE: 60 * 1000,
-  HOUR: 60 * 60 * 1000,
-  DAY: 24 * 60 * 60 * 1000,
-} as const;
-
-/**
- * SLA 관련 상수
- */
-export const SLA = {
-  /**
-   * 우선순위별 SLA 시간 배율
-   * - CRITICAL: 기본 SLA의 50% (긴급)
-   * - HIGH: 기본 SLA의 75%
-   * - MEDIUM: 기본 SLA의 100% (기준)
-   * - LOW: 기본 SLA의 150%
-   */
-  // `as Record<string, number>` 를 붙이면 키가 string 으로 넓어져 인덱스 접근이
-  // `number | undefined` 가 되고, 호출부마다 폴백을 붙여야 한다. 키는 실제로
-  // 우선순위 4개뿐이고 호출부도 zod enum 으로 검증된 값을 넘기므로 좁게 둔다.
-  PRIORITY_MULTIPLIER: {
-    CRITICAL: 0.5,
-    HIGH: 0.75,
-    MEDIUM: 1.0,
-    LOW: 1.5,
-  },
 } as const;
 
 /**

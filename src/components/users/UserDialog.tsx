@@ -52,7 +52,6 @@ interface UserDialogProps {
   onSaved: () => void;
   defaultClientId?: string;
   clients?: Client[];
-  roles?: any[];
 }
 
 export function UserDialog({
@@ -62,7 +61,6 @@ export function UserDialog({
   onSaved,
   defaultClientId,
   clients: propClients,
-  roles: _roles,
 }: UserDialogProps) {
   // ... (state definitions)
   const [name, setName] = useState('');

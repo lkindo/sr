@@ -64,22 +64,6 @@ describe('ClientService', () => {
     });
   });
 
-  describe('getAllClients', () => {
-    it('모든 고객사 목록을 반환해야 함', async () => {
-      const mockClients = [
-        { id: 'client1', code: 'CLI001', name: 'Client 1' },
-        { id: 'client2', code: 'CLI002', name: 'Client 2' },
-      ];
-
-      vi.mocked(prisma.client.findMany).mockResolvedValue(mockClients as any);
-
-      const result = await clientService.getAllClients();
-
-      expect(result).toEqual(mockClients);
-      expect(prisma.client.findMany).toHaveBeenCalled();
-    });
-  });
-
   describe('createClient', () => {
     it('성공적으로 고객사를 생성해야 함', async () => {
       const clientData = {

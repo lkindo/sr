@@ -6,7 +6,6 @@ import { SRService } from '@/services/sr.service';
 import {
   createSRAction,
   deleteSRAction,
-  getSRAction,
   getSRActivitiesAction,
   getSRCommentsAction,
   getSRDetailsAction,
@@ -188,23 +187,6 @@ describe('SR Server Actions', () => {
 
       const result = await deleteSRAction('sr-1');
       expect(result.success).toBe(false);
-    });
-  });
-
-  describe('getSRAction', () => {
-    it('returns SR when found', async () => {
-      mockSRService.getSRById.mockResolvedValue({ id: 'sr-1', title: 'SR' });
-      const result = await getSRAction('sr-1');
-      expect(result.success).toBe(true);
-    });
-
-    it('returns failure when not found', async () => {
-      mockSRService.getSRById.mockResolvedValue(null);
-      const result = await getSRAction('sr-999');
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.code).toBe('NOT_FOUND');
-      }
     });
   });
 

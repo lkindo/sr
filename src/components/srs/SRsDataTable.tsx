@@ -21,13 +21,14 @@ import {
   X,
 } from 'lucide-react';
 
+import { ResponsiveTableShell } from '@/components/common/ResponsiveTableShell';
 import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import {
   Pagination,
   PaginationContent,
@@ -595,146 +596,144 @@ export function SRsDataTable({
           )}
 
           {/* Responsive Table - Show Table on larger screens, Cards on smaller screens */}
-          <div className="hidden md:block overflow-x-auto">
-            <Table className="sr-table-template">
-              <TableHeader>
+          <ResponsiveTableShell>
+            <TableHeader>
+              <TableRow>
+                <TableHead
+                  aria-sort={
+                    sortField === 'srNumber'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('srNumber')}>
+                    SR 번호{getSortIcon('srNumber')}
+                  </Button>
+                </TableHead>
+                <TableHead
+                  className="min-w-[150px]"
+                  aria-sort={
+                    sortField === 'title'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('title')}>
+                    제목{getSortIcon('title')}
+                  </Button>
+                </TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'client'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('client')}>
+                    고객사{getSortIcon('client')}
+                  </Button>
+                </TableHead>
+                <TableHead>요청자</TableHead>
+                <TableHead>담당자</TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'priority'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('priority')}>
+                    우선순위{getSortIcon('priority')}
+                  </Button>
+                </TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'status'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('status')}>
+                    상태{getSortIcon('status')}
+                  </Button>
+                </TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'dueDate'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('dueDate')}>
+                    마감일{getSortIcon('dueDate')}
+                  </Button>
+                </TableHead>
+                <TableHead>댓글/첨부</TableHead>
+                <TableHead
+                  aria-sort={
+                    sortField === 'createdAt'
+                      ? sortOrder === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  }
+                >
+                  <Button variant="ghost" onClick={() => handleSort('createdAt')}>
+                    생성일{getSortIcon('createdAt')}
+                  </Button>
+                </TableHead>
+                <TableHead>작업</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {srs && srs.length > 0 ? (
+                srs.map((sr) => <SRTableRow key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
+              ) : (
                 <TableRow>
-                  <TableHead
-                    aria-sort={
-                      sortField === 'srNumber'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('srNumber')}>
-                      SR 번호{getSortIcon('srNumber')}
-                    </Button>
-                  </TableHead>
-                  <TableHead
-                    className="min-w-[150px]"
-                    aria-sort={
-                      sortField === 'title'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('title')}>
-                      제목{getSortIcon('title')}
-                    </Button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortField === 'client'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('client')}>
-                      고객사{getSortIcon('client')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>요청자</TableHead>
-                  <TableHead>담당자</TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortField === 'priority'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('priority')}>
-                      우선순위{getSortIcon('priority')}
-                    </Button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortField === 'status'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('status')}>
-                      상태{getSortIcon('status')}
-                    </Button>
-                  </TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortField === 'dueDate'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('dueDate')}>
-                      마감일{getSortIcon('dueDate')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>댓글/첨부</TableHead>
-                  <TableHead
-                    aria-sort={
-                      sortField === 'createdAt'
-                        ? sortOrder === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : 'none'
-                    }
-                  >
-                    <Button variant="ghost" onClick={() => handleSort('createdAt')}>
-                      생성일{getSortIcon('createdAt')}
-                    </Button>
-                  </TableHead>
-                  <TableHead>작업</TableHead>
+                  <TableCell colSpan={11}>
+                    {hasActiveFilters ? (
+                      <EmptyState
+                        icon={SearchX}
+                        title="검색 결과가 없습니다"
+                        description="다른 검색어나 필터를 시도해보세요."
+                        action={
+                          <Button variant="outline" onClick={resetFilters}>
+                            필터 초기화
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={Inbox}
+                        title="SR이 없습니다"
+                        description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
+                        action={
+                          <Button
+                            onClick={() => setIsCreateDialogOpen(true)}
+                            className="sr-btn-template-primary"
+                          >
+                            <Plus className="mr-2 h-4 w-4" /> SR 등록
+                          </Button>
+                        }
+                      />
+                    )}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {srs && srs.length > 0 ? (
-                  srs.map((sr) => <SRTableRow key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={11}>
-                      {hasActiveFilters ? (
-                        <EmptyState
-                          icon={SearchX}
-                          title="검색 결과가 없습니다"
-                          description="다른 검색어나 필터를 시도해보세요."
-                          action={
-                            <Button variant="outline" onClick={resetFilters}>
-                              필터 초기화
-                            </Button>
-                          }
-                        />
-                      ) : (
-                        <EmptyState
-                          icon={Inbox}
-                          title="SR이 없습니다"
-                          description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
-                          action={
-                            <Button
-                              onClick={() => setIsCreateDialogOpen(true)}
-                              className="sr-btn-template-primary"
-                            >
-                              <Plus className="mr-2 h-4 w-4" /> SR 등록
-                            </Button>
-                          }
-                        />
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+              )}
+            </TableBody>
+          </ResponsiveTableShell>
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3 p-3">

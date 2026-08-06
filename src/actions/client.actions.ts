@@ -121,30 +121,6 @@ export async function deleteClientAction(id: string) {
   }
 }
 
-export async function getClientAction(id: string): Promise<Result<ClientGetResult>> {
-  try {
-    const session = await getAuthenticatedSession();
-
-    // ClientService 인스턴스 생성
-    const clientService = services.clientService;
-
-    // 고객사 조회
-    const client = await clientService.getClientById(id);
-
-    // 권한 확인: 관리자 권한(CLIENT:READ)이 있거나, 본인의 고객사 ID여야 함
-    // ensureCanReadClient 내부에서 ADMIN 여부 및 CLIENT:READ 권한, 소속 고객사 여부 통합 확인
-    ensureCanReadClient(session.user, client || undefined);
-
-    if (!client) {
-      return fail('고객사를 찾을 수 없습니다.', 'NOT_FOUND');
-    }
-
-    return ok(client);
-  } catch (error) {
-    return errorToResult(error);
-  }
-}
-
 export async function getClientsForSelection() {
   try {
     logger.debug('🔍 [getClientsForSelection] 고객사 목록 조회 시작');

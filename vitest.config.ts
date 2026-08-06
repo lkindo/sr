@@ -38,8 +38,6 @@ export default defineConfig({
         // 주의: src/types/*.ts는 제외하지 않는다 — session.ts처럼 런타임 코드가 있는 파일이 섞여 있고,
         // 순수 타입 파일은 statement가 0개라 가중 평균에 영향을 주지 않는다.
         'src/**/*.d.ts',
-        // Storybook 스토리. storybook 프로젝트가 별도로 실행하는 픽스처이지 프로덕션 코드가 아니다.
-        'src/stories/**',
         'src/**/*.stories.ts',
         'src/**/*.stories.tsx',
         // Prisma가 생성하는 코드. 우리가 작성하지 않으므로 테스트 대상이 아니다.
@@ -84,18 +82,23 @@ export default defineConfig({
       //
       // ── 2026-08-05 래칫 ─────────────────────────────────────────────────
       // 감사 후속 작업으로 테스트가 늘면서(163 → 173 파일, 1597 → 1722 테스트)
-      // `--project=unit` 실측이 다음과 같이 올랐다:
-      //   statements 48.27 (3,681/7,626) · branches 41.84 (2,239/5,351) ·
-      //   functions  46.91 (774/1,650)
-      // 새로 덮인 것은 대부분 **인가 경로**다 — 감사가 지적한 결함들을 고치면서
-      // 그 계약을 고정하는 테스트를 함께 넣었다:
-      //   세션 재검증, Prisma 에러 매핑, 첨부 인가, 고객사 테넌트 경계,
-      //   SR 상태 전이 사전조건, 댓글 내부노트 격리, SLA 정밀도, 액션 레이트리밋.
+      // `--project=unit` 실측이 statements 48.27 / branches 41.84 / functions 46.91 로 올랐고,
+      // 임계값을 실측보다 약 1%p 낮은 47.2 / 40.8 / 45.9 / 46.7 로 잡았다.
       //
-      // 임계값은 실측보다 약 1%p 낮게 잡는다. 딱 붙이면 무해한 리팩터(테스트가 없던
-      // 파일 한 개 추가 등)에도 빨간불이 떠서, 게이트를 신뢰하지 않고 숫자를 내리게 된다.
-      // 이 버퍼는 CI 실측(storybook 프로젝트 포함)이 unit 단독보다 1.4~1.6%p 높다는
-      // 점까지 함께 흡수한다.
+      // ── 2026-08-06 Phase 1 Dead Code 제거 ───────────────────────────────
+      // 프로덕션 호출자가 0인 소스(권한 계층·서비스 메서드 17개·server action 5개·ProfileDialog·
+      // StatsCard·REST RBAC 라우트·죽은 export)와 그 코드만 부양하던 테스트를 함께 지웠다.
+      // 분모(소스)와 분자(그 소스를 덮던 테스트)가 같이 줄어드는 작업이라 수치가 흔들릴 수
+      // 있는데, 실측 결과는 오히려 올랐다:
+      //   statements 48.71 · branches 41.72 · functions 46.39 · lines 48.53
+      //   (`SKIP_DB_TESTS=true pnpm test:coverage`, unit + storybook, 161파일 1555테스트)
+      // 지운 것이 전부 dead code 였다는 뜻이다 — 커버돼 있던 분자를 통째로 들어냈다면
+      // 비율이 떨어졌을 것이다. **그래서 임계값은 그대로 둔다.**
+      //
+      // 참고: 이 작업 중 한 번 45.5/38.6/43.7/45.2 로 내린 커밋이 있었는데, 원인은
+      // dead code 삭제가 아니라 **살아 있는 코드의 테스트 100개를 함께 지운 것**이었다.
+      // 위 "낮추는 것은 금지" 규칙이 정확히 그 회귀를 잡아낸 사례다. 임계값을 내려서
+      // 통과시키고 싶어질 때는 먼저 지운 테스트가 죽은 코드만 덮고 있었는지 확인할 것.
       thresholds: {
         statements: 47.2,
         branches: 40.8,
@@ -117,13 +120,7 @@ export default defineConfig({
           globals: true,
           environment: 'jsdom',
           include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-          exclude: [
-            'src/stories/**',
-            '**/node_modules/**',
-            '**/dist/**',
-            '**/e2e/**',
-            '**/.next/**',
-          ],
+          exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
           setupFiles: ['./vitest.setup.ts'],
         },
       },

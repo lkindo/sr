@@ -252,10 +252,6 @@ export const validateTransition = (
         if (!updateData.rejectionReason && !currentData.rejectionReason) {
           missingFields.push('거절 사유(rejectionReason)');
         }
-      } else {
-        if (!updateData[field] && !currentData[field]) {
-          missingFields.push(field);
-        }
       }
     }
 

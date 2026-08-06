@@ -14,6 +14,9 @@ import {
 } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
+// 이 다이얼로그는 이름만 보여주고 id 로 지운다. RoleTable/RoleMobileList 가 공유하는
+// `RoleItem` 으로 넓히면 permissions 를 optional 로 낮춰야 해서, 목록 쪽 타입이
+// 되레 느슨해진다. 필요한 두 필드만 요구하는 편이 좁고 정확하다.
 interface Role {
   id: string;
   name: string;

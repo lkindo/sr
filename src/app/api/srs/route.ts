@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
-import { ensureCanCreateSR, isInternalUser } from '@/lib/policies';
+import { ensureCanCreateSR, resolveClientIdFilter } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { srCreateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
@@ -47,27 +47,9 @@ export const GET = withAuthAndRateLimit(
       clientId: searchParams.get('clientId'),
     });
 
-    let clientIdFilter: string | { in: string[] } | undefined = query.clientId;
-
-    // Authorization Check: External users must be restricted to their assigned clients
-    if (!isInternalUser(session.user)) {
-      const userClientIds = session.user.clientIds || [];
-
-      if (userClientIds.length === 0) {
-        // User has no assigned clients -> return empty list
-        return NextResponse.json(serializeResponse(createResponse([], 0)));
-      }
-
-      if (typeof clientIdFilter === 'string') {
-        // User requested a specific client -> verify they have access
-        if (!userClientIds.includes(clientIdFilter)) {
-          // Unauthorized client -> return empty list
-          return NextResponse.json(serializeResponse(createResponse([], 0)));
-        }
-      } else {
-        // No specific client requested -> restrict query to all assigned clients
-        clientIdFilter = { in: userClientIds };
-      }
+    const clientIdFilter = resolveClientIdFilter(session.user, query.clientId);
+    if (typeof clientIdFilter === 'object' && clientIdFilter.in.length === 0) {
+      return NextResponse.json(serializeResponse(createResponse([], 0)));
     }
 
     // 필터 파라미터 (전부 위 스키마를 통과한 값이다)

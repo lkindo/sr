@@ -10,7 +10,7 @@ import { ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { AuthenticatedUser } from '@/types/session';
 
-const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
+export const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
 /**
  * 권한 검증에 필요한 SR 필드만 추린 형태.
@@ -395,7 +395,7 @@ export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIde
 // Role 권한 함수
 // ============================================================================
 
-const SYSTEM_ROLES = ['ADMIN', 'USER', 'GUEST'];
+const RESERVED_ROLE_NAMES = ['ADMIN', 'USER', 'GUEST'];
 
 export function canCreateRole(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.CREATE);
@@ -416,7 +416,7 @@ export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
 
 export function canDeleteRole(user: AuthenticatedUser, role: Role): boolean {
   // 시스템 역할은 삭제 불가
-  if (SYSTEM_ROLES.includes(role.name)) {
+  if (RESERVED_ROLE_NAMES.includes(role.name)) {
     return false;
   }
 
@@ -456,7 +456,7 @@ export function ensureCanUpdateRole(user: AuthenticatedUser, role: Role): void {
 }
 
 export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
-  if (SYSTEM_ROLES.includes(role.name)) {
+  if (RESERVED_ROLE_NAMES.includes(role.name)) {
     throw new ForbiddenError('시스템 역할은 삭제할 수 없습니다.');
   }
   if (!canDeleteRole(user, role)) {
@@ -476,7 +476,7 @@ export function ensureRoleNameNotReserved(user: AuthenticatedUser, nextName?: st
   const isAdmin = user.roles?.includes('ADMIN') ?? false;
   if (isAdmin) return;
 
-  if (SYSTEM_ROLES.some((name) => name.toLowerCase() === nextName.trim().toLowerCase())) {
+  if (RESERVED_ROLE_NAMES.some((name) => name.toLowerCase() === nextName.trim().toLowerCase())) {
     throw new ForbiddenError(`시스템 역할 이름(${nextName})으로 변경할 수 없습니다.`);
   }
 }
@@ -540,4 +540,41 @@ export function ensureCanAssignRole(user: AuthenticatedUser, role: Role): void {
   if (!canAssignRole(user, role)) {
     throw new ForbiddenError('역할 할당 권한이 없습니다.');
   }
+}
+
+/**
+ * 목록 조회의 고객사 필터를 세션과 요청 파라미터로부터 도출한다.
+ * `srs/route.ts` 와 `users/route.ts` 에 글자까지 동일하게 복제돼 있던 블록의 추출이다.
+ *
+ * 내부 사용자(ADMIN/MANAGER/ENGINEER)는 요청한 clientId 를 그대로 쓴다.
+ * 외부 사용자는 본인 소속 고객사로만 바운딩되고, 소속이 없거나 타 테넌트를
+ * 요청하면 `{ in: [] }` 를 돌려준다 — 호출부는 이때 빈 목록으로 즉시 응답한다.
+ *
+ * **`'all'` 같은 문자열을 특별 취급하지 않는다.** 필터 UI 의 '전체' 선택은
+ * `SRsDataTable.tsx:187` 이 쿼리스트링을 만들기 전에 이미 걷어내므로 여기까지
+ * 오지 않고, 여기서 `'all'` 을 "필터 없음"으로 해석하면 외부 사용자가
+ * `?clientId=all` 을 직접 호출했을 때의 결과가 빈 목록에서 소속 고객사 전체로
+ * 바뀐다. 추출은 동작을 보존해야 한다.
+ */
+export function resolveClientIdFilter(
+  user: AuthenticatedUser,
+  requestedClientId?: string | null
+): { in: string[] } | string | undefined {
+  const clientIdFilter = requestedClientId || undefined;
+
+  if (isInternalUser(user)) {
+    return clientIdFilter;
+  }
+
+  const userClientIds = user.clientIds || [];
+  if (userClientIds.length === 0) {
+    return { in: [] };
+  }
+
+  if (typeof clientIdFilter === 'string') {
+    // 소속되지 않은 타 테넌트를 지정했으면 빈 결과로 차단한다.
+    return userClientIds.includes(clientIdFilter) ? clientIdFilter : { in: [] };
+  }
+
+  return { in: userClientIds };
 }

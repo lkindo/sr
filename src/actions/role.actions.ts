@@ -73,44 +73,6 @@ export async function deleteRoleAction(id: string): Promise<Result<void>> {
   }
 }
 
-export async function getRoleAction(id: string): Promise<Result<Role>> {
-  try {
-    await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
-
-    const roleService = services.roleService;
-    const role = await roleService.getRoleById(id);
-    if (!role) {
-      return fail('역할을 찾을 수 없습니다.', 'NOT_FOUND');
-    }
-    return ok(role);
-  } catch (error) {
-    return errorToResult(error);
-  }
-}
-
-export async function getAllRolesAction(): Promise<
-  Result<
-    (Role & {
-      permissions: Array<{
-        permission: Permission;
-      }>;
-      _count: {
-        users: number;
-      };
-    })[]
-  >
-> {
-  try {
-    await authenticateAndAuthorize(PERMISSIONS.ROLE.READ);
-
-    const roleService = services.roleService;
-    const roles = await roleService.getAllRoles();
-    return ok(roles);
-  } catch (error) {
-    return errorToResult(error);
-  }
-}
-
 export async function updateRolePermissionsAction(
   roleId: string,
   permissionIds: string[]
