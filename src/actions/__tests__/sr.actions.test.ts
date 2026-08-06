@@ -64,13 +64,25 @@ vi.mock('@/services/sr.service', () => ({
 
 // Import auth to setup mocks
 import { auth } from '@/auth';
+import { rateLimiters } from '@/lib/rate-limiter';
 
 describe('SR Server Actions', () => {
   const mockUser = { id: 'user-1', name: 'User', roles: ['ADMIN'], permissions: [], clientIds: [] };
   const mockSession = { user: mockUser, expires: '2099-01-01' };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+
+    /**
+     * 레이트리미터는 **실물을 쓰되 테스트마다 초기화**한다.
+     *
+     * create/update/delete 세 액션이 모두 strict(분당 5회) 버킷을 공유하므로,
+     * 초기화하지 않으면 스위트 중간부터 429 가 나서 관련 없는 단언이 깨진다.
+     * 리미터를 mock 으로 덮지 않는 이유는, 그러면 액션에서 `requireRateLimit` 을
+     * 통째로 지워도 이 파일이 계속 통과하기 때문이다 —
+     * 제한이 실제로 걸리는지는 `sr.actions.rate-limit.test.ts` 가 검증한다.
+     */
+    await rateLimiters.strict.resetAll();
 
     // Setup generic mock implementations
     vi.mocked(auth).mockResolvedValue(mockSession as any);

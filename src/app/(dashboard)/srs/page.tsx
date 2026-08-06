@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client';
 
 import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
-import { getCachedClients, getCachedUsers } from '@/lib/cache';
+import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
 import { srService } from '@/services/sr.service';
 
@@ -42,9 +42,25 @@ type SortableField = (typeof SORTABLE_FIELDS)[number];
 export default async function SRsPage({ searchParams }: Props) {
   const resolvedSearchParams = (await searchParams) || {};
 
-  // Start fetching cached data early (parallel execution)
-  const clientsPromise = getCachedClients();
-  const usersPromise = getCachedUsers();
+  // 세션 정보 가져오기.
+  // 필터 옵션(고객사·담당자) 조회가 세션 스코프에 의존하므로 가장 먼저 해석한다.
+  // 예전에는 두 캐시 조회를 세션보다 먼저 시작했고, 그래서 스코프를 적용할 수 없었다.
+  const session = await auth();
+  const userRoles = session?.user?.roles || [];
+
+  // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
+  const isAdminManagerEngineer = userRoles.some((role) =>
+    ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
+  );
+
+  // 고객사 사용자인 경우 해당 고객사의 SR만 조회
+  // Optimized: Use clientIds from session instead of DB query
+  const userClientIds: string[] = session?.user?.clientIds || [];
+
+  // Start fetching filter options early (parallel execution).
+  // 외부 사용자에게는 소속 고객사만 넘긴다 — `undefined`(전체)와 `[]`(없음)는 다르다.
+  const clientsPromise = getCachedClients(isAdminManagerEngineer ? undefined : userClientIds);
+  const usersPromise = getCachedAssignableUsers();
 
   // 페이지네이션 파라미터는 /api/srs와 동일한 검증 규칙(lib/pagination)을 공유합니다.
   // 잘못된 값(NaN, 0, 음수, 과도한 크기)은 안전한 기본값으로 대체되어 500/OOM을 방지합니다.
@@ -71,20 +87,7 @@ export default async function SRsPage({ searchParams }: Props) {
   const dateFrom = getSearchParam(resolvedSearchParams.dateFrom);
   const dateTo = getSearchParam(resolvedSearchParams.dateTo);
 
-  // 세션 정보 가져오기
-  const session = await auth();
-  const userRoles = session?.user?.roles || [];
-
-  // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
-  const isAdminManagerEngineer = userRoles.some((role) =>
-    ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
-  );
-
   const where: Prisma.SRWhereInput = {};
-
-  // 고객사 사용자인 경우 해당 고객사의 SR만 조회
-  // Optimized: Use clientIds from session instead of DB query
-  const userClientIds: string[] = session?.user?.clientIds || [];
 
   if (status && status !== 'all')
     where.status = status as

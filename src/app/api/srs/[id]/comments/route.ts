@@ -5,9 +5,10 @@ import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/errors';
-import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
+import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { FIELD_LIMITS } from '@/lib/schemas';
+import { backgroundTask } from '@/lib/wait-until';
 
 const commentSchema = z.object({
   // 상한이 없으면 인증된 단일 POST 로 거대한 텍스트를 sr_comments.content(무제한 TEXT)에
@@ -119,7 +120,9 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    ensureCanReadSR(session.user, sr);
+    // 읽기 권한이 아니라 쓰기 권한으로 게이트한다 —
+    // `ensureCanCommentOnSR` 이 읽기 가능 여부 + `COMMENT:CREATE` 를 함께 본다(감사 4.1).
+    ensureCanCommentOnSR(session.user, sr);
 
     // 댓글 + 활동로그를 하나의 트랜잭션으로 커밋 (중간 실패 시 감사 이력 불일치 방지)
     const comment = await prisma.$transaction(async (tx) => {
@@ -208,6 +211,33 @@ export const POST = withAuthAndRateLimit(
 
     if (outbox.length > 0) {
       await enqueueEmails(outbox);
+    }
+
+    /**
+     * 푸시 알림 (감사 4.3).
+     *
+     * `pushCommentAdded` 설정은 스키마·설정 UI·`sendForEvent` 에 전부 배선돼 있었는데
+     * **이 경로가 pushService 를 한 번도 호출하지 않아** 통째로 죽어 있었다.
+     * 사용자가 토글을 켜도 댓글 푸시는 오지 않았다.
+     *
+     * 수신자는 이메일과 동일한 규칙으로 고른다 — 요청자와 담당자 중 작성자 본인 제외.
+     * 설정 확인은 `sendForEvent` 가 담당하므로 여기서는 대상만 추린다.
+     */
+    const pushTargets = [sr.requester.id, sr.assignee?.id].filter(
+      (userId): userId is string => Boolean(userId) && userId !== session.user.id
+    );
+
+    if (pushTargets.length > 0) {
+      const { pushService } = await import('@/services/push.service');
+      backgroundTask(
+        pushService.sendForEvent('COMMENT_ADDED', [...new Set(pushTargets)], {
+          title: '새 댓글',
+          body: `${sr.srNumber}: ${comment.user.name}님이 댓글을 남겼습니다.`,
+          url: `/srs/${sr.id}`,
+          tag: 'comment-added',
+        }),
+        'comment-push-dispatch'
+      );
     }
 
     return NextResponse.json(comment, { status: 201 });

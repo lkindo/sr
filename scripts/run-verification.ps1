@@ -24,7 +24,6 @@ if ($clean) {
     $filesToClean = @(
         ".eslintcache",
         "tsconfig.tsbuildinfo",
-        "tsconfig.full.tsbuildinfo",
         "test-results"
     )
     foreach ($file in $filesToClean) {

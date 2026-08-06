@@ -15,7 +15,7 @@ import {
   MAX_UPLOAD_TOTAL_SIZE,
   validateFile,
 } from '@/lib/file-validator';
-import { ensureCanReadSR } from '@/lib/policies';
+import { ensureCanAttachToSR, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeMany, serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, STORAGE_DIR } from '@/lib/storage';
@@ -62,7 +62,9 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    ensureCanReadSR(session.user, sr);
+    // 업로드는 쓰기다 — 읽기 권한이 아니라 수정 권한으로 게이트하고
+    // 종결된 SR 은 막는다(감사 4.1).
+    ensureCanAttachToSR(session.user, sr);
 
     // FormData에서 파일 추출
     const formData = await req.formData();

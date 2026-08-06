@@ -45,9 +45,12 @@ vi.mock('@/lib/auth-wrapper', () => ({
     handler(request, { ...ctx, session: { user: { id: 'user-1', roles: ['ADMIN'] } } }),
 }));
 
+// 이 스위트의 관심사는 트랜잭션 원자성이지 인가가 아니므로 정책은 통과시킨다.
+// 인가 계약 자체는 `src/lib/__tests__/policies.attachment.test.ts` 가 실물로 검증한다.
 vi.mock('@/lib/policies', () => ({
   ensureCanReadSR: vi.fn(),
   ensureCanUpdateSR: vi.fn(),
+  ensureCanAttachToSR: vi.fn(),
 }));
 
 vi.mock('@/lib/serialization', () => ({

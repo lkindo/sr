@@ -4,17 +4,17 @@
 
 ## 필수 Secrets
 
-### 데이터베이스 (Supabase)
+### 데이터베이스 (PostgreSQL)
 
 1. **DATABASE_URL**
    - 설명: Production 데이터베이스 연결 URL
    - 형식: `postgresql://user:password@host:port/database`
-   - 경로: Supabase Dashboard → Settings → Database → Connection String
+   - 확인 방법: 운영 PostgreSQL 서버의 접속 정보(호스트/포트/계정)로 연결 문자열 구성
 
 2. **DIRECT_URL**
    - 설명: Direct 데이터베이스 연결 URL (Prisma)
    - 형식: `postgresql://user:password@host:port/database`
-   - 경로: Supabase Dashboard → Settings → Database → Direct URL
+   - 확인 방법: 커넥션 풀러를 거치지 않는 운영 PostgreSQL 직접 연결 문자열 사용
 
 3. **TEST_DATABASE_URL**
    - 설명: 테스트용 데이터베이스 URL
@@ -158,7 +158,7 @@ Secrets가 올바르게 설정되었는지 확인하려면:
 ### 데이터베이스 연결 실패
 
 - DATABASE_URL 형식 확인
-- Supabase에서 IP 허용 목록 확인 (0.0.0.0/0 허용 필요)
+- 데이터베이스 서버의 IP 허용 목록(방화벽) 확인 (CI/배포 환경에서의 접근 허용 필요)
 - SSL 모드 확인 (`?sslmode=require` 추가 필요할 수 있음)
 
 ### Vercel 배포 실패

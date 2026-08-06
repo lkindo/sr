@@ -47,6 +47,12 @@ export async function updateSRAction(
   formData: FormData
 ): Promise<Result<SRUpdateResult>> {
   try {
+    // REST 트윈(`PATCH /api/srs/[id]`)은 `{ preset: 'strict' }` 로 분당 5회다(감사 4.3).
+    // 서버 액션은 유효 세션 + `Next-Action` 헤더만으로 도달 가능한 공개 POST 이므로,
+    // 여기에 제한이 없으면 액션 경로로 그 한도를 그대로 우회할 수 있었다.
+    // 담당자 변경마다 대상에게 이메일 + 푸시가 발화하므로 무제한 알림 폭주가 가능했다.
+    await requireRateLimit('strict');
+
     const processedData = buildSRUpdateInput(formData);
     const validationResult = validateWithSchema(processedData, srUpdateSchema);
     if (!validationResult.success) {
@@ -69,6 +75,9 @@ export async function updateSRAction(
 
 export async function deleteSRAction(id: string): Promise<Result<void>> {
   try {
+    // REST 트윈과 동일하게 strict. 삭제는 되돌릴 수 없으므로 더욱 그렇다(감사 4.3).
+    await requireRateLimit('strict');
+
     // SR 삭제 권한 체크는 서비스 레이어에서 처리
     const session = await getAuthenticatedSession();
 

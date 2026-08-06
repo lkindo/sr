@@ -34,6 +34,10 @@ vi.mock('@/services/push.service', () => ({
   pushService: {
     sendToUser: vi.fn().mockResolvedValue(undefined),
     sendToUsers: vi.fn().mockResolvedValue(undefined),
+    // 리스너는 이제 설정을 존중하는 `sendForEvent` 만 호출한다(감사 4.3).
+    // `sendToUser(s)` 는 사용자 설정을 보지 않으므로, 아래 테스트들이 그 호출이
+    // 0건임을 함께 단언한다 — 한쪽만 바꾸고 다른 쪽이 남는 것을 막는다.
+    sendForEvent: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -109,10 +113,13 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:created', payload);
 
       expect(mockPrisma.user.findMany).toHaveBeenCalledTimes(1);
-      expect(pushService.sendToUsers).toHaveBeenCalledWith(
+      expect(pushService.sendForEvent).toHaveBeenCalledWith(
+        'SR_CREATED',
         ['admin-1', 'admin-2'],
         expect.objectContaining({ tag: 'sr-created', url: '/srs/sr-1' })
       );
+      // 설정을 보지 않는 경로는 더 이상 쓰지 않는다.
+      expect(pushService.sendToUsers).not.toHaveBeenCalled();
       // Only admin-1 opted in.
       expect(emailService.buildSRCreated).toHaveBeenCalledTimes(1);
       expect(emailService.buildSRCreated).toHaveBeenCalledWith(
@@ -150,7 +157,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:created', payload);
 
-      expect(pushService.sendToUsers).toHaveBeenCalledTimes(1);
+      expect(pushService.sendForEvent).toHaveBeenCalledTimes(1);
       expect(emailService.buildSRCreated).not.toHaveBeenCalled();
     });
 
@@ -159,7 +166,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:created', payload);
 
-      expect(pushService.sendToUsers).not.toHaveBeenCalled();
+      expect(pushService.sendForEvent).not.toHaveBeenCalled();
       expect(emailService.buildSRCreated).not.toHaveBeenCalled();
     });
 
@@ -190,7 +197,7 @@ describe('registerSRNotificationListeners', () => {
       await emitAndFlush('sr:status_changed', { ...payload, requesterId: undefined });
 
       expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
+      expect(pushService.sendForEvent).not.toHaveBeenCalled();
     });
 
     it('returns early when the requester does not exist', async () => {
@@ -198,7 +205,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:status_changed', payload);
 
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
+      expect(pushService.sendForEvent).not.toHaveBeenCalled();
       expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
     });
 
@@ -210,10 +217,12 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:status_changed', payload);
 
-      expect(pushService.sendToUser).toHaveBeenCalledWith(
-        'req-2',
+      expect(pushService.sendForEvent).toHaveBeenCalledWith(
+        'SR_STATUS_CHANGED',
+        ['req-2'],
         expect.objectContaining({ tag: 'sr-status-changed' })
       );
+      expect(pushService.sendToUser).not.toHaveBeenCalled();
       expect(emailService.buildSRStatusChanged).toHaveBeenCalledWith(
         'req@example.com',
         'SR-002',
@@ -250,7 +259,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:status_changed', payload);
 
-      expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
+      expect(pushService.sendForEvent).toHaveBeenCalledTimes(1);
       expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
     });
 
@@ -281,7 +290,7 @@ describe('registerSRNotificationListeners', () => {
 
       expect(logger.info).toHaveBeenCalledWith('SR 담당 해제 감지 (알림 생략)', { srId: 'sr-3' });
       expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
+      expect(pushService.sendForEvent).not.toHaveBeenCalled();
     });
 
     it('returns early when the assignee does not exist', async () => {
@@ -289,7 +298,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:assigned', payload);
 
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
+      expect(pushService.sendForEvent).not.toHaveBeenCalled();
       expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
     });
 
@@ -301,10 +310,12 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:assigned', payload);
 
-      expect(pushService.sendToUser).toHaveBeenCalledWith(
-        'assignee-1',
+      expect(pushService.sendForEvent).toHaveBeenCalledWith(
+        'SR_ASSIGNED',
+        ['assignee-1'],
         expect.objectContaining({ tag: 'sr-assigned' })
       );
+      expect(pushService.sendToUser).not.toHaveBeenCalled();
       expect(emailService.buildSRAssigned).toHaveBeenCalledWith(
         'assignee@example.com',
         'SR-003',
@@ -339,7 +350,7 @@ describe('registerSRNotificationListeners', () => {
 
       await emitAndFlush('sr:assigned', payload);
 
-      expect(pushService.sendToUser).toHaveBeenCalledTimes(1);
+      expect(pushService.sendForEvent).toHaveBeenCalledTimes(1);
       expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
     });
 

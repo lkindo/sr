@@ -49,7 +49,9 @@ type SortOrder = 'asc' | 'desc';
 // SR 타입 정의
 type SRListItem = Awaited<ReturnType<SRService['getAllSRs']>>[number];
 type ClientListItem = { id: string; code: string; name: string };
-type UserListItem = { id: string; name: string; email: string };
+// 담당자 필터는 id 와 name 만 렌더링한다. email 을 요구하면 서버가 그것을
+// RSC 페이로드로 실어 보내야 하고, 그게 정확히 감사 4.2 가 지적한 유출이었다.
+type UserListItem = { id: string; name: string };
 type PaginationInfo = {
   currentPage: number;
   itemsPerPage: number;

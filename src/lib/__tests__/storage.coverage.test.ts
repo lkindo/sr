@@ -97,10 +97,13 @@ describe('resolveAttachmentFilePath', () => {
     expect(resolveAttachmentFilePath(abs)).toBeNull();
   });
 
-  it('resolves an absolute path inside LEGACY_PUBLIC_DIR when the file exists', () => {
+  it('rejects an absolute path inside the legacy public/uploads root', () => {
+    // 이 테스트는 원래 "레거시 루트도 해석한다"를 사양으로 못 박고 있었다.
+    // 그 폴백이 곧 결함이었다 — public/ 아래 파일은 Next 가 URL 루트에서 정적 서빙하므로
+    // 인가를 거치지 않고 열린다(감사 4.1). 이제 STORAGE_DIR 밖은 전부 거부한다.
     const abs = path.join(resolvedLegacyRoot, 'old', 'b.png');
     mockExistsSync.mockReturnValue(true);
-    expect(resolveAttachmentFilePath(abs)).toBe(path.resolve(abs));
+    expect(resolveAttachmentFilePath(abs)).toBeNull();
   });
 
   it('resolves an absolute path equal to a root itself', () => {
@@ -116,12 +119,14 @@ describe('resolveAttachmentFilePath', () => {
     expect(resolveAttachmentFilePath(rel)).toBe(expected);
   });
 
-  it('falls back to LEGACY_PUBLIC_DIR for a relative path when not present in STORAGE_DIR', () => {
+  it('does not fall back to public/uploads for a relative path missing from STORAGE_DIR', () => {
+    // 파일이 레거시 경로에만 존재해도 해석하지 않는다. 프로덕션에서 그 경로는
+    // 볼륨이 아니라 이미지 레이어라, 런타임에 쓰인 파일은 어차피 다음 배포에서 사라진다.
     const rel = 'old/d.txt';
     const inStorage = path.resolve(path.join(resolvedStorageRoot, rel));
     const inLegacy = path.resolve(path.join(resolvedLegacyRoot, rel));
     mockExistsSync.mockImplementation((p: string) => p === inLegacy && p !== inStorage);
-    expect(resolveAttachmentFilePath(rel)).toBe(inLegacy);
+    expect(resolveAttachmentFilePath(rel)).toBeNull();
   });
 
   it('normalizes a uploads/ URL prefix to a relative path under STORAGE_DIR', () => {

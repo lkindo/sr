@@ -42,16 +42,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -74,6 +74,29 @@ jobs:
       # 그런 테스트는 통제가 완전히 사라져도 초록불이라 회귀를 전혀 못 잡는다.
       - name: Check E2E tests have assertions
         run: pnpm check:e2e-assertions
+
+      # 액션은 커밋 SHA 로 고정한다(감사 4.6).
+      # 태그는 이동 가능한 참조다 — 공격자가 액션 저장소를 침해하면 `v4` 를 악성 커밋으로
+      # 옮길 수 있고, 그 액션은 우리 워크플로에서 `SERVER_KEY`·`GITHUB_TOKEN` 을 포함한
+      # 시크릿에 접근한다. `@master` 는 더 나빠서, 침해 없이 업스트림 커밋 하나로 바뀐다.
+      # 버전 갱신은 dependabot(github-actions 생태계)이 SHA 와 주석을 함께 올려 준다.
+      - name: Check GitHub Actions are pinned to commit SHAs
+        run: |
+          # `^\s*-?\s*uses:` 로 **YAML 키 형태만** 잡는다. 단순히 'uses:' 를 찾으면
+          # 이 스텝의 안내 문구 자체가 걸려 항상 실패한다.
+          unpinned=$(grep -rnE '^[[:space:]]*-?[[:space:]]*uses:' .github/workflows/*.yml \
+            | grep -v '@[0-9a-f]\{40\}' \
+            || true)
+          if [ -n "$unpinned" ]; then
+            echo "다음 액션이 커밋 SHA 로 고정되어 있지 않습니다:"
+            echo "$unpinned"
+            echo ""
+            echo "고정 방법: gh api repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha"
+            echo "  (annotated tag 면 gh api repos/<owner>/<repo>/git/tags/<sha> --jq .object.sha 로 한 번 더)"
+            echo "형식: uses: owner/repo@<40자 sha> # <version>"
+            exit 1
+          fi
+          echo "모든 액션이 커밋 SHA 로 고정되어 있습니다."
 
   # 단위 테스트 및 통합 테스트
   test:
@@ -111,16 +134,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -167,7 +190,7 @@ jobs:
       # 커버리지 "게이트"는 위 스텝(vitest 임계값)이 담당한다.
       # 이 스텝은 외부 리포팅 전용이며 Codecov 장애로 CI 를 막지 않는다(의도된 비게이팅).
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
         if: success()
         with:
           files: ./coverage/coverage-final.json
@@ -179,7 +202,7 @@ jobs:
       # mutation-test 잡이 "테스트가 존재하는 파일"만 뮤테이션 대상으로 고르는 데 사용한다.
       # 테스트가 아예 없는 파일은 커버리지 게이트가 담당하므로 뮤테이션 점수에서 제외한다.
       - name: Upload coverage map for mutation testing
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: success()
         with:
           name: coverage-final
@@ -221,7 +244,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0 # Git history for diff calculation
 
@@ -229,10 +252,10 @@ jobs:
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -254,7 +277,7 @@ jobs:
       # test 잡이 만든 커버리지 맵. stryker-ci.ts 가 이걸로 "테스트가 있는 파일"만 고른다.
       # 없으면 스크립트가 경고 후 전체 변경 파일을 대상으로 삼는다(게이트는 계속 동작).
       - name: Download coverage map
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         continue-on-error: true # 아티팩트 부재는 스크립트가 처리한다
         with:
           name: coverage-final
@@ -272,16 +295,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -357,6 +380,19 @@ jobs:
       # 않으므로(관련 spec 없음) 한도를 사실상 해제한다. rate limit 자체는 단위 테스트가 검증한다.
       RATE_LIMIT_MIDDLEWARE_WINDOW_MS: '60000'
       RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS: '1000000'
+      # 로그인은 별도로 STRICT(기본 1분 5회)를 `login:${email}:${ip}` 키로 받는다.
+      # 위 미들웨어 한도만 올려두면 이 버킷은 그대로 남는다. setup 이 admin@example.com 으로
+      # 두 번 로그인하고(TEST_USER_EMAIL, TEST_MANAGER_EMAIL 이 같은 계정) retries: 2 가
+      # 붙으면 5회에 근접한다.
+      #
+      # 주의: 이건 **예방 조치이지, 관측된 실패를 고친 것이 아니다.** 로컬에서 setup 이
+      # 반복 실패했을 때 처음엔 이 리미터를 원인으로 지목했지만, 실패한 실행의 Playwright
+      # trace 를 뜯어 보니 로그인 POST 도 세션 GET 도 200 이었고 로그 전체에 429 가 0건이었다.
+      # 실제 원인은 dev 모드에서 워커 3개가 경합해 `router.push('/dashboard')` 가 테스트
+      # 타임아웃(60초)을 넘긴 것이었고, `--workers=1` 이면 그대로 통과한다.
+      # 로그인 스로틀을 검증하는 E2E 는 없고 rate limiter 는 단위 테스트가 검증한다.
+      RATE_LIMIT_STRICT_WINDOW_MS: '60000'
+      RATE_LIMIT_STRICT_MAX_REQUESTS: '1000000'
       # playwright.config.ts 의 webServer 는 쓰지 않는다(아래 "포트 충돌" 주석 참고).
       SKIP_WEBSERVER: '1'
       BASE_URL: 'http://localhost:3000'
@@ -387,16 +423,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
@@ -405,7 +441,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -523,7 +559,7 @@ jobs:
       # 리포터는 test-results/ 로 출력한다(playwright.config.ts 의 outputDir/html outputFolder).
       # 기존 설정은 존재하지 않는 playwright-report/ 를 올려 빈 아티팩트만 남겼다.
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
           name: playwright-report
@@ -532,7 +568,7 @@ jobs:
           retention-days: 7
 
       - name: Upload application server log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: failure()
         with:
           name: e2e-server-log
@@ -548,7 +584,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # ── 이 스텝은 게이트다 ────────────────────────────────────────────────
       # `.gitleaks.toml` 은 잘 작성되어 있었지만 **어떤 워크플로도 실행하지 않았다**.
@@ -573,10 +609,10 @@ jobs:
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -593,7 +629,7 @@ jobs:
         run: pnpm audit --prod --audit-level=critical
 
       - name: Run Trivy vulnerability scanner (SARIF)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -606,7 +642,7 @@ jobs:
       # 의존성 게이트는 위의 `pnpm audit` 이 담당한다. Trivy 를 이중 게이트로 만들면
       # 시크릿 스캐너 오탐(시드의 bcrypt 해시 등)으로 앱 회귀와 무관하게 빨간불이 된다.
       - name: Run Trivy vulnerability scanner (Table, report only)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -616,7 +652,7 @@ jobs:
       # SARIF 업로드는 GitHub Advanced Security 가 켜져 있어야 성공한다.
       # 리포트 발행 실패로 파이프라인을 막지 않는다(의도된 비게이팅).
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
         if: always()
         continue-on-error: true
         with:

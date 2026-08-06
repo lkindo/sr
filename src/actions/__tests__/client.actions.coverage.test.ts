@@ -56,8 +56,11 @@ vi.mock('@/lib/action-helpers', async () => {
 });
 
 // Control policy decisions explicitly.
+// 이 스위트는 액션의 **배선**(검증 → 서비스 호출 → Result 변환)을 다루므로 정책은
+// 통과시킨다. 테넌트 경계 자체는 `client.actions.tenant.test.ts` 가 실물 정책으로 검증한다.
 vi.mock('@/lib/policies', () => ({
   ensureCanReadClient: vi.fn(),
+  ensureCanWriteClient: vi.fn(),
   isInternalUser: vi.fn(),
 }));
 

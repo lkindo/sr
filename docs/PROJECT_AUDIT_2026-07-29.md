@@ -1,11 +1,20 @@
 # SR 관리 시스템 최종 감사 보고서
 
 **대상**: `d:/project/sr` (Next.js 16 + Prisma + PostgreSQL, 멀티테넌트 SR 관리 시스템)
-**감사 방식**: 정적 소스 분석 (빌드/테스트 미실행), 10개 영역 교차 검증
+**원본 감사**: 2026-07-29, 정적 소스 분석 (빌드/테스트 미실행), 10개 영역 교차 검증
+**최종 재평가**: 2026-08-05, 게이트 실행 기반 (tsc/lint/vitest/build/nginx -t/CI 이력 실측)
+
+**현재 판정: 82 / 100 (B) · 배포 가능(Go)** — 원본 50(D) · No-Go 에서 갱신.
+재평가 근거와 후속 수정 내역은 **8절**에 있다.
 
 ---
 
 ## 1. 총평
+
+> **⚠️ 이 절은 2026-07-29 원본 판정이며, 현재 상태가 아니다.**
+> 여기 기술된 배포 차단 항목은 전부 해소되었다. **현재 판정은 82/100 (B), 배포 가능(Go)** 이며
+> 근거는 2절 점수표와 8절(2026-08-05 재평가)에 있다. 이 절은 출발점의 기록으로 남겨 둔다 —
+> 지웠다면 "무엇이 얼마나 바뀌었는가"에 다시 답할 수 없게 된다.
 
 이 시스템은 **"설계는 상급, 마감은 미완"** 의 전형이다. 정책 계층 분리(`src/lib/policies.ts`), 모든 SR 변경 경로의 낙관적 잠금(`src/services/sr.service.ts:339-347`), AsyncLocalStorage 기반 트랜잭션 커밋 후 이벤트 발행(`src/lib/prisma.ts:33-58`), DB 측 `COUNT(*) FILTER` 집계(`src/app/api/dashboard/stats/route.ts:90-117`), 첨부파일 경로 봉쇄와 매직넘버 검증(`src/lib/storage.ts:32-51`, `src/lib/file-validator.ts:121-158`) 등 상급 개발자가 의도적으로 넣은 흔적이 소스 전반에 실재하며, 이는 이 규모 사내 앱의 평균을 크게 상회한다.
 
@@ -17,24 +26,41 @@
 
 ## 2. 완성도 점수표
 
-| 영역                                          | 점수 | 등급  | 핵심 근거                                                                                                                                                                                                   |
-| --------------------------------------------- | ---: | :---: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 보안 · 인증/인가 · RBAC · 테넌트 격리         |   45 | **D** | 정책 계층·첨부 경로 봉쇄·파라미터화 SQL은 견고하나, `.env.docker:9`의 커밋된 서명키로 세션 위조 가능. `canReadClient`/`canReadUser`/`canUpdateUser`가 권한 플래그만 검사(`src/lib/policies.ts:139,191,203`) |
-| Prisma 스키마 · 마이그레이션 · 쿼리           |   62 | **C** | 원자적 채번·낙관적 잠금·명시적 select는 우수. BigInt 직렬화 누락으로 첨부 REST 전멸(`src/lib/serialization.ts:37`), `created_at` 인덱스 부재(`prisma/schema.prisma:288`)                                    |
-| API 라우트 · 검증 · 에러 · HTTP 시맨틱        |   57 | **D** | 40개 중 32개가 단일 래퍼 사용, 에러 taxonomy 양호. DELETE가 성공 후 500(`src/app/api/srs/[id]/route.ts:82`), PATCH가 무동작 200(`src/app/api/users/[id]/client/route.ts:193`)                               |
-| 서버 액션 · 서비스 · 상태머신 · 도메인 이벤트 |   53 | **D** | 트랜잭션 후 이벤트·감사로그 롤백 강제는 정교. intake POST가 이벤트 미발행(`src/app/api/srs/[id]/intake/route.ts:211`), `updateSR` 필드 단위 인가 부재(`src/services/sr.service.ts:201`)                     |
-| Docker · CI/CD · nginx · 배포 안전성          |   38 | **F** | 3단계 빌드·비루트·볼륨·로그 로테이션은 준수. deploy가 CI에 무의존(`.github/workflows/deploy.yml:3`), 하드코딩 admin 재시드(`:121`), 헬스체크·롤백 전무                                                      |
-| 테스트 전략 · 커버리지 정직성 · E2E           |   40 | **D** | 136파일·2292단언, 상태머신/storage 테스트는 모범적. `coverage.include` 부재로 게이트가 48%만 측정(`vitest.config.ts:19`), 보안 E2E가 `console.log` 사용                                                     |
-| React 컴포넌트 · 훅 · 상태관리                |   55 | **D** | RSC 설계·React Query 낙관적 업데이트는 정석. 비밀번호 평문 localStorage 저장(`src/components/auth/LoginForm.tsx:62`), 유휴 타임아웃 무동작(`IdleTimeoutProvider.tsx:46`)                                    |
-| 성능 · 캐싱 · 확장성 · 리소스 상한            |   56 | **D** | DB측 집계·스트리밍 다운로드·매직넘버 검사 실재. `itemsPerPage` 무제한(`src/app/(dashboard)/srs/page.tsx:26`), 대시보드 캐시 키가 사장                                                                       |
-| 제품 완성도 · UX 플로우 · 문서                |   58 | **D** | SR 생명주기 전 구간 출시 가능 수준. 서비스 카테고리 생성 UI 부재, 신규 인스턴스 부트스트랩 경로 부재, 관리자 비밀번호 재설정 무동작                                                                         |
-| 설정 · 환경변수 · 타입 · 도구 · 저장소 위생   |   60 | **C** | strict TS, `@ts-ignore` 0건, pre-commit 게이트 양호. `.npmrc`가 공급망 검증 전면 비활성(`.npmrc:3`), 실 시크릿 커밋, `NEXT_PUBLIC_APP_URL` 주석 처리                                                        |
+> **갱신 이력**: 원본 2026-07-29(정적 분석) → 1차 재평가 2026-08-05(게이트 실행) →
+> 2차 재평가 2026-08-05(후속 수정 반영). 아래 표의 세 열이 각각 그 시점이다.
+> 재평가 과정과 근거는 9절에 있다.
 
-### 종합 점수: **50 / 100 (D)**
+| 영역                                          | 원본 | 재평가¹ | 현재 | 등급  | 현재 시점의 핵심 근거                                                                                                                                                               |
+| --------------------------------------------- | ---: | ------: | ---: | :---: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 보안 · 인증/인가 · RBAC · 테넌트 격리         |   45 |      74 |   87 | **B** | 시크릿 유출·교차 테넌트 5경로·권한상승 폐쇄. 세션 60초 재검증, 500 응답 유출 차단, 첨부 업로드 쓰기 인가. CSP `'unsafe-inline'`·레거시 `public/uploads`·익명 `/clients/public` 잔존 |
+| Prisma 스키마 · 마이그레이션 · 쿼리           |   62 |      78 |   80 | **B** | BigInt·인덱스·pg_trgm·아웃박스·드리프트 검사 완료. SR 삭제 시 blob 미정리, SLA 분모의 nullable `dueDate`, 첨부/이력 `take` 부재 잔존                                                |
+| API 라우트 · 검증 · 에러 · HTTP 시맨틱        |   57 |      74 |   82 | **B** | Prisma 에러 4종 4xx 매핑, enum 캐스팅 제거, 400/409 시맨틱 정상화, `.max()`·allowlist. 응답 봉투 분열과 SSE `X-Accel-Buffering` 잔존                                                |
+| 서버 액션 · 서비스 · 상태머신 · 도메인 이벤트 |   53 |      71 |   81 | **B** | 이벤트 발행·필드 단위 인가·fail-closed 전이·아웃박스. 푸시 preference 존중, SLA 절삭 수정, 액션 레이트리밋. 재오픈 시 `completedAt` 미초기화, 트리아지 `priority` 미갱신 잔존       |
+| Docker · CI/CD · nginx · 배포 안전성          |   38 |      79 |   88 | **B** | CI 게이팅·헬스체크·롤백·백업·인증서 갱신에 더해 HSTS·HTTP/2·액션 **58개 SHA 핀**·nginx 설정 검증 게이트. nginx 레이트리밋·부유 `node:22` 태그·오프사이트 백업(수용) 잔존            |
+| 테스트 전략 · 커버리지 정직성 · E2E           |   40 |      73 |   78 | **C** | 게이트가 실제 신호를 냄(정직한 분모·단언 강제·main E2E 완주). 173파일 1722테스트, 커버리지 48.27%. 절대치가 여전히 50% 미만이고 E2E 는 main/PR 에서만 실행                          |
+| React 컴포넌트 · 훅 · 상태관리                |   55 |      68 |   76 | **C** | 평문 비밀번호·유휴 타임아웃·SSE·a11y 해소에 더해 에러 바운더리 2종·skip 링크·reduced-motion. 대시보드/my-requests/clients 의 abort 없는 raw fetch 잔존                              |
+| 성능 · 캐싱 · 확장성 · 리소스 상한            |   56 |      72 |   76 | **C** | OOM 4경로 봉쇄·인덱스·스트리밍. RSC 페이로드에서 전 사용자 PII 제거, HTTP/2. `/srs` 배지 카운트 6쿼리, 프로세스 로컬 리미터(수용) 잔존                                              |
+| 제품 완성도 · UX 플로우 · 문서                |   58 |      76 |   78 | **B** | 부트스트랩·카테고리 UI·비밀번호 재설정·타임존으로 출시 경로 개통. 운영 런북 신설. README/START_SERVER 드리프트, `/settings/system` 조작 데이터 잔존                                 |
+| 설정 · 환경변수 · 타입 · 도구 · 저장소 위생   |   60 |      78 |   82 | **B** | strict 3종·lint 래칫·공급망 검증·ENV 플레이스홀더 거부. 액션 SHA 핀 + CI 가드. 죽은 코드(`permissions.ts`·`recharts`·`tsconfig.full.json`)와 타입 인지 lint 부재 잔존               |
+
+¹ 게이트를 실제 실행해 얻은 1차 재평가(2026-08-05 오전). 원본은 빌드·테스트를 돌리지 않은 정적 분석이었다.
+
+### 종합 점수: **82 / 100 (B)** — 원본 50(D) → 재평가 74(C) → **현재 82(B)**
 
 가중치: 보안 0.22 · 데이터 0.12 · API 0.12 · 도메인 0.12 · DevOps 0.12 · 테스트 0.10 · 프론트 0.08 · 성능 0.05 · UX 0.04 · 설정 0.03
 
-가중 평균이 50에 수렴하는 이유는 명확하다. 가장 큰 가중치를 가진 보안 영역이 45점(D)이고, 그 다음 큰 세 영역(데이터·API·도메인)이 모두 53~62 구간에 머무르며, 배포 안전성이 38점(F)으로 하방을 끌어내린다. 개별 영역 평균은 52.4지만, 보안·DevOps의 결함들이 서로 결합해 **실사용 침해 경로**를 형성하기 때문에 종합 판정은 산술 평균보다 보수적으로 읽어야 한다.
+가중 평균 82.1, 단순 평균 80.8. 원본이 산술 평균(52.4)보다 보수적인 50을 준 이유는 결함들이 결합해 **실사용 침해 경로**를 형성했기 때문인데, 그 체인이 끊긴 지금은 남은 항목들이 서로 독립적이라 두 값을 벌릴 이유가 없다.
+
+**B 구간에 머무는 이유**는 갭이 한 곳에 몰려 있지 않다는 것이다. 어느 영역도 12~24점 범위를 벗어나지 않으며, 각 영역에 2~3건씩 흩어진 Medium 항목이 고르게 깎고 있다. 한 방에 점수를 올릴 항목은 남아 있지 않다. 가장 큰 단일 감점 요인은 **커버리지 절대치(48%)** 와 **프론트엔드의 클라이언트 컴포넌트 데이터 페칭**이다.
+
+### 배포 판정: **Go** (원본: No-Go)
+
+원본의 배포 차단 4항목은 전부 닫혔고, 시스템은 게이트된 파이프라인을 통해 운영 중이다.
+남은 항목 중 사고 시 실제 피해가 발생하는 것은 다음 3건이며, 전부 Medium 등급이다.
+
+1. CSP `'unsafe-inline'` — nonce 를 생성하면서 어떤 `<script>` 에도 적용하지 않아 실효 정책이 `unsafe-inline` 이다.
+2. 레거시 `public/uploads` 가 첨부 해석 루트로 남아 있고 파일 1개가 아직 추적된다.
+3. `COMMENT:*`/`ATTACHMENT:*` 권한이 시드·부여되지만 어디서도 강제되지 않는다(조용히 무효한 통제).
 
 ---
 
@@ -44,7 +70,9 @@
 
 ---
 
-### 3.1 [CRITICAL] NextAuth 서명 시크릿이 git에 커밋되어 실제 배포 컨테이너가 사용 중
+### 3.1 [해소] [CRITICAL] NextAuth 서명 시크릿이 git에 커밋되어 실제 배포 컨테이너가 사용 중
+
+  <!-- verified: FIXED — 2026-08-02 실측 대조. 이력(origin/main 루트 커밋 .env.docker)의 NEXTAUTH_SECRET/AUTH_SECRET/EMAIL_SERVER_PASSWORD 는 이미 교체돼 있었다(해시 불일치). 남아 있던 것은 DB 비밀번호 하나로, 운영(sr-app)과 스테이징(sr-app-test) 양쪽이 유출된 값 e66ce813 을 그대로 쓰고 있었다. ALTER USER + .env.docker/.env.prod/.env.docker.test/.env.staging 갱신 + 컨테이너 재생성으로 교체했고, GitHub Secret 4종(PROD/STAGING x ENV_DOCKER/COMPOSE_ENV)도 갱신했다 — deploy.yml:118,120 이 배포마다 이 값으로 env 를 덮어쓰므로 이게 빠지면 다음 배포에 되돌아간다. 재확인: 유출값 e66ce813, 현재 운영 cd489320, 스테이징 bb26a4f5. 사이트 200, DB 쿼리 정상 / 남은 일: 이력 삭제(filter-repo)는 하지 않았다 — 이력에 남은 값이 전부 무효라 전체 커밋 해시를 바꿀 이유가 없다고 판단(소유자 결정 2026-08-02) -->
 
 **파일**: `.env.docker:9-10`, `.env.docker.test:6-7`
 
@@ -730,7 +758,9 @@ Let's Encrypt 인증서는 90일 유효다. 유지보수 모드의 시스템에�
 
 ---
 
-### 3.30 [HIGH] 관측성 전무 — 에러 추적·메트릭·업타임 감시·알림이 하나도 없음
+### 3.30 [부분] [HIGH] 관측성 전무 — 에러 추적·메트릭·업타임 감시·알림이 하나도 없음
+
+  <!-- verified: PARTIAL — uptime-kuma(2.x, 서버에서 5주째 가동 중)에 모니터 3번 '앱 헬스체크 (/api/health)' 등록. https://sr.lkindo.kr/api/health 를 60초 간격으로 감시하며, 이 엔드포인트는 prisma $queryRaw SELECT 1 로 DB 연결까지 확인하고 실패 시 503 을 낸다. 기존 모니터 1번은 프론트 200 만 봐서 DB 장애를 못 잡았다. pino 종료 플러시는 이전에 완료 / 남은 일: **uptime-kuma 에 알림 채널이 하나도 설정돼 있지 않다**(notification 테이블 비어 있음). 즉 장애를 감지해도 아무에게도 통보되지 않으며, 대시보드를 직접 봐야만 알 수 있다. MTTD 확보라는 목적은 알림 채널을 붙이기 전까지 달성되지 않는다 -->
 
 > **부분 해결 (2026-08-01).** pino 종료 플러시와 앱 헬스체크를 구현했다.
 >
@@ -1368,7 +1398,6 @@ async getClientDetailsById(id: string) {
 - ~~**클라이언트 `hasPermission` 이 세션과 다른 구분자로 키를 조립해 항상 false**~~ — **감사 이후 발견·해소됨(2026-08-01).** `src/hooks/use-permissions.ts` 가 `` `${resource}.${action}` `` 로 조립하는데 `src/auth.ts:146` 은 세션 토큰에 `` `${resource}:${action}` `` 를 담는다. 따라서 `hasPermission`/`hasAnyPermission`/`hasAllPermissions` 가 어떤 입력에도 false 였다. 현재 호출부(`PermissionGuard`, `Sidebar`)가 모두 `roles` 를 쓰고 있어 증상이 드러나지 않았을 뿐, 권한으로 게이트하는 순간 조용히 막히는 지뢰였다. 구분자를 맞추고 비교를 대소문자 무시로 바꿨다. 기존 테스트 두 개가 `permissions: ['sr.view', ...]` 라는 프로덕션에 존재하지 않는 형태를 픽스처로 써서 점 조립을 정상 동작으로 못 박고 있었으므로 실제 세션 형태로 교체했다.
 
 - [해소] **`SessionProvider`에 서버 해석 세션을 전달하지 않음** — `src/components/providers/ClientLayout.tsx:43`의 `<SessionProvider>`가 `session` prop을 받지 않는데, `src/app/(dashboard)/layout.tsx:10`은 이미 `auth()`를 서버에서 await해 Header에만 전달한다. `usePermissions`(`use-permissions.ts:9, 25, 30`)가 `session?.user`가 undefined면 모든 검사에 false를 반환하므로 SSR 동안과 `/api/auth/session` 해석 전까지 사이드바 전체(`Sidebar.tsx:34-52, 66-77`), 상단 nav 필터(`Header.tsx:113-118`), `ExportButton`(`:16-18`)이 비어 있다가 팝인한다. `SRsDataTable.tsx:114`의 `isClientUser = !hasAnyRole([...])`는 더 나쁘다 — 로딩 창 동안 ADMIN이 클라이언트 사용자로 취급되어 퀵필터 바와 상세 필터 버튼(`:315`)이 숨겨졌다가 주입되어 테이블이 밀린다. → `const session = await auth()`를 레이아웃에서 `<SessionProvider session={session}>`로 전달하고, `usePermissions`가 `status`를 노출해 호출자가 'loading'과 'denied'를 구분(스켈레톤 렌더)하게 한다.
-  <!-- verified: FIXED — 483c60d — src/app/layout.tsx 가 auth() 를 await 해 ClientLayout → <SessionProvider session={session}> 로 전달. Header 의 nav 필터도 클라이언트 세션만 보는 hasAnyRole() 대신 서버 props 와 병합된 user 를 쓴다. 회귀 테스트 2건(src/app/__tests__/layout.session.test.tsx, src/components/layout/__tests__/Header.nav.test.tsx)은 각 결함을 되돌리면 실패하는 것을 확인했다. 실제 증상: ADMIN 로그인 시 조직 관리·권한 관리 메뉴 미표시 / 남은 일: usePermissions 의 status 노출/스켈레톤 렌더는 미적용. 초기 세션이 심어지면서 첫 렌더의 loading 창이 사라져 실익이 크지 않다고 판단 -->
 
 - **검색 디바운스 타이머가 낡은 `searchParams` 스냅샷으로 발화** — `SRsDataTable.tsx:156-165`의 디바운스 effect가 deps `[searchQuery]`만 갖는데 본문에서 `handleFilterChange`(`:190`)를 호출하고, 이는 `createQueryString`(`useCallback(..., [searchParams])`, `:175-188`)을 클로저로 잡는다. 사용자가 검색어를 입력하고 500ms 내에 상태 필터를 고르면, Select가 내비게이트한 후 대기 중이던 디바운스 타이머가 내비게이션 이전 searchParams로 만든 URL을 push해 **방금 선택한 상태 필터를 조용히 폐기**한다. 반대 순서도 마찬가지다. 게다가 `:168-173`의 동기화 effect가 searchParams 변경마다 `if (searchQuery !== currentSearch) setSearchQuery(currentSearch)`를 무조건 실행하므로, 모든 필터/정렬/페이지 내비게이션이 **입력 중인 검색어를 지운다**(그 내비게이션들이 pending search 값을 URL에 싣지 않으므로 currentSearch가 ''). → URL을 단일 진실 원천으로: `handleFilterChange`가 현재 `searchQuery`를 `createQueryString`에 포함시키고, 동기화 effect를 이 컴포넌트가 시작한 내비게이션의 에코를 무시하는 ref로 게이트(또는 로컬 상태를 버리고 `filters.search`로 입력을 구동).
 
@@ -1507,7 +1536,7 @@ async getClientDetailsById(id: string) {
 - `OrganizationTree.tsx:407, 147`이 `key={user.id || Math.random()}`을 쓴다 — id 없는 항목이 매 렌더마다 새 키를 받아 dnd-kit의 `useDraggable` 노드 등록이 상호작용 중간에 해체되고 포커스가 유실된다. `:299-305`가 `PointerSensor`만 등록해 **키보드/스크린리더 사용자는 사용자 재배정 워크플로에 접근할 경로가 전혀 없다**. `KeyboardSensor` 추가 + 드래그 핸들에 `tabIndex`/aria-label, 그리고 `UserCardContextMenu`에 비드래그 대체 액션 노출.
 - `docs/system_manual.md:37, 58, 81, 103` 등의 모든 스크린샷이 `file:///d:/project/sr/public/images/manual/...`로 참조된다. 이미지는 `public/images/manual/`에 실재하므로 `/images/manual/...`로 서빙 가능하며 `file:///` 접두사는 불필요하다. GitHub, 문서 사이트, 내보낸 `docs/system_manual.html`, 다른 경로에 클론한 모든 개발자에게 이미지가 깨진다.
 - `README.md:48-50`이 Next.js 16.0.7 / Node 24.x / React 19.2.1을 주장하지만 `package.json:81, 85`는 next 16.1.6, react ^19.2.4이고 `:5-7`은 `engines: { node: 22.x }`다 — 문서화된 Node major가 선언된 지원보다 하나 앞선다. `:5`가 존재하지 않는 `docs/images/overview.png`를 임베드하고, `:182-183`의 닫히지 않은 코드 펜스가 대부분의 렌더러에서 `## 📖 문서` 헤딩을 코드 블록으로 삼킨다. `:127-131`의 환경 변수 표는 `RATE_LIMIT_*` 3개만 문서화하고 DATABASE_URL·NEXTAUTH_SECRET·NEXT_PUBLIC_APP_URL·VAPID 키를 전부 누락한다.
-- `START_SERVER.md:19` 등의 모든 명령이 `cd "C:\Users\sanle\OneDrive\문서\GitHub\sr"`로 시작하고(실제 저장소는 d:/project/sr), 예상 출력 블록이 `Next.js 15.0.3`을 주장하며, `'📚 관련 문서'`가 존재하지 않는 파일 4개(EDGE_RUNTIME_FIX.md, SETUP_COMPLETE.md, SUPABASE_SETUP.md, DEVELOPMENT_STATUS.md)를 링크하고, `'첫 사용자 등록'` 절이 Prisma Studio 수동 역할 삽입을 안내하는데 이는 README(`:102`)의 `db:seed`와 모순되며 3.4에 따라 애초에 동작하지 않는다.
+- `START_SERVER.md:19` 등의 모든 명령이 `cd "C:\Users\sanle\OneDrive\문서\GitHub\sr"`로 시작하고(실제 저장소는 d:/project/sr), 예상 출력 블록이 `Next.js 15.0.3`을 주장하며, `'📚 관련 문서'`가 존재하지 않는 파일 3개(EDGE_RUNTIME_FIX.md, SETUP_COMPLETE.md, DEVELOPMENT_STATUS.md)를 링크하고, `'첫 사용자 등록'` 절이 Prisma Studio 수동 역할 삽입을 안내하는데 이는 README(`:102`)의 `db:seed`와 모순되며 3.4에 따라 애초에 동작하지 않는다.
 - `e2e/26-settings-pages.spec.ts:22-25, 51-53, 122-125, 137-140, 157-159` 등 스위트 전반이 기능 부재를 통과로 변환하는 `if (!visible) { console.log('...스킵'); test.skip(); }` 패턴을 쓴다(27-service-categories 7건, 25-my-requests 6건, 24/26 각 5건, 28 4건). `27-service-categories.spec.ts:52`의 `expect(categories.length).toBeGreaterThanOrEqual(0)`와 `23-role-exclusivity.spec.ts`의 7개 항상-참 단언도 마찬가지. `21-sr-status-transitions.spec.ts:203, 234, 332, 400, 491`은 `console.log('⚠️ 보류 버튼을 찾을 수 없습니다. (UI에 미구현 가능성)')`로 명시적으로 기능 부재를 로그하고 녹색을 유지한다. 존재해야 할 기능은 `await expect(locator).toBeVisible()`로, 미구현 기능은 `test.fixme()` 또는 최상위 `test.skip(reason)`으로 표시.
 - `playwright.config.ts:22`의 `retries: process.env.CI ? 2 : 1`이 로컬에서도 재시도를 켜 개발 중 간헐 버그를 숨긴다. e2e 전반에 217개 고정 `waitForTimeout`(21이 27건, 22가 25건, 20이 19건, 19가 16건, 공유 헬퍼에 8건)이 있고 이를 보상하려 타임아웃이 이미 확대되었다(`:11` 30초→60초, `:15` 5초→10초). 평균 1초로 매 e2e 실행의 3~4분이 순수 sleep이며 각각이 느린 러너에서 잠재적 flake다. CI `retries: 2`는 SSE/알림 경로의 실제 경쟁 조건을 녹색으로 재시도해 조사되지 않게 한다. `helpers/test-helpers.ts:61`의 `expect(duration).toBeLessThan(thresholdMs)`와 `src/__tests__/performance/benchmark.test.ts:33, 54, 73, 95, 119`의 20-100ms 벽시계 단언은 부하 있는 GitHub 러너에서 코드 정확성과 무관하게 실패한다.
 - `playwright.config.ts:147-164`의 firefox/webkit/Mobile Chrome 프로젝트가 chromium의 `testIgnore`(`:110-120`)를 갖지 않고 `dependencies: ['setup']`만 선언해, `multi-user-setup`이 생성하는 `playwright/.auth/{client,manager,engineer}.json`을 요구하는 08/09/17-23 스펙과 `sr-permissions.spec.ts`를 실행한다. `setup` 프로젝트 자체가 무효다 — `testMatch: /global-setup\.ts/`가 `test()` 호출이 없는 파일을 가리킨다. 결과적으로 DB를 변경하는 멀티유저 워크플로가 하나의 DB에 대해 4개 브라우저에서 `fullyParallel: true`로 병렬 실행되며, HTTP 403을 단언하는 저장소 유일의 두 단언(`sr-permissions.spec.ts:247, 273`)이 auth 파일이 없거나 낡은 상태로 5회 실행된다. 같은 스펙이 파괴적 SR 삭제(`:113-192`)와 감사 로그 단언을 수행하므로 자기 자신과 경쟁한다.
@@ -1520,10 +1549,10 @@ async getClientDetailsById(id: string) {
 - `scripts/deploy-local.ps1:3, 19, 31`이 로컬 빌드(커밋되지 않은 변경 포함)를 `latest` 태그로 프로덕션에 직접 밀어넣으며 `-o StrictHostKeyChecking=no`로 SSH 호스트 키 검증을 끈다 — DNS/라우트 하이재킹이 SSH 개인키 핸드셰이크와 이미지 tarball을 모두 수신한다. `docker compose down`이 `docker load` **전에** 실행되어 수백 MB 전송 전체 동안 프로덕션이 오프라인이다. break-glass 도구로 명확히 이름 짓고 known_hosts를 쓰며 커밋 SHA + `-local` 접미사로 태깅하고 순서를 뒤집거나, 삭제하고 `workflow_dispatch`를 쓴다.
 - 자기 등록 후 승인 대기 중인 사용자가 보이지 않는다 — `users/UsersClient.tsx:42, 58`이 활성 사용자를 기본값으로 하고 카운트 배지 없는 3칩 필터만 제공한다. 자기 등록 ENGINEER는 비활성으로 생성되어(`register/actions.ts:92`) 비활성 탭에만 있고, 자기 등록 CLIENT는 활성이지만 PENDING UserClient 행을 갖는데 승인 컨트롤이 해당 행에만 인라인으로 나타날 뿐 필터·탭·카운트가 없다. 등록 시 알림도 없다(`actions.ts:118-128`이 domainEvents도 emailService도 건드리지 않음). 신규 엔지니어는 `'관리자 승인 후 사용 가능합니다'`를 듣고 `auth.ts:78`에서 설명 없이 차단되며, 관리자는 비활성 칩을 클릭하지 않는 한 그 계정을 영원히 보지 못한다.
 - `settings/notifications/page.tsx:214-216, 310-314`가 모든 사용자에게 `emailSRCreated`/`pushSRCreated` 토글을 렌더링하지만 `sr:created` 알림은 ADMIN/MANAGER에게만 발송된다(`listener.ts:19-29, 34-60`). CLIENT_USER가 이를 켜고 저장에 성공한 뒤 한 건도 받지 못하며, 이는 실제로 고장난 푸시 토글(4.3)과 구별되지 않아 진단을 어렵게 한다.
-- 리포팅이 필터 없는 CSV 버튼 하나다 — `ExportButton`이 `dashboard/page.tsx:198`에 한 번 렌더링되어 쿼리 스트링 없이 GET하고(`:23`), 라우트(`reports/export/route.ts:22-45`)는 파라미터를 전혀 받지 않으며 ADMIN/MANAGER에 대해 `where = {}`로 최대 5만 행을 내보낸다. `/reports` 페이지도 nav 항목도 없다(`navigation.ts:2`의 `BarChart3` import가 제거된 항목의 잔재). 버튼은 md 브레이크포인트 아래에서 숨겨지고(`:59`) `text/csv`를 방출하면서 `'엑셀 다운로드'`로 레이블된다. PRD의 기간 통계·고객사별 만족도·SLA 준수 리포팅이 부분 구현조차 없다.
-- 만족도 평가가 스키마(`prisma/schema.prisma:272-273`), zod(`schemas.ts:123-127`), 서비스(`sr.service.ts:222-225`)까지 배선되어 있으나 이를 수집하거나 표시하는 UI가 전혀 없다 — 확인 완료 버튼(`SRStatusActions.tsx:212`)은 `action:'confirm'`만 POST한다. 프로덕션의 모든 행에서 `satisfaction_rating`이 NULL이므로 PRD가 약속한 `'고객사별 만족도'` 리포트를 생산할 수 없다. 절반 지어진 API 표면은 함정이기도 하다 — 일반 update 엔드포인트로 값을 PATCH할 수 있으나 어떤 UI도 보여주지 않는다.
-- 댓글이 생성·조회만 가능하다 — `srs/[id]/comments/route.ts`는 GET(`:17`)과 POST(`:56`)만 export하고 per-comment 라우트가 없으며 `SRComments.tsx`에 편집/삭제 어피던스가 없다. 그런데 `prisma/seed.ts:45-46`이 `COMMENT:UPDATE`/`COMMENT:DELETE`를 시드해 `PermissionBoard.tsx`에 할당 가능한 토글로 노출한다. 오타나 실수로 붙여넣은 자격증명이 담긴 댓글을 작성자도 ADMIN도 제거할 수 없다.
-- 인앱 알림 채널이 존재하지 않는다 — Header에 알림 벨/인박스가 없고, `/api/notifications` 라우트도 없으며, `realtime-events.ts:26`의 `NOTIFICATION_RECEIVED`를 발행하거나 수신하는 것이 없다. 이는 `GEMINI.md` 4절 66행의 `'이메일, 웹 푸시(Web Push) 및 인앱 알림(In-App Notification) 알림 채널로 발송된다'`와 모순된다. 브라우저 푸시 권한을 거부하고 알림 메일을 읽지 않는 사용자는 자신에게 SR이 배정되었음을 발견할 방법이 없다.
+- [범위 제외] 리포팅이 필터 없는 CSV 버튼 하나다 — `ExportButton`이 `dashboard/page.tsx:198`에 한 번 렌더링되어 쿼리 스트링 없이 GET하고(`:23`), 라우트(`reports/export/route.ts:22-45`)는 파라미터를 전혀 받지 않으며 ADMIN/MANAGER에 대해 `where = {}`로 최대 5만 행을 내보낸다. `/reports` 페이지도 nav 항목도 없다(`navigation.ts:2`의 `BarChart3` import가 제거된 항목의 잔재). 버튼은 md 브레이크포인트 아래에서 숨겨지고(`:59`) `text/csv`를 방출하면서 `'엑셀 다운로드'`로 레이블된다. PRD의 기간 통계·고객사별 만족도·SLA 준수 리포팅이 부분 구현조차 없다.
+- [범위 제외] 만족도 평가가 스키마(`prisma/schema.prisma:272-273`), zod(`schemas.ts:123-127`), 서비스(`sr.service.ts:222-225`)까지 배선되어 있으나 이를 수집하거나 표시하는 UI가 전혀 없다 — 확인 완료 버튼(`SRStatusActions.tsx:212`)은 `action:'confirm'`만 POST한다. 프로덕션의 모든 행에서 `satisfaction_rating`이 NULL이므로 PRD가 약속한 `'고객사별 만족도'` 리포트를 생산할 수 없다. 절반 지어진 API 표면은 함정이기도 하다 — 일반 update 엔드포인트로 값을 PATCH할 수 있으나 어떤 UI도 보여주지 않는다.
+- [범위 제외] 댓글이 생성·조회만 가능하다 — `srs/[id]/comments/route.ts`는 GET(`:17`)과 POST(`:56`)만 export하고 per-comment 라우트가 없으며 `SRComments.tsx`에 편집/삭제 어피던스가 없다. 그런데 `prisma/seed.ts:45-46`이 `COMMENT:UPDATE`/`COMMENT:DELETE`를 시드해 `PermissionBoard.tsx`에 할당 가능한 토글로 노출한다. 오타나 실수로 붙여넣은 자격증명이 담긴 댓글을 작성자도 ADMIN도 제거할 수 없다.
+- [범위 제외] 인앱 알림 채널이 존재하지 않는다 — Header에 알림 벨/인박스가 없고, `/api/notifications` 라우트도 없으며, `realtime-events.ts:26`의 `NOTIFICATION_RECEIVED`를 발행하거나 수신하는 것이 없다. 이는 `GEMINI.md` 4절 66행의 `'이메일, 웹 푸시(Web Push) 및 인앱 알림(In-App Notification) 알림 채널로 발송된다'`와 모순된다. 브라우저 푸시 권한을 거부하고 알림 메일을 읽지 않는 사용자는 자신에게 SR이 배정되었음을 발견할 방법이 없다.
 - `src/lib/prisma.ts:69`의 느린 쿼리 미들웨어가 development로만 게이트되어 `scripts/summarize-slow-queries.ts`와 `report:slow-queries`가 프로덕션 데이터를 받을 수 없다. `scripts/warm-dashboard.ts`는 캐시되지 않은 동일 요청을 재발행할 뿐이라 근본 원인(4.2의 `created_at` 인덱스 부재)을 가린다.
 - `SRAttachment.uploadedBy`(`prisma/schema.prisma:358`)가 `@db.VarChar(30)`도 relation도 없다 — 스키마의 다른 모든 user 참조는 명시적 onDelete를 가진 실제 relation이다(`SRActivity.user` RESTRICT 등). `hardDeleteUser`(`user.service.ts:493-508`)가 SR/activity/comment/statusHistory만 검사하고 첨부를 누락하므로, 업로드만 한 사용자가 4개 가드를 전부 통과해 하드 삭제되고 `sr_attachments.uploaded_by`가 DB 레벨 에러 없이 존재하지 않는 id를 가리키게 된다.
 - `service_categories.client_id`가 `ON DELETE SET NULL`(`schema.prisma:187`, `0_init/migration.sql:480`)이고 NULL clientId가 '글로벌 카테고리'의 인코딩이다(`service-category.service.ts:78-87, 106-121`). `ClientService.deleteClient`(`client.service.ts:222, 233-235`)의 애플리케이션 가드를 거치지 않는 모든 경로(수동 psql 정리, 미래의 관리 엔드포인트, seed/reset 스크립트)가 해당 클라이언트의 비공개 카테고리를 **글로벌로 전환**해 다른 모든 테넌트의 드롭다운에 떠난 클라이언트의 내부 카테고리명과 SLA 정책을 노출한다. `onDelete: Restrict`로 변경하거나 명시적 `isGlobal Boolean` 플래그 도입.
@@ -1631,18 +1660,31 @@ async getClientDetailsById(id: string) {
 
 ### Phase 1 — 1주 내 (배포 차단 해제)
 
-| 작업                                                                                                                                    | 영역        | 공수 | 기대 효과                                                              |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ----------- | :--: | ---------------------------------------------------------------------- |
-| `NEXTAUTH_SECRET`/`AUTH_SECRET`/DB 비밀번호를 환경별로 신규 발급, `.env.docker*` 추적 해제 + 이력 삭제, GitHub Secrets 주입 (3.1, 3.13) | 보안/설정   |  M   | 세션 위조 경로 차단 — **이것이 해결되기 전 나머지 보안 수정은 무의미** |
-| `deploy.yml:121`의 자동 seed 중단 + `prisma/seed.ts`의 무조건 비밀번호 리셋 제거 + 스테이징 admin/engineer 계정 삭제 (3.2)              | DevOps      |  S   | 공개 자격증명으로의 스테이징 ADMIN 로그인 차단                         |
-| `docker-compose.test.yml`의 `3001:3000`/`5433:5432` 제거 + `setup-server.sh:41` 방화벽 규칙 제거 (3.12)                                 | DevOps      |  S   | 인터넷 노출 DB·평문 앱 제거, `X-Real-IP` 스푸핑 경로 봉쇄              |
-| `deploy.yml`을 CI 성공에 의존시키기(`needs`/`workflow_run`) + `concurrency` + `paths-ignore` (3.3)                                      | DevOps      |  S   | 품질 게이트가 실제로 배포를 막게 됨                                    |
-| `canReadClient`/`canReadUser`/`canUpdateUser`에 테넌트 술어 추가 (3.6, 3.7, 3.10)                                                       | 보안        |  M   | 교차 테넌트 조회 3경로와 자가 테넌트 가입 차단                         |
-| `updateSR`/`createSRAction`의 `clientId` 소속 검증 (3.8, 3.9)                                                                           | 도메인      |  S   | 교차 테넌트 데이터 주입·오배치 차단                                    |
-| `deepSerialize`에 bigint 분기 추가 + 첨부 반환 5개 라우트에 `serializeResponse` 적용 (3.14)                                             | 데이터/API  |  S   | 첨부파일 REST 기능 전체 복구, 중복 업로드·고아 행 발생 중단            |
-| `LoginForm.tsx:62`의 비밀번호 저장 제거 + 부팅 시 기존 키 정리 (3.5)                                                                    | 프론트/보안 |  S   | 평문 자격증명 영구 노출 제거                                           |
-| `srs/page.tsx:25-26`의 `page`/`itemsPerPage` 클램프 (3.20)                                                                              | 성능        |  S   | 단일 URL OOM 경로 차단                                                 |
-| `DELETE /api/srs/[id]` 응답 바디 수정 + `PATCH /api/users/[id]/client`를 409로 (3.15, 3.16)                                             | API         |  S   | 성공을 실패로/실패를 성공으로 보고하는 두 라우트 정상화                |
+> **상태(2026-08-02 재확인): 10건 전부 해소.**
+> 표시는 코드를 직접 확인해 붙였다. 표 자체가 오랫동안 갱신되지 않아 "얼마나 됐나"에
+> 아무도 답할 수 없었고, Phase 2 만 표시가 달려 있어 Phase 1 이 미착수처럼 보였다.
+>
+> 마지막까지 열려 있던 **3.1** 은 2026-08-02 에 닫았다. 확인해 보니 세션 서명 키와 메일
+> 비밀번호는 **이미 교체돼 있었고**(이력의 값과 해시 불일치), 실제로 남아 있던 것은 **DB
+> 비밀번호 하나**였다 — 그리고 그것을 운영과 스테이징이 **둘 다** 유출된 값 그대로 쓰고
+> 있었다. 양쪽을 교체하고 GitHub Secret 4종까지 갱신했다. 시크릿을 갱신하지 않으면
+> `deploy.yml:118,120` 이 다음 배포에서 옛 값으로 덮어써 되돌아간다.
+>
+> 이력 삭제(`git filter-repo`)는 하지 않았다. 이력에 남은 값이 이제 전부 무효라 전체 커밋
+> 해시를 바꿀 이유가 없다(소유자 결정 2026-08-02).
+
+| 작업                                                                                                                                       | 영역        | 공수 | 기대 효과                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------- | :--: | ---------------------------------------------------------------------- |
+| ✅ `NEXTAUTH_SECRET`/`AUTH_SECRET`/DB 비밀번호를 환경별로 신규 발급, `.env.docker*` 추적 해제 + 이력 삭제, GitHub Secrets 주입 (3.1, 3.13) | 보안/설정   |  M   | 세션 위조 경로 차단 — **이것이 해결되기 전 나머지 보안 수정은 무의미** |
+| ✅ `deploy.yml:121`의 자동 seed 중단 + `prisma/seed.ts`의 무조건 비밀번호 리셋 제거 + 스테이징 admin/engineer 계정 삭제 (3.2)              | DevOps      |  S   | 공개 자격증명으로의 스테이징 ADMIN 로그인 차단                         |
+| ✅ `docker-compose.test.yml`의 `3001:3000`/`5433:5432` 제거 + `setup-server.sh:41` 방화벽 규칙 제거 (3.12)                                 | DevOps      |  S   | 인터넷 노출 DB·평문 앱 제거, `X-Real-IP` 스푸핑 경로 봉쇄              |
+| ✅ `deploy.yml`을 CI 성공에 의존시키기(`needs`/`workflow_run`) + `concurrency` + `paths-ignore` (3.3)                                      | DevOps      |  S   | 품질 게이트가 실제로 배포를 막게 됨                                    |
+| ✅ `canReadClient`/`canReadUser`/`canUpdateUser`에 테넌트 술어 추가 (3.6, 3.7, 3.10)                                                       | 보안        |  M   | 교차 테넌트 조회 3경로와 자가 테넌트 가입 차단                         |
+| ✅ `updateSR`/`createSRAction`의 `clientId` 소속 검증 (3.8, 3.9)                                                                           | 도메인      |  S   | 교차 테넌트 데이터 주입·오배치 차단                                    |
+| ✅ `deepSerialize`에 bigint 분기 추가 + 첨부 반환 5개 라우트에 `serializeResponse` 적용 (3.14)                                             | 데이터/API  |  S   | 첨부파일 REST 기능 전체 복구, 중복 업로드·고아 행 발생 중단            |
+| ✅ `LoginForm.tsx:62`의 비밀번호 저장 제거 + 부팅 시 기존 키 정리 (3.5)                                                                    | 프론트/보안 |  S   | 평문 자격증명 영구 노출 제거                                           |
+| ✅ `srs/page.tsx:25-26`의 `page`/`itemsPerPage` 클램프 (3.20)                                                                              | 성능        |  S   | 단일 URL OOM 경로 차단                                                 |
+| ✅ `DELETE /api/srs/[id]` 응답 바디 수정 + `PATCH /api/users/[id]/client`를 409로 (3.15, 3.16)                                             | API         |  S   | 성공을 실패로/실패를 성공으로 보고하는 두 라우트 정상화                |
 
 ### Phase 2 — 1개월 내 (기능 결함 · 안전망 복구)
 
@@ -1670,27 +1712,134 @@ async getClientDetailsById(id: string) {
 
 ### Phase 3 — 분기 내 (구조 개선 · 재발 방지)
 
-| 작업                                                                                                                                    | 영역        | 공수 | 기대 효과                                              |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ----------- | :--: | ------------------------------------------------------ |
-| `eslint-config-next` 연결 + `react-hooks/exhaustive-deps: 'error'` + 타입 인지 lint(`no-floating-promises`) (4.4, 4.6)                  | 설정        |  M   | 훅 의존성·부유 Promise 버그 클래스 전체를 CI에서 차단  |
-| `pnpm lint --max-warnings` 도입 후 898 → 0 ratchet, `noUncheckedIndexedAccess` 활성화 (4.6)                                             | 설정        |  L   | 715개 `any`와 34개 object-injection 경고의 점진적 제거 |
-| `.npmrc` 공급망 검증 복구 + gitleaks/Trivy를 실제 게이트로 + 액션 SHA 핀 (4.6)                                                          | 설정/DevOps |  S   | 의존성 침해·시크릿 커밋 재발 방지                      |
-| `srs(created_at)` 및 `(client_id, created_at)` 인덱스 + `pg_trgm` GIN 검색 인덱스 (4.2)                                                 | 데이터      |  M   | 최다 호출 쿼리와 검색의 스캔 제거                      |
-| 대시보드 stats 캐시 실제 연결 + `/srs`의 5개 badge 카운트를 단일 `FILTER` 집계로 (4.5)                                                  | 성능        |  M   | 대시보드·목록 DB 부하 대폭 감소                        |
-| 첨부 쓰기 3경로 트랜잭션화 + SR 삭제 시 blob 정리 + intake PATCH activity를 트랜잭션 내부로 (4.2)                                       | 데이터      |  M   | 고아 행·고아 파일·감사 추적 유실 제거                  |
-| Notification 트랜잭셔널 outbox 구현 + SMTP 재시도 + 푸시 preference 존중 (4.3)                                                          | 도메인      |  L   | 알림 전달 보장과 사용자 설정 실동작                    |
-| 상태 전이 인가를 permission 기반으로 전환 + fail-closed + UI를 `getAvailableTransitions`에서 도출 (4.3)                                 | 도메인      |  M   | 커스텀 역할 사용 가능, UI-백엔드 발산 재발 방지        |
-| 레이트리미터·SSE 에미터·첨부 저장소를 프로세스 외부로(Redis/Postgres LISTEN-NOTIFY/S3) (4.5)                                            | 성능        |  L   | 복제본 증설 가능, 레이트리밋 실효화                    |
-| 모든 텍스트 필드 `.max()` + 쿼리 파라미터 zod 검증 + `sortBy` allowlist + 응답 봉투 통일 (4.3)                                          | API         |  M   | DB 팽창·스키마 유출·페이지네이션 불안정 동시 해결      |
-| ✅ DB 기반 통합 테스트 14건 이식(교차 테넌트 필터, 트랜잭션 원자성, 동시 채번) (3.37) — **완료 2026-08-01**                             | 테스트      |  M   | 목 기반으로는 잡을 수 없는 결함 클래스 커버            |
-| `NEXT_PUBLIC_APP_URL`/`STORAGE_DIR`/VAPID/EMAIL을 `ENV_VARIABLES`에 등록 + 플레이스홀더 거부 validate (4.6)                             | 설정        |  S   | 알림 링크 오도메인·푸시 무동작·업로드 유실 방지        |
-| 죽은 코드 정리 — `permissions.ts`, `recharts`, `tsconfig.full.json`, `ProfileDialog`, 45개 에이전트 스크래치, 6개 테스트 아티팩트 (5절) | 설정        |  S   | 리뷰 노이즈 제거, mock/스키마 드리프트 차단            |
-| 인앱 알림 채널 구현 또는 GEMINI.md 정정, 만족도 평가 UI, 댓글 편집/삭제, 리포트 필터 (5절)                                              | UX          |  L   | PRD-구현 격차 해소                                     |
-| 문서 정합 — README 버전/펜스/env 표, START_SERVER.md 재작성, system_manual.md 이미지 경로 (5절)                                         | 문서        |  S   | 온보딩 경로 실동작                                     |
+> **상태(2026-08-02 코드 재확인): 14건 중 11건 해소, 1건 부분, 2건 미착수.**
+> Phase 1 과 같은 이유로 표시가 빠져 있었다 — 작업은 했는데 표를 갱신하지 않았다.
+>
+> **PRD 격차 항목(만족도 평가 UI · 댓글 편집/삭제 · 인앱 알림 채널 · 리포트 필터)은
+> 소유자 결정으로 범위에서 제외했다(2026-08-02).** 감사가 과하게 요구한 부분이라는 판단이며,
+> 결함이 아니라 미구현 기능이므로 지금 운영 중인 시스템의 정확성·안전성과는 무관하다.
+> 근거가 되는 관찰은 5절에 그대로 남겨 두되 `[범위 제외]` 로 표시했다 — 지웠다면 다음에
+> 읽는 사람이 같은 항목을 다시 올렸을 것이다. **재평가 시 '제품 완성도' 항목에서
+> 이 격차들은 감점 사유로 계산하지 않는다.**
+>
+> 남은 미착수 2건: **프로세스 외부화(Redis/S3)** 는 앱 복제본을 늘려야 의미가 생기는
+> 작업이라 단일 VM 에서는 실익이 없고, **문서 정합** 은 온보딩 문제다.
+
+| 작업                                                                                                                                                                                                                      | 영역        | 공수 | 기대 효과                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | :--: | ------------------------------------------------------ |
+| ✅ `eslint-config-next` 연결 + `react-hooks/exhaustive-deps: 'error'` + 타입 인지 lint(`no-floating-promises`) (4.4, 4.6)                                                                                                 | 설정        |  M   | 훅 의존성·부유 Promise 버그 클래스 전체를 CI에서 차단  |
+| ✅ `pnpm lint --max-warnings` 도입(현재 래칫 1060) + `noUncheckedIndexedAccess` 활성화 — 0 까지의 감축은 진행 중 · 원문: 898 → 0 ratchet, `noUncheckedIndexedAccess` 활성화 (4.6)                                         | 설정        |  L   | 715개 `any`와 34개 object-injection 경고의 점진적 제거 |
+| ✅ `.npmrc` 공급망 검증 복구 + gitleaks/Trivy를 실제 게이트로 (2026-08-02) + **액션 SHA 핀 58개 전부 + CI 가드 (2026-08-05)** — 2026-08-05 이전에는 0/27 이 핀되어 있었고 `trivy-action@master` 는 부유 참조였다 (4.6)    | 설정/DevOps |  S   | 의존성 침해·시크릿 커밋 재발 방지                      |
+| ✅ `srs(created_at)` 및 `(client_id, created_at)` 인덱스 + `pg_trgm` GIN 검색 인덱스 (4.2)                                                                                                                                | 데이터      |  M   | 최다 호출 쿼리와 검색의 스캔 제거                      |
+| ⚠️ **부분** — 대시보드 stats 캐시: 죽은 코드 제거 + **비캐시 결정**(SSE 실시간 갱신과 충돌). `/srs` 배지 카운트는 **여전히 `countSRs` 6회** — 단일 `FILTER` 집계 미적용 (4.5)                                             | 성능        |  M   | 대시보드·목록 DB 부하 대폭 감소                        |
+| ⚠️ **부분** — 첨부 쓰기 3경로 트랜잭션화 ✅ / intake PATCH activity ✅ / **SR 삭제 시 blob 정리는 미적용** — `deleteSR` 이 `storagePath` 를 건드리지 않아 파일이 볼륨에 영구 잔존 (4.2)                                   | 데이터      |  M   | 고아 행·고아 파일·감사 추적 유실 제거                  |
+| ✅ Notification 트랜잭셔널 outbox 구현 + SMTP 재시도 + 푸시 preference 존중 — outbox/재시도는 2026-08-02, **preference 존중은 2026-08-05** (리스너 3경로 + 댓글 경로를 `sendForEvent` 로 전환) (4.3)                      | 도메인      |  L   | 알림 전달 보장과 사용자 설정 실동작                    |
+| ✅ 상태 전이 인가를 permission 기반으로 전환 + fail-closed + UI를 `getAvailableTransitions`에서 도출 (4.3)                                                                                                                | 도메인      |  M   | 커스텀 역할 사용 가능, UI-백엔드 발산 재발 방지        |
+| ❌ **미착수** — 레이트리미터·SSE 에미터·첨부 저장소를 프로세스 외부로(Redis/Postgres LISTEN-NOTIFY/S3) (4.5)                                                                                                              | 성능        |  L   | 복제본 증설 가능, 레이트리밋 실효화                    |
+| ✅ 모든 텍스트 필드 `.max()` + 쿼리 파라미터 zod 검증 + `sortBy` allowlist + 응답 봉투 통일 (4.3)                                                                                                                         | API         |  M   | DB 팽창·스키마 유출·페이지네이션 불안정 동시 해결      |
+| ✅ DB 기반 통합 테스트 14건 이식(교차 테넌트 필터, 트랜잭션 원자성, 동시 채번) (3.37) — **완료 2026-08-01**                                                                                                               | 테스트      |  M   | 목 기반으로는 잡을 수 없는 결함 클래스 커버            |
+| ✅ `NEXT_PUBLIC_APP_URL`/`STORAGE_DIR`/VAPID/EMAIL을 `ENV_VARIABLES`에 등록 + 플레이스홀더 거부 validate (4.6)                                                                                                            | 설정        |  S   | 알림 링크 오도메인·푸시 무동작·업로드 유실 방지        |
+| ⚠️ **부분** — 죽은 코드 정리: `permissions.ts`·`recharts`·`tsconfig.full.json` 은 아직 남아 있다 · `permissions.ts`, `recharts`, `tsconfig.full.json`, `ProfileDialog`, 45개 에이전트 스크래치, 6개 테스트 아티팩트 (5절) | 설정        |  S   | 리뷰 노이즈 제거, mock/스키마 드리프트 차단            |
+| 문서 정합 — README 버전/펜스/env 표, START_SERVER.md 재작성, system_manual.md 이미지 경로 (5절)                                                                                                                           | 문서        |  S   | 온보딩 경로 실동작                                     |
 
 ---
 
-## 8. 검토 범위와 한계
+## 8. 2026-08-05 재평가 및 후속 수정
+
+### 8.1 재평가가 원본과 다른 점 — 게이트를 실제로 실행했다
+
+원본 감사의 한계 1번은 "빌드·테스트·실행을 하지 않았다"였다. 재평가에서는 돌렸고, 그 결과가 여러 판단을 바꿨다.
+
+| 게이트                     | 결과                                                              |
+| -------------------------- | ----------------------------------------------------------------- |
+| `tsc --noEmit`             | 오류 0                                                            |
+| `pnpm lint`                | 오류 0 / 경고 1,056 (래칫 1,060 → **1,056** 으로 하향)            |
+| `vitest --project=unit`    | 173 파일 · 1,722 통과 · 0 실패                                    |
+| 커버리지 (소스 238개 분모) | statements **48.27%** · branches 41.84% · functions 46.91%        |
+| `next build`               | 성공                                                              |
+| `check:e2e-assertions`     | 스펙 35개, 단언 없는 테스트 0                                     |
+| CI on main (실 이력)       | Security/Quality/Unit/Build/**E2E** 전부 success → Deploy success |
+| `nginx -t` (Docker 실행)   | 통과 — 아래 8.3 에서 이 실행이 결함 2건을 잡았다                  |
+
+원본이 인용한 "커버리지 84.23% / 111파일"은 분모가 절반이라 나온 숫자였다. 지금의 48.27%는
+소스 238개 전체를 분모로 한 정직한 수치이며, 낮아진 것이 아니라 **처음으로 측정된 것**이다.
+
+### 8.2 후속 수정에서 닫은 항목 (7묶음)
+
+| #   | 항목                                                                                                        | 원 감사     |
+| --- | ----------------------------------------------------------------------------------------------------------- | ----------- |
+| 1   | `session.maxAge` 8시간 명시 + jwt 콜백 60초 TTL 클레임 재조회, 비활성/삭제 계정 세션 파기                   | 4.1         |
+| 2   | 500 응답의 raw `error.message` 차단(프로덕션) + Prisma P2002/P2025/P2003/P2014/ValidationError → 4xx 매핑   | 4.1/4.3     |
+| 3   | `/api/srs` 의 `status`/`priority` raw 캐스팅 제거(zod `nativeEnum`) — 위 2번과 결합해 스키마 유출 경로였다  | 4.3         |
+| 4   | 첨부 업로드를 `ensureCanReadSR` → `ensureCanAttachToSR`(수정 권한 + 종결 상태 차단)                         | 4.1         |
+| 5   | `/api/service-categories` 테넌트 스코핑 + 담당자 이메일 제외, `getCachedUsers` → `getCachedAssignableUsers` | 4.1/4.2     |
+| 6   | `ensureCanDeleteSR`·고객사 쓰기 3경로(REST DELETE + 서버 액션 2개)에 테넌트 술어 추가                       | 4.1         |
+| 7   | 푸시 preference 존중, SLA 소수시간 절삭 수정, `updateSRAction`/`deleteSRAction` 레이트리밋                  | 4.3         |
+| 8   | `(dashboard)/error.tsx` + `global-error.tsx` + skip 링크 + `prefers-reduced-motion`                         | 4.4         |
+| 9   | HSTS + HTTP/2 + 액션 SHA 핀 58개 + CI 핀 가드 + 배포 전 `nginx -t` 게이트                                   | 4.1/4.5/4.6 |
+
+회귀 테스트 8개 파일 125건을 함께 넣었다. 그중 3건은 **수정을 되돌려 실제로 실패하는 것을
+확인**했다 — 비활성 사용자 세션 파기, `deleteSRAction` 레이트리밋, `canDeleteSR` 테넌트 술어.
+
+### 8.3 Docker 로 nginx 를 실제로 띄워 잡은 결함 2건
+
+HSTS·HTTP/2 를 넣은 뒤 `nginx -t` 를 실행하자 **기존 설정의 결함**이 드러났다.
+정적 읽기로는 보이지 않았고, 실행해야만 나오는 종류였다.
+
+1. **`status.lkindo.kr` 블록이 nginx 기동을 막을 수 있었다.**
+   `proxy_pass http://uptime-kuma:3001;` 로 호스트를 직접 적어, nginx 가 **설정 로드 시점에**
+   DNS 를 해석하고 실패하면 기동을 거부한다(`[emerg] host not found in upstream`).
+   uptime-kuma 컨테이너가 내려가 있으면 **nginx 전체가 죽어 `sr.lkindo.kr` 까지 함께 내려간다** —
+   감시 도구 때문에 감시 대상이 죽는 형태다. prod/staging 블록은 처음부터
+   `set $upstream_x ...; proxy_pass $upstream_x;` + `resolver` 로 이 문제를 피하고 있었는데,
+   나중에 추가된 status 블록만 그 패턴을 따르지 않았다. 같은 패턴으로 통일했다.
+
+2. **변수명이 nginx 내장 변수와 충돌했다.**
+   1번을 고치며 `$upstream_status` 를 썼는데, 이는 upstream 모듈의 내장 변수라
+   `[emerg] the duplicate "upstream_status" variable` 로 기동에 실패한다. `$upstream_kuma` 로 변경.
+
+**실측 검증** (nginx 1.31.3, `nginx:alpine`):
+
+- `nginx -t` 통과, 컨테이너 기동 성공 (uptime-kuma 부재 상태에서도)
+- 3개 vhost 전부 **HTTP/2 협상**, `strict-transport-security: max-age=63072000; includeSubDomains` 응답
+- 502 응답에도 HSTS 가 붙는다 → `always` 플래그가 실제로 동작
+- 평문 80 은 301 리다이렉트, HSTS 헤더 없음(정상 — `map` 이 https 에만 값을 준다)
+- 배포 게이트가 실동작함을 확인: `http2 on;` → `http2 onn;` 오타를 넣으면 exit 1
+
+`preload` 는 **의도적으로 넣지 않았다.** 프리로드 목록 등재는 브라우저에 하드코딩되어
+사실상 되돌릴 수 없고 별도 제출 절차가 필요하다. 소유자가 그 영구성을 명시적으로
+수용할 때 추가할 항목이다.
+
+### 8.4 표시가 실제보다 앞서 나갔던 항목 (정정 완료)
+
+7절 로드맵의 ✅ 를 코드와 대조하다 **표시는 완료인데 코드가 따라오지 않은 항목 4건**을 찾아
+표에 반영했다. 다음 사람이 표만 보고 넘기면 그대로 묻히므로 기록해 둔다.
+
+1. **"대시보드 stats 캐시 실제 연결"** — 실제로는 죽은 `baseCacheKey`/`cacheKey` 를 **제거**했고,
+   캐시는 SSE 실시간 갱신과 충돌한다는 이유로 **의도적으로 붙이지 않았다**. 판단은 타당하니
+   표현만 정정했다.
+2. **"`/srs` 5개 badge 카운트를 단일 `FILTER` 집계로"** — 여전히 `countSRs` 6회 병렬 호출이다.
+3. **"SR 삭제 시 blob 정리"** — `deleteSR` 은 감사 로그 + `sR.delete` 만 하고 `storagePath` 를
+   건드리지 않는다. 삭제된 SR 의 첨부 파일이 볼륨에 영구 잔존한다. mock 폴백(`deleteClient`)도
+   그대로라 트랜잭션 밖 삭제 가능성이 남아 있다.
+4. **"액션 SHA 핀"** — 2026-08-05 이전에는 `uses:` 27종 **0개**가 핀되어 있었고,
+   `aquasecurity/trivy-action@master` 는 오히려 부유 브랜치 참조였다. 지금은 58개 전부 핀 + CI 가드.
+
+### 8.5 다음에 손댈 것 (점수 기여 순)
+
+| 항목                                                                    | 영역        | 공수 |
+| ----------------------------------------------------------------------- | ----------- | :--: |
+| CSP `'unsafe-inline'` 제거 + `x-nonce` 를 실제 `<script>` 에 적용       | 보안        |  M   |
+| 레거시 `public/uploads` 해석 루트 제거 + 추적 파일 1개 정리             | 보안        |  S   |
+| `COMMENT:*`/`ATTACHMENT:*` 권한을 실제로 강제하거나 카탈로그에서 삭제   | 보안        |  S   |
+| 커버리지 48% → 60% (라우트 25개가 여전히 테스트 0건)                    | 테스트      |  L   |
+| 대시보드/my-requests/clients 를 RSC 로 전환(또는 `useQuery` 로 이동)    | 프론트      |  L   |
+| `deleteSR` 의 blob 정리 + `/srs` 배지 단일 `FILTER` 집계                | 데이터/성능 |  M   |
+| 재오픈 시 `completedAt`/`confirmedAt` 초기화 + 트리아지 `priority` 갱신 | 도메인      |  S   |
+
+---
+
+## 9. 검토 범위와 한계
 
 ### 분석한 것
 

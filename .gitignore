@@ -19,12 +19,17 @@
 /dist/
 .turbo/
 .vercel/
-.vercelignore
 
 # 3. Environment Variables & Credentials (CRITICAL SECRETS)
 # ------------------------------------------------------------------------------
 .env
 .env*.local
+# `.env` 를 잠깐 다른 DB 로 돌려 놓고 원본을 옆에 백업해 두는 일이 실제로 있었다.
+# `.env.e2ebackup` 같은 이름은 위의 두 줄에 걸리지 않아 `git add -A` 한 번이면
+# 시크릿째 커밋된다 — 이 저장소가 이미 한 번 당한 사고다(감사 3.1: 루트 커밋의
+# `.env.docker` 가 아직도 NEXTAUTH_SECRET 을 노출한다). 접두사로 통째로 막는다.
+.env.*
+!.env.example
 # Docker 배포용 실제 시크릿(NEXTAUTH_SECRET/AUTH_SECRET, DB 비밀번호) 추적 차단.
 # 플레이스홀더만 담은 .env.example 은 계속 추적한다.
 .env.docker*
@@ -116,3 +121,18 @@ prisma/seed.bundle.cjs
 *.tmp.json
 *.tmp.sh
 *.tmp.log
+
+# 편집기·도구가 남기는 사본. `.original.*` 은 실행되지 않는 테스트 백업이
+# `__tests__` 안에 660줄로 남아 있던 전례가 있어 패턴으로 막는다.
+*.bak
+*.orig
+*.original.*
+
+# e2e/19-file-upload-download.spec.ts:41-78 이 실행 시점에 직접 만든다.
+# 과거에 11MB 짜리 test-large-file.bin 이 커밋되어 있었다.
+playwright/.test-files/
+
+# `.Jules/` 와 대소문자만 다른 중복 경로. core.ignorecase 때문에
+# 두 철자가 인덱스에 공존해 Linux CI 에서 트리가 갈라졌다.
+.jules/
+.Jules/

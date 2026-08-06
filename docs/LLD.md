@@ -10,25 +10,25 @@
 
 > **⚠️ 이 문서의 이력에 대하여 (2026-07-30 정정)**
 >
-> 이 문서의 초안(1.0/1.1)은 **Vercel + Supabase + Upstash Redis + Vercel Blob + Resend +
+> 이 문서의 초안(1.0/1.1)은 **Vercel + Upstash Redis + Vercel Blob + Resend +
 > React Email + Inngest + Sentry** 를 전제로 작성되었다. **그중 어느 것도 채택되지 않았다.**
 > 실제 운영 스택은 다음과 같다(2026-07-30 실측).
 >
-> | 영역        | 실제 채택                                                                   | 초안이 적었던 것(미채택)    |
-> | ----------- | --------------------------------------------------------------------------- | --------------------------- |
-> | 프레임워크  | Next.js 16.1.6 (App Router), React 19.2.4                                   | Next.js 14.x                |
-> | 런타임      | Node 22.x (`package.json` engines), pnpm 10                                 | Vercel Functions            |
-> | DB          | PostgreSQL 16 (`postgres:16-alpine` 컨테이너, named volume)                 | Supabase PostgreSQL         |
-> | 커넥션 풀러 | 없음 (Prisma 6.19 가 DB에 직접 연결)                                        | PgBouncer / Supabase Pooler |
-> | 인증        | NextAuth/Auth.js v5(5.0.0-beta.32), JWT 세션, bcryptjs                      | —                           |
-> | 파일 저장   | 서버 디스크 `STORAGE_DIR=/app/var/uploads` (컨테이너 볼륨)                  | Vercel Blob                 |
-> | 캐시        | 프로세스 내 캐시(`src/lib/cache.ts`)                                        | Upstash Redis               |
-> | 백그라운드  | `src/lib/wait-until.ts` 의 `backgroundTask` (응답 후 실행)                  | Inngest                     |
-> | 이메일      | nodemailer 7.0 (SMTP)                                                       | Resend + React Email        |
-> | 웹 푸시     | web-push 3.6 (VAPID)                                                        | —                           |
-> | 실시간      | 자체 SSE (`/api/realtime`)                                                  | —                           |
-> | 배포        | 자체 서버(Oracle Cloud VM) + Docker Compose + nginx:alpine                  | Vercel                      |
-> | 에러 추적   | **없음** (pino → stdout). Sentry 는 2026-07-30 미사용 결정, Axiom 도 미채택 | Sentry / Axiom              |
+> | 영역        | 실제 채택                                                                   | 초안이 적었던 것(미채택) |
+> | ----------- | --------------------------------------------------------------------------- | ------------------------ |
+> | 프레임워크  | Next.js 16.1.6 (App Router), React 19.2.4                                   | Next.js 14.x             |
+> | 런타임      | Node 22.x (`package.json` engines), pnpm 10                                 | Vercel Functions         |
+> | DB          | PostgreSQL 16 (`postgres:16-alpine` 컨테이너, named volume)                 | 외부 관리형 PostgreSQL   |
+> | 커넥션 풀러 | 없음 (Prisma 6.19 가 DB에 직접 연결)                                        | PgBouncer                |
+> | 인증        | NextAuth/Auth.js v5(5.0.0-beta.32), JWT 세션, bcryptjs                      | —                        |
+> | 파일 저장   | 서버 디스크 `STORAGE_DIR=/app/var/uploads` (컨테이너 볼륨)                  | Vercel Blob              |
+> | 캐시        | 프로세스 내 캐시(`src/lib/cache.ts`)                                        | Upstash Redis            |
+> | 백그라운드  | `src/lib/wait-until.ts` 의 `backgroundTask` (응답 후 실행)                  | Inngest                  |
+> | 이메일      | nodemailer 7.0 (SMTP)                                                       | Resend + React Email     |
+> | 웹 푸시     | web-push 3.6 (VAPID)                                                        | —                        |
+> | 실시간      | 자체 SSE (`/api/realtime`)                                                  | —                        |
+> | 배포        | 자체 서버(Oracle Cloud VM) + Docker Compose + nginx:alpine                  | Vercel                   |
+> | 에러 추적   | **없음** (pino → stdout). Sentry 는 2026-07-30 미사용 결정, Axiom 도 미채택 | Sentry / Axiom           |
 >
 > 아래 본문에서 **구현이 확인된 절**(디렉토리 구조, DB 클라이언트, 알림 파이프라인, 파일 저장소,
 > 캐싱, 에러 처리, 테스트 전략, 배포/CI)은 실제 구현 파일을 읽어 현재 코드로 교체했다.
@@ -237,7 +237,8 @@ sr/
 ### DB 연결 설정
 
 > **정정(2026-07-30)**: 이 절은 원래 "Connection Pooling 설정" 이라는 제목으로
-> Supabase 호스트와 PgBouncer 포트(6543)를 적고 있었다. **Supabase 도 PgBouncer 도 쓰지 않는다.**
+> 외부 관리형 데이터베이스 서비스의 호스트와 PgBouncer 포트(6543)를 적고 있었다.
+> **그 관리형 서비스도 PgBouncer 도 쓰지 않는다.**
 > DB 는 앱과 같은 호스트에서 도는 `postgres:16-alpine` 컨테이너이고, Prisma 가 내부 브리지
 > 네트워크(`sr-net`)로 직접 연결한다. 커넥션 풀러는 없다.
 > `DATABASE_URL` / `DIRECT_URL` 두 변수는 코드에 남아 있고 둘 다 필수다
@@ -3383,7 +3384,7 @@ NextAuth.js가 자동으로 처리:
 | E2E             | **Playwright 1.58**                                      | `pnpm test:e2e`                               |
 | 뮤테이션        | **Stryker 9.5.1** (`@stryker-mutator/vitest-runner`)     | `pnpm test:mutation`, `pnpm test:mutation:ci` |
 | 접근성          | `@axe-core/playwright`                                   | `e2e/30-accessibility.spec.ts`                |
-| API 목킹        | `msw` 2.x                                                | 단위 테스트                                   |
+| API 목킹        | Vitest `vi.mock` (모듈 단위)                             | 단위 테스트                                   |
 
 ### 파일 배치
 
@@ -3500,7 +3501,7 @@ test.describe('SR Workflow', () => {
 ## 배포 및 CI/CD
 
 > **⚠️ 정정(2026-07-30) — 이 절의 초안은 `amondnet/vercel-action` 으로 Vercel 에 배포하고
-> Supabase/Upstash/Resend/Inngest/Sentry/Axiom 환경 변수를 Vercel 대시보드에 넣는 것을
+> Upstash/Resend/Inngest/Sentry/Axiom 환경 변수를 Vercel 대시보드에 넣는 것을
 > 전제했다. Vercel 은 채택되지 않았다.** 실제 배포는 **GHCR 이미지 빌드 → SSH → 자체 서버의
 > Docker Compose 재기동** 이다. 아래는 저장소의 워크플로 파일을 읽어 정리한 실제 파이프라인이다.
 
@@ -3626,7 +3627,6 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
 ```
 
 **삭제된 변수** — 초안이 나열했던 다음 변수들은 어떤 코드도 읽지 않는다:
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `RESEND_API_KEY`,
 `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`,
 `AXIOM_TOKEN`, `AXIOM_ORG_ID`.
@@ -3652,7 +3652,7 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
 
 ### 환경별 설정 체크리스트
 
-> **정정(2026-07-30)**: 초안의 체크리스트는 Supabase / Upstash / Resend / Inngest / Vercel /
+> **정정(2026-07-30)**: 초안의 체크리스트는 Upstash / Resend / Inngest / Vercel /
 > Sentry 항목으로 채워져 있었다. 그 항목들은 **채택되지 않은 서비스의 계정 준비 작업**이므로
 > 모두 제거하고, 실제로 필요한 준비 작업으로 대체했다.
 
@@ -3694,11 +3694,12 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
 
 **문서 버전 관리:**
 
-| 버전 | 작성자           | 변경 사항                                                                                                                                                                                                                                                       | 작성일     |
-| ---- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1.0  | Development Team | LLD 초안 작성                                                                                                                                                                                                                                                   | 2025-11-06 |
-| 1.1  | Development Team | 캐싱 전략 절 갱신(Redis 제거)                                                                                                                                                                                                                                   | 2025-11-07 |
-| 1.2  | Development Team | 미채택 스택(Vercel/Supabase/Upstash/Vercel Blob/Resend/React Email/Inngest/Sentry) 기술을 실측 구현으로 교체. 디렉토리 구조·DB 연결·알림 파이프라인·이메일·파일 저장소·캐싱/Rate Limit·에러 처리·CSP·테스트 전략·배포/CI·체크리스트 정정. 미구현 절에 배너 추가 | 2026-07-30 |
+| 버전 | 작성자           | 변경 사항                                                                                                                                                                                                                                              | 작성일     |
+| ---- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| 1.0  | Development Team | LLD 초안 작성                                                                                                                                                                                                                                          | 2025-11-06 |
+| 1.1  | Development Team | 캐싱 전략 절 갱신(Redis 제거)                                                                                                                                                                                                                          | 2025-11-07 |
+| 1.2  | Development Team | 미채택 스택(Vercel/Upstash/Vercel Blob/Resend/React Email/Inngest/Sentry) 기술을 실측 구현으로 교체. 디렉토리 구조·DB 연결·알림 파이프라인·이메일·파일 저장소·캐싱/Rate Limit·에러 처리·CSP·테스트 전략·배포/CI·체크리스트 정정. 미구현 절에 배너 추가 | 2026-07-30 |
+| 1.3  | Development Team | 초기 설계안의 외부 관리형 데이터베이스 서비스 서술 제거 (미채택 확정, 자체 PostgreSQL 사용)                                                                                                                                                            | 2026-08-06 |
 
 ---
 

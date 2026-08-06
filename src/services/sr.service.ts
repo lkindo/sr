@@ -804,7 +804,9 @@ export class SRService {
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
     const existingSR = await prisma.sR.findUnique({ where: { id } });
     if (!existingSR) throw new NotFoundError('SR');
-    ensureCanDeleteSR(sessionUser);
+    // 테넌트 술어를 포함한다 — 예전에는 `existingSR` 을 가져와 놓고 인가에 쓰지 않아
+    // `SR:DELETE` 보유자가 남의 테넌트 SR 을 지울 수 있었다(감사 4.1).
+    ensureCanDeleteSR(sessionUser, existingSR);
 
     // 트랜잭션으로 감사 로그 적재 및 SR 삭제 원자적 실행
     await prisma.$transaction(async (tx) => {

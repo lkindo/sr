@@ -1,0 +1,12 @@
+# push 당 1회. 코드가 로컬을 떠나기 전 마지막 정적 게이트다.
+#
+# tsconfig.json 의 `incremental: true` 가 tsconfig.tsbuildinfo 에 캐시를 남기므로
+# 보통 ~17초, 캐시가 없는 첫 실행만 ~34초다. 커밋 10번에 push 1번이라면
+# 예전 구조 대비 사람이 기다리는 시간이 한 자릿수 배로 줄어든다.
+#
+# 테스트는 여기에 두지 않았다. 단위 스위트 전량이 6분이고 CI 가 이미 같은 것을
+# 커버리지까지 붙여 돌린다(ci-cd.yml). 로컬에서 6분을 또 내는 값어치가 없다.
+# 변경분만 빨리 보고 싶으면 직접: pnpm vitest related --run --project=unit <파일>
+#
+# 긴급 상황에서 건너뛰려면: HUSKY=0 git push
+pnpm type-check

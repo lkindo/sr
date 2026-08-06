@@ -350,7 +350,9 @@ describe('SRService', () => {
       const sendEmailSpy = vi
         .spyOn(emailService, 'buildSRStatusChanged')
         .mockResolvedValue({} as any);
-      const sendPushSpy = vi.spyOn(pushService, 'sendToUser').mockResolvedValue({} as any);
+      // 리스너는 사용자 설정을 존중하는 `sendForEvent` 를 쓴다(감사 4.3).
+      // 예전에는 `sendToUser` 를 직접 불러 `pushSRStatusChanged` 를 무시했다.
+      const sendPushSpy = vi.spyOn(pushService, 'sendForEvent').mockResolvedValue(undefined);
 
       // Execute
       const data = { status: 'IN_PROGRESS' as const };
@@ -380,7 +382,8 @@ describe('SRService', () => {
         expect.any(String)
       );
       expect(sendPushSpy).toHaveBeenCalledWith(
-        'req-1',
+        'SR_STATUS_CHANGED',
+        ['req-1'],
         expect.objectContaining({ title: 'SR 상태 변경' })
       );
     });

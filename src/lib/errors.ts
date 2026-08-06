@@ -152,14 +152,38 @@ export class TooManyRequestsError extends ServiceError {
 }
 
 /**
- * Prisma 알려진 요청 오류(P####)를 도메인 에러로 변환합니다.
+ * P2002(unique 제약 위반)의 `meta.target` 에서 사용자에게 보여줄 필드명을 뽑는다.
+ *
+ * `target` 은 드라이버/버전에 따라 `string[]`, `string`, `undefined` 로 모두 나타난다.
+ * 필드명만 쓰고 **모델명과 제출값은 쓰지 않는다** — 필드명은 사용자가 방금 입력한
+ * 폼 항목이라 정보 가치가 있지만, 모델명은 스키마 구조를 알려줄 뿐이다.
+ */
+function extractUniqueTargetFields(error: unknown): string | null {
+  const target = (error as { meta?: { target?: unknown } } | null | undefined)?.meta?.target;
+
+  if (Array.isArray(target)) {
+    const fields = target.filter((t): t is string => typeof t === 'string');
+    return fields.length > 0 ? fields.join(', ') : null;
+  }
+  if (typeof target === 'string' && target.length > 0) {
+    return target;
+  }
+  return null;
+}
+
+/**
+ * Prisma 오류를 도메인 에러로 변환합니다.
  * 매핑 대상이 아니면 null 을 반환하므로 호출측에서 원본 오류를 그대로 전파하면 됩니다.
  *
- * - P2003(외래키 제약 위반): 존재하지 않는 ID를 참조한 잘못된 입력이므로 400 으로 내린다.
- *   (매핑이 없으면 원시 Prisma 오류가 그대로 500 으로 노출되어, 사용자는 서버 장애로 오인하고
- *    로그에는 스택만 남는다.)
+ * **왜 이 매핑이 필요한가(감사 4.1).** 매핑이 없으면 Prisma 오류가 일반 `Error` 로
+ * 흘러 `handleApiError` 의 500 분기에 도달한다. 결과는 두 가지로 나쁘다.
+ *   1. 클라이언트 잘못(중복 생성, 없는 ID 참조, 잘못된 enum 값)이 5xx 로 보고된다 —
+ *      5xx 만 재시도하는 클라이언트가 절대 성공할 수 없는 요청을 반복한다.
+ *   2. `PrismaClientValidationError` 의 메시지는 **모델명·필드 목록·생성 쿼리 형태**를
+ *      담고 있어 그대로 응답 본문이 되면 스키마가 유출된다. `?status=BOGUS` 처럼
+ *      자명하게 도달 가능한 경로였다.
  *
- * Prisma 런타임 타입을 import 하지 않고 code 속성으로만 판정한다.
+ * Prisma 런타임 타입을 import 하지 않고 code/name 속성으로만 판정한다.
  * (errors.ts 는 서버/클라이언트 양쪽에서 import 되므로 런타임 의존성을 늘리지 않는다.)
  */
 export function mapPrismaError(error: unknown): ServiceError | null {
@@ -169,9 +193,39 @@ export function mapPrismaError(error: unknown): ServiceError | null {
   }
 
   const code = (error as { code?: unknown } | null | undefined)?.code;
+  const name = (error as { name?: unknown } | null | undefined)?.name;
 
+  // P2002: unique 제약 위반 → 409. 중복 생성은 충돌이지 서버 장애가 아니다.
+  if (code === 'P2002') {
+    const fields = extractUniqueTargetFields(error);
+    return new ConflictError(
+      fields
+        ? `이미 사용 중인 값입니다. (${fields})`
+        : '이미 존재하는 값입니다. 입력값을 다시 확인해주세요.'
+    );
+  }
+
+  // P2025: 대상 레코드 없음 → 404. update/delete 가 0건을 만났을 때 나온다.
+  if (code === 'P2025') {
+    return new NotFoundError('대상');
+  }
+
+  // P2003(외래키 제약 위반): 존재하지 않는 ID를 참조한 잘못된 입력이므로 400 으로 내린다.
   if (code === 'P2003') {
     return new BadRequestError('존재하지 않는 대상을 참조했습니다. 입력값을 다시 확인해주세요.');
+  }
+
+  // P2014: 필수 관계를 끊는 변경 → 409. 참조가 남아 있어 지울 수 없는 경우다.
+  if (code === 'P2014') {
+    return new ReferentialIntegrityError(
+      '다른 데이터가 이 항목을 참조하고 있어 변경할 수 없습니다.'
+    );
+  }
+
+  // 인자 검증 실패(잘못된 enum 값, 존재하지 않는 필드 등) → 400.
+  // 원문 메시지는 스키마를 통째로 노출하므로 **절대 전달하지 않는다.**
+  if (name === 'PrismaClientValidationError') {
+    return new BadRequestError('요청 파라미터가 올바르지 않습니다.');
   }
 
   return null;

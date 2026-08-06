@@ -80,17 +80,17 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # pnpm을 먼저 설치해야 setup-node의 cache:'pnpm'이 pnpm store를 찾을 수 있다.
       - name: Setup pnpm
         # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
         # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
         # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
       - name: Use Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
           cache: 'pnpm'
@@ -99,7 +99,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -158,7 +158,7 @@ jobs:
       # (기존 설정은 존재하지 않는 playwright-report/ 를 올려 항상 빈 아티팩트만 남겼다)
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: playwright-report
           path: test-results/
@@ -167,7 +167,7 @@ jobs:
 
       - name: Upload application server log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: e2e-server-log
           path: server.log

@@ -3,7 +3,6 @@ import { $Enums, Prisma } from '@prisma/client';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { SLA } from '@/lib/constants';
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { ensureCanReadSR, isInternalUser } from '@/lib/policies';
@@ -11,6 +10,7 @@ import prisma from '@/lib/prisma';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
+import { serviceCategoryService } from '@/services/service-category.service';
 import { assertAssignable } from '@/services/sr.service';
 
 // Force Node.js runtime
@@ -86,10 +86,12 @@ export const POST = withAuthAndRateLimit(
     const assignee = await assertAssignable(validated.assigneeId);
 
     // 4. SLA 기반 마감일 자동 계산
-    const slaHours = sr.serviceCategory.slaHours;
-    const adjustedHours = slaHours * SLA.PRIORITY_MULTIPLIER[validated.actualPriority];
-    const dueDate = new Date();
-    dueDate.setHours(dueDate.getHours() + adjustedHours);
+    //    계산은 serviceCategoryService 한 곳에만 둔다 — 예전에는 같은 구문이 네 곳에
+    //    복제돼 있었고, 그 구현이 `setHours` 로 소수 시간을 절삭했다(감사 4.3).
+    const dueDate = serviceCategoryService.calculateDueDateFromHours(
+      sr.serviceCategory.slaHours,
+      validated.actualPriority
+    );
 
     // 5. SR 업데이트 (REQUESTED → INTAKE) — 하나의 트랜잭션에서 원자적으로 처리
     //    상태 변경 + 상태 이력 + 활동 로그를 함께 커밋하여 중간 실패 시
@@ -408,10 +410,11 @@ export const PATCH = withAuthAndRateLimit(
     // 5. SLA 재계산 (우선순위 변경 시)
     let dueDate = sr.dueDate;
     if (validated.actualPriority && validated.actualPriority !== sr.actualPriority) {
-      const adjustedHours =
-        sr.serviceCategory.slaHours * SLA.PRIORITY_MULTIPLIER[validated.actualPriority];
-      dueDate = new Date(sr.intakeAt || new Date());
-      dueDate.setHours(dueDate.getHours() + adjustedHours);
+      dueDate = serviceCategoryService.calculateDueDateFromHours(
+        sr.serviceCategory.slaHours,
+        validated.actualPriority,
+        sr.intakeAt || new Date()
+      );
     }
 
     // 6. 담당자 검증 및 조회 (변경 시)
