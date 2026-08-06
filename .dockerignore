@@ -48,9 +48,17 @@ pnpm-debug.log*
 test_results.txt
 test-results
 playwright-report
-playwright-report
 blob-report
 coverage
+
+# 로컬에서 생기는 생성물. `.gitignore` 만 막고 있으면 `COPY . .` 로
+# 빌더 레이어에 그대로 구워진다(과거 4MB).
+*.tar.gz
+*.tsbuildinfo
+coverage_summary*.txt
+actions_runs.json
+build_error.log
+output.css
 
 # Project specific configs (not needed in production runner)
 .vercel
@@ -62,20 +70,21 @@ docs
 e2e
 playwright
 playwright.config.ts
-playwright.debug.config.ts
 vitest.config.ts
-vitest.mutation.config.ts
 vitest.setup.ts
 vitest.shims.d.ts
+vitest.stryker.config.ts
+vitest.integration.setup.ts
 stryker.config.mjs
 eslint.config.mjs
 .eslintrc.*
 .prettierignore
 .prettierrc
-README.md
 *.md
 vercel.json
 components.json
+# 지금은 없지만 과거에 커밋된 적이 있는 VAPID 키 파일이다(7327a52, c9b9e11).
+# 재유입 방어선이므로 "파일이 없다"는 이유로 지우지 말 것.
 vapid.json
 vapid_final.json
 

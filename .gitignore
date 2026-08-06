@@ -19,7 +19,6 @@
 /dist/
 .turbo/
 .vercel/
-.vercelignore
 
 # 3. Environment Variables & Credentials (CRITICAL SECRETS)
 # ------------------------------------------------------------------------------
@@ -122,3 +121,18 @@ prisma/seed.bundle.cjs
 *.tmp.json
 *.tmp.sh
 *.tmp.log
+
+# 편집기·도구가 남기는 사본. `.original.*` 은 실행되지 않는 테스트 백업이
+# `__tests__` 안에 660줄로 남아 있던 전례가 있어 패턴으로 막는다.
+*.bak
+*.orig
+*.original.*
+
+# e2e/19-file-upload-download.spec.ts:41-78 이 실행 시점에 직접 만든다.
+# 과거에 11MB 짜리 test-large-file.bin 이 커밋되어 있었다.
+playwright/.test-files/
+
+# `.Jules/` 와 대소문자만 다른 중복 경로. core.ignorecase 때문에
+# 두 철자가 인덱스에 공존해 Linux CI 에서 트리가 갈라졌다.
+.jules/
+.Jules/
