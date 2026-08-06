@@ -204,7 +204,7 @@ BOOTSTRAP_ADMIN_PASSWORD=충분히-긴-임시-비밀번호
 
 ## 📊 현재 데이터베이스 상태
 
-### Supabase PostgreSQL
+### PostgreSQL
 
 - **연결 상태**: ✅ 정상
 - **테이블**: 17개
@@ -222,7 +222,6 @@ BOOTSTRAP_ADMIN_PASSWORD=충분히-긴-임시-비밀번호
 
 - **`EDGE_RUNTIME_FIX.md`**: Edge Runtime 오류 수정 내역
 - **`SETUP_COMPLETE.md`**: 설정 완료 요약
-- **`SUPABASE_SETUP.md`**: Supabase 설정 가이드
 - **`DEVELOPMENT_STATUS.md`**: 개발 현황
 
 ---

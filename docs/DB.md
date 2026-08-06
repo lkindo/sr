@@ -20,8 +20,8 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 
 다른 문서(PRD, TRD, LLD)에서 데이터베이스 관련 내용이 필요한 경우 본 문서를 참조하세요.
 
-> **⚠️ 2026-07-30 정정.** 이 문서 1.3 이하 버전은 초기 설계안의 스택(Supabase PostgreSQL,
-> PgBouncer 커넥션 풀러, Vercel Blob)을 사실처럼 기술하고 있었다. **그중 어느 것도 채택되지
+> **⚠️ 2026-07-30 정정.** 이 문서 1.3 이하 버전은 초기 설계안의 스택(외부 관리형
+> PostgreSQL 서비스, PgBouncer 커넥션 풀러, Vercel Blob)을 사실처럼 기술하고 있었다. **그중 어느 것도 채택되지
 > 않았다.** 또한 실제 스키마와 다음과 같이 어긋나 있었다.
 >
 > - 이미 삭제된 테이블(`accounts`, `sessions`, `verification_tokens`)을 존재하는 것으로 기술
@@ -53,13 +53,14 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 
 ## 문서 개정 이력
 
-| 버전 | 작성자           | 변경 사항                                                                                                               | 작성일     | 검수자   |
-| ---- | ---------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------- | -------- |
-| 1.0  | Development Team | DB 설계 초안 작성                                                                                                       | 2025-11-06 | [검수자] |
-| 1.1  | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가                                                                      | 2025-11-06 | [검수자] |
-| 1.2  | Development Team | Single Source of Truth 명시, 문서 간 참조 가이드 추가                                                                   | 2025-11-07 | [검수자] |
-| 1.3  | Development Team | SR 요청/접수 프로세스 분리를 위한 필드 추가 (요청자/접수자 역할 분리)                                                   | 2025-01-12 | [검수자] |
-| 1.4  | Development Team | 미채택 스택(Supabase/PgBouncer/Vercel Blob) 서술 정정, 실제 스키마·마이그레이션과 전면 대조하여 테이블/ENUM/제약 재작성 | 2026-07-30 | [검수자] |
+| 버전 | 작성자           | 변경 사항                                                                                                      | 작성일     | 검수자   |
+| ---- | ---------------- | -------------------------------------------------------------------------------------------------------------- | ---------- | -------- |
+| 1.0  | Development Team | DB 설계 초안 작성                                                                                              | 2025-11-06 | [검수자] |
+| 1.1  | Development Team | ENUM 정의 통합, 필드명 표준화, 상태 전이 정의 추가                                                             | 2025-11-06 | [검수자] |
+| 1.2  | Development Team | Single Source of Truth 명시, 문서 간 참조 가이드 추가                                                          | 2025-11-07 | [검수자] |
+| 1.3  | Development Team | SR 요청/접수 프로세스 분리를 위한 필드 추가 (요청자/접수자 역할 분리)                                          | 2025-01-12 | [검수자] |
+| 1.4  | Development Team | 미채택 스택(PgBouncer/Vercel Blob) 서술 정정, 실제 스키마·마이그레이션과 전면 대조하여 테이블/ENUM/제약 재작성 | 2026-07-30 | [검수자] |
+| 1.5  | Development Team | 초기 설계안의 외부 관리형 데이터베이스 서비스 서술 제거 (미채택 확정, 자체 PostgreSQL 사용)                    | 2026-08-06 | [검수자] |
 
 ---
 
@@ -89,7 +90,7 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 | 호스팅 형태       | 자체 호스팅. 앱과 같은 호스트의 Docker Compose 서비스(`db`). 관리형 서비스 아님 |
 | 데이터 영속화     | Docker named volume `sr_db_data` → `/var/lib/postgresql/data`                   |
 | 네트워크 노출     | 없음. 호스트 포트 미매핑, 앱은 내부 브리지 네트워크(`sr-net`)로만 접근          |
-| Connection Pooler | **없음.** PgBouncer·Supabase Pooler·Prisma Data Proxy 모두 미사용               |
+| Connection Pooler | **없음.** PgBouncer·Prisma Data Proxy 모두 미사용                               |
 | Character Set     | UTF-8                                                                           |
 | 타임스탬프 타입   | `timestamptz` (UTC 저장)                                                        |
 | ORM               | Prisma 6.19 (`@prisma/client` + `prisma`)                                       |

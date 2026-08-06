@@ -8,7 +8,7 @@
 **검수자:** [검수자 정보]
 
 > **⚠️ 이 문서는 2026-07-30 에 실제 구현 기준으로 정정되었다.**
-> 1.3 까지의 TRD 는 Vercel + Supabase + Upstash Redis + Vercel Blob + Resend + Inngest +
+> 1.3 까지의 TRD 는 Vercel + Upstash Redis + Vercel Blob + Resend + Inngest +
 > Sentry/Axiom 을 전제로 작성되어 있었다. **그중 어느 것도 채택되지 않았다.**
 > 실제 구성은 자체 서버(Oracle Cloud VM) + Docker Compose + nginx + PostgreSQL 16 컨테이너다.
 > 미채택 스택의 선택 경위는 설계 의사결정 기록으로서 남겨 두되, 모두 **"초기 설계안 / 미채택"**
@@ -31,13 +31,14 @@
 
 ## 문서 개정 이력
 
-| 버전 | 작성자           | 변경 사항                                                                                                                                                                                                                               | 작성일     | 검수자   |
-| ---- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------- |
-| 1.0  | Development Team | TRD 초안 작성                                                                                                                                                                                                                           | 2025-11-06 | [검수자] |
-| 1.1  | Development Team | SR 상태 ENUM 통합, 명명 규칙 정리, Prisma 스키마 업데이트                                                                                                                                                                               | 2025-11-06 | [검수자] |
-| 1.2  | Development Team | 문서 간 참조 가이드 추가, 중복 제거 최적화                                                                                                                                                                                              | 2025-11-07 | [검수자] |
-| 1.3  | Development Team | TRD 본연의 역할에 집중하도록 구현 코드 제거, LLD 참조 체계 구축                                                                                                                                                                         | 2025-11-07 | [검수자] |
-| 1.4  | Development Team | 미채택 스택(Supabase / Vercel Blob / Upstash Redis / Vercel / Resend / Inngest / Sentry / Axiom) 서술을 실측 구현으로 정정. 기술 스택 표·아키텍처 도식·배포·모니터링 절 전면 교체, 선택 이유 표는 "초기 설계안 / 미채택" 으로 표기 유지 | 2026-07-30 | [검수자] |
+| 버전 | 작성자           | 변경 사항                                                                                                                                                                                                                    | 작성일     | 검수자   |
+| ---- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | -------- |
+| 1.0  | Development Team | TRD 초안 작성                                                                                                                                                                                                                | 2025-11-06 | [검수자] |
+| 1.1  | Development Team | SR 상태 ENUM 통합, 명명 규칙 정리, Prisma 스키마 업데이트                                                                                                                                                                    | 2025-11-06 | [검수자] |
+| 1.2  | Development Team | 문서 간 참조 가이드 추가, 중복 제거 최적화                                                                                                                                                                                   | 2025-11-07 | [검수자] |
+| 1.3  | Development Team | TRD 본연의 역할에 집중하도록 구현 코드 제거, LLD 참조 체계 구축                                                                                                                                                              | 2025-11-07 | [검수자] |
+| 1.4  | Development Team | 미채택 스택(Vercel Blob / Upstash Redis / Vercel / Resend / Inngest / Sentry / Axiom) 서술을 실측 구현으로 정정. 기술 스택 표·아키텍처 도식·배포·모니터링 절 전면 교체, 선택 이유 표는 "초기 설계안 / 미채택" 으로 표기 유지 | 2026-07-30 | [검수자] |
+| 1.5  | Development Team | 초기 설계안의 외부 관리형 데이터베이스 서비스 서술 제거 (미채택 확정, 자체 PostgreSQL 사용)                                                                                                                                  | 2026-08-06 | [검수자] |
 
 ---
 
@@ -78,7 +79,7 @@
 
 ### 기술 스택 요약
 
-> **정정(2026-07-30)**: 1.3 까지 이 표는 Database=Supabase PostgreSQL, Storage=Vercel Blob,
+> **정정(2026-07-30)**: 1.3 까지 이 표는 Database=외부 관리형 PostgreSQL 서비스, Storage=Vercel Blob,
 > Cache=Upstash Redis, Deployment=Vercel, Email=Resend + React Email, Background Jobs=Inngest,
 > Monitoring=Sentry + Axiom, Next.js=14.x 로 기술하고 있었다. **여덟 항목 모두 채택되지 않았다.**
 > 아래는 `package.json` · `docker-compose.prod.yml` · `Dockerfile` · `nginx/nginx.conf` ·
@@ -410,9 +411,10 @@
 **버전**: **PostgreSQL 16** — `postgres:16-alpine` 이미지, 컨테이너 `sr-db`,
 앱과 **같은 호스트**에서 Docker bridge 네트워크(`sr-net`)로만 접근한다.
 
-> **정정(2026-07-30)**: 1.3 까지 이 절은 "Supabase PostgreSQL (PostgreSQL 15, 관리형)" 을
-> **"✅ 선택"** 으로 표기하고 있었다. **Supabase 는 채택되지 않았다.** 관리형 서비스가 아니며
-> Supabase Storage / Auth / Realtime / Pooler / RLS 중 어느 것도 사용하지 않는다.
+> **정정(2026-07-30)**: 1.3 까지 이 절은 초기 설계안의 외부 관리형 데이터베이스 서비스
+> ("PostgreSQL 15, 관리형") 를 **"✅ 선택"** 으로 표기하고 있었다. **그 외부 관리형 스택은
+> 채택되지 않았다.** 관리형 서비스가 아니며, 그 스택이 함께 제공하던
+> Storage / Auth / Realtime / Pooler / RLS 중 어느 것도 사용하지 않는다.
 > 아래 내용은 `docker-compose.prod.yml:49-81` 실측 기준이다.
 
 **실제 구성**:
@@ -430,18 +432,17 @@
 
 **대안 기술 비교** (초기 설계안의 의사결정 기록 — 실제 채택 결과를 반영해 정정):
 
-| 기술                                   | 장점                                               | 단점                                         | 선택 여부                   |
-| -------------------------------------- | -------------------------------------------------- | -------------------------------------------- | --------------------------- |
-| **자체 호스트 PostgreSQL 16 컨테이너** | 비용 없음, 앱과 동일 호스트라 지연 최소, 전면 통제 | 백업·패치·확장을 직접 책임, 단일 호스트 SPOF | ✅ 선택 (실제 채택)         |
-| Supabase PostgreSQL                    | 관리형, Pooler, Storage 통합                       | 비용 (대규모 시), 외부 의존                  | ❌ 초기 설계안 / **미채택** |
-| Neon PostgreSQL                        | Serverless, Auto-scaling                           | Storage 별도, 초기 지원                      | ❌ 초기 설계안 / 미채택     |
-| PlanetScale (MySQL)                    | Auto-scaling, Branching                            | PostgreSQL 아님, 복잡한 기능 제약            | ❌                          |
-| AWS RDS                                | 안정적, 다양한 옵션                                | 설정 복잡, 비용 높음                         | ❌                          |
-| Railway PostgreSQL                     | 간단, 저렴                                         | Connection Pool 수동 설정                    | ❌                          |
+| 기술                                   | 장점                                               | 단점                                         | 선택 여부               |
+| -------------------------------------- | -------------------------------------------------- | -------------------------------------------- | ----------------------- |
+| **자체 호스트 PostgreSQL 16 컨테이너** | 비용 없음, 앱과 동일 호스트라 지연 최소, 전면 통제 | 백업·패치·확장을 직접 책임, 단일 호스트 SPOF | ✅ 선택 (실제 채택)     |
+| Neon PostgreSQL                        | Serverless, Auto-scaling                           | Storage 별도, 초기 지원                      | ❌ 초기 설계안 / 미채택 |
+| PlanetScale (MySQL)                    | Auto-scaling, Branching                            | PostgreSQL 아님, 복잡한 기능 제약            | ❌                      |
+| AWS RDS                                | 안정적, 다양한 옵션                                | 설정 복잡, 비용 높음                         | ❌                      |
+| Railway PostgreSQL                     | 간단, 저렴                                         | Connection Pool 수동 설정                    | ❌                      |
 
 **Connection Pooling 전략**:
 
-- **외부 풀러 없음.** PgBouncer / Supabase Pooler / Prisma Data Proxy 를 사용하지 않는다.
+- **외부 풀러 없음.** PgBouncer / Prisma Data Proxy 를 사용하지 않는다.
 - Prisma Client 내장 풀이 `DATABASE_URL` 로 직접 접속한다. 앱은 상시 구동 프로세스 1개이므로
   서버리스처럼 `connection_limit=1` 로 제한할 이유가 없다.
 - `DIRECT_URL` 은 `schema.prisma` 가 요구해 유지하지만, 풀러가 없으므로 `DATABASE_URL` 과 같은
@@ -492,7 +493,6 @@
 | ------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------- | --------------------------- |
 | **서버 디스크 + Docker volume** | 비용 없음, 인증 라우트로 완전 통제, 외부 의존 없음 | 호스트 디스크 용량·장애에 종속, CDN 없음, 수평 확장 시 공유 불가 | ✅ 선택 (실제 채택)         |
 | Vercel Blob                     | 간단, CDN, 자동 공개 URL                           | 비용, Vercel 종속                                                | ❌ 초기 설계안 / **미채택** |
-| Supabase Storage                | 무료 플랜                                          | 별도 관리                                                        | ❌ 초기 설계안 / 미채택     |
 | AWS S3                          | 강력, 다양한 기능                                  | 설정 복잡, 비용 관리                                             | ❌                          |
 | Cloudinary                      | 이미지 변환 강력                                   | 비용 높음, 오버킬                                                | ❌                          |
 
@@ -566,7 +566,6 @@
 | **NextAuth.js v5** | Next.js 통합, 다양한 Provider | 복잡한 설정 (v5)       | ✅ 선택   |
 | Clerk              | 간단, UI 제공                 | 비용 높음, Lock-in     | ❌        |
 | Auth0              | 엔터프라이즈급, 강력          | 비용 매우 높음         | ❌        |
-| Supabase Auth      | Supabase 통합                 | Next.js 통합 약함      | ❌        |
 | Custom Auth        | 완전한 제어                   | 보안 리스크, 개발 시간 | ❌        |
 
 **보안 설정**:
@@ -1353,7 +1352,7 @@ app/
    - 상시 구동 프로세스 1개이므로 `connection_limit=1` 같은 서버리스용 제약이 필요하지 않다.
 
 3. **Read Replica**
-   - 없음. 단일 PostgreSQL 컨테이너다. (초기 설계안의 "Supabase Pro 읽기 복제본" 은 미채택)
+   - 없음. 단일 PostgreSQL 컨테이너다. (초기 설계안의 외부 관리형 데이터베이스 서비스 읽기 복제본은 미채택)
 
 4. **느린 쿼리 관측**
    - 개발 환경에서만 Prisma 미들웨어가 `PRISMA_SLOW_MS`(기본 200ms) 초과 쿼리를 경고하고,

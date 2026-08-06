@@ -98,7 +98,7 @@ ssh-key-2026-01-18.key  (평문 RSA 개인키 1675B — 커밋 이력 0건, hist
 **대상 (PR 0-E: 문서 정정 — 소스 무관)**
 
 - `README.md`: 버전표(:46-58, 6개 중 5개 오류) 삭제 → "의존성 버전은 package.json 이 단일 진실" 한 줄로 대체 / `:49 Node.js 24.x` → `22.x`(package.json:5-7 engines 와 정면 충돌) / `:40` 의 Vercel Blob·Redis 주장 삭제(코드 참조 0) / `:5` 깨진 이미지 `docs/images/overview.png` 행 삭제 / `:183` 고아 코드펜스 제거(📖 문서 절 전체가 코드블록에 갇혀 있음) / 문서 목록에 `docs/LLD.md`·`TRD.md`·`DB.md`·`SERVER_RUNBOOK_2026-08-01.md`·`backup-and-restore.md`·`SECRET_ROTATION.md` 추가.
-- `START_SERVER.md` 삭제, `:133-167` 부트스트랩 시딩 절차만 README '시작하기'로 흡수(나머지는 타인 PC 경로 `C:\Users\sanle\…` 3회, Next 15 표기, 존재하지 않는 Supabase 절, 죽은 링크 4개).
+- `START_SERVER.md` 삭제, `:133-167` 부트스트랩 시딩 절차만 README '시작하기'로 흡수(나머지는 타인 PC 경로 `C:\Users\sanle\…` 3회, Next 15 표기, 죽은 링크 3개).
 - `docs/system_manual.md` 상단에 "정본은 이 파일, `.html`/`.pptx` 는 생성물" 명시(3중 사본, `.pptx` 는 50KB zip 바이너리라 diff 불가).
 - `docs/PROJECT_AUDIT_2026-07-29.md:1520-1522, :1742` 에 처리 커밋 SHA 를 달아 항목 종료.
 

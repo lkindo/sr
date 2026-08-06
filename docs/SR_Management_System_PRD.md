@@ -6,7 +6,7 @@
 **작성자:** Product Team
 
 > **읽기 전 주의**: 이 문서의 초기 판(1.0~1.2)은 실제로 채택되지 않은 스택
-> (Vercel / Supabase / Upstash Redis / Resend / Inngest / Vercel Blob / Sentry / Axiom /
+> (Vercel / Upstash Redis / Resend / Inngest / Vercel Blob / Sentry / Axiom /
 > 매터모스트 / Python·Celery)을 사실처럼 기술하고 있었다. 1.3 에서 기술·운영 관련 서술을
 > 2026-07-30 기준 실제 구현으로 정정했다. 되돌릴 수 없는 값(비용 추정·초기 환경 구성 계획)은
 > 삭제하지 않고 **초기 설계안 이력**으로 표시해 배너 안에 남겼다.
@@ -1089,7 +1089,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 **Connection Pooling:**
 
-- 외부 커넥션 풀러 **없음** (PgBouncer / Supabase Pooler / Prisma Data Proxy 모두 미사용).
+- 외부 커넥션 풀러 **없음** (PgBouncer / Prisma Data Proxy 모두 미사용).
   Prisma Client 의 내장 풀만 사용한다(`src/lib/prisma.ts`).
 - 앱 컨테이너와 PostgreSQL 16 컨테이너가 같은 호스트의 브리지 네트워크(`sr-net`)로 직접 연결된다.
   DB 포트는 호스트에 공개하지 않는다.
@@ -1098,7 +1098,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 ---
 
 > **⚠️ 이 절의 초기 판은 실제 배포와 일치하지 않았다.**
-> 원문은 Vercel + Supabase + Upstash Redis + Resend + Inngest 를 전제로 작성된
+> 원문은 Vercel + Upstash Redis + Resend + Inngest 를 전제로 작성된
 > 초기 설계안이며, 그중 어느 것도 채택되지 않았다. 실제 운영 구성은 다음과 같다.
 >
 > - 호스팅: 자체 서버(Oracle Cloud VM) + Docker Compose + nginx:alpine 리버스 프록시
@@ -1137,7 +1137,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 - Shadcn/ui 기반 UI 컴포넌트 구축
 - 배포 파이프라인 구축: GitHub Actions → GHCR 이미지 → 자체 서버 Docker Compose
 
-> 초기 설계안의 Supabase 프로젝트와 Vercel Blob, Vercel 배포 파이프라인은 **채택되지 않았다.**
+> 초기 설계안의 외부 관리형 데이터베이스 서비스와 Vercel Blob, Vercel 배포 파이프라인은 **채택되지 않았다.**
 
 **Phase 2: SR 관리 핵심 (2~3개월)**
 
@@ -1242,7 +1242,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 > **요구사항 불일치**: 위 「데이터 보안 > 백업 및 복구」는 "최소 30일 보관 · 이중 백업(로컬 + 원격)"을
 > 요구하지만, 실제는 보존 14일 · 로컬 단일 저장이다. 미충족 항목으로 관리한다.
-> (초기 설계안의 Supabase 자동 백업/PITR 티어와 Vercel Blob 버전 관리는 채택되지 않았다.)
+> (초기 설계안의 외부 관리형 데이터베이스 서비스가 제공하는 자동 백업/PITR 티어와 Vercel Blob 버전 관리는 채택되지 않았다.)
 
 **정기 유지보수:**
 
@@ -1265,7 +1265,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 
 > **아래는 2025-11 시점 계획이며 현재 구성이 아니다.** 실제로는 Oracle Cloud VM 1대에서
 > Docker Compose 로 nginx + 앱 + PostgreSQL 컨테이너를 직접 운영한다. 아래 서비스(Vercel,
-> Supabase, Upstash Redis, Resend, Inngest)는 하나도 사용하지 않으므로 그 무료 티어 한도와
+> Upstash Redis, Resend, Inngest)는 하나도 사용하지 않으므로 그 무료 티어 한도와
 > 예상 비용은 현재 비용과 무관하다. **실제 비용은 측정된 값이 없어(미확인) 다시 쓰지 않았다.**
 
 **소규모/MVP (무료~월 $25) — 당시 추정**
@@ -1273,11 +1273,6 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 ```
 ├─ Vercel: Hobby Plan (무료)
 │  └─ 제한: 100GB 대역폭, 6,000분 빌드 시간
-├─ Supabase: Free tier (무료)
-│  ├─ PostgreSQL: 500MB 데이터베이스
-│  ├─ Storage: 1GB 파일 저장
-│  ├─ Bandwidth: 5GB/월
-│  └─ Connection Pooler 포함
 ├─ Upstash Redis: Free tier (무료)
 │  └─ 제한: 10K commands/day, 256MB
 ├─ Resend: Free tier (무료)
@@ -1305,9 +1300,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 **Development (로컬) — 당시 계획**
 
 ```bash
-- PostgreSQL:
-  - 옵션 1: Supabase 개발 프로젝트 (무료)
-  - 옵션 2: Docker 컨테이너 (로컬 PostgreSQL)
+- PostgreSQL: Docker 컨테이너 (로컬 PostgreSQL)
 - Storage: Vercel Blob (개발 환경)
 - Redis: Docker 컨테이너 (선택) 또는 Upstash Free
 - 이메일: 콘솔 로그 출력 (실제 발송 안 함)
@@ -1317,7 +1310,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 **Preview (Vercel Preview Deployments) — 당시 계획**
 
 ```bash
-- PostgreSQL: Supabase Preview/Staging 프로젝트
+- PostgreSQL: 외부 관리형 DB 서비스의 Preview/Staging 프로젝트
 - Storage: Vercel Blob (Preview 환경)
 - Redis: Upstash (개발 인스턴스)
 - 이메일: Resend Test 환경
@@ -1328,8 +1321,8 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 **Production (Vercel Production) — 당시 계획**
 
 ```bash
-- PostgreSQL: Supabase Production 프로젝트
-  - Connection String: postgresql://[user]:[password]@db.[project].supabase.co:6543/postgres
+- PostgreSQL: 외부 관리형 DB 서비스의 Production 프로젝트
+  - Connection String: postgresql://[user]:[password]@[host]:6543/postgres
   - Pooling Mode: Transaction (Serverless 환경 최적화)
 - Storage: Vercel Blob (Production)
 - Redis: Upstash Production
@@ -1337,7 +1330,7 @@ nodemailer(SMTP) / web-push(VAPID) 호출 → 사용자 수신
 - Inngest: Production 환경
 - 도메인: 커스텀 도메인 (sr.yourdomain.com)
 - 모니터링: Sentry + Axiom
-- 백업: Supabase 자동 백업 + 수동 백업
+- 백업: 관리형 DB 자동 백업 + 수동 백업
 ```
 
 #### 4.3 CI/CD 파이프라인 (실제 구성)
@@ -1444,7 +1437,7 @@ Let's Encrypt 인증서 스크립트(prod) → 미사용 이미지 prune
 - Docker Compose: https://docs.docker.com/compose/
 - Vitest: https://vitest.dev / Playwright: https://playwright.dev
 
-> Supabase·Vercel 공식 문서 링크는 해당 서비스를 사용하지 않으므로 제거했다.
+> Vercel 공식 문서 링크는 해당 서비스를 사용하지 않으므로 제거했다.
 
 **추가 참고 문서(저장소 내):**
 
@@ -1464,8 +1457,9 @@ Let's Encrypt 인증서 스크립트(prod) → 미사용 이미지 prune
 | ---- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | 1.0  | Product Team | 초안 작성                                                                                                                                                                                                                                                                           | 2025-11-06 |
 | 1.1  | Product Team | 기술 스택 업데이트 (Next.js + Vercel + PostgreSQL)                                                                                                                                                                                                                                  | 2025-11-06 |
-| 1.2  | Product Team | 데이터베이스를 Supabase PostgreSQL로 변경 (기본 DB 기능만 사용)                                                                                                                                                                                                                     | 2025-11-06 |
+| 1.2  | Product Team | 데이터베이스를 외부 관리형 PostgreSQL 서비스로 변경 (기본 DB 기능만 사용)                                                                                                                                                                                                           | 2025-11-06 |
 | 1.3  | Product Team | 미채택 스택 서술 정정: 알림(매터모스트→웹 푸시), 알림 아키텍처(Celery→도메인 이벤트+backgroundTask), 캐싱·실행 환경·커넥션 풀링, 구현 단계, 운영 계획(모니터링·백업), CI/CD 파이프라인, 로드맵, 부록. 비용(4.1)·환경 구성(4.2)은 초기 설계안 이력으로 보존. Sentry 미사용 결정 명시 | 2026-07-30 |
+| 1.4  | Product Team | 초기 설계안의 외부 관리형 데이터베이스 서비스 서술 제거 (미채택 확정, 자체 PostgreSQL 사용)                                                                                                                                                                                         | 2026-08-06 |
 
 ---
 
