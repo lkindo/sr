@@ -1,6 +1,7 @@
 import { Prisma, SR, SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
+import { PAGINATION } from '@/lib/constants';
 import { domainEvents } from '@/lib/domain-events';
 import {
   BadRequestError,
@@ -20,6 +21,7 @@ import {
   isInternalUser,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { validateTransition } from '@/lib/sr-state-machine';
@@ -576,7 +578,7 @@ export class SRService {
             where: { id },
             data: updateData,
             include: {
-              client: { select: { id: true, code: true, name: true } },
+              client: { select: CLIENT_SUMMARY_SELECT },
               requester: {
                 select: {
                   id: true,
@@ -680,7 +682,7 @@ export class SRService {
       where: { id },
       include: {
         client: {
-          select: { id: true, code: true, name: true },
+          select: CLIENT_SUMMARY_SELECT,
         },
         requester: {
           select: { id: true, name: true, email: true, image: true },
@@ -768,8 +770,8 @@ export class SRService {
 
         // Relations
         client: { select: { id: true, name: true } },
-        requester: { select: { id: true, name: true, email: true } },
-        assignee: { select: { id: true, name: true, email: true } },
+        requester: { select: USER_SUMMARY_SELECT },
+        assignee: { select: USER_SUMMARY_SELECT },
         serviceCategory: {
           select: {
             id: true,
@@ -851,7 +853,7 @@ export class SRService {
     }>;
     nextCursor: string | null;
   }> {
-    const limit = options?.limit || 20;
+    const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
     const cursor = options?.cursor;
 
     const activities = await prisma.sRActivity.findMany({
@@ -892,7 +894,7 @@ export class SRService {
     }>;
     nextCursor: string | null;
   }> {
-    const limit = options?.limit || 20;
+    const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
     const cursor = options?.cursor;
 
     const comments = await prisma.sRComment.findMany({

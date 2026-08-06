@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
+import { InlineSpinner } from '@/components/common/InlineSpinner';
+import { MobileListCard } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 
@@ -30,7 +32,7 @@ export function ClientMobileList({
       {loading ? (
         <div className="text-center py-8">
           <div className="flex justify-center items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            <InlineSpinner />
             <span className="text-muted-foreground">로딩 중...</span>
           </div>
         </div>
@@ -48,10 +50,7 @@ export function ClientMobileList({
           const isExpanded = expandedRows.has(client.id);
           const users = clientUsers[client.id] || [];
           return (
-            <div
-              key={client.id}
-              className="border rounded-lg bg-card text-card-foreground shadow-sm overflow-hidden"
-            >
+            <MobileListCard key={client.id}>
               <div className="p-3.5 space-y-2">
                 {/* Header: Name & Status */}
                 <div className="flex justify-between items-start">
@@ -148,7 +147,7 @@ export function ClientMobileList({
                   )}
                 </div>
               )}
-            </div>
+            </MobileListCard>
           );
         })
       )}

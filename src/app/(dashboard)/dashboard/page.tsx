@@ -23,7 +23,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
-import { priorityLabels, statusLabels } from '@/lib/constants/sr';
+import {
+  priorityBadgeVariants as priorityColors,
+  priorityLabels,
+  statusBadgeVariants as statusColors,
+  statusLabels,
+} from '@/lib/constants/sr';
 
 import { DashboardSkeleton } from './DashboardSkeleton';
 
@@ -113,23 +118,6 @@ interface DashboardStats {
     count: number;
   }>;
 }
-
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  REQUESTED: 'secondary',
-  INTAKE: 'default',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'default',
-  CONFIRMED: 'default',
-  REJECTED: 'destructive',
-};
-
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);

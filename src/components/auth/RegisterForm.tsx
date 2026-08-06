@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 
 import { registerUser } from '@/app/(auth)/register/actions'; // import 경로 수정
+import { InlineSpinner } from '@/components/common/InlineSpinner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui';
 import { Button } from '@/components/ui';
 import {
@@ -437,7 +438,7 @@ export default function RegisterForm() {
                 </Label>
                 {loadingClients ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground p-3 border rounded-md">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <InlineSpinner />
                     고객사 목록 로딩 중...
                   </div>
                 ) : clients.length === 0 ? (

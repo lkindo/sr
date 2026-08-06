@@ -1,9 +1,11 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
+import { INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { formatISODateInAppZone } from '@/lib/timezone';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -14,9 +16,7 @@ export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     const userId = session.user.id;
     const userRoles = session.user.roles || [];
-    const isAdminManagerEngineer = userRoles.some((role: string) =>
-      ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)
-    );
+    const isAdminManagerEngineer = userRoles.some((role: string) => INTERNAL_ROLES.includes(role));
     const isEngineer = userRoles.includes('ENGINEER');
 
     /**
@@ -298,7 +298,7 @@ export const GET = withAuthAndRateLimit(
       const clientIds = srByClient.map((item) => item.clientId);
       const clients = await prisma.client.findMany({
         where: { id: { in: clientIds } },
-        select: { id: true, name: true, code: true },
+        select: CLIENT_SUMMARY_SELECT,
       });
 
       const clientMap = clients.reduce(

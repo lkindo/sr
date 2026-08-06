@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
+import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { firstZodIssueMessage, NotFoundError, ValidationError } from '@/lib/errors';
+import { NotFoundError } from '@/lib/errors';
 import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { FIELD_LIMITS } from '@/lib/schemas';
@@ -78,16 +78,7 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    const body = await parseJsonBody(request);
-    let validated;
-    try {
-      validated = commentSchema.parse(body);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        throw new ValidationError(firstZodIssueMessage(error));
-      }
-      throw error;
-    }
+    const validated = await validateRequestBody(request, commentSchema);
 
     // Check if SR exists and get related data
     const sr = await prisma.sR.findUnique({

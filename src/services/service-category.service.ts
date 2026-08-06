@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { serviceCategoryCreateSchema, serviceCategoryUpdateSchema } from '@/lib/schemas';
 
 type ServiceCategoryCreateData = z.infer<typeof serviceCategoryCreateSchema>;
@@ -63,7 +64,7 @@ export class ServiceCategoryService {
               OR: [{ clientId: null }, { clientId: { in: options.clientIds } }],
             },
       include: {
-        client: { select: { id: true, code: true, name: true } },
+        client: { select: CLIENT_SUMMARY_SELECT },
         handler: { select: handlerSelect },
         backupHandler: { select: handlerSelect },
       },
@@ -92,7 +93,7 @@ export class ServiceCategoryService {
     return prisma.serviceCategory.findMany({
       where: { isActive: true },
       include: {
-        client: { select: { id: true, code: true, name: true } },
+        client: { select: CLIENT_SUMMARY_SELECT },
         handler: { select: { id: true, name: true } },
       },
       orderBy: { categoryName: 'asc' },
@@ -160,9 +161,9 @@ export class ServiceCategoryService {
           isActive: true,
         },
         include: {
-          client: { select: { id: true, code: true, name: true } },
-          handler: { select: { id: true, name: true, email: true } },
-          backupHandler: { select: { id: true, name: true, email: true } },
+          client: { select: CLIENT_SUMMARY_SELECT },
+          handler: { select: USER_SUMMARY_SELECT },
+          backupHandler: { select: USER_SUMMARY_SELECT },
         },
       });
     } catch (error) {
@@ -213,9 +214,9 @@ export class ServiceCategoryService {
           backupHandlerId: validated.backupHandlerId,
         },
         include: {
-          client: { select: { id: true, code: true, name: true } },
-          handler: { select: { id: true, name: true, email: true } },
-          backupHandler: { select: { id: true, name: true, email: true } },
+          client: { select: CLIENT_SUMMARY_SELECT },
+          handler: { select: USER_SUMMARY_SELECT },
+          backupHandler: { select: USER_SUMMARY_SELECT },
         },
       });
     } catch (error) {

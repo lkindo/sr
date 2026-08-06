@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui';
 import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';
+import { getUserTypeBadgeVariant } from '@/lib/user-helpers';
 
 interface Permission {
   permission: {
@@ -50,8 +51,19 @@ interface User {
   }>;
 }
 
-// 사용자 유형 판별 함수
-const getUserTypeLabel = (user: User): string => {
+/**
+ * 이 화면 전용 유형 판별. `@/lib/user-helpers` 의 `getUserTypeLabel` 과 **판정 규칙이 다르다**.
+ *
+ * 공용판은 `user.userType` 을 먼저 보고, 아무것도 맞지 않으면 '미분류' 로 떨어진다.
+ * 그런데 `userType` 은 Prisma 스키마에 없는 필드다(`prisma/schema.prisma` 확인). 즉
+ * 공용판을 여기에 그대로 쓰면 소속 고객사가 없는 비-ADMIN 사용자가 전부
+ * '기술 지원팀'(파란 배지) 에서 '미분류'(회색 배지) 로 바뀐다.
+ *
+ * 목록 화면(UserTable/UserMobileList)은 공용판을 쓰고 있어 지금도 문구가 갈린다.
+ * 어느 쪽 문구가 옳은지는 화면 소유자가 정할 일이므로, 정비 커밋에서 한쪽으로
+ * 몰지 않고 차이를 남긴 채 이름만 분리해 둔다.
+ */
+const getUserTypeLabelLegacy = (user: User): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
   const hasAdminRole = user.roles.some((ur) => ur.role.name === 'ADMIN');
   if (hasAdminRole) {
@@ -65,20 +77,6 @@ const getUserTypeLabel = (user: User): string => {
 
   // 3. 고객사에 소속되지 않았으면 SR 처리자 (엔지니어)
   return '기술 지원팀';
-};
-
-// 유형별 배지 색상 결정
-const getUserTypeBadgeVariant = (typeLabel: string) => {
-  switch (typeLabel) {
-    case '시스템 운영팀':
-      return 'destructive' as const;
-    case '기술 지원팀':
-      return 'default' as const;
-    case '고객사 담당자':
-      return 'outline' as const;
-    default:
-      return 'secondary' as const;
-  }
 };
 
 export default function UserDetailPage() {
@@ -377,8 +375,8 @@ export default function UserDetailPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">사용자 유형</h3>
-                <Badge variant={getUserTypeBadgeVariant(getUserTypeLabel(user))}>
-                  {getUserTypeLabel(user)}
+                <Badge variant={getUserTypeBadgeVariant(getUserTypeLabelLegacy(user))}>
+                  {getUserTypeLabelLegacy(user)}
                 </Badge>
               </div>
               <div>

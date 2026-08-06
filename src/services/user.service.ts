@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { SECURITY } from '@/lib/constants';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { CLIENT_SUMMARY_SELECT, USER_WITH_ROLES_INCLUDE } from '@/lib/prisma-selects';
 import { userUpdateSchema } from '@/lib/schemas';
 import { excludePassword } from '@/lib/user-helpers';
 
@@ -129,10 +130,7 @@ export class UserService {
   async getUserByEmail(email: string) {
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        roles: { include: { role: true } },
-        clients: { include: { client: true } },
-      },
+      include: USER_WITH_ROLES_INCLUDE,
     });
     if (!user) return null;
     return excludePassword(user);
@@ -225,7 +223,7 @@ export class UserService {
           createdAt: true,
           updatedAt: true,
           roles: { include: { role: true } },
-          clients: { include: { client: { select: { id: true, name: true, code: true } } } },
+          clients: { include: { client: { select: CLIENT_SUMMARY_SELECT } } },
         },
       }),
       prisma.user.count({ where }),
@@ -255,10 +253,7 @@ export class UserService {
       ? { ...rest, password: await hash(password, SECURITY.BCRYPT_WORK_FACTOR) }
       : { ...rest };
 
-    const includeConfig = {
-      roles: { include: { role: true } },
-      clients: { include: { client: true } },
-    };
+    const includeConfig = USER_WITH_ROLES_INCLUDE;
 
     const beforeUser = await prisma.user.findUnique({
       where: { id },
@@ -464,10 +459,7 @@ export class UserService {
 
     const existingUser = await userFindUniqueFn({
       where: { id: userId },
-      include: {
-        roles: { include: { role: true } },
-        clients: { include: { client: true } },
-      },
+      include: USER_WITH_ROLES_INCLUDE,
     });
 
     if (!existingUser) {

@@ -17,6 +17,7 @@ import {
 } from '@dnd-kit/core';
 import { Building2, ChevronDown, ChevronRight, GripVertical, Plus, Users } from 'lucide-react';
 
+import { InlineSpinner } from '@/components/common/InlineSpinner';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { cn, escapeRegExp } from '@/lib/utils';
@@ -418,7 +419,7 @@ export function OrganizationTree({
 
                       {isLoadingUsers && (
                         <div className="text-center py-4 text-sm text-muted-foreground flex items-center justify-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                          <InlineSpinner />
                           사용자 정보 로딩 중...
                         </div>
                       )}

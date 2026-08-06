@@ -16,6 +16,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
+// 생성/수정 폼이 다루는 필드만. `RoleItem` 으로 넓히지 않는 이유는 DeleteRoleDialog 와 같다.
 interface Role {
   id: string;
   name: string;
