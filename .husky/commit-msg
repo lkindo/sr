@@ -1,0 +1,31 @@
+# Conventional Commits 형식 검사.
+#
+# 새 규칙을 도입하는 게 아니다. 최근 커밋 40개가 100% 이 형식이므로 이미 지키던
+# 관례를 자동화할 뿐이다. 실제로 이 훅이 없어서 셸 heredoc 잔재가 섞인
+# `@\nchore(deps): ...` 같은 제목이 커밋된 적이 있다.
+#
+# commitlint 를 붙이면 의존성 3개(@commitlint/cli, config-conventional, 그 트리)가
+# 따라오는데, 규칙 하나 강제하자고 그럴 이유가 없어 grep 으로 처리한다.
+# 제목 길이는 검사하지 않는다 — 기존 커밋 제목이 최대 89자라 72자 규칙을 넣으면
+# 지켜지던 관례를 오히려 깨뜨린다.
+
+subject=$(head -n 1 "$1")
+
+# git 이 자동 생성하거나 rebase 가 소비하는 제목은 통과시킨다.
+case "$subject" in
+  Merge*|Revert*|fixup!*|squash!*|amend!*) exit 0 ;;
+esac
+
+if ! printf '%s' "$subject" |
+  grep -qE '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-zA-Z0-9 ._/-]+\))?!?: .+'; then
+  echo ""
+  echo "커밋 메시지 제목이 Conventional Commits 형식이 아닙니다."
+  echo ""
+  echo "  받은 값: $subject"
+  echo ""
+  echo "  형식:    <type>(<scope>): <설명>"
+  echo "  type:    feat fix docs style refactor perf test build ci chore revert"
+  echo "  예:      fix(rbac): enforce COMMENT:CREATE and ATTACHMENT:CREATE"
+  echo ""
+  exit 1
+fi
