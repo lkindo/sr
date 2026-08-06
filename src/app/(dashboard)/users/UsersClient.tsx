@@ -431,9 +431,6 @@ export default function UsersClient() {
           clients={clients}
           onToggleAll={handleToggleAll}
           onToggleUser={handleToggleUser}
-          onAssignRoles={handleAssignRoles}
-          onToggleActive={handleToggleActive}
-          onDelete={handleDeleteUser}
           onRefresh={fetchUsers}
         />
 
@@ -481,7 +478,6 @@ export default function UsersClient() {
         open={isUserDialogOpen}
         onOpenChange={setIsUserDialogOpen}
         user={selectedUser}
-        roles={roles}
         clients={clients}
         onSaved={handleUserSaved}
       />

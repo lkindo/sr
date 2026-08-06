@@ -33,18 +33,6 @@ export interface RateLimitConfig {
    * @default 100
    */
   maxRequests: number;
-
-  /**
-   * 스킵 성공 응답 (2xx)
-   * @default false
-   */
-  skipSuccessfulRequests?: boolean;
-
-  /**
-   * 스킵 실패 응답 (4xx, 5xx)
-   * @default false
-   */
-  skipFailedRequests?: boolean;
 }
 
 export interface RateLimitResult {
@@ -90,12 +78,7 @@ export class MemoryRateLimiter {
     this.config = {
       windowMs: config.windowMs,
       maxRequests: config.maxRequests,
-      skipSuccessfulRequests: config.skipSuccessfulRequests ?? false,
-      skipFailedRequests: config.skipFailedRequests ?? false,
     };
-
-    // 주기적으로 오래된 버킷 정리 (메모리 누수 방지)
-    this.startCleanup();
   }
 
   /**
@@ -222,15 +205,6 @@ export class MemoryRateLimiter {
   /** 테스트·운영 관측용. 현재 추적 중인 버킷 수. */
   get size(): number {
     return this.buckets.size;
-  }
-
-  /**
-   * 오래된 버킷 정리 (Edge Runtime 타이머 미작동 및 메모리 누수 대응)
-   * performIncrementalEviction 수동 청소로 일괄 통제하므로 setInterval 타이머는 폐지합니다.
-   */
-  private startCleanup(): void {
-    // performIncrementalEviction에서 점진적으로 만료 처리를 하여 메모리를 회수하므로 타이머를 가동하지 않습니다.
-    return;
   }
 }
 

@@ -156,48 +156,7 @@
   /* SR Management Custom Styles - Framer Dark Canvas Paradigm */
 
   /* Quick Filter Buttons (Pill / Pricing Tab Paradigm) */
-  .sr-filter-button {
-    @apply inline-flex items-center justify-center gap-2;
-    @apply h-10 px-4 py-2;
-    border: 1px solid rgba(255, 255, 255, 0.03);
-    border-radius: 9999px; /* rounded-framer-pill */
-    @apply text-sm font-medium;
-    @apply transition-all duration-200;
-    background: transparent;
-    color: #999999; /* Ink Muted */
-  }
-
-  .sr-filter-button:hover {
-    background: rgba(20, 20, 20, 0.5);
-    color: #ffffff;
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  .sr-filter-button.active {
-    background: #1c1c1c; /* Surface 2 LIFT */
-    color: #ffffff; /* Ink */
-    border-color: rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .sr-filter-button:disabled {
-    @apply opacity-40 cursor-not-allowed;
-  }
-
   /* Badge in Filter Button */
-  .sr-filter-badge {
-    @apply inline-flex items-center justify-center;
-    @apply h-5 min-w-5 px-1.5;
-    @apply rounded text-xs font-medium;
-    background: rgba(255, 255, 255, 0.08);
-    color: #999999;
-  }
-
-  .sr-filter-button.active .sr-filter-badge {
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
-  }
-
   /* Content Area */
   .sr-content-area {
     @apply w-full max-w-7xl mx-auto;
@@ -222,77 +181,8 @@
   }
 
   /* Table Styles (Premium Data Table Paradigm) */
-  .sr-table {
-    @apply w-full border-collapse overflow-hidden;
-    border-radius: 15px; /* rounded-framer-lg */
-  }
-
-  .sr-table thead {
-    background: #1c1c1c; /* Surface 2 */
-    border-bottom: 1px solid #262626; /* Hairline */
-  }
-
-  .sr-table th {
-    @apply h-12 px-6 text-left;
-    @apply text-xs font-semibold;
-    color: #ffffff; /* Ink */
-    letter-spacing: -0.13px; /* caption tracking */
-  }
-
-  .sr-table td {
-    @apply h-12 px-6;
-    @apply text-sm;
-    color: rgba(255, 255, 255, 0.8); /* soft white */
-  }
-
-  .sr-table tbody tr {
-    background: #141414; /* Surface 1 */
-    border-bottom: 1px solid #1a1a1a; /* Hairline Soft */
-    @apply transition-all duration-200;
-  }
-
-  .sr-table tbody tr:hover {
-    background: #1c1c1c; /* Surface 2 LIFT */
-    color: #ffffff;
-    cursor: pointer;
-  }
-
   /* Header Styles (Transparent backdrop-blur bar) */
-  .sr-header {
-    @apply sticky top-0 z-[60];
-    @apply w-full h-[72px];
-    background: rgba(9, 9, 9, 0.8); /* Canvas with opacity */
-    backdrop-blur: 16px;
-    -webkit-backdrop-filter: blur(16px);
-    border-b: 1px solid #262626; /* Hairline */
-  }
-
-  .sr-header-nav-item {
-    @apply px-3 py-2 rounded-full;
-    @apply text-sm transition-colors;
-  }
-
-  .sr-header-nav-item.active {
-    background: #1c1c1c; /* Surface 2 */
-    color: #ffffff; /* Ink */
-    font-weight: 500;
-  }
-
-  .sr-header-nav-item:not(.active) {
-    color: #999999; /* Ink Muted */
-  }
-
-  .sr-header-nav-item:not(.active):hover {
-    color: #ffffff;
-    background: rgba(255, 255, 255, 0.05);
-  }
-
   /* Filter Panel */
-  .sr-filter-panel {
-    @apply p-6 bg-card/40 rounded-xl;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
   /* List Head */
   .sr-list-head {
     @apply flex items-center justify-between;
@@ -304,105 +194,8 @@
   }
 
   /* Icon Buttons */
-  .sr-icon-button {
-    @apply inline-flex items-center justify-center;
-    @apply w-10 h-10 rounded-full;
-    background: #141414; /* Surface 1 */
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    @apply transition-colors duration-200;
-  }
-
-  .sr-icon-button:hover {
-    background: #1c1c1c; /* Surface 2 */
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .sr-icon-button:active {
-    @apply scale-95;
-  }
-
   /* Status Badges (Granular translucent semantic sets) */
-  .sr-status-badge {
-    @apply inline-flex items-center gap-1.5;
-    @apply px-2.5 py-0.5;
-    @apply text-xs font-semibold;
-    border-radius: 6px; /* rounded-framer-sm */
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .sr-status-badge.requested {
-    background: rgba(163, 163, 163, 0.1);
-    color: #a3a3a3; /* semantic-pending */
-  }
-
-  .sr-status-badge.intake,
-  .sr-status-badge.accepted {
-    background: rgba(0, 153, 255, 0.1);
-    color: #0099ff; /* semantic-info / accent-blue */
-  }
-
-  .sr-status-badge.in-progress,
-  .sr-status-badge.in_progress {
-    background: rgba(0, 153, 255, 0.15);
-    color: #0099ff; /* semantic-info */
-  }
-
-  .sr-status-badge.resolved,
-  .sr-status-badge.completed,
-  .sr-status-badge.closed {
-    background: rgba(34, 197, 94, 0.1);
-    color: #22c55e; /* semantic-success */
-  }
-
-  .sr-status-badge.rejected {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444; /* semantic-error */
-  }
-
-  .sr-status-badge.hold {
-    background: rgba(245, 158, 11, 0.1);
-    color: #f59e0b; /* semantic-warning */
-  }
-
-  .sr-status-badge.reopened {
-    background: rgba(168, 85, 247, 0.1);
-    color: #a855f7; /* purple - info/transition */
-  }
-
   /* Priority Badges (Framer premium semantic chips) */
-  .sr-priority-badge {
-    @apply inline-flex items-center;
-    @apply px-2.5 py-0.5;
-    @apply text-xs font-medium;
-    border-radius: 4px; /* rounded-framer-xs */
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .sr-priority-badge.critical {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.2);
-  }
-
-  .sr-priority-badge.high {
-    background: rgba(249, 115, 22, 0.1);
-    color: #f97316;
-    border-color: rgba(249, 115, 22, 0.2);
-  }
-
-  .sr-priority-badge.medium {
-    background: rgba(234, 179, 8, 0.1);
-    color: #eab308;
-    border-color: rgba(234, 179, 8, 0.2);
-  }
-
-  .sr-priority-badge.low {
-    background: rgba(163, 163, 163, 0.1);
-    color: #a3a3a3;
-    border-color: rgba(163, 163, 163, 0.2);
-  }
-
   /* Gradient Spotlight Atmosphere Utilities */
   .gradient-spotlight-violet {
     position: relative;
@@ -449,63 +242,8 @@
   }
 
   /* Form Text Input Multi-state Extensions */
-  .sr-input-invalid {
-    border-color: #ef4444 !important;
-    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2) !important;
-  }
-
-  .sr-input-disabled {
-    opacity: 0.5 !important;
-    cursor: not-allowed !important;
-    background-color: rgba(9, 9, 9, 0.5) !important;
-  }
-
   /* Icon Utility Classes */
-  .sr-icon-sm {
-    @apply w-4 h-4;
-  }
-
-  .sr-icon-md {
-    @apply w-5 h-5;
-  }
-
-  .sr-icon-lg {
-    @apply w-6 h-6;
-  }
-
-  .sr-icon-xl {
-    @apply w-8 h-8;
-  }
-
   /* Icon Color Classes */
-  .sr-icon-primary {
-    @apply text-[hsl(var(--sr-primary-dark))];
-  }
-
-  .sr-icon-accent-orange {
-    @apply text-[hsl(var(--sr-accent-orange))];
-  }
-
-  .sr-icon-accent-blue {
-    @apply text-[hsl(var(--sr-accent-blue))];
-  }
-
-  .sr-icon-success {
-    @apply text-green-600;
-  }
-
-  .sr-icon-warning {
-    @apply text-orange-600;
-  }
-
-  .sr-icon-error {
-    @apply text-red-600;
-  }
-
-  .sr-icon-muted {
-    @apply text-muted-foreground;
-  }
-
   /* Loading and Empty States */
   .sr-loading {
     @apply flex flex-col items-center justify-center;
@@ -563,14 +301,6 @@
     animation: fadeIn 0.3s ease-out;
   }
 
-  .sr-slide-in {
-    animation: slideIn 0.4s ease-out;
-  }
-
-  .sr-pulse {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
   .sr-empty-state {
     @apply flex flex-col items-center justify-center;
     @apply py-16 px-4 text-center;
@@ -590,80 +320,7 @@
   }
 
   /* Error States */
-  .sr-error-state {
-    @apply flex flex-col items-center justify-center;
-    @apply py-16 px-4 text-center;
-    @apply bg-destructive/5 border border-destructive/20 rounded-lg;
-  }
-
-  .sr-error-icon {
-    @apply w-16 h-16 mb-4 text-destructive;
-  }
-
-  .sr-error-title {
-    @apply text-lg font-semibold text-destructive mb-2;
-  }
-
-  .sr-error-message {
-    @apply text-sm text-destructive/80 mb-6 max-w-md;
-  }
-
   /* Form Elements */
-  .sr-input {
-    @apply h-10 px-3 py-2;
-    @apply border border-input rounded;
-    @apply bg-background text-foreground;
-    @apply transition-colors duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0;
-    @apply disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
-  .sr-input:hover:not(:disabled) {
-    @apply border-primary/50;
-  }
-
-  .sr-input-error {
-    @apply border-destructive focus:ring-destructive;
-  }
-
-  .sr-textarea {
-    @apply min-h-20 px-3 py-2;
-    @apply border border-input rounded;
-    @apply bg-background text-foreground;
-    @apply transition-colors duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0;
-    @apply disabled:opacity-50 disabled:cursor-not-allowed;
-    @apply resize-y;
-  }
-
-  .sr-select {
-    @apply h-10 px-3 py-2;
-    @apply border border-input rounded;
-    @apply bg-background text-foreground;
-    @apply transition-colors duration-200;
-    @apply focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0;
-    @apply disabled:opacity-50 disabled:cursor-not-allowed;
-    @apply cursor-pointer;
-  }
-
-  .sr-label {
-    @apply text-sm font-medium text-foreground;
-    @apply mb-1.5 block;
-  }
-
-  .sr-label-required::after {
-    content: ' *';
-    @apply text-destructive;
-  }
-
-  .sr-field-error {
-    @apply text-xs text-destructive mt-1;
-  }
-
-  .sr-field-hint {
-    @apply text-xs text-muted-foreground mt-1;
-  }
-
   /* Responsive Design Enhancements */
   @media (max-width: 768px) {
     .sr-content-area {
@@ -673,25 +330,9 @@
     .sr-list-head {
       @apply flex-col items-start gap-3;
     }
-
-    .sr-header-nav-item {
-      @apply text-xs px-2 py-1.5;
-    }
-
-    .sr-table th,
-    .sr-table td {
-      @apply px-3 text-xs;
-    }
   }
 
   @media (max-width: 640px) {
-    .sr-filter-button {
-      @apply text-xs px-3 py-1.5 h-8;
-    }
-
-    .sr-icon-button {
-      @apply w-8 h-8;
-    }
   }
 
   /* HTML Template Inspired Styles */
@@ -732,11 +373,6 @@
   }
 
   /* Header with Accent Border */
-  .sr-header-accent {
-    border-bottom-width: 1px;
-    border-color: #f1f5f9;
-  }
-
   /* Content Background */
   .sr-content-bg {
     @apply bg-background;
@@ -763,40 +399,7 @@
     @apply hover:bg-primary/90 active:bg-primary/85;
   }
 
-  .sr-btn-template-accent {
-    @apply bg-[hsl(var(--sr-accent-orange))] text-white;
-    @apply hover:opacity-90 active:opacity-80;
-  }
-
-  .sr-btn-template-small {
-    @apply h-8 px-4 text-xs;
-  }
-
-  .sr-btn-template-medium {
-    @apply h-8 px-4;
-  }
-
-  .sr-btn-template-big {
-    @apply h-12 px-8;
-  }
-
   /* Badge Button Group from Template */
-  .sr-badge-group {
-    @apply inline-flex rounded overflow-hidden;
-  }
-
-  .sr-badge-item {
-    @apply bg-[hsl(var(--sr-bg-light))] h-10 px-3.5 leading-10;
-    @apply border-r border-gray-200;
-    @apply hover:bg-gray-200 active:bg-gray-300;
-    @apply transition-colors duration-200;
-    @apply first:border-l-0 last:border-r-0;
-  }
-
-  .sr-badge-item.active {
-    @apply bg-[hsl(var(--sr-primary-dark))] text-white;
-  }
-
   /* Table from Template */
   .sr-table-template {
     @apply w-full;
@@ -824,30 +427,6 @@
   }
 
   /* Progress Bar from Template */
-  .sr-progress-bar-template {
-    @apply bg-[hsl(var(--sr-bg-light))] h-4 w-32 rounded-lg relative;
-  }
-
-  .sr-progress-fill {
-    @apply h-4 rounded-lg;
-  }
-
-  .sr-progress-yellow {
-    @apply bg-[#ffbd4c];
-  }
-
-  .sr-progress-red {
-    @apply bg-[#ff7e66];
-  }
-
-  .sr-progress-green {
-    @apply bg-[#66df6e];
-  }
-
-  .sr-progress-blue {
-    @apply bg-[#66c7ff];
-  }
-
   /* Input from Template */
   .sr-input-template {
     @apply border border-gray-300 rounded h-10 px-3;

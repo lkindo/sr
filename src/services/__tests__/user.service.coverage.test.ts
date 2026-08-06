@@ -58,18 +58,6 @@ describe('UserService Coverage', () => {
     });
   });
 
-  describe('getUserByClientId', () => {
-    it('calls prisma.user.findMany with client filter', async () => {
-      vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'u1' }] as any);
-      await userService.getUserByClientId('c1');
-      expect(prisma.user.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { clients: { some: { clientId: 'c1' } } },
-        })
-      );
-    });
-  });
-
   describe('updateUser', () => {
     it('updates basic user info', async () => {
       vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1', name: 'New Name' } as any);
@@ -201,17 +189,6 @@ describe('UserService Coverage', () => {
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: 'u1' },
         data: { name: 'N' },
-      });
-    });
-  });
-
-  describe('activateUser', () => {
-    it('sets isActive to true and invalidates cache', async () => {
-      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1', isActive: true } as any);
-      await userService.activateUser('u1');
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'u1' },
-        data: { isActive: true },
       });
     });
   });

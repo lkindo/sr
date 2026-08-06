@@ -19,9 +19,6 @@ interface UserTableProps {
   clients: any[];
   onToggleAll: () => void;
   onToggleUser: (userId: string) => void;
-  onAssignRoles: (user: any) => void;
-  onToggleActive: (userId: string, isActive: boolean) => void;
-  onDelete: (user: any) => void;
   onRefresh: () => void;
 }
 
@@ -33,9 +30,6 @@ export function UserTable({
   clients,
   onToggleAll,
   onToggleUser,
-  onAssignRoles: _onAssignRoles,
-  onToggleActive: _onToggleActive,
-  onDelete: _onDelete,
   onRefresh,
 }: UserTableProps) {
   return (

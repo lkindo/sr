@@ -439,31 +439,6 @@ describe('SRService', () => {
     });
   });
 
-  describe('getStatusHistory', () => {
-    it('should return status history with pagination', async () => {
-      const mockHistory = [
-        { id: 'h-1', currentStatus: 'REQUESTED', changedAt: new Date() },
-        { id: 'h-2', currentStatus: 'IN_PROGRESS', changedAt: new Date() },
-      ];
-
-      vi.mocked(prisma.sRStatusHistory.findMany).mockResolvedValue(mockHistory as any);
-      vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(2);
-
-      const result = await srService.getStatusHistory('sr-1', { skip: 0, take: 10 });
-
-      expect(result.items).toEqual(mockHistory);
-      expect(result.total).toBe(2);
-      expect(prisma.sRStatusHistory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { srId: 'sr-1' },
-          skip: 0,
-          take: 10,
-          orderBy: { changedAt: 'desc' },
-        })
-      );
-    });
-  });
-
   describe('countSRs', () => {
     it('should return count of SRs', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(5);
@@ -581,35 +556,6 @@ describe('SRService', () => {
 
       const result = await srService.getSRDetailsById('non-existent');
       expect(result).toBeNull();
-    });
-  });
-  describe('getStatusHistory', () => {
-    it('should return status history with pagination', async () => {
-      const mockHistory = [
-        {
-          id: 'hist-1',
-          previousStatus: 'REQUESTED',
-          currentStatus: 'IN_PROGRESS',
-          changedAt: new Date(),
-          changeReason: 'Started work',
-          user: { id: 'user-1', name: 'User', email: 'user@test.com', image: null },
-        },
-      ];
-
-      // Since we imported prisma as default, we can try to cast it.
-      (prisma as any).sRStatusHistory = {
-        findMany: vi.fn().mockResolvedValue(mockHistory),
-        count: vi.fn().mockResolvedValue(1),
-      };
-
-      const result = await srService.getStatusHistory('sr-1', { skip: 0, take: 10 });
-
-      expect(result.items).toEqual(mockHistory);
-      expect(result.total).toBe(1);
-      // Verify call on the injected mock
-      expect((prisma as any).sRStatusHistory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { srId: 'sr-1' }, skip: 0, take: 10 })
-      );
     });
   });
 

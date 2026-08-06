@@ -8,7 +8,6 @@ import { getClientsForSelection } from '../client.actions';
 // Mock dependencies
 vi.mock('@/services/client.service', () => {
   const ClientService = vi.fn();
-  ClientService.prototype.getAllClients = vi.fn();
   ClientService.prototype.getClientsForSelection = vi.fn();
   return { ClientService };
 });
@@ -39,7 +38,6 @@ describe('Client Actions Security', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    (ClientService.prototype.getAllClients as any).mockResolvedValue(mockClientsFull);
     (ClientService.prototype.getClientsForSelection as any).mockResolvedValue(mockClientsSafe);
   });
 

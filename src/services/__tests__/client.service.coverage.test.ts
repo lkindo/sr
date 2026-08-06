@@ -32,17 +32,6 @@ describe('ClientService Coverage', () => {
     clientService = new ClientService();
   });
 
-  describe('getClientByName', () => {
-    it('finds client by name', async () => {
-      vi.mocked(prisma.client.findFirst).mockResolvedValue({ id: 'c1', name: 'Test' } as any);
-      const result = await clientService.getClientByName('Test');
-      expect(result).toEqual({ id: 'c1', name: 'Test' });
-      expect(prisma.client.findFirst).toHaveBeenCalledWith({
-        where: { name: { contains: 'Test', mode: 'insensitive' } },
-      });
-    });
-  });
-
   describe('getClientByCode', () => {
     it('finds client by code', async () => {
       vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', code: 'C1' } as any);
@@ -126,36 +115,6 @@ describe('ClientService Coverage', () => {
       expect(selectedKeys.sort()).toEqual(
         ['createdAt', 'id', 'priority', 'srNumber', 'status', 'title'].sort()
       );
-    });
-  });
-
-  describe('activateClient', () => {
-    it('activates client', async () => {
-      await clientService.activateClient('c1');
-      expect(prisma.client.update).toHaveBeenCalledWith({
-        where: { id: 'c1' },
-        data: { isActive: true },
-      });
-    });
-  });
-
-  describe('deactivateClient', () => {
-    it('deactivates client', async () => {
-      await clientService.deactivateClient('c1');
-      expect(prisma.client.update).toHaveBeenCalledWith({
-        where: { id: 'c1' },
-        data: { isActive: false },
-      });
-    });
-  });
-
-  describe('getClientsByUserId', () => {
-    it('finds clients for user', async () => {
-      vi.mocked(prisma.client.findMany).mockResolvedValue([]);
-      await clientService.getClientsByUserId('u1');
-      expect(prisma.client.findMany).toHaveBeenCalledWith({
-        where: { users: { some: { userId: 'u1' } } },
-      });
     });
   });
 

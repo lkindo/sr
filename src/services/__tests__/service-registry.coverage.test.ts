@@ -5,7 +5,6 @@ import { registerSRNotificationListeners } from '@/services/listeners/sr-notific
 import { PermissionService } from '@/services/permission.service';
 import { RoleService } from '@/services/role.service';
 import { services } from '@/services/service-registry';
-import { SRService } from '@/services/sr.service';
 import { UserService } from '@/services/user.service';
 
 // The constructor of ServiceRegistry registers domain-event listeners as a
@@ -35,10 +34,6 @@ describe('service-registry', () => {
     expect(services.clientService).toBeInstanceOf(ClientService);
   });
 
-  it('exposes an srService that is the correct type', () => {
-    expect(services.srService).toBeInstanceOf(SRService);
-  });
-
   it('exposes a roleService that is the correct type', () => {
     expect(services.roleService).toBeInstanceOf(RoleService);
   });
@@ -51,22 +46,16 @@ describe('service-registry', () => {
     const first = services.userService;
     const second = services.userService;
     expect(first).toBe(second);
-
-    const srFirst = services.srService;
-    const srSecond = services.srService;
-    expect(srFirst).toBe(srSecond);
   });
 
   it('caches every accessor independently', () => {
     const user = services.userService;
     const client = services.clientService;
-    const sr = services.srService;
     const role = services.roleService;
     const permission = services.permissionService;
 
     expect(services.userService).toBe(user);
     expect(services.clientService).toBe(client);
-    expect(services.srService).toBe(sr);
     expect(services.roleService).toBe(role);
     expect(services.permissionService).toBe(permission);
   });

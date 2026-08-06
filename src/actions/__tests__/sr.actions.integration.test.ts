@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnauthorizedError } from '@/lib/errors';
 import { SRService } from '@/services/sr.service';
 
-import { createSRAction, getSRAction, updateSRAction } from '../sr.actions';
+import { createSRAction, updateSRAction } from '../sr.actions';
 
 vi.mock('@/lib/action-helpers', () => ({
   authenticateAndAuthorize: vi.fn(async () => ({
@@ -72,12 +72,6 @@ describe('SR actions integration-ish', () => {
       expect.objectContaining({ title: 'Updated Title' }),
       expect.objectContaining({ id: 'user-2' })
     );
-  });
-
-  it('getSRAction은 SRService.getSRById를 통해 SR을 조회한다', async () => {
-    const result = await getSRAction('sr-1');
-    expect(result.success).toBe(true);
-    expect(SRService.prototype.getSRById).toHaveBeenCalledWith('sr-1');
   });
 
   it('권한이 없는 경우 UnauthorizedError를 반환한다', async () => {

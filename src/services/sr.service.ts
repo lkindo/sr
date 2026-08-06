@@ -118,8 +118,6 @@ export async function assertAssignable(
  * - 권한 정책 적용
  */
 export class SRService {
-  constructor() {}
-
   /**
    * 서비스 카테고리가 해당 고객사에서 사용 가능한지 검증합니다.
    * 전역 카테고리(clientId = null)이거나 해당 고객사 전용 카테고리만 허용합니다.
@@ -835,56 +833,6 @@ export class SRService {
       assigneeId: existingSR.assigneeId,
       actorId: sessionUser.id,
     });
-  }
-
-  /**
-   * SR 상태 변경 이력 조회 (페이징 지원)
-   */
-  async getStatusHistory(
-    srId: string,
-    options?: {
-      skip?: number;
-      take?: number;
-    }
-  ): Promise<{
-    items: Array<{
-      id: string;
-      previousStatus: string | null;
-      currentStatus: string;
-      changedAt: Date;
-      changeReason: string | null;
-      user: {
-        id: string;
-        name: string;
-        email: string;
-        image: string | null;
-      };
-    }>;
-    total: number;
-  }> {
-    const { skip = 0, take = 20 } = options || {};
-    const [items, total] = await Promise.all([
-      prisma.sRStatusHistory.findMany({
-        where: { srId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-            },
-          },
-        },
-        orderBy: { changedAt: 'desc' },
-        skip,
-        take,
-      }),
-      prisma.sRStatusHistory.count({
-        where: { srId },
-      }),
-    ]);
-    return { items, total };
   }
 
   /**

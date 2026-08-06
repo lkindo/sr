@@ -2,7 +2,6 @@ import { registerSRNotificationListeners } from './listeners/sr-notification.lis
 import { ClientService } from './client.service';
 import { PermissionService } from './permission.service';
 import { RoleService } from './role.service';
-import { SRService } from './sr.service';
 import { UserService } from './user.service';
 
 let listenersRegistered = false;
@@ -29,10 +28,6 @@ class ServiceRegistry {
 
   get clientService(): ClientService {
     return this.getOrCreate('clientService', () => new ClientService());
-  }
-
-  get srService(): SRService {
-    return this.getOrCreate('srService', () => new SRService());
   }
 
   get roleService(): RoleService {

@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
 
-import {
-  getSRAction,
-  getSRActivitiesAction,
-  getSRCommentsAction,
-  getSRDetailsAction,
-} from '../sr.actions';
+import { getSRActivitiesAction, getSRCommentsAction, getSRDetailsAction } from '../sr.actions';
 
 // Mock dependencies
 vi.mock('next/cache', () => ({
@@ -75,35 +70,6 @@ describe('SR Server Actions Security', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  describe('getSRAction Security', () => {
-    it('blocks unauthorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as any);
-      mockSRService.getSRById.mockResolvedValue(targetSR);
-
-      const result = await getSRAction('sr-1');
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        // It might be FORBIDDEN or whatever errorToResult converts ForbiddenError to.
-        // ForbiddenError usually maps to 403 or similar code if handled, or just 'ERROR'
-        // Let's just check it failed.
-        // Based on other tests, it might return { success: false, error: ... }
-      }
-    });
-
-    it('allows authorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as any);
-      mockSRService.getSRById.mockResolvedValue(targetSR);
-
-      const result = await getSRAction('sr-1');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(targetSR);
-      }
-    });
   });
 
   describe('getSRDetailsAction Security', () => {
@@ -182,67 +148,6 @@ describe('SR Server Actions Security', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.comments).toHaveLength(1);
-      }
-    });
-  });
-
-  describe('Tenant Isolation Security', () => {
-    it('should prevent access to SR of another client even if user has SR:READ permission', async () => {
-      // 1. Setup a user who is a CLIENT_USER (or CLIENT_ADMIN)
-      // They have SR:READ permission.
-      // But they belong to client-2.
-      const attackerUser = {
-        id: 'attacker-1',
-        name: 'Attacker',
-        roles: ['CLIENT_USER'],
-        permissions: ['SR:READ'], // This is the key. CLIENT_USER has this.
-        clientIds: ['client-2'],
-      };
-
-      const targetSR = {
-        id: 'sr-1',
-        clientId: 'client-1',
-        requesterId: 'victim-1',
-        title: 'Secret SR',
-        status: 'REQUESTED',
-      };
-
-      vi.mocked(auth).mockResolvedValue({ user: attackerUser, expires: '2099-01-01' } as any);
-      mockSRService.getSRById.mockResolvedValue(targetSR);
-
-      const result = await getSRAction('sr-1');
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toMatch(/권한이 없습니다/);
-      }
-    });
-
-    it('should allow access to internal users (MANAGER) with SR:READ permission regardless of client', async () => {
-      const managerUser = {
-        id: 'manager-1',
-        name: 'Manager',
-        roles: ['MANAGER'],
-        permissions: ['SR:READ'],
-        clientIds: [], // Managers might not have clientIds
-      };
-
-      const targetSR = {
-        id: 'sr-1',
-        clientId: 'client-1',
-        requesterId: 'victim-1',
-        title: 'Secret SR',
-        status: 'REQUESTED',
-      };
-
-      vi.mocked(auth).mockResolvedValue({ user: managerUser, expires: '2099-01-01' } as any);
-      mockSRService.getSRById.mockResolvedValue(targetSR);
-
-      const result = await getSRAction('sr-1');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(targetSR);
       }
     });
   });

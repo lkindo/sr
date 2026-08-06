@@ -57,15 +57,4 @@ describe('SR Actions Coverage', () => {
       expect(revalidatePath).toHaveBeenCalledWith('/srs');
     });
   });
-
-  describe('getSRAction', () => {
-    it('returns NOT_FOUND if service returns null', async () => {
-      vi.mocked(SRService.prototype.getSRById).mockResolvedValue(null);
-      const result = await actions.getSRAction('none');
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.code).toBe('NOT_FOUND');
-      }
-    });
-  });
 });

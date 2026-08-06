@@ -32,8 +32,6 @@ const SLA_PRIORITY_MULTIPLIERS = new Map<SRPriority, number>([
  * - 담당자/백업 담당자 배정
  */
 export class ServiceCategoryService {
-  constructor() {}
-
   // ============================================================================
   // 조회 메서드
   // ============================================================================
@@ -71,27 +69,6 @@ export class ServiceCategoryService {
       },
       orderBy: { categoryName: 'asc' },
     });
-  }
-
-  /**
-   * ID로 서비스 카테고리 조회
-   */
-  async getById(id: string) {
-    const category = await prisma.serviceCategory.findUnique({
-      where: { id },
-      include: {
-        client: { select: { id: true, code: true, name: true } },
-        handler: { select: { id: true, name: true, email: true } },
-        backupHandler: { select: { id: true, name: true, email: true } },
-        _count: { select: { srs: true } },
-      },
-    });
-
-    if (!category) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    return category;
   }
 
   /**
@@ -280,122 +257,6 @@ export class ServiceCategoryService {
   }
 
   // ============================================================================
-  // 상태 관리 메서드
-  // ============================================================================
-
-  /**
-   * 서비스 카테고리 활성화
-   */
-  async activate(id: string) {
-    const existing = await prisma.serviceCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: { isActive: true },
-    });
-  }
-
-  /**
-   * 서비스 카테고리 비활성화
-   */
-  async deactivate(id: string) {
-    const existing = await prisma.serviceCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: { isActive: false },
-    });
-  }
-
-  // ============================================================================
-  // 담당자 관리 메서드
-  // ============================================================================
-
-  /**
-   * 담당자 배정
-   */
-  async assignHandler(id: string, handlerId: string) {
-    const existing = await prisma.serviceCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    // 담당자 존재 확인
-    const handler = await prisma.user.findUnique({ where: { id: handlerId } });
-    if (!handler) {
-      throw new NotFoundError('담당자', handlerId);
-    }
-
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: { handlerId },
-      include: {
-        handler: { select: { id: true, name: true, email: true } },
-      },
-    });
-  }
-
-  /**
-   * 백업 담당자 배정
-   */
-  async assignBackupHandler(id: string, backupHandlerId: string) {
-    const existing = await prisma.serviceCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    // 백업 담당자 존재 확인
-    const backupHandler = await prisma.user.findUnique({ where: { id: backupHandlerId } });
-    if (!backupHandler) {
-      throw new NotFoundError('백업 담당자', backupHandlerId);
-    }
-
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: { backupHandlerId },
-      include: {
-        backupHandler: { select: { id: true, name: true, email: true } },
-      },
-    });
-  }
-
-  /**
-   * 담당자 배정 해제
-   */
-  async unassignHandler(id: string) {
-    const existing = await prisma.serviceCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: { handlerId: null },
-    });
-  }
-
-  /**
-   * 백업 담당자 배정 해제
-   */
-  async unassignBackupHandler(id: string) {
-    const existing = await prisma.serviceCategory.findUnique({ where: { id } });
-    if (!existing) {
-      throw new NotFoundError('서비스 카테고리', id);
-    }
-
-    return prisma.serviceCategory.update({
-      where: { id },
-      data: { backupHandlerId: null },
-    });
-  }
-
-  // ============================================================================
   // SLA 계산 메서드
   // ============================================================================
 
@@ -461,20 +322,6 @@ export class ServiceCategoryService {
      * 복제돼 있어 한 곳을 고쳐도 나머지가 계속 절삭했다.
      */
     return new Date(startDate.getTime() + adjustedHours * 60 * 60 * 1000);
-  }
-
-  /**
-   * SR 카운트 포함 조회 (통계용)
-   */
-  async getAllWithStats() {
-    return prisma.serviceCategory.findMany({
-      include: {
-        client: { select: { id: true, code: true, name: true } },
-        handler: { select: { id: true, name: true } },
-        _count: { select: { srs: true } },
-      },
-      orderBy: { categoryName: 'asc' },
-    });
   }
 }
 

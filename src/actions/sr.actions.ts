@@ -90,23 +90,6 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
   }
 }
 
-export async function getSRAction(id: string): Promise<Result<SR>> {
-  try {
-    const session = await getAuthenticatedSession();
-    const sr = await srService.getSRById(id);
-
-    if (!sr) {
-      return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');
-    }
-
-    ensureCanReadSR(session.user, sr);
-
-    return ok(serializeResponse(sr));
-  } catch (error) {
-    return errorToResult(error);
-  }
-}
-
 export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>> {
   try {
     const session = await getAuthenticatedSession();

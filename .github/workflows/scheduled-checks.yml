@@ -69,31 +69,9 @@ jobs:
         env:
           ANALYZE: 'true'
 
-  # 성능 테스트
-  performance-test:
-    name: Performance Testing
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Setup pnpm
-        # 버전은 package.json 의 `packageManager` 핀을 단일 원천으로 삼는다.
-        # 여기에 `version:` 을 같이 주면 pnpm/action-setup 이
-        # "Multiple versions of pnpm specified" 로 즉시 실패한다.
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run performance benchmark tests
-        run: |
-          pnpm test src/__tests__/performance/benchmark.test.ts || true
-          echo "⚡ Performance tests completed"
+  # 성능 테스트 잡은 제거했다(2026-08-06, Phase 1).
+  # src/__tests__/performance/benchmark.test.ts 는 V8 벽시계(performance.now)로 20~100ms
+  # 임계값을 단언하는 테스트였고, 공유 러너의 부하에 따라 결과가 흔들렸다. 게다가 파일이
+  # `src/**/*.test.ts` 에 걸려 차단 게이트인 `pnpm test:coverage` 에서도 함께 돌고 있었다.
+  # 여기 잡은 `|| true` 로 결과를 버리고 있었으므로 신호 가치도 0이었다.
+  # 성능 회귀를 다시 보려면 벽시계가 아니라 쿼리 수·할당량 같은 결정적 지표로 재작성할 것.

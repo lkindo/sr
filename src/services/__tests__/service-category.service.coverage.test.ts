@@ -47,26 +47,6 @@ describe('ServiceCategoryService', () => {
     });
   });
 
-  describe('getById', () => {
-    it('returns category when found', async () => {
-      const row = { id: 'abc', categoryName: 'X' };
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(row as never);
-
-      const result = await service.getById('abc');
-
-      expect(result).toBe(row);
-      expect(prisma.serviceCategory.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'abc' } })
-      );
-    });
-
-    it('throws NotFoundError when not found', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-
-      await expect(service.getById('missing')).rejects.toThrow(NotFoundError);
-    });
-  });
-
   describe('getByClientId', () => {
     it('queries with provided clientId', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
@@ -136,17 +116,6 @@ describe('ServiceCategoryService', () => {
       };
       const allowed = (where.OR ?? []).map((c) => c.clientId);
       expect(allowed).toEqual(['client-9', null]);
-    });
-  });
-
-  describe('getAllWithStats', () => {
-    it('includes _count of srs', async () => {
-      vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
-
-      await service.getAllWithStats();
-
-      const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0];
-      expect(call?.include).toHaveProperty('_count');
     });
   });
 
@@ -345,137 +314,6 @@ describe('ServiceCategoryService', () => {
   // ==========================================================================
   // 상태 관리
   // ==========================================================================
-
-  describe('activate / deactivate', () => {
-    it('activate throws NotFoundError when missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-      await expect(service.activate('id1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('activate updates isActive to true', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({ id: 'id1' } as never);
-
-      await service.activate('id1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith({
-        where: { id: 'id1' },
-        data: { isActive: true },
-      });
-    });
-
-    it('deactivate throws NotFoundError when missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-      await expect(service.deactivate('id1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('deactivate updates isActive to false', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({ id: 'id1' } as never);
-
-      await service.deactivate('id1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith({
-        where: { id: 'id1' },
-        data: { isActive: false },
-      });
-    });
-  });
-
-  // ==========================================================================
-  // 담당자 관리
-  // ==========================================================================
-
-  describe('assignHandler', () => {
-    it('throws NotFoundError when category missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-      await expect(service.assignHandler('id1', 'h1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('throws NotFoundError when handler missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
-
-      await expect(service.assignHandler('id1', 'h1')).rejects.toThrow(NotFoundError);
-      expect(prisma.serviceCategory.update).not.toHaveBeenCalled();
-    });
-
-    it('assigns handler when both exist', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'h1' } as never);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({ id: 'id1' } as never);
-
-      await service.assignHandler('id1', 'h1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'id1' }, data: { handlerId: 'h1' } })
-      );
-    });
-  });
-
-  describe('assignBackupHandler', () => {
-    it('throws NotFoundError when category missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-      await expect(service.assignBackupHandler('id1', 'b1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('throws NotFoundError when backup handler missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null as never);
-
-      await expect(service.assignBackupHandler('id1', 'b1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('assigns backup handler when both exist', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'b1' } as never);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({ id: 'id1' } as never);
-
-      await service.assignBackupHandler('id1', 'b1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'id1' }, data: { backupHandlerId: 'b1' } })
-      );
-    });
-  });
-
-  describe('unassignHandler', () => {
-    it('throws NotFoundError when missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-      await expect(service.unassignHandler('id1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('sets handlerId to null', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({ id: 'id1' } as never);
-
-      await service.unassignHandler('id1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith({
-        where: { id: 'id1' },
-        data: { handlerId: null },
-      });
-    });
-  });
-
-  describe('unassignBackupHandler', () => {
-    it('throws NotFoundError when missing', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null as never);
-      await expect(service.unassignBackupHandler('id1')).rejects.toThrow(NotFoundError);
-    });
-
-    it('sets backupHandlerId to null', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ id: 'id1' } as never);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({ id: 'id1' } as never);
-
-      await service.unassignBackupHandler('id1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith({
-        where: { id: 'id1' },
-        data: { backupHandlerId: null },
-      });
-    });
-  });
 
   // ==========================================================================
   // SLA 계산

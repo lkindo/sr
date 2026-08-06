@@ -54,11 +54,3 @@ export const PERMISSIONS = {
 export function hasPermissionFlag(user: AuthenticatedUser, permission: string) {
   return user.permissions?.includes(permission) ?? false;
 }
-
-export function hasAnyPermissionFlag(user: AuthenticatedUser, permissions: string[]) {
-  return permissions.some((permission) => hasPermissionFlag(user, permission));
-}
-
-export function hasAllPermissionFlags(user: AuthenticatedUser, permissions: string[]) {
-  return permissions.every((permission) => hasPermissionFlag(user, permission));
-}

@@ -86,6 +86,7 @@ describe('UserService Security', () => {
         name: 'Test',
         password: 'hashed_password',
       };
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserWithPassword as any);
       vi.mocked(prisma.user.update).mockResolvedValue(mockUserWithPassword as any);
 
       const result = await userService.updateUser('u1', { name: 'New Name' });

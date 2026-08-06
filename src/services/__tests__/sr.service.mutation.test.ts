@@ -3,8 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { emailService } from '@/services/email.service';
-import { pushService } from '@/services/push.service';
 import { SRService } from '@/services/sr.service';
 
 // Mock dependencies with inline definition to avoid hoisting issues
@@ -261,30 +259,6 @@ describe('SRService Mutation Tests', () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
       const result = await srService.getSRById('non-existent');
       expect(result).toBeNull();
-    });
-  });
-
-  describe('getStatusHistory', () => {
-    it('should return status history with pagination', async () => {
-      const mockHistory = [
-        { id: 'h-1', currentStatus: 'REQUESTED', changedAt: new Date() },
-        { id: 'h-2', currentStatus: 'IN_PROGRESS', changedAt: new Date() },
-      ];
-
-      vi.mocked(prisma.sRStatusHistory.findMany).mockResolvedValue(mockHistory as any);
-      vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(2);
-
-      const result = await srService.getStatusHistory('sr-1', { skip: 0, take: 10 });
-
-      expect(result.items).toEqual(mockHistory);
-      expect(result.total).toBe(2);
-      expect(prisma.sRStatusHistory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { srId: 'sr-1' },
-          skip: 0,
-          take: 10,
-        })
-      );
     });
   });
 

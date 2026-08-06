@@ -30,8 +30,6 @@ type RoleUpdateData = z.infer<typeof roleUpdateSchema>;
  * 간주해 통과시킨다 — 요청 경로는 반드시 actor 를 넘겨야 한다.
  */
 export class RoleService {
-  constructor() {}
-
   async getRoleById(id: string): Promise<Role | null> {
     return prisma.role.findUnique({ where: { id } });
   }

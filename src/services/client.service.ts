@@ -124,16 +124,6 @@ export class ClientService {
     });
   }
 
-  async getClientByName(name: string) {
-    return prisma.client.findFirst({
-      where: { name: { contains: name, mode: 'insensitive' } },
-    });
-  }
-
-  async getAllClients() {
-    return prisma.client.findMany();
-  }
-
   async getClientsForSelection(clientIds?: string[]) {
     // If clientIds are provided, restrict the query to those IDs
     const where = clientIds ? { id: { in: clientIds } } : {};
@@ -298,32 +288,6 @@ export class ClientService {
     const result = await prisma.client.delete({ where: { id } });
 
     return result;
-  }
-
-  async activateClient(clientId: string) {
-    const result = await prisma.client.update({
-      where: { id: clientId },
-      data: { isActive: true },
-    });
-
-    return result;
-  }
-
-  async deactivateClient(clientId: string) {
-    const result = await prisma.client.update({
-      where: { id: clientId },
-      data: { isActive: false },
-    });
-
-    return result;
-  }
-
-  async getClientsByUserId(userId: string) {
-    return prisma.client.findMany({
-      where: {
-        users: { some: { userId } },
-      },
-    });
   }
 
   async getClientWithDetailsAndCategories(id: string) {

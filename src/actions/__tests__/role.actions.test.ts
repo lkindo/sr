@@ -28,7 +28,6 @@ vi.mock('@/lib/action-helpers', () => ({
 import {
   createRoleAction,
   deleteRoleAction,
-  getRoleAction,
   updateRoleAction,
   updateRolePermissionsAction,
 } from '../role.actions';
@@ -149,31 +148,6 @@ describe('role.actions', () => {
         null,
         SESSION.user
       );
-    });
-  });
-
-  describe('getRoleAction', () => {
-    it('역할이 존재하지 않을 시 fail 결과를 반환해야 함', async () => {
-      mockRoleService.getRoleById.mockResolvedValue(null);
-
-      const result = await getRoleAction('r-none');
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('역할을 찾을 수 없습니다.');
-      }
-    });
-
-    it('역할을 성공적으로 조회해야 함', async () => {
-      const mockRole = { id: 'r1', name: 'ADMIN' };
-      mockRoleService.getRoleById.mockResolvedValue(mockRole as any);
-
-      const result = await getRoleAction('r1');
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual(mockRole);
-      }
     });
   });
 

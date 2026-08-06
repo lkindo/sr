@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 감사 3.17 회귀 테스트 — 라우트 게이트.
  *
  * 비밀번호 재설정은 `USER:UPDATE` 보유자(또는 ADMIN)만 할 수 있어야 한다.
- * 본인 변경은 현재 비밀번호를 요구하는 changePasswordAction 을 거쳐야 하며,
+ * 본인 변경은 현재 비밀번호를 요구하는 POST /api/profile/password 를 거쳐야 하며,
  * 이 라우트로 우회할 수 있으면 그 확인 절차가 무력해진다.
  */
 

@@ -32,7 +32,7 @@ export interface EnvVariable {
   /**
    * 카테고리
    */
-  category: 'database' | 'auth' | 'storage' | 'cache' | 'email' | 'webhook' | 'rate-limit' | 'push';
+  category: 'database' | 'auth' | 'storage' | 'email' | 'rate-limit' | 'push';
 
   /**
    * 검증 함수 (선택사항)
@@ -471,9 +471,7 @@ export function printEnvSummary(): void {
         database: '데이터베이스',
         auth: '인증',
         storage: '스토리지',
-        cache: '캐시',
         email: '이메일',
-        webhook: '웹훅',
         'rate-limit': 'Rate Limiting',
         push: '푸시 알림',
       }[category] || category;

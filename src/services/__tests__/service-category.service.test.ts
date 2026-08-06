@@ -64,28 +64,6 @@ describe('ServiceCategoryService', () => {
     });
   });
 
-  describe('getById', () => {
-    it('ID로 서비스 카테고리를 조회해야 함', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
-        ...mockCategory,
-        _count: { srs: 5 },
-      } as any);
-
-      const result = await service.getById('cat-1');
-
-      expect(result.id).toBe('cat-1');
-      expect(prisma.serviceCategory.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'cat-1' } })
-      );
-    });
-
-    it('존재하지 않는 카테고리는 에러를 던져야 함', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(null);
-
-      await expect(service.getById('non-existent')).rejects.toThrow('서비스 카테고리');
-    });
-  });
-
   describe('getByClientId', () => {
     it('고객사 ID로 카테고리 목록을 조회해야 함', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([mockCategory] as any);
@@ -165,53 +143,6 @@ describe('ServiceCategoryService', () => {
       } as any);
 
       await expect(service.delete('cat-1')).rejects.toThrow('SR이 연결');
-    });
-  });
-
-  describe('activate/deactivate', () => {
-    it('카테고리를 활성화해야 함', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(mockCategory as any);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({
-        ...mockCategory,
-        isActive: true,
-      } as any);
-
-      const result = await service.activate('cat-1');
-
-      expect(result.isActive).toBe(true);
-    });
-
-    it('카테고리를 비활성화해야 함', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(mockCategory as any);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue({
-        ...mockCategory,
-        isActive: false,
-      } as any);
-
-      const result = await service.deactivate('cat-1');
-
-      expect(result.isActive).toBe(false);
-    });
-  });
-
-  describe('담당자 관리', () => {
-    it('담당자를 배정해야 함', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(mockCategory as any);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'user-1', name: 'User 1' } as any);
-      vi.mocked(prisma.serviceCategory.update).mockResolvedValue(mockCategory as any);
-
-      await service.assignHandler('cat-1', 'user-1');
-
-      expect(prisma.serviceCategory.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { handlerId: 'user-1' } })
-      );
-    });
-
-    it('존재하지 않는 담당자는 에러를 던져야 함', async () => {
-      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue(mockCategory as any);
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
-
-      await expect(service.assignHandler('cat-1', 'non-existent')).rejects.toThrow('담당자');
     });
   });
 
