@@ -3383,7 +3383,7 @@ NextAuth.js가 자동으로 처리:
 | E2E             | **Playwright 1.58**                                      | `pnpm test:e2e`                               |
 | 뮤테이션        | **Stryker 9.5.1** (`@stryker-mutator/vitest-runner`)     | `pnpm test:mutation`, `pnpm test:mutation:ci` |
 | 접근성          | `@axe-core/playwright`                                   | `e2e/30-accessibility.spec.ts`                |
-| API 목킹        | `msw` 2.x                                                | 단위 테스트                                   |
+| API 목킹        | Vitest `vi.mock` (모듈 단위)                             | 단위 테스트                                   |
 
 ### 파일 배치
 
