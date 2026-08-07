@@ -25,6 +25,7 @@ import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { validateTransition } from '@/lib/sr-state-machine';
+import { deleteAttachmentBlob } from '@/lib/storage';
 import { appZoneDateStamp } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
@@ -69,6 +70,20 @@ function toNumberOrNull(value: unknown): number | null {
 function toStringOrNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null || value === '') return null;
   return value;
+}
+
+/**
+ * 첨부 행에서 저장소 내부 경로를 뽑는다.
+ *
+ * `storagePath` 는 나중에 도입된 컬럼이라 그 이전에 올라온 행은 null 이다.
+ * 그 경우 `fileUrl` 에서 되살린다 — `api/attachments/[id]` DELETE 와 동일한 규칙이라,
+ * 한쪽만 고치면 옛 첨부가 경로에 따라 지워지거나 남는 차이가 생긴다.
+ */
+function toStoragePathname(attachment: { storagePath: string | null; fileUrl: string }): string {
+  return (
+    attachment.storagePath ??
+    (attachment.fileUrl.startsWith('http') ? new URL(attachment.fileUrl).pathname.slice(1) : '')
+  );
 }
 
 /**
@@ -581,8 +596,7 @@ export class SRService {
         typeof validated.estimatedHours === 'string'
           ? parseFloat(validated.estimatedHours)
           : validated.estimatedHours;
-    if (validated.intakeNotes !== undefined)
-      updateData.intakeNotes = validated.intakeNotes || null;
+    if (validated.intakeNotes !== undefined) updateData.intakeNotes = validated.intakeNotes || null;
     if (validated.resolutionDescription !== undefined)
       updateData.resolutionDescription = validated.resolutionDescription || null;
     if (validated.rejectionReason !== undefined)
@@ -850,6 +864,15 @@ export class SRService {
     // `SR:DELETE` 보유자가 남의 테넌트 SR 을 지울 수 있었다(감사 4.1).
     ensureCanDeleteSR(sessionUser, existingSR);
 
+    // 첨부 blob 경로를 **행이 사라지기 전에** 모아 둔다.
+    // sr_attachments 는 `onDelete: Cascade` 라 SR 을 지우면 행이 함께 사라지는데,
+    // 디스크의 파일은 아무도 지우지 않아 볼륨에 영구 잔존했다(감사 4.2).
+    // 참조가 사라진 뒤에는 어떤 경로를 지워야 하는지 알아낼 방법이 없다.
+    const attachments = await prisma.sRAttachment.findMany({
+      where: { srId: id },
+      select: { storagePath: true, fileUrl: true },
+    });
+
     // 트랜잭션으로 감사 로그 적재 및 SR 삭제 원자적 실행
     await prisma.$transaction(async (tx) => {
       // 1. 감사 로그 적재
@@ -866,6 +889,19 @@ export class SRService {
       //     새어나가 원자성이 깨진다. 목 쪽을 고칠 일이다.)
       await tx.sR.delete({ where: { id } });
     });
+
+    // 커밋이 끝난 뒤에 blob 을 지운다 — `api/attachments/[id]` DELETE 와 같은 순서다.
+    // 반대로 하면(파일 먼저) 그 사이 실패했을 때 없는 파일을 가리키는 행이 남아
+    // 매 다운로드가 500 이 된다. 이 순서에서 최악은 참조 없는 파일이 남는 것이고,
+    // 그건 사용자에게 보이지 않는다.
+    await Promise.all(
+      attachments.map((attachment) =>
+        deleteAttachmentBlob(toStoragePathname(attachment)).catch(() => {
+          // 커밋은 이미 끝났다. 정리 실패로 삭제 자체를 실패시키면 사용자가 이미
+          // 사라진 SR 을 다시 지우려 시도하게 되므로 여기서는 삼킨다.
+        })
+      )
+    );
 
     // 실시간 이벤트 발행
     emitRealtimeEvent(REALTIME_EVENTS.SR_DELETED, {

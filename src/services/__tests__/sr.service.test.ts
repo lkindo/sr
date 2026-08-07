@@ -9,6 +9,7 @@ import {
 } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { deleteAttachmentBlob } from '@/lib/storage';
 import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
@@ -37,6 +38,7 @@ const { mockPrisma } = vi.hoisted(() => {
     },
     sRAttachment: {
       deleteMany: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     sRStatusHistory: {
       create: vi.fn().mockResolvedValue({}),
@@ -84,6 +86,10 @@ vi.mock('@/lib/policies', async (importOriginal) => {
 vi.mock('@/lib/sr-state-machine', () => ({
   validateTransition: vi.fn().mockReturnValue({ valid: true }),
   getRequiredFields: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock('@/lib/storage', () => ({
+  deleteAttachmentBlob: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('SRService', () => {
@@ -440,6 +446,52 @@ describe('SRService', () => {
       await srService.deleteSR('sr-1', mockUser);
 
       expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+    });
+
+    /**
+     * 삭제 가능한 SR 하나와 그 첨부 목록을 준비한다.
+     *
+     * 목 반환값을 `as unknown as` 로 좁혀 `any` 를 쓰지 않는다 —
+     * `--max-warnings` 래칫은 숫자를 올리지 않는 것이 규칙이라, 새로 넣는 코드가
+     * 예산을 잠식하면 기존 부채를 갚을 여지가 그만큼 줄어든다.
+     */
+    const arrangeDeletableSR = (
+      attachments: { storagePath: string | null; fileUrl: string }[] = []
+    ) => {
+      const mockSR = { id: 'sr-1', clientId: 'client-1' } as unknown as Awaited<
+        ReturnType<typeof prisma.sR.findUnique>
+      >;
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR);
+      vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
+      vi.mocked(prisma.sR.delete).mockResolvedValue(
+        mockSR as unknown as Awaited<ReturnType<typeof prisma.sR.delete>>
+      );
+      vi.mocked(prisma.sRAttachment.findMany).mockResolvedValue(
+        attachments as unknown as Awaited<ReturnType<typeof prisma.sRAttachment.findMany>>
+      );
+    };
+
+    // 감사 4.2: sr_attachments 는 onDelete: Cascade 라 행은 함께 사라지지만
+    // 디스크의 파일은 아무도 지우지 않아 볼륨에 영구 잔존했다.
+    it('SR 을 지우면 첨부 blob 도 함께 정리한다', async () => {
+      arrangeDeletableSR([
+        { storagePath: 'sr-1/a.pdf', fileUrl: 'http://x/sr-1/a.pdf' },
+        // storagePath 가 도입되기 전 행은 null 이라 fileUrl 에서 되살려야 한다.
+        { storagePath: null, fileUrl: 'http://x/sr-1/legacy.png' },
+      ]);
+
+      await srService.deleteSR('sr-1', mockUser);
+
+      expect(deleteAttachmentBlob).toHaveBeenCalledWith('sr-1/a.pdf');
+      expect(deleteAttachmentBlob).toHaveBeenCalledWith('sr-1/legacy.png');
+    });
+
+    it('blob 정리가 실패해도 SR 삭제는 성공으로 끝난다', async () => {
+      arrangeDeletableSR([{ storagePath: 'sr-1/a.pdf', fileUrl: '' }]);
+      vi.mocked(deleteAttachmentBlob).mockRejectedValueOnce(new Error('EACCES'));
+
+      // 커밋은 이미 끝났다. 여기서 던지면 사용자가 이미 사라진 SR 을 다시 지우려 한다.
+      await expect(srService.deleteSR('sr-1', mockUser)).resolves.toBeUndefined();
     });
   });
 

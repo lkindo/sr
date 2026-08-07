@@ -26,7 +26,11 @@ vi.mock('@/lib/prisma', () => {
     user: { findMany: vi.fn().mockResolvedValue([]), findUnique: vi.fn().mockResolvedValue(null) },
     serviceCategory: { findUnique: vi.fn().mockResolvedValue(null) },
     sRComment: { deleteMany: vi.fn().mockResolvedValue({}) },
-    sRAttachment: { deleteMany: vi.fn().mockResolvedValue({}) },
+    // deleteSR 이 삭제 전 첨부 blob 경로를 모은다(감사 4.2). 목이 없으면 그 조회에서 죽는다.
+    sRAttachment: {
+      deleteMany: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     sRStatusHistory: {
       deleteMany: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
@@ -76,6 +80,10 @@ vi.mock('@/lib/logger', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/storage', () => ({
+  deleteAttachmentBlob: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/sr-state-machine', () => ({
