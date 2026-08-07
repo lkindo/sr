@@ -55,16 +55,16 @@ export const SR_HANDLER_INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
  * ```
  */
 export class UserService {
-  private async runInTransaction<T>(cb: (tx: any) => Promise<T>): Promise<T> {
-    if (typeof prisma.$transaction === 'function') {
-      const originalTransaction = prisma.$transaction;
-      return await originalTransaction(async (tx) => {
-        const actualTx = tx?.user ? tx : (prisma as any).default || tx;
-        return await cb(actualTx);
-      });
-    }
-    const tx = (prisma as any).user ? prisma : (prisma as any).default || prisma;
-    return await cb(tx);
+  /**
+   * 쓰기 경로를 트랜잭션으로 감싼다.
+   *
+   * 콜백에는 트랜잭션 클라이언트(tx)만 전달한다. 예전에는 각 호출부가
+   * `tx?.x?.y || prisma.x?.y || prisma.default?.x?.y` 폴백 체인을 21곳에 두고 있었는데,
+   * 그건 테스트 목이 불완전할 때 통과시키려는 장치였고 프로덕션에서는 쓰기가 조용히
+   * 트랜잭션 밖으로 새어나가 원자성을 깨뜨릴 수 있었다. 목이 부족하면 목을 고친다.
+   */
+  private async runInTransaction<T>(cb: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+    return prisma.$transaction((tx) => cb(tx));
   }
 
   async getUserById(id: string) {
@@ -264,20 +264,14 @@ export class UserService {
     }
 
     const updatedUser = await this.runInTransaction(async (tx) => {
-      const userUpdateFn =
-        tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;
-      let user = await userUpdateFn({
+      let user = await tx.user.update({
         where: { id },
         data: updateData,
       });
 
       if (clientIds) {
         // 시스템 운영팀 체크
-        const userFindUniqueFn =
-          tx?.user?.findUnique ||
-          (prisma as any).user?.findUnique ||
-          (prisma as any).default?.user?.findUnique;
-        const userRoles = (await userFindUniqueFn({
+        const userRoles = (await tx.user.findUnique({
           where: { id },
           select: { roles: { include: { role: true } } },
         })) as { roles: { role: { name: string } }[] } | null;
@@ -298,7 +292,7 @@ export class UserService {
         ).map((membership) => membership.clientId);
         const newClientIds = clientIds.filter((clientId) => !existingClientIds.includes(clientId));
 
-        user = await userUpdateFn({
+        user = await tx.user.update({
           where: { id },
           data: {
             clients: {
@@ -325,8 +319,8 @@ export class UserService {
         targetEntity: 'User',
         targetId: id,
         changes: {
-          before: excludePassword(beforeUser),
-          after: excludePassword(afterUser),
+          before: beforeUser ? excludePassword(beforeUser) : null,
+          after: afterUser ? excludePassword(afterUser) : null,
           // 해시조차 감사 로그에 남기지 않는다. 재설정이 있었다는 사실만 기록한다.
           ...(password ? { passwordReset: true } : {}),
         },
@@ -363,21 +357,18 @@ export class UserService {
       // 1. 진행 중인 SR 확인 — TOCTOU 방지를 위해 검사와 비활성화를 같은 트랜잭션에서 수행한다.
       //    (검사 후 비활성화 사이에 새 SR이 배정되어 비활성 담당자에게 orphan SR이
       //     남는 문제를 줄인다. 배정 경로의 isActive 가드와 함께 동작.)
-      const activeSRs =
-        tx?.sR && typeof tx.sR.findMany === 'function'
-          ? await tx.sR.findMany({
-              where: {
-                assigneeId: userId,
-                status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
-              },
-              select: {
-                id: true,
-                srNumber: true,
-                title: true,
-                status: true,
-              },
-            })
-          : [];
+      const activeSRs = await tx.sR.findMany({
+        where: {
+          assigneeId: userId,
+          status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
+        },
+        select: {
+          id: true,
+          srNumber: true,
+          title: true,
+          status: true,
+        },
+      });
 
       // 2. 진행 중인 SR이 있으면 비활성화 차단
       if (activeSRs.length > 0) {
@@ -391,9 +382,7 @@ export class UserService {
       }
 
       // 3. 진행 중인 SR이 없으면 비활성화
-      const userUpdateFn =
-        tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;
-      const user = await userUpdateFn({
+      const user = await tx.user.update({
         where: { id: userId },
         data: { isActive: false },
       });
@@ -416,49 +405,25 @@ export class UserService {
     actorId?: string | null,
     ipAddress?: string | null
   ): Promise<Omit<User, 'password'>> {
-    const prismaInstance = (await import('@/lib/prisma')).default;
-
-    const sRCountFn =
-      prismaInstance.sR && typeof prismaInstance.sR.count === 'function'
-        ? prismaInstance.sR.count.bind(prismaInstance.sR)
-        : async () => 0;
-    const sRActivityCountFn =
-      prismaInstance.sRActivity && typeof prismaInstance.sRActivity.count === 'function'
-        ? prismaInstance.sRActivity.count.bind(prismaInstance.sRActivity)
-        : async () => 0;
-    const sRCommentCountFn =
-      prismaInstance.sRComment && typeof prismaInstance.sRComment.count === 'function'
-        ? prismaInstance.sRComment.count.bind(prismaInstance.sRComment)
-        : async () => 0;
-    const sRStatusHistoryCountFn =
-      prismaInstance.sRStatusHistory && typeof prismaInstance.sRStatusHistory.count === 'function'
-        ? prismaInstance.sRStatusHistory.count.bind(prismaInstance.sRStatusHistory)
-        : async () => 0;
-    const userFindUniqueFn =
-      prismaInstance.user && typeof prismaInstance.user.findUnique === 'function'
-        ? prismaInstance.user.findUnique.bind(prismaInstance.user)
-        : async () => null;
-
     // ⚡ Bolt: 1-4 연관 데이터 확인을 병렬로 처리하여 지연 시간 단축
     const [relatedDataCount, activityCount, commentCount, statusHistoryCount] = await Promise.all([
-      sRCountFn({
+      prisma.sR.count({
         where: {
           OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
         },
       }),
-      sRActivityCountFn({
+      prisma.sRActivity.count({
         where: { userId },
       }),
-      sRCommentCountFn({
+      prisma.sRComment.count({
         where: { userId },
       }),
-      sRStatusHistoryCountFn({
+      prisma.sRStatusHistory.count({
         where: { changedBy: userId },
       }),
     ]);
 
-    const existingUser = await userFindUniqueFn({
-      where: { id: userId },
+    const existingUser = await prisma.user.findUnique({      where: { id: userId },
       include: USER_WITH_ROLES_INCLUDE,
     });
 
@@ -492,9 +457,7 @@ export class UserService {
 
     return this.runInTransaction(async (tx) => {
       // 5. 완전 삭제 수행
-      const userDeleteFn =
-        tx?.user?.delete || (prisma as any).user?.delete || (prisma as any).default?.user?.delete;
-      const deletedUser = await userDeleteFn({ where: { id: userId } });
+      const deletedUser = await tx.user.delete({ where: { id: userId } });
 
       await auditService.createLog(tx, {
         userId: actorId,
@@ -529,9 +492,7 @@ export class UserService {
 
     return await this.runInTransaction(async (tx) => {
       // 1. 사용자 생성
-      const userCreateFn =
-        tx?.user?.create || (prisma as any).user?.create || (prisma as any).default?.user?.create;
-      const user = await userCreateFn({
+      const user = await tx.user.create({
         data: {
           email: userData.email,
           name: userData.name,
@@ -547,13 +508,7 @@ export class UserService {
       if (roleIdsToAssign.length === 0 && userData.userType) {
         // userType 기반 기본 역할 자동 할당
         const defaultRoleName = userData.userType === 'CLIENT' ? 'CLIENT_USER' : 'ENGINEER';
-        const roleFindFirstFn =
-          tx?.role?.findFirst ||
-          (prisma as any).role?.findFirst ||
-          (prisma as any).default?.role?.findFirst;
-        const defaultRole = roleFindFirstFn
-          ? await roleFindFirstFn({ where: { name: defaultRoleName } })
-          : null;
+        const defaultRole = await tx.role.findFirst({ where: { name: defaultRoleName } });
 
         if (defaultRole) {
           roleIdsToAssign = [defaultRole.id];
@@ -561,46 +516,26 @@ export class UserService {
       }
 
       if (roleIdsToAssign.length > 0) {
-        const userRoleCreateManyFn =
-          tx?.userRole?.createMany ||
-          (prisma as any).userRole?.createMany ||
-          (prisma as any).default?.userRole?.createMany;
-        if (typeof userRoleCreateManyFn === 'function') {
-          await userRoleCreateManyFn({
-            data: roleIdsToAssign.map((roleId) => ({
-              userId: user.id,
-              roleId,
-            })),
-          });
-        }
+        await tx.userRole.createMany({
+          data: roleIdsToAssign.map((roleId) => ({
+            userId: user.id,
+            roleId,
+          })),
+        });
       }
 
       // 3. 고객사 할당
       if (clientIds.length > 0) {
-        const userClientCreateManyFn =
-          tx?.userClient?.createMany ||
-          (prisma as any).userClient?.createMany ||
-          (prisma as any).default?.userClient?.createMany;
-        if (typeof userClientCreateManyFn === 'function') {
-          await userClientCreateManyFn({
-            data: clientIds.map((clientId) => ({
-              userId: user.id,
-              clientId,
-            })),
-          });
-        }
+        await tx.userClient.createMany({
+          data: clientIds.map((clientId) => ({
+            userId: user.id,
+            clientId,
+          })),
+        });
       }
 
       // 4. 전체 정보와 함께 반환
-      const userFindUniqueOrThrowFn =
-        tx?.user?.findUniqueOrThrow ||
-        tx?.user?.findUnique ||
-        (prisma as any).user?.findUniqueOrThrow ||
-        (prisma as any).user?.findUnique ||
-        (prisma as any).default?.user?.findUniqueOrThrow ||
-        (prisma as any).default?.user?.findUnique;
-
-      const createdUser = await userFindUniqueOrThrowFn({
+      const createdUser = await tx.user.findUniqueOrThrow({
         where: { id: user.id },
         include: {
           roles: {
@@ -717,9 +652,7 @@ export class UserService {
 
     return this.runInTransaction(async (tx) => {
       // 비밀번호 업데이트
-      const userUpdateFn =
-        tx?.user?.update || (prisma as any).user?.update || (prisma as any).default?.user?.update;
-      const updatedUser = await userUpdateFn({
+      const updatedUser = await tx.user.update({
         where: { id: userId },
         data: { password: hashedPassword },
       });

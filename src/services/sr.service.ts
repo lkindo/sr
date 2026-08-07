@@ -335,66 +335,14 @@ export class SRService {
         );
       }
 
-      // ────────────────────────────────────────────────────────────────────
-      // 필드 단위 인가: 접수(트리아지) 결과는 운영팀이 소유한다.
-      //
-      // ensureCanUpdateSR 는 "이 SR 을 수정할 수 있는가"만 판정하므로, SR:UPDATE 를 가진
-      // 고객사 관리자(CLIENT_ADMIN)나 SR:UPDATE_SELF 를 가진 요청자 본인도 통과한다.
-      // 그 상태에서 dueDate/actualPriority/estimatedHours/estimatedCompletionDate/
-      // intakeNotes/assigneeId 까지
-      // 그대로 기록하면 SLA 기한과 실제 우선순위를 스스로 고쳐 SLA 준수율 지표를 위조하고
-      // 담당 엔지니어를 조용히 재배정할 수 있다. (전용 intake PATCH 라우트는 같은 필드를
-      // ADMIN/MANAGER 로 제한하고 있으므로 동일한 취지를 서비스 계층에 둔다.)
-      //
-      // 값이 실제로 바뀌는 경우에만 차단한다. 수정 다이얼로그가 전체 객체를 다시 전송하는
-      // 형태여도 동일 값 재전송은 no-op 으로 통과시켜야 정상 편집이 깨지지 않는다.
-      // (users/[id] 라우트에서 채택한 "변경 시도만 거부" 방식과 동일)
-      //
+      // 필드 단위 인가(규칙 본문은 collectOperatorFieldChanges 주석 참조).
       // REST 라우트(PATCH /api/srs/[id])와 Server Action(updateSRAction)이 모두 이 지점을
       // 지나므로 규칙은 여기 한 곳에만 둔다.
-      // ────────────────────────────────────────────────────────────────────
-      const operatorFieldChanges: string[] = [];
-      if (
-        validated.dueDate !== undefined &&
-        toTimestampOrNull(validated.dueDate) !== toTimestampOrNull(existingSR.dueDate)
-      ) {
-        operatorFieldChanges.push('dueDate');
-      }
-      if (
-        validated.actualPriority !== undefined &&
-        validated.actualPriority !== existingSR.actualPriority
-      ) {
-        operatorFieldChanges.push('actualPriority');
-      }
-      if (
-        validated.estimatedHours !== undefined &&
-        toNumberOrNull(validated.estimatedHours) !== toNumberOrNull(existingSR.estimatedHours)
-      ) {
-        operatorFieldChanges.push('estimatedHours');
-      }
-      if (
-        validated.intakeNotes !== undefined &&
-        toStringOrNull(validated.intakeNotes) !== toStringOrNull(existingSR.intakeNotes)
-      ) {
-        operatorFieldChanges.push('intakeNotes');
-      }
-      // estimatedCompletionDate(예상 완료일)도 접수 산출물이다. intake PATCH 라우트가
-      // actualPriority/estimatedHours/estimatedCompletionDate/intakeNotes/assigneeId 를 모두
-      // ADMIN/MANAGER 로 제한하고 있으므로 동일하게 운영 소유 필드로 취급한다.
-      // (SR 수정 다이얼로그는 이 필드를 전송하지 않으므로 일반 편집 경로는 영향받지 않는다.)
-      if (
-        validated.estimatedCompletionDate !== undefined &&
-        toTimestampOrNull(validated.estimatedCompletionDate) !==
-          toTimestampOrNull(existingSR.estimatedCompletionDate)
-      ) {
-        operatorFieldChanges.push('estimatedCompletionDate');
-      }
-      if (
-        assigneeId !== undefined &&
-        toStringOrNull(assigneeId) !== toStringOrNull(existingSR.assigneeId)
-      ) {
-        operatorFieldChanges.push('assigneeId');
-      }
+      const operatorFieldChanges = this.collectOperatorFieldChanges(
+        validated,
+        existingSR,
+        assigneeId
+      );
 
       if (operatorFieldChanges.length > 0 && !canWriteOperatorOwnedFields(sessionUser)) {
         throw new ForbiddenError(
@@ -409,150 +357,12 @@ export class SRService {
         await assertAssignable(assigneeId);
       }
 
-      const updateData: Prisma.SRUncheckedUpdateInput = {};
-
-      // basic fields
-      if (validated.title !== undefined) updateData.title = validated.title;
-      if (validated.description !== undefined) updateData.description = validated.description;
-      if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
-      if (validated.priority !== undefined) updateData.priority = validated.priority;
-      if (validated.status !== undefined) updateData.status = validated.status;
-
-      // 요청자가 표명한 희망 긴급도·기한. 운영자 소유 필드가 아니므로 게이트하지 않는다.
-      // (스키마에 선언이 없어 zod 가 조용히 버리던 값들 — 감사 3.27)
-      if (validated.requestedPriority !== undefined)
-        updateData.requestedPriority = validated.requestedPriority;
-      if (validated.requestedCompletionDate !== undefined)
-        updateData.requestedCompletionDate = validated.requestedCompletionDate
-          ? new Date(validated.requestedCompletionDate)
-          : null;
-      if (validated.actualPriority !== undefined)
-        updateData.actualPriority = validated.actualPriority;
-      if (validated.estimatedHours !== undefined)
-        updateData.estimatedHours =
-          typeof validated.estimatedHours === 'string'
-            ? parseFloat(validated.estimatedHours)
-            : validated.estimatedHours;
-      if (validated.intakeNotes !== undefined)
-        updateData.intakeNotes = validated.intakeNotes || null;
-      if (validated.resolutionDescription !== undefined)
-        updateData.resolutionDescription = validated.resolutionDescription || null;
-      if (validated.rejectionReason !== undefined)
-        updateData.rejectionReason = validated.rejectionReason || null;
-      if (validated.satisfactionRating !== undefined)
-        updateData.satisfactionRating = validated.satisfactionRating || null;
-      if (validated.additionalFeedback !== undefined)
-        updateData.additionalFeedback = validated.additionalFeedback || null;
-
-      // dates
-      if (validated.expectedCompletionDate !== undefined)
-        updateData.expectedCompletionDate = validated.expectedCompletionDate
-          ? new Date(validated.expectedCompletionDate)
-          : null;
-      if (validated.dueDate !== undefined)
-        updateData.dueDate = validated.dueDate ? new Date(validated.dueDate) : null;
-      if (validated.actualCompletionDate !== undefined)
-        updateData.actualCompletionDate = validated.actualCompletionDate
-          ? new Date(validated.actualCompletionDate)
-          : null;
-      if (validated.estimatedCompletionDate !== undefined)
-        updateData.estimatedCompletionDate = validated.estimatedCompletionDate
-          ? new Date(validated.estimatedCompletionDate)
-          : null;
-
-      // relations
-      if (validated.serviceCategoryId !== undefined) {
-        if (validated.serviceCategoryId) {
-          // 생성 경로와 동일한 테넌트 경계를 적용한다.
-          // (없으면 타 고객사 카테고리로 바꿔 이름/SLA를 되읽을 수 있다.)
-          await this.ensureCategoryBelongsToClient(
-            validated.serviceCategoryId,
-            validated.clientId ?? existingSR.clientId
-          );
-          updateData.serviceCategoryId = validated.serviceCategoryId;
-        }
-      }
-
-      if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
-
-      // priority SLA adjustment - ServiceCategoryService 활용
-      if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
-        try {
-          const dueDate = await serviceCategoryService.calculateDueDate(
-            existingSR.serviceCategoryId,
-            validated.actualPriority,
-            existingSR.intakeAt || new Date()
-          );
-          updateData.dueDate = dueDate;
-        } catch {
-          // 카테고리를 찾지 못해도 SR 업데이트는 계속 진행
-          logger.warn('SLA 기한 계산 실패', { categoryId: existingSR.serviceCategoryId });
-        }
-      }
-
-      // 상태 변경 처리: statusHistory를 updateData에 포함
-      const statusChanged = validated.status && validated.status !== existingSR.status;
-      if (statusChanged) {
-        updateData.statusHistory = {
-          create: {
-            previousStatus: existingSR.status,
-            currentStatus: validated.status!,
-            changedBy: sessionUser.id,
-            changeReason:
-              validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
-          },
-        };
-        // REQUESTED → INTAKE 전이 시 접수 메타데이터를 채운다.
-        // (전용 intake 라우트가 아닌 일반 PATCH 로 접수돼도 intakeAt 이 기록되지 않으면
-        //  대시보드의 SLA/처리시간 통계 쿼리 조건(intake_at IS NOT NULL)에서 누락되어
-        //  통계가 오염된다.)
-        if (
-          validated.status === 'INTAKE' &&
-          existingSR.status === 'REQUESTED' &&
-          !existingSR.intakeAt
-        ) {
-          updateData.intakeAt = new Date();
-          updateData.intakeById = sessionUser.id;
-        }
-        if (validated.status === 'COMPLETED') {
-          if (!updateData.actualCompletionDate) {
-            updateData.actualCompletionDate = new Date();
-          }
-          // 재오픈(7일) 창 판정 기준이 되는 completedAt 을 항상 기록
-          // (status 라우트뿐 아니라 updateSR 경로로 완료돼도 창 규칙이 동작하도록)
-          updateData.completedAt = new Date();
-        }
-        if (validated.status === 'CONFIRMED') {
-          updateData.confirmedAt = new Date();
-        }
-      }
-
-      const assigneeChanged = assigneeId !== undefined && assigneeId !== existingSR.assigneeId;
-
-      // Optimize: Use nested writes for activities to reduce DB round trips
-      const activitiesToCreate: Prisma.SRActivityCreateWithoutSrInput[] = [];
-
-      if (statusChanged) {
-        activitiesToCreate.push({
-          user: { connect: { id: sessionUser.id } },
-          type: 'STATUS_CHANGED',
-          description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
-        });
-      }
-
-      if (assigneeChanged) {
-        activitiesToCreate.push({
-          user: { connect: { id: sessionUser.id } },
-          type: 'ASSIGNED',
-          description: assigneeId ? '담당자가 할당되었습니다.' : '담당자 할당이 해제되었습니다.',
-        });
-      }
-
-      if (activitiesToCreate.length > 0) {
-        updateData.activities = {
-          create: activitiesToCreate,
-        };
-      }
+      const { updateData, statusChanged, assigneeChanged } = await this.buildSRUpdateData(
+        validated,
+        existingSR,
+        sessionUser,
+        assigneeId
+      );
 
       // 1. 트랜잭션으로 업데이트 및 활동 로그 생성 (순수 DB 작업만 트랜잭션 내부에서 수행)
       const updatedSR = await prisma.$transaction(async (tx) => {
@@ -584,7 +394,7 @@ export class SRService {
                   id: true,
                   name: true,
                   email: true,
-                  notificationPreference: true, // 추가
+                  notificationPreference: true,
                 },
               },
               assignee: {
@@ -592,7 +402,7 @@ export class SRService {
                   id: true,
                   name: true,
                   email: true,
-                  notificationPreference: true, // 추가
+                  notificationPreference: true,
                 },
               },
               serviceCategory: {
@@ -661,6 +471,238 @@ export class SRService {
       // (잘못된 참조 ID 가 500 으로 노출되는 것을 방지)
       throw mapPrismaError(error) ?? error;
     }
+  }
+
+  /**
+   * 필드 단위 인가: 접수(트리아지) 결과는 운영팀이 소유한다.
+   *
+   * ensureCanUpdateSR 는 "이 SR 을 수정할 수 있는가"만 판정하므로, SR:UPDATE 를 가진
+   * 고객사 관리자(CLIENT_ADMIN)나 SR:UPDATE_SELF 를 가진 요청자 본인도 통과한다.
+   * 그 상태에서 dueDate/actualPriority/estimatedHours/estimatedCompletionDate/
+   * intakeNotes/assigneeId 까지
+   * 그대로 기록하면 SLA 기한과 실제 우선순위를 스스로 고쳐 SLA 준수율 지표를 위조하고
+   * 담당 엔지니어를 조용히 재배정할 수 있다. (전용 intake PATCH 라우트는 같은 필드를
+   * ADMIN/MANAGER 로 제한하고 있으므로 동일한 취지를 서비스 계층에 둔다.)
+   *
+   * 값이 실제로 바뀌는 경우에만 차단한다. 수정 다이얼로그가 전체 객체를 다시 전송하는
+   * 형태여도 동일 값 재전송은 no-op 으로 통과시켜야 정상 편집이 깨지지 않는다.
+   * (users/[id] 라우트에서 채택한 "변경 시도만 거부" 방식과 동일)
+   *
+   * @returns 운영팀 소유 필드 중 값이 실제로 바뀌는 필드명 목록
+   */
+  private collectOperatorFieldChanges(
+    validated: z.infer<typeof srUpdateSchema>,
+    existingSR: SR,
+    assigneeId?: string | null
+  ): string[] {
+    const operatorFieldChanges: string[] = [];
+    if (
+      validated.dueDate !== undefined &&
+      toTimestampOrNull(validated.dueDate) !== toTimestampOrNull(existingSR.dueDate)
+    ) {
+      operatorFieldChanges.push('dueDate');
+    }
+    if (
+      validated.actualPriority !== undefined &&
+      validated.actualPriority !== existingSR.actualPriority
+    ) {
+      operatorFieldChanges.push('actualPriority');
+    }
+    if (
+      validated.estimatedHours !== undefined &&
+      toNumberOrNull(validated.estimatedHours) !== toNumberOrNull(existingSR.estimatedHours)
+    ) {
+      operatorFieldChanges.push('estimatedHours');
+    }
+    if (
+      validated.intakeNotes !== undefined &&
+      toStringOrNull(validated.intakeNotes) !== toStringOrNull(existingSR.intakeNotes)
+    ) {
+      operatorFieldChanges.push('intakeNotes');
+    }
+    // estimatedCompletionDate(예상 완료일)도 접수 산출물이다. intake PATCH 라우트가
+    // actualPriority/estimatedHours/estimatedCompletionDate/intakeNotes/assigneeId 를 모두
+    // ADMIN/MANAGER 로 제한하고 있으므로 동일하게 운영 소유 필드로 취급한다.
+    // (SR 수정 다이얼로그는 이 필드를 전송하지 않으므로 일반 편집 경로는 영향받지 않는다.)
+    if (
+      validated.estimatedCompletionDate !== undefined &&
+      toTimestampOrNull(validated.estimatedCompletionDate) !==
+        toTimestampOrNull(existingSR.estimatedCompletionDate)
+    ) {
+      operatorFieldChanges.push('estimatedCompletionDate');
+    }
+    if (
+      assigneeId !== undefined &&
+      toStringOrNull(assigneeId) !== toStringOrNull(existingSR.assigneeId)
+    ) {
+      operatorFieldChanges.push('assigneeId');
+    }
+    return operatorFieldChanges;
+  }
+
+  /**
+   * 검증된 입력으로 Prisma 업데이트 페이로드를 조립한다.
+   *
+   * SLA 기한 재계산(serviceCategoryService.calculateDueDate)과 카테고리 테넌트 검증에
+   * I/O 가 있으므로 async 다. statusChanged/assigneeChanged 를 함께 반환하는 이유는
+   * 트랜잭션 커밋 이후의 이벤트 발행부가 같은 판정을 재계산 없이 소비해야 하기 때문이다.
+   */
+  private async buildSRUpdateData(
+    validated: z.infer<typeof srUpdateSchema>,
+    existingSR: SR,
+    sessionUser: AuthenticatedUser,
+    assigneeId?: string | null
+  ): Promise<{
+    updateData: Prisma.SRUncheckedUpdateInput;
+    statusChanged: boolean;
+    assigneeChanged: boolean;
+  }> {
+    const updateData: Prisma.SRUncheckedUpdateInput = {};
+
+    // basic fields
+    if (validated.title !== undefined) updateData.title = validated.title;
+    if (validated.description !== undefined) updateData.description = validated.description;
+    if (validated.clientId !== undefined) updateData.clientId = validated.clientId;
+    if (validated.priority !== undefined) updateData.priority = validated.priority;
+    if (validated.status !== undefined) updateData.status = validated.status;
+
+    // 요청자가 표명한 희망 긴급도·기한. 운영자 소유 필드가 아니므로 게이트하지 않는다.
+    // (스키마에 선언이 없어 zod 가 조용히 버리던 값들 — 감사 3.27)
+    if (validated.requestedPriority !== undefined)
+      updateData.requestedPriority = validated.requestedPriority;
+    if (validated.requestedCompletionDate !== undefined)
+      updateData.requestedCompletionDate = validated.requestedCompletionDate
+        ? new Date(validated.requestedCompletionDate)
+        : null;
+    if (validated.actualPriority !== undefined)
+      updateData.actualPriority = validated.actualPriority;
+    if (validated.estimatedHours !== undefined)
+      updateData.estimatedHours =
+        typeof validated.estimatedHours === 'string'
+          ? parseFloat(validated.estimatedHours)
+          : validated.estimatedHours;
+    if (validated.intakeNotes !== undefined)
+      updateData.intakeNotes = validated.intakeNotes || null;
+    if (validated.resolutionDescription !== undefined)
+      updateData.resolutionDescription = validated.resolutionDescription || null;
+    if (validated.rejectionReason !== undefined)
+      updateData.rejectionReason = validated.rejectionReason || null;
+    if (validated.satisfactionRating !== undefined)
+      updateData.satisfactionRating = validated.satisfactionRating || null;
+    if (validated.additionalFeedback !== undefined)
+      updateData.additionalFeedback = validated.additionalFeedback || null;
+
+    // dates
+    if (validated.expectedCompletionDate !== undefined)
+      updateData.expectedCompletionDate = validated.expectedCompletionDate
+        ? new Date(validated.expectedCompletionDate)
+        : null;
+    if (validated.dueDate !== undefined)
+      updateData.dueDate = validated.dueDate ? new Date(validated.dueDate) : null;
+    if (validated.actualCompletionDate !== undefined)
+      updateData.actualCompletionDate = validated.actualCompletionDate
+        ? new Date(validated.actualCompletionDate)
+        : null;
+    if (validated.estimatedCompletionDate !== undefined)
+      updateData.estimatedCompletionDate = validated.estimatedCompletionDate
+        ? new Date(validated.estimatedCompletionDate)
+        : null;
+
+    // relations
+    if (validated.serviceCategoryId !== undefined) {
+      if (validated.serviceCategoryId) {
+        // 생성 경로와 동일한 테넌트 경계를 적용한다.
+        // (없으면 타 고객사 카테고리로 바꿔 이름/SLA를 되읽을 수 있다.)
+        await this.ensureCategoryBelongsToClient(
+          validated.serviceCategoryId,
+          validated.clientId ?? existingSR.clientId
+        );
+        updateData.serviceCategoryId = validated.serviceCategoryId;
+      }
+    }
+
+    if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
+
+    // priority SLA adjustment - ServiceCategoryService 활용
+    if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
+      try {
+        const dueDate = await serviceCategoryService.calculateDueDate(
+          existingSR.serviceCategoryId,
+          validated.actualPriority,
+          existingSR.intakeAt || new Date()
+        );
+        updateData.dueDate = dueDate;
+      } catch {
+        // 카테고리를 찾지 못해도 SR 업데이트는 계속 진행
+        logger.warn('SLA 기한 계산 실패', { categoryId: existingSR.serviceCategoryId });
+      }
+    }
+
+    // 상태 변경 처리: statusHistory를 updateData에 포함
+    const statusChanged = validated.status !== undefined && validated.status !== existingSR.status;
+    if (statusChanged) {
+      updateData.statusHistory = {
+        create: {
+          previousStatus: existingSR.status,
+          currentStatus: validated.status!,
+          changedBy: sessionUser.id,
+          changeReason:
+            validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
+        },
+      };
+      // REQUESTED → INTAKE 전이 시 접수 메타데이터를 채운다.
+      // (전용 intake 라우트가 아닌 일반 PATCH 로 접수돼도 intakeAt 이 기록되지 않으면
+      //  대시보드의 SLA/처리시간 통계 쿼리 조건(intake_at IS NOT NULL)에서 누락되어
+      //  통계가 오염된다.)
+      if (
+        validated.status === 'INTAKE' &&
+        existingSR.status === 'REQUESTED' &&
+        !existingSR.intakeAt
+      ) {
+        updateData.intakeAt = new Date();
+        updateData.intakeById = sessionUser.id;
+      }
+      if (validated.status === 'COMPLETED') {
+        if (!updateData.actualCompletionDate) {
+          updateData.actualCompletionDate = new Date();
+        }
+        // 재오픈(7일) 창 판정 기준이 되는 completedAt 을 항상 기록
+        // (status 라우트뿐 아니라 updateSR 경로로 완료돼도 창 규칙이 동작하도록)
+        updateData.completedAt = new Date();
+      }
+      if (validated.status === 'CONFIRMED') {
+        updateData.confirmedAt = new Date();
+      }
+    }
+
+    const assigneeChanged = assigneeId !== undefined && assigneeId !== existingSR.assigneeId;
+
+    // Optimize: Use nested writes for activities to reduce DB round trips
+    const activitiesToCreate: Prisma.SRActivityCreateWithoutSrInput[] = [];
+
+    if (statusChanged) {
+      activitiesToCreate.push({
+        user: { connect: { id: sessionUser.id } },
+        type: 'STATUS_CHANGED',
+        description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
+      });
+    }
+
+    if (assigneeChanged) {
+      activitiesToCreate.push({
+        user: { connect: { id: sessionUser.id } },
+        type: 'ASSIGNED',
+        description: assigneeId ? '담당자가 할당되었습니다.' : '담당자 할당이 해제되었습니다.',
+      });
+    }
+
+    if (activitiesToCreate.length > 0) {
+      updateData.activities = {
+        create: activitiesToCreate,
+      };
+    }
+
+    return { updateData, statusChanged, assigneeChanged };
   }
 
   async getSRById(id: string): Promise<SR | null> {
@@ -819,10 +861,10 @@ export class SRService {
         changes: { id, title: existingSR.title, srNumber: existingSR.srNumber },
       });
 
-      // 2. SR 삭제 (테스트 모킹 환경을 고려한 안전 폴백 적용)
-      const deleteClient =
-        tx && 'sR' in tx && typeof (tx as any).sR.delete === 'function' ? tx : prisma;
-      await deleteClient.sR.delete({ where: { id } });
+      // 2. SR 삭제 — 감사 로그와 반드시 같은 트랜잭션에서 수행한다.
+      //    (테스트 목이 불완전하다는 이유로 prisma 로 폴백하면 삭제가 트랜잭션 밖으로
+      //     새어나가 원자성이 깨진다. 목 쪽을 고칠 일이다.)
+      await tx.sR.delete({ where: { id } });
     });
 
     // 실시간 이벤트 발행

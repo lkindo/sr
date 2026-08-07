@@ -60,7 +60,8 @@ interface SR {
   createdAt: string;
 }
 
-interface Client {
+/** 고객사 상세 화면 전용 응답 형태. 선택 목록용 `ClientSummary` 와 달리 연관 목록까지 포함한다. */
+interface ClientDetail {
   id: string;
   code: string;
   name: string;
@@ -87,7 +88,7 @@ import {
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [client, setClient] = useState<Client | null>(null);
+  const [client, setClient] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);

@@ -12,13 +12,15 @@ import { ClientApprovalActions } from '@/components/users/ClientApprovalActions'
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
 import { getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
+import type { ClientSummary } from '@/types/client.types';
+import type { UserListItem } from '@/types/user-view';
 
 interface UserTableProps {
-  users: any[];
+  users: UserListItem[];
   loading: boolean;
   searchQuery: string;
   selectedUserIds: Set<string>;
-  clients: any[];
+  clients: ClientSummary[];
   onToggleAll: () => void;
   onToggleUser: (userId: string) => void;
   onRefresh: () => void;

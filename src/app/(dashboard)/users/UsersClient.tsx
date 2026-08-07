@@ -15,7 +15,7 @@ import { UserMobileList } from '@/components/users/UserMobileList';
 import { UserTable } from '@/components/users/UserTable';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
-import { User } from '@/types/user';
+import type { UserListItem } from '@/types/user-view';
 
 interface PaginationData {
   currentPage: number;
@@ -31,7 +31,7 @@ export default function UsersClient() {
   useSession();
   const { toast } = useToast();
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserListItem[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -85,8 +85,8 @@ export default function UsersClient() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isAssignRoleDialogOpen, setIsAssignRoleDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserListItem | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -190,12 +190,12 @@ export default function UsersClient() {
     setIsUserDialogOpen(true);
   };
 
-  const handleAssignRoles = (user: User) => {
+  const handleAssignRoles = (user: UserListItem) => {
     setSelectedUser(user);
     setIsAssignRoleDialogOpen(true);
   };
 
-  const handleDeleteUser = (user: User) => {
+  const handleDeleteUser = (user: UserListItem) => {
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
   };

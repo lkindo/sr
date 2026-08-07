@@ -16,15 +16,7 @@ import {
 import { Button } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
-
-interface Attachment {
-  id: string;
-  fileName: string;
-  fileSize: number | bigint;
-  fileType: string;
-  fileUrl: string;
-  createdAt: string;
-}
+import type { SRAttachmentView } from '@/types/sr.types';
 
 interface SRAttachmentsProps {
   srId: string;
@@ -32,7 +24,7 @@ interface SRAttachmentsProps {
 }
 
 export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachments, setAttachments] = useState<SRAttachmentView[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();

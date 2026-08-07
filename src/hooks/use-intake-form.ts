@@ -203,8 +203,6 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
             errorMessage = `서버 오류 (${response.status}): ${response.statusText || '알 수 없는 오류'}`;
           }
         } catch {
-          // ignore
-
           // 응답 읽기 실패 시 상태 코드로 메시지 생성
           errorMessage = `서버 오류 (${response.status}): ${response.statusText || '응답을 읽을 수 없습니다'}`;
         }

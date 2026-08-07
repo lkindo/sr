@@ -32,12 +32,7 @@ import { Input, PasswordInput } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
-
-interface Client {
-  id: string;
-  name: string;
-  code: string;
-}
+import type { ClientSummary } from '@/types/client.types';
 
 // 비밀번호 강도 계산 함수
 function calculatePasswordStrength(password: string): {
@@ -90,7 +85,7 @@ export default function RegisterForm() {
 
   // 새로운 상태
   const [accountType, setAccountType] = useState<'ENGINEER' | 'CLIENT'>('CLIENT');
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
   const [loadingClients, setLoadingClients] = useState(false);
 

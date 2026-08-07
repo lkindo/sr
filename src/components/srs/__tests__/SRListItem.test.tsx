@@ -34,14 +34,20 @@ Object.assign(navigator, {
   },
 });
 
-vi.mock('@/components/ui', () => ({
-  Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-  Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => (
-    <button onClick={onClick} {...props}>
-      {children}
-    </button>
-  ),
-}));
+// Badge/Button 은 렌더 부담을 줄이려 스텁하되, CopyButton 은 이 스위트가 aria-label 과
+// 클립보드 호출을 직접 단언하므로 실제 구현을 쓴다.
+vi.mock('@/components/ui', async () => {
+  const { CopyButton } = await import('@/components/ui/copy-button');
+  return {
+    CopyButton,
+    Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+    Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => (
+      <button onClick={onClick} {...props}>
+        {children}
+      </button>
+    ),
+  };
+});
 
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: vi.fn() }),

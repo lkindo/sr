@@ -9,13 +9,19 @@ import { SR_HANDLER_INTERNAL_ROLES, UserService } from '@/services/user.service'
 
 vi.mock('@/lib/prisma', () => ({
   default: {
+    $transaction: vi.fn((cb: any) =>
+      typeof cb === 'function' ? cb(prisma) : Promise.all(cb)
+    ),
     user: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
       count: vi.fn(),
+      delete: vi.fn(),
+      create: vi.fn(),
     },
     role: { findFirst: vi.fn() },
+    rolePermission: { findMany: vi.fn() },
     userRole: { createMany: vi.fn() },
     userClient: { createMany: vi.fn(), deleteMany: vi.fn() },
   },

@@ -2,6 +2,17 @@
  * 페이지네이션 유틸리티
  *
  * API 응답과 데이터베이스 쿼리에서 사용할 수 있는 페이지네이션 헬퍼 함수들을 제공합니다.
+ *
+ * [응답 봉투 규약]
+ * - 목록 조회 (list): { data: T[], meta: PaginationMeta }
+ * - 단건 조회 (single): bare object T
+ * - 본문 없는 변이 (body-less mutation): { success: boolean }
+ *
+ * [예외 목록 (레거시/특수 규약)]
+ * - GET /api/roles
+ * - GET /api/permissions
+ * - GET /api/service-categories
+ * - GET /api/clients/[id]
  */
 
 import { z } from 'zod';

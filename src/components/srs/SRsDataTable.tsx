@@ -37,7 +37,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination';
 import { usePermissions } from '@/hooks/use-permissions';
-import { SRService } from '@/services/sr.service';
+import type { SRListItem } from '@/types/sr.types';
 
 import { priorityLabels, statusLabels } from './constants';
 import { SRCardItem, SRTableRow } from './SRListItem';
@@ -46,9 +46,6 @@ const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
 
 type SortField = 'srNumber' | 'title' | 'client' | 'priority' | 'status' | 'createdAt' | 'dueDate';
 type SortOrder = 'asc' | 'desc';
-
-// SR 타입 정의
-type SRListItem = Awaited<ReturnType<SRService['getAllSRs']>>[number];
 type ClientListItem = { id: string; code: string; name: string };
 // 담당자 필터는 id 와 name 만 렌더링한다. email 을 요구하면 서버가 그것을
 // RSC 페이로드로 실어 보내야 하고, 그게 정확히 감사 4.2 가 지적한 유출이었다.

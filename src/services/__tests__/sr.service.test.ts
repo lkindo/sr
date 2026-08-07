@@ -122,6 +122,10 @@ describe('SRService', () => {
     // clearAllMocks 는 구현을 되돌리지 않으므로, 경계 위반 시나리오가 뒤 테스트로 새지 않도록 명시적으로 초기화한다.
     mockPrisma.serviceCategory.findUnique.mockResolvedValue(null);
 
+    // 같은 이유로 $transaction 도 되돌린다. 개별 테스트가 부분 tx 목(sR.update 만 있는 등)을
+    // 넘기도록 오버라이드하면, 그 목이 다음 테스트까지 살아남아 tx.sR.delete 가 사라진다.
+    mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockPrisma));
+
     srService = new SRService();
   });
 

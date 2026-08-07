@@ -5,24 +5,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
 import { getProfileAction } from '@/actions/user.actions';
+import type { EditableSR } from '@/components/srs/EditSRDialog';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
-
-interface Client {
-  id: string;
-  code: string;
-  name: string;
-}
-
-interface Attachment {
-  id: string;
-  fileName: string;
-  fileSize: number | bigint;
-  fileType: string;
-  fileUrl: string;
-  createdAt: Date | string;
-}
+import type { ClientSummary } from '@/types/client.types';
+import type { SRAttachmentView } from '@/types/sr.types';
 
 interface ServiceCategory {
   id: string;
@@ -35,7 +23,7 @@ export function useEditSRForm({
   onOpenChange,
   onUpdated,
 }: {
-  sr: any;
+  sr: EditableSR;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdated: () => void;
@@ -49,8 +37,8 @@ export function useEditSRForm({
   const [status, setStatus] = useState('');
   const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<SRAttachmentView[]>([]);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
@@ -68,16 +56,15 @@ export function useEditSRForm({
     if (isClientUser) {
       const profileResult = await getProfileAction();
       if (profileResult.success && profileResult.data) {
-        const userClients = (profileResult.data as any).clients || [];
-        if (userClients.length > 0) {
-          const userClient = userClients[0].client;
+        const userClient = (profileResult.data.clients ?? [])[0]?.client;
+        if (userClient) {
           setClients([{ id: userClient.id, code: userClient.code, name: userClient.name }]);
           if (sr?.clientId) setClientId(sr.clientId);
         }
       }
     } else {
       const result = await getClientsForSelection();
-      if (result.success) setClients(result.data as Client[]);
+      if (result.success) setClients(result.data as ClientSummary[]);
     }
   }, [isClientUser, sr?.clientId]);
 

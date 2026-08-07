@@ -1,9 +1,8 @@
 import { z } from 'zod';
 
-import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
+import { srCreateSchema } from '@/lib/schemas';
 
-export type SRCreateInput = z.infer<typeof srCreateSchema>;
-export type SRUpdateInput = z.infer<typeof srUpdateSchema>;
+type SRCreateInput = z.infer<typeof srCreateSchema>;
 
 /**
  * FormData를 SR 생성 입력 객체로 변환합니다.

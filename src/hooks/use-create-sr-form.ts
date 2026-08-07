@@ -6,15 +6,10 @@ import { createSRAction } from '@/actions/sr.actions';
 import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
+import type { ClientSummary } from '@/types/client.types';
 
 const MIN_TITLE_LENGTH = 5;
 const MIN_DESCRIPTION_LENGTH = 10;
-
-interface Client {
-  id: string;
-  code: string;
-  name: string;
-}
 
 export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; open: boolean }) {
   const [title, setTitle] = useState('');
@@ -24,7 +19,7 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
   const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
   const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -37,9 +32,8 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     if (isClientUser) {
       const profileResult = await getProfileAction();
       if (profileResult.success && profileResult.data) {
-        const userClients = (profileResult.data as any).clients || [];
-        if (userClients.length > 0) {
-          const userClient = userClients[0].client;
+        const userClient = (profileResult.data.clients ?? [])[0]?.client;
+        if (userClient) {
           setClients([{ id: userClient.id, code: userClient.code, name: userClient.name }]);
           setClientId(userClient.id);
         } else {
@@ -59,7 +53,7 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     } else {
       const result = await getClientsForSelection();
       if (result.success) {
-        setClients(result.data as Client[]);
+        setClients(result.data as ClientSummary[]);
       } else {
         toast({
           title: '오류',

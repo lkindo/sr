@@ -20,6 +20,7 @@ export interface RateLimitOptions {
 
 /**
  * Route Handler에 Rate Limit 적용
+ * (프로덕션은 rateLimit({limiter}) 만 사용, 나머지 옵션은 __tests__/api-rate-limit.test.ts:107,154,182,209 전용)
  */
 export function withRateLimit<
   T extends NextRequest = NextRequest,

@@ -13,17 +13,19 @@ import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithAction
 import { UserActions } from '@/components/users/UserActions';
 import { getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
 import { cn } from '@/lib/utils';
+import type { ClientSummary } from '@/types/client.types';
+import type { UserListItem } from '@/types/user-view';
 
 interface UserMobileListProps {
-  users: any[];
+  users: UserListItem[];
   loading: boolean;
   searchQuery: string;
   selectedUserIds: Set<string>;
-  clients: any[];
+  clients: ClientSummary[];
   onToggleUser: (userId: string) => void;
-  onAssignRoles: (user: any) => void;
+  onAssignRoles: (user: UserListItem) => void;
   onToggleActive: (userId: string, isActive: boolean) => void;
-  onDelete: (user: any) => void;
+  onDelete: (user: UserListItem) => void;
   onRefresh: () => void;
 }
 

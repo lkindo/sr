@@ -10,7 +10,7 @@
     "dev:test": "cross-env SKIP_ENV_VALIDATION=true next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --cache --cache-location .eslintcache --max-warnings 930",
+    "lint": "eslint . --cache --cache-location .eslintcache --max-warnings 897",
     "lint:fix": "eslint . --fix",
     "format:check": "prettier . --check --cache",
     "format:fix": "prettier . --write",
