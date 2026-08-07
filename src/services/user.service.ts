@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { SECURITY } from '@/lib/constants';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
+import { INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, USER_WITH_ROLES_INCLUDE } from '@/lib/prisma-selects';
 import { userUpdateSchema } from '@/lib/schemas';
@@ -30,14 +31,6 @@ const SR_HANDLING_REQUIRED_PERMISSIONS = [
   'COMMENT:CREATE',
   'COMMENT:READ',
 ];
-
-/**
- * SR 담당자가 될 수 있는 내부 역할. (lib/policies 의 INTERNAL_ROLES = isInternalUser 기준과 동일)
- *
- * DB 쿼리 조건으로 써야 해서 역할명 목록 자체가 필요하므로 여기서 선언한다. 두 정의가 조용히
- * 어긋나지 않도록 user.service.coverage.test.ts 가 isInternalUser 와의 일치를 검증한다.
- */
-export const SR_HANDLER_INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
 /**
  * 사용자 서비스 (User Service)
@@ -634,7 +627,7 @@ export class UserService {
       where: {
         isActive: true,
         // 역할 축: 내부 사용자만 담당자가 될 수 있다.
-        roles: { some: { role: { name: { in: SR_HANDLER_INTERNAL_ROLES } } } },
+        roles: { some: { role: { name: { in: INTERNAL_ROLES } } } },
         AND: permissionFilters,
       },
       select: {

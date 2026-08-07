@@ -1,17 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BusinessRuleError } from '@/lib/errors';
-import { isInternalUser } from '@/lib/policies';
+import { INTERNAL_ROLES, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { SR_HANDLER_INTERNAL_ROLES, UserService } from '@/services/user.service';
+import { UserService } from '@/services/user.service';
 
 // Mock dependencies
 
 vi.mock('@/lib/prisma', () => ({
   default: {
-    $transaction: vi.fn((cb: any) =>
-      typeof cb === 'function' ? cb(prisma) : Promise.all(cb)
-    ),
+    $transaction: vi.fn((cb: any) => (typeof cb === 'function' ? cb(prisma) : Promise.all(cb))),
     user: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -330,13 +328,15 @@ describe('UserService Coverage', () => {
       });
 
     it('담당자 내부 역할 목록은 lib/policies 의 isInternalUser 기준과 일치한다', () => {
-      // 두 곳에 있는 "내부 사용자" 정의가 조용히 어긋나면 배정 규칙이 정책과 달라진다.
-      for (const role of SR_HANDLER_INTERNAL_ROLES) {
+      // 예전에는 user.service 가 ['ADMIN','MANAGER','ENGINEER'] 를 따로 선언했고 이 테스트가
+      // 두 사본의 일치를 지켰다. 이제 정책 상수 하나만 쓰므로, 지켜야 할 것은
+      // "그 상수가 isInternalUser 와 같은 것을 뜻하는가"다.
+      for (const role of INTERNAL_ROLES) {
         expect(isInternalUser({ roles: [role] } as any)).toBe(true);
       }
       // 외부(고객사) 역할은 어느 쪽 기준으로도 내부 사용자가 아니다.
       for (const role of ['CLIENT_ADMIN', 'CLIENT_USER', 'USER', 'GUEST']) {
-        expect(SR_HANDLER_INTERNAL_ROLES).not.toContain(role);
+        expect(INTERNAL_ROLES).not.toContain(role);
         expect(isInternalUser({ roles: [role] } as any)).toBe(false);
       }
     });
