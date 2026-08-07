@@ -31,6 +31,12 @@ interface Offender {
   title: string;
 }
 
+interface SkipOffender {
+  file: string;
+  line: number;
+  text: string;
+}
+
 function listSpecFiles(dir: string, base = dir): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
@@ -92,10 +98,69 @@ function hasExpectCall(body: ts.Node): boolean {
   return found;
 }
 
-function findOffenders(file: string): Offender[] {
+/**
+ * 무조건 스킵을 찾는다 — `test.skip()` (인자 없음) 과 `test.skip(true, …)`.
+ *
+ * 둘은 런타임 동작이 같다: 조건 없이 항상 건너뛴다. 그런데 스킵된 테스트는 리포트에서
+ * 실패가 아니라 "통과 아님"으로만 보여서, 화면 전체가 망가져도 CI 는 초록불이다.
+ * 2026-08 정비에서 이 상태의 테스트가 **29개** 쌓여 있었고, 스킵을 단언으로 바꾸자
+ * 존재한 적 없는 테이블을 찾던 테스트, 호출되지 않는 API 를 기다리던 테스트,
+ * 세 겹으로 깨져 있던 드래그 테스트가 한꺼번에 드러났다.
+ *
+ * `test.skip(true, …)` 까지 잡는 이유: 처음에는 `test.skip()` 만 금지했더니, 규칙을
+ * 문자로만 만족시키려고 `test.skip(true, '사유')` 로 바꾼 변경이 실제로 일어났다.
+ * 사유 문자열이 붙었을 뿐 건너뛰는 것은 똑같았다.
+ *
+ * **`if` 안의 스킵은 허용한다.** `if (!srId) test.skip(true, …)` 처럼 앞 단계 실패를
+ * 이어받는 연쇄 가드는 실제로 조건부이고, Playwright 가 권장하는 형태다.
+ */
+function findUnconditionalSkips(sf: ts.SourceFile, file: string): SkipOffender[] {
+  const out: SkipOffender[] = [];
+
+  const isConditional = (node: ts.Node): boolean => {
+    for (let p = node.parent; p; p = p.parent) {
+      if (ts.isIfStatement(p) || ts.isConditionalExpression(p)) return true;
+      // 테스트/훅 본문을 벗어나면 더 볼 필요가 없다.
+      if (ts.isFunctionLike(p) && p.parent && ts.isCallExpression(p.parent)) return false;
+    }
+    return false;
+  };
+
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      (node.expression.expression.text === 'test' || node.expression.expression.text === 'it') &&
+      node.expression.name.text === 'skip'
+    ) {
+      const [first] = node.arguments;
+      const unconditional =
+        node.arguments.length === 0 || (first && first.kind === ts.SyntaxKind.TrueKeyword);
+
+      if (unconditional && !isConditional(node)) {
+        const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+        out.push({ file, line: line + 1, text: node.getText(sf).split('\n')[0]!.trim() });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  visit(sf);
+  return out;
+}
+
+function parseSpec(file: string): ts.SourceFile {
   const fullPath = join(E2E_DIR, file);
-  const source = readFileSync(fullPath, 'utf8');
-  const sf = ts.createSourceFile(fullPath, source, ts.ScriptTarget.Latest, true);
+  return ts.createSourceFile(
+    fullPath,
+    readFileSync(fullPath, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true
+  );
+}
+
+function findOffenders(sf: ts.SourceFile, file: string): Offender[] {
   const offenders: Offender[] = [];
 
   const visit = (node: ts.Node) => {
@@ -126,24 +191,46 @@ function main() {
 
   // 전체 스펙을 게이트한다. 도입 시점에 34개 전부가 통과하므로 범위를 좁힐 이유가 없고,
   // 좁히면 그 밖에서 단언 없는 테스트가 새로 생겨도 잡지 못한다.
-  const offenders = specs.flatMap(findOffenders);
+  const offenders: Offender[] = [];
+  const skips: SkipOffender[] = [];
+  for (const file of specs) {
+    const sf = parseSpec(file);
+    offenders.push(...findOffenders(sf, file));
+    skips.push(...findUnconditionalSkips(sf, file));
+  }
 
   console.log(`[e2e-assertions] 스펙 ${specs.length}개 검사`);
 
-  if (offenders.length === 0) {
-    console.log('[e2e-assertions] OK — 단언 없는 테스트가 없다.');
+  if (offenders.length === 0 && skips.length === 0) {
+    console.log('[e2e-assertions] OK — 단언 없는 테스트도, 무조건 스킵도 없다.');
     return;
   }
 
-  console.error(`\n[e2e-assertions] 단언(expect) 없는 테스트 ${offenders.length}건:`);
-  for (const o of offenders) {
-    console.error(`  ${o.file}:${o.line}  ${o.title}`);
+  if (offenders.length > 0) {
+    console.error(`\n[e2e-assertions] 단언(expect) 없는 테스트 ${offenders.length}건:`);
+    for (const o of offenders) {
+      console.error(`  ${o.file}:${o.line}  ${o.title}`);
+    }
+    console.error(
+      '\n단언 없는 테스트는 통제가 사라져도 통과한다.\n' +
+        '  - 검증할 것이 있으면 `await expect(...)` 를 쓸 것\n' +
+        '  - 미구현 기능이면 `test.fixme(...)` 로 명시할 것 (통과로 위장하지 말 것)'
+    );
   }
-  console.error(
-    '\n단언 없는 테스트는 통제가 사라져도 통과한다.\n' +
-      '  - 검증할 것이 있으면 `await expect(...)` 를 쓸 것\n' +
-      '  - 미구현 기능이면 `test.fixme(...)` 로 명시할 것 (통과로 위장하지 말 것)'
-  );
+
+  if (skips.length > 0) {
+    console.error(`\n[e2e-assertions] 무조건 스킵 ${skips.length}건:`);
+    for (const s of skips) {
+      console.error(`  ${s.file}:${s.line}  ${s.text}`);
+    }
+    console.error(
+      '\n조건 없이 건너뛰는 테스트는 화면이 통째로 망가져도 초록불이다.\n' +
+        '  - 있어야 정상인 요소면 스킵을 지우고 `await expect(...).toBeVisible()` 로 실패하게 둘 것\n' +
+        '  - 없어야 정상이면 `await expect(...).toBeHidden()` 으로 그것을 단언할 것\n' +
+        '  - 미구현 기능이면 `test.fixme(...)` 로 명시할 것\n' +
+        '  - 앞 단계 실패를 이어받는 가드라면 `if (조건) test.skip(true, 사유)` 로 조건을 드러낼 것'
+    );
+  }
 
   process.exit(1);
 }

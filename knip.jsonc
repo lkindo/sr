@@ -1,0 +1,45 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+
+  // Next.js 관례 진입점은 importer 가 0이어도 죽은 코드가 아니다(계획서 §5).
+  // 여기 빠지면 knip 이 앱 전체를 "미사용"으로 신고한다.
+  "entry": [
+    "src/app/**/{page,layout,loading,error,global-error,not-found,template,default}.tsx",
+    "src/app/**/route.ts",
+    "src/proxy.ts",
+    "src/instrumentation.ts",
+    "src/auth.ts",
+    "src/auth.config.ts",
+    "src/**/*.stories.tsx",
+    "prisma/**",
+    "e2e/**",
+    "tests/**",
+    "scripts/**",
+    ".storybook/*.{ts,tsx}",
+
+    // shadcn 프리미티브는 벤더링된 라이브러리 표면이다. 미사용 하위 export
+    // (DialogPortal, ContextMenu*, TableCaption, useFormField 등 약 40개)를 지우면
+    // `npx shadcn add/diff` 가 upstream 과 대조할 수 없게 된다 — 계획서 §5 가 제거 금지로
+    // 못 박은 항목이다. 고칠 생각이 없는 40건을 baseline 에 넣으면 래칫이 영원히
+    // 내려가지 않으므로, 진입점으로 선언해 리포트에서 제외한다.
+    "src/components/ui/**",
+
+    // vitest.config.ts:115-120 의 alias 대상. 코드가 import 하지 않고 설정이 주입하므로
+    // knip 은 진입점을 알 수 없다.
+    "src/__tests__/mocks/**"
+  ],
+
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "prisma/**/*.ts"],
+
+  // postcss-load-config / @stryker-mutator/api 는 런타임 의존이 아니라 JSDoc `@type`
+  // 주석 안에서만 참조된다(postcss.config.mjs:1, stryker.config.mjs:2).
+  // @stryker-mutator/api 는 설치조차 되어 있지 않다 — 에디터 타입 힌트용 문자열이다.
+  //
+  // lint-staged 는 .husky/pre-commit 이 `pnpm exec lint-staged` 로 실제 실행한다.
+  // knip 이 husky 훅 안의 `pnpm exec` 를 해석하지 못해 미사용으로 오탐한다.
+  "ignoreDependencies": ["postcss-load-config", "@stryker-mutator/api", "lint-staged"],
+
+  // `type-check` 는 바이너리가 아니라 package.json 스크립트이고(.husky/pre-push),
+  // `lint-staged` 는 위와 같은 이유다.
+  "ignoreBinaries": ["type-check", "lint-staged"]
+}
