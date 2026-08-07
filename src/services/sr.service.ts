@@ -87,6 +87,33 @@ function toStoragePathname(attachment: { storagePath: string | null; fileUrl: st
 }
 
 /**
+ * 커서 페이지네이션 공통부.
+ *
+ * `take: limit + 1` 로 한 건 더 읽어 다음 페이지 존재 여부를 판단하고, 그 여분은 잘라낸다.
+ * 커서가 있으면 `skip: 1` 로 커서 행 자신을 건너뛴다 — 빠뜨리면 매 페이지마다 이전
+ * 페이지의 마지막 행이 한 번 더 나온다.
+ *
+ * 활동 내역과 댓글이 같은 규칙을 각자 복제하고 있었다. 한쪽만 고치면 두 목록의
+ * 페이징이 조용히 어긋난다.
+ */
+async function cursorPage<T extends { id: string }>(
+  fetchPage: (args: { take: number; skip?: number; cursor?: { id: string } }) => Promise<T[]>,
+  options?: { cursor?: string; limit?: number }
+): Promise<{ items: T[]; nextCursor: string | null }> {
+  const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
+  const cursor = options?.cursor;
+
+  const rows = await fetchPage({
+    take: limit + 1,
+    ...(cursor && { skip: 1, cursor: { id: cursor } }),
+  });
+
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return { items, nextCursor: hasMore ? (items[items.length - 1]?.id ?? null) : null };
+}
+
+/**
  * 담당자로 배정 가능한 사용자인지 검증하고, 검증된 사용자 정보를 반환한다.
  *
  * - 존재하지 않으면 NotFoundError (원시 FK 위반이 500 으로 새는 것을 방지)
@@ -931,27 +958,16 @@ export class SRService {
     }>;
     nextCursor: string | null;
   }> {
-    const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
-    const cursor = options?.cursor;
-
-    const activities = await prisma.sRActivity.findMany({
-      where: { srId },
-      take: limit + 1,
-      ...(cursor && {
-        skip: 1,
-        cursor: { id: cursor },
-      }),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: { id: true, name: true, image: true },
-        },
-      },
-    });
-
-    const hasMore = activities.length > limit;
-    const items = hasMore ? activities.slice(0, limit) : activities;
-    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
+    const { items, nextCursor } = await cursorPage(
+      (page) =>
+        prisma.sRActivity.findMany({
+          ...page,
+          where: { srId },
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { id: true, name: true, image: true } } },
+        }),
+      options
+    );
 
     return { activities: items, nextCursor };
   }
@@ -972,27 +988,16 @@ export class SRService {
     }>;
     nextCursor: string | null;
   }> {
-    const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
-    const cursor = options?.cursor;
-
-    const comments = await prisma.sRComment.findMany({
-      where: { srId },
-      take: limit + 1,
-      ...(cursor && {
-        skip: 1,
-        cursor: { id: cursor },
-      }),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: { id: true, name: true, image: true },
-        },
-      },
-    });
-
-    const hasMore = comments.length > limit;
-    const items = hasMore ? comments.slice(0, limit) : comments;
-    const nextCursor = hasMore ? (items[items.length - 1]?.id ?? null) : null;
+    const { items, nextCursor } = await cursorPage(
+      (page) =>
+        prisma.sRComment.findMany({
+          ...page,
+          where: { srId },
+          orderBy: { createdAt: 'desc' },
+          include: { user: { select: { id: true, name: true, image: true } } },
+        }),
+      options
+    );
 
     return { comments: items, nextCursor };
   }

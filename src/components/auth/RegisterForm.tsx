@@ -34,6 +34,46 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import type { ClientSummary } from '@/types/client.types';
 
+/** `calculatePasswordStrength` 가 돌려주는 개별 규칙 충족 여부. */
+interface PasswordChecks {
+  length: boolean;
+  lowercase: boolean;
+  uppercase: boolean;
+  number: boolean;
+  special: boolean;
+}
+
+/**
+ * 비밀번호 요구사항의 **표시 순서**.
+ *
+ * `calculatePasswordStrength` 의 `checks` 객체는 lowercase 를 uppercase 보다 먼저
+ * 선언하는데 화면은 대문자를 먼저 보여준다. 그래서 `Object.entries(checks)` 로
+ * 순회하면 두 줄의 순서가 조용히 뒤바뀐다. 순서는 여기서 명시한다.
+ */
+function passwordRequirements(checks: PasswordChecks) {
+  return [
+    { key: 'length', label: '최소 8자 이상', met: checks.length },
+    { key: 'uppercase', label: '대문자 포함', met: checks.uppercase },
+    { key: 'lowercase', label: '소문자 포함', met: checks.lowercase },
+    { key: 'number', label: '숫자 포함', met: checks.number },
+    { key: 'special', label: '특수문자 포함 (@$!%*?&#)', met: checks.special },
+  ];
+}
+
+/** 요구사항 한 줄. 충족 여부에 따라 아이콘과 색만 달라진다. */
+function PasswordRequirement({ met, label }: { met: boolean; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      {met ? (
+        <Check className="h-3 w-3 text-green-600" />
+      ) : (
+        <X className="h-3 w-3 text-muted-foreground" />
+      )}
+      <span className={met ? 'text-green-600' : 'text-muted-foreground'}>{label}</span>
+    </div>
+  );
+}
+
 // 비밀번호 강도 계산 함수
 function calculatePasswordStrength(password: string): {
   score: number;
@@ -280,86 +320,9 @@ export default function RegisterForm() {
 
                     {/* 비밀번호 요구사항 체크리스트 */}
                     <div className="grid grid-cols-1 gap-1 mt-2">
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {passwordStrength.checks.length ? (
-                          <Check className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <X className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span
-                          className={
-                            passwordStrength.checks.length
-                              ? 'text-green-600'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          최소 8자 이상
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {passwordStrength.checks.uppercase ? (
-                          <Check className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <X className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span
-                          className={
-                            passwordStrength.checks.uppercase
-                              ? 'text-green-600'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          대문자 포함
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {passwordStrength.checks.lowercase ? (
-                          <Check className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <X className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span
-                          className={
-                            passwordStrength.checks.lowercase
-                              ? 'text-green-600'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          소문자 포함
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {passwordStrength.checks.number ? (
-                          <Check className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <X className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span
-                          className={
-                            passwordStrength.checks.number
-                              ? 'text-green-600'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          숫자 포함
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs">
-                        {passwordStrength.checks.special ? (
-                          <Check className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <X className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span
-                          className={
-                            passwordStrength.checks.special
-                              ? 'text-green-600'
-                              : 'text-muted-foreground'
-                          }
-                        >
-                          특수문자 포함 (@$!%*?&#)
-                        </span>
-                      </div>
+                      {passwordRequirements(passwordStrength.checks).map(({ key, label, met }) => (
+                        <PasswordRequirement key={key} met={met} label={label} />
+                      ))}
                     </div>
                   </div>
                 )}

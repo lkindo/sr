@@ -67,6 +67,38 @@ export class UserService {
     return prisma.$transaction((tx) => cb(tx));
   }
 
+  /**
+   * 사용자 레코드를 갱신하고 그 사실을 **같은 트랜잭션에서** 감사 로그로 남긴다.
+   *
+   * 갱신과 로그가 갈라지면 "바뀌었는데 기록이 없는" 상태나 그 반대가 생긴다.
+   * 한 곳에 모아 두면 새 변이 메서드를 더할 때 로그를 빠뜨릴 여지가 줄어든다.
+   *
+   * 감사 로그의 `userId` 는 **행위자**다. 대상 사용자(`userId` 인자)와 다를 수 있어
+   * (관리자가 남을 비활성화 / 본인이 자기 비밀번호 변경) 호출부가 명시적으로 넘긴다.
+   */
+  private async applyUserUpdateWithAudit(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    data: Prisma.UserUpdateInput,
+    actionType: string,
+    changes: Record<string, unknown>,
+    actorId?: string | null,
+    ipAddress?: string | null
+  ): Promise<Omit<User, 'password'>> {
+    const user = await tx.user.update({ where: { id: userId }, data });
+
+    await auditService.createLog(tx, {
+      userId: actorId,
+      actionType,
+      targetEntity: 'User',
+      targetId: userId,
+      changes,
+      ipAddress,
+    });
+
+    return excludePassword(user);
+  }
+
   async getUserById(id: string) {
     const user = await prisma.user.findUnique({
       where: { id },
@@ -382,21 +414,15 @@ export class UserService {
       }
 
       // 3. 진행 중인 SR이 없으면 비활성화
-      const user = await tx.user.update({
-        where: { id: userId },
-        data: { isActive: false },
-      });
-
-      await auditService.createLog(tx, {
-        userId: actorId,
-        actionType: 'USER_DEACTIVATE',
-        targetEntity: 'User',
-        targetId: userId,
-        changes: { status: 'inactive' },
-        ipAddress,
-      });
-
-      return excludePassword(user);
+      return this.applyUserUpdateWithAudit(
+        tx,
+        userId,
+        { isActive: false },
+        'USER_DEACTIVATE',
+        { status: 'inactive' },
+        actorId,
+        ipAddress
+      );
     });
   }
 
@@ -423,7 +449,8 @@ export class UserService {
       }),
     ]);
 
-    const existingUser = await prisma.user.findUnique({      where: { id: userId },
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
       include: USER_WITH_ROLES_INCLUDE,
     });
 
@@ -651,22 +678,16 @@ export class UserService {
     const hashedPassword = await hash(newPassword, SECURITY.BCRYPT_WORK_FACTOR);
 
     return this.runInTransaction(async (tx) => {
-      // 비밀번호 업데이트
-      const updatedUser = await tx.user.update({
-        where: { id: userId },
-        data: { password: hashedPassword },
-      });
-
-      await auditService.createLog(tx, {
-        userId: actorId || userId,
-        actionType: 'PASSWORD_CHANGE',
-        targetEntity: 'User',
-        targetId: userId,
-        changes: { note: '사용자 본인 비밀번호 변경 완료' },
-        ipAddress,
-      });
-
-      return excludePassword(updatedUser);
+      // 본인이 바꾸는 경우가 대부분이라 행위자 기본값이 대상 사용자 자신이다.
+      return this.applyUserUpdateWithAudit(
+        tx,
+        userId,
+        { password: hashedPassword },
+        'PASSWORD_CHANGE',
+        { note: '사용자 본인 비밀번호 변경 완료' },
+        actorId || userId,
+        ipAddress
+      );
     });
   }
 }

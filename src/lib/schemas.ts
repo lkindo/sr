@@ -323,3 +323,42 @@ export const serviceCategoryCreateSchema = z.object({
 });
 
 export const serviceCategoryUpdateSchema = serviceCategoryCreateSchema.partial();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 라우트 본문 스키마
+//
+// 아래 넷은 각자의 라우트 파일 안에 선언돼 있었다. 규칙이 라우트에 흩어져 있으면
+// "이 엔드포인트가 무엇을 받는가"를 알려면 파일을 열어야 하고, 같은 필드에 대한
+// 상한이 파일마다 어긋나도 아무도 모른다. 규칙 자체는 그대로 옮긴 순수 이동이다.
+//
+// **`profile/route.ts` 의 `updateProfileSchema` 는 여기로 옮기지 않는다.**
+// 그쪽은 avatar 에 `.or(z.literal(''))` 가 붙어 있고 그게 "아바타 지우기" 경로다
+// (settings/profile/page.tsx). 아래 userUpdateSchema 에는 그 분기가 없어서,
+// 합치면 아바타를 지울 수 없게 된다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** SR 댓글 본문. 상한이 없으면 인증된 단일 POST 로 무제한 TEXT 를 영속시킬 수 있다(감사 4.3). */
+export const commentSchema = z.object({
+  content: z
+    .string()
+    .min(1, '댓글 내용을 입력해주세요.')
+    .max(FIELD_LIMITS.NOTE, `댓글은 ${FIELD_LIMITS.NOTE}자를 초과할 수 없습니다.`),
+});
+
+/** SR 상태 전이 요청. 실제 전이 가능 여부는 sr-state-machine 이 판정한다. */
+export const statusActionSchema = z.object({
+  action: z.enum(['complete', 'hold', 'reject', 'reopen', 'start', 'resume', 'confirm']),
+  reason: z.string().optional(),
+  resolutionDescription: z.string().optional(),
+});
+
+/** 사용자 고객사 소속 변경. `force` 는 진행 중 SR 이 있어도 강행할지 여부다. */
+export const clientAssignSchema = z.object({
+  clientId: z.string().min(1, '고객사 ID가 필요합니다'),
+  force: z.boolean().optional(),
+});
+
+/** 사용자 역할 배정. 빈 배열은 "역할 전부 해제"라는 의미이므로 min(1) 을 걸지 않는다. */
+export const roleAssignSchema = z.object({
+  roleIds: z.array(z.string()),
+});
