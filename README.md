@@ -215,13 +215,11 @@ pnpm storybook         # 스토리북 실행 (6006 포트)
 - [SERVER_RUNBOOK_2026-08-01.md](./docs/SERVER_RUNBOOK_2026-08-01.md): 프로덕션 호스트에서 한 번 실행하는 서버 측 잔여 작업 런북. 각 블록이 멱등하고 단계마다 확인 명령을 제공합니다.
 - [backup-and-restore.md](./docs/backup-and-restore.md): 프로덕션 DB(`pg_dump -Fc`)와 첨부파일(`/app/var/uploads` tar) 백업·복구 절차 및 보존기간(기본 14일) 정책입니다.
 
-### 감사 · 정비
+### 감사
 
 - [PROJECT_AUDIT_2026-07-29.md](./docs/archive/PROJECT_AUDIT_2026-07-29.md): 10개 영역 교차 검증 감사 보고서. 게이트 실행 기반 재평가로 82/100(B), 배포 가능(Go) 판정입니다.
-- [CLEANUP_PLAN_2026-08-06.md](./docs/CLEANUP_PLAN_2026-08-06.md): 6축 병렬 감사로 확정한 132건의 동작 보존 범위 소스 정비 계획서. ESLint 실측치와 고아 파일·팬텀 의존성 목록을 포함합니다.
 - [specs/2026-06-17-rules-and-harness-design.md](./docs/superpowers/specs/2026-06-17-rules-and-harness-design.md): 프로젝트 헌법과 통합 검증 하네스 스크립트 구축 설계 명세서입니다.
 
-### 사용자 매뉴얼 · 변경 이력
+### 사용자 매뉴얼
 
 - [system_manual.md](./docs/system_manual.md): 화면별 기능·UI 구성요소·RBAC·SLA/상태 전이 제약을 정리한 사용자 및 운영 매뉴얼입니다. (동일 내용의 [.html](./docs/system_manual.html) / [.pptx](./docs/system_manual.pptx) 병존)
-- [CHANGELOG.md](./docs/CHANGELOG.md): 버전별 변경 이력. 최신 항목은 v0.2.0(2026-01-22) — 모바일 UX/디자인 시스템 고도화, PWA `navigationPreload`, 관리자·보안 기능입니다.
