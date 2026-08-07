@@ -19,56 +19,28 @@ import { expect, test } from '@playwright/test';
 
 test.describe('서비스 카테고리', () => {
   test('서비스 카테고리 API 응답 확인', async ({ page }) => {
-    // API 응답 캡처
-    let categoriesResponse: any = null;
+    // 이 테스트는 예전에 /srs 를 열어 놓고 응답이 잡히기를 기다렸는데, /srs 는
+    // /api/service-categories 를 호출하지 않는다(SR 생성 다이얼로그가 서버 액션
+    // getServiceCategoriesForSelection 을 쓴다). 그래서 항상 스킵으로 끝났고 이 엔드포인트를
+    // 한 번도 검증한 적이 없다. 엔드포인트 자체는 살아 있고 테넌트 스코핑까지 하므로
+    // (route.ts 주석의 감사 4.1) 직접 호출해 단언한다.
+    const response = await page.request.get('/api/service-categories');
+    expect(response.status()).toBe(200);
 
-    page.on('response', async (response) => {
-      if (response.url().includes('/api/service-categories')) {
-        try {
-          categoriesResponse = await response.json();
-        } catch (e) {
-          console.log('⚠️ API 응답 파싱 실패');
-        }
-      }
-    });
+    const body = await response.json();
+    const categories = Array.isArray(body) ? body : (body.data ?? []);
+    expect(Array.isArray(categories)).toBe(true);
 
-    // SR 생성 페이지로 이동 (카테고리 API 호출 유도)
-    // 고정 sleep 대신 해당 API 응답 자체를 기다린다. 호출이 없으면 아래에서 스킵 판단.
-    const categoriesCall = page
-      .waitForResponse((resp) => resp.url().includes('/api/service-categories'), {
-        timeout: 15000,
-      })
-      .catch(() => null);
+    // 시드가 카테고리 5개를 넣는다. 0개면 스코핑 회귀이거나 시드 누락이다.
+    expect(categories.length).toBeGreaterThan(0);
 
-    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 15000,
-    });
-    await categoriesCall;
-
-    if (!categoriesResponse) {
-      console.log('⚠️ Service Categories API 응답을 캡처하지 못했습니다. 테스트 스킵.');
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
-      return;
-    }
-
-    console.log('✅ Service Categories API 응답 캡처 성공');
-
-    // 응답 데이터 확인
-    const categories = Array.isArray(categoriesResponse)
-      ? categoriesResponse
-      : categoriesResponse.data || [];
-
+    // ADMIN 세션이므로 내부 사용자 분기를 타고 담당자 이메일까지 온다.
+    // 외부 사용자에게 이 필드가 새면 감사 4.1 의 재발이다.
     console.log(`📊 서비스 카테고리 개수: ${categories.length}`);
-
-    if (categories.length > 0) {
-      console.log('📋 카테고리 목록:');
-      categories.slice(0, 5).forEach((cat: any) => {
-        console.log(`  - ${cat.name || cat.title || cat.id}`);
-      });
+    for (const cat of categories) {
+      expect(cat).toHaveProperty('id');
+      expect(cat).toHaveProperty('categoryName');
     }
-
-    expect(categories.length).toBeGreaterThanOrEqual(0);
   });
 
   test('SR 생성 시 서비스 카테고리 선택', async ({ page }) => {
@@ -82,27 +54,14 @@ test.describe('서비스 카테고리', () => {
       .locator('button')
       .filter({ hasText: /SR 요청|등록|생성|New SR/i })
       .first();
-    await createButton.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const buttonVisible = await createButton.isVisible().catch(() => false);
-
-    if (!buttonVisible) {
-      console.log('⚠️ SR 생성 버튼을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
-      return;
-    }
+    await expect(createButton).toBeVisible({ timeout: 10000 });
 
     await createButton.click();
     await page.waitForTimeout(500);
 
     // Dialog 확인
     const dialog = page.locator('[role="dialog"], .dialog, .modal').first();
-    const dialogVisible = await dialog.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (!dialogVisible) {
-      console.log('⚠️ SR 생성 Dialog를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
-      return;
-    }
+    await expect(dialog).toBeVisible({ timeout: 5000 });
 
     // 카테고리는 선택된 고객사로 스코프된다(감사 3.19). 고객사를 고르기 전에는
     // categories 가 비어 있어 셀렉트가 disabled 다 — 앱의 의도된 계약이므로
@@ -119,22 +78,7 @@ test.describe('서비스 카테고리', () => {
       .locator('select[name*="category"], [role="combobox"]')
       .filter({ hasText: /카테고리|Category|서비스/i })
       .first();
-    const selectVisible = await categorySelect.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (!selectVisible) {
-      console.log('⚠️ 서비스 카테고리 Select를 찾을 수 없습니다.');
-
-      // Dialog 닫기
-      const closeButton = dialog
-        .locator('button')
-        .filter({ hasText: /취소|닫기|Close/i })
-        .first();
-      await closeButton.click().catch(() => {});
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
-      return;
-    }
-
-    console.log('✅ 서비스 카테고리 Select 발견');
+    await expect(categorySelect).toBeVisible({ timeout: 5000 });
 
     // 고객사 선택 → 서버 액션 → categories 반영 사이의 레이스를 없앤다.
     // isVisible() 은 enabled 를 보장하지 않아 예전에는 disabled 버튼을 클릭하다 타임아웃났다.
@@ -174,21 +118,12 @@ test.describe('서비스 카테고리', () => {
     });
 
     // 첫 번째 고객사 클릭
-    const firstClient = page.locator('tbody tr, [role="row"]').first();
-    // 목록 로드를 실제로 기다린다 (고객사가 없을 수도 있으므로 판단은 아래에서)
-    await firstClient.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const clientVisible = await firstClient.isVisible().catch(() => false);
+    // 목록은 스켈레톤이 걷힌 뒤에 채워진다. 행이 아니라 "상세로 가는 링크"를 직접
+    // 기다려야 빈 tbody 를 잡고 실패하지 않는다.
+    const clientLink = page.locator('tbody a[href^="/clients/"]').first();
+    await expect(clientLink).toBeVisible({ timeout: 20000 });
 
-    if (!clientVisible) {
-      console.log('⚠️ 고객사가 없습니다. 테스트 스킵.');
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
-      return;
-    }
-
-    const clientLink = firstClient.locator('a').first();
-    const linkVisible = await clientLink.isVisible({ timeout: 2000 }).catch(() => false);
-
-    if (linkVisible) {
+    {
       // API 응답 캡처
       let clientCategoriesResponse: any = null;
 
@@ -223,53 +158,31 @@ test.describe('서비스 카테고리', () => {
           console.log('⚠️ 고객사별 카테고리 API 호출이 없거나 응답을 캡처하지 못했습니다.');
         }
       }
-    } else {
-      console.log('⚠️ 고객사 링크를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
     }
   });
 
-  test('서비스 카테고리 필터링', async ({ page }) => {
+  // SR 목록에는 카테고리 필터가 없다. SRsDataTable 이 제공하는 필터는 상태 / 우선순위 /
+  // 고객사 / 담당자 네 가지뿐이다(SRsDataTable.tsx 의 SelectValue placeholder 참조).
+  // 이 테스트는 그 사실을 몰랐던 채 "필터를 못 찾으면 스킵"으로 끝나 한 번도 실행된 적이
+  // 없다. 기능이 생기면 fixme 를 떼면 되고, 그때까지 초록불로 위장하지 않는다.
+  test.fixme('서비스 카테고리 필터링', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
       timeout: 15000,
     });
 
-    // 카테고리 필터 Select 찾기
     const categoryFilter = page
       .locator('select[name*="category"], [role="combobox"]')
       .filter({ hasText: /카테고리|Category/i })
       .first();
-    // 필터 UI 렌더링을 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await categoryFilter.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const filterVisible = await categoryFilter.isVisible().catch(() => false);
+    await expect(categoryFilter).toBeVisible({ timeout: 10000 });
 
-    if (!filterVisible) {
-      console.log('⚠️ 카테고리 필터를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
-      return;
-    }
-
-    console.log('✅ 카테고리 필터 발견');
-
-    // 필터 적용
     await categoryFilter.click();
-    await page.waitForTimeout(300);
-
     const options = page.locator('[role="option"]');
-    const optionCount = await options.count();
+    await expect(options.first()).toBeVisible({ timeout: 5000 });
+    await options.first().click();
 
-    if (optionCount > 0) {
-      await options.first().click();
-      await page.waitForTimeout(1000);
-
-      console.log('✅ 카테고리 필터 적용 완료');
-
-      // 필터링 후 SR 목록 확인
-      const rows = page.locator('tbody tr, [role="row"]');
-      const rowCount = await rows.count();
-
-      console.log(`📊 필터링된 SR 개수: ${rowCount}`);
-    }
+    // 필터 적용 후에도 목록 테이블은 유지된다.
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible();
   });
 });

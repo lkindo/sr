@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 /**
  * Organization 페이지 테스트
@@ -17,6 +17,43 @@ import { expect, test } from '@playwright/test';
  * waitFor({ state: 'visible' }).catch(() => {}) 로 기다린 뒤 판단한다.
  */
 
+/**
+ * 조직도 본문이 실제로 그려질 때까지 기다린다.
+ *
+ * 이 화면은 클라이언트에서 고객사/사용자를 받아 그리므로 처음에는 main 안에
+ * "로딩 중..." 만 있다. main 가시성만 기다리면 그 상태에서 통과해 버려서,
+ * 뒤따르는 단언이 아직 비어 있는 DOM 을 보고 실패한다.
+ */
+async function expectOrganizationLoaded(page: Page) {
+  await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('로딩 중...')).toHaveCount(0, { timeout: 30000 });
+}
+
+/**
+ * dnd-kit 드래그를 실제로 발생시킨다.
+ *
+ * Playwright 의 `locator.dragTo()` 는 여기서 동작하지 않는다. OrganizationTree 는
+ * PointerSensor 를 `activationConstraint: { distance: 8 }` 로 쓰는데, dragTo 는
+ * 중간 이동 없이 down→up 에 가깝게 움직여 8px 임계값을 넘기지 못하고 드래그가
+ * 시작조차 하지 않는다(예전 테스트가 여기서 타임아웃났다).
+ * 임계값을 확실히 넘기고 목적지까지 여러 단계로 움직인다.
+ */
+async function dragTo(page: Page, handle: Locator, target: Locator) {
+  const from = await handle.boundingBox();
+  const to = await target.boundingBox();
+  if (!from || !to) throw new Error('드래그 원본 또는 대상의 위치를 구할 수 없습니다.');
+
+  const startX = from.x + from.width / 2;
+  const startY = from.y + from.height / 2;
+
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  // 8px 활성화 임계값을 넘긴다.
+  await page.mouse.move(startX + 20, startY, { steps: 5 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
+  await page.mouse.up();
+}
+
 test.describe('Organization 페이지', () => {
   test('Organization 페이지 접근', async ({ page }) => {
     await page.goto('/organization', { waitUntil: 'domcontentloaded' });
@@ -30,23 +67,13 @@ test.describe('Organization 페이지', () => {
 
   test('조직도 트리 구조 확인', async ({ page }) => {
     await page.goto('/organization', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectOrganizationLoaded(page);
 
     // 트리 구조 또는 카드 레이아웃 확인
     // OrganizationTree renders a list of cards with class "space-y-2" wrapper
     // We look for client card headers which contain "사용자 추가" button or client name
     const treeOrCards = page.locator('.space-y-2 > .border, .sr-card-template').first();
-    // 조직도 데이터 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await treeOrCards.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const structureVisible = await treeOrCards.isVisible().catch(() => false);
-
-    if (!structureVisible) {
-      console.log('⚠️ 조직도 구조를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
-      return;
-    }
-
-    console.log('✅ 조직도 트리 구조 확인');
+    await expect(treeOrCards).toBeVisible({ timeout: 10000 });
 
     // 고객사 목록이 표시되는지 확인
     const clientElements = page.locator('button:has-text("사용자 추가")'); // Each client header has "사용자 추가" button (if admin) or just check for rows
@@ -58,20 +85,12 @@ test.describe('Organization 페이지', () => {
 
   test('고객사별 사용자 목록 확인', async ({ page }) => {
     await page.goto('/organization', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectOrganizationLoaded(page);
 
     // 첫 번째 고객사 찾기
     // We assume client rows are div.border.rounded-lg
     const firstClient = page.locator('.space-y-2 > .border').first();
-    // 조직도 데이터 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await firstClient.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const clientVisible = await firstClient.isVisible().catch(() => false);
-
-    if (!clientVisible) {
-      console.log('⚠️ 고객사를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
-      return;
-    }
+    await expect(firstClient).toBeVisible({ timeout: 10000 });
 
     const clientName = (await firstClient.textContent()) || '고객사';
     console.log(`📋 고객사: ${clientName}`);
@@ -98,151 +117,100 @@ test.describe('Organization 페이지', () => {
   });
   test('사용자 Drag & Drop 재배정 (기능 존재 시)', async ({ page }) => {
     await page.goto('/organization', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
+    await expectOrganizationLoaded(page);
 
-    // 1. Ensure at least one client is expanded and has users
-    const firstClient = page.locator('.space-y-2 > .border').first();
-    // 조직도 데이터 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await firstClient.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    // 드래그 핸들은 **펼쳐진** 고객사 안에서만 렌더된다(OrganizationTree 의 isExpanded).
+    // 예전에는 첫 번째 고객사만 펼쳤는데, 그 자리에 소속 사용자가 0명인 고객사가 오면
+    // 핸들이 없어 그대로 스킵됐다. 목록 순서에 기대지 않고 "사용자를 가진 고객사"를 찾는다.
+    //
+    // 전부 펼치지 않는 이유: 카드가 길어지면 목적지 카드가 뷰포트 밖으로 밀려나고,
+    // mouse.move 는 자동 스크롤을 하지 않아 드롭이 아예 잡히지 않는다.
+    const clientCards = page.locator('.space-y-2 > .border');
+    await expect(clientCards.first()).toBeVisible({ timeout: 10000 });
 
-    if (!(await firstClient.isVisible())) {
-      console.log('⚠️ 고객사가 없습니다. 테스트 스킵');
-      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
-      return;
-    }
+    // 이동하려면 고객사가 최소 2개 있어야 한다(출발지 + 목적지).
+    const clientCount = await clientCards.count();
+    expect(clientCount).toBeGreaterThanOrEqual(2);
 
-    // Expand first client
-    const expandButton = firstClient.locator('button').first();
-    const userList = firstClient.locator('.pl-12'); // User list container
-
-    if (!(await userList.isVisible().catch(() => false))) {
-      await expandButton.click();
-      // Wait for data fetch and render
-      await expect(page.locator('.cursor-grab').first())
-        .toBeVisible({ timeout: 5000 })
-        .catch(() => {});
-    }
-
-    // Drag 가능한 사용자 카드 찾기 (dnd-kit useDraggable handle)
-    const draggableUser = page.locator('.cursor-grab').first();
-    const isDraggable = await draggableUser.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (!isDraggable) {
-      console.log('⚠️ Drag & Drop 기능이 구현되어 있지 않습니다. 테스트 스킵.');
-      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
-      return;
-    }
-
-    console.log('✅ Drag & Drop 기능 발견');
-
-    // Drop 대상 찾기 (첫번째 고객사 말고 다른 고객사로 이동)
-    const dropTargets = page.locator('[class*="drop"], [data-droppable="true"]'); // .client-header usually
-    const count = await dropTargets.count();
-
-    if (count < 2) {
-      console.log('⚠️ 이동할 수 있는 다른 고객사가 부족합니다.');
-      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
-      return;
-    }
-
-    const targetIndex = 1; // 두 번째 고객사로 이동
-    const dropTarget = dropTargets.nth(targetIndex);
-
-    // 1. Drag & Drop -> 취소 테스트
-    try {
-      console.log('🔄 Drag & Drop 취소 테스트 시작');
-      await draggableUser.dragTo(dropTarget);
-      await page.waitForTimeout(500);
-
-      const confirmDialog = page.locator('[role="dialog"], .dialog').first();
-      await expect(confirmDialog).toBeVisible({ timeout: 5000 });
-      console.log('✅ 재배정 확인 Dialog 표시됨');
-
-      const cancelButton = confirmDialog
-        .locator('button')
-        .filter({ hasText: /취소|Cancel/i })
-        .first();
-      await cancelButton.click();
-      await expect(confirmDialog).not.toBeVisible();
-      console.log('✅ 재배정 취소 완료');
-    } catch (error) {
-      console.log('⚠️ Drag & Drop 취소 테스트 실패:', error);
-      throw error;
-    }
-
-    // 2. Drag & Drop -> 확인(이동) 테스트
-    try {
-      console.log('🔄 Drag & Drop 확인(이동) 테스트 시작');
-      // 다시 드래그 (상태가 초기화되었는지 확인 겸)
-      await draggableUser.dragTo(dropTarget);
-      await page.waitForTimeout(500);
-
-      const confirmDialog = page.locator('[role="dialog"], .dialog').first();
-      await expect(confirmDialog).toBeVisible({ timeout: 5000 });
-
-      // 확인 버튼 클릭
-      const confirmButton = confirmDialog
-        .locator('button')
-        .filter({ hasText: /확인|이동|Confirm|Move/i })
-        .first();
-      await confirmButton.click();
-
-      // 성공 메시지 또는 UI 변경 대기
-      // Note: 실제 이동 로직은 Mocking 되지 않았으므로 에러가 날 수도 있고, 변경 사항이 반영될 수도 있음.
-      // 여기서는 에러 없이 다이얼로그가 닫히고, 후속 처리가 되는지 확인
-
-      await expect(confirmDialog).not.toBeVisible({ timeout: 5000 });
-      console.log('✅ 재배정 확인 버튼 클릭 완료, 다이얼로그 닫힘');
-
-      // 추가적인 검증: 토스트 메시지나 UI 업데이트 확인 (선택 사항)
-    } catch (error) {
-      console.log('⚠️ Drag & Drop 확인 테스트 실패:', error);
-      throw error;
-    }
-
-    // 3. 연속 동작 테스트 (버그 재현용: 확인 후 다시 드래그 시도)
-    try {
-      console.log('🔄 연속 Drag & Drop 시도 (버그 재현 확인)');
-      await page.waitForTimeout(1000);
-
-      // 같은 사용자 혹은 다른 사용자를 다시 드래그
-      // Note: 이전 드래그로 사용자가 이동했을 수 있으므로 다시 찾거나, 같은 변수 사용 (만약 DOM이 갱신되었다면 에러날 수 있음)
-      // 다시 찾기
-      const draggableUser2 = page.locator('.cursor-grab').first();
-      // 같은 타겟 혹은 다른 타겟
-      // 이전 이동으로 targetIndex(1)에 사용자가 추가되었을 것임.
-      // 다시 같은 곳으로 이동 시도? 어차피 사용자는 1명 이동했으므로,
-      // 원래 그룹에 남은 다른 사용자가 있다면 그걸 드래그.
-      // 만약 사용자가 1명뿐이었다면, 1번 그룹으로 이동했으므로 1번 그룹에서 0번 그룹으로 이동 시도해야 함.
-
-      // 간단하게: 현재 화면에 보이는 첫번째 드래그 핸들을 잡고,
-      // 현재 보이지 않는(혹은 다른) 드롭 타겟으로 이동.
-
-      // 안전하게 다시 요소 확보
-      const dragHandles = page.locator('.cursor-grab');
-      if ((await dragHandles.count()) === 0) {
-        console.log('⚠️ 더 이상 이동할 사용자가 없습니다.');
-      } else {
-        const handle = dragHandles.first();
-        // 타겟도 다시 확보? 그냥 기존 dropTarget 사용 (같은 곳으로 이동 시도 -> 경고 뜰 수도 있음)
-        // 만약 이미 이동한 사용자라면 "같은 고객사로 이동 불가" 뜰 것임.
-        // 다른 고객사로 이동 시도
-
-        const dropTarget2 = dropTargets.nth(targetIndex === 1 ? 0 : 1);
-
-        await handle.dragTo(dropTarget2);
-        await page.waitForTimeout(500);
-
-        const anyDialog = page.locator('[role="dialog"], .dialog, [role="alert"]').first();
-        if (await anyDialog.isVisible()) {
-          const text = await anyDialog.textContent();
-          console.log(`ℹ️ 세 번째 시도 결과 Dialog: ${text}`);
-        }
-
-        console.log('✅ 연속 동작 테스트 수행 완료');
+    // 1) 카드 헤더의 "N명" 배지로 사용자가 있는 고객사를 고른다.
+    //    펼쳐 보고 판단하면 확장 → 사용자 fetch → 리렌더가 겹쳐 카드 DOM 이 교체되고,
+    //    루프 중간의 클릭이 엉뚱한 카드를 토글한다. 펼치기 전에 결정한다.
+    let sourceIndex = -1;
+    for (let i = 0; i < clientCount; i++) {
+      const badge = await clientCards
+        .nth(i)
+        .getByText(/^\d+명$/)
+        .first()
+        .textContent()
+        .catch(() => null);
+      if (badge && Number(badge.replace('명', '')) > 0) {
+        sourceIndex = i;
+        break;
       }
-    } catch (e) {
-      console.log('⚠️ 연속 동작 테스트 중 에러:', e);
     }
+    // 시드가 고객사에 사용자를 배정하므로, 어느 고객사에도 사용자가 없으면 회귀다.
+    expect(sourceIndex).toBeGreaterThanOrEqual(0);
+
+    // 2) 출발지 카드만 펼친다 — 전부 펼치면 목적지가 뷰포트 밖으로 밀려서
+    //    mouse.move 가 닿지 못한다(자동 스크롤이 없다).
+    await clientCards.nth(sourceIndex).locator('button').first().click();
+    await expect(clientCards.nth(sourceIndex).locator('.cursor-grab').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    // Drop 대상 = 고객사 카드 자체다. dnd-kit 의 useDroppable 은 setNodeRef 만 걸 뿐
+    // 클래스나 data 속성을 붙이지 않으므로, 예전 셀렉터
+    // `[class*="drop"], [data-droppable="true"]` 는 처음부터 아무것도 찾지 못했다.
+    // **출발지와 다른** 고객사로 옮겨야 확인 다이얼로그가 뜬다(같은 고객사면 토스트만 뜬다).
+    const targetIndex = sourceIndex === 0 ? 1 : 0;
+    const dropTarget = clientCards.nth(targetIndex);
+    const sourceCard = clientCards.nth(sourceIndex);
+    const draggableUser = sourceCard.locator('.cursor-grab').first();
+    await expect(draggableUser).toBeVisible({ timeout: 15000 });
+    await expect(dropTarget).toBeVisible();
+
+    // 재배정 확인은 Radix **AlertDialog** 라 role 이 `alertdialog` 다.
+    // 예전 셀렉터 `[role="dialog"], .dialog` 로는 영영 찾지 못한다.
+    const confirmDialog = page.getByRole('alertdialog');
+
+    // 1. 드래그 → 확인 다이얼로그 → 취소하면 아무 일도 일어나지 않아야 한다.
+    await dragTo(page, draggableUser, dropTarget);
+    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+    await confirmDialog
+      .locator('button')
+      .filter({ hasText: /취소|Cancel/i })
+      .first()
+      .click();
+    await expect(confirmDialog).not.toBeVisible();
+
+    // 2. 다시 드래그 → 확인하면 다이얼로그가 닫혀야 한다.
+    //    (1 에서 취소했으므로 드래그 상태가 초기화되어 재시도가 가능해야 한다.)
+    await dragTo(page, sourceCard.locator('.cursor-grab').first(), dropTarget);
+    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+    await confirmDialog
+      .locator('button')
+      .filter({ hasText: /확인|이동|Confirm|Move/i })
+      .first()
+      .click();
+    await expect(confirmDialog).not.toBeVisible({ timeout: 10000 });
+
+    // 3. 확인까지 마친 뒤에도 다음 드래그가 되어야 한다.
+    //    예전에 "한 번 확인하면 그 뒤 드래그가 먹지 않는" 버그가 있었고, 이 단계가 그 회귀 가드다.
+    //    동시에 2 에서 옮긴 사용자를 **원래 고객사로 되돌려** 이 스펙을 반복 실행 가능하게
+    //    유지한다. (되돌리지 않으면 한 번 돌 때마다 사용자가 한쪽으로 쏠려서, 다음 실행 때
+    //    출발지에 사용자가 없어 실패한다 — 실제로 그렇게 깨졌다.)
+    await expectOrganizationLoaded(page);
+    await clientCards.nth(targetIndex).locator('button').first().click();
+    const movedUser = clientCards.nth(targetIndex).locator('.cursor-grab').first();
+    await expect(movedUser).toBeVisible({ timeout: 15000 });
+
+    await dragTo(page, movedUser, sourceCard);
+    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+    await confirmDialog
+      .locator('button')
+      .filter({ hasText: /확인|이동|Confirm|Move/i })
+      .first()
+      .click();
+    await expect(confirmDialog).not.toBeVisible({ timeout: 10000 });
   });
 });
