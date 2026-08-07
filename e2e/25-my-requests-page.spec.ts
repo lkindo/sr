@@ -32,7 +32,7 @@ test.describe('My Requests 페이지', () => {
 
     if (!isVisible) {
       console.log('⚠️ My Requests 페이지 로드 지연. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '내 요청 목록 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -59,7 +59,7 @@ test.describe('My Requests 페이지', () => {
 
     if (!myRequestsResponse) {
       console.log('⚠️ My Requests API 응답을 캡처하지 못했습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '내 요청 목록 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -99,7 +99,7 @@ test.describe('My Requests 페이지', () => {
 
     if (!tableVisible) {
       console.log('⚠️ SR 목록 테이블을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '내 요청 목록 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -132,7 +132,7 @@ test.describe('My Requests 페이지', () => {
 
     if (!filterVisible) {
       console.log('⚠️ 상태 필터를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '내 요청 목록 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -178,7 +178,7 @@ test.describe('My Requests 페이지', () => {
 
     if (!headerVisible) {
       console.log('⚠️ 정렬 가능한 헤더를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '내 요청 목록 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -214,7 +214,7 @@ test.describe('My Requests 페이지', () => {
 
     if (!rowVisible) {
       console.log('⚠️ SR이 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '내 요청 목록 조건 미충족으로 테스트 스킵');
       return;
     }
 

@@ -36,7 +36,7 @@ test.describe('Settings 페이지', () => {
       await expect(page.locator('body')).toBeVisible();
     } else {
       console.log(`⚠️ 예상치 못한 리디렉션: ${url}`);
-      test.skip();
+      test.skip(true, '설정 화면 조건 미충족으로 테스트 스킵');
     }
   });
 
@@ -70,7 +70,7 @@ test.describe('Settings 페이지', () => {
 
     if (!nameVisible) {
       console.log('⚠️ 이름 입력 필드를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '설정 화면 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -141,7 +141,7 @@ test.describe('Settings 페이지', () => {
 
     if (!elementVisible) {
       console.log('⚠️ 비밀번호 관련 요소를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '설정 화면 조건 미충족으로 테스트 스킵');
       return;
     }
     console.log('✅ 비밀번호 관련 요소 발견 - 테스트 통과');
@@ -160,7 +160,7 @@ test.describe('Settings 페이지', () => {
 
     if (!contentVisible) {
       console.log('⚠️ Notification 페이지를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '설정 화면 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -183,7 +183,7 @@ test.describe('Settings 페이지', () => {
 
     if (!switchVisible) {
       console.log('⚠️ 알림 설정 토글을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '설정 화면 조건 미충족으로 테스트 스킵');
       return;
     }
 

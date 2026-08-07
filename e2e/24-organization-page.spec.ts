@@ -42,7 +42,7 @@ test.describe('Organization 페이지', () => {
 
     if (!structureVisible) {
       console.log('⚠️ 조직도 구조를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -69,7 +69,7 @@ test.describe('Organization 페이지', () => {
 
     if (!clientVisible) {
       console.log('⚠️ 고객사를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -107,7 +107,7 @@ test.describe('Organization 페이지', () => {
 
     if (!(await firstClient.isVisible())) {
       console.log('⚠️ 고객사가 없습니다. 테스트 스킵');
-      test.skip();
+      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -129,7 +129,7 @@ test.describe('Organization 페이지', () => {
 
     if (!isDraggable) {
       console.log('⚠️ Drag & Drop 기능이 구현되어 있지 않습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
       return;
     }
 
@@ -141,7 +141,7 @@ test.describe('Organization 페이지', () => {
 
     if (count < 2) {
       console.log('⚠️ 이동할 수 있는 다른 고객사가 부족합니다.');
-      test.skip();
+      test.skip(true, '조직도 페이지 조건 미충족으로 테스트 스킵');
       return;
     }
 

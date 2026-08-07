@@ -48,7 +48,7 @@ test.describe('서비스 카테고리', () => {
 
     if (!categoriesResponse) {
       console.log('⚠️ Service Categories API 응답을 캡처하지 못했습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
       return;
     }
 
@@ -87,7 +87,7 @@ test.describe('서비스 카테고리', () => {
 
     if (!buttonVisible) {
       console.log('⚠️ SR 생성 버튼을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
       return;
     }
 
@@ -100,7 +100,7 @@ test.describe('서비스 카테고리', () => {
 
     if (!dialogVisible) {
       console.log('⚠️ SR 생성 Dialog를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
       return;
     }
 
@@ -130,7 +130,7 @@ test.describe('서비스 카테고리', () => {
         .filter({ hasText: /취소|닫기|Close/i })
         .first();
       await closeButton.click().catch(() => {});
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
       return;
     }
 
@@ -181,7 +181,7 @@ test.describe('서비스 카테고리', () => {
 
     if (!clientVisible) {
       console.log('⚠️ 고객사가 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
       return;
     }
 
@@ -225,7 +225,7 @@ test.describe('서비스 카테고리', () => {
       }
     } else {
       console.log('⚠️ 고객사 링크를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
     }
   });
 
@@ -246,7 +246,7 @@ test.describe('서비스 카테고리', () => {
 
     if (!filterVisible) {
       console.log('⚠️ 카테고리 필터를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '권한 또는 카테고리 데이터 조건 미충족');
       return;
     }
 

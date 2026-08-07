@@ -30,7 +30,7 @@ test.describe('SR 활동 로그 및 이력', () => {
 
     if (!srVisible) {
       console.log('⚠️ SR이 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, 'SR 데이터가 없어 테스트를 진행할 수 없습니다.');
       return;
     }
 
@@ -49,7 +49,7 @@ test.describe('SR 활동 로그 및 이력', () => {
     const tabVisible = await activityTab.isVisible().catch(() => false);
     if (!tabVisible) {
       console.log('⚠️ 활동 이력 탭을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, '활동 이력 탭을 찾을 수 없어 테스트를 스킵합니다.');
       return;
     }
     await activityTab.click({ force: true });
@@ -91,7 +91,7 @@ test.describe('SR 활동 로그 및 이력', () => {
     const firstSR = page.locator('tbody tr, [role="row"]').first();
     await firstSR.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     if (!(await firstSR.isVisible())) {
-      test.skip();
+      test.skip(true, 'SR 목록 데이터가 없어 테스트를 스킵합니다.');
       return;
     }
 
@@ -129,7 +129,7 @@ test.describe('SR 활동 로그 및 이력', () => {
     await firstSR.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     if (!(await firstSR.isVisible().catch(() => false))) {
       console.log('⚠️ SR이 없습니다. 테스트 스킵.');
-      test.skip();
+      test.skip(true, 'SR 목록 데이터가 없어 필터링 테스트를 스킵합니다.');
       return;
     }
 

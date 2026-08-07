@@ -151,8 +151,7 @@ jobs:
             --project=chromium \
             --project=multi-user \
             --project=role-personas \
-            --project=permissions \
-            --grep-invert "Dashboard Visual & Performance|Manual Screen Captures"
+            --project=permissions
 
       # playwright.config.ts 의 리포터 출력 경로는 test-results/ 다.
       # (기존 설정은 존재하지 않는 playwright-report/ 를 올려 항상 빈 아티팩트만 남겼다)
