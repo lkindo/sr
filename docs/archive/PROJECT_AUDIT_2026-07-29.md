@@ -9,6 +9,28 @@
 
 ---
 
+> # ⛔ 이 문서는 종결된 기록이다. 현재 규칙이 아니다.
+>
+> **종결일 2026-08-07.** 모든 항목이 해소 / 수용된 위험 / 티켓 이관 중 하나로 닫혔다.
+> 마지막까지 남아 있던 4건의 처리는 다음과 같다.
+>
+> | 항목                                | 처리                                                                                            |
+> | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+> | 4.2 SR 삭제 시 첨부 blob 잔존       | **해소** — `deleteSR` 이 커밋 후 blob 을 정리한다                                                |
+> | 4.5 프로세스 외부화(Redis/S3)       | **수용된 위험**(소유자 결정) — 단일 VM 에서는 실익이 없다. 복제본 증설 시 재검토                |
+> | 4.5 `/srs` 배지 `countSRs` 6회      | **티켓 이관** — [#249](https://github.com/lkindo/sr/issues/249)                                  |
+> | 5절 죽은 코드 정리                  | **해소** — 정비 Phase 0·1 이 전부 제거했고 표기만 밀려 있었다                                    |
+>
+> **지금 유효한 규칙을 찾는다면 여기가 아니라 이쪽이다:**
+> 설계는 `docs/LLD.md` · `docs/TRD.md` · `docs/DB.md`,
+> 운영은 `docs/SERVER_RUNBOOK_2026-08-01.md` · `docs/backup-and-restore.md`,
+> 정비 이력과 "죽은 것처럼 보이지만 살아 있는 것" 목록은 `docs/CLEANUP_PLAN_2026-08-06.md` §5.
+>
+> 여기 적힌 코드 위치(줄 번호·파일 경로)는 2026-08-05 기준이며, 이후 정비로 상당수가
+> 이동·삭제되었다. 이 문서를 근거로 코드를 고치기 전에 현재 소스를 먼저 확인할 것.
+
+---
+
 ## 1. 총평
 
 > **⚠️ 이 절은 2026-07-29 원본 판정이며, 현재 상태가 아니다.**
@@ -1731,15 +1753,15 @@ async getClientDetailsById(id: string) {
 | ✅ `pnpm lint --max-warnings` 도입(현재 래칫 1060) + `noUncheckedIndexedAccess` 활성화 — 0 까지의 감축은 진행 중 · 원문: 898 → 0 ratchet, `noUncheckedIndexedAccess` 활성화 (4.6)                                         | 설정        |  L   | 715개 `any`와 34개 object-injection 경고의 점진적 제거 |
 | ✅ `.npmrc` 공급망 검증 복구 + gitleaks/Trivy를 실제 게이트로 (2026-08-02) + **액션 SHA 핀 58개 전부 + CI 가드 (2026-08-05)** — 2026-08-05 이전에는 0/27 이 핀되어 있었고 `trivy-action@master` 는 부유 참조였다 (4.6)    | 설정/DevOps |  S   | 의존성 침해·시크릿 커밋 재발 방지                      |
 | ✅ `srs(created_at)` 및 `(client_id, created_at)` 인덱스 + `pg_trgm` GIN 검색 인덱스 (4.2)                                                                                                                                | 데이터      |  M   | 최다 호출 쿼리와 검색의 스캔 제거                      |
-| ⚠️ **부분** — 대시보드 stats 캐시: 죽은 코드 제거 + **비캐시 결정**(SSE 실시간 갱신과 충돌). `/srs` 배지 카운트는 **여전히 `countSRs` 6회** — 단일 `FILTER` 집계 미적용 (4.5)                                             | 성능        |  M   | 대시보드·목록 DB 부하 대폭 감소                        |
-| ⚠️ **부분** — 첨부 쓰기 3경로 트랜잭션화 ✅ / intake PATCH activity ✅ / **SR 삭제 시 blob 정리는 미적용** — `deleteSR` 이 `storagePath` 를 건드리지 않아 파일이 볼륨에 영구 잔존 (4.2)                                   | 데이터      |  M   | 고아 행·고아 파일·감사 추적 유실 제거                  |
+| ✅ 대시보드 stats 캐시 — 죽은 코드 제거 + **비캐시 결정**(SSE 실시간 갱신과 충돌하므로 캐시하지 않는다). `/srs` 배지 카운트 `countSRs` 6회 통합은 **별도 티켓 이관**(#249, 소유자 결정 2026-08-07) (4.5)                                             | 성능        |  M   | 대시보드·목록 DB 부하 대폭 감소                        |
+| ✅ 첨부 쓰기 3경로 트랜잭션화 / intake PATCH activity / **SR 삭제 시 blob 정리 — 완료 2026-08-07**: `deleteSR` 이 커밋 후 첨부 blob 을 정리한다(`api/attachments/[id]` DELETE 와 동일한 순서) (4.2)                                   | 데이터      |  M   | 고아 행·고아 파일·감사 추적 유실 제거                  |
 | ✅ Notification 트랜잭셔널 outbox 구현 + SMTP 재시도 + 푸시 preference 존중 — outbox/재시도는 2026-08-02, **preference 존중은 2026-08-05** (리스너 3경로 + 댓글 경로를 `sendForEvent` 로 전환) (4.3)                      | 도메인      |  L   | 알림 전달 보장과 사용자 설정 실동작                    |
 | ✅ 상태 전이 인가를 permission 기반으로 전환 + fail-closed + UI를 `getAvailableTransitions`에서 도출 (4.3)                                                                                                                | 도메인      |  M   | 커스텀 역할 사용 가능, UI-백엔드 발산 재발 방지        |
-| ❌ **미착수** — 레이트리미터·SSE 에미터·첨부 저장소를 프로세스 외부로(Redis/Postgres LISTEN-NOTIFY/S3) (4.5)                                                                                                              | 성능        |  L   | 복제본 증설 가능, 레이트리밋 실효화                    |
+| 🅰️ **수용된 위험**(소유자 결정 2026-08-07) — 레이트리미터·SSE 에미터·첨부 저장소의 프로세스 외부화(Redis/LISTEN-NOTIFY/S3). 이 문서가 이미 적었듯 **단일 VM 에서는 실익이 없다**. 앱 복제본을 늘리는 시점에 재검토한다 — 그때까지 레이트리밋은 인스턴스 단위이고 SSE 는 프로세스 로컬이라는 제약을 받아들인다 (4.5)                                                                                                              | 성능        |  L   | 복제본 증설 가능, 레이트리밋 실효화                    |
 | ✅ 모든 텍스트 필드 `.max()` + 쿼리 파라미터 zod 검증 + `sortBy` allowlist + 응답 봉투 통일 (4.3)                                                                                                                         | API         |  M   | DB 팽창·스키마 유출·페이지네이션 불안정 동시 해결      |
 | ✅ DB 기반 통합 테스트 14건 이식(교차 테넌트 필터, 트랜잭션 원자성, 동시 채번) (3.37) — **완료 2026-08-01**                                                                                                               | 테스트      |  M   | 목 기반으로는 잡을 수 없는 결함 클래스 커버            |
 | ✅ `NEXT_PUBLIC_APP_URL`/`STORAGE_DIR`/VAPID/EMAIL을 `ENV_VARIABLES`에 등록 + 플레이스홀더 거부 validate (4.6)                                                                                                            | 설정        |  S   | 알림 링크 오도메인·푸시 무동작·업로드 유실 방지        |
-| ⚠️ **부분** — 죽은 코드 정리: `permissions.ts`·`recharts`·`tsconfig.full.json` 은 아직 남아 있다 · `permissions.ts`, `recharts`, `tsconfig.full.json`, `ProfileDialog`, 45개 에이전트 스크래치, 6개 테스트 아티팩트 (5절) | 설정        |  S   | 리뷰 노이즈 제거, mock/스키마 드리프트 차단            |
+| ✅ 죽은 코드 정리 — **완료 2026-08-07**: `permissions.ts`·`recharts`·`tsconfig.full.json`·`ProfileDialog`·에이전트 스크래치·테스트 아티팩트 전부 제거(정비 Phase 0·1). 재발은 `pnpm check:dead`(knip) 가 CI 에서 막는다 (5절) | 설정        |  S   | 리뷰 노이즈 제거, mock/스키마 드리프트 차단            |
 | 문서 정합 — README 버전/펜스/env 표, START_SERVER.md 재작성, system_manual.md 이미지 경로 (5절)                                                                                                                           | 문서        |  S   | 온보딩 경로 실동작                                     |
 
 ---

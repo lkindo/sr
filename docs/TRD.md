@@ -757,7 +757,7 @@
 > 한다(소유자 결정). 실무적으로 우선순위가 높은 것은 (a) `/api/health` 를 이미 구동 중인
 > uptime-kuma 감시 대상에 등록, (b) uptime-kuma 정의를 저장소 compose 로 끌어와 IaC 화,
 > (c) pino 의 SIGTERM 플러시 핸들러 추가(현재 `sync: false` 라 종료 시 버퍼가 유실될 수 있다).
-> 자세한 근거는 [docs/PROJECT_AUDIT_2026-07-29.md](PROJECT_AUDIT_2026-07-29.md) 3.30 참조.
+> 자세한 근거는 [docs/archive/PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md) 3.30 참조.
 
 ---
 
@@ -1377,7 +1377,7 @@ app/
 
 **실측값 (2026-07-30)**: statements 커버리지 **41.27%**, 뮤테이션 점수 **49.64%**.
 위 "목표 커버리지" 는 목표치이며 현재 달성값이 아니다. 두 수치의 격차와 커버리지 게이트의
-측정 범위 문제는 [docs/PROJECT_AUDIT_2026-07-29.md](PROJECT_AUDIT_2026-07-29.md) 3.33 참조.
+측정 범위 문제는 [docs/archive/PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md) 3.33 참조.
 
 ### Vitest 선택 이유
 
@@ -1622,7 +1622,7 @@ minLength: 4096 })`.
 5. **로그 보관**: 컨테이너별 3 × 10MB 로테이션 범위 내 (일수 기준 보장 없음)
 
 > **구현 상세**: `src/lib/logger.ts`, `docker-compose.prod.yml` 의 `logging:` 블록,
-> [docs/PROJECT_AUDIT_2026-07-29.md](PROJECT_AUDIT_2026-07-29.md) 3.30 참조
+> [docs/archive/PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md) 3.30 참조
 
 ---
 
@@ -1732,7 +1732,7 @@ minLength: 4096 })`.
 - **[DB.md](DB.md)**: 데이터베이스 설계, Prisma 스키마
 - **[LLD.md](LLD.md)**: 구현 상세, 코드 예제, API 엔드포인트
 - **[SECRET_ROTATION.md](SECRET_ROTATION.md)**: 시크릿 배치·로테이션 런북 (배포 사실의 근거)
-- **[PROJECT_AUDIT_2026-07-29.md](PROJECT_AUDIT_2026-07-29.md)**: 감사 보고서.
+- **[PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md)**: 감사 보고서.
   본 문서의 "PRD-구현 격차" 정정 근거
 - **[API.md](API.md)** (선택 사항): API 레퍼런스 문서
 
