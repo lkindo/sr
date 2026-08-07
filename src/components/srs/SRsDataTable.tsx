@@ -35,7 +35,7 @@ import {
   PaginationItem,
   PaginationNext,
   PaginationPrevious,
-} from '@/components/ui/pagination';
+} from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { SRListItem } from '@/types/sr.types';
 

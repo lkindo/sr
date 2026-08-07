@@ -8,13 +8,14 @@ import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 // Select 관련 import 제거됨
-import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
+import { type AssignableRole, AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { UserDialog } from '@/components/users/UserDialog';
 import { UserMobileList } from '@/components/users/UserMobileList';
 import { UserTable } from '@/components/users/UserTable';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import type { ClientSummary } from '@/types/client.types';
 import type { UserListItem } from '@/types/user-view';
 
 interface PaginationData {
@@ -32,8 +33,8 @@ export default function UsersClient() {
   const { toast } = useToast();
 
   const [users, setUsers] = useState<UserListItem[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [roles, setRoles] = useState<AssignableRole[]>([]);
   const [loading, setLoading] = useState(true);
   // error 상태 제거 (사용되지 않음)
 

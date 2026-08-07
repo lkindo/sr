@@ -17,7 +17,8 @@ import { ScrollArea } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-interface Role {
+/** 역할 배정 다이얼로그가 요구하는 최소 역할 형태. 유일 공급자인 UsersClient 가 이 타입을 쓴다. */
+export interface AssignableRole {
   id: string;
   name: string;
   description: string | null;
@@ -40,7 +41,7 @@ interface AssignRolesDialogProps {
   onOpenChange: (open: boolean) => void;
   user: User | null;
   onSaved: () => void;
-  availableRoles?: Role[];
+  availableRoles?: AssignableRole[];
 }
 
 export function AssignRolesDialog({
@@ -50,7 +51,7 @@ export function AssignRolesDialog({
   onSaved,
   availableRoles,
 }: AssignRolesDialogProps) {
-  const [roles, setRoles] = useState<Role[]>(availableRoles || []);
+  const [roles, setRoles] = useState<AssignableRole[]>(availableRoles || []);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);

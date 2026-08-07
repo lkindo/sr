@@ -109,7 +109,7 @@ export function UserTable({
                 <div className="flex gap-1 flex-wrap justify-center">
                   {(() => {
                     // 시스템 운영팀(ADMIN, MANAGER, ENGINEER)은 고객사 할당 불가
-                    const isSystemTeam = user.roles.some((ur: any) =>
+                    const isSystemTeam = user.roles.some((ur) =>
                       ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
                     );
 
@@ -129,7 +129,7 @@ export function UserTable({
                         onAssigned={onRefresh}
                       />
                     ) : (
-                      user.clients.map((uc: any) =>
+                      user.clients.map((uc) =>
                         uc.status === 'PENDING' ? (
                           <ClientApprovalActions
                             key={uc.client.id}
@@ -157,7 +157,7 @@ export function UserTable({
                   {user.roles.length === 0 ? (
                     <Badge variant="outline">역할 없음</Badge>
                   ) : (
-                    user.roles.map((ur: any) => (
+                    user.roles.map((ur) => (
                       <Badge key={ur.role.id} variant="secondary">
                         {ur.role.name}
                       </Badge>
