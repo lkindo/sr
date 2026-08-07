@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, Clock, Loader2, PauseCircle, Play, RotateCcw, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui';
@@ -11,10 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { canPerformTransition } from '@/lib/sr-state-machine';
 
-import { CompleteSRDialog } from './CompleteSRDialog';
-import { HoldSRDialog } from './HoldSRDialog';
-import { RejectSRDialog } from './RejectSRDialog';
-import { ReopenSRDialog } from './ReopenSRDialog';
+import { SRStatusChangeDialog } from './SRStatusChangeDialog';
+
+/** 재오픈 허용 창. sr-state-machine 의 서버 판정과 같은 값이어야 한다. */
+const REOPEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type SRStatus =
   | 'REQUESTED'
@@ -278,35 +277,45 @@ export function SRStatusActions({
     }
   };
 
+  // 재오픈 가능 창은 완료 후 7일이다. 완료일이 없으면(레거시 데이터) 서버 판정에 맡긴다.
+  const reopenBlockedReason =
+    completedAt && new Date().getTime() - new Date(completedAt).getTime() > REOPEN_WINDOW_MS
+      ? '완료 후 7일이 지나 재오픈할 수 없습니다.'
+      : null;
+
   return (
     <>
       <div className="flex gap-1 shrink-0">{renderActions()}</div>
 
-      {/* 다이얼로그들 */}
-      <CompleteSRDialog
+      {/* 다이얼로그들 — 넷 다 같은 컴포넌트이고 action 만 다르다. */}
+      <SRStatusChangeDialog
+        action="complete"
         open={completeDialogOpen}
         onOpenChange={setCompleteDialogOpen}
         srId={srId}
         srNumber={srNumber}
       />
-      <HoldSRDialog
+      <SRStatusChangeDialog
+        action="hold"
         open={holdDialogOpen}
         onOpenChange={setHoldDialogOpen}
         srId={srId}
         srNumber={srNumber}
       />
-      <RejectSRDialog
+      <SRStatusChangeDialog
+        action="reject"
         open={rejectDialogOpen}
         onOpenChange={setRejectDialogOpen}
         srId={srId}
         srNumber={srNumber}
       />
-      <ReopenSRDialog
+      <SRStatusChangeDialog
+        action="reopen"
         open={reopenDialogOpen}
         onOpenChange={setReopenDialogOpen}
         srId={srId}
         srNumber={srNumber}
-        completedAt={completedAt}
+        disabledReason={reopenBlockedReason}
       />
     </>
   );
