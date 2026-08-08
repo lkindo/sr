@@ -132,32 +132,36 @@ test.describe('Organization 페이지', () => {
     const clientCount = await clientCards.count();
     expect(clientCount).toBeGreaterThanOrEqual(2);
 
-    // 1) 카드 헤더의 "N명" 배지로 사용자가 있는 고객사를 고른다.
-    //    펼쳐 보고 판단하면 확장 → 사용자 fetch → 리렌더가 겹쳐 카드 DOM 이 교체되고,
-    //    루프 중간의 클릭이 엉뚱한 카드를 토글한다. 펼치기 전에 결정한다.
+    // 1) 실제로 드래그할 사용자가 나오는 고객사를 찾는다.
+    //
+    //    헤더의 "N명" 배지를 믿으면 안 된다 — 배지는 `client._count.users`(필터 없는 전체)이고,
+    //    펼쳤을 때 그려지는 목록은 `/api/clients/[id]` 가 **ADMIN 역할 사용자를 제외**한
+    //    결과다(client.service.ts 의 filteredUsers). 소속이 ADMIN 뿐인 고객사는
+    //    배지가 "1명" 인데 드래그 핸들이 0개다. CI 시드가 정확히 그런 분포를 만든다.
+    //
+    //    그래서 펼쳐 보고 핸들이 실제로 나오는지로 판단한다. 아니면 도로 접는다 —
+    //    카드가 길어지면 목적지가 뷰포트 밖으로 밀려서 mouse.move 가 닿지 못한다
+    //    (Playwright 의 마우스 이동은 자동 스크롤을 하지 않는다).
     let sourceIndex = -1;
     for (let i = 0; i < clientCount; i++) {
-      const badge = await clientCards
-        .nth(i)
-        .getByText(/^\d+명$/)
-        .first()
-        .textContent()
-        .catch(() => null);
-      if (badge && Number(badge.replace('명', '')) > 0) {
+      const card = clientCards.nth(i);
+      const expandToggle = card.locator('button').first();
+
+      await expandToggle.click();
+      // 펼치면 그 시점에 사용자 목록을 fetch 한다(organization/page.tsx). 응답을 기다린다.
+      const handle = card.locator('.cursor-grab').first();
+      await handle.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+      if (await handle.isVisible().catch(() => false)) {
         sourceIndex = i;
         break;
       }
+      await expandToggle.click();
     }
-    // 시드가 고객사에 사용자를 배정하므로, 어느 고객사에도 사용자가 없으면 회귀다.
+
+    // 시드는 드래그 가능한(= ADMIN 이 아닌) 사용자를 가진 고객사를 최소 하나 만든다.
+    // 하나도 없으면 시드가 바뀌었거나 목록 필터가 회귀한 것이다.
     expect(sourceIndex).toBeGreaterThanOrEqual(0);
-
-    // 2) 출발지 카드만 펼친다 — 전부 펼치면 목적지가 뷰포트 밖으로 밀려서
-    //    mouse.move 가 닿지 못한다(자동 스크롤이 없다).
-    await clientCards.nth(sourceIndex).locator('button').first().click();
-    await expect(clientCards.nth(sourceIndex).locator('.cursor-grab').first()).toBeVisible({
-      timeout: 15000,
-    });
-
     // Drop 대상 = 고객사 카드 자체다. dnd-kit 의 useDroppable 은 setNodeRef 만 걸 뿐
     // 클래스나 data 속성을 붙이지 않으므로, 예전 셀렉터
     // `[class*="drop"], [data-droppable="true"]` 는 처음부터 아무것도 찾지 못했다.
@@ -166,7 +170,7 @@ test.describe('Organization 페이지', () => {
     const dropTarget = clientCards.nth(targetIndex);
     const sourceCard = clientCards.nth(sourceIndex);
     const draggableUser = sourceCard.locator('.cursor-grab').first();
-    await expect(draggableUser).toBeVisible({ timeout: 15000 });
+    await expect(draggableUser).toBeVisible();
     await expect(dropTarget).toBeVisible();
 
     // 재배정 확인은 Radix **AlertDialog** 라 role 이 `alertdialog` 다.
