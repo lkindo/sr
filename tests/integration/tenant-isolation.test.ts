@@ -1,4 +1,4 @@
-import { beforeEach, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import prisma from '@/lib/prisma';
 import { srService } from '@/services/sr.service';
@@ -171,5 +171,94 @@ describeDb('테넌트 격리 (실제 DB)', () => {
     );
 
     expect(sr.id).toBeDefined();
+  });
+
+  /**
+   * 이슈 #249 — 배지 5종을 단일 집계로 합치면서 생 SQL 로 옮긴 부분.
+   *
+   * `getSRBadgeCounts` 는 Prisma 의 where 가 아니라 손으로 쓴 SQL 로 테넌트를 거른다.
+   * 즉 **Prisma 가 대신 지켜 주던 경계를 우리가 직접 짊어졌다.** 술어 하나가 빠지면
+   * 다른 고객사의 SR 개수가 배지 숫자로 그대로 새어 나가고, 목록에는 아무것도 안 보이니
+   * 눈으로는 알아채기 어렵다. 그래서 실제 Postgres 로 확인한다.
+   */
+  describe('배지 집계 (getSRBadgeCounts)', () => {
+    // 페이지가 넘기는 것과 같은 방식으로 오늘 범위를 만든다(컨테이너 TZ = Asia/Seoul).
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const countsFor = (clientIds: string[] | null) =>
+      srService.getSRBadgeCounts({
+        clientIds,
+        dueFrom: today,
+        dueTo: tomorrow,
+        assigneeId: internalUserId,
+      });
+
+    it('외부 사용자 스코프는 타 고객사를 세지 않는다', async () => {
+      const counts = await countsFor([ownClientId]);
+
+      // 양쪽 테넌트에 REQUESTED SR 이 하나씩 있다. 스코프가 동작하면 1 이다.
+      expect(counts.waiting).toBe(1);
+    });
+
+    it('전 테넌트(null)는 양쪽을 모두 센다 — 스코프가 실제로 일하고 있음을 보이는 대조군', async () => {
+      const counts = await countsFor(null);
+
+      expect(counts.waiting).toBe(2);
+    });
+
+    // 소속 승인 대기 등으로 고객사가 하나도 없는 사용자. 여기서 열리는 방향으로
+    // 실패하면(빈 배열을 '조건 없음'으로 해석하면) 전 테넌트가 노출된다.
+    it('소속 고객사가 없으면 모든 배지가 0 이다', async () => {
+      const counts = await countsFor([]);
+
+      expect(counts).toEqual({
+        waiting: 0,
+        inProgress: 0,
+        urgent: 0,
+        dueToday: 0,
+        myAssigned: 0,
+      });
+    });
+
+    it('배지마다 서로 다른 술어를 적용한다', async () => {
+      // 우리 테넌트의 SR 을 '오늘 마감 · 진행 중 · 긴급 · 내 담당' 으로 바꾼다.
+      const noon = new Date(today);
+      noon.setHours(12, 0, 0, 0);
+      await prisma.sR.updateMany({
+        where: { clientId: ownClientId },
+        data: {
+          status: 'IN_PROGRESS',
+          priority: 'CRITICAL',
+          dueDate: noon,
+          assigneeId: internalUserId,
+        },
+      });
+
+      const counts = await countsFor([ownClientId]);
+
+      expect(counts).toEqual({
+        waiting: 0, // 더 이상 REQUESTED 가 아니다
+        inProgress: 1,
+        urgent: 1,
+        dueToday: 1,
+        myAssigned: 1,
+      });
+    });
+
+    // 마감일 경계는 KST 자정이다. 어제/내일 마감이 오늘 배지에 섞이면 안 된다.
+    it('오늘 마감 배지는 날짜 경계를 지킨다', async () => {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      await prisma.sR.updateMany({
+        where: { clientId: ownClientId },
+        data: { status: 'IN_PROGRESS', dueDate: yesterday },
+      });
+
+      expect((await countsFor([ownClientId])).dueToday).toBe(0);
+    });
   });
 });

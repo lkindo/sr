@@ -160,17 +160,14 @@ export default async function SRsPage({ searchParams }: Props) {
 
   const orderBy = getOrderBy();
 
-  // 1. 통계 집계용 격리 (Isolation) 기반 where 조건
+  // 1. 배지 통계의 스코프
   // 임시 필터(상태, 담당자, 검색어 등)에 의해 상단 대시보드 배지 통계가 왜곡되는 결함을 정정합니다.
   // 단, 멀티테넌트 데이터 격리(clientId 격리)는 철저히 유지합니다.
-  const whereStats: Prisma.SRWhereInput = {};
-  if (!isAdminManagerEngineer) {
-    if (userClientIds.length > 0) {
-      whereStats.clientId = { in: userClientIds };
-    } else {
-      whereStats.clientId = { in: [] };
-    }
-  }
+  //
+  // `null` 은 "전 테넌트"를 뜻하며 내부 사용자에게만 준다. 외부 사용자는 소속 고객사
+  // 목록을 그대로 넘기는데, 그 목록이 비어 있으면(소속 미승인 등) 아무것도 세지 않는다 —
+  // 열리는 방향으로 실패하지 않게 하려는 의도다.
+  const badgeClientIds = isAdminManagerEngineer ? null : userClientIds;
 
   // 오늘 날짜 및 마감일 범위 계산
   const today = new Date();
@@ -179,17 +176,7 @@ export default async function SRsPage({ searchParams }: Props) {
   tomorrow.setDate(tomorrow.getDate() + 1);
 
   // Fetch all data in parallel
-  const [
-    srData,
-    totalCount,
-    waitingCount,
-    inProgressCount,
-    urgentCount,
-    dueTodayCount,
-    myAssignedCount,
-    clients,
-    users,
-  ] = await Promise.all([
+  const [srData, totalCount, globalCounts, clients, users] = await Promise.all([
     srService.getAllSRs({
       where,
       orderBy,
@@ -197,33 +184,17 @@ export default async function SRsPage({ searchParams }: Props) {
       take: itemsPerPage,
     }),
     srService.countSRs({ where }), // 현재 활성화된 필터/검색 적용 결과 총 개수
-    srService.countSRs({ where: { ...whereStats, status: 'REQUESTED' } }),
-    srService.countSRs({ where: { ...whereStats, status: 'IN_PROGRESS' } }),
-    srService.countSRs({ where: { ...whereStats, priority: { in: ['CRITICAL', 'HIGH'] } } }),
-    srService.countSRs({
-      where: {
-        ...whereStats,
-        dueDate: { gte: today, lt: tomorrow },
-        status: { in: ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
-      },
-    }),
-    srService.countSRs({
-      where: {
-        ...whereStats,
-        assigneeId: session?.user?.id || 'non-existent',
-      },
+    // 배지 5종을 한 번의 집계로 얻는다(이슈 #249). 예전에는 countSRs 를 다섯 번 불러
+    // 같은 행 집합을 다섯 번 스캔했다.
+    srService.getSRBadgeCounts({
+      clientIds: badgeClientIds,
+      dueFrom: today,
+      dueTo: tomorrow,
+      assigneeId: session?.user?.id || 'non-existent',
     }),
     clientsPromise,
     usersPromise,
   ]);
-
-  const globalCounts = {
-    waiting: waitingCount,
-    inProgress: inProgressCount,
-    urgent: urgentCount,
-    dueToday: dueTodayCount,
-    myAssigned: myAssignedCount,
-  };
 
   const paginationInfo = {
     currentPage: page,

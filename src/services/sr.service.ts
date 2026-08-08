@@ -31,7 +31,13 @@ import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { UserService } from '@/services/user.service';
 import { AuthenticatedUser } from '@/types/session';
-import { SRCreateResult, SRDetails, SRListItem, SRUpdateResult } from '@/types/sr.types';
+import {
+  SRBadgeCounts,
+  SRCreateResult,
+  SRDetails,
+  SRListItem,
+  SRUpdateResult,
+} from '@/types/sr.types';
 
 type SrUpdateData = z.infer<typeof srUpdateSchema>;
 type SrCreateData = z.infer<typeof srCreateSchema>;
@@ -882,6 +888,65 @@ export class SRService {
 
   async countSRs(params?: { where?: Prisma.SRWhereInput }): Promise<number> {
     return prisma.sR.count({ where: params?.where });
+  }
+
+  /**
+   * `/srs` 상단 배지 5종을 **한 번의 쿼리**로 집계한다(이슈 #249).
+   *
+   * 예전에는 `countSRs` 를 다섯 번 불렀다. 다섯 호출은 술어만 다를 뿐 **같은 행 집합을
+   * 다섯 번 스캔**했고, SR 이 늘수록 선형으로 나빠졌다. 목록 조회 1회 + 카운트 6회가
+   * 페이지 로드마다 붙던 것을 목록 1회 + 카운트 2회로 줄인다
+   * (남은 하나는 필터가 적용된 페이지네이션 총계라 술어가 다르다).
+   *
+   * **테넌트 경계가 이 메서드의 핵심 계약이다.** 배지는 필터와 무관하게 "내가 볼 수 있는
+   * 전체"를 세므로, 여기서 스코프 술어가 빠지면 다른 고객사의 SR 개수가 그대로 새어
+   * 나간다. 그래서 스코프를 옵셔널로 두지 않고 `clientIds` 를 **필수 인자**로 받는다 —
+   * 전 테넌트 조회는 `null` 을 명시해야만 가능하다. 깜빡해서 열리는 일이 없도록.
+   *
+   * 생 SQL 을 쓰지만 값은 전부 `Prisma.sql` 태그드 템플릿으로 바인딩한다. 문자열을
+   * 이어 붙이면 테넌트 술어 자리가 그대로 주입 표면이 된다.
+   *
+   * 마감일 경계(`dueFrom`/`dueTo`)는 호출자가 계산해 넘긴다. SQL 안에서 `now()` 로
+   * 구하면 DB 세션의 시간대에 따라 KST 자정이 아닌 곳에서 날짜가 롤오버한다.
+   */
+  async getSRBadgeCounts(params: {
+    /** 스코프할 고객사 ID. `null` 이면 전 테넌트(내부 사용자)를 뜻한다. */
+    clientIds: string[] | null;
+    /** 오늘 시작(포함) — 앱 시간대 기준으로 호출자가 계산한다. */
+    dueFrom: Date;
+    /** 내일 시작(제외). */
+    dueTo: Date;
+    /** "내 담당" 배지 기준 사용자. */
+    assigneeId: string;
+  }): Promise<SRBadgeCounts> {
+    // 빈 배열은 `= ANY('{}')` 가 항상 거짓이라 "아무것도 못 봄"이 된다.
+    // 소속 고객사가 없는 외부 사용자에게 정확히 그 동작이어야 한다(fail-closed).
+    const tenantScope =
+      params.clientIds === null
+        ? Prisma.sql`TRUE`
+        : Prisma.sql`client_id = ANY(${params.clientIds}::text[])`;
+
+    // COUNT 는 bigint 를 돌려주고 Prisma 는 그걸 BigInt 로 매핑한다.
+    // JSON 직렬화가 불가능해 서버 컴포넌트 경계를 넘지 못하므로 SQL 에서 int 로 내린다.
+    const [row] = await prisma.$queryRaw<Array<Record<keyof SRBadgeCounts, number>>>`SELECT
+        COUNT(*) FILTER (WHERE status = 'REQUESTED')::int                      AS "waiting",
+        COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int                    AS "inProgress",
+        COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int          AS "urgent",
+        COUNT(*) FILTER (WHERE due_date >= ${params.dueFrom}
+                           AND due_date <  ${params.dueTo}
+                           AND status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD'))::int AS "dueToday",
+        COUNT(*) FILTER (WHERE assignee_id = ${params.assigneeId})::int        AS "myAssigned"
+      FROM srs
+      WHERE ${tenantScope}`;
+
+    // 집계 쿼리는 행이 없어도 한 줄을 돌려주지만, 방어적으로 0 을 채운다.
+    return {
+      waiting: row?.waiting ?? 0,
+      inProgress: row?.inProgress ?? 0,
+      urgent: row?.urgent ?? 0,
+      dueToday: row?.dueToday ?? 0,
+      myAssigned: row?.myAssigned ?? 0,
+    };
   }
 
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {

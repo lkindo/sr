@@ -128,3 +128,23 @@ export interface SRAttachmentView {
   fileUrl: string;
   createdAt: Date | string;
 }
+
+/**
+ * `/srs` 상단 배지 5종의 개수.
+ *
+ * 목록에 걸린 필터와 **무관하게** "내가 볼 수 있는 전체"를 센다. 필터를 걸 때마다
+ * 배지가 같이 흔들리면 전체 상황을 볼 수 없기 때문이다(그래서 `whereStats` 는 목록의
+ * `where` 와 별개로 유지된다). 다만 테넌트 경계만은 예외 없이 적용된다.
+ */
+export interface SRBadgeCounts {
+  /** 접수 대기(REQUESTED) */
+  waiting: number;
+  /** 진행 중(IN_PROGRESS) */
+  inProgress: number;
+  /** 긴급(CRITICAL·HIGH) */
+  urgent: number;
+  /** 오늘 마감이면서 아직 닫히지 않은 것 */
+  dueToday: number;
+  /** 내가 담당인 것 */
+  myAssigned: number;
+}
