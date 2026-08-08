@@ -177,7 +177,17 @@ test.describe('Organization 페이지', () => {
     // 예전 셀렉터 `[role="dialog"], .dialog` 로는 영영 찾지 못한다.
     const confirmDialog = page.getByRole('alertdialog');
 
-    // 1. 드래그 → 확인 다이얼로그 → 취소하면 아무 일도 일어나지 않아야 한다.
+    // 이 스펙은 **재배정을 실제로 확정하지 않는다.** 다이얼로그를 열고 취소만 한다.
+    //
+    // 확정까지 하면 시드가 만든 소속이 바뀌고, 그 소속을 계약으로 단언하는 다른 스펙이
+    // 깨진다 — e2e/roles/client-admin.spec.ts 의 "CLIENT_ADMIN 의 소속이 TEST001" 이
+    // 실제로 그렇게 무너졌다. 되돌리는 단계를 붙여도 앞 단계가 실패하면 되돌리지 못한
+    // 채로 끝나므로, 공유 DB 를 쓰는 스위트에서는 애초에 바꾸지 않는 편이 안전하다.
+    //
+    // 확정 경로(PATCH /api/users/[id]/client)는 라우트 테스트가 따로 덮는다. 여기서
+    // 지키려는 것은 드래그 상호작용 → 드롭 인식 → 확인 다이얼로그로 이어지는 UI 연결이다.
+
+    // 1. 드래그하면 확인 다이얼로그가 뜨고, 취소하면 아무 일도 일어나지 않아야 한다.
     await dragTo(page, draggableUser, dropTarget);
     await expect(confirmDialog).toBeVisible({ timeout: 5000 });
     await confirmDialog
@@ -187,34 +197,16 @@ test.describe('Organization 페이지', () => {
       .click();
     await expect(confirmDialog).not.toBeVisible();
 
-    // 2. 다시 드래그 → 확인하면 다이얼로그가 닫혀야 한다.
-    //    (1 에서 취소했으므로 드래그 상태가 초기화되어 재시도가 가능해야 한다.)
+    // 2. 취소 뒤에도 다음 드래그가 되어야 한다.
+    //    예전에 "한 번 다이얼로그를 띄우면 그 뒤 드래그가 먹지 않는" 버그가 있었고,
+    //    이 단계가 그 회귀 가드다.
     await dragTo(page, sourceCard.locator('.cursor-grab').first(), dropTarget);
     await expect(confirmDialog).toBeVisible({ timeout: 5000 });
     await confirmDialog
       .locator('button')
-      .filter({ hasText: /확인|이동|Confirm|Move/i })
+      .filter({ hasText: /취소|Cancel/i })
       .first()
       .click();
-    await expect(confirmDialog).not.toBeVisible({ timeout: 10000 });
-
-    // 3. 확인까지 마친 뒤에도 다음 드래그가 되어야 한다.
-    //    예전에 "한 번 확인하면 그 뒤 드래그가 먹지 않는" 버그가 있었고, 이 단계가 그 회귀 가드다.
-    //    동시에 2 에서 옮긴 사용자를 **원래 고객사로 되돌려** 이 스펙을 반복 실행 가능하게
-    //    유지한다. (되돌리지 않으면 한 번 돌 때마다 사용자가 한쪽으로 쏠려서, 다음 실행 때
-    //    출발지에 사용자가 없어 실패한다 — 실제로 그렇게 깨졌다.)
-    await expectOrganizationLoaded(page);
-    await clientCards.nth(targetIndex).locator('button').first().click();
-    const movedUser = clientCards.nth(targetIndex).locator('.cursor-grab').first();
-    await expect(movedUser).toBeVisible({ timeout: 15000 });
-
-    await dragTo(page, movedUser, sourceCard);
-    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
-    await confirmDialog
-      .locator('button')
-      .filter({ hasText: /확인|이동|Confirm|Move/i })
-      .first()
-      .click();
-    await expect(confirmDialog).not.toBeVisible({ timeout: 10000 });
+    await expect(confirmDialog).not.toBeVisible();
   });
 });
