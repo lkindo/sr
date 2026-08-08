@@ -96,8 +96,29 @@ docker run -d --rm \
   -e POSTGRES_DB="$REHEARSAL_DB" \
   "$PG_IMAGE" >/dev/null
 
-log "준비 대기..."
+# `pg_isready` 만으로는 부족하다.
+#
+# postgres 이미지는 초기화 중 **임시 서버**를 띄워 DB/계정을 만든 뒤 그것을 종료하고
+# 본 서버를 다시 올린다. 임시 서버에도 pg_isready 는 성공하므로, 그 틈에 pg_restore 를
+# 시작하면 곧이어 오는 종료에 연결이 끊기고
+#   FATAL: terminating connection due to administrator command
+# 로 죽는다. 증상만 보면 백업이 깨진 것처럼 보이지만 백업은 멀쩡하다.
+#
+# 그래서 초기화 완료 로그를 먼저 기다린 뒤 pg_isready 로 확인한다. 이미지가 출력하는
+# `PostgreSQL init process complete; ready for start up.` 이 그 경계다.
+log "초기화 완료 대기..."
 waited=0
+until docker logs "$CONTAINER_NAME" 2>&1 | grep -q 'init process complete'; do
+  sleep 2
+  waited=$((waited + 2))
+  if [ "$waited" -ge 120 ]; then
+    log "ERROR: 일회용 Postgres 초기화가 120초 안에 끝나지 않았습니다."
+    docker logs "$CONTAINER_NAME" 2>&1 | tail -20
+    exit 1
+  fi
+done
+
+log "준비 대기..."
 until docker exec "$CONTAINER_NAME" pg_isready -U "$REHEARSAL_USER" -d "$REHEARSAL_DB" >/dev/null 2>&1; do
   sleep 2
   waited=$((waited + 2))
