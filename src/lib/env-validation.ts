@@ -32,7 +32,7 @@ export interface EnvVariable {
   /**
    * 카테고리
    */
-  category: 'database' | 'auth' | 'storage' | 'email' | 'rate-limit' | 'push';
+  category: 'database' | 'auth' | 'storage' | 'email' | 'rate-limit' | 'push' | 'observability';
 
   /**
    * 검증 함수 (선택사항)
@@ -209,6 +209,23 @@ export const ENV_VARIABLES: EnvVariable[] = [
   positiveIntegerVar('RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS', 'File Upload Rate Limit 최대 요청 수'),
   positiveIntegerVar('RATE_LIMIT_MIDDLEWARE_WINDOW_MS', 'Middleware Rate Limit 윈도우 (밀리초)'),
   positiveIntegerVar('RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS', 'Middleware Rate Limit 최대 요청 수'),
+
+  // 에러 트래킹 (선택사항)
+  // 미설정이면 Sentry 를 초기화하지 않는다(src/lib/sentry-init.ts). 부팅을 막지 않는다 —
+  // 관측 수단이 없다고 서비스가 못 뜰 이유는 없다.
+  {
+    name: 'SENTRY_DSN',
+    required: false,
+    description: '에러 트래킹 DSN (서버). 없으면 Sentry 비활성',
+    category: 'observability',
+  },
+  {
+    // 브라우저 번들에 들어가므로 NEXT_PUBLIC_ 접두사가 필요하다.
+    name: 'NEXT_PUBLIC_SENTRY_DSN',
+    required: false,
+    description: '에러 트래킹 DSN (브라우저). 없으면 클라이언트 Sentry 비활성',
+    category: 'observability',
+  },
 
   // Web Push (선택사항)
   // 키가 없거나 플레이스홀더면 푸시는 "미설정"으로 동작해야 한다. 절대 부팅을 막지 않는다.
@@ -421,6 +438,7 @@ export function printEnvSummary(): void {
         storage: '스토리지',
         email: '이메일',
         'rate-limit': 'Rate Limiting',
+        observability: '관측성',
         push: '푸시 알림',
       }[category] || category;
 
