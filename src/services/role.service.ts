@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
 import {
+  ensureCanCreateRole,
   ensureCanDeleteRole,
   ensureCanUpdateRole,
   ensureNoPrivilegeEscalation,
@@ -58,9 +59,17 @@ export class RoleService {
   async createRole(
     data: RoleCreateData,
     actorId?: string | null,
-    ipAddress?: string | null
+    ipAddress?: string | null,
+    actor?: AuthenticatedUser
   ): Promise<Role> {
     const validated = roleCreateSchema.parse(data);
+
+    // 형제 연산(update/delete)과 같은 자리에서 정책을 판정한다. 예전에는 이 경로만
+    // 정책 검사가 없었고, `ensureCanCreateRole` 은 정의만 된 채 아무도 부르지 않았다.
+    if (actor) {
+      ensureCanCreateRole(actor);
+    }
+
     return prisma.$transaction(async (tx) => {
       const role = await tx.role.create({ data: validated });
       await auditService.createLog(tx, {

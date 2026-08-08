@@ -25,7 +25,7 @@ export const MAX_UPLOAD_FILE_COUNT = 10;
 /**
  * 허용된 파일 MIME 타입 목록
  */
-export const ALLOWED_FILE_TYPES = {
+const ALLOWED_FILE_TYPES = {
   // 이미지
   'image/jpeg': { ext: ['.jpg', '.jpeg'], maxSize: 10 * 1024 * 1024 }, // 10MB
   'image/png': { ext: ['.png'], maxSize: 10 * 1024 * 1024 }, // 10MB
@@ -140,7 +140,7 @@ export function validateFileExtension(fileName: string): void {
  * @returns 검증된 MIME 타입
  * @throws {FileValidationError} MIME 타입 불일치 또는 허용되지 않은 타입
  */
-export async function validateFileContent(buffer: ArrayBuffer, fileName: string): Promise<string> {
+async function validateFileContent(buffer: ArrayBuffer, fileName: string): Promise<string> {
   const uint8Array = new Uint8Array(buffer);
 
   // file-type 라이브러리로 실제 파일 타입 감지

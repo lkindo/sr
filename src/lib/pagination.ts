@@ -214,7 +214,7 @@ export function createPaginatedResponse<T>(
  * }
  * ```
  */
-export function extractPaginationParams(request: Request): PaginationParams {
+function extractPaginationParams(request: Request): PaginationParams {
   const { searchParams } = new URL(request.url);
 
   return paginationSchema.parse({

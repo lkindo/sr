@@ -16,7 +16,7 @@ import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 
-export interface ServiceCategory {
+interface ServiceCategory {
   id: string;
   categoryName: string;
   description?: string | null;

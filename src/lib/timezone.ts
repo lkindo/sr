@@ -59,7 +59,7 @@ export function getAppZoneDateParts(value: string | Date | number = new Date()):
  * 두 시각의 **일수 차이**를 구할 때 쓴다. 양쪽 모두 정확한 UTC 자정이므로
  * 차이가 항상 86400000 의 배수가 되어 DST·오프셋 오차가 끼어들 여지가 없다.
  */
-export function appZoneCalendarDayUTC(value: string | Date | number = new Date()): number {
+function appZoneCalendarDayUTC(value: string | Date | number = new Date()): number {
   return Date.parse(`${formatISODateInAppZone(value)}T00:00:00Z`);
 }
 

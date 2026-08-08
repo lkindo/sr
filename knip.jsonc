@@ -23,6 +23,12 @@
     // 내려가지 않으므로, 진입점으로 선언해 리포트에서 제외한다.
     "src/components/ui/**",
 
+    // use-toast 도 shadcn 이 벤더링한 파일이다(헤더의 "Inspired by react-hot-toast").
+    // 앱은 `useToast()` 훅만 쓰지만 shadcn 은 toast/reducer/__resetToastsForTest 를 함께
+    // 내보낸다. 지우면 `npx shadcn diff` 가 upstream 과 대조할 수 없게 되므로,
+    // ui 프리미티브와 같은 이유로 진입점으로 선언해 리포트에서 제외한다.
+    "src/hooks/use-toast.ts",
+
     // vitest.config.ts:115-120 의 alias 대상. 코드가 import 하지 않고 설정이 주입하므로
     // knip 은 진입점을 알 수 없다.
     "src/__tests__/mocks/**"

@@ -84,10 +84,16 @@ describe('role.actions', () => {
         expect(result.data).toEqual(mockRole);
       }
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:create');
-      expect(mockRoleService.createRole).toHaveBeenCalledWith({
-        name: 'NEW_ROLE',
-        description: 'desc',
-      });
+      // 생성 경로도 형제 연산과 똑같이 actor 를 넘겨야 한다. 넘기지 않으면
+      // ROLE_CREATE 감사 로그의 userId 가 비어 "누가 만들었나"에 답할 수 없고,
+      // 서비스가 정책을 판정할 수도 없다. update/delete 는 감사 3.11 에서 고쳤는데
+      // 생성만 빠져 있었다 — 이 단언이 그 재발을 막는다.
+      expect(mockRoleService.createRole).toHaveBeenCalledWith(
+        { name: 'NEW_ROLE', description: 'desc' },
+        SESSION.user.id,
+        null,
+        SESSION.user
+      );
     });
   });
 

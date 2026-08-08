@@ -9,17 +9,17 @@
 
 import type { ClientSummary } from './client.types';
 
-export interface RoleView {
+interface RoleView {
   id: string;
   name: string;
   description?: string;
 }
 
-export interface UserRoleView {
+interface UserRoleView {
   role: RoleView;
 }
 
-export interface UserClientView {
+interface UserClientView {
   client: ClientSummary;
   /** 소속 승인 상태. 셀프 회원가입 소속은 승인 전까지 PENDING 이다. */
   status?: 'PENDING' | 'APPROVED';

@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
  * 수신자는 **단건**이다 — 아웃박스는 행 하나가 수신자 하나여야 누가 못 받았는지
  * 개별로 추적할 수 있다. 다중 수신은 행을 여러 개 만든다.
  */
-export interface RenderedEmail {
+interface RenderedEmail {
   to: string;
   subject: string;
   html: string;

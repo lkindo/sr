@@ -19,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   roleFindUnique: vi.fn(),
+  roleCreate: vi.fn(),
   roleUpdate: vi.fn(),
   roleDelete: vi.fn(),
   permissionFindMany: vi.fn(),
@@ -77,7 +78,7 @@ const otherRole = { id: 'r-2', name: 'SUPPORT', description: null };
 beforeEach(() => {
   vi.clearAllMocks();
   const tx = {
-    role: { update: mocks.roleUpdate, delete: mocks.roleDelete },
+    role: { create: mocks.roleCreate, update: mocks.roleUpdate, delete: mocks.roleDelete },
     rolePermission: {
       deleteMany: mocks.rolePermissionDeleteMany,
       createMany: mocks.rolePermissionCreateMany,
@@ -88,6 +89,10 @@ beforeEach(() => {
   );
   mocks.roleUpdate.mockImplementation(async ({ data }: { data: unknown }) => ({
     ...otherRole,
+    ...(data as object),
+  }));
+  mocks.roleCreate.mockImplementation(async ({ data }: { data: unknown }) => ({
+    id: 'r-new',
     ...(data as object),
   }));
   mocks.roleDelete.mockResolvedValue(otherRole);
@@ -230,5 +235,54 @@ describe('deleteRole — 시스템 역할 보호', () => {
     await expect(
       service.deleteRole('r-2', roleManager.id, null, roleManager)
     ).resolves.toBeDefined();
+  });
+});
+
+/**
+ * createRole 만 오랫동안 형제 연산과 달랐다.
+ *
+ * update/delete 는 감사 3.11 에서 서비스 계층으로 가드를 옮겼는데 생성 경로는 빠져,
+ * `ensureCanCreateRole` 이 정의만 된 채 아무도 부르지 않았다(knip 이 미사용 export 로
+ * 신고해서 드러났다). 더 실질적인 문제는 액션이 actor 를 아예 넘기지 않아
+ * **ROLE_CREATE 감사 로그의 userId 가 비어 있었다**는 점이다 — 감사 로그가 답해야 할
+ * 바로 그 질문("누가 이 역할을 만들었나")에 답할 수 없었다.
+ */
+describe('createRole — 생성 권한과 감사 행위자', () => {
+  it('생성 권한이 없으면 거부한다', async () => {
+    // ROLE:READ/UPDATE/DELETE 는 있지만 ROLE:CREATE 는 없는 역할 관리자.
+    await expect(
+      service.createRole({ name: 'NEW_ROLE' }, roleManager.id, null, roleManager as never)
+    ).rejects.toThrow('역할 생성 권한이 없습니다.');
+
+    // 거부는 '던졌다' 가 아니라 '행이 안 생겼다' 로 확인해야 의미가 있다.
+    expect(mocks.roleCreate).not.toHaveBeenCalled();
+  });
+
+  it('ROLE:CREATE 보유자는 생성할 수 있다 — 과잉 차단 방지 대조군', async () => {
+    const creator = { ...roleManager, permissions: ['ROLE:CREATE'] };
+
+    await expect(
+      service.createRole({ name: 'NEW_ROLE' }, creator.id, null, creator as never)
+    ).resolves.toMatchObject({ name: 'NEW_ROLE' });
+  });
+
+  it('감사 로그에 행위자를 남긴다', async () => {
+    await service.createRole({ name: 'NEW_ROLE' }, admin.id, '10.0.0.1', admin as never);
+
+    expect(mocks.createLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: admin.id,
+        actionType: 'ROLE_CREATE',
+        ipAddress: '10.0.0.1',
+      })
+    );
+  });
+
+  // 시드·마이그레이션 스크립트는 세션이 없다. 클래스 주석이 명시한 계약이다.
+  it('actor 가 없으면 시스템 호출로 보고 통과시킨다', async () => {
+    await expect(service.createRole({ name: 'SEEDED' })).resolves.toMatchObject({
+      name: 'SEEDED',
+    });
   });
 });

@@ -15,7 +15,7 @@ import {
 import { Badge } from '@/components/ui';
 import { ScrollArea } from '@/components/ui';
 
-export interface OngoingSR {
+interface OngoingSR {
   id: string;
   srNumber: string;
   title: string;

@@ -20,7 +20,7 @@ interface User {
 }
 
 // Intake 폼 스키마
-export const intakeFormSchema = z.object({
+const intakeFormSchema = z.object({
   actualPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'], {
     message: '실제 우선순위를 선택해주세요',
   }),

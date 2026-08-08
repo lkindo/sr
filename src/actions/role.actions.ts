@@ -23,10 +23,14 @@ export async function createRoleAction(formData: FormData): Promise<Result<Role>
     }
     const validated = validationResult.data;
 
-    await authenticateAndAuthorize('role:create');
+    // 서비스가 감사 로그에 행위자를 남기고 정책을 판정하려면 session 이 필요하다.
+    // 예전에는 반환값을 버려서 ROLE_CREATE 감사 로그의 userId 가 비어 있었다 —
+    // "누가 이 역할을 만들었나"에 답할 수 없었다. update/delete 는 감사 3.11 에서
+    // 이미 고쳤는데 생성 경로만 빠져 있었다.
+    const session = await authenticateAndAuthorize('role:create');
 
     const roleService = services.roleService;
-    const role = await roleService.createRole(validated);
+    const role = await roleService.createRole(validated, session.user.id, null, session.user);
 
     return ok(role);
   } catch (error) {
