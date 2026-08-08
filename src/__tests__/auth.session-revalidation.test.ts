@@ -49,17 +49,9 @@ const findUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 function dbUser(overrides: Partial<{ isActive: boolean }> = {}) {
   return {
     isActive: true,
-    roles: [
-      {
-        role: {
-          name: 'ADMIN',
-          permissions: [
-            { permission: { resource: 'SR', action: 'READ' } },
-            { permission: { resource: 'SR', action: 'UPDATE' } },
-          ],
-        },
-      },
-    ],
+    // 권한은 더 이상 이 쿼리가 읽지 않는다. 토큰에 담지 않기 때문이다
+    // (lib/role-permissions.ts 가 세션 콜백에서 역할로부터 편다).
+    roles: [{ role: { name: 'ADMIN' } }],
     clients: [{ clientId: 'client-1' }],
     ...overrides,
   };
@@ -114,7 +106,9 @@ describe('jwt 콜백 — 클레임 재조회', () => {
     expect(result).not.toBeNull();
     expect(result?.id).toBe('user-1');
     expect(result?.roles).toEqual(['ADMIN']);
-    expect(result?.permissions).toEqual(['SR:READ', 'SR:UPDATE']);
+    // 권한은 토큰에 없어야 한다 — 쿠키가 nginx 헤더 버퍼를 넘겨 로그인 사용자만
+    // 502 를 받은 원인이었다(2026-08-08).
+    expect(result?.permissions).toBeUndefined();
     expect(result?.clientIds).toEqual(['client-1']);
     expect(typeof result?.checkedAt).toBe('number');
   });
@@ -140,7 +134,7 @@ describe('jwt 콜백 — 클레임 재조회', () => {
     // 역할이 CLIENT_USER 로 강등된 상태를 DB 가 돌려준다.
     findUnique.mockResolvedValue({
       isActive: true,
-      roles: [{ role: { name: 'CLIENT_USER', permissions: [] } }],
+      roles: [{ role: { name: 'CLIENT_USER' } }],
       clients: [],
     });
 
@@ -156,7 +150,6 @@ describe('jwt 콜백 — 클레임 재조회', () => {
 
     expect(findUnique).toHaveBeenCalledTimes(1);
     expect(result?.roles).toEqual(['CLIENT_USER']);
-    expect(result?.permissions).toEqual([]);
     expect(result?.clientIds).toEqual([]);
   });
 

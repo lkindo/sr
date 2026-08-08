@@ -10,6 +10,7 @@ import {
   ensureRoleNameNotReserved,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { invalidateRolePermissions } from '@/lib/role-permissions';
 import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
 import type { AuthenticatedUser } from '@/types/session';
 
@@ -246,6 +247,11 @@ export class RoleService {
         ipAddress,
       });
     });
+
+    // 세션의 권한은 역할→권한 캐시에서 펴진다(lib/role-permissions.ts).
+    // 여기서 버리지 않으면 회수한 권한이 캐시 TTL 만큼 계속 유효하다 —
+    // 인가에서 그 지연은 받아들일 수 없다.
+    invalidateRolePermissions();
 
     // 업데이트된 역할 정보 반환
     return this.getRoleById(roleId);

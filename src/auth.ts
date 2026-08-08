@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
+import { expandRolePermissions } from '@/lib/role-permissions';
 import { verifyPassword } from '@/lib/security';
 
 import { authConfig } from './auth.config';
@@ -32,7 +33,6 @@ const CLAIMS_REFRESH_INTERVAL_MS = 60_000;
 
 type UserClaims = {
   roles: string[];
-  permissions: string[];
   clientIds: string[];
 };
 
@@ -50,18 +50,10 @@ async function loadUserClaims(userId: string): Promise<UserClaims | null> {
     where: { id: userId },
     select: {
       isActive: true,
+      // 권한은 여기서 읽지 않는다. 토큰에 담지 않기 때문이다(role-permissions.ts 참조).
+      // 4단계 중첩 조인이 사라져 이 쿼리 자체도 가벼워졌다.
       roles: {
-        include: {
-          role: {
-            include: {
-              permissions: {
-                include: {
-                  permission: true,
-                },
-              },
-            },
-          },
-        },
+        select: { role: { select: { name: true } } },
       },
       clients: {
         // 승인된 소속만 세션 clientIds 에 반영한다.
@@ -79,16 +71,8 @@ async function loadUserClaims(userId: string): Promise<UserClaims | null> {
     return null;
   }
 
-  const permissionsSet = new Set<string>();
-  userWithRoles.roles.forEach((ur) => {
-    ur.role.permissions.forEach((rp) => {
-      permissionsSet.add(`${rp.permission.resource}:${rp.permission.action}`);
-    });
-  });
-
   return {
     roles: userWithRoles.roles.map((ur) => ur.role.name),
-    permissions: Array.from(permissionsSet),
     clientIds: userWithRoles.clients.map((uc) => uc.clientId),
   };
 }
@@ -237,7 +221,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
 
       token.roles = claims.roles;
-      token.permissions = claims.permissions;
+      // permissions 는 **의도적으로 토큰에 넣지 않는다.** 쿠키 크기가 nginx 헤더 버퍼를
+      // 넘겨 로그인 사용자만 502 를 받는 장애를 냈다(2026-08-08). session 콜백에서 편다.
       token.clientIds = claims.clientIds;
       token.checkedAt = Date.now();
 
@@ -245,13 +230,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (token && session.user) {
+        const roles = (token.roles as string[]) || [];
+
         session.user.id = token.id as string;
         session.user.email = token.email as string;
         session.user.name = token.name as string;
         session.user.image = token.image as string;
-        session.user.roles = (token.roles as string[]) || [];
-        session.user.permissions = (token.permissions as string[]) || [];
+        session.user.roles = roles;
         session.user.clientIds = (token.clientIds as string[]) || [];
+        // 권한은 쿠키가 아니라 여기서 채운다. 소비처(policies / permission-helpers /
+        // 라우트)는 예전과 똑같이 `session.user.permissions` 를 읽으면 된다.
+        session.user.permissions = await expandRolePermissions(roles);
       }
       return session;
     },
