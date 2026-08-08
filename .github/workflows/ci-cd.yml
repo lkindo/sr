@@ -607,6 +607,43 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  # 운영 이미지가 실제로 빌드되는지 확인한다.
+  #
+  # **왜 별도 잡인가.** 위 `build` 잡의 `pnpm build` 로는 이 실패를 잡을 수 없다. 그쪽은
+  # 원본 체크아웃에서 돌지만, 운영 이미지는 `.dockerignore` 로 걸러진 축소된 컨텍스트에서
+  # 빌드된다. 두 입력이 다르므로 결과도 다를 수 있다.
+  #
+  # 2026-08-08 에 정확히 그 일이 있었다. `.dockerignore` 가 `vitest.shims.d.ts` 는 제외하면서
+  # 테스트 파일은 제외하지 않아, 도커 안에서만 jest-dom 매처 타입이 사라져 타입 에러 205건이
+  # 났다. 로컬 빌드도 CI 의 build 잡도 전부 초록이었고, **운영 배포가 첫 발견 지점**이었다.
+  #
+  # **왜 PR 에서만 도는가.** main/dev push 는 배포가 어차피 같은 이미지를 빌드하므로
+  # 거기서 드러난다. 정작 신호가 필요한 곳은 머지 전이다 — 특히 Dependabot PR 은 기본
+  # 브랜치를 직접 겨냥해서, 이 잡이 없으면 의존성 업데이트의 도커 빌드가 운영 배포에서
+  # 처음 실행된다. 매 push 마다 돌리면 비용만 두 배가 되고 얻는 것은 없다.
+  #
+  # 푸시하지 않는다. 여기서는 '빌드가 되는가' 만 본다.
+  docker-build:
+    name: Docker Image Build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # 보안 스캔
   security:
     name: Security Scan
