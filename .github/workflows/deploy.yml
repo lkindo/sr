@@ -243,6 +243,10 @@ jobs:
 
               # 3. 미사용 이미지 prune (최근 7일 이미지는 롤백용으로 남긴다)
               docker image prune -af --filter "until=168h" || true
+              # 빌드 캐시는 위 명령이 건드리지 않는다. 2026-08-08 에 이것만 2.5GB 쌓여
+              # 디스크가 100%(여유 20KB) 가 됐고, 그 결과 배포의 tar 추출과 nginx 의
+              # proxy_temp 쓰기가 함께 실패해 로그인 사용자에게 502 가 나갔다.
+              docker builder prune -af || true
 
             else
               echo "Deploying Production (main branch)..."
@@ -379,4 +383,10 @@ jobs:
               #    뒤의 `docker image prune -af` 가 **직전 SHA 이미지까지** 지워 롤백 경로를
               #    없앴다. 최근 7일 이미지는 남긴다.
               docker image prune -af --filter "until=168h" || true
+              # 빌드 캐시는 이미지 prune 대상이 아니다(2026-08-08 장애 원인).
+              docker builder prune -af || true
+
+              # 정리 후 여유가 얼마나 남았는지 로그에 남긴다. 다음에 같은 일이 생기면
+              # 배포 로그만 보고 "언제부터 조여왔는지" 를 되짚을 수 있다.
+              df -h / | tail -1
             fi
