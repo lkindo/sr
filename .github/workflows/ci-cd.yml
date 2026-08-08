@@ -544,8 +544,35 @@ jobs:
       # Captures'는 검증이 아니라 문서용 스크린샷 생성이라 scripts/capture-manual.ts 로
       # 옮겨 playwright 수집 대상에서 빠졌다. 같은 이유로 항상 빨간불이던 firefox /
       # webkit / Mobile Chrome 프로젝트도 playwright.config.ts 에서 제거했다.
+      # 의존성이 바뀐 PR 인가?
+      #
+      # PR 은 비용 때문에 보안 핵심 부분집합만 돌린다(아래 참고). 그 절충은 사람이 쓰는
+      # 기능 PR 에는 맞지만 **의존성 업데이트에는 맞지 않는다.** 무엇이 깨질지 범위를 좁혀
+      # 예측할 수 없기 때문이다.
+      #
+      # 2026-08-08 에 그 대가를 치렀다. 의존성 58개 PR(#250)이 부분집합을 통과해 머지됐고,
+      # main 의 전체 스위트에서 4건이 깨졌다 — axe 4.12 가 로딩 스켈레톤을 검사해 낸 가짜
+      # h1 위반 1건과, @radix-ui/react-select 2.3.7 에서 force 클릭이 메뉴를 열지 못해 생긴
+      # 담당자 선택 실패 3건. 둘 다 부분집합에 포함되지 않는 프로젝트였다.
+      #
+      # 서드파티 액션을 쓰지 않는다. gh 는 러너에 기본 설치되어 있고, 변경 파일 목록은
+      # API 가 그대로 준다 — git diff 를 쓰려면 fetch-depth 를 늘려야 해서 더 비싸다.
+      - name: Detect dependency changes
+        id: deps
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path' \
+               | grep -qE '^(package\.json|pnpm-lock\.yaml)$'; then
+            echo 'full=true' >> "$GITHUB_OUTPUT"
+            echo '의존성 변경 감지 — 전체 E2E 선택을 실행한다.'
+          else
+            echo 'full=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run E2E tests (full selection)
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || steps.deps.outputs.full == 'true'
         run: |
           pnpm exec playwright test \
             --project=chromium \
@@ -578,7 +605,7 @@ jobs:
       # 두 명령을 나눈 이유: 위치 인자(파일 필터)를 붙이면 명시적으로 지정한 프로젝트에도
       # 그 필터가 적용되어 role-persona-setup 이 0개로 잘려 나간다(실측 확인).
       - name: Run E2E tests (pull request — security-critical subset)
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.deps.outputs.full != 'true'
         run: |
           pnpm exec playwright test \
             --project=permissions \
