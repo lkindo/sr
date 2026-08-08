@@ -35,14 +35,20 @@ test.describe('Accessibility (A11y) 검증', () => {
     test('대시보드 페이지 접근성 확인', async ({ browser }) => {
       await withAuthContext(browser, 'manager', async (page) => {
         await page.goto('/dashboard');
-        await checkA11y(page, 'Dashboard');
+        // h1 이 렌더될 때까지 기다린다. 이 페이지의 로딩 스켈레톤(loading.tsx)에는
+        // h1 이 없어서, 넘기지 않으면 axe 가 스켈레톤을 검사하고
+        // `page-has-heading-one` 을 가짜로 신고한다. 헬퍼 주석이 예고한 실패다.
+        await checkA11y(page, 'Dashboard', 'h1');
       });
     });
 
     test('SR 목록 페이지 접근성 확인', async ({ browser }) => {
       await withAuthContext(browser, 'manager', async (page) => {
         await page.goto('/srs');
-        await checkA11y(page, 'SR List');
+        // h1 이 렌더될 때까지 기다린다. 이 페이지의 로딩 스켈레톤(loading.tsx)에는
+        // h1 이 없어서, 넘기지 않으면 axe 가 스켈레톤을 검사하고
+        // `page-has-heading-one` 을 가짜로 신고한다. 헬퍼 주석이 예고한 실패다.
+        await checkA11y(page, 'SR List', 'h1');
       });
     });
 

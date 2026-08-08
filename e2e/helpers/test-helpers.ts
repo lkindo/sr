@@ -535,13 +535,7 @@ export async function createAndIntakeSR(
 }
 
 export type SRStatusAction =
-  | 'start'
-  | 'complete'
-  | 'hold'
-  | 'resume'
-  | 'reject'
-  | 'confirm'
-  | 'reopen';
+  'start' | 'complete' | 'hold' | 'resume' | 'reject' | 'confirm' | 'reopen';
 
 /**
  * SR 상세 화면의 액션 트리거 버튼 이름 (src/components/srs/SRStatusActions.tsx 의 aria-label)
@@ -660,7 +654,16 @@ export async function selectAssignee(page: Page, email: string = ENGINEER_ASSIGN
     .first()
     .locator('..')
     .locator('[role="combobox"]');
-  await trigger.click({ force: true });
+  // `force: true` 를 쓰지 않는다. force 는 actionability 검사를 건너뛰고 이벤트만
+  // 쏘므로, 트리거가 아직 준비되지 않았으면 클릭은 '성공'하지만 메뉴는 열리지 않는다.
+  // 그러면 실패가 15초 뒤 '옵션이 안 보인다' 로 나타나 원인을 가린다.
+  // 2026-08-08 CI 실패가 그랬다(@radix-ui/react-select 2.2.6 → 2.3.7).
+  // 같은 폼의 우선순위 select 는 처음부터 force 없이 통과하고 있었다.
+  await trigger.click();
+
+  // 메뉴가 실제로 열렸는지 먼저 확인한다. 여기서 실패하면 '드롭다운이 안 열렸다' 로
+  // 읽히고, 다음 단계에서 실패하면 '그 담당자가 목록에 없다' 로 읽힌다.
+  await page.getByRole('listbox').waitFor({ state: 'visible', timeout: 10000 });
 
   // 옵션 라벨은 `{name} ({email})` 형태다(IntakeFormCard).
   // 정규식 대신 부분 문자열 매칭을 쓴다(getByRole 의 name 은 기본이 부분일치가 아니라
