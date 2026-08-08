@@ -105,11 +105,22 @@ export default defineConfig({
       //   (`pnpm test:coverage`, 164파일 1569테스트)
       // Phase 3 는 삭제가 아니라 이동/좁히기라 분모가 거의 그대로다. 위 1%p 버퍼 정책이
       // 여전히 성립하므로 **임계값은 그대로 둔다.**
+      //
+      // ── 2026-08-08 훅·API 라우트 커버리지 보강 후 재측정 ─────────────────
+      //   statements 57.01 · branches 47.21 · functions 53.26 · lines 57.57
+      //   (`SKIP_DB_TESTS=true vitest run --coverage --project unit`)
+      // 0% 였던 훅 5종(43.98% → 91.67%)과 미테스트 API 라우트 10종(56.6% → 70.9%)을
+      // 덮었다. 분모는 그대로이고 분자만 늘어난 작업이라 수치가 온전히 올랐다.
+      // 위 1%p 버퍼 정책대로 임계값을 올린다 — 올린 만큼이 앞으로의 하한이 된다.
+      //
+      // 페이지·레이아웃(src/app/**/page.tsx 등)은 여전히 0.4% 다. 데이터 조회 + JSX
+      // 조합이라 단위 테스트 가치가 낮고 E2E 가 이미 덮는다. **커버리지 include 에서
+      // 빼지는 않는다** — 분모를 줄이면 위 주석이 경고한 순환 논리가 그대로 재현된다.
       thresholds: {
-        statements: 47.2,
-        branches: 40.8,
-        functions: 45.9,
-        lines: 46.7,
+        statements: 56,
+        branches: 46.2,
+        functions: 52.2,
+        lines: 56.5,
       },
     },
     alias: {
