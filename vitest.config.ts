@@ -116,11 +116,17 @@ export default defineConfig({
       // 페이지·레이아웃(src/app/**/page.tsx 등)은 여전히 0.4% 다. 데이터 조회 + JSX
       // 조합이라 단위 테스트 가치가 낮고 E2E 가 이미 덮는다. **커버리지 include 에서
       // 빼지는 않는다** — 분모를 줄이면 위 주석이 경고한 순환 논리가 그대로 재현된다.
+      //
+      // ── 2026-08-08 다이얼로그 4종 보강 후 재측정 ─────────────────────────
+      //   statements 60.54 · branches 50.70 · functions 55.95 · lines 61.11
+      // UserDialog·ClientDialog·AssignRolesDialog·ServiceCategoryDialog 를 덮어
+      // src/components 36.0% → 47.9%. 전부 사용자 입력이 서버로 넘어가는 경계라,
+      // 남은 컴포넌트(표현 위주)보다 투자 대비 효과가 크다.
       thresholds: {
-        statements: 56,
-        branches: 46.2,
-        functions: 52.2,
-        lines: 56.5,
+        statements: 59.5,
+        branches: 49.7,
+        functions: 54.9,
+        lines: 60.1,
       },
     },
     alias: {
