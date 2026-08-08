@@ -416,17 +416,6 @@ jobs:
       # 로그인 스로틀을 검증하는 E2E 는 없고 rate limiter 는 단위 테스트가 검증한다.
       RATE_LIMIT_STRICT_WINDOW_MS: '60000'
       RATE_LIMIT_STRICT_MAX_REQUESTS: '1000000'
-      # STRICT 만 올리면 반쪽이다. src/proxy.ts 는 그와 별개로 `/api/*` 전부에 IP 단위
-      # 버킷(RATE_LIMIT_MIDDLEWARE_*, 미설정 시 1분 100회)을 건다. E2E 트래픽은 전부
-      # 127.0.0.1 이라 이 한 버킷을 스위트 전체가 나눠 쓴다.
-      #
-      # playwright.config.ts 의 webServer 블록은 이미 이 값을 올려 두지만, 여기서는
-      # SKIP_WEBSERVER=1 로 그 블록을 끄고 서버를 직접 띄우므로 그 설정이 적용되지 않는다.
-      # 빠뜨리면 100번째 API 호출부터 429 가 떨어지고, 화면이 데이터를 못 받아 빈 채로
-      # 렌더된다 — 증상은 "접근성 위반 35건(h1 없음)" 이나 "드래그 핸들이 없다" 처럼
-      # 엉뚱한 곳에서 나타난다(2026-08-08 실측).
-      RATE_LIMIT_MIDDLEWARE_WINDOW_MS: '60000'
-      RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS: '1000000'
       # playwright.config.ts 의 webServer 는 쓰지 않는다(아래 "포트 충돌" 주석 참고).
       SKIP_WEBSERVER: '1'
       BASE_URL: 'http://localhost:3000'
