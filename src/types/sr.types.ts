@@ -112,3 +112,19 @@ export type SRListItem = Pick<
   };
   _count: { comments: number; attachments: number };
 };
+
+/**
+ * 첨부파일 목록 항목 (클라이언트 뷰).
+ *
+ * `createdAt` 은 `Date | string` 이다. RSC 로 내려오면 Date, `/api/srs/[id]/attachments`
+ * 를 fetch 하면 JSON 직렬화된 string 이라 두 경로가 실제로 서로 다른 값을 싣는다.
+ * 소비자는 전부 `new Date(createdAt)` 으로 감싸므로 두 형태 모두 안전하다.
+ */
+export interface SRAttachmentView {
+  id: string;
+  fileName: string;
+  fileSize: number | bigint;
+  fileType: string;
+  fileUrl: string;
+  createdAt: Date | string;
+}

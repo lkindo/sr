@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SRStatus } from '@prisma/client';
-import { z } from 'zod';
 
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { statusActionSchema } from '@/lib/schemas';
 import { srService } from '@/services/sr.service';
-
-const statusActionSchema = z.object({
-  action: z.enum(['complete', 'hold', 'reject', 'reopen', 'start', 'resume', 'confirm']),
-  reason: z.string().optional(),
-  resolutionDescription: z.string().optional(),
-});
 
 // PATCH /api/srs/[id]/status - SR 상태 전이 (Rate Limit: 표준)
 //

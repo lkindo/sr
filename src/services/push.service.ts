@@ -1,38 +1,15 @@
 // Server-only module - not to be imported in client components
 import 'server-only';
 
+import type {
+  NotificationPreference as DBNotificationPreference,
+  PushSubscription as DBPushSubscription,
+} from '@prisma/client';
 import { createECDH } from 'node:crypto';
 
 import { isPlaceholderValue } from '@/lib/env-validation';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
-
-// Define types inline to avoid import conflicts with browser PushSubscription
-interface DBPushSubscription {
-  id: string;
-  userId: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-  userAgent: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface DBNotificationPreference {
-  id: string;
-  userId: string;
-  emailSRCreated: boolean;
-  emailSRAssigned: boolean;
-  emailSRStatusChanged: boolean;
-  emailCommentAdded: boolean;
-  pushSRCreated: boolean;
-  pushSRAssigned: boolean;
-  pushSRStatusChanged: boolean;
-  pushCommentAdded: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 // WebPush subscription interface (matches web-push library expectations)
 interface WebPushSubscription {
@@ -240,7 +217,7 @@ export class PushService {
    * Helper to send to a single subscription
    */
   private async sendToSubscription(
-    webPush: any,
+    webPush: typeof import('web-push'),
     sub: DBPushSubscription,
     payload: PushPayload
   ): Promise<{ statusCode: number; body: string } | null> {

@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma, SRPriority, SRStatus } from '@prisma/client';
 
 import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
@@ -88,17 +88,8 @@ export default async function SRsPage({ searchParams }: Props) {
 
   const where: Prisma.SRWhereInput = {};
 
-  if (status && status !== 'all')
-    where.status = status as
-      | 'REQUESTED'
-      | 'INTAKE'
-      | 'IN_PROGRESS'
-      | 'ON_HOLD'
-      | 'COMPLETED'
-      | 'CONFIRMED'
-      | 'REJECTED';
-  if (priority && priority !== 'all')
-    where.priority = priority as 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  if (status && status !== 'all') where.status = status as SRStatus;
+  if (priority && priority !== 'all') where.priority = priority as SRPriority;
 
   // clientId 필터 처리
   if (clientId && clientId !== 'all') {

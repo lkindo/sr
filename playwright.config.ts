@@ -206,32 +206,16 @@ export default defineConfig({
       dependencies: ['setup', 'multi-user-setup'],
     },
 
-    /* 추가 브라우저 테스트 (선택사항)
+    /* 크로스 브라우저(firefox / webkit / Mobile Chrome) 프로젝트는 제거했다.
      *
-     * 아래 세 프로젝트는 testIgnore 가 없어 멀티유저 스펙(08/09/17~23)까지 수집하며,
-     * 그 스펙들은 manager/engineer/client.json(multi-user-setup 산출물)을 읽는다.
-     * 즉 여기에도 같은 종류의 의존 누락이 있지만 의존만 추가해도 초록불이 되지는 않는다
-     * (단일 인증 상태로 멀티유저 스펙을 중복 실행하는 구조적 결함이 먼저다).
-     * 그래서 ci-cd.yml 의 --project 선택에서 제외되어 있고, 여기서는 사실만 기록한다.
-     * 고칠 때는 dependencies 가 아니라 testIgnore 부터 맞춰야 한다.
+     * 셋 다 testIgnore 가 없어 멀티유저 스펙(08/09/17~23)까지 수집했고, 그 스펙들은
+     * manager/engineer/client.json(multi-user-setup 산출물)을 읽는다. 단일 인증 상태로
+     * 멀티유저 스펙을 중복 실행하는 구조적 결함이라 dependencies 를 더해도 초록불이
+     * 되지 않아, ci-cd.yml 의 --project 선택에서 늘 빠져 있었다. 즉 "설정에는 있지만
+     * 아무 데서도 돌지 않는" 상태였고, 그건 크로스 브라우저를 검증한다는 착각만 준다.
+     *
+     * 다시 켤 때는 dependencies 가 아니라 testIgnore 부터 맞출 것 — 멀티유저 스펙을
+     * 제외하고 단일 인증으로 충분한 스펙만 수집하게 한 뒤 CI 의 --project 에 추가한다.
      */
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-      dependencies: ['setup'],
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-      dependencies: ['setup'],
-    },
-
-    /* 모바일 뷰포트 테스트 */
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-      dependencies: ['setup'],
-    },
   ],
 });

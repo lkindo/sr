@@ -4,14 +4,8 @@
  * 백엔드 SRService의 validateTransition과 동일한 규칙을 적용합니다.
  */
 
-export type SRStatus =
-  | 'REQUESTED'
-  | 'INTAKE'
-  | 'IN_PROGRESS'
-  | 'ON_HOLD'
-  | 'COMPLETED'
-  | 'CONFIRMED'
-  | 'REJECTED';
+import type { SRStatus } from '@prisma/client';
+export type { SRStatus };
 
 /**
  * 각 상태에서 전환 가능한 다음 상태들

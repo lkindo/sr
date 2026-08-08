@@ -1,27 +1,13 @@
-interface UserRole {
-  role: {
-    id: string;
-    name: string;
-  };
-}
+import type { UserListItem } from '@/types/user-view';
 
-interface UserClient {
-  client: {
-    id: string;
-    name: string;
-    code: string;
-  };
-}
-
-interface User {
-  id: string;
-  userType: 'ENGINEER' | 'CLIENT';
-  roles: UserRole[];
-  clients: UserClient[];
-}
+/**
+ * 유형 판별에 실제로 필요한 필드만 뽑은 입력 타입.
+ * 뷰 타입(`UserListItem`)에서 파생시켜, 뷰가 바뀌면 여기도 컴파일러가 따라오게 한다.
+ */
+type UserTypeSource = Pick<UserListItem, 'id' | 'userType' | 'roles' | 'clients'>;
 
 // 사용자 유형 판별 함수
-export const getUserTypeLabel = (user: User): string => {
+export const getUserTypeLabel = (user: UserTypeSource): string => {
   // 1. Admin 역할이 있으면 시스템 관리자
   const hasAdminRole = user.roles.some((ur) => ur.role.name === 'ADMIN');
   if (hasAdminRole) {

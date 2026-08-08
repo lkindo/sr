@@ -28,16 +28,10 @@ test.describe('Settings 페이지', () => {
       .waitFor({ state: 'visible', timeout: 15000 })
       .catch(() => {});
 
-    // URL 확인 (리디렉션 가능)
-    const url = page.url();
-    if (url.includes('/settings') || url.includes('/profile')) {
-      console.log(`✅ Settings 페이지 접근 성공: ${url}`);
-      // body 존재 확인만
-      await expect(page.locator('body')).toBeVisible();
-    } else {
-      console.log(`⚠️ 예상치 못한 리디렉션: ${url}`);
-      test.skip();
-    }
+    // /settings 는 자기 자신이거나 프로필로 리디렉션된다. 그 밖으로 튕기면 회귀다.
+    // (예전에는 그 경우를 스킵해서, 로그인 페이지로 튕겨도 초록불이었다.)
+    expect(page.url()).toMatch(/\/(settings|profile)/);
+    await expect(page.locator('body')).toBeVisible();
   });
 
   test('Profile 설정 페이지 접근', async ({ page }) => {
@@ -62,17 +56,12 @@ test.describe('Settings 페이지', () => {
       .waitFor({ state: 'visible', timeout: 15000 })
       .catch(() => {});
 
+    // 프로필도 클라이언트에서 데이터를 받아 그린다. 로딩 문구가 사라진 뒤에 폼이 생긴다.
+    await expect(page.getByText('프로필 정보를 불러오는 중...')).toHaveCount(0, { timeout: 30000 });
+
     // 이름 입력 필드 찾기
     const nameInput = page.locator('input[name="name"], input[placeholder*="이름"]').first();
-    // 프로필 폼 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await nameInput.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const nameVisible = await nameInput.isVisible().catch(() => false);
-
-    if (!nameVisible) {
-      console.log('⚠️ 이름 입력 필드를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
+    await expect(nameInput).toBeVisible({ timeout: 15000 });
 
     // 현재 이름 가져오기
     const currentName = await nameInput.inputValue();
@@ -136,36 +125,14 @@ test.describe('Settings 페이지', () => {
     }
 
     const passwordElements = page.locator('text=/비밀번호|Password/i').first();
-    await passwordElements.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const elementVisible = await passwordElements.isVisible().catch(() => false);
-
-    if (!elementVisible) {
-      console.log('⚠️ 비밀번호 관련 요소를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
-    console.log('✅ 비밀번호 관련 요소 발견 - 테스트 통과');
+    await expect(passwordElements).toBeVisible({ timeout: 10000 });
   });
 
   test('Notification 설정 페이지 접근', async ({ page }) => {
     await page.goto('/settings/notifications', { waitUntil: 'domcontentloaded' });
 
     const mainContent = page.locator('main, [role="main"]');
-    // 본문 렌더링을 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await mainContent
-      .first()
-      .waitFor({ state: 'visible', timeout: 15000 })
-      .catch(() => {});
-    const contentVisible = await mainContent.isVisible().catch(() => false);
-
-    if (!contentVisible) {
-      console.log('⚠️ Notification 페이지를 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
-
-    await expect(mainContent).toBeVisible();
-    console.log('✅ Notification 설정 페이지 접근 성공');
+    await expect(mainContent.first()).toBeVisible({ timeout: 15000 });
   });
 
   test('알림 설정 토글', async ({ page }) => {
@@ -177,15 +144,7 @@ test.describe('Settings 페이지', () => {
 
     // 알림 토글 스위치 찾기
     const toggleSwitch = page.locator('input[type="checkbox"], [role="switch"]').first();
-    // 설정 로드를 실제로 기다린다 (없으면 아래에서 스킵 판단)
-    await toggleSwitch.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const switchVisible = await toggleSwitch.isVisible().catch(() => false);
-
-    if (!switchVisible) {
-      console.log('⚠️ 알림 설정 토글을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
+    await expect(toggleSwitch).toBeVisible({ timeout: 10000 });
 
     // 현재 상태 확인
     const isChecked = await toggleSwitch.isChecked();

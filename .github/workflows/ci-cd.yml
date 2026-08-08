@@ -63,15 +63,38 @@ jobs:
       # ESLint 는 경고만 있으면 0 으로 종료하므로, 래칫이 없던 시절에는 경고가
       # 몇 개로 불어나도 CI 가 영원히 초록이었다(감사 4.6). 새 경고는 이제 실패다.
       # 숫자를 올려서 통과시키지 말 것 — 경고를 없애고 숫자를 내리는 방향으로만 쓴다.
+      #
+      # 현재 882 의 구성 (2026-08-07 `pnpm eslint . -f json` 실측):
+      #   @typescript-eslint/no-explicit-any        759  (프로덕션 59 / 테스트 700)
+      #   no-console                                 47  (전량 prisma/seed.ts)
+      #   security/detect-object-injection           39  (전량 프로덕션)
+      #   @typescript-eslint/no-unused-vars          36  (프로덕션 13 / 테스트 23)
+      #   security/detect-possible-timing-attacks     1
+      # 줄일 여지가 가장 큰 곳은 테스트의 no-explicit-any 700 건이다. 반대로
+      # detect-object-injection 은 오탐 비중이 높으므로, 손대려면 개별 억제보다
+      # eslint.config.mjs 에서 규칙을 끄는 편이 정직하다(이미 부분 override 가 있다).
       - name: Run ESLint
         run: pnpm lint
 
       - name: Run TypeScript type check
         run: pnpm type-check
 
-      # 단언 없는 E2E 테스트를 막는다(감사 3.34).
+      # dead file / export / dependency 를 한 도구로 막는다.
+      # 2026-08 정비에서 지운 것(죽은 서비스 메서드 17개, 호출자 0인 server action 5개,
+      # 미사용 의존성 6개)이 6개월 뒤 다시 쌓이는 것을 사람 리뷰에 기대지 않는다.
+      #
+      # --max-issues 는 --max-warnings 와 같은 단조 감소 래칫이다. 도입 시점 실측이 20 이고,
+      # **숫자를 올려서 통과시키는 것을 금지한다.** PR 마다 내려가거나 유지되어야 한다.
+      # 현재 20 의 구성: 미사용 export 10 + 미사용 타입 6 + 중복 export 1 +
+      #                  미선언 바이너리 2(husky 훅 오탐) + 미사용 devDep 1(eslint-config-next)
+      - name: Dead code check
+        run: pnpm check:dead
+
+      # 단언 없는 E2E 테스트와 **무조건 스킵**을 막는다(감사 3.34 + 2026-08 정비 4-5-1).
       # 보안·권한상승 스펙이 expect 대신 console.log 를 쓰던 시기가 있었는데,
       # 그런 테스트는 통제가 완전히 사라져도 초록불이라 회귀를 전혀 못 잡는다.
+      # 같은 이유로 `test.skip()` / `test.skip(true, …)` 도 막는다 — 정비 직전 29곳이
+      # 그 상태였고, 걷어내자 존재한 적 없는 UI 를 찾던 테스트들이 무더기로 드러났다.
       - name: Check E2E tests have assertions
         run: pnpm check:e2e-assertions
 
@@ -506,12 +529,12 @@ jobs:
       # 프로젝트 이름이 사라지면 playwright 가 "Project(s) ... not found" 로 즉시 실패한다.
       # 조용히 건너뛰지 않는다는 뜻이므로, 이름 변경은 여기서 반드시 드러난다.
       #
-      # 제외 사유(모두 playwright.config.ts / 스펙 쪽 문제라 이 워크플로에서 고칠 수 없다):
-      #  - firefox / webkit / Mobile Chrome: testIgnore 가 없어 멀티유저 스펙까지 단일
-      #    인증 상태로 중복 실행한다. 켜면 앱 회귀가 아닌 설정 결함으로 항상 빨간불이 된다.
-      #  - 'Dashboard Visual & Performance': 스냅샷이 *-win32.png 뿐이라 리눅스에서 무조건
-      #    실패하고, 4개 중 3개는 :6006 Storybook 서버를 요구한다.
-      #  - 'Manual Screen Captures': 검증이 아니라 문서용 스크린샷 생성 작업이다.
+      # 예전에는 --grep-invert 로 두 스위트를 걸러냈는데, 둘 다 원인 자체를 없앴으므로
+      # 플래그가 사라졌다: 'Dashboard Visual & Performance'(e2e/visual/)는 *-win32.png
+      # 스냅샷뿐이라 리눅스에서 돌 수 없는 죽은 게이트여서 삭제했고, 'Manual Screen
+      # Captures'는 검증이 아니라 문서용 스크린샷 생성이라 scripts/capture-manual.ts 로
+      # 옮겨 playwright 수집 대상에서 빠졌다. 같은 이유로 항상 빨간불이던 firefox /
+      # webkit / Mobile Chrome 프로젝트도 playwright.config.ts 에서 제거했다.
       - name: Run E2E tests (full selection)
         if: github.event_name == 'push'
         run: |
@@ -519,8 +542,7 @@ jobs:
             --project=chromium \
             --project=multi-user \
             --project=role-personas \
-            --project=permissions \
-            --grep-invert "Dashboard Visual & Performance|Manual Screen Captures"
+            --project=permissions
 
       # ── PR 범위 ───────────────────────────────────────────────────────────
       # 목적: 최근 감사가 고친 테넌트 경계 / RBAC 회귀를 "머지 전에" 막는다.

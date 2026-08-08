@@ -25,13 +25,13 @@ vi.mock('@/hooks/use-sr', () => ({
   useChangeSRStatus: vi.fn(),
 }));
 
-// Mock sub-dialogs to simplify
-vi.mock('../CompleteSRDialog', () => ({
-  CompleteSRDialog: () => <div data-testid="complete-dialog" />,
+// 다이얼로그는 하나로 합쳐졌다(SRStatusChangeDialog). action 을 testid 에 실어
+// "어떤 전이의 다이얼로그가 열렸는가"를 예전과 같은 수준으로 계속 구분할 수 있게 한다.
+vi.mock('../SRStatusChangeDialog', () => ({
+  SRStatusChangeDialog: ({ action }: { action: string }) => (
+    <div data-testid={`${action}-dialog`} />
+  ),
 }));
-vi.mock('../HoldSRDialog', () => ({ HoldSRDialog: () => <div data-testid="hold-dialog" /> }));
-vi.mock('../RejectSRDialog', () => ({ RejectSRDialog: () => <div data-testid="reject-dialog" /> }));
-vi.mock('../ReopenSRDialog', () => ({ ReopenSRDialog: () => <div data-testid="reopen-dialog" /> }));
 
 describe('SRStatusActions Component', () => {
   const mockPush = vi.fn();

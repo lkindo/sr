@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-
-const roleAssignSchema = z.object({
-  roleIds: z.array(z.string()),
-});
+import { roleAssignSchema } from '@/lib/schemas';
 
 // POST /api/users/[id]/roles - 사용자에게 역할 할당 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(

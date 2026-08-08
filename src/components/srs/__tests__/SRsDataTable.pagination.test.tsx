@@ -28,7 +28,16 @@ vi.mock('@/components/srs/CreateSRDialog', () => ({
 }));
 
 // Mock UI components
-vi.mock('@/components/ui/pagination', () => ({
+//
+// 프리미티브는 전부 이 배럴 목 하나로 모은다. SRsDataTable 이 `@/components/ui/pagination`
+// 서브경로가 아니라 배럴에서 Pagination 계열을 가져오므로(앱 코드는 배럴 규칙),
+// 서브경로를 따로 목킹하면 그 목은 아무도 타지 않는다.
+//
+// Pagination 계열을 실제 구현 대신 스텁으로 두는 이유: 실제 판은 `<a aria-disabled>` 를
+// 렌더하는데 이 스위트는 `toBeDisabled()` 로 단언한다(jest-dom 은 aria-disabled 를
+// disabled 로 보지 않는다). 여기서 검증하려는 것은 shadcn 프리미티브의 마크업이 아니라
+// "SRsDataTable 이 hasPrevPage/hasNextPage 를 올바로 전달하는가"다.
+vi.mock('@/components/ui', () => ({
   Pagination: ({ children }: any) => <nav aria-label="페이지 탐색">{children}</nav>,
   PaginationContent: ({ children }: any) => <ul>{children}</ul>,
   PaginationItem: ({ children }: any) => <li>{children}</li>,
@@ -48,10 +57,6 @@ vi.mock('@/components/ui/pagination', () => ({
     </button>
   ),
   PaginationEllipsis: () => <span>...</span>,
-}));
-
-// Mock other UI components needed
-vi.mock('@/components/ui', () => ({
   Button: ({ children, onClick, ...props }: any) => (
     <button onClick={onClick} {...props}>
       {children}

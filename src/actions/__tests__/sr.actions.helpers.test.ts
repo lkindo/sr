@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSRCreateInput, buildSRUpdateInput } from '../sr-form.utils';
+import { buildSRCreateInput, buildSRUpdateInput } from '@/lib/sr-form.utils';
 
 describe('sr.actions helpers', () => {
   it('buildSRCreateInput는 FormData의 모든 필드를 추출한다', () => {

@@ -15,7 +15,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const AUDIT = 'docs/PROJECT_AUDIT_2026-07-29.md';
+const AUDIT = 'docs/archive/PROJECT_AUDIT_2026-07-29.md';
 
 const BADGE = {
   FIXED: '[해소]',

@@ -13,17 +13,19 @@ import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithAction
 import { UserActions } from '@/components/users/UserActions';
 import { getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
 import { cn } from '@/lib/utils';
+import type { ClientSummary } from '@/types/client.types';
+import type { UserListItem } from '@/types/user-view';
 
 interface UserMobileListProps {
-  users: any[];
+  users: UserListItem[];
   loading: boolean;
   searchQuery: string;
   selectedUserIds: Set<string>;
-  clients: any[];
+  clients: ClientSummary[];
   onToggleUser: (userId: string) => void;
-  onAssignRoles: (user: any) => void;
+  onAssignRoles: (user: UserListItem) => void;
   onToggleActive: (userId: string, isActive: boolean) => void;
-  onDelete: (user: any) => void;
+  onDelete: (user: UserListItem) => void;
   onRefresh: () => void;
 }
 
@@ -119,7 +121,7 @@ export function UserMobileList({
                   <span className="text-muted-foreground font-medium shrink-0">역할</span>
                   {user.roles.length > 0 ? (
                     <div className="flex gap-0.5 items-center overflow-hidden">
-                      {user.roles.slice(0, 1).map((ur: any) => (
+                      {user.roles.slice(0, 1).map((ur) => (
                         <Badge
                           key={ur.role.id}
                           variant="secondary"
@@ -145,7 +147,7 @@ export function UserMobileList({
                 <span className="text-muted-foreground font-medium shrink-0">고객사</span>
                 <div className="flex-1 min-w-0">
                   {(() => {
-                    const isSystemTeam = user.roles.some((ur: any) =>
+                    const isSystemTeam = user.roles.some((ur) =>
                       ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
                     );
                     if (isSystemTeam)
@@ -167,7 +169,7 @@ export function UserMobileList({
                       <div className="flex gap-1 items-center overflow-hidden">
                         {user.clients
                           .slice(0, 1)
-                          .map((uc: any) =>
+                          .map((uc) =>
                             uc.status === 'PENDING' ? (
                               <ClientApprovalActions
                                 key={uc.client.id}

@@ -1,153 +1,187 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 
-import { RoleService } from '../role.service';
-import { UserService } from '../user.service';
-
-vi.mock('bcryptjs', () => ({
-  hash: vi.fn().mockResolvedValue('hashed'),
-  compare: vi.fn(),
-}));
+import { AuditService, auditService } from '../audit.service';
 
 vi.mock('@/lib/prisma', () => {
   const mockPrisma = {
     auditLog: {
       create: vi.fn(),
-      findMany: vi.fn(),
-      deleteMany: vi.fn(),
-      count: vi.fn(),
     },
-    user: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      findUniqueOrThrow: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    },
-    role: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      delete: vi.fn(),
-    },
-    userRole: {
-      createMany: vi.fn(),
-    },
-    userClient: {
-      createMany: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-    sR: {
-      findMany: vi.fn(),
-      count: vi.fn(),
-    },
-    sRActivity: {
-      count: vi.fn(),
-    },
-    sRComment: {
-      count: vi.fn(),
-    },
-    sRStatusHistory: {
-      count: vi.fn(),
-    },
-    $transaction: vi.fn((cb) => cb(mockPrisma)),
   };
-  return {
-    default: mockPrisma,
-  };
+  return { default: mockPrisma };
 });
 
-describe('Audit Logging System Integration', () => {
-  let roleService: RoleService;
-  let userService: UserService;
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+describe('AuditService.createLog', () => {
+  let service: AuditService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    roleService = new RoleService();
-    userService = new UserService();
-
-    // Default $transaction behavior: pass back the mock prisma object itself as tx
-    vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(prisma));
+    service = new AuditService();
   });
 
-  it('역할 생성(createRole) 시 감사 로그가 정상 적재되어야 한다', async () => {
-    vi.mocked(prisma.role.create).mockResolvedValue({
-      id: 'role-123',
-      name: 'AUDIT_TEST_ROLE',
-      description: 'Test role for auditing',
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  it('exports a singleton instance', () => {
+    expect(auditService).toBeInstanceOf(AuditService);
+  });
+
+  it('passes object changes through unchanged using default prisma client when tx is null', async () => {
+    const changesObj = { before: { x: 1 }, after: { x: 2 } };
+
+    await service.createLog(null, {
+      userId: 'user-1',
+      actionType: 'UPDATE',
+      targetEntity: 'SR',
+      targetId: 'sr-1',
+      changes: changesObj,
+      ipAddress: '10.0.0.1',
     });
 
-    const role = await roleService.createRole(
-      { name: 'AUDIT_TEST_ROLE', description: 'Test role for auditing' },
-      'actor-123',
-      '192.168.1.100'
-    );
-
-    expect(role.id).toBe('role-123');
-    expect(prisma.role.create).toHaveBeenCalled();
-    expect(prisma.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          userId: 'actor-123',
-          actionType: 'ROLE_CREATE',
-          targetEntity: 'Role',
-          targetId: 'role-123',
-          ipAddress: '192.168.1.100',
-        }),
-      })
-    );
-  });
-
-  it('사용자 생성(createUser) 시 감사 로그가 정상 적재되어야 한다', async () => {
-    vi.mocked(prisma.user.create).mockResolvedValue({
-      id: 'user-123',
-      email: 'audit-test-user@example.com',
-      name: 'Audit User',
-    } as any);
-
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user-123',
-      email: 'audit-test-user@example.com',
-      name: 'Audit User',
-      roles: [],
-      clients: [],
-    } as any);
-
-    const user = await userService.createUser(
-      {
-        email: 'audit-test-user@example.com',
-        name: 'Audit User',
-        password: 'Password123!',
-        userType: 'ENGINEER',
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        actionType: 'UPDATE',
+        targetEntity: 'SR',
+        targetId: 'sr-1',
+        changes: changesObj,
+        ipAddress: '10.0.0.1',
       },
-      'actor-456',
-      '127.0.0.1'
-    );
-
-    expect(user.id).toBe('user-123');
-    expect(prisma.user.create).toHaveBeenCalled();
-    expect(prisma.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          userId: 'actor-456',
-          actionType: 'USER_CREATE',
-          targetEntity: 'User',
-          targetId: 'user-123',
-          ipAddress: '127.0.0.1',
-        }),
-      })
-    );
+    });
   });
 
-  it('Zod 에러 등으로 트랜잭션 실패 시 감사 로그가 호출되지 않아야 한다', async () => {
-    await expect(
-      roleService.createRole({ name: '' } as any, 'actor-123', '192.168.1.100')
-    ).rejects.toThrow();
+  it('parses a valid JSON string into an object for the changes column', async () => {
+    const jsonString = JSON.stringify({ field: 'value', n: 42 });
 
-    expect(prisma.role.create).not.toHaveBeenCalled();
+    await service.createLog(null, {
+      actionType: 'CREATE',
+      targetEntity: 'User',
+      changes: jsonString,
+    });
+
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0]![0] as any;
+    expect(callArg.data.changes).toEqual({ field: 'value', n: 42 });
+    // not the raw string
+    expect(typeof callArg.data.changes).toBe('object');
+  });
+
+  it('keeps an invalid JSON string as a string scalar', async () => {
+    const invalid = 'this is not json {';
+
+    await service.createLog(null, {
+      actionType: 'NOTE',
+      targetEntity: 'SR',
+      changes: invalid,
+    });
+
+    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0]![0] as any;
+    expect(callArg.data.changes).toBe(invalid);
+  });
+
+  it('defaults optional fields (userId, targetId, ipAddress) to null', async () => {
+    await service.createLog(null, {
+      actionType: 'DELETE',
+      targetEntity: 'Role',
+      changes: { removed: true },
+    });
+
+    const callArg = vi.mocked(prisma.auditLog.create).mock.calls[0]![0] as any;
+    expect(callArg.data.userId).toBeNull();
+    expect(callArg.data.targetId).toBeNull();
+    expect(callArg.data.ipAddress).toBeNull();
+  });
+
+  it('uses the provided tx client instead of the default prisma client', async () => {
+    const tx = {
+      auditLog: {
+        create: vi.fn().mockResolvedValue(undefined),
+      },
+    };
+
+    await service.createLog(tx, {
+      userId: 'u',
+      actionType: 'UPDATE',
+      targetEntity: 'SR',
+      targetId: 't',
+      changes: { a: 1 },
+      ipAddress: null,
+    });
+
+    expect(tx.auditLog.create).toHaveBeenCalledTimes(1);
     expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('warns and skips when the client has no auditLog delegate', async () => {
+    const tx = {}; // no auditLog
+
+    await service.createLog(tx, {
+      actionType: 'UPDATE',
+      targetEntity: 'SR',
+      changes: { a: 1 },
+    });
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[AuditService] auditLog.create is not defined on client. Skipping DB log.'
+    );
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  it('warns and skips when auditLog.create is not a function', async () => {
+    const tx = { auditLog: { create: 'not-a-function' } };
+
+    await service.createLog(tx, {
+      actionType: 'UPDATE',
+      targetEntity: 'SR',
+      changes: { a: 1 },
+    });
+
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs the error and rethrows when create throws', async () => {
+    const boom = new Error('db down');
+    vi.mocked(prisma.auditLog.create).mockRejectedValueOnce(boom);
+
+    await expect(
+      service.createLog(null, {
+        actionType: 'UPDATE',
+        targetEntity: 'SR',
+        targetId: 'sr-9',
+        changes: { a: 1 },
+      })
+    ).rejects.toThrow('db down');
+
+    expect(logger.error).toHaveBeenCalledWith('[AuditService] Failed to create audit log', boom, {
+      actionType: 'UPDATE',
+      targetEntity: 'SR',
+      targetId: 'sr-9',
+    });
+  });
+
+  it('passes targetId as undefined in error context when not provided', async () => {
+    const boom = new Error('fail');
+    vi.mocked(prisma.auditLog.create).mockRejectedValueOnce(boom);
+
+    await expect(
+      service.createLog(null, {
+        actionType: 'CREATE',
+        targetEntity: 'User',
+        changes: { a: 1 },
+      })
+    ).rejects.toThrow('fail');
+
+    const ctx = vi.mocked(logger.error).mock.calls[0]![2] as any;
+    expect(ctx.targetId).toBeUndefined();
   });
 });

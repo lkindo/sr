@@ -10,7 +10,7 @@
     "dev:test": "cross-env SKIP_ENV_VALIDATION=true next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . --cache --cache-location .eslintcache --max-warnings 930",
+    "lint": "eslint . --cache --cache-location .eslintcache --max-warnings 882",
     "lint:fix": "eslint . --fix",
     "format:check": "prettier . --check --cache",
     "format:fix": "prettier . --write",
@@ -40,6 +40,7 @@
     "verify": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1",
     "verify:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1 -fast",
     "check:e2e-assertions": "tsx scripts/check-e2e-assertions.ts",
+    "check:dead": "knip --max-issues 20",
     "test:integration": "vitest run --project=integration"
   },
   "dependencies": {
@@ -122,9 +123,11 @@
     "globals": "^17.8.0",
     "husky": "^9.1.7",
     "jsdom": "^28.1.0",
+    "knip": "^6.32.0",
     "lint-staged": "^16.2.7",
     "playwright": "^1.58.2",
     "postcss": "^8",
+    "prettier": "3.7.1",
     "prisma": "^6.19.0",
     "storybook": "^10.2.10",
     "tailwindcss": "^3.4.1",

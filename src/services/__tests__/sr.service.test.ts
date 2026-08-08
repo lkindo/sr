@@ -9,6 +9,7 @@ import {
 } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { deleteAttachmentBlob } from '@/lib/storage';
 import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
@@ -37,6 +38,7 @@ const { mockPrisma } = vi.hoisted(() => {
     },
     sRAttachment: {
       deleteMany: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     sRStatusHistory: {
       create: vi.fn().mockResolvedValue({}),
@@ -86,6 +88,10 @@ vi.mock('@/lib/sr-state-machine', () => ({
   getRequiredFields: vi.fn().mockReturnValue([]),
 }));
 
+vi.mock('@/lib/storage', () => ({
+  deleteAttachmentBlob: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe('SRService', () => {
   let srService: SRService;
   // no repository mocks needed here
@@ -121,6 +127,10 @@ describe('SRService', () => {
     // 카테고리 테넌트 검증 기본값: 카테고리 미존재(no-op).
     // clearAllMocks 는 구현을 되돌리지 않으므로, 경계 위반 시나리오가 뒤 테스트로 새지 않도록 명시적으로 초기화한다.
     mockPrisma.serviceCategory.findUnique.mockResolvedValue(null);
+
+    // 같은 이유로 $transaction 도 되돌린다. 개별 테스트가 부분 tx 목(sR.update 만 있는 등)을
+    // 넘기도록 오버라이드하면, 그 목이 다음 테스트까지 살아남아 tx.sR.delete 가 사라진다.
+    mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockPrisma));
 
     srService = new SRService();
   });
@@ -436,6 +446,52 @@ describe('SRService', () => {
       await srService.deleteSR('sr-1', mockUser);
 
       expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+    });
+
+    /**
+     * 삭제 가능한 SR 하나와 그 첨부 목록을 준비한다.
+     *
+     * 목 반환값을 `as unknown as` 로 좁혀 `any` 를 쓰지 않는다 —
+     * `--max-warnings` 래칫은 숫자를 올리지 않는 것이 규칙이라, 새로 넣는 코드가
+     * 예산을 잠식하면 기존 부채를 갚을 여지가 그만큼 줄어든다.
+     */
+    const arrangeDeletableSR = (
+      attachments: { storagePath: string | null; fileUrl: string }[] = []
+    ) => {
+      const mockSR = { id: 'sr-1', clientId: 'client-1' } as unknown as Awaited<
+        ReturnType<typeof prisma.sR.findUnique>
+      >;
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR);
+      vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
+      vi.mocked(prisma.sR.delete).mockResolvedValue(
+        mockSR as unknown as Awaited<ReturnType<typeof prisma.sR.delete>>
+      );
+      vi.mocked(prisma.sRAttachment.findMany).mockResolvedValue(
+        attachments as unknown as Awaited<ReturnType<typeof prisma.sRAttachment.findMany>>
+      );
+    };
+
+    // 감사 4.2: sr_attachments 는 onDelete: Cascade 라 행은 함께 사라지지만
+    // 디스크의 파일은 아무도 지우지 않아 볼륨에 영구 잔존했다.
+    it('SR 을 지우면 첨부 blob 도 함께 정리한다', async () => {
+      arrangeDeletableSR([
+        { storagePath: 'sr-1/a.pdf', fileUrl: 'http://x/sr-1/a.pdf' },
+        // storagePath 가 도입되기 전 행은 null 이라 fileUrl 에서 되살려야 한다.
+        { storagePath: null, fileUrl: 'http://x/sr-1/legacy.png' },
+      ]);
+
+      await srService.deleteSR('sr-1', mockUser);
+
+      expect(deleteAttachmentBlob).toHaveBeenCalledWith('sr-1/a.pdf');
+      expect(deleteAttachmentBlob).toHaveBeenCalledWith('sr-1/legacy.png');
+    });
+
+    it('blob 정리가 실패해도 SR 삭제는 성공으로 끝난다', async () => {
+      arrangeDeletableSR([{ storagePath: 'sr-1/a.pdf', fileUrl: '' }]);
+      vi.mocked(deleteAttachmentBlob).mockRejectedValueOnce(new Error('EACCES'));
+
+      // 커밋은 이미 끝났다. 여기서 던지면 사용자가 이미 사라진 SR 을 다시 지우려 한다.
+      await expect(srService.deleteSR('sr-1', mockUser)).resolves.toBeUndefined();
     });
   });
 

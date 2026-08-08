@@ -8,6 +8,7 @@ export * from './card';
 export * from './checkbox';
 export * from './collapsible';
 export * from './context-menu';
+export * from './copy-button';
 export * from './dialog';
 export * from './dropdown-menu';
 export * from './file-upload';

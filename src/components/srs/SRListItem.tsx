@@ -5,8 +5,8 @@ import { Clock } from 'lucide-react';
 
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { CopyButton } from '@/components/ui';
 import { TableCell, TableRow } from '@/components/ui';
-import { CopyButton } from '@/components/ui/copy-button';
 import { getDueDateStatus } from '@/lib/date-utils';
 import { formatAppZoneDate, formatAppZoneShortDate } from '@/lib/timezone';
 import { SRListItem } from '@/types/sr.types';

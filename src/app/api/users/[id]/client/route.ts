@@ -1,21 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { clientAssignSchema } from '@/lib/schemas';
 
 /**
  * 고객사 할당/변경 요청 바디 스키마
  * force: 진행 중인 SR이 있어도 강제로 소속을 변경할지 여부
  */
-const clientAssignSchema = z.object({
-  clientId: z.string().min(1, '고객사 ID가 필요합니다'),
-  force: z.boolean().optional(),
-});
-
 /**
  * 고객사 소속 관리 권한 판정 (ADMIN, MANAGER만 가능)
  */

@@ -26,18 +26,10 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
-import { useEditSRForm } from '@/hooks/useEditSRForm';
+import { useEditSRForm } from '@/hooks/use-edit-sr-form';
+import type { SRAttachmentView } from '@/types/sr.types';
 
-interface Attachment {
-  id: string;
-  fileName: string;
-  fileSize: number | bigint;
-  fileType: string;
-  fileUrl: string;
-  createdAt: Date | string;
-}
-
-interface SR {
+export interface EditableSR {
   id: string;
   title: string;
   description: string;
@@ -66,13 +58,13 @@ interface SR {
     id: string;
     categoryName: string;
   } | null;
-  attachments?: Attachment[];
+  attachments?: SRAttachmentView[];
 }
 
 interface EditSRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  sr: SR;
+  sr: EditableSR;
   onUpdated: () => void;
 }
 

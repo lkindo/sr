@@ -1446,7 +1446,7 @@ Let's Encrypt 인증서 스크립트(prod) → 미사용 이미지 prune
 - [LLD.md](./LLD.md) — 구현 상세 및 테스트 전략 (Vitest, Playwright, Stryker)
 - [SECRET_ROTATION.md](./SECRET_ROTATION.md) — 배포 시크릿 등록·교체 절차
 - [backup-and-restore.md](./backup-and-restore.md) — 백업/복구 운영 절차
-- [PROJECT_AUDIT_2026-07-29.md](./PROJECT_AUDIT_2026-07-29.md) — 문서-구현 격차 감사
+- [PROJECT_AUDIT_2026-07-29.md](./archive/PROJECT_AUDIT_2026-07-29.md) — 문서-구현 격차 감사
 - [system_manual.md](./system_manual.md) — 사용자 매뉴얼
 
 ---

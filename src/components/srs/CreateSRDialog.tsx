@@ -14,7 +14,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
-import { useCreateSRForm } from '@/hooks/useCreateSRForm';
+import { useCreateSRForm } from '@/hooks/use-create-sr-form';
 
 interface CreateSRDialogProps {
   open: boolean;

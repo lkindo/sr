@@ -519,15 +519,11 @@ test.describe('다중 사용자 협업 워크플로우', () => {
 });
 
 test.describe('협업 시나리오 - 변형 케이스', () => {
-  test('동시 댓글 작성 및 충돌 방지', async ({ browser: _browser }) => {
+  test.fixme('동시 댓글 작성 및 충돌 방지', async ({ browser: _browser }) => {
     // 이 테스트는 동시성 처리를 확인합니다.
-    // 현재는 스킵하고, 추후 구현합니다.
-    test.skip();
   });
 
-  test('담당자 부재 시 재배정', async ({ browser: _browser }) => {
+  test.fixme('담당자 부재 시 재배정', async ({ browser: _browser }) => {
     // 이 테스트는 담당자 변경 시나리오를 확인합니다.
-    // 추후 구현합니다.
-    test.skip();
   });
 });

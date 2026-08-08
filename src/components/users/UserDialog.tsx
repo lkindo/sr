@@ -18,15 +18,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import { passwordSchema } from '@/lib/schemas';
+import type { ClientSummary } from '@/types/client.types';
 
 /** 서버 `passwordSchema` 가 실제로 요구하는 규칙. 입력 힌트와 검증을 한 곳에서 맞춘다. */
 const PASSWORD_RULE_HINT = '8자 이상, 대문자·소문자·숫자·특수문자 각 1개 이상';
-
-interface Client {
-  id: string;
-  name: string;
-  code: string;
-}
 
 interface User {
   id: string;
@@ -41,7 +36,7 @@ interface User {
     };
   }>;
   clients?: Array<{
-    client: Client;
+    client: ClientSummary;
   }>;
 }
 
@@ -51,7 +46,7 @@ interface UserDialogProps {
   user: User | null;
   onSaved: () => void;
   defaultClientId?: string;
-  clients?: Client[];
+  clients?: ClientSummary[];
 }
 
 export function UserDialog({
@@ -75,7 +70,7 @@ export function UserDialog({
   const [selectedClientId, setSelectedClientId] = useState<string>('');
 
   // Use passed clients or empty array initially
-  const [clients, setClients] = useState<Client[]>(propClients || []);
+  const [clients, setClients] = useState<ClientSummary[]>(propClients || []);
   const [loading, setLoading] = useState(false);
   const [loadingClients, setLoadingClients] = useState(!propClients);
   const { toast } = useToast();

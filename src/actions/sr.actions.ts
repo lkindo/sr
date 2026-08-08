@@ -15,10 +15,9 @@ import { ensureCanReadSR } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
+import { buildSRCreateInput, buildSRUpdateInput } from '@/lib/sr-form.utils';
 import { srService } from '@/services/sr.service';
 import { SRCreateResult, SRDetails, SRUpdateResult } from '@/types/sr.types';
-
-import { buildSRCreateInput, buildSRUpdateInput } from './sr-form.utils';
 
 export async function createSRAction(formData: FormData): Promise<Result<SRCreateResult>> {
   try {

@@ -558,7 +558,7 @@ const SR_ACTION_TRIGGERS: Record<SRStatusAction, RegExp> = {
 
 /**
  * 다이얼로그가 열리는 액션의 제출 버튼 이름
- * (CompleteSRDialog / HoldSRDialog / RejectSRDialog / ReopenSRDialog 의 submit 버튼 라벨)
+ * (SRStatusChangeDialog 의 submit 버튼 라벨 — 액션별 설정표의 submitLabel)
  * 여기에 없는 액션(start / resume / confirm)은 다이얼로그 없이 즉시 전환된다.
  */
 const SR_ACTION_DIALOG_SUBMIT: Partial<Record<SRStatusAction, RegExp>> = {

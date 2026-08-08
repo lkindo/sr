@@ -23,11 +23,10 @@ import { Input } from '@/components/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
+import type { IntakeFormValues } from '@/hooks/use-intake-form';
 import { priorityLabels } from '@/lib/constants/sr';
 import { cn } from '@/lib/utils';
 import type { SRDetails } from '@/types/sr.types';
-
-import type { IntakeFormValues } from './useIntakeForm';
 
 interface UserType {
   id: string;

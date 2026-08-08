@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
@@ -7,17 +6,8 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { FIELD_LIMITS } from '@/lib/schemas';
+import { commentSchema } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
-
-const commentSchema = z.object({
-  // 상한이 없으면 인증된 단일 POST 로 거대한 텍스트를 sr_comments.content(무제한 TEXT)에
-  // 영속시킬 수 있다(감사 4.3). 공용 상수를 써서 다른 자유 텍스트 필드와 기준을 맞춘다.
-  content: z
-    .string()
-    .min(1, '댓글 내용을 입력해주세요.')
-    .max(FIELD_LIMITS.NOTE, `댓글은 ${FIELD_LIMITS.NOTE}자를 초과할 수 없습니다.`),
-});
 
 // GET /api/srs/[id]/comments - SR 댓글 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(

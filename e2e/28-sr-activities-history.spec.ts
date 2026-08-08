@@ -25,14 +25,7 @@ test.describe('SR 활동 로그 및 이력', () => {
 
     // 첫 번째 SR 클릭
     const firstSR = page.locator('tbody tr, [role="row"]').first();
-    await firstSR.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    const srVisible = await firstSR.isVisible().catch(() => false);
-
-    if (!srVisible) {
-      console.log('⚠️ SR이 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
+    await expect(firstSR).toBeVisible({ timeout: 10000 });
 
     const srLink = firstSR.locator('a').first();
     await srLink.click();
@@ -45,13 +38,7 @@ test.describe('SR 활동 로그 및 이력', () => {
       .or(page.locator('button').filter({ hasText: /활동 이력/i }))
       .first();
 
-    await activityTab.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-    const tabVisible = await activityTab.isVisible().catch(() => false);
-    if (!tabVisible) {
-      console.log('⚠️ 활동 이력 탭을 찾을 수 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
+    await expect(activityTab).toBeVisible({ timeout: 15000 });
     await activityTab.click({ force: true });
 
     // 탭이 활성화되었는지 확인 (더 유연한 확인)
@@ -89,11 +76,7 @@ test.describe('SR 활동 로그 및 이력', () => {
 
     // 첫 번째 SR 클릭
     const firstSR = page.locator('tbody tr, [role="row"]').first();
-    await firstSR.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    if (!(await firstSR.isVisible())) {
-      test.skip();
-      return;
-    }
+    await expect(firstSR).toBeVisible({ timeout: 10000 });
 
     await firstSR.locator('a').first().click();
     // 상세 페이지 이동 확정 (networkidle 대신 URL 기준)
@@ -126,12 +109,7 @@ test.describe('SR 활동 로그 및 이력', () => {
     });
 
     const firstSR = page.locator('tbody tr, [role="row"]').first();
-    await firstSR.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
-    if (!(await firstSR.isVisible().catch(() => false))) {
-      console.log('⚠️ SR이 없습니다. 테스트 스킵.');
-      test.skip();
-      return;
-    }
+    await expect(firstSR).toBeVisible({ timeout: 10000 });
 
     await firstSR.locator('a').first().click();
     // 상세 페이지 이동 확정 (networkidle + 고정 sleep 대신 URL 기준)

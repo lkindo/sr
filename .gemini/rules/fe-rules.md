@@ -10,6 +10,24 @@
 - **클라이언트 컴포넌트 최소화**: 사용자 인터랙션(이벤트 핸들러, `useState`, `useEffect` 등)이 꼭 필요한 단말 리프(Leaf) 컴포넌트에 한해서만 파일 최상단에 `"use client"`를 선언하여 Client Component로 설계한다.
 - **경계 분리**: 데이터 조회 로직이 담긴 서버 컴포넌트 내부에 클라이언트 컴포넌트를 자식(Children)이나 Props 형태로 주입하여 성능과 데이터 로딩을 효율화한다.
 
+### 1.1. 파일명 및 배치 규칙
+
+대소문자 비구분 파일시스템(Windows)에서는 잘못된 케이스의 import 가 로컬에서 해석되지만
+Linux Docker 빌드에서 module-not-found 로 터진다. 규칙을 하나로 고정한다.
+
+- **PascalCase 는 기능 컴포넌트만**: `SRsDataTable.tsx`, `UserDialog.tsx` 등 화면을 구성하는 컴포넌트 파일.
+- **kebab-case 는 그 외 전부**: `components/ui/` 의 shadcn 원시 컴포넌트, 훅, 유틸, 서비스, 타입.
+- **훅은 `src/hooks/` 아래에 `use-*.ts`**: 컴포넌트 디렉터리 안에 훅을 두지 않는다.
+- **`src/actions/` 아래는 전부 Server Action**: `'use server'` 가 없는 순수 헬퍼는 `src/lib/` 로 보낸다.
+  이 규칙 덕분에 RPC 공개 표면 감사가 파일 목록만으로 끝난다.
+
+### 1.2. `components/ui` import 규칙
+
+- **앱 코드는 배럴을 쓴다**: `import { Button, CopyButton } from '@/components/ui'`.
+- **`components/ui/` 내부끼리는 서브경로를 쓴다**: 배럴을 경유하면 순환이 생긴다.
+- 새 원시 컴포넌트를 추가하면 `src/components/ui/index.ts` 에 **알파벳 순으로** re-export 를 함께 넣는다.
+  (빠뜨리면 소비자가 서브경로로 우회하게 되고 규칙이 조용히 무너진다.)
+
 ---
 
 ## 2. Tailwind CSS 및 스타일링 규칙

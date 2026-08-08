@@ -40,6 +40,9 @@ describe('UserService Security', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks 는 구현체를 지우지 않는다. 개별 테스트가 건 $transaction 오버라이드가
+    // 다음 테스트로 새지 않도록 기본 위임 동작(tx = 모듈 목)으로 되돌린다.
+    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(prisma));
     userService = new UserService();
   });
 

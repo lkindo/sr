@@ -8,14 +8,15 @@ import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 // Select 관련 import 제거됨
-import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
+import { type AssignableRole, AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { UserDialog } from '@/components/users/UserDialog';
 import { UserMobileList } from '@/components/users/UserMobileList';
 import { UserTable } from '@/components/users/UserTable';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
-import { User } from '@/types/user';
+import type { ClientSummary } from '@/types/client.types';
+import type { UserListItem } from '@/types/user-view';
 
 interface PaginationData {
   currentPage: number;
@@ -31,9 +32,9 @@ export default function UsersClient() {
   useSession();
   const { toast } = useToast();
 
-  const [users, setUsers] = useState<User[]>([]);
-  const [clients, setClients] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [roles, setRoles] = useState<AssignableRole[]>([]);
   const [loading, setLoading] = useState(true);
   // error 상태 제거 (사용되지 않음)
 
@@ -85,8 +86,8 @@ export default function UsersClient() {
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isAssignRoleDialogOpen, setIsAssignRoleDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserListItem | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -190,12 +191,12 @@ export default function UsersClient() {
     setIsUserDialogOpen(true);
   };
 
-  const handleAssignRoles = (user: User) => {
+  const handleAssignRoles = (user: UserListItem) => {
     setSelectedUser(user);
     setIsAssignRoleDialogOpen(true);
   };
 
-  const handleDeleteUser = (user: User) => {
+  const handleDeleteUser = (user: UserListItem) => {
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
   };

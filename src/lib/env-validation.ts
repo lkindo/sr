@@ -121,6 +121,24 @@ function isBase64Key(value: string, minLength: number, maxLength: number): boole
 /**
  * 환경 변수 정의
  */
+/**
+ * 양의 정수를 요구하는 선택적 환경 변수 하나를 만든다.
+ *
+ * 레이트리밋 설정 10개가 같은 6줄(required/category/validate/validationError)을
+ * 이름과 설명만 바꿔 반복하고 있었다. 검증 규칙이 한 곳에 있어야 새 변수를 더할 때
+ * `> 0` 을 빠뜨리는 일이 생기지 않는다.
+ */
+function positiveIntegerVar(name: string, description: string): EnvVariable {
+  return {
+    name,
+    required: false,
+    description,
+    category: 'rate-limit',
+    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
+    validationError: `${name}는 양의 정수여야 합니다.`,
+  };
+}
+
 export const ENV_VARIABLES: EnvVariable[] = [
   // Database
   {
@@ -181,86 +199,16 @@ export const ENV_VARIABLES: EnvVariable[] = [
   },
 
   // Rate Limiting (선택사항)
-  {
-    name: 'RATE_LIMIT_STRICT_WINDOW_MS',
-    required: false,
-    description: 'Strict Rate Limit 윈도우 (밀리초)',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_STRICT_WINDOW_MS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_STRICT_MAX_REQUESTS',
-    required: false,
-    description: 'Strict Rate Limit 최대 요청 수',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_STRICT_MAX_REQUESTS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_STANDARD_WINDOW_MS',
-    required: false,
-    description: 'Standard Rate Limit 윈도우 (밀리초)',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_STANDARD_WINDOW_MS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_STANDARD_MAX_REQUESTS',
-    required: false,
-    description: 'Standard Rate Limit 최대 요청 수',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_STANDARD_MAX_REQUESTS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_RELAXED_WINDOW_MS',
-    required: false,
-    description: 'Relaxed Rate Limit 윈도우 (밀리초)',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_RELAXED_WINDOW_MS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_RELAXED_MAX_REQUESTS',
-    required: false,
-    description: 'Relaxed Rate Limit 최대 요청 수',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_RELAXED_MAX_REQUESTS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_FILE_UPLOAD_WINDOW_MS',
-    required: false,
-    description: 'File Upload Rate Limit 윈도우 (밀리초)',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_FILE_UPLOAD_WINDOW_MS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS',
-    required: false,
-    description: 'File Upload Rate Limit 최대 요청 수',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_MIDDLEWARE_WINDOW_MS',
-    required: false,
-    description: 'Middleware Rate Limit 윈도우 (밀리초)',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_MIDDLEWARE_WINDOW_MS는 양의 정수여야 합니다.',
-  },
-  {
-    name: 'RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS',
-    required: false,
-    description: 'Middleware Rate Limit 최대 요청 수',
-    category: 'rate-limit',
-    validate: (value) => !isNaN(parseInt(value)) && parseInt(value) > 0,
-    validationError: 'RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS는 양의 정수여야 합니다.',
-  },
+  positiveIntegerVar('RATE_LIMIT_STRICT_WINDOW_MS', 'Strict Rate Limit 윈도우 (밀리초)'),
+  positiveIntegerVar('RATE_LIMIT_STRICT_MAX_REQUESTS', 'Strict Rate Limit 최대 요청 수'),
+  positiveIntegerVar('RATE_LIMIT_STANDARD_WINDOW_MS', 'Standard Rate Limit 윈도우 (밀리초)'),
+  positiveIntegerVar('RATE_LIMIT_STANDARD_MAX_REQUESTS', 'Standard Rate Limit 최대 요청 수'),
+  positiveIntegerVar('RATE_LIMIT_RELAXED_WINDOW_MS', 'Relaxed Rate Limit 윈도우 (밀리초)'),
+  positiveIntegerVar('RATE_LIMIT_RELAXED_MAX_REQUESTS', 'Relaxed Rate Limit 최대 요청 수'),
+  positiveIntegerVar('RATE_LIMIT_FILE_UPLOAD_WINDOW_MS', 'File Upload Rate Limit 윈도우 (밀리초)'),
+  positiveIntegerVar('RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS', 'File Upload Rate Limit 최대 요청 수'),
+  positiveIntegerVar('RATE_LIMIT_MIDDLEWARE_WINDOW_MS', 'Middleware Rate Limit 윈도우 (밀리초)'),
+  positiveIntegerVar('RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS', 'Middleware Rate Limit 최대 요청 수'),
 
   // Web Push (선택사항)
   // 키가 없거나 플레이스홀더면 푸시는 "미설정"으로 동작해야 한다. 절대 부팅을 막지 않는다.
