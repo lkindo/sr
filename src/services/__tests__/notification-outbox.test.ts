@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * 감사 4.2 회귀 테스트 — 알림 아웃박스.
@@ -35,7 +35,13 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { dispatchPendingNotifications, enqueueEmails, MAX_ATTEMPTS } from '../notification-outbox';
+import {
+  dispatchPendingNotifications,
+  enqueueEmails,
+  MAX_ATTEMPTS,
+  startNotificationDispatcher,
+  stopNotificationDispatcher,
+} from '../notification-outbox';
 
 const row = (over: Partial<Record<string, unknown>> = {}) => ({
   id: 'n-1',
@@ -178,5 +184,108 @@ describe('dispatchPendingNotifications', () => {
     const sql = mocks.queryRaw.mock.calls[0]![0].join('?');
     expect(sql).toContain('FOR UPDATE SKIP LOCKED');
     expect(sql).toContain("'PENDING'");
+  });
+});
+
+/**
+ * 디스패처 타이머의 생명주기.
+ *
+ * 이 타이머는 운영에서 30초마다 돌며 밀린 알림을 실제로 내보낸다
+ * (`instrumentation.ts` 가 부팅 때 켠다). 그런데 지금까지 테스트가 하나도 없었다 —
+ * `startNotificationDispatcher` 안의 `NODE_ENV === 'test'` 가드 때문에 테스트에서는
+ * 아무 일도 일어나지 않아, 검증할 방법이 없다고 여겨진 것으로 보인다. 그 가드를
+ * 명시적으로 비켜서면 나머지 동작은 전부 검증할 수 있다.
+ *
+ * 여기서 지키려는 계약:
+ *   - 테스트 환경에서는 절대 타이머를 걸지 않는다(가드 자체의 회귀 방지).
+ *   - 껐다는 설정을 존중한다(NOTIFICATION_DISPATCHER=off).
+ *   - 두 번 켜도 타이머는 하나다 — 중복되면 발송 시도가 배로 늘어난다.
+ *   - 멈추면 실제로 멈춘다.
+ */
+describe('알림 디스패처 타이머', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    // 모듈 수준 타이머 변수는 테스트 간에 샌다. 매번 확실히 비운다.
+    stopNotificationDispatcher();
+    // tick 이 돌아도 조회 결과가 비어 있어 아무것도 발송하지 않게 한다.
+    mocks.queryRaw.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    stopNotificationDispatcher();
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([
+    ['NODE_ENV=test', { NODE_ENV: 'test', VITEST: '' }],
+    ['VITEST 플래그', { NODE_ENV: 'production', VITEST: 'true' }],
+  ])('테스트 실행 중에는 타이머를 걸지 않는다 (%s)', (_label, env) => {
+    // 가드가 사라지면 스위트 내내 30초짜리 실제 인터벌이 살아남는다.
+    for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
+
+    startNotificationDispatcher(1_000);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('NOTIFICATION_DISPATCHER=off 이면 타이머를 걸지 않는다', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', '');
+    vi.stubEnv('NOTIFICATION_DISPATCHER', 'off');
+
+    startNotificationDispatcher(1_000);
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('주기마다 밀린 알림을 처리한다', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', '');
+
+    startNotificationDispatcher(1_000);
+    await vi.advanceTimersByTimeAsync(3_000);
+
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(3);
+  });
+
+  // 중복 기동은 조용한 형태로 나쁘다: 타이머가 둘이면 같은 주기에 claim 이 두 번 돌아
+  // 부하가 배가 된다(발송 자체는 FOR UPDATE SKIP LOCKED 가 막아 준다).
+  it('두 번 켜도 타이머는 하나만 유지한다', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', '');
+
+    startNotificationDispatcher(1_000);
+    startNotificationDispatcher(1_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('멈추면 더 이상 돌지 않는다', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', '');
+
+    startNotificationDispatcher(1_000);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+
+    stopNotificationDispatcher();
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  // 한 번의 실패로 타이머가 죽으면 그 뒤 알림이 전부 멈춘다 — 소스 주석이 명시한 계약이다.
+  it('한 주기가 실패해도 다음 주기는 계속 돈다', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VITEST', '');
+    mocks.queryRaw.mockRejectedValueOnce(new Error('DB down'));
+
+    startNotificationDispatcher(1_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(mocks.queryRaw).toHaveBeenCalledTimes(2);
   });
 });

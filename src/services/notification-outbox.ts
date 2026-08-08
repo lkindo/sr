@@ -184,7 +184,13 @@ let dispatcherTimer: NodeJS.Timeout | null = null;
  */
 export function startNotificationDispatcher(intervalMs = 30_000): void {
   if (dispatcherTimer) return;
-  if (process.env.NODE_ENV === 'test') return;
+  // 테스트 실행 중에는 절대 걸지 않는다. 30초짜리 실제 인터벌이 스위트 내내 살아
+  // 남으면 테스트 간에 상태가 새고 프로세스도 늦게 끝난다.
+  //
+  // NODE_ENV 만으로는 부족했다: 이 프로젝트의 vitest 는 NODE_ENV=development 로 돌아
+  // (실측 확인) 이 가드가 실제로는 한 번도 걸리지 않았다. vitest 가 항상 세팅하는
+  // VITEST 플래그를 함께 본다.
+  if (process.env.NODE_ENV === 'test' || process.env.VITEST) return;
   if (process.env.NOTIFICATION_DISPATCHER === 'off') {
     logger.warn('[Outbox] NOTIFICATION_DISPATCHER=off — 알림이 발송되지 않습니다.');
     return;
