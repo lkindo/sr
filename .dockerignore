@@ -95,3 +95,23 @@ Dockerfile
 
 # Nginx config and certs
 nginx
+
+# 테스트 파일은 운영 이미지에 들어갈 이유가 없고, 들어오면 오히려 빌드를 깨뜨린다.
+#
+# 2026-08-08 배포 실패가 그랬다. 이 파일은 vitest.shims.d.ts 를 제외하는데 테스트
+# 파일은 제외하지 않았다. 그 shim 의 `/// <reference types="@vitest/browser-playwright" />`
+# 가 jest-dom 매처를 vitest 의 Assertion 에 붙이는 유일한 경로였고, 도커에는 shim 없이
+# 테스트만 복사되어 `next build` 의 타입 검사가 매처를 못 찾고 205건을 쏟아냈다
+# (toBeInTheDocument does not exist on type 'Assertion<HTMLElement>').
+#
+# 직접 원인은 @vitest/browser 4.0.18 → 4.1.10 이지만, 진짜 문제는 **테스트 도구가
+# 없는 이미지에서 테스트를 타입 검사하고 있었다**는 구조다. shim 을 되돌려 넣는 것은
+# 같은 사고를 다음 버전까지 미루는 것에 불과하다. 테스트를 아예 보내지 않는다.
+# 패턴 앞의 `**/` 는 필수다. docker 의 .dockerignore 는 최상위부터 매칭하므로
+# `__tests__` 만 쓰면 루트의 __tests__ 디렉터리 하나만 걸리고 src/ 하위는 그대로 들어온다.
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.stories.tsx
+tests
+.storybook
