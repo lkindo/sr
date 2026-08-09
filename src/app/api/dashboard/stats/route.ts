@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
-import { INTERNAL_ROLES } from '@/lib/policies';
+import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { formatISODateInAppZone } from '@/lib/timezone';
@@ -46,6 +46,15 @@ export const GET = withAuthAndRateLimit(
         } else {
           baseWhere.clientId = { in: [] }; // 고객사가 없으면 빈 결과
         }
+      }
+
+      // 담당자 스코프 — ENGINEER 는 배정된 SR 만 본다(canReadSR 과 같은 규칙,
+      // src/lib/policies.ts 의 resolveAssigneeScope). 이게 없으면 대시보드의 recentSRs 가
+      // ENGINEER 가 열 수 없는(상세 403) SR 의 **제목과 링크**를 노출한다.
+      // 집계 수치도 마찬가지로 자기 SR 기준이 된다 — '내 담당 SR' 카드와 같은 관점이다.
+      const assigneeScope = resolveAssigneeScope(session.user);
+      if (assigneeScope) {
+        baseWhere.assigneeId = assigneeScope;
       }
 
       // Get SR trend (last 30 days)

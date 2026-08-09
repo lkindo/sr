@@ -48,6 +48,12 @@ interface ClientListItem {
   name: string;
 }
 
+/** SR 목록 행. 목록↔상세 일관성 검증에 필요한 필드만. */
+interface SrListItem {
+  id: string;
+  srNumber: string;
+}
+
 interface SrDetail {
   id: string;
   srNumber: string;
@@ -200,6 +206,45 @@ test.describe('ENGINEER: 내부 사용자로서 할 수 있는 일 (양성)', ()
       'seedSR 이 ENGINEER 페르소나를 담당자로 지정하지 않았습니다. 이 양성 대조가 성립하지 않습니다.'
     ).toBe(user.id);
     expect(sr.status).toBe('INTAKE');
+  });
+
+  /**
+   * 회귀 가드 — 목록과 상세가 어긋나 있었다.
+   *
+   * canReadSR 은 ENGINEER 에게 `sr.assigneeId === user.id` 만 허용한다
+   * ("비즈니스 헌법 제1조 격리 원칙", src/lib/policies.ts). 그런데 목록 경로는
+   * resolveClientIdFilter 만 거쳤고 그 함수는 내부 사용자를 그대로 통과시켰다.
+   *
+   * 실측(수정 전): GET /api/srs 가 미배정 SR-2024-003 까지 3건을 돌려줬고,
+   * 그 3건의 상세는 전부 403 이었다. 목록에서 보이는 행을 클릭하면 접근 거부가 되는
+   * 구조였고, 그 자체가 **제목과 고객사명의 노출**이다.
+   *
+   * 이제 목록에도 같은 담당자 스코프가 걸린다(policies.ts 의 resolveAssigneeScope).
+   * "목록에 있는 모든 행은 열 수 있다" 를 직접 단언한다 — 두 경로가 다시 갈라지면 깨진다.
+   */
+  test('목록에 보이는 SR 은 전부 상세도 열린다', async ({ request }) => {
+    const response = await apiRequestWithRateLimitRetry(request, 'get', '/api/srs?pageSize=100');
+    expect(response.status(), 'ENGINEER 가 SR 목록을 조회하지 못했습니다.').toBe(200);
+
+    const rows = ((await response.json()) as Paginated<SrListItem>).data ?? [];
+    expect(
+      rows.length,
+      '목록이 비어 있으면 이 검증이 공허해집니다. seedSR 이 만든 배정 SR 이 보여야 합니다.'
+    ).toBeGreaterThan(0);
+
+    const user = await fetchSessionUser(request);
+    for (const row of rows) {
+      const detail = await apiRequestWithRateLimitRetry(request, 'get', `/api/srs/${row.id}`);
+      expect(
+        detail.status(),
+        `SR ${row.srNumber} 이 목록에는 보이는데 상세는 ${detail.status()} 입니다. ` +
+          '목록 스코프와 canReadSR 이 어긋났습니다 — 제목·고객사명이 노출됩니다.'
+      ).toBe(200);
+      expect(
+        ((await detail.json()) as { assigneeId: string | null }).assigneeId,
+        `SR ${row.srNumber} 이 ENGINEER 에게 배정되지 않았는데 목록에 있습니다.`
+      ).toBe(user.id);
+    }
   });
 });
 

@@ -9,8 +9,14 @@ async function globalSetup(config: FullConfig) {
   const page = await context.newPage();
 
   try {
-    // 개발 서버 URL
-    const baseURL = config.projects[0]?.use.baseURL || 'http://localhost:3000';
+    // 개발 서버 URL.
+    //
+    // `config.projects[0].use.baseURL` 만 보면 안 된다 — baseURL 은 playwright.config 의
+    // **최상위** `use` 에 있고 프로젝트별 `use` 에는 없어서 항상 undefined 로 떨어졌다.
+    // 그 결과 BASE_URL=http://localhost:3100 으로 돌려도 글로벌 셋업만 3000 번(다른 서버)에
+    // 로그인해서 엉뚱한 인증 상태를 user.json 에 덮어썼다. BASE_URL 을 1순위로 본다.
+    const baseURL =
+      process.env.BASE_URL || config.projects[0]?.use.baseURL || 'http://localhost:3000';
 
     // 로그인 페이지로 이동
     await page.goto(`${baseURL}/login`);

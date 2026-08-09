@@ -196,6 +196,41 @@ export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): 
   }
 }
 
+/**
+ * 첨부파일을 지울 수 있는가.
+ *
+ * 이 규칙은 원래 **화면에만** 있었다. src/app/(dashboard)/srs/[id]/page.tsx 가
+ * `ADMIN|MANAGER || (신청자 본인 && REQUESTED)` 로 삭제 버튼을 감췄는데,
+ * DELETE /api/attachments/[id] 는 `ensureCanUpdateSR` 만 요구했다. 그쪽이 더 넓어서
+ * CLIENT_USER 는 SR:UPDATE_SELF 로 자사 SR 을 수정할 수 있으므로, 접수(INTAKE) 이후에도
+ * API 로는 첨부를 지울 수 있었다 — 통제가 버튼을 숨기는 것뿐이었다.
+ *
+ * 이제 규칙은 여기 하나뿐이고 화면과 API 가 같은 함수를 부른다.
+ *
+ * 접수 전(REQUESTED)까지만 신청자에게 허용하는 이유: 접수 이후의 첨부는 운영팀이
+ * 판단 근거로 삼는 자료라, 요청자가 임의로 지우면 처리 이력이 사라진다.
+ */
+export function canDeleteAttachment(
+  user: AuthenticatedUser,
+  sr: SRAccessFields & { requesterId?: string | null; status?: string }
+): boolean {
+  if (!canUpdateSR(user, sr)) return false;
+
+  const roles = user.roles ?? [];
+  if (roles.includes('ADMIN') || roles.includes('MANAGER')) return true;
+
+  return sr.requesterId === user.id && sr.status === 'REQUESTED';
+}
+
+export function ensureCanDeleteAttachment(
+  user: AuthenticatedUser,
+  sr: SRAccessFields & { requesterId?: string | null; status?: string }
+): void {
+  if (!canDeleteAttachment(user, sr)) {
+    throw new ForbiddenError('첨부파일 삭제 권한이 없습니다.');
+  }
+}
+
 export function ensureCanDeleteSR(user: AuthenticatedUser, sr: SRAccessFields): void {
   if (!canDeleteSR(user, sr)) {
     throw new ForbiddenError('SR 삭제 권한이 없습니다.');
@@ -540,6 +575,32 @@ export function ensureCanAssignRole(user: AuthenticatedUser, role: Role): void {
   if (!canAssignRole(user, role)) {
     throw new ForbiddenError('역할 할당 권한이 없습니다.');
   }
+}
+
+/**
+ * 목록 조회에 걸어야 하는 **담당자 스코프**.
+ *
+ * `canReadSR` 은 ENGINEER 에게 `sr.assigneeId === user.id` 만 허용한다
+ * ("비즈니스 헌법 제1조 격리 원칙"). 그런데 목록 경로는 `resolveClientIdFilter` 만 거쳤고,
+ * 그 함수는 내부 사용자를 그대로 통과시킨다. 그 결과 **목록과 상세가 어긋났다**:
+ *   GET /api/srs        → 200, 미배정 SR 까지 제목·고객사가 보인다
+ *   GET /api/srs/{그 id} → 403
+ * 목록에서 보이는 행을 클릭하면 접근 거부가 되는 구조였고, 그 자체가 정보 노출이다
+ * (제목과 고객사명이 새어 나간다).
+ *
+ * 규칙이 두 곳에 있으면 갈라진다 — 그래서 canReadSR 과 **같은 우선순위**를 여기 한 번 더
+ * 적지 않고, 같은 판정 순서를 그대로 따른다: ADMIN → MANAGER(+SR:READ) → ENGINEER.
+ * 외부 사용자는 clientId 스코프가 이미 처리하므로 여기서는 아무것도 하지 않는다.
+ */
+export function resolveAssigneeScope(user: AuthenticatedUser): string | undefined {
+  if (user.roles?.includes('ADMIN')) return undefined;
+
+  const isManager = user.roles?.includes('MANAGER') ?? false;
+  if (isManager && hasPermissionFlag(user, PERMISSIONS.SR.READ)) return undefined;
+
+  if (user.roles?.includes('ENGINEER')) return user.id;
+
+  return undefined;
 }
 
 /**

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SRPriority, SRStatus } from '@prisma/client';
+import { Prisma, SRPriority, SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
-import { ensureCanCreateSR, resolveClientIdFilter } from '@/lib/policies';
+import { ensureCanCreateSR, resolveAssigneeScope, resolveClientIdFilter } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { srCreateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
@@ -53,11 +53,19 @@ export const GET = withAuthAndRateLimit(
     }
 
     // 필터 파라미터 (전부 위 스키마를 통과한 값이다)
-    const filters = {
+    const filters: Prisma.SRWhereInput = {
       status: query.status,
       clientId: clientIdFilter,
       priority: query.priority,
     };
+
+    // 담당자 스코프 — ENGINEER 는 배정된 SR 만 본다(canReadSR 과 같은 규칙).
+    // 이게 없으면 목록에는 보이는데 상세는 403 인 행이 생기고, 그 자체가 제목·고객사명
+    // 노출이다. undefined 면 Prisma 가 조건을 걸지 않는다.
+    const assigneeScope = resolveAssigneeScope(session.user);
+    if (assigneeScope) {
+      filters.assigneeId = assigneeScope;
+    }
 
     const [srs, totalCount] = await Promise.all([
       srService.getAllSRs({
