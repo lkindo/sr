@@ -280,7 +280,14 @@ async function seedReferenceData() {
         OR: [
           {
             resource: 'SR',
-            action: { in: ['CREATE', 'READ', 'UPDATE', 'STATUS_CHANGE', 'CONFIRM'] },
+            // DELETE 는 **자사 SR 에 한정**된다 — 권한 자체가 테넌트를 넓히지 않는다.
+            // policies.canDeleteSR 이 `isInternalUser(user) || user.clientIds.includes(sr.clientId)`
+            // 로 외부 사용자를 자기 테넌트에 묶기 때문이다(감사 4.1 에서 강화된 조건).
+            //
+            // 예전에는 이 목록에 DELETE 가 없는데도 상세 화면이 CLIENT_ADMIN 에게
+            // 삭제 버튼을 보여 줬다. 누르면 반드시 403 인 죽은 버튼이었다.
+            // 화면 쪽이 의도를 맞게 표현하고 있었고 권한이 뒤처져 있던 쪽이다.
+            action: { in: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'CONFIRM'] },
           },
           { resource: 'CLIENT', action: 'READ' },
           { resource: 'USER', action: { in: ['READ', 'UPDATE', 'UPDATE_SELF'] } },

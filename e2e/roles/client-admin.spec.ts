@@ -400,6 +400,79 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
     ).not.toContain(OTHER_CLIENT_CODE);
   });
 
+  test('자사 SR 은 지울 수 있고, 타 테넌트 SR 은 여전히 막힌다', async ({ request }) => {
+    // ── 무엇을 고정하는가 ────────────────────────────────────────────────
+    // CLIENT_ADMIN 은 오랫동안 상세 화면에 삭제 버튼이 보이는데 서버는 403 을 주는
+    // 상태였다 — 시드의 CLIENT_ADMIN 권한 목록에 SR:DELETE 가 없었기 때문이다.
+    // 제품 결정에 따라 "자사 SR 은 삭제 가능" 으로 정하고 권한을 부여했다
+    // (prisma/migrations/20260809120000_client_admin_sr_delete).
+    //
+    // 권한을 넓히는 변경이므로 **경계가 함께 지켜지는지**를 같은 테스트에서 확인한다.
+    // 양성만 두면 "전부 허용" 인 고장 상태에서도 통과한다.
+    const categoriesResponse = await apiRequestWithRateLimitRetry(
+      request,
+      'get',
+      `/api/clients/${ownClientId}/categories`
+    );
+    expect(categoriesResponse.status()).toBe(200);
+    const categories = (await categoriesResponse.json()) as ServiceCategoryItem[];
+    expect(
+      categories.length,
+      `${OWN_CLIENT_CODE} 의 서비스 카테고리가 없어 삭제 대상 SR 을 만들 수 없습니다.`
+    ).toBeGreaterThan(0);
+
+    const createResponse = await apiRequestWithRateLimitRetry(request, 'post', '/api/srs', {
+      data: {
+        title: `CLIENT_ADMIN 삭제 검증용 SR ${Date.now()}`,
+        description: 'CLIENT_ADMIN 이 자사 SR 을 삭제할 수 있는지 확인하기 위한 SR 입니다.',
+        clientId: ownClientId,
+        serviceCategoryId: categories[0]!.id,
+        requestedPriority: 'MEDIUM',
+      },
+    });
+    expect(createResponse.status(), `자사 SR 생성 실패. 응답: ${await createResponse.text()}`).toBe(
+      201
+    );
+    const ownSrId = ((await createResponse.json()) as SrListItem).id;
+
+    // ── 양성: 자사 SR 은 지워지고 실제로 사라진다 ────────────────────────
+    const deleteResponse = await apiRequestWithRateLimitRetry(
+      request,
+      'delete',
+      `/api/srs/${ownSrId}`
+    );
+    expect(
+      deleteResponse.status(),
+      `CLIENT_ADMIN 이 자사 SR 을 삭제하지 못했습니다(권한 부여가 반영되지 않았습니다). ` +
+        `응답: ${await deleteResponse.text()}`
+    ).toBe(200);
+
+    // 200 을 주고 실제로는 남아 있는 경우까지 배제한다.
+    const goneResponse = await apiRequestWithRateLimitRetry(request, 'get', `/api/srs/${ownSrId}`);
+    expect(goneResponse.status(), '삭제가 200 이었는데 SR 이 아직 조회됩니다.').toBe(404);
+
+    // ── 음성: 타 테넌트 SR 은 SR:DELETE 를 가져도 못 지운다 ──────────────
+    // canDeleteSR 이 외부 사용자에게 소속 조건을 함께 요구하기 때문이다(감사 4.1).
+    const blocked = await apiRequestWithRateLimitRetry(
+      request,
+      'delete',
+      `/api/srs/${otherTenantSrId}`
+    );
+    expect(
+      blocked.status(),
+      `CLIENT_ADMIN 이 타 테넌트 SR(${otherTenantSrNumber})을 삭제했습니다. ` +
+        `SR:DELETE 부여가 테넌트 경계를 넓혔습니다. 응답: ${await blocked.text()}`
+    ).toBe(403);
+
+    // 403 을 주고 실제로는 지워지는 경우까지 배제한다 — MANAGER 세션으로 확인한다.
+    const stillThere = await apiRequestWithRateLimitRetry(
+      managerRequest,
+      'get',
+      `/api/srs/${otherTenantSrId}`
+    );
+    expect(stillThere.status(), '삭제가 403 이었는데 타 테넌트 SR 이 사라졌습니다.').toBe(200);
+  });
+
   test('자기 clientIds 에 타 테넌트를 추가하는 자가 승격은 반영되지 않는다 (감사 3.7)', async ({
     request,
   }) => {
