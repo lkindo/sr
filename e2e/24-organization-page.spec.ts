@@ -75,12 +75,14 @@ test.describe('Organization 페이지', () => {
     const treeOrCards = page.locator('.space-y-2 > .border, .sr-card-template').first();
     await expect(treeOrCards).toBeVisible({ timeout: 10000 });
 
-    // 고객사 목록이 표시되는지 확인
-    const clientElements = page.locator('button:has-text("사용자 추가")'); // Each client header has "사용자 추가" button (if admin) or just check for rows
-    const clientCount = await clientElements.count();
+    // 화면의 고객사 카드 수를 API 와 대조한다.
+    // 예전에는 '사용자 추가' 버튼 수를 세고 `toBeGreaterThanOrEqual(0)` 로 끝냈다 —
+    // 개수는 언제나 0 이상이라 조직도가 통째로 비어도 통과하는 단언이었다.
+    const response = await page.request.get('/api/clients?limit=100');
+    expect(response.status()).toBe(200);
+    const clients = (await response.json()).data as Array<{ id: string }>;
 
-    console.log(`📊 표시된 고객사 수: ${clientCount}`);
-    expect(clientCount).toBeGreaterThanOrEqual(0);
+    await expect(page.locator('.space-y-2 > .border')).toHaveCount(clients.length);
   });
 
   test('고객사별 사용자 목록 확인', async ({ page }) => {
@@ -92,28 +94,33 @@ test.describe('Organization 페이지', () => {
     const firstClient = page.locator('.space-y-2 > .border').first();
     await expect(firstClient).toBeVisible({ timeout: 10000 });
 
-    const clientName = (await firstClient.textContent()) || '고객사';
-    console.log(`📋 고객사: ${clientName}`);
+    // 시드 계약상 TEST001 에는 사용자가 있다. "첫 번째 카드" 에 기대지 않고
+    // 사용자를 가진 고객사를 API 로 정한 뒤 그 카드를 펼친다.
+    const listed = await page.request.get('/api/clients?limit=100');
+    const clients = (await listed.json()).data as Array<{ id: string; name: string }>;
 
-    // 확장 가능한 경우 확장 (Chevron icon button is the first button usually)
-    // OrganizationTree implementation: Button with ChevronRight/Down is the first child of the clickable div (or first button inside)
-    const expandButton = firstClient.locator('button').first();
-
-    // Check if already expanded (look for ChevronDown or just assume we toggle)
-    // Or check if user list is visible
-    const userList = firstClient.locator('.pl-12, .space-y-2').nth(1); // sub list has padding
-    if (!(await userList.isVisible())) {
-      await expandButton.click();
-      await page.waitForTimeout(500);
+    // 헤더의 "N명" 배지는 `_count.users`(전체)이고, 펼쳤을 때 그려지는 목록은
+    // /api/clients/[id] 가 **ADMIN 역할 사용자를 제외**한 결과다(client.service 의
+    // filteredUsers). 그래서 화면에 몇 명이 나와야 하는지는 상세 API 가 답이다.
+    let target: { name: string; expected: number } | undefined;
+    for (const client of clients) {
+      const detail = await page.request.get(`/api/clients/${client.id}`);
+      if (!detail.ok()) continue;
+      const users = ((await detail.json()).users ?? []) as unknown[];
+      if (users.length > 0) {
+        target = { name: client.name, expected: users.length };
+        break;
+      }
     }
+    expect(target, '사용자를 가진 고객사가 하나도 없습니다 — 시드가 바뀌었습니다.').toBeDefined();
 
-    // 사용자 목록 확인
-    // Users are in the expanded list. We can look for .cursor-grab for draggable users, or just text
-    const userElements = firstClient.locator('.cursor-grab');
-    const userCount = await userElements.count();
+    const card = page.locator('.space-y-2 > .border').filter({ hasText: target!.name }).first();
+    await expect(card).toBeVisible();
+    await card.locator('button').first().click();
 
-    console.log(`👥 표시된 사용자 수: ${userCount}`);
-    expect(userCount).toBeGreaterThanOrEqual(0);
+    // 예전에는 `toBeGreaterThanOrEqual(0)` 이라 0명이 그려져도 통과했다.
+    // 상세 API 가 말한 인원수와 정확히 맞아야 한다.
+    await expect(card.locator('.cursor-grab')).toHaveCount(target!.expected);
   });
   test('사용자 Drag & Drop 재배정 (기능 존재 시)', async ({ page }) => {
     await page.goto('/organization', { waitUntil: 'domcontentloaded' });

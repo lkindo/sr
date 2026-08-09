@@ -7,61 +7,6 @@
     "noAssertionAllowlist 는 단언 없이 통과 중인 기존 테스트의 유예 목록이다. 새 항목 추가 금지.",
     "측정하지 않는 영역: \"관측 조건 if 안에 갇힌 expect\"(약 52건). 문법은 멀쩡하지만 요소를 못 찾으면 실행되지 않아 결과는 공허한 단언과 같다. 예산이 0 이 되어도 이 영역은 남는다."
   ],
-  "noAssertionAllowlist": ["05-sr-detail.spec.ts:SR 탭 네비게이션"],
-  "files": {
-    "05-sr-detail.spec.ts": {
-      "tolerantBranch": 3,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 2,
-      "fixedWaitMs": 800
-    },
-    "12-role-management.spec.ts": {
-      "tolerantBranch": 1,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 2,
-      "fixedWaitMs": 1000
-    },
-    "24-organization-page.spec.ts": {
-      "tolerantBranch": 0,
-      "vacuousAssertion": 2,
-      "fixedWaitCalls": 1,
-      "fixedWaitMs": 500
-    },
-    "25-my-requests-page.spec.ts": {
-      "tolerantBranch": 0,
-      "vacuousAssertion": 1,
-      "fixedWaitCalls": 3,
-      "fixedWaitMs": 3300
-    },
-    "26-settings-pages.spec.ts": {
-      "tolerantBranch": 2,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 5,
-      "fixedWaitMs": 3500
-    },
-    "27-service-categories.spec.ts": {
-      "tolerantBranch": 0,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 5,
-      "fixedWaitMs": 3600
-    },
-    "28-sr-activities-history.spec.ts": {
-      "tolerantBranch": 4,
-      "vacuousAssertion": 1,
-      "fixedWaitCalls": 3,
-      "fixedWaitMs": 3000
-    },
-    "30-accessibility.spec.ts": {
-      "tolerantBranch": 1,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 0,
-      "fixedWaitMs": 0
-    },
-    "helpers/test-helpers.ts": {
-      "tolerantBranch": 0,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 5,
-      "fixedWaitMs": 2800
-    }
-  }
+  "noAssertionAllowlist": [],
+  "files": {}
 }

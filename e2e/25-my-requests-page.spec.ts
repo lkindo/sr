@@ -34,13 +34,12 @@ async function expectMyRequestsLoaded(page: Page) {
 
 test.describe('My Requests 페이지', () => {
   test('My Requests 페이지 접근', async ({ page }) => {
-    await page.goto('/my-requests', { timeout: 60000 });
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(2000);
+    await page.goto('/my-requests', { waitUntil: 'domcontentloaded' });
 
-    // 페이지 콘텐츠 확인
-    const mainContent = page.locator('main, [role="main"]');
-    await expect(mainContent).toBeVisible({ timeout: 10000 });
+    // 고정 2초 대기 대신 로딩이 실제로 끝난 것을 기다린다.
+    // (SSE 때문에 networkidle 은 쓸 수 없고, 그렇다고 sleep 을 쓸 이유도 없다.)
+    await expectMyRequestsLoaded(page);
+    await expect(page.getByRole('heading', { name: /내 요청/ }).first()).toBeVisible();
   });
 
   test('내가 요청한 SR만 표시 확인', async ({ page }) => {
@@ -65,16 +64,20 @@ test.describe('My Requests 페이지', () => {
     expect(Array.isArray(data)).toBe(true);
     const srList: unknown[] = data;
 
-    console.log(`📊 내 SR 개수: ${srList.length}`);
+    // 이 화면은 테이블이 아니라 카드 목록이다. 예전에는 `tbody tr` 을 세고
+    // `toBeGreaterThanOrEqual(0)` 으로 끝냈는데, 그 로케이터는 이 페이지에서 항상 0이고
+    // 0 은 언제나 0 이상이라 **무엇을 확인했는지 없는 단언**이었다.
+    // 카드 하나마다 SR 상세로 가는 링크가 2개(번호 + 상세 보기)씩 붙으므로,
+    // 서로 다른 링크 대상의 수가 곧 카드 수다.
+    const hrefs = await page
+      .locator('main a[href^="/srs/"]')
+      .evaluateAll((els) => els.map((el) => (el as HTMLAnchorElement).getAttribute('href')));
+    const shownIds = new Set(hrefs.map((href) => href?.split('/srs/')[1]));
 
-    // 화면의 SR 행 수와 비교
-    const srRows = page.locator('tbody tr, [role="row"]');
-    const rowCount = await srRows.count();
-
-    console.log(`📋 화면에 표시된 SR: ${rowCount}`);
-
-    // 개수가 일치하는지 확인 (페이지네이션이 있을 경우 차이 발생 가능)
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    expect(
+      shownIds.size,
+      `API 는 ${srList.length}건을 내려줬는데 화면에는 ${shownIds.size}건이 있습니다.`
+    ).toBe(srList.length);
   });
 
   // 이 화면은 테이블이 아니라 SR 카드 목록이다(my-requests/page.tsx). 예전 테스트는
@@ -101,37 +104,43 @@ test.describe('My Requests 페이지', () => {
     expect(new Set(hrefs).size).toBe(hrefs.length / 2);
   });
 
-  test('상태별 필터링 기능', async ({ page }) => {
+  test('상태 필터를 걸면 그 상태의 SR 만 남는다', async ({ page }) => {
     await page.goto('/my-requests', { waitUntil: 'domcontentloaded' });
     await expectMyRequestsLoaded(page);
 
-    // 필터 Select 또는 버튼 찾기
-    const statusFilter = page
-      .locator('select[name*="status"], [role="combobox"]')
-      .filter({ hasText: /상태|Status/i })
-      .first();
+    // 로케이터를 **현재 표시값**으로 잡으면 안 된다. 필터를 바꾸는 순간 텍스트가
+    // 바뀌어 로케이터가 스스로를 놓친다(`hasText: /상태|전체/` 로 잡았다가 실제로 그랬다).
+    // '필터 및 정렬' 카드의 첫 콤보박스가 상태 필터다(두 번째는 정렬 기준).
+    const filterCard = page.locator('.border').filter({ hasText: '필터 및 정렬' }).first();
+    const statusFilter = filterCard.getByRole('combobox').first();
     await expect(statusFilter).toBeVisible({ timeout: 10000 });
 
-    // 필터 적용
     await statusFilter.click();
-    await page.waitForTimeout(300);
 
-    // 옵션 선택
-    const firstOption = page.locator('[role="option"]').first();
-    const optionVisible = await firstOption.isVisible({ timeout: 2000 }).catch(() => false);
+    // 예전에는 옵션이 안 보이면 그대로 통과했고, 골라도 개수를 로그로 찍고 끝이었다.
+    // '전체' 가 아닌 실제 상태를 하나 골라 결과를 단언한다.
+    const options = page.getByRole('option');
+    await expect(options.first()).toBeVisible({ timeout: 5000 });
+    const target = options.filter({ hasNotText: '전체' }).first();
+    const targetLabel = (await target.innerText()).trim();
+    await target.click();
 
-    if (optionVisible) {
-      await firstOption.click();
-      await page.waitForTimeout(1000);
+    await expect(statusFilter).toContainText(targetLabel);
 
-      console.log('✅ 필터 적용 완료');
-
-      // 필터 적용 후 목록 업데이트 확인
-      const rows = page.locator('tbody tr, [role="row"]');
-      const count = await rows.count();
-
-      console.log(`📊 필터링 후 SR 개수: ${count}`);
+    // 남은 카드의 상태 배지가 전부 고른 값이어야 한다. 0건이면 "해당 SR 이 없습니다"
+    // 안내가 대신 떠야 하고, 그 둘 중 하나는 반드시 성립해야 한다.
+    const cards = page.locator('main a[href^="/srs/"]');
+    const remaining = await cards.count();
+    if (remaining === 0) {
+      await expect(page.getByText(/요청.*없습니다|SR이 없습니다/)).toBeVisible();
+      return;
     }
+
+    const badges = page.getByText(targetLabel, { exact: true });
+    await expect(
+      badges.first(),
+      `"${targetLabel}" 로 걸렀는데 그 상태의 카드가 하나도 없습니다.`
+    ).toBeVisible();
   });
 
   // 정렬은 클릭 가능한 테이블 헤더가 아니라 "정렬 기준" 콤보박스로 한다.

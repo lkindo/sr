@@ -1,195 +1,140 @@
-import { expect, test } from '@playwright/test';
+import { type Browser, expect, type Page, test } from '@playwright/test';
+
+import { deleteSeededSRs, type SeededSR, seedSR } from './fixtures/sr';
 
 /**
- * ⚠️ networkidle 금지
- * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
- * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
- * 계속 열어 둔다. "500ms 동안 네트워크 요청 0건" 조건이 성립하지 않으므로
- * networkidle 은 항상 30초 뒤 타임아웃난다. domcontentloaded 를 쓰고, 실제로
- * 필요한 대상은 expect(...).toBeVisible() 의 자동 재시도로 기다린다.
- */
-import { createSRViaAPI, createTestSR, deleteSRViaAPI } from './helpers/test-helpers';
-
-/**
- * SR 상세 페이지 테스트
+ * SR 상세 페이지 — 탭 구조와 댓글 작성.
  *
- * 개선사항:
- * - SR이 없을 경우 직접 생성하여 테스트 안정성 향상
- * - 탭 셀렉터를 더 유연하게 개선
+ * ── 이 파일의 내력 ───────────────────────────────────────────────────────
+ * 예전의 이 스펙은 탭도 댓글도 전부 "찾으면 하고, 못 찾으면 로그" 였다.
+ * '탭 네비게이션' 테스트는 **단언이 하나도 없었고**(탭 리스트가 없으면 else 로
+ * 빠져 "단일 뷰 레이아웃일 수 있음" 을 찍고 끝), '코멘트 추가' 는 입력란이나
+ * 제출 버튼을 못 찾으면 그대로 통과했다. 탭이 통째로 사라져도, 댓글 작성이
+ * 아예 없어져도 두 테스트 모두 초록불이었다.
+ *
+ * ── 무엇을 계약으로 삼는가 ────────────────────────────────────────────────
+ * 탭은 3개(댓글 · 활동 이력 · 첨부파일)이고 각 탭패널의 내용이 정해져 있다
+ * (src/app/(dashboard)/srs/[id]/page.tsx 의 TabsList). 개수를 세는 대신
+ * **이름으로** 찍어 확인하고, 클릭 후 그 패널의 고유한 내용까지 확인한다.
+ * 댓글은 서버 상태(GET /api/srs/{id}/comments)로 확정한다 — 화면에 보이는 것만
+ * 확인하면 낙관적 렌더와 구분되지 않는다.
+ *
+ * ⚠️ networkidle 금지 — 로그인 상태에서는 /api/realtime SSE 가 계속 열려 있어
+ * "500ms 동안 요청 0건" 이 영원히 성립하지 않는다.
  */
+
+/** 댓글 목록 응답에서 이 스펙이 쓰는 필드. */
+interface CommentRow {
+  id: string;
+  content: string;
+}
+
+const seededSRIds: string[] = [];
+
+async function seed(browser: Browser): Promise<SeededSR> {
+  const sr = await seedSR(browser, { stage: 'INTAKE', title: `상세 페이지 SR ${Date.now()}` });
+  seededSRIds.push(sr.id);
+  return sr;
+}
+
+test.afterAll(async ({ browser }) => {
+  await deleteSeededSRs(browser, seededSRIds);
+});
+
+async function openDetail(page: Page, sr: SeededSR): Promise<void> {
+  await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
+  // 엉뚱한 SR 을 보고 있지 않은지부터 확정한다.
+  await expect(page.getByTestId('sr-title')).toHaveText(sr.title);
+}
+
+/** 활성 탭패널. 같은 문구의 TabsTrigger 와 충돌하지 않도록 스코프한다. */
+function activePanel(page: Page) {
+  return page.locator('[role="tabpanel"][data-state="active"]');
+}
 
 test.describe('SR 상세 페이지', () => {
-  let testSRId: string | null = null;
-  const createdSRIds: string[] = [];
+  test('상세 정보가 시드한 값 그대로 보인다', async ({ browser, page }) => {
+    const sr = await seed(browser);
+    await openDetail(page, sr);
 
-  test.afterAll(async ({ browser }) => {
-    // 생성된 모든 SR 삭제 (클린업)
-    if (createdSRIds.length > 0) {
-      const context = await browser.newContext({
-        storageState: './playwright/.auth/user.json',
-      });
-      const request = context.request;
-      console.log(`🧹 Cleaning up ${createdSRIds.length} SRs...`);
-      for (const id of createdSRIds) {
-        await deleteSRViaAPI(request, id);
-      }
-      await context.close();
-    }
+    // 예전에는 "상세 정보" 라는 **제목**만 보이면 통과였다. 제목이 있는 것과
+    // 내용이 맞는 것은 다르다 — SR 번호와 상태까지 확인한다.
+    // (SR 번호는 h1 과 CopyButton 의 value 로 두 번 나오므로 h1 을 겨냥한다.)
+    await expect(page.getByRole('heading', { name: sr.srNumber, level: 1 })).toBeVisible();
+    await expect(page.getByText('접수', { exact: true }).first()).toBeVisible();
   });
 
-  test.beforeAll(async ({ browser }) => {
-    // 테스트용 SR을 API로 빠르게 생성
-    const context = await browser.newContext({
-      storageState: './playwright/.auth/user.json',
-    });
-    const request = context.request;
+  test('탭 3개가 이름대로 있고, 각 탭패널이 자기 내용을 보여준다', async ({ browser, page }) => {
+    const sr = await seed(browser);
+    await openDetail(page, sr);
 
-    try {
-      // 1. 필요한 데이터(고객사, 카테코리) 조회
-      const [clientResp, categoryResp] = await Promise.all([
-        request.get('/api/clients'),
-        request.get('/api/service-categories'),
-      ]);
+    const tablist = page.getByRole('tablist');
+    await expect(tablist).toBeVisible();
 
-      const clients = await clientResp.json();
-      const categories = await categoryResp.json();
-
-      if (clients.data?.length > 0 && categories.data?.length > 0) {
-        const timestamp = Date.now();
-        const sr = await createSRViaAPI(request, {
-          title: `상세 페이지 테스트 SR ${timestamp}`,
-          description: '상세 페이지 테스트용 SR입니다 (API로 생성됨).',
-          clientId: clients.data[0].id,
-          serviceCategoryId: categories.data[0].id,
-          requestedPriority: 'MEDIUM',
-        });
-        testSRId = sr.id;
-        createdSRIds.push(sr.id); // 클린업 대상에 추가
-        console.log(`✅ API를 통해 테스트 SR 생성 완료: ${testSRId}`);
-      } else {
-        console.warn('⚠️ 테스트 데이터가 부족하여 UI 생성 시도를 고려하거나 스킵합니다.');
-      }
-    } catch (e) {
-      console.error('❌ beforeAll (API Setup) 실패:', e);
-    } finally {
-      await context.close();
+    // 개수만 세면(예전 방식) 탭 하나가 다른 것으로 바뀌어도 통과한다. 이름으로 찍는다.
+    await expect(tablist.getByRole('tab')).toHaveCount(3);
+    for (const name of [/댓글/, /활동 이력/, /첨부파일/]) {
+      await expect(tablist.getByRole('tab', { name })).toBeVisible();
     }
+
+    // 클릭이 실제로 그 패널을 여는지까지 확인한다. 각 패널의 고유한 문구를 쓴다.
+    await page.getByRole('tab', { name: /댓글/ }).click();
+    await expect(activePanel(page).getByText('새 댓글 작성')).toBeVisible();
+
+    await page.getByRole('tab', { name: /활동 이력/ }).click();
+    await expect(activePanel(page).getByText(/^활동 이력 \(\d+\)$/)).toBeVisible();
+
+    await page.getByRole('tab', { name: /첨부파일/ }).click();
+    await expect(activePanel(page).getByRole('button', { name: '파일 업로드' })).toBeVisible();
   });
 
-  test('SR 상세 페이지 접근', async ({ page }) => {
-    test.skip(!testSRId, 'SR ID가 없습니다');
+  test('댓글을 남기면 서버에 저장되고 목록 개수가 늘어난다', async ({ browser, page }) => {
+    const sr = await seed(browser);
+    await openDetail(page, sr);
 
-    await page.goto(`/srs/${testSRId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.getByRole('tab', { name: /댓글/ }).click();
+    const panel = activePanel(page);
+    await expect(panel.getByText('댓글 (0)')).toBeVisible();
 
-    // 상세 정보 섹션 확인 (여러 가능한 셀렉터)
-    const detailSection = page
-      .locator('h3, h2, h4')
-      .filter({ hasText: /상세 정보|상세|Details/i })
-      .first();
-    await expect(detailSection).toBeVisible({ timeout: 10000 });
+    const content = `E2E 상세 댓글 ${Date.now()}`;
+    const posted = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === `/api/srs/${sr.id}/comments` &&
+        r.request().method() === 'POST'
+    );
+    await panel.getByRole('textbox', { name: '댓글 작성' }).fill(content);
+    await panel.getByRole('button', { name: '댓글 추가' }).click();
 
-    console.log('✅ SR 상세 페이지 접근 성공');
+    expect((await posted).status(), '댓글 등록이 201 이 아닙니다.').toBe(201);
+
+    // ── 화면 반영 ────────────────────────────────────────────────────────
+    await expect(panel.getByText(content)).toBeVisible();
+    await expect(panel.getByText('댓글 (1)')).toBeVisible();
+
+    // ── 서버 상태 ────────────────────────────────────────────────────────
+    // 화면만 보면 낙관적 렌더에 속을 수 있다. 예전 스펙은 여기까지 가지 않았다.
+    const listed = await page.request.get(`/api/srs/${sr.id}/comments`);
+    expect(listed.status()).toBe(200);
+    const body = (await listed.json()) as { comments: CommentRow[] } | CommentRow[];
+    const rows = Array.isArray(body) ? body : body.comments;
+    expect(rows.map((r) => r.content)).toContain(content);
   });
 
-  test('SR 탭 네비게이션', async ({ page }) => {
-    test.skip(!testSRId, 'SR ID가 없습니다');
+  test('빈 댓글은 등록되지 않는다', async ({ browser, page }) => {
+    // 음성 대조. 위 테스트가 "무엇을 넣어도 통과" 로 지나가는 것을 막는다.
+    const sr = await seed(browser);
+    await openDetail(page, sr);
 
-    await page.goto(`/srs/${testSRId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.getByRole('tab', { name: /댓글/ }).click();
+    const panel = activePanel(page);
 
-    // 탭 확인 (더 유연한 셀렉터 사용)
-    // 탭 버튼은 role="tab" 또는 data-state 속성을 가질 수 있음
-    const tabList = page.locator('[role="tablist"]');
+    // 공백만 넣어도 등록되면 안 된다. 버튼이 막히든 서버가 막든, 결과는 0건이어야 한다.
+    await panel.getByRole('textbox', { name: '댓글 작성' }).fill('   ');
+    await panel.getByRole('button', { name: '댓글 추가' }).click();
 
-    if (await tabList.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // 탭 리스트가 있는 경우
-      const tabs = tabList.locator('[role="tab"], button');
-      const tabCount = await tabs.count();
-      console.log(`✅ 탭 개수: ${tabCount}`);
-
-      // 각 탭 클릭 테스트
-      for (let i = 0; i < Math.min(tabCount, 3); i++) {
-        const tab = tabs.nth(i);
-        if (await tab.isVisible().catch(() => false)) {
-          await tab.click();
-          await page.waitForTimeout(300);
-          console.log(`✅ 탭 ${i + 1} 클릭 완료`);
-        }
-      }
-    } else {
-      // 대안: 텍스트로 탭 찾기
-      const commentTab = page
-        .getByRole('tab', { name: /댓글|Comments/i })
-        .or(page.locator('button').filter({ hasText: /댓글|Comments/i }));
-
-      if (await commentTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await commentTab.click();
-        console.log('✅ 댓글 탭 클릭 완료');
-      } else {
-        console.log('⚠️ 탭 UI를 찾을 수 없습니다 (단일 뷰 레이아웃일 수 있음)');
-      }
-    }
-  });
-
-  test('SR 코멘트 추가', async ({ page }) => {
-    test.skip(!testSRId, 'SR ID가 없습니다');
-
-    await page.goto(`/srs/${testSRId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-    // 댓글 탭 클릭 (있다면)
-    const commentTab = page
-      .getByRole('tab', { name: /댓글|Comments/i })
-      .or(page.locator('button').filter({ hasText: /댓글|Comments/i }));
-
-    if (await commentTab.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await commentTab.click();
-      await page.waitForTimeout(500);
-    }
-
-    // 댓글 입력 (여러 가능한 셀렉터)
-    const commentTextarea = page
-      .locator('textarea')
-      .filter({
-        hasText: '',
-      })
-      .or(page.locator('textarea[placeholder*="댓글"]'))
-      .or(page.locator('textarea[placeholder*="comment"]'))
-      .first();
-
-    if (await commentTextarea.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const timestamp = Date.now();
-      const testComment = `E2E 테스트 댓글 ${timestamp}`;
-
-      await commentTextarea.fill(testComment);
-
-      // 제출 버튼 찾기
-      const submitButton = page
-        .getByRole('button', { name: /댓글 추가|등록|Submit|Add/i })
-        .or(page.locator('button[type="submit"]').filter({ hasText: /댓글|추가|등록/i }));
-
-      if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // API 응답 대기
-        const commentResponsePromise = page
-          .waitForResponse(
-            (resp) => resp.url().includes('/api/') && resp.request().method() === 'POST',
-            { timeout: 10000 }
-          )
-          .catch(() => null);
-
-        await submitButton.click();
-
-        const response = await commentResponsePromise;
-        if (response) {
-          console.log(`✅ 댓글 추가 API 응답: ${response.status()}`);
-        }
-
-        // 성공 확인
-        await expect(page.locator(`text=${testComment}`)).toBeVisible({ timeout: 10000 });
-        console.log('✅ 댓글 추가 성공');
-      } else {
-        console.log('⚠️ 댓글 제출 버튼을 찾을 수 없습니다');
-      }
-    } else {
-      console.log('⚠️ 댓글 입력란을 찾을 수 없습니다');
-    }
+    const listed = await page.request.get(`/api/srs/${sr.id}/comments`);
+    const body = (await listed.json()) as { comments: CommentRow[] } | CommentRow[];
+    const rows = Array.isArray(body) ? body : body.comments;
+    expect(rows, '공백만 있는 댓글이 저장되었습니다.').toHaveLength(0);
   });
 });

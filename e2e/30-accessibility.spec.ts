@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { checkA11y, withAuthContext } from './helpers/test-helpers';
 
@@ -77,17 +77,18 @@ test.describe('Accessibility (A11y) 검증', () => {
       await withAuthContext(browser, 'manager', async (page) => {
         await page.goto('/srs', { waitUntil: 'domcontentloaded' });
 
+        // 시드가 SR 3건을 넣으므로 목록에 링크가 없으면 그것이 회귀다.
+        // 예전에는 링크를 못 찾으면 경고만 찍고 통과해서, 목록이 비어도 —
+        // 즉 상세 접근성을 한 번도 검사하지 못해도 — 초록불이었다.
         const firstSRLink = page.locator('tr a').first();
-        // SR 링크가 나타날 때까지 기다린다. 없으면 아래 else 로 건너뛴다(기존 동작 유지).
-        await firstSRLink.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-        if (await firstSRLink.isVisible()) {
-          await firstSRLink.click();
-          await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
-          // 상세 데이터가 렌더된 뒤에 검사한다. 스켈레톤을 검사하면 h1 이 없다고 나온다.
-          await checkA11y(page, 'SR Detail', '[data-testid="sr-title"]');
-        } else {
-          console.warn('⚠️ 테스트할 SR이 없어 상세 페이지 접근성 테스트를 건너뜁니다.');
-        }
+        await expect(firstSRLink, 'SR 목록에 상세 링크가 없습니다.').toBeVisible({
+          timeout: 15000,
+        });
+
+        await firstSRLink.click();
+        await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
+        // 상세 데이터가 렌더된 뒤에 검사한다. 스켈레톤을 검사하면 h1 이 없다고 나온다.
+        await checkA11y(page, 'SR Detail', '[data-testid="sr-title"]');
       });
     });
   });

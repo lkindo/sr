@@ -63,39 +63,26 @@ test.describe('역할 관리 - ADMIN 권한', () => {
     console.log(`✅ 역할 확인: ${roleNameText}`);
   });
 
-  test('역할별 권한 관리', async ({ page }) => {
+  test('권한 관리 버튼이 그 역할의 권한 설정을 연다', async ({ page }) => {
     await page.goto('/roles', { waitUntil: 'domcontentloaded' });
 
-    // 첫 번째 역할 행
     const firstRole = page.locator('tbody tr').first();
     await expect(firstRole).toBeVisible({ timeout: 10000 });
+    const roleName = ((await firstRole.locator('td').first().textContent()) ?? '').trim();
+    expect(roleName, '역할 이름을 읽지 못했습니다.').not.toBe('');
 
-    // 권한 관리 버튼 또는 수정 버튼 찾기
-    const actionButton = firstRole
-      .locator('button')
-      .filter({ hasText: /권한|Permission|수정|Edit/i })
-      .first();
+    // '권한 관리' 버튼은 RoleTable 에 항상 있다(src/components/roles/RoleTable.tsx).
+    // 예전에는 못 찾으면 행을 클릭해 상세로 가는 척했는데 /roles/[id] 라우트는
+    // 존재하지 않는다 — 즉 버튼이 사라져도, 다이얼로그가 안 열려도 통과했다.
+    await firstRole.getByRole('button', { name: '권한 관리' }).click();
 
-    if (await actionButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await actionButton.click();
-      await page.waitForTimeout(500);
+    // 다이얼로그 제목에 **그 역할 이름**이 있어야 한다. 아무 다이얼로그나 열린 것이
+    // 아니라 고른 행의 권한 설정이 열렸음을 확인한다.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(`권한 설정 - ${roleName}`)).toBeVisible();
 
-      // Dialog 또는 상세 페이지 확인
-      const dialog = page.locator('[role="dialog"]').first();
-      if (await dialog.isVisible({ timeout: 3000 }).catch(() => false)) {
-        console.log('✅ 권한 관리 Dialog 열림');
-
-        // Dialog 닫기
-        await page.keyboard.press('Escape');
-      }
-    } else {
-      // 행 클릭으로 상세 페이지 이동 시도
-      await firstRole.click();
-      await page.waitForTimeout(500);
-
-      if (page.url().includes('/roles/')) {
-        console.log('✅ 역할 상세 페이지로 이동');
-      }
-    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
   });
 });

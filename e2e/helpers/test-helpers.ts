@@ -203,7 +203,8 @@ export async function createTestSR(
   const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
   await createButton.click();
   console.log('Clicked Create button');
-  await page.waitForTimeout(1000); // 다이얼로그 애니메이션 대기
+  // 애니메이션을 sleep 으로 재는 대신 다이얼로그가 실제로 뜬 것을 기다린다.
+  await expect(page.getByRole('dialog')).toBeVisible({ timeout: 15000 });
 
   await page.getByRole('textbox', { name: '제목 *' }).fill(data.title);
   await page.getByRole('textbox', { name: '설명 *' }).fill(data.description);
@@ -214,17 +215,17 @@ export async function createTestSR(
   const isClientEnabled = await clientCombobox.isEnabled().catch(() => false);
   if (isClientEnabled) {
     await clientCombobox.click();
-    await page.waitForTimeout(500);
+    // Radix Select 는 옵션이 붙은 뒤에야 role=option 이 잡힌다.
+    // 옵션 로케이터를 기다리는 것 자체가 동기화라, 고정 대기가 필요 없다.
     await page.getByRole('option').first().click();
     console.log('Selected client');
   }
 
-  // 서비스 카테고리 선택
+  // 서비스 카테고리 선택. 고객사가 정해져야 목록이 오므로 셀렉트가 열릴 때까지 기다린다.
   const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
+  await expect(categoryCombobox).toBeEnabled({ timeout: 15000 });
   await categoryCombobox.click();
-  await page.waitForTimeout(500);
   await page.getByRole('option').first().click();
-  await page.waitForTimeout(300);
   console.log('Selected category');
 
   // SR 생성 API 응답 대기 (Server Action 사용 시 /srs로 요청됨)
@@ -416,8 +417,9 @@ export async function gotoAndWaitForData(
     await navigatePromise;
   }
 
-  // React 컴포넌트 렌더링 완료 대기
-  await page.waitForTimeout(500);
+  // 예전에는 여기서 "React 렌더링 완료 대기" 로 500ms 를 잤다. 렌더는 시간이 아니라
+  // 결과로 확인해야 한다 — 호출부가 필요한 요소를 `expect(...).toBeVisible()` 로
+  // 기다리면 Playwright 가 알아서 재시도하므로 이 대기는 순수한 지연이었다.
 }
 
 // ============================================================================

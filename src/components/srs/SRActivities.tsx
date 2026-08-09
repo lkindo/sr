@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import type { SRActivityType } from '@prisma/client';
 import { Loader2 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
@@ -13,23 +14,53 @@ interface SRActivitiesProps {
   srId: string;
 }
 
-const activityTypeLabels: Record<string, string> = {
+/**
+ * 활동 유형 라벨.
+ *
+ * `Record<SRActivityType, ...>` 로 못박는다. 예전에는 `Record<string, string>` 이라
+ * 키가 스키마와 어긋나도 타입 검사가 통과했고, 실제로 6개 중 4개가 존재하지 않는
+ * 키였다 — UPDATED / STATUS_CHANGE / COMMENT / ATTACHMENT. prisma 의 enum 은
+ * STATUS_CHANGED / COMMENTED / ATTACHMENT_ADDED 처럼 다른 이름이라, 12개 유형 중
+ * 10개가 `|| activity.type` 폴백으로 떨어져 한국어 화면에 "ATTACHMENT_ADDED" 같은
+ * 영문 enum 이 그대로 찍혔다. 이제 유형이 늘면 여기서 컴파일이 깨진다.
+ */
+const activityTypeLabels: Record<SRActivityType, string> = {
   CREATED: '생성',
-  UPDATED: '수정',
-  STATUS_CHANGE: '상태 변경',
+  STATUS_CHANGED: '상태 변경',
+  PRIORITY_CHANGED: '우선순위 변경',
   ASSIGNED: '담당자 지정',
-  COMMENT: '댓글',
-  ATTACHMENT: '첨부파일',
+  REASSIGNED: '담당자 변경',
+  COMMENTED: '댓글',
+  ATTACHMENT_ADDED: '첨부 추가',
+  ATTACHMENT_REMOVED: '첨부 삭제',
+  REOPENED: '재요청',
+  COMPLETED: '완료',
+  REJECTED: '반려',
+  INTAKE_UPDATED: '접수 정보 수정',
 };
 
-const activityTypeColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
+const activityTypeColors: Record<SRActivityType, 'default' | 'secondary' | 'destructive'> = {
   CREATED: 'default',
-  UPDATED: 'secondary',
-  STATUS_CHANGE: 'default',
+  STATUS_CHANGED: 'default',
+  PRIORITY_CHANGED: 'secondary',
   ASSIGNED: 'default',
-  COMMENT: 'secondary',
-  ATTACHMENT: 'secondary',
+  REASSIGNED: 'secondary',
+  COMMENTED: 'secondary',
+  ATTACHMENT_ADDED: 'secondary',
+  ATTACHMENT_REMOVED: 'secondary',
+  REOPENED: 'destructive',
+  COMPLETED: 'default',
+  REJECTED: 'destructive',
+  INTAKE_UPDATED: 'secondary',
 };
+
+/**
+ * 서버가 내려주는 `type` 은 직렬화를 거치며 `string` 이 된다.
+ * 알려진 유형이면 라벨/색을, 아니면(스키마가 앞서 나간 경우) 원문을 그대로 쓴다.
+ */
+function isKnownActivityType(type: string): type is SRActivityType {
+  return type in activityTypeLabels;
+}
 
 export function SRActivities({ srId }: SRActivitiesProps) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
@@ -113,10 +144,16 @@ export function SRActivities({ srId }: SRActivitiesProps) {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{activity.user.name}</span>
                       <Badge
-                        variant={activityTypeColors[activity.type] || 'secondary'}
+                        variant={
+                          isKnownActivityType(activity.type)
+                            ? activityTypeColors[activity.type]
+                            : 'secondary'
+                        }
                         className="text-xs"
                       >
-                        {activityTypeLabels[activity.type] || activity.type}
+                        {isKnownActivityType(activity.type)
+                          ? activityTypeLabels[activity.type]
+                          : activity.type}
                       </Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(activity.createdAt).toLocaleString('ko-KR')}

@@ -914,9 +914,42 @@ const RULE_LABELS: Record<keyof FileBudget, string> = {
   fixedWaitMs: '고정 대기 총 ms',
 };
 
+/**
+ * 남은 위반을 파일:줄 단위로 전부 찍는다.
+ *
+ * 평소 게이트는 **예산을 넘긴 것만** 자세히 보여 준다. 그건 CI 에 맞는 동작이지만,
+ * 남은 유예를 실제로 갚으려 할 때는 "지금 무엇이 어디에 남아 있는지" 목록이 필요하다.
+ * 기준선을 임시로 0 으로 바꿔 보는 편법을 쓰지 않도록 조회 전용 모드를 둔다.
+ */
+function report(measurement: Measurement): void {
+  const sections: Array<[string, RuleHit[]]> = [
+    ['관용 분기', measurement.tolerantHits],
+    ['공허 단언', measurement.vacuousHits],
+    ['고정 대기', measurement.fixedWaitHits],
+  ];
+
+  for (const [label, hits] of sections) {
+    console.log(`\n[${label}] ${hits.length}건`);
+    for (const hit of [...hits].sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line)) {
+      console.log(`  ${hit.file}:${hit.line}  ${hit.detail}`);
+    }
+  }
+
+  console.log(`\n[무단언] ${measurement.noAssertion.length}건`);
+  for (const offender of measurement.noAssertion) {
+    console.log(`  ${offender.file}:${offender.line}  ${offender.title}`);
+  }
+}
+
 function main(): void {
   const update = process.argv.includes('--update');
   const measurement = measure();
+
+  if (process.argv.includes('--report')) {
+    summarize(measurement);
+    report(measurement);
+    return;
+  }
 
   if (update) {
     writeBaseline(measurement);

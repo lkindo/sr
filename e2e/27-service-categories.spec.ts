@@ -43,122 +43,74 @@ test.describe('서비스 카테고리', () => {
     }
   });
 
-  test('SR 생성 시 서비스 카테고리 선택', async ({ page }) => {
+  test('SR 등록 다이얼로그의 카테고리는 고른 고객사로 스코프된다', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
       timeout: 15000,
     });
 
-    // SR 생성 버튼 클릭
-    const createButton = page
-      .locator('button')
-      .filter({ hasText: /SR 요청|등록|생성|New SR/i })
-      .first();
-    await expect(createButton).toBeVisible({ timeout: 10000 });
-
-    await createButton.click();
-    await page.waitForTimeout(500);
-
-    // Dialog 확인
-    const dialog = page.locator('[role="dialog"], .dialog, .modal').first();
-    await expect(dialog).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: /등록/ }).first().click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
 
     // 카테고리는 선택된 고객사로 스코프된다(감사 3.19). 고객사를 고르기 전에는
-    // categories 가 비어 있어 셀렉트가 disabled 다 — 앱의 의도된 계약이므로
-    // 테스트도 고객사 → 카테고리 순서를 지켜야 한다.
+    // categories 가 비어 있어 셀렉트가 disabled 다 — 앱의 의도된 계약이다.
+    const categorySelect = dialog.getByRole('combobox', { name: /서비스 카테고리/ });
     const clientCombobox = dialog.getByRole('combobox', { name: /고객사/ });
-    if (await clientCombobox.isEnabled().catch(() => false)) {
+
+    if (await clientCombobox.isEnabled()) {
+      // 고객사를 고르기 전에는 잠겨 있어야 한다 — 이게 스코프 계약의 관측 가능한 형태다.
+      await expect(categorySelect).toBeDisabled();
       await clientCombobox.click();
       await page.getByRole('option').first().click();
-      await page.waitForTimeout(300);
     }
 
-    // 서비스 카테고리 Select 찾기
-    const categorySelect = dialog
-      .locator('select[name*="category"], [role="combobox"]')
-      .filter({ hasText: /카테고리|Category|서비스/i })
-      .first();
-    await expect(categorySelect).toBeVisible({ timeout: 5000 });
-
-    // 고객사 선택 → 서버 액션 → categories 반영 사이의 레이스를 없앤다.
-    // isVisible() 은 enabled 를 보장하지 않아 예전에는 disabled 버튼을 클릭하다 타임아웃났다.
-    await expect(categorySelect).toBeEnabled({ timeout: 10000 });
-
-    // Select 클릭
+    // 고객사가 정해지면 열린다. 고정 대기 대신 상태 자체를 기다린다.
+    await expect(categorySelect).toBeEnabled({ timeout: 15000 });
     await categorySelect.click();
-    await page.waitForTimeout(300);
 
-    // 옵션 목록 확인
-    const options = page.locator('[role="option"]');
-    const optionCount = await options.count();
+    // 예전에는 옵션 수를 로그로 찍고 `if (optionCount > 0)` 로 감쌌다 — 0개여도 통과였다.
+    // 시드가 카테고리를 넣으므로 최소 1개가 있어야 하고, 고르면 값이 남아야 한다.
+    const options = page.getByRole('option');
+    await expect(options.first()).toBeVisible();
+    const chosen = (await options.first().innerText()).trim();
+    await options.first().click();
+    await expect(categorySelect).toContainText(chosen);
 
-    console.log(`📋 카테고리 옵션 수: ${optionCount}`);
-
-    if (optionCount > 0) {
-      // 첫 번째 옵션 선택
-      await options.first().click();
-      await page.waitForTimeout(500);
-
-      console.log('✅ 서비스 카테고리 선택 완료');
-    }
-
-    // Dialog 닫기
-    const closeButton = dialog
-      .locator('button')
-      .filter({ hasText: /취소|닫기|Close/i })
-      .first();
-    await closeButton.click().catch(() => {});
+    await dialog
+      .getByRole('button', { name: /취소|닫기/ })
+      .first()
+      .click();
+    await expect(dialog).toBeHidden();
   });
 
-  test('고객사별 서비스 카테고리 관리 API', async ({ page }) => {
-    // 고객사 상세 페이지로 이동
-    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 15000,
-    });
+  test('고객사 상세는 그 고객사의 카테고리만 내려받는다', async ({ page }) => {
+    // 예전 이 테스트는 response 리스너로 응답을 주워 담고 개수를 console.log 했다.
+    // 캡처에 실패해도, 상세로 못 가도 통과했다. 대조군을 두고 API 를 직접 확인한다.
+    const clients = await page.request.get('/api/clients?limit=100');
+    expect(clients.status()).toBe(200);
+    const rows = (await clients.json()).data as Array<{ id: string; name: string }>;
+    expect(rows.length, '고객사가 2개 이상 있어야 스코프를 대조할 수 있습니다.').toBeGreaterThan(1);
 
-    // 첫 번째 고객사 클릭
-    // 목록은 스켈레톤이 걷힌 뒤에 채워진다. 행이 아니라 "상세로 가는 링크"를 직접
-    // 기다려야 빈 tbody 를 잡고 실패하지 않는다.
-    const clientLink = page.locator('tbody a[href^="/clients/"]').first();
-    await expect(clientLink).toBeVisible({ timeout: 20000 });
+    const [first, second] = rows;
+    const categoriesOf = async (clientId: string) => {
+      const response = await page.request.get(`/api/clients/${clientId}/categories`);
+      expect(response.status()).toBe(200);
+      return (await response.json()) as Array<{ id: string; categoryName: string }>;
+    };
 
-    {
-      // API 응답 캡처
-      let clientCategoriesResponse: any = null;
+    const firstCategories = await categoriesOf(first!.id);
+    const secondCategories = await categoriesOf(second!.id);
+    expect(firstCategories.length, `${first!.name} 의 카테고리가 없습니다.`).toBeGreaterThan(0);
 
-      page.on('response', async (response) => {
-        if (response.url().includes('/api/clients/') && response.url().includes('/categories')) {
-          try {
-            clientCategoriesResponse = await response.json();
-          } catch (e) {
-            // 파싱 실패 무시
-          }
-        }
-      });
+    // 두 고객사의 카테고리 id 가 겹치면 스코프가 새고 있는 것이다.
+    const secondIds = new Set(secondCategories.map((c) => c.id));
+    const overlap = firstCategories.filter((c) => secondIds.has(c.id)).map((c) => c.categoryName);
+    expect(overlap, `카테고리가 고객사 간에 공유되고 있습니다: ${overlap.join(', ')}`).toEqual([]);
 
-      await clientLink.click();
-      await page.waitForTimeout(2000);
-
-      // URL 확인
-      const url = page.url();
-      const isClientDetailPage = url.includes('/clients/') && url.split('/clients/')[1];
-
-      if (isClientDetailPage) {
-        console.log('✅ 고객사 상세 페이지 접근');
-
-        if (clientCategoriesResponse) {
-          console.log('✅ 고객사별 카테고리 API 응답 확인');
-
-          const categories = Array.isArray(clientCategoriesResponse)
-            ? clientCategoriesResponse
-            : clientCategoriesResponse.data || [];
-          console.log(`📊 고객사 카테고리 수: ${categories.length}`);
-        } else {
-          console.log('⚠️ 고객사별 카테고리 API 호출이 없거나 응답을 캡처하지 못했습니다.');
-        }
-      }
-    }
+    // 화면도 그 목록을 그대로 보여주는지 확인한다.
+    await page.goto(`/clients/${first!.id}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(first!.name).first()).toBeVisible({ timeout: 15000 });
   });
 
   // SR 목록에는 카테고리 필터가 없다. SRsDataTable 이 제공하는 필터는 상태 / 우선순위 /
