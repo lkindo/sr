@@ -1,4 +1,4 @@
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { type APIRequestContext, type Browser, expect, type Page, test } from '@playwright/test';
 import fs from 'fs';
 
 import { deleteSeededSRs, type SeededSR, seedSR, type SeedSROptions } from './fixtures/sr';
@@ -102,8 +102,10 @@ async function listAttachments(page: Page, srId: string): Promise<AttachmentRow[
 }
 
 /** 단일 업로드 API. 준비 단계에서 쓴다(업로드 UI 자체는 첫 테스트가 검증한다). */
-async function uploadViaApi(page: Page, srId: string, file: UploadFile) {
-  return page.request.post('/api/attachments', {
+// APIRequestContext 를 받는다(Page 가 아니라). 준비 단계에서 다른 페르소나 세션으로
+// 올려야 하는 경우가 있어서다 — 예: 신청자가 지울 수 없는 첨부를 운영자로 만들어 둔다.
+async function uploadViaApi(api: APIRequestContext, srId: string, file: UploadFile) {
+  return api.post('/api/attachments', {
     multipart: { file, srId },
   });
 }
@@ -207,7 +209,7 @@ test.describe('첨부파일 업로드·목록·다운로드 (CLIENT)', () => {
     // 준비는 API 로. 업로드 UI 는 위 테스트가 이미 검증한다.
     const fileName = `e2e-download-${Date.now()}.txt`;
     const buffer = Buffer.from(`다운로드 왕복 검증\n${'x'.repeat(1024)}\n끝\n`, 'utf8');
-    const created = await uploadViaApi(page, sr.id, {
+    const created = await uploadViaApi(page.request, sr.id, {
       name: fileName,
       mimeType: 'text/plain',
       buffer,
@@ -252,7 +254,11 @@ test.describe('첨부파일 삭제 (ADMIN)', () => {
     const sr = await seed(browser, { stage: 'INTAKE', title: `첨부 삭제 SR ${Date.now()}` });
 
     const fileName = `e2e-delete-${Date.now()}.txt`;
-    const created = await uploadViaApi(page, sr.id, textFile(fileName, '삭제 대상 파일입니다.\n'));
+    const created = await uploadViaApi(
+      page.request,
+      sr.id,
+      textFile(fileName, '삭제 대상 파일입니다.\n')
+    );
     expect(created.status(), '준비 업로드가 201 이 아닙니다.').toBe(201);
     const attachment = (await created.json()) as AttachmentRow;
 
@@ -283,6 +289,83 @@ test.describe('첨부파일 삭제 (ADMIN)', () => {
     expect(activities.status()).toBe(200);
     const types = ((await activities.json()) as Array<{ type: string }>).map((a) => a.type);
     expect(types).toContain('ATTACHMENT_REMOVED');
+  });
+});
+
+// ============================================================================
+// 삭제 권한 — 통제가 화면에만 있으면 안 된다
+// ============================================================================
+
+test.describe('첨부파일 삭제 권한 (CLIENT)', () => {
+  test.use({ storageState: PERSONA_AUTH_FILES.client });
+
+  /**
+   * 회귀 가드 — 이 통제는 한동안 **화면에만** 있었다.
+   *
+   * 상세 화면은 `ADMIN|MANAGER || (신청자 본인 && REQUESTED)` 로 삭제 버튼을 감췄는데,
+   * DELETE /api/attachments/[id] 는 `ensureCanUpdateSR` 만 요구했다. CLIENT_USER 는
+   * 자사 SR 에 SR:UPDATE_SELF 를 가지므로, 접수(INTAKE) 이후에도 API 로는 지울 수 있었다.
+   * 즉 버튼을 숨기는 것이 유일한 방어였다.
+   *
+   * 이제 규칙이 policies.ts 의 canDeleteAttachment 하나이고 API 가 그것을 강제한다.
+   */
+  test('접수된 SR 의 첨부는 신청자도 API 로 지울 수 없다', async ({ browser, page }) => {
+    const sr = await seed(browser, { stage: 'INTAKE', title: `첨부 삭제 권한 SR ${Date.now()}` });
+
+    // 준비: 첨부는 운영자(ADMIN 세션)로 올린다 — 신청자의 업로드 권한과 무관하게 대상만 만든다.
+    const admin = await browser.newContext({ storageState: PERSONA_AUTH_FILES.admin });
+    let attachmentId: string;
+    try {
+      const created = await uploadViaApi(
+        admin.request,
+        sr.id,
+        textFile(`e2e-perm-${Date.now()}.txt`, '삭제 권한 검증용 파일입니다.\n')
+      );
+      expect(created.status(), '준비 업로드가 201 이 아닙니다.').toBe(201);
+      attachmentId = ((await created.json()) as AttachmentRow).id;
+    } finally {
+      await admin.close();
+    }
+
+    // 신청자(CLIENT_USER) 세션으로 삭제 시도 — 막혀야 한다.
+    const denied = await page.request.delete(`/api/attachments/${attachmentId}`);
+    expect(
+      denied.status(),
+      `신청자가 INTAKE 상태 SR 의 첨부를 지웠습니다. 통제가 화면에만 있습니다. ` +
+        `응답: ${await denied.text()}`
+    ).toBe(403);
+
+    // 403 을 주고 실제로는 지워지는 경우까지 배제한다 — 서버 상태로 확인한다.
+    const stillThere = await page.request.get(`/api/srs/${sr.id}/attachments`);
+    expect(stillThere.status()).toBe(200);
+    const rows = (await stillThere.json()) as AttachmentRow[];
+    expect(
+      rows.map((row) => row.id),
+      '삭제가 403 이었는데 첨부가 사라졌습니다.'
+    ).toContain(attachmentId);
+  });
+
+  test('접수 전(REQUESTED) SR 의 첨부는 신청자가 지울 수 있다', async ({ browser, page }) => {
+    // 음성 테스트만 있으면 "전부 403" 인 과잉 차단 상태에서도 통과한다. 양성 대조를 둔다.
+    const sr = await seed(browser, {
+      stage: 'REQUESTED',
+      title: `첨부 삭제 허용 SR ${Date.now()}`,
+    });
+
+    const fileName = `e2e-own-${Date.now()}.txt`;
+    const created = await uploadViaApi(
+      page.request,
+      sr.id,
+      textFile(fileName, '본인 첨부입니다.\n')
+    );
+    expect(created.status(), '신청자의 업로드가 201 이 아닙니다.').toBe(201);
+    const attachmentId = ((await created.json()) as AttachmentRow).id;
+
+    const removed = await page.request.delete(`/api/attachments/${attachmentId}`);
+    expect(
+      removed.status(),
+      `신청자가 접수 전 자기 SR 의 첨부를 지우지 못했습니다(과잉 차단). 응답: ${await removed.text()}`
+    ).toBe(200);
   });
 });
 
@@ -356,7 +439,7 @@ test.describe('업로드 제한 (CLIENT)', () => {
 
   test('위험 확장자(.exe)는 서버가 400 으로 막는다', async ({ page }) => {
     // 서버 단언이 먼저다 — 이것이 실제 통제다.
-    const response = await uploadViaApi(page, sr.id, {
+    const response = await uploadViaApi(page.request, sr.id, {
       name: 'e2e-malware.exe',
       mimeType: 'application/octet-stream',
       buffer: Buffer.from('MZ\x90\x00\x03', 'binary'),
@@ -388,7 +471,7 @@ test.describe('업로드 제한 (CLIENT)', () => {
 
   test('확장자와 실제 내용이 다른 파일은 서버가 400 으로 막는다', async ({ page }) => {
     // 내용은 PNG 인데 이름은 .txt — 확장자 스푸핑. magic-byte 검사가 이것을 잡아야 한다.
-    const spoofed = await uploadViaApi(page, sr.id, {
+    const spoofed = await uploadViaApi(page.request, sr.id, {
       name: 'e2e-spoofed.txt',
       mimeType: 'text/plain',
       buffer: PNG_BYTES,
@@ -399,7 +482,7 @@ test.describe('업로드 제한 (CLIENT)', () => {
     );
 
     // 반대 방향: 타입을 식별할 수 없는 내용에 이미지 확장자를 붙인 경우.
-    const unknown = await uploadViaApi(page, sr.id, {
+    const unknown = await uploadViaApi(page.request, sr.id, {
       name: 'e2e-unknown.png',
       mimeType: 'image/png',
       buffer: Buffer.from('이건 그냥 텍스트입니다.\n', 'utf8'),
@@ -419,7 +502,11 @@ test.describe('업로드 제한 (CLIENT)', () => {
       title: `첨부 잠금 SR ${Date.now()}`,
     });
 
-    const response = await uploadViaApi(page, closed.id, textFile('e2e-late.txt', '늦은 첨부\n'));
+    const response = await uploadViaApi(
+      page.request,
+      closed.id,
+      textFile('e2e-late.txt', '늦은 첨부\n')
+    );
     expect(response.status(), '종결된 SR 에 대한 업로드가 403 이 아닙니다.').toBe(403);
     const body = (await response.json()) as { error: string; code: string };
     expect(body.error).toContain('종결된 SR');

@@ -107,6 +107,56 @@ describe('Policy Functions', () => {
       expect(policies.canUpdateSR(userNoPerms, sr)).toBe(false);
     });
 
+    describe('canDeleteAttachment', () => {
+      // 이 규칙은 한동안 화면(SRDetail 의 canDelete)에만 있었고 API 는 canUpdateSR 만 봤다.
+      // 아래 첫 단언이 그 간극을 고정한다 — 수정 권한과 첨부 삭제 권한은 같지 않다.
+      const intakeSR = {
+        id: 'sr-att',
+        clientId: 'c1',
+        requesterId: 'user-owner',
+        status: 'INTAKE',
+      } as any;
+      const owner: any = {
+        id: 'user-owner',
+        roles: ['CLIENT_USER'],
+        permissions: [PERMISSIONS.SR.UPDATE_SELF],
+        clientIds: ['c1'],
+      };
+
+      it('신청자라도 접수 이후에는 지울 수 없다 — 수정 권한과 구분된다', () => {
+        expect(policies.canUpdateSR(owner, intakeSR)).toBe(true); // 수정은 가능하지만
+        expect(policies.canDeleteAttachment(owner, intakeSR)).toBe(false); // 첨부 삭제는 불가
+      });
+
+      it('신청자는 접수 전(REQUESTED)에는 지울 수 있다', () => {
+        expect(policies.canDeleteAttachment(owner, { ...intakeSR, status: 'REQUESTED' })).toBe(
+          true
+        );
+      });
+
+      it('ADMIN·MANAGER 는 상태와 무관하게 지울 수 있다', () => {
+        expect(policies.canDeleteAttachment(adminUser, intakeSR)).toBe(true);
+        const manager: any = {
+          id: 'user-mgr',
+          roles: ['MANAGER'],
+          permissions: [PERMISSIONS.SR.UPDATE],
+          clientIds: [],
+        };
+        expect(policies.canDeleteAttachment(manager, intakeSR)).toBe(true);
+      });
+
+      it('SR 자체를 못 고치는 사람은 첨부도 못 지운다', () => {
+        expect(policies.canDeleteAttachment(userNoPerms, intakeSR)).toBe(false);
+      });
+
+      it('ensureCanDeleteAttachment 는 거부 시 ForbiddenError 를 던진다', () => {
+        expect(() => policies.ensureCanDeleteAttachment(owner, intakeSR)).toThrow(ForbiddenError);
+        expect(() =>
+          policies.ensureCanDeleteAttachment(owner, { ...intakeSR, status: 'REQUESTED' })
+        ).not.toThrow();
+      });
+    });
+
     it('canUpdateSR: granular branch tests', () => {
       const uId = 'u-upd';
       const srU = { id: 's1', requesterId: uId, clientId: 'c1' } as any;

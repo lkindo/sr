@@ -364,6 +364,14 @@ export default function SRDetailPage() {
             <TabsContent value="attachments" className="mt-6">
               <SRAttachments
                 srId={sr.id}
+                /*
+                  권위는 서버에 있다 — src/lib/policies.ts 의 canDeleteAttachment 가
+                  DELETE /api/attachments/[id] 를 게이트한다. 여기 조건은 그것을 그대로
+                  미러링해 "누르면 반드시 실패하는 버튼" 을 만들지 않기 위한 것이다.
+                  (policies.ts 를 직접 import 하지 않는 이유: 그 모듈이 @prisma/client 와
+                   logger 를 끌어와 클라이언트 번들에 들어가면 안 된다. 순수 규칙만 떼어낸
+                   클라이언트 안전 모듈로 분리하는 것이 다음 단계다.)
+                */
                 canDelete={
                   hasAnyRole(['ADMIN', 'MANAGER']) ||
                   (session?.user?.id === sr.requesterId && sr.status === 'REQUESTED')

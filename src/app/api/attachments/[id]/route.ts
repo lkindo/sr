@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanReadSR, ensureCanUpdateSR } from '@/lib/policies';
+import { ensureCanDeleteAttachment, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob } from '@/lib/storage';
@@ -70,8 +70,10 @@ export const DELETE = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    // 권한 체크: SR을 수정할 수 있는 권한이 있어야 첨부파일도 삭제 가능
-    ensureCanUpdateSR(session.user, sr);
+    // 권한 체크: 삭제 규칙은 SR 수정 권한보다 좁다.
+    // 예전에는 ensureCanUpdateSR 만 요구해 화면이 감추던 것을 API 가 그대로 허용했다
+    // (CLIENT_USER 가 INTAKE 이후에도 첨부를 지울 수 있었다). 규칙은 policies.ts 한 곳에 있다.
+    ensureCanDeleteAttachment(session.user, sr);
 
     const pathname =
       attachment.storagePath ??
