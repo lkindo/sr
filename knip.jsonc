@@ -31,7 +31,7 @@
 
     // vitest.config.ts:115-120 의 alias 대상. 코드가 import 하지 않고 설정이 주입하므로
     // knip 은 진입점을 알 수 없다.
-    "src/__tests__/mocks/**"
+    "src/__tests__/mocks/**",
   ],
 
   "project": ["src/**/*.{ts,tsx}", "scripts/**/*.ts", "prisma/**/*.ts"],
@@ -46,5 +46,5 @@
 
   // `type-check` 는 바이너리가 아니라 package.json 스크립트이고(.husky/pre-push),
   // `lint-staged` 는 위와 같은 이유다.
-  "ignoreBinaries": ["type-check", "lint-staged"]
+  "ignoreBinaries": ["type-check", "lint-staged"],
 }

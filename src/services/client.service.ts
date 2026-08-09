@@ -5,7 +5,6 @@ import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/
 import prisma from '@/lib/prisma';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 
-import { serviceCategoryService } from './service-category.service';
 import { UserService } from './user.service';
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;

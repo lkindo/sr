@@ -191,11 +191,11 @@ describe('ClientService Coverage', () => {
         id: 'c1',
         users: [],
         serviceCategories: own,
-      } as any);
+      } as never);
       // 이 메서드가 카테고리를 **다시 조회하면** 아래 목이 응답에 섞여 들어온다.
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([
         { id: 'cat-other', categoryName: '남의 분류', clientId: 'c2' },
-      ] as any);
+      ] as never);
 
       const result = await clientService.getClientWithDetailsAndCategories('c1');
 
@@ -207,7 +207,7 @@ describe('ClientService Coverage', () => {
     });
 
     it('상세 조회가 카테고리를 이 고객사로만 스코프하고 담당자까지 가져온다', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', users: [] } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', users: [] } as never);
 
       await clientService.getClientWithDetailsAndCategories('c1');
 
