@@ -17,10 +17,10 @@ import { changeSRStatus } from './helpers/test-helpers';
  * ── 이 파일이 왜 통째로 다시 쓰였는가 ─────────────────────────────────────
  * 이전 판은 상태를 `page.locator('text=/완료|COMPLETED/i').first()` 로 확인했다.
  * 그런데 상세 화면의 상태 배지 문구는 `src/lib/constants/sr.ts` 의 statusLabels 이고
- * ('완료', '보류', '거부' …), 같은 화면에는 '완료 처리' · '보류' · '거절' **버튼**이 있다.
+ * ('완료', '보류', '거절' …), 같은 화면에는 '완료 처리' · '보류' · '거절' **버튼**이 있다.
  * 넓은 텍스트 매칭은 버튼에 먼저 걸리므로
  *   - `text=/보류|ON_HOLD/i` 는 보류 **버튼**에 걸렸고
- *   - `text=/거절|REJECTED/i` 는 거절 **버튼**에 걸렸으며 (배지 문구는 '거부')
+ *   - `text=/거절|REJECTED/i` 는 거절 **버튼**에 걸렸으며
  *   - `text=/완료|COMPLETED/i` 는 '완료 처리' 버튼에 걸렸다
  * 즉 상태가 하나도 바뀌지 않아도 전부 초록불이었다. 거기에 관용 분기 14개와
  * 고정 대기 25회(35.6초)가 얹혀 "버튼이 없으면 로그만 남기고 통과"까지 하고 있었다.
@@ -66,7 +66,7 @@ const STATUS_LABELS: Record<SRStage, string> = {
   ON_HOLD: '보류',
   COMPLETED: '완료',
   CONFIRMED: '확인완료',
-  REJECTED: '거부',
+  REJECTED: '거절',
 };
 
 /**

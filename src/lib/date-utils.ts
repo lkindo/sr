@@ -33,7 +33,7 @@ export function getDueDateStatus(
   // 문구를 '보류중' 이 아니라 '보류' 로 둔다 — 상태 배지(statusLabels.ON_HOLD)와
   // 같은 행에 나란히 렌더되기 때문이다(SRListItem.tsx 의 인접 열). 두 배지가
   // '보류' 와 '보류중' 으로 갈리면 사용자는 다른 단계라고 읽는다.
-  // 나머지 분기('완료됨'/'거절됨')는 이번 결정 범위 밖이라 그대로 둔다.
+  // 남은 '완료됨' 은 COMPLETED 와 CONFIRMED 를 합쳐 부르므로 단순 치환이 불가하다 — 별건.
   if (status === 'ON_HOLD') {
     return {
       label: '보류',
@@ -43,10 +43,13 @@ export function getDueDateStatus(
     };
   }
 
-  // 거절 상태: 거절 표시
+  // 거절 상태: 거절 표시.
+  // 상태 배지(statusLabels.REJECTED)와 같은 행에 나란히 뜨므로 문구를 맞춘다 —
+  // /srs 목록 한 행에서 상태 열 '거절' 옆 마감일 열이 '거절됨' 이면 다른 단계로 읽힌다.
+  // (이곳이 두 단어가 실제로 동시에 보이던 유일한 지점이다.)
   if (status === 'REJECTED') {
     return {
-      label: '거절됨',
+      label: '거절',
       variant: 'destructive',
       isOverdue: false,
       isUrgent: false,

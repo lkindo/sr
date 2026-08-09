@@ -71,7 +71,7 @@ describe('date-utils', () => {
     it('should return rejected status for REJECTED', () => {
       const status = getDueDateStatus('2023-01-01', 'REJECTED');
       expect(status).toEqual({
-        label: '거절됨',
+        label: '거절',
         variant: 'destructive',
         isOverdue: false,
         isUrgent: false,
