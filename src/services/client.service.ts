@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
@@ -124,9 +125,28 @@ export class ClientService {
     });
   }
 
-  async getClientsForSelection(clientIds?: string[]) {
-    // If clientIds are provided, restrict the query to those IDs
-    const where = clientIds ? { id: { in: clientIds } } : {};
+  /**
+   * 셀렉트 박스용 고객사 목록.
+   *
+   * **비활성 고객사는 선택지에서 뺀다.** 예전에는 `isActive` 를 보지 않아
+   * 비활성화한 고객사가 SR 등록·수정 다이얼로그에 그대로 떴고, 고를 수도 있었다.
+   * 그러면 고객사 비활성화가 신규 SR 에 대해 아무 의미가 없다.
+   *
+   * @param clientIds 외부 사용자 스코프. 주어지면 그 안으로만 한정한다.
+   * @param options.includeId 상태와 무관하게 반드시 포함할 고객사.
+   *   수정 다이얼로그가 쓴다 — 이미 비활성이 된 고객사의 SR 을 열었을 때
+   *   현재 값이 선택지에서 사라지면 셀렉트가 빈 채로 뜨고, 저장 시 무엇이
+   *   들어갈지 알 수 없게 된다. 기존 값은 보이되 새로 고를 수는 없어야 한다.
+   */
+  async getClientsForSelection(clientIds?: string[], options?: { includeId?: string }) {
+    const where: Prisma.ClientWhereInput = {
+      OR: [{ isActive: true }, ...(options?.includeId ? [{ id: options.includeId }] : [])],
+    };
+
+    // 외부 사용자 스코프는 위 조건과 AND 로 묶인다(Prisma 최상위 필드는 AND).
+    if (clientIds) {
+      where.id = { in: clientIds };
+    }
 
     return prisma.client.findMany({
       where,

@@ -277,7 +277,10 @@ describe('client.actions coverage', () => {
       expect(result.success).toBe(true);
       expect(result.data).toEqual(clients);
       // Internal users get undefined (no client-id filter).
-      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(undefined);
+      // 2번째 인자는 includeId 옵션 — 수정 다이얼로그가 현재 고객사를 유지할 때만 채운다.
+      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(undefined, {
+        includeId: undefined,
+      });
     });
 
     it('filters by clientIds for external users', async () => {
@@ -291,7 +294,9 @@ describe('client.actions coverage', () => {
       const result: any = await getClientsForSelection();
 
       expect(result.success).toBe(true);
-      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(['c2']);
+      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(['c2'], {
+        includeId: undefined,
+      });
     });
 
     it('falls back to empty array when external user has no clientIds', async () => {
@@ -305,7 +310,23 @@ describe('client.actions coverage', () => {
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual([]);
-      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith([]);
+      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith([], {
+        includeId: undefined,
+      });
+    });
+
+    it('includeId 를 서비스에 그대로 넘긴다 — 비활성이 된 현재 고객사를 남기기 위한 것', async () => {
+      (authenticateAndAuthorize as any).mockResolvedValue({
+        user: { id: 'u1', roles: ['ADMIN'], clientIds: [] },
+      });
+      (isInternalUser as any).mockReturnValue(true);
+      mockClientService.getClientsForSelection.mockResolvedValue([]);
+
+      await getClientsForSelection('c-inactive');
+
+      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(undefined, {
+        includeId: 'c-inactive',
+      });
     });
 
     it('returns a friendly error when an Error is thrown', async () => {

@@ -136,7 +136,15 @@ export async function deleteClientAction(id: string) {
   }
 }
 
-export async function getClientsForSelection() {
+/**
+ * 셀렉트 박스용 고객사 목록. 비활성 고객사는 빠진다.
+ *
+ * @param includeId 상태와 무관하게 포함할 고객사 id. SR 수정 다이얼로그가
+ *   현재 값을 유지하기 위해 넘긴다(그 고객사가 이미 비활성이어도 보여야 한다).
+ *   테넌트 스코프는 그대로 적용되므로, 외부 사용자가 남의 고객사 id 를 넘겨도
+ *   소속 밖이면 결과에 들어오지 않는다.
+ */
+export async function getClientsForSelection(includeId?: string) {
   try {
     logger.debug('🔍 [getClientsForSelection] 고객사 목록 조회 시작');
 
@@ -150,7 +158,7 @@ export async function getClientsForSelection() {
     const clientIds = isInternal ? undefined : session.user.clientIds || [];
 
     // 필요한 정보만 선택적으로 조회 (보안 강화)
-    const clients = await clientService.getClientsForSelection(clientIds);
+    const clients = await clientService.getClientsForSelection(clientIds, { includeId });
 
     logger.debug('✅ [getClientsForSelection] 고객사 조회 성공:', {
       count: clients.length,

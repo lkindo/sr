@@ -63,7 +63,10 @@ export function useEditSRForm({
         }
       }
     } else {
-      const result = await getClientsForSelection();
+      // 이 SR 의 현재 고객사는 비활성이더라도 선택지에 남겨야 한다.
+      // 그러지 않으면 비활성화된 고객사의 SR 을 수정하려고 열었을 때 셀렉트가
+      // 빈 채로 뜬다(= 사용자가 손대지도 않은 값이 바뀐 것처럼 보인다).
+      const result = await getClientsForSelection(sr?.clientId);
       if (result.success) setClients(result.data as ClientSummary[]);
     }
   }, [isClientUser, sr?.clientId]);

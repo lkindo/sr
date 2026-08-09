@@ -126,7 +126,22 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     fetchCategories(clientId);
   }, [open, clientId, fetchCategories]);
 
-  const uploadAttachments = async (srId: string, filesToUpload: File[]) => {
+  /**
+   * 배치 업로드 결과. `uploaded` 는 **서버에 실제로 저장된** 개수다.
+   *
+   * POST /api/srs/[id]/attachments 는 부분 성공을 201 로 돌려준다 —
+   * 검증에 걸린 파일은 `data.errors[]` 에 담기고 나머지만 저장된다.
+   * (전부 실패한 경우에만 400 이다.)
+   */
+  interface AttachmentUploadOutcome {
+    uploaded: number;
+    rejected: Array<{ fileName: string; error: string }>;
+  }
+
+  const uploadAttachments = async (
+    srId: string,
+    filesToUpload: File[]
+  ): Promise<AttachmentUploadOutcome> => {
     const formData = new FormData();
     filesToUpload.forEach((file) => formData.append('files', file));
     try {
@@ -135,12 +150,28 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
         body: formData,
       });
       if (!response.ok) throw new Error('Failed to upload attachments');
+
+      // `response.ok` 만 보면 안 된다. 예전에는 여기서 끝내고 호출부가 **고른 파일 수**로
+      // "첨부파일 N개 업로드" 를 띄웠다. 3개 중 2개가 확장자·크기 검증에 걸려도
+      // 응답은 201 이므로 사용자에게는 3개 다 올라간 것으로 보였고, 상세를 열어야
+      // 비로소 없다는 것을 알 수 있었다. 저장된 개수는 응답이 알려 준다.
+      const body = (await response.json()) as {
+        data?: {
+          attachments?: unknown[];
+          errors?: Array<{ fileName: string; error: string }>;
+        };
+      };
+      return {
+        uploaded: body.data?.attachments?.length ?? 0,
+        rejected: body.data?.errors ?? [],
+      };
     } catch {
       toast({
         title: '경고',
         description: 'SR은 생성되었으나 첨부파일 업로드에 실패했습니다.',
         variant: 'destructive',
       });
+      return { uploaded: 0, rejected: [] };
     }
   };
 
@@ -188,12 +219,27 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       if (!result.success) throw new Error(result.error || 'SR 생성에 실패했습니다.');
 
       const createdSR = result.data;
-      if (files.length > 0) await uploadAttachments(createdSR.id, files);
+      const upload =
+        files.length > 0
+          ? await uploadAttachments(createdSR.id, files)
+          : { uploaded: 0, rejected: [] };
 
-      toast({
-        title: '성공',
-        description: `SR이 생성되었습니다.${files.length > 0 ? ` (첨부파일 ${files.length}개 업로드)` : ''}`,
-      });
+      // 거부된 파일이 있으면 성공 토스트로 덮지 않고 사유를 그대로 보여 준다.
+      // 사용자가 다시 올릴지 판단하려면 어떤 파일이 왜 걸렸는지가 필요하다.
+      if (upload.rejected.length > 0) {
+        toast({
+          title: '일부 첨부파일이 업로드되지 않았습니다',
+          description: `SR은 생성되었습니다. ${upload.uploaded}개 업로드 / ${upload.rejected.length}개 실패 — ${upload.rejected
+            .map((r) => `${r.fileName}: ${r.error}`)
+            .join(', ')}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '성공',
+          description: `SR이 생성되었습니다.${upload.uploaded > 0 ? ` (첨부파일 ${upload.uploaded}개 업로드)` : ''}`,
+        });
+      }
       onCreated();
     } catch (error) {
       toast({

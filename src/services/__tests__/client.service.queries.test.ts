@@ -40,6 +40,42 @@ describe('ClientService Coverage', () => {
     });
   });
 
+  describe('getClientsForSelection', () => {
+    // 이 필터가 없던 시절, 비활성화한 고객사가 SR 등록·수정 다이얼로그의 선택지에
+    // 그대로 남아 있었다. 고객사 비활성화가 신규 SR 에 대해 무의미해진다.
+    it('비활성 고객사를 제외한다', async () => {
+      vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
+
+      await clientService.getClientsForSelection();
+
+      expect(prisma.client.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { OR: [{ isActive: true }] } })
+      );
+    });
+
+    it('includeId 로 지정한 고객사는 비활성이어도 남긴다', async () => {
+      vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
+
+      await clientService.getClientsForSelection(undefined, { includeId: 'c-off' });
+
+      expect(prisma.client.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { OR: [{ isActive: true }, { id: 'c-off' }] } })
+      );
+    });
+
+    it('테넌트 스코프는 활성 조건과 AND 로 함께 걸린다', async () => {
+      vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
+
+      await clientService.getClientsForSelection(['c1', 'c2']);
+
+      expect(prisma.client.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { OR: [{ isActive: true }], id: { in: ['c1', 'c2'] } },
+        })
+      );
+    });
+  });
+
   describe('getClientDetailsById', () => {
     it('fetches detailed client info', async () => {
       vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);

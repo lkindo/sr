@@ -9,12 +9,6 @@
   ],
   "noAssertionAllowlist": ["05-sr-detail.spec.ts:SR 탭 네비게이션"],
   "files": {
-    "04-sr-create.spec.ts": {
-      "tolerantBranch": 0,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 1,
-      "fixedWaitMs": 500
-    },
     "05-sr-detail.spec.ts": {
       "tolerantBranch": 3,
       "vacuousAssertion": 0,
