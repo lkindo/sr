@@ -159,7 +159,10 @@ export function ensureCanAttachToSR(
 
   if (CLOSED_SR_STATUSES.has(sr.status)) {
     throw new ForbiddenError(
-      '종결된 SR(완료/확정/반려)에는 첨부파일을 추가할 수 없습니다. 필요하면 SR을 다시 열어주세요.'
+      // 상태 이름은 정본(constants/sr.ts 의 statusLabels)을 따른다.
+      // 예전에는 '완료/확정/반려' 였다 — 한 문장에 비정본 표기가 둘이었고,
+      // 사용자가 '반려' 라는 단어를 만나는 유일한 지점이 여기였다.
+      '종결된 SR(완료/확인완료/거절)에는 첨부파일을 추가할 수 없습니다. 필요하면 SR을 다시 열어주세요.'
     );
   }
 }
