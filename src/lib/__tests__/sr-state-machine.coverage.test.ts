@@ -167,9 +167,28 @@ describe('validateTransition - step 2: role gating', () => {
   });
 
   it('enforces client-only roles on COMPLETED -> CONFIRMED', () => {
-    expect(validateTransition('COMPLETED', 'CONFIRMED', ['ENGINEER']).valid).toBe(false);
-    expect(validateTransition('COMPLETED', 'CONFIRMED', ['CLIENT_ADMIN']).valid).toBe(true);
-    expect(validateTransition('COMPLETED', 'CONFIRMED', ['ADMIN']).valid).toBe(true);
+    // 역할 게이트만 보려면 신청자 조건을 만족시켜 두고 역할만 바꿔 가며 비교해야 한다.
+    // (확인 완료에는 역할 + 신청자 본인이 모두 필요하다.)
+    const own = { requesterId: 'u1' };
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['ENGINEER'], own, {}, [], 'u1').valid
+    ).toBe(false);
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['CLIENT_ADMIN'], own, {}, [], 'u1').valid
+    ).toBe(true);
+    expect(validateTransition('COMPLETED', 'CONFIRMED', ['ADMIN'], own, {}, [], 'u1').valid).toBe(
+      true
+    );
+  });
+
+  it('신청자가 아니면 어떤 역할로도 CONFIRMED 로 전환할 수 없다', () => {
+    const own = { requesterId: 'u1' };
+    for (const roles of [['ADMIN'], ['MANAGER'], ['CLIENT_ADMIN'], ['CLIENT_USER']]) {
+      expect(
+        validateTransition('COMPLETED', 'CONFIRMED', roles, own, {}, [], 'someone-else').valid,
+        `${roles[0]} 이 남의 SR 을 확인 완료할 수 있다`
+      ).toBe(false);
+    }
   });
 
   // 이 테스트는 원래 MANAGER 거부를 단언했고, 그건 당시 규칙을 정확히 기록한 것이었다.

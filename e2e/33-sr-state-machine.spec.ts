@@ -314,13 +314,26 @@ test.describe('SR 상태 머신: 액션별 필수 필드', () => {
       error: '재오픈 사유를 입력해주세요.',
     },
     {
-      // statusActionSchema(src/lib/schemas.ts)의 reason 은 `z.string().optional()` 이라
-      // 길이 제약이 없다. 빈 문자열을 거르는 것은 라우트의 `!reason` 뿐이므로 함께 고정한다.
+      // 이 케이스는 원래 라우트의 `!reason` 검사만 겨냥했다 — 당시 statusActionSchema 의
+      // reason 이 `z.string().optional()` 이라 길이 제약이 없었기 때문이다.
+      // 그 사이 스키마가 `.trim().min(1)` 로 바뀌어(공백만 보내는 우회를 막기 위해)
+      // 이제는 zod 가 먼저 400 을 낸다. 더 이른 지점에서 막히는 것이므로 개선이고,
+      // 문구는 스키마의 것이 된다.
       stage: 'REQUESTED',
       action: 'reject',
       missing: "reason: '' (빈 문자열)",
       payload: { reason: '' },
-      error: '거절 사유를 입력해주세요.',
+      error: '사유를 입력해주세요.',
+    },
+    {
+      // 공백만 보내는 우회. `'   '` 는 truthy 라서 라우트의 `!reason` 을 그대로 통과했고,
+      // 사유가 공백인 채로 상태 이력에 남았다 — 감사 추적이 있으나 마나 해진다.
+      // 스키마의 trim().min(1) 이 이것을 막는다.
+      stage: 'REQUESTED',
+      action: 'reject',
+      missing: "reason: '   ' (공백만)",
+      payload: { reason: '   ' },
+      error: '사유를 입력해주세요.',
     },
   ];
 
@@ -372,12 +385,14 @@ test.describe('SR 상태 머신: 권한 축', () => {
   test('confirm 은 신청자만 가능하다 — ADMIN 도 대신 확인할 수 없다', async ({ request }) => {
     const sr = seeded.get('COMPLETED')!;
 
-    // 상태머신의 TRANSITION_ROLES 는 ADMIN 을 허용한다. 그런데 라우트는 그보다 앞서
-    // requesterId 를 비교해 403 을 낸다 — 규칙이 두 곳에 있어 갈라진 지점이다.
-    // 실제 계약은 라우트 쪽(더 엄격한 쪽)이며, 아래 단언이 그 사실을 박제한다.
+    // TRANSITION_ROLES 는 여전히 ADMIN 을 허용한다 — 역할 표는 "그 SR 의 신청자인가" 를
+    // 알 수 없기 때문이다. 그 신원 검사는 validateTransition 안으로 들어갔고
+    // (src/lib/sr-state-machine.ts 의 '고객 인수 게이트'), 두 라우트 모두 그곳을 지난다.
+    // 아래 단언은 역할 표가 넓다는 사실 자체를 박제한다 — 신원 검사가 사라지면
+    // 이 넓은 역할 표가 곧바로 구멍이 된다.
     expect(
       TRANSITION_ROLES.COMPLETED?.CONFIRMED,
-      'TRANSITION_ROLES 가 바뀌면 이 divergence 주석도 함께 갱신해야 합니다.'
+      'TRANSITION_ROLES 가 좁아졌다면 이 주석과 아래 우회 테스트의 전제도 갱신해야 합니다.'
     ).toContain('ADMIN');
 
     const response = await patchStatus(request, sr.id, { action: 'confirm' });
@@ -389,6 +404,53 @@ test.describe('SR 상태 머신: 권한 축', () => {
     ).toBe(403);
     expect(await errorOf(response)).toBe('신청자만 확인할 수 있습니다.');
     expect(await readStatus(request, sr.id), '거부됐는데 확인 완료로 넘어갔습니다.').toBe(
+      'COMPLETED'
+    );
+  });
+
+  /**
+   * 회귀 가드 — 고객 인수 게이트를 **다른 문으로** 우회할 수 있었다.
+   *
+   * 상태는 두 경로로 바뀐다: `PATCH /api/srs/{id}/status` (action 기반)와
+   * `PATCH /api/srs/{id}` (srUpdateSchema 의 status 필드). "신청자만 확인" 검사는
+   * 앞의 라우트에만 있었고 뒤의 경로는 그것을 타지 않았다.
+   *
+   * 실측(수정 전): 상태 라우트 403 / 업데이트 라우트 **200 + 실제로 CONFIRMED**.
+   * ADMIN 도, 신청자가 아닌 CLIENT_ADMIN 도 남의 SR 을 종결시킬 수 있었다.
+   *
+   * 신원 검사를 validateTransition(두 경로의 공통 지점)으로 옮겨 닫았다.
+   * 이 테스트는 그 수정이 되돌아가면 즉시 빨간불이 된다.
+   */
+  test('confirm 은 SR 업데이트 라우트로도 우회할 수 없다', async ({ browser, request }) => {
+    const sr = seeded.get('COMPLETED')!;
+
+    // (1) ADMIN — 운영자가 고객 인수를 대신 누를 수 없다.
+    const asAdmin = await request.patch(`/api/srs/${sr.id}`, { data: { status: 'CONFIRMED' } });
+    expect(
+      asAdmin.ok(),
+      `ADMIN 이 PATCH /api/srs/{id} 로 고객 인수 게이트를 우회했습니다. 응답: ${await asAdmin.text()}`
+    ).toBeFalsy();
+    expect(await readStatus(request, sr.id), '우회가 거부됐는데 상태는 바뀌었습니다.').toBe(
+      'COMPLETED'
+    );
+
+    // (2) 신청자가 아닌 외부 사용자 — 같은 테넌트라도 남의 SR 은 종결할 수 없다.
+    const clientAdmin = await browser.newContext({
+      storageState: PERSONA_AUTH_FILES.clientAdmin,
+    });
+    try {
+      const asClientAdmin = await clientAdmin.request.patch(`/api/srs/${sr.id}`, {
+        data: { status: 'CONFIRMED' },
+      });
+      expect(
+        asClientAdmin.ok(),
+        `신청자가 아닌 CLIENT_ADMIN 이 남의 SR 을 확인 완료했습니다. ` +
+          `응답: ${await asClientAdmin.text()}`
+      ).toBeFalsy();
+    } finally {
+      await clientAdmin.close();
+    }
+    expect(await readStatus(request, sr.id), '우회가 거부됐는데 상태는 바뀌었습니다.').toBe(
       'COMPLETED'
     );
   });

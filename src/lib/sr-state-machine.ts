@@ -177,6 +177,8 @@ export const canPerformTransition = (
  * @param userRoles 사용자 역할 목록 (Optional)
  * @param currentData 현재 SR 데이터 (Optional)
  * @param updateData 업데이트할 SR 데이터 (Optional)
+ * @param userPermissions 사용자 권한 목록 (Optional)
+ * @param actorId 전이를 수행하는 사용자 ID. 신청자 본인만 가능한 전이(CONFIRMED)의 판정에 쓴다.
  * @returns 가능 여부와 메시지
  */
 export const validateTransition = (
@@ -185,7 +187,8 @@ export const validateTransition = (
   userRoles?: string[],
   currentData?: any,
   updateData?: any,
-  userPermissions?: string[]
+  userPermissions?: string[],
+  actorId?: string
 ): { valid: boolean; message?: string } => {
   // 1. 상태 흐름 유효성 검사
   if (!canTransition(from, to)) {
@@ -223,6 +226,29 @@ export const validateTransition = (
       return {
         valid: false,
         message: `이 상태 변경을 수행할 권한이 없습니다. (필요 ${needed})`,
+      };
+    }
+  }
+
+  // 2-1. 고객 인수 게이트 — 확인 완료는 **신청자 본인만** 할 수 있다.
+  //
+  // 이 규칙은 원래 PATCH /api/srs/[id]/status 라우트 안에만 있었다. 그런데 상태는
+  // PATCH /api/srs/[id] (srUpdateSchema 의 status 필드)로도 바꿀 수 있고, 그 경로는
+  // 라우트의 검사를 타지 않는다. 실측 결과 ADMIN 과 **신청자가 아닌 CLIENT_ADMIN** 이
+  // 그 경로로 남의 SR 을 CONFIRMED 로 종결시킬 수 있었다(상태 라우트는 403, 업데이트
+  // 라우트는 200). 같은 규칙이 한 경로에만 있으면 반드시 이런 발산이 생긴다.
+  //
+  // 위의 역할/권한 표만으로는 막을 수 없다 — TRANSITION_ROLES 는 'CLIENT_USER' 라는
+  // **역할**을 허용할 뿐 "그 SR 의 신청자인가"를 알지 못한다. 그래서 신원 검사를 여기
+  // 공유 지점에 둔다. 두 라우트 모두 srService.updateSR 를 거치므로 함께 닫힌다.
+  //
+  // fail-closed 다: 신원을 확인할 수 없으면(currentData 나 actorId 가 없으면) 거부한다.
+  if (to === 'CONFIRMED') {
+    const requesterId = currentData?.requesterId;
+    if (!requesterId || !actorId || requesterId !== actorId) {
+      return {
+        valid: false,
+        message: '신청자만 확인할 수 있습니다.',
       };
     }
   }

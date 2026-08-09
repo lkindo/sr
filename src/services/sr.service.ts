@@ -362,7 +362,10 @@ export class SRService {
           sessionUser.roles,
           existingSR,
           validated,
-          sessionUser.permissions
+          sessionUser.permissions,
+          // 신청자 본인만 가능한 전이(CONFIRMED)를 판정하려면 행위자 ID 가 필요하다.
+          // 이것이 없으면 상태 머신은 fail-closed 로 거부한다.
+          sessionUser.id
         );
 
         if (!transitionResult.valid) {

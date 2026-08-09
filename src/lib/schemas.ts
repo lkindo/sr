@@ -358,8 +358,12 @@ export const commentSchema = z.object({
 /** SR 상태 전이 요청. 실제 전이 가능 여부는 sr-state-machine 이 판정한다. */
 export const statusActionSchema = z.object({
   action: z.enum(['complete', 'hold', 'reject', 'reopen', 'start', 'resume', 'confirm']),
-  reason: z.string().optional(),
-  resolutionDescription: z.string().optional(),
+  // trim().min(1) 이 필요한 이유: 라우트는 `!reason` 으로만 필수 여부를 판정한다.
+  // 공백뿐인 문자열('   ')은 truthy 라 그 검사를 그대로 통과했고, 보류·거절·재오픈의
+  // 사유가 공백인 채로 상태 이력에 남았다. 감사 추적이 있으나 마나 해진다.
+  // trim 은 preprocess 가 아니라 스키마 단계에서 하므로 저장되는 값도 정리된다.
+  reason: z.string().trim().min(1, '사유를 입력해주세요.').optional(),
+  resolutionDescription: z.string().trim().min(1, '해결 내용을 입력해주세요.').optional(),
 });
 
 /** 사용자 고객사 소속 변경. `force` 는 진행 중 SR 이 있어도 강행할지 여부다. */

@@ -65,8 +65,65 @@ describe('validateTransition — 시드 역할 동작 보존', () => {
     ).toBe(true);
   });
 
-  it('CLIENT_USER 는 완료를 확인할 수 있다', () => {
-    expect(validateTransition('COMPLETED', 'CONFIRMED', ['CLIENT_USER']).valid).toBe(true);
+  it('CLIENT_USER 는 자기가 신청한 완료 SR 을 확인할 수 있다', () => {
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_USER'],
+        { requesterId: 'u1' },
+        {},
+        [],
+        'u1'
+      ).valid
+    ).toBe(true);
+  });
+
+  /**
+   * 확인 완료는 고객 인수 행위다. 역할만으로는 판정할 수 없다 —
+   * TRANSITION_ROLES 는 'CLIENT_USER' 라는 역할을 허용할 뿐 "그 SR 의 신청자인가" 를 모른다.
+   *
+   * 이 검사가 없던 동안 PATCH /api/srs/[id] (srUpdateSchema 의 status)로 우회가 가능했다.
+   * 실측: 상태 라우트는 403 인데 업데이트 라우트는 200 이었고, ADMIN 과 신청자가 아닌
+   * CLIENT_ADMIN 이 남의 SR 을 CONFIRMED 로 종결시킬 수 있었다.
+   */
+  it('신청자가 아니면 역할이 허용돼도 확인할 수 없다', () => {
+    // 같은 CLIENT_USER 역할이지만 신청자가 다르다
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_USER'],
+        { requesterId: 'u1' },
+        {},
+        [],
+        'u2'
+      ).valid
+    ).toBe(false);
+    // ADMIN 도 대신 눌러 줄 수 없다
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['ADMIN'],
+        { requesterId: 'u1' },
+        {},
+        [],
+        'admin'
+      ).valid
+    ).toBe(false);
+  });
+
+  it('신원을 확인할 수 없으면 확인 완료를 거부한다 (fail-closed)', () => {
+    // actorId 없음
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['CLIENT_USER'], { requesterId: 'u1' }, {}).valid
+    ).toBe(false);
+    // currentData 없음
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['CLIENT_USER'], undefined, undefined, [], 'u1')
+        .valid
+    ).toBe(false);
   });
 
   it('CLIENT_USER 는 접수할 수 없다', () => {
@@ -103,14 +160,15 @@ describe('validateTransition — 커스텀 역할(권한 경로)', () => {
   });
 
   it('확인·재오픈은 SR:CONFIRM 을 요구한다 (운영자 권한과 구분)', () => {
+    // 신청자 검사가 추가되면서 이 엣지는 "권한 + 신청자 본인" 을 모두 요구한다.
+    // 권한만 확인하려면 신청자 조건을 만족시켜 두고 권한만 바꿔 가며 비교해야 한다.
+    const own = { requesterId: 'u1' };
     expect(
-      validateTransition('COMPLETED', 'CONFIRMED', customRole, undefined, undefined, [
-        'SR:STATUS_CHANGE',
-      ]).valid
+      validateTransition('COMPLETED', 'CONFIRMED', customRole, own, {}, ['SR:STATUS_CHANGE'], 'u1')
+        .valid
     ).toBe(false);
     expect(
-      validateTransition('COMPLETED', 'CONFIRMED', customRole, undefined, undefined, ['SR:CONFIRM'])
-        .valid
+      validateTransition('COMPLETED', 'CONFIRMED', customRole, own, {}, ['SR:CONFIRM'], 'u1').valid
     ).toBe(true);
   });
 

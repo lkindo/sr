@@ -114,9 +114,31 @@ describe('SR State Machine', () => {
       expect(result.message).toContain('권한이 없습니다');
     });
 
-    it('CLIENT_USER는 CONFIRMED로 전환 가능', () => {
-      const result = validateTransition('COMPLETED', 'CONFIRMED', clientUserRoles);
-      expect(result.valid).toBe(true);
+    it('CLIENT_USER는 자기가 신청한 SR 만 CONFIRMED로 전환 가능', () => {
+      // 확인 완료는 고객 인수 행위라 역할만으로는 부족하다 — 신청자 본인이어야 한다.
+      // (이 조건이 없던 동안 PATCH /api/srs/[id] 로 남의 SR 을 종결시킬 수 있었다.)
+      const own = validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        clientUserRoles,
+        { requesterId: 'u1' },
+        {},
+        [],
+        'u1'
+      );
+      expect(own.valid).toBe(true);
+
+      const others = validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        clientUserRoles,
+        { requesterId: 'u1' },
+        {},
+        [],
+        'u2'
+      );
+      expect(others.valid).toBe(false);
+      expect(others.message).toContain('신청자만');
     });
 
     it('필수 필드가 누락된 전환은 valid: false와 필수 필드 메시지 반환 (데이터 검증 실패)', () => {
