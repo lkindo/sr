@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Progress } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { statusLabelOf } from '@/lib/constants/sr';
 
 interface MySR {
   id: string;
@@ -85,16 +86,19 @@ const STATUS_ORDER = [
   SRStatus.REJECTED,
 ] as const;
 
-const statusLabels: Record<SRStatus, string> = {
-  REQUESTED: '접수 대기',
-  INTAKE: '접수',
-  IN_PROGRESS: '진행 중',
-  ON_HOLD: '보류',
-  COMPLETED: '완료',
-  CONFIRMED: '확인됨',
-  REJECTED: '거부됨',
-};
-
+/**
+ * 상태 **라벨** 사본은 정본(@/lib/constants/sr)으로 흡수했다(2026-08-10).
+ *
+ * 7키 중 4키가 정본과 달랐다 — 같은 SR 이 이 화면에서는 '접수 대기'/'진행 중'/
+ * '확인됨'/'거부됨' 인데 /srs 에서는 '요청됨'/'진행중'/'확인완료'/'거절' 로 보였다.
+ * 목록에서 본 이름과 상세에서 본 이름이 달라 사용자가 다른 단계로 읽는다.
+ * (IN_PROGRESS 는 공백 하나 차이라 눈으로는 같아 보이지만 exact 매칭에서는 다르다.)
+ *
+ * **색(statusColors)은 흡수하지 않는다.** 아래 맵에는 'outline' 이 있는데 정본
+ * statusBadgeVariants 의 유니온에는 없다. 타입을 넓혀 억지로 합치면 통합이 아니라
+ * 배지 색 리디자인이 되고, constants/sr.ts 가 소유자 판단으로 격리해 둔 항목을
+ * 우회하게 된다. 색 통합은 네 화면을 함께 보고 결정할 별건이다.
+ */
 const statusColors: Record<SRStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   REQUESTED: 'secondary',
   INTAKE: 'secondary',
@@ -214,7 +218,7 @@ export default function MyRequestsPage() {
 
         <Card className="sr-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">접수 대기</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">요청됨</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
@@ -225,7 +229,7 @@ export default function MyRequestsPage() {
 
         <Card className="sr-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">진행 중</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">진행중</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
@@ -264,8 +268,7 @@ export default function MyRequestsPage() {
                   <SelectItem value="all">전체 상태</SelectItem>
                   {STATUS_ORDER.map((status) => (
                     <SelectItem key={status} value={status}>
-                      {/* eslint-disable-next-line security/detect-object-injection -- 키는 SRStatus enum 상수 튜플에서만 온다 */}
-                      {statusLabels[status]}
+                      {statusLabelOf(status)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -318,7 +321,7 @@ export default function MyRequestsPage() {
                       >
                         {sr.srNumber}
                       </Link>
-                      <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+                      <Badge variant={statusColors[sr.status]}>{statusLabelOf(sr.status)}</Badge>
                       <Badge variant={priorityColors[sr.requestedPriority]}>
                         {priorityLabels[sr.requestedPriority]}
                       </Badge>
@@ -372,6 +375,7 @@ export default function MyRequestsPage() {
                       ) : (
                         <div className="flex items-center gap-2 text-sm">
                           <AlertCircle className="h-4 w-4 text-orange-600" />
+                          {/* 상태 이름이 아니라 "아직 접수되지 않았다" 는 서술이다 — 정본 라벨과 별개. */}
                           <span className="text-orange-600">접수 대기 중</span>
                         </div>
                       )}
