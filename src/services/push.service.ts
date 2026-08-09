@@ -118,10 +118,7 @@ export interface PushSubscriptionData {
 }
 
 export type NotificationEventType =
-  | 'SR_CREATED'
-  | 'SR_ASSIGNED'
-  | 'SR_STATUS_CHANGED'
-  | 'COMMENT_ADDED';
+  'SR_CREATED' | 'SR_ASSIGNED' | 'SR_STATUS_CHANGED' | 'COMMENT_ADDED';
 
 // Lazy load web-push to avoid bundling issues
 let webPushModule: typeof import('web-push') | null = null;

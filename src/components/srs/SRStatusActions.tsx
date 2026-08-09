@@ -16,13 +16,7 @@ import { SRStatusChangeDialog } from './SRStatusChangeDialog';
 const REOPEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 type SRStatus =
-  | 'REQUESTED'
-  | 'INTAKE'
-  | 'IN_PROGRESS'
-  | 'ON_HOLD'
-  | 'COMPLETED'
-  | 'CONFIRMED'
-  | 'REJECTED';
+  'REQUESTED' | 'INTAKE' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CONFIRMED' | 'REJECTED';
 
 interface SRStatusActionsProps {
   srId: string;
