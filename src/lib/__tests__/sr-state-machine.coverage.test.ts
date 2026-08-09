@@ -119,9 +119,11 @@ describe('REQUIRED_FIELDS / getRequiredFields', () => {
 
 describe('validateTransition - step 1: state flow validity', () => {
   it('rejects an invalid state flow with a descriptive message', () => {
+    // 메시지는 API 오류로 그대로 토스트에 뜬다. 예전에는 영문 enum 이 노출됐다
+    // ("REQUESTED에서 COMPLETED(으)로…"). 사용자가 읽는 문장이므로 한국어 라벨을 쓴다.
     const result = validateTransition('REQUESTED', 'COMPLETED');
     expect(result.valid).toBe(false);
-    expect(result.message).toBe('REQUESTED에서 COMPLETED(으)로 직접 전환할 수 없습니다.');
+    expect(result.message).toBe('요청됨에서 완료(으)로 직접 전환할 수 없습니다.');
   });
 
   it('rejects any transition out of terminal REJECTED', () => {
@@ -247,7 +249,8 @@ describe('validateTransition - step 3: required-field validation', () => {
     const result = validateTransition('INTAKE', 'IN_PROGRESS', ['ADMIN'], {}, {});
     expect(result.valid).toBe(false);
     expect(result.message).toContain('담당자(assigneeId)');
-    expect(result.message).toContain('IN_PROGRESS 상태로 전환하려면');
+    // 영문 enum 이 아니라 한국어 라벨이어야 한다(statusLabels.IN_PROGRESS).
+    expect(result.message).toContain('진행중 상태로 전환하려면');
   });
 
   it('IN_PROGRESS: assigneeId present in updateData -> valid', () => {

@@ -17,13 +17,18 @@ import { changeSRStatus } from './helpers/test-helpers';
  * ── 이 파일이 왜 통째로 다시 쓰였는가 ─────────────────────────────────────
  * 이전 판은 상태를 `page.locator('text=/완료|COMPLETED/i').first()` 로 확인했다.
  * 그런데 상세 화면의 상태 배지 문구는 `src/lib/constants/sr.ts` 의 statusLabels 이고
- * ('완료', '대기', '거부' …), 같은 화면에는 '완료 처리' · '보류' · '거절' **버튼**이 있다.
+ * ('완료', '보류', '거부' …), 같은 화면에는 '완료 처리' · '보류' · '거절' **버튼**이 있다.
  * 넓은 텍스트 매칭은 버튼에 먼저 걸리므로
- *   - `text=/보류|ON_HOLD/i` 는 보류 **버튼**에 걸렸고 (배지 문구는 '대기' 라 애초에 못 만난다)
+ *   - `text=/보류|ON_HOLD/i` 는 보류 **버튼**에 걸렸고
  *   - `text=/거절|REJECTED/i` 는 거절 **버튼**에 걸렸으며 (배지 문구는 '거부')
  *   - `text=/완료|COMPLETED/i` 는 '완료 처리' 버튼에 걸렸다
  * 즉 상태가 하나도 바뀌지 않아도 전부 초록불이었다. 거기에 관용 분기 14개와
  * 고정 대기 25회(35.6초)가 얹혀 "버튼이 없으면 로그만 남기고 통과"까지 하고 있었다.
+ *
+ * ⚠️ 2026-08-09: ON_HOLD 라벨이 '대기' → '보류' 로 통일되면서 **배지와 버튼이 같은
+ * 글자**가 됐다. 예전에는 배지가 '대기' 라 `text=보류` 가 배지를 "애초에 못 만나는"
+ * 것이 우연한 안전장치였는데, 그 안전장치가 사라졌다. 그래서 배지 단언은 텍스트가
+ * 아니라 `data-testid="sr-status-badge"` 로 겨냥한다(아래 expectStatusBadge).
  *
  * ── 다시 쓴 원칙 ──────────────────────────────────────────────────────────
  * 1. 준비는 `fixtures/sr.ts` 의 API 픽스처로 한다. 각 테스트가 자기 시작 상태의 SR 을
@@ -58,7 +63,7 @@ const STATUS_LABELS: Record<SRStage, string> = {
   REQUESTED: '요청됨',
   INTAKE: '접수',
   IN_PROGRESS: '진행중',
-  ON_HOLD: '대기',
+  ON_HOLD: '보류',
   COMPLETED: '완료',
   CONFIRMED: '확인완료',
   REJECTED: '거부',
@@ -86,20 +91,27 @@ const ALL_ACTION_BUTTONS = [
  * data-testid 가 없다. 같은 문구('진행중' 등)의 배지가 하단 상태 변경 이력 타임라인에도
  * 있으므로 화면 전체에서 텍스트로 찾으면 무엇을 보고 있는지 알 수 없다.
  * 유일하게 안정적인 훅이 형제 요소인 `data-testid="sr-title"` 이라 그 부모를 헤더로 삼는다.
- * (더 나은 방법은 배지 자체에 data-testid="sr-status-badge" 를 붙이는 것이다 — 보고서 참조.)
  */
 function detailHeader(page: Page): Locator {
   return page.locator('div:has(> p[data-testid="sr-title"])');
 }
 
-/** 헤더의 상태 배지가 기대한 상태인지 단언한다. */
+/**
+ * 헤더의 상태 배지가 기대한 상태인지 단언한다.
+ *
+ * 배지를 **testid 로** 집는다. 문구로 집으면 안 된다 — ON_HOLD 라벨이 '보류' 가 되면서
+ * 같은 화면의 '보류' 버튼과 글자가 같아졌다. 그래도 문구는 함께 단언한다:
+ * testid 만 보면 배지가 엉뚱한 상태를 그려도 통과하기 때문이다.
+ */
 async function expectStatusBadge(page: Page, srId: string, stage: SRStage): Promise<void> {
   const header = detailHeader(page);
   await expect(header, `SR ${srId}: 상세 헤더가 렌더되지 않았습니다.`).toBeVisible();
+  const badge = page.getByTestId('sr-status-badge');
+  await expect(badge, `SR ${srId}: 상태 배지를 찾지 못했습니다.`).toBeVisible();
   await expect(
-    header.getByText(STATUS_LABELS[stage], { exact: true }),
+    badge,
     `SR ${srId}: 상태 배지가 '${STATUS_LABELS[stage]}'(${stage}) 가 아닙니다.`
-  ).toBeVisible();
+  ).toHaveText(STATUS_LABELS[stage]);
 }
 
 /** 페르소나 세션으로 페이지를 열고 끝나면 컨텍스트를 정리한다. */
@@ -562,17 +574,65 @@ test.describe('SR 상태 이력', () => {
         `SR ${sr.id}: 상태 변경 이력 카드가 없습니다.`
       ).toBeVisible();
 
+      // 사유 문구는 **한국어 라벨**이어야 한다.
+      //
+      // 예전에는 이 단언이 '상태 변경: INTAKE → IN_PROGRESS' 였다. 즉 사용자에게
+      // 영문 enum 이 보이는 상태를 테스트가 정상으로 못박고 있었다 — 결함이 눈에
+      // 띄지 않았던 이유가 이것이다. changeReason 폴백은 statusLabels 를 쓴다.
       for (const reason of [
         'SR 생성',
         'SR 접수 처리',
-        '상태 변경: INTAKE → IN_PROGRESS',
-        '상태 변경: IN_PROGRESS → COMPLETED',
+        '상태 변경: 접수 → 진행중',
+        '상태 변경: 진행중 → 완료',
       ]) {
         await expect(
           page.getByText(reason, { exact: true }),
           `SR ${sr.id}: 타임라인에 '${reason}' 항목이 없습니다.`
         ).toBeVisible();
       }
+
+      // 타임라인 어디에도 영문 enum 이 남아 있으면 안 된다.
+      const timeline = page.locator('div:has(> p:text-is("상태 변경 이력"))').first();
+      const timelineText = (await timeline.innerText().catch(() => '')) || '';
+      expect(
+        timelineText.match(/REQUESTED|INTAKE|IN_PROGRESS|ON_HOLD|COMPLETED|CONFIRMED|REJECTED/g) ??
+          [],
+        `SR ${sr.id}: 타임라인에 영문 enum 이 그대로 보입니다.`
+      ).toEqual([]);
+    });
+  });
+
+  test('보류 전이가 남긴 문구에 영문 enum 이 새지 않는다', async ({ browser }) => {
+    // ── 여기가 결함이었다 ────────────────────────────────────────────────
+    // 상태 전이는 활동 이력 description 과 상태 이력 changeReason 을 남기는데,
+    // 둘 다 enum 을 그대로 문자열에 끼워 넣었다(sr.service.ts / status/route.ts).
+    // 그래서 라벨을 무엇으로 정하든 활동 이력 탭에는 "상태가 IN_PROGRESS에서
+    // ON_HOLD로 변경되었습니다." 가, 타임라인에는 '보류' 배지 **바로 아래 줄**에
+    // "상태 변경: IN_PROGRESS → ON_HOLD" 가 떴다. 한 화면에 한국어와 영문이 공존했다.
+    //
+    // ON_HOLD 를 쓰는 이유: 시드에 ON_HOLD SR 이 없어서 이 스펙이 유일한 실증 경로다.
+    const sr = await seedSR(browser, { stage: 'ON_HOLD', title: '보류 문구 확인' });
+    seededIds.push(sr.id);
+
+    await withPage(browser, 'legacyManager', async (page) => {
+      await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
+      await expectStatusBadge(page, sr.id, 'ON_HOLD');
+
+      // 활동 이력 탭의 전이 설명
+      await page.getByRole('tab', { name: /활동 이력/ }).click();
+      const panel = page.locator('[role="tabpanel"][data-state="active"]');
+      await expect(panel.getByText(/^활동 이력 \(\d+\)$/)).toBeVisible();
+
+      await expect(
+        panel.getByText('상태가 진행중에서 보류(으)로 변경되었습니다.', { exact: true }),
+        `SR ${sr.id}: 활동 이력의 전이 설명이 한국어 라벨이 아닙니다.`
+      ).toBeVisible();
+
+      const panelText = await panel.innerText();
+      expect(
+        panelText.match(/REQUESTED|INTAKE|IN_PROGRESS|ON_HOLD|COMPLETED|CONFIRMED|REJECTED/g) ?? [],
+        `SR ${sr.id}: 활동 이력에 영문 enum 이 그대로 보입니다.`
+      ).toEqual([]);
     });
   });
 });

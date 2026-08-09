@@ -103,7 +103,7 @@ test.describe('SR 상세 화면 연속 액션 (ADMIN)', () => {
     await expect(startButton).toHaveCount(0);
     const completeButton = page.getByRole('button', { name: '완료 처리' });
     await expect(completeButton).toBeVisible();
-    await expect(page.getByRole('button', { name: '보류' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '보류', exact: true })).toBeVisible();
 
     // ── 3) 완료 처리 (IN_PROGRESS → COMPLETED) ────────────────────────────
     await completeButton.click();
@@ -129,7 +129,7 @@ test.describe('SR 상세 화면 연속 액션 (ADMIN)', () => {
 
     // 완료된 SR 에는 진행 액션이 남아 있으면 안 된다.
     await expect(page.getByRole('button', { name: '완료 처리' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '보류' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '보류', exact: true })).toHaveCount(0);
     // 재오픈은 ADMIN 에게 열려 있고(sr-state-machine 의 COMPLETED → IN_PROGRESS),
     // 확인 완료는 신청자(CLIENT_USER)만 가능하므로 ADMIN 세션에는 없어야 한다.
     await expect(page.getByRole('button', { name: '재오픈' })).toBeVisible();

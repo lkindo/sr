@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { priorityLabels, statusLabelOf } from '@/lib/constants/sr';
 import { logger } from '@/lib/logger';
 import { formatAppZoneDate, formatISODateInAppZone } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
@@ -59,8 +60,8 @@ function toCsvLine(sr: ExportRow): string {
   return [
     csvCell(sr.srNumber),
     csvCell(sr.title),
-    csvCell(sr.status),
-    csvCell(sr.priority),
+    csvCell(statusLabelOf(sr.status)),
+    csvCell(priorityLabels[sr.priority] ?? sr.priority),
     csvCell(sr.client?.name || ''),
     csvCell(sr.requester?.name || ''),
     csvCell(sr.assignee?.name || '미지정'),

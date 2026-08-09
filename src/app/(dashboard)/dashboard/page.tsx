@@ -27,7 +27,7 @@ import {
   priorityBadgeVariants as priorityColors,
   priorityLabels,
   statusBadgeVariants as statusColors,
-  statusLabels,
+  statusLabelOf,
 } from '@/lib/constants/sr';
 
 import { DashboardSkeleton } from './DashboardSkeleton';
@@ -288,7 +288,7 @@ export default function DashboardPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
                           <Badge variant={statusColors[sr.status] || 'default'} className="text-xs">
-                            {statusLabels[sr.status] || sr.status}
+                            {statusLabelOf(sr.status)}
                           </Badge>
                           <Badge
                             variant={priorityColors[sr.priority] || 'default'}
@@ -567,7 +567,7 @@ export default function DashboardPage() {
                     <Badge variant={priorityColors[sr.priority]}>
                       {priorityLabels[sr.priority]}
                     </Badge>
-                    <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+                    <Badge variant={statusColors[sr.status]}>{statusLabelOf(sr.status)}</Badge>
                   </div>
                 </div>
               ))}

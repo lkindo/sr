@@ -5,6 +5,8 @@
  */
 
 import type { SRStatus } from '@prisma/client';
+
+import { statusLabelOf } from '@/lib/constants/sr';
 export type { SRStatus };
 
 /**
@@ -194,7 +196,7 @@ export const validateTransition = (
   if (!canTransition(from, to)) {
     return {
       valid: false,
-      message: `${from}에서 ${to}(으)로 직접 전환할 수 없습니다.`,
+      message: `${statusLabelOf(from)}에서 ${statusLabelOf(to)}(으)로 직접 전환할 수 없습니다.`,
     };
   }
 
@@ -278,7 +280,7 @@ export const validateTransition = (
     if (missingFields.length > 0) {
       return {
         valid: false,
-        message: `${to} 상태로 전환하려면 다음 필드가 필요합니다: ${missingFields.join(', ')}`,
+        message: `${statusLabelOf(to)} 상태로 전환하려면 다음 필드가 필요합니다: ${missingFields.join(', ')}`,
       };
     }
   }

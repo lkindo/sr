@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle, Clock, Pause, User, XCircle } from 'lucide-re
 
 import { Badge } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
-import { statusLabels } from '@/lib/constants/sr';
+import { statusLabelOf } from '@/lib/constants/sr';
 import { cn } from '@/lib/utils';
 
 interface StatusHistoryItem {
@@ -120,7 +120,7 @@ export function SRStatusTimeline({ statusHistory, currentStatus }: SRStatusTimel
                         variant={statusColors[history.currentStatus]}
                         className={cn(isCurrentStatus && 'ring-2 ring-primary ring-offset-2')}
                       >
-                        {statusLabels[history.currentStatus]}
+                        {statusLabelOf(history.currentStatus)}
                       </Badge>
                       {isMostRecent && (
                         <Badge variant="outline" className="text-xs">

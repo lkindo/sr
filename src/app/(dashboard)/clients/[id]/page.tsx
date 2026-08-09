@@ -82,7 +82,7 @@ import {
   priorityBadgeVariants as priorityColors,
   priorityLabels,
   statusBadgeVariants as statusColors,
-  statusLabels,
+  statusLabelOf,
 } from '@/lib/constants/sr';
 
 export default function ClientDetailPage() {
@@ -612,7 +612,9 @@ export default function ClientDetailPage() {
                       <TableRow key={sr.id}>
                         <TableCell className="font-medium">{sr.title}</TableCell>
                         <TableCell>
-                          <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+                          <Badge variant={statusColors[sr.status]}>
+                            {statusLabelOf(sr.status)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant={priorityColors[sr.priority]}>

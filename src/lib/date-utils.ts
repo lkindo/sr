@@ -28,10 +28,15 @@ export function getDueDateStatus(
     };
   }
 
-  // 보류 상태: 보류 표시
+  // 보류 상태: 보류 표시.
+  //
+  // 문구를 '보류중' 이 아니라 '보류' 로 둔다 — 상태 배지(statusLabels.ON_HOLD)와
+  // 같은 행에 나란히 렌더되기 때문이다(SRListItem.tsx 의 인접 열). 두 배지가
+  // '보류' 와 '보류중' 으로 갈리면 사용자는 다른 단계라고 읽는다.
+  // 나머지 분기('완료됨'/'거절됨')는 이번 결정 범위 밖이라 그대로 둔다.
   if (status === 'ON_HOLD') {
     return {
-      label: '보류중',
+      label: '보류',
       variant: 'secondary',
       isOverdue: false,
       isUrgent: false,

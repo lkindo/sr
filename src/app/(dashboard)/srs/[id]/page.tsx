@@ -127,7 +127,14 @@ export default function SRDetailPage() {
                   className="text-muted-foreground hover:text-foreground"
                 />
                 <div className="flex gap-1.5 shrink-0">
+                  {/*
+                    상태 배지 문구는 액션 버튼 문구와 겹친다 — ON_HOLD 라벨을 '보류' 로
+                    통일하면서(2026-08-09) 배지 '보류' 와 SRStatusActions 의 '보류' 버튼이
+                    같은 화면에 같은 글자로 존재하게 됐다. 텍스트로 배지를 겨냥하면
+                    버튼에 먼저 걸리므로 테스트가 잡을 훅을 배지 자신에게 준다.
+                  */}
                   <Badge
+                    data-testid="sr-status-badge"
                     variant={statusColors[sr.status]}
                     className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
                   >

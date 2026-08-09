@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useToast } from '@/hooks/use-toast';
+import { statusLabelOf } from '@/lib/constants/sr';
 import { logger } from '@/lib/logger';
 
 /**
@@ -67,7 +68,7 @@ export function useRealtimeStatus() {
         // 알림 토스트 (선택 사항)
         toast({
           title: '실시간 업데이트',
-          description: `SR #${data.srNumber}의 상태가 ${data.status}로 변경되었습니다.`,
+          description: `SR #${data.srNumber}의 상태가 ${statusLabelOf(data.status)}(으)로 변경되었습니다.`,
         });
       } catch (err) {
         logger.error(

@@ -57,9 +57,11 @@ describe('date-utils', () => {
     });
 
     it('should return on hold status for ON_HOLD', () => {
+      // 마감일 배지는 상태 배지와 같은 행에 나란히 뜨므로 문구를 맞춘다
+      // (statusLabels.ON_HOLD = '보류'). 예전에는 '보류중' 이라 한 행에 두 이름이었다.
       const status = getDueDateStatus('2023-01-01', 'ON_HOLD');
       expect(status).toEqual({
-        label: '보류중',
+        label: '보류',
         variant: 'secondary',
         isOverdue: false,
         isUrgent: false,

@@ -154,8 +154,11 @@ test.describe('실시간 갱신 (SSE)', () => {
     // 담당 ENGINEER 가 진행을 시작한다 → sr:updated
     await transitionAs(browser, 'engineer', sr.id, { action: 'start' });
 
+    // 토스트 문구도 한국어 라벨이어야 한다.
+    // 예전에는 `...상태가 IN_PROGRESS로 변경되었습니다.` 였다 — 이 단언이 영문 enum
+    // 노출을 정상으로 못박고 있었다(use-realtime-status.ts 가 data.status 를 그대로 썼다).
     await expect(
-      page.getByText(`SR #${sr.srNumber}의 상태가 IN_PROGRESS로 변경되었습니다.`, { exact: true })
+      page.getByText(`SR #${sr.srNumber}의 상태가 진행중(으)로 변경되었습니다.`, { exact: true })
     ).toBeVisible();
 
     // 목록의 상태 배지가 '접수' → '진행중' 으로 바뀐다(lib/constants/sr.ts 의 statusLabels).

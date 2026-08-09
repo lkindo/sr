@@ -2,6 +2,7 @@ import { Prisma, SR, SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { PAGINATION } from '@/lib/constants';
+import { statusLabelOf } from '@/lib/constants/sr';
 import { domainEvents } from '@/lib/domain-events';
 import {
   BadRequestError,
@@ -697,7 +698,8 @@ export class SRService {
           currentStatus: validated.status!,
           changedBy: sessionUser.id,
           changeReason:
-            validated.changeReason || `상태 변경: ${existingSR.status} → ${validated.status}`,
+            validated.changeReason ||
+            `상태 변경: ${statusLabelOf(existingSR.status)} → ${statusLabelOf(validated.status!)}`,
         },
       };
       // REQUESTED → INTAKE 전이 시 접수 메타데이터를 채운다.
@@ -734,7 +736,7 @@ export class SRService {
       activitiesToCreate.push({
         user: { connect: { id: sessionUser.id } },
         type: 'STATUS_CHANGED',
-        description: `상태가 ${existingSR.status}에서 ${validated.status}로 변경되었습니다.`,
+        description: `상태가 ${statusLabelOf(existingSR.status)}에서 ${statusLabelOf(validated.status!)}(으)로 변경되었습니다.`,
       });
     }
 

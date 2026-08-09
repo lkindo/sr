@@ -3,6 +3,7 @@ import { SRStatus } from '@prisma/client';
 
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { statusLabelOf } from '@/lib/constants/sr';
 import { statusActionSchema } from '@/lib/schemas';
 import { srService } from '@/services/sr.service';
 
@@ -156,7 +157,8 @@ export const PATCH = withAuthAndRateLimit(
       srId,
       {
         status: newStatus,
-        changeReason: reason || `상태 변경: ${currentStatus} → ${newStatus}`,
+        changeReason:
+          reason || `상태 변경: ${statusLabelOf(currentStatus)} → ${statusLabelOf(newStatus)}`,
         ...(updateData.resolutionDescription && {
           resolutionDescription: updateData.resolutionDescription,
         }),
