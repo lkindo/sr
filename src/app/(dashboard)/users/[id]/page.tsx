@@ -122,7 +122,10 @@ export default function UserDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [params.id, router, toast]);
+    // `router` 는 더 이상 이 콜백 안에서 쓰이지 않는다 — 404 를 튕김이 아니라
+    // not-found 경계로 처리하도록 바꾸면서 router.push 가 빠졌다. 의존성에 남겨 두면
+    // 무엇이 이 콜백을 다시 만드는지 오해하게 되므로 함께 지운다.
+  }, [params.id, toast]);
 
   useEffect(() => {
     if (params.id) {

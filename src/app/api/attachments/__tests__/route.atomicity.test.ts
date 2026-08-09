@@ -49,7 +49,10 @@ vi.mock('@/lib/auth-wrapper', () => ({
 // 인가 계약 자체는 `src/lib/__tests__/policies.attachment.test.ts` 가 실물로 검증한다.
 vi.mock('@/lib/policies', () => ({
   ensureCanReadSR: vi.fn(),
-  ensureCanUpdateSR: vi.fn(),
+  // 첨부 삭제는 SR 수정 권한보다 좁다(canDeleteAttachment). 이 파일은 원자성만 보므로
+  // 권한은 통과시키되, 라우트가 부르는 이름을 여기 두어야 한다 — 이름이 바뀌면
+  // 모의가 비어 있는 채로 호출돼 TypeError 로 터진다.
+  ensureCanDeleteAttachment: vi.fn(),
   ensureCanAttachToSR: vi.fn(),
 }));
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { MemoryRateLimiter } from '../rate-limiter';
 
@@ -17,6 +17,10 @@ import { MemoryRateLimiter } from '../rate-limiter';
 const CAPACITY_TRIGGER = 10_001;
 
 describe('MemoryRateLimiter — 용량 초과 축출', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('제한에 걸린 키는 대량 축출이 일어나도 계속 막혀 있다', async () => {
     const limiter = new MemoryRateLimiter({ windowMs: 60_000, maxRequests: 5 });
 
@@ -48,13 +52,18 @@ describe('MemoryRateLimiter — 용량 초과 축출', () => {
   });
 
   it('윈도우가 지나면 정상적으로 다시 허용한다(축출과 무관하게)', async () => {
+    // 예전에는 windowMs 20ms 에 실제로 30ms 를 자며 확인했다. 전체 스위트를 병렬로
+    // 돌리면 세 번째 check 가 20ms 창을 넘겨 도착해 `false` 여야 할 것이 `true` 가
+    // 되면서 간헐 실패했다. 리미터는 Date.now() 만 읽으므로 가짜 타이머로 시간을
+    // 직접 밀면 부하와 무관하게 결정적으로 검증된다.
+    vi.useFakeTimers();
     const limiter = new MemoryRateLimiter({ windowMs: 20, maxRequests: 2 });
 
     expect((await limiter.check('normal')).allowed).toBe(true);
     expect((await limiter.check('normal')).allowed).toBe(true);
     expect((await limiter.check('normal')).allowed).toBe(false);
 
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    vi.advanceTimersByTime(30);
 
     expect((await limiter.check('normal')).allowed).toBe(true);
   });
