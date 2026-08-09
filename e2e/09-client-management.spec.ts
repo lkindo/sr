@@ -80,7 +80,22 @@ test.describe('고객사 관리 - ADMIN 권한', () => {
     // 시드에 반드시 있는 코드로 검색해 결과가 실제로 좁혀지는지 본다.
     const search = page.locator('input[type="search"], input[placeholder*="검색"]').first();
     await expect(search).toBeVisible({ timeout: 10000 });
+
+    // 검색어가 실제로 서버에 반영된 응답을 기다린다.
+    //
+    // 이 화면은 키 입력마다 요청을 보낸다(디바운스 없음). 예전에는 fill 직후 바로
+    // 행 수를 단언했는데, 그러면 'TEST00' 응답이 'TEST001' 응답보다 늦게 도착해
+    // 필터가 풀린 목록을 덮어쓴 순간을 그대로 본다 — 실제로 전체 실행에서 산발
+    // 실패했다. 앱에는 취소 가드를 넣었고(clients/page.tsx), 테스트도 마지막
+    // 요청의 응답을 기준으로 삼는다.
+    const filtered = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === '/api/clients' &&
+        new URL(response.url()).searchParams.get('search') === 'TEST001' &&
+        response.status() === 200
+    );
     await search.fill('TEST001');
+    await filtered;
 
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(1, { timeout: 15000 });

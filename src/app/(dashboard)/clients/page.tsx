@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 
 import { ClientDialog } from '@/components/clients/ClientDialog';
@@ -64,7 +64,23 @@ export default function ClientsPage() {
 
   const { toast } = useToast();
 
+  /**
+   * 진행 중인 목록 요청. 새 요청이 시작되면 이전 것을 취소한다.
+   *
+   * 검색 입력에는 디바운스가 없어 키 입력마다 요청이 나간다. 취소가 없으면
+   * 'TEST00' 응답이 'TEST001' 응답보다 **늦게** 도착해 필터 결과를 덮어쓴다 —
+   * 검색창에는 'TEST001' 이 있는데 표에는 전체 목록이 떠 있는 상태가 된다.
+   * 실제로 E2E 09번('검색어를 넣으면 그 고객사만 남는다')이 그렇게 산발 실패했다.
+   * (/users 는 조회 경로가 둘이라 URL 단일화로 풀었지만, 여기는 경로가 하나라
+   *  늦게 온 응답을 버리는 것으로 충분하다.)
+   */
+  const inFlightRef = useRef<AbortController | null>(null);
+
   const fetchClients = useCallback(async () => {
+    inFlightRef.current?.abort();
+    const controller = new AbortController();
+    inFlightRef.current = controller;
+
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -74,7 +90,9 @@ export default function ClientsPage() {
       if (industryFilter !== 'all') params.append('industry', industryFilter);
       if (statusFilter !== 'all') params.append('isActive', statusFilter);
 
-      const response = await fetch(`/api/clients?${params.toString()}`);
+      const response = await fetch(`/api/clients?${params.toString()}`, {
+        signal: controller.signal,
+      });
       if (!response.ok) throw new Error('Failed to fetch clients');
       const result = await response.json();
 
@@ -88,14 +106,21 @@ export default function ClientsPage() {
         totalItems: result.meta.totalItems,
         totalPages: result.meta.totalPages,
       }));
-    } catch {
+    } catch (error) {
+      // 취소는 정상 흐름이다 — 더 새로운 요청이 이미 떠 있다는 뜻이므로
+      // 오류 토스트를 띄우거나 로딩을 끄면 안 된다(깜빡임의 원인).
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+
       toast({
         title: '오류',
-        description: '고객사 목록을 불러오는데 실패했습니다.',
+        description: '고객사 목록을 불러오지 못했습니다.',
         variant: 'destructive',
       });
     } finally {
-      setLoading(false);
+      // 취소된 요청은 이 시점에 이미 최신 요청이 로딩을 켠 상태다. 자기 것일 때만 끈다.
+      if (inFlightRef.current === controller) {
+        setLoading(false);
+      }
     }
   }, [
     pagination.currentPage,
@@ -109,6 +134,9 @@ export default function ClientsPage() {
   useEffect(() => {
     fetchClients();
   }, [fetchClients]);
+
+  // 화면을 떠날 때 남은 요청을 정리한다.
+  useEffect(() => () => inFlightRef.current?.abort(), []);
 
   const handleCreateClient = () => {
     setSelectedClient(null);
