@@ -142,7 +142,13 @@ export default defineConfig({
           name: 'unit',
           globals: true,
           environment: 'jsdom',
-          include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+          // `tests/**/*.unit.test.ts` 도 집는다.
+          //
+          // 통합 테스트 인프라 중 **부수 효과가 없는 순수 모듈**(현재는 db-guard)은
+          // DB 없이 검증되어야 한다. 그 가드가 지키는 상황이 정확히 "테스트 DB 가 없는
+          // 환경" 이라, 검증이 DB 를 요구하면 정작 필요한 곳에서 돌지 않는다.
+          // 아래 integration 프로젝트는 같은 패턴을 exclude 해서 중복 실행을 막는다.
+          include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.unit.test.ts'],
           exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
           setupFiles: ['./vitest.setup.ts'],
         },
@@ -166,7 +172,16 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: ['tests/integration/**/*.test.ts'],
-          exclude: ['src/**', '**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
+          // `*.unit.test.ts` 는 unit 프로젝트가 가져간다(위 주석 참조).
+          // 여기서 빼지 않으면 DB 가 필요 없는 파일이 DB 셋업을 기다리다 함께 죽는다.
+          exclude: [
+            'src/**',
+            '**/*.unit.test.ts',
+            '**/node_modules/**',
+            '**/dist/**',
+            '**/e2e/**',
+            '**/.next/**',
+          ],
           setupFiles: ['./vitest.integration.setup.ts'],
           // 같은 DB 를 공유하므로 파일 간 병렬 실행은 TRUNCATE 가 서로를 지우게 만든다.
           fileParallelism: false,

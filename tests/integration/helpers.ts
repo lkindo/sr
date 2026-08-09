@@ -3,6 +3,10 @@ import { describe } from 'vitest';
 
 import prisma from '@/lib/prisma';
 
+import { assertDestructiveResetIsSafe } from './db-guard';
+
+const SKIPPING_DB_TESTS = process.env.SKIP_DB_TESTS === 'true';
+
 /**
  * DB 통합 테스트용 describe.
  *
@@ -10,7 +14,7 @@ import prisma from '@/lib/prisma';
  * "DB 가 있으면 실행" 같은 반대 방향으로 만들면 CI 설정이 어긋났을 때 아무것도 돌지 않으면서
  * 초록불이 되는데, 그게 이 감사 항목(3.37)이 지적한 실패 방식 그 자체다.
  */
-export const describeDb = process.env.SKIP_DB_TESTS === 'true' ? describe.skip : describe;
+export const describeDb = SKIPPING_DB_TESTS ? describe.skip : describe;
 
 /**
  * DB 통합 테스트 공용 헬퍼 (감사 3.37).
@@ -50,6 +54,10 @@ const DATA_TABLES = [
  * 실수로 permissions/roles 까지 날리지 않도록 한다(그러면 이후 테스트가 전부 깨진다).
  */
 export async function resetDatabase(client: PrismaClient = prisma) {
+  // TRUNCATE 를 실제로 실행하는 것은 이 함수뿐이다. 셋업(vitest.integration.setup.ts)이
+  // 이미 앞에서 막지만, 마지막 관문은 방아쇠를 쥔 쪽이 들고 있어야 한다.
+  assertDestructiveResetIsSafe();
+
   const list = DATA_TABLES.map((t) => `"${t}"`).join(', ');
   await client.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
 }

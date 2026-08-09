@@ -14,6 +14,8 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll } from 'vitest';
 
+import { assertDestructiveResetIsSafe } from './tests/integration/db-guard';
+
 /**
  * DB 없이 조용히 통과시키지 않는다.
  *
@@ -36,6 +38,13 @@ beforeAll(async () => {
     );
     return;
   }
+
+  // 연결을 시도하기 **전에** 이 DB 를 비워도 되는지부터 본다.
+  //
+  // 순서가 중요하다 — 개발 DB 는 당연히 연결에 성공하므로, 연결 검사를 먼저 하면
+  // 아무 경고 없이 통과한 뒤 첫 `resetDatabase` 에서 시드가 사라진다.
+  // 실제로 두 번 그렇게 날아갔다(2026-08-07, 2026-08-09).
+  assertDestructiveResetIsSafe();
 
   // `vitest.setup.ts` 의 플레이스홀더가 다시 새어 들어오면 즉시 알아채도록 막는다.
   // 이 값으로는 인증 실패만 반복되므로, 원인을 "DB 가 없다"로 오해하기 쉽다.
