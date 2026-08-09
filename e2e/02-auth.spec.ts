@@ -25,24 +25,31 @@ import { PERSONA_AUTH_FILES } from './helpers/auth-helpers';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/** 이 스펙이 만든 계정. afterAll 에서 지운다 — 공유 DB 라 매 실행 쌓이면 안 된다. */
-const registeredEmails: string[] = [];
+/**
+ * 이 스펙이 만드는 계정의 공통 접두사.
+ *
+ * 이메일을 모듈 변수에 모아 두고 afterAll 에서 지우는 흔한 방식은 **실패한 실행의
+ * 데이터를 영구히 남긴다.** Playwright 는 테스트가 실패하면 워커 프로세스를 버리고
+ * 재시도를 새 워커에서 시작하므로, 그 모듈 변수도 함께 사라진다. 실제로 그렇게 남은
+ * 가입 계정 6건을 나중에 손으로 치워야 했다.
+ *
+ * 그래서 "내가 기억하는 것" 이 아니라 **접두사로 조회해서** 지운다. 그러면 지난 실행이
+ * 흘린 것까지 함께 회수된다.
+ */
+const REGISTERED_EMAIL_PREFIX = 'e2e-register-';
 
 test.afterAll(async ({ browser }) => {
-  if (registeredEmails.length === 0) return;
   const context = await browser.newContext({ storageState: PERSONA_AUTH_FILES.admin });
   try {
-    for (const email of registeredEmails) {
-      const lookup = await context.request.get(
-        `/api/users?search=${encodeURIComponent(email)}&pageSize=5`
-      );
-      if (!lookup.ok()) continue;
-      const found = ((await lookup.json()) as { data?: Array<{ id: string; email: string }> }).data;
-      const user = (found ?? []).find((candidate) => candidate.email === email);
-      if (!user) continue;
+    const listUrl = `/api/users?search=${encodeURIComponent(REGISTERED_EMAIL_PREFIX)}&pageSize=100`;
+    const listed = await context.request.get(listUrl);
+    if (!listed.ok()) return;
+
+    const { data = [] } = (await listed.json()) as { data?: Array<{ id: string; email: string }> };
+    for (const user of data.filter((u) => u.email.startsWith(REGISTERED_EMAIL_PREFIX))) {
       const removed = await context.request.delete(`/api/users/${user.id}?hard=true`);
       if (!removed.ok()) {
-        console.warn(`가입 계정 정리 실패: ${email} → ${removed.status()}`);
+        console.warn(`가입 계정 정리 실패: ${user.email} → ${removed.status()}`);
       }
     }
   } finally {
@@ -52,8 +59,8 @@ test.afterAll(async ({ browser }) => {
 
 const PASSWORD = 'TestPassword123!';
 
-function uniqueEmail(prefix: string): string {
-  return `${prefix}${Date.now()}${Math.floor(Math.random() * 10000)}@example.com`;
+function uniqueEmail(kind: 'client' | 'engineer'): string {
+  return `${REGISTERED_EMAIL_PREFIX}${kind}-${Date.now()}${Math.floor(Math.random() * 10000)}@example.com`;
 }
 
 /** 회원가입 폼의 공통 입력. 계정 유형 선택과 제출은 호출부가 한다. */
@@ -93,7 +100,6 @@ test.describe('회원가입', () => {
     await firstClient.click();
 
     await page.click('button[type="submit"]');
-    registeredEmails.push(email);
 
     // 안내 문구가 계약이다. CLIENT 는 "고객사 관리자 승인" 을 안내받아야 한다
     // (register/actions.ts:123). 이게 사라지면 사용자는 왜 데이터가 안 보이는지 알 수 없다.
@@ -128,7 +134,6 @@ test.describe('회원가입', () => {
     await expect(page.getByText(/관리자 승인/).first()).toBeVisible();
 
     await page.click('button[type="submit"]');
-    registeredEmails.push(email);
 
     await expect(page.getByText('관리자 승인 후 사용 가능합니다.')).toBeVisible({ timeout: 15000 });
     await page.waitForURL('/login', { timeout: 20000 });

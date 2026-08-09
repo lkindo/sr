@@ -192,7 +192,12 @@ export default defineConfig({
       // 주의: 그 폴백은 ADMIN 세션이므로, test.use 를 빠뜨린 MANAGER/CLIENT_ADMIN 스펙은
       //       "권한이 있다"는 쪽으로 조용히 통과할 수 있다. 스펙은 반드시
       //       PERSONA_AUTH_FILES.manager / .clientAdmin 를 명시할 것.
-      dependencies: ['setup', 'role-persona-setup'],
+      //
+      // multi-user-setup 도 의존한다: e2e/roles/ 에는 MANAGER/CLIENT_ADMIN 뿐 아니라
+      // ENGINEER·CLIENT_USER 경계 스펙도 있고, 그 둘의 인증 파일(engineer.json /
+      // client.json)은 role-persona-setup 이 아니라 multi-user-setup 이 만든다.
+      // 빠뜨리면 없거나 만료된 인증 파일로 돌면서 "권한이 없다"는 쪽으로 오통과한다.
+      dependencies: ['setup', 'multi-user-setup', 'role-persona-setup'],
     },
 
     // 권한 테스트 (단독 실행 가능)
