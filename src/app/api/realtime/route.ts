@@ -59,6 +59,18 @@ export async function GET(request: NextRequest) {
     start(controller) {
       let closed = false;
 
+      // 연결 직후 주석 프레임 하나를 즉시 흘린다.
+      //
+      // 아무것도 쓰지 않으면 응답 헤더가 첫 keep-alive(30초)까지 버퍼에 갇힌다.
+      // 실측(프로덕션 빌드): 요청 +296ms → 응답 헤더 +30,372ms. 그동안 EventSource 는
+      // onopen 을 못 받으므로 use-realtime-status.ts 의 연결 표시가 30초 늦게 켜지고,
+      // 테스트가 응답을 기다리면 매번 30초를 태운다. 이벤트 전달 자체는 정상이었다 —
+      // 첫 이벤트가 헤더를 함께 밀어냈기 때문에 증상이 '느린 연결 표시' 로만 보였다.
+      //
+      // `:` 로 시작하는 줄은 SSE 주석이라 클라이언트가 이벤트로 해석하지 않는다.
+      // retry 를 함께 지정해 재연결 간격도 명시한다.
+      controller.enqueue(encoder.encode(': connected\n\nretry: 3000\n\n'));
+
       const send = (eventName: string, data: any) => {
         if (closed || !canReceive(data)) return;
         try {

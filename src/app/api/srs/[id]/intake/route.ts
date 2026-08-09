@@ -132,6 +132,12 @@ export const POST = withAuthAndRateLimit(
             },
           },
           actualPriority: validated.actualPriority,
+          // `priority` 는 목록·필터·정렬이 쓰는 **실효 우선순위**다
+          // (schema.prisma 의 @@index([status, priority, createdAt])).
+          // 생성 시 requestedPriority 로 한 번 세팅된 뒤 접수에서 갱신되지 않아,
+          // 접수자가 LOW → CRITICAL 로 올려도 목록은 계속 '낮음' 으로 보이고
+          // '긴급' 필터에도 잡히지 않았다. 접수가 정한 값을 실효값으로 승격한다.
+          priority: validated.actualPriority,
           estimatedHours: validated.estimatedHours,
           estimatedCompletionDate: new Date(validated.estimatedCompletionDate),
           dueDate: dueDate,
@@ -411,6 +417,9 @@ export const PATCH = withAuthAndRateLimit(
     const updateData: Prisma.SRUncheckedUpdateInput = {};
     if (validated.actualPriority !== undefined) {
       updateData.actualPriority = validated.actualPriority;
+      // POST(접수)와 같은 이유로 실효 우선순위도 함께 옮긴다. 여기만 빠뜨리면
+      // 에스컬레이션(접수 정보 수정)이 목록에 반영되지 않는 원래 증상이 그대로 남는다.
+      updateData.priority = validated.actualPriority;
     }
     if (validated.estimatedHours !== undefined) {
       updateData.estimatedHours = validated.estimatedHours;

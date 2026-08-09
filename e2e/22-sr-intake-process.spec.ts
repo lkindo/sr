@@ -330,21 +330,33 @@ test.describe('SR 접수 권한 테스트', () => {
   });
 
   /**
-   * 접수 **페이지** 자체는 아직 역할로 막혀 있지 않다.
-   * src/app/(dashboard)/srs/[id]/intake/page.tsx 는 useIntakeForm 이 돌려주는 sr 유무만
-   * 보고 렌더하고, 그 데이터를 주는 GET /api/srs/[id]/intake 는 ensureCanReadSR 만 건다
-   * (읽기 권한은 자기 SR 이면 CLIENT 에게도 있다). src/proxy.ts 도 인증 여부만 본다.
-   * 따라서 CLIENT 가 URL 을 직접 치면 '접수 처리' 폼이 그려진다 — 저장은 위 테스트가
-   * 확인하듯 403 이므로 데이터가 새지는 않지만, 화면은 막혀 있어야 옳다.
-   * 라우트 가드가 생기면 이 fixme 를 풀 것.
+   * 회귀 가드 — 접수 페이지에 역할 가드가 **없었다.**
+   *
+   * 예전에는 useIntakeForm 이 돌려주는 sr 유무만 보고 렌더했고, 그 데이터를 주는
+   * GET /api/srs/[id]/intake 는 ensureCanReadSR 만 건다(자기 SR 이면 CLIENT 도 읽을 수 있다).
+   * src/proxy.ts 도 인증 여부만 본다. 그래서 CLIENT 가 URL 을 직접 치면 '접수 처리' 폼이
+   * 우선순위·담당자 콤보박스와 저장 버튼까지 그대로 그려졌다. 저장은 위 테스트가 확인하듯
+   * 403 이라 데이터가 새지는 않았지만, 누를 수 있는 척하는 화면을 보여 주는 것 자체가 결함이고
+   * 방어가 한 겹뿐이라는 뜻이기도 했다.
+   *
+   * 이제 페이지가 역할을 먼저 확인한다(src/app/(dashboard)/srs/[id]/intake/page.tsx).
    */
-  test.fixme('CLIENT의 접수 페이지 직접 접근은 차단되어야 한다', async ({ browser }) => {
+  test('CLIENT 에게는 접수 페이지가 열리지 않는다', async ({ browser }) => {
     const context = await browser.newContext({ storageState: CLIENT_AUTH });
     const page = await context.newPage();
 
     try {
       await page.goto(`/srs/${sr.id}/intake`, { waitUntil: 'domcontentloaded' });
-      await expect(page).not.toHaveURL(/\/intake$/);
+
+      // 권한 안내가 보여야 한다 — 조용히 빈 화면을 주면 사용자는 로딩 실패와 구분할 수 없다.
+      await expect(page.getByText('SR 접수 처리 권한이 없습니다.')).toBeVisible({
+        timeout: 20000,
+      });
+
+      // 화면이 렌더된 것을 확정한 뒤에 폼의 부재를 확인해야 의미가 있다.
+      await expect(page.getByRole('heading', { name: /SR 접수/ })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: '저장' })).toHaveCount(0);
+      await expect(page.getByRole('combobox', { name: /담당자/ })).toHaveCount(0);
     } finally {
       await context.close();
     }
