@@ -15,6 +15,8 @@ import { RoleItem as Role } from '@/types/role';
 export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
+  /** 접근이 거부됐는가. 빈 목록과 구분해서 보여 주기 위한 상태다. */
+  const [accessDenied, setAccessDenied] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
@@ -25,7 +27,15 @@ export default function RolesPage() {
     setLoading(true);
     try {
       const response = await fetch('/api/roles');
+      if (response.status === 403) {
+        // 403 을 토스트로만 알리고 목록을 비우면 화면은 '등록된 역할이 없습니다.' 가 된다.
+        // 그건 "권한 없음" 과 "데이터 없음" 을 구분할 수 없게 만드는 거짓말이다.
+        setAccessDenied(true);
+        setRoles([]);
+        return;
+      }
       if (!response.ok) throw new Error('Failed to fetch roles');
+      setAccessDenied(false);
       const data: Role[] = await response.json();
       // 권한 데이터가 없는 경우 빈 배열로 초기화
       const rolesWithPermissions = data.map((role) => ({
@@ -87,6 +97,26 @@ export default function RolesPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-muted-foreground">로딩 중...</p>
+      </div>
+    );
+  }
+
+  // 권한이 없으면 "역할이 없다" 로 위장하지 않고 그렇다고 말한다.
+  // 메뉴는 ROLE:READ 로 게이트되지만(config/navigation.ts) URL 직접 접근은 남는다.
+  if (accessDenied) {
+    return (
+      <div className="space-y-6">
+        <div className="sr-card-template">
+          <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">역할 목록</h3>
+          </div>
+          <div className="flex flex-col items-center justify-center gap-2 py-16">
+            <p className="text-muted-foreground">역할 목록을 볼 권한이 없습니다.</p>
+            <p className="text-sm text-muted-foreground">
+              필요하면 시스템 관리자에게 권한을 요청하세요.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

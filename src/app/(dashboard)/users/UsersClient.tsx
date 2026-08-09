@@ -13,6 +13,7 @@ import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { UserDialog } from '@/components/users/UserDialog';
 import { UserMobileList } from '@/components/users/UserMobileList';
 import { UserTable } from '@/components/users/UserTable';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import type { ClientSummary } from '@/types/client.types';
@@ -31,17 +32,45 @@ export default function UsersClient() {
   // useSession 호출은 유지하되 미사용 리턴값 제거
   useSession();
   const { toast } = useToast();
+  const { hasPermission, isAdmin } = usePermissions();
+
+  // 서버(src/lib/policies.ts 의 canCreateUser)와 같은 규칙이다: ADMIN 이거나 USER:CREATE.
+  const canCreateUser = isAdmin() || hasPermission('USER', 'CREATE');
 
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [roles, setRoles] = useState<AssignableRole[]>([]);
   const [loading, setLoading] = useState(true);
-  // error 상태 제거 (사용되지 않음)
+  /**
+   * 접근이 거부됐는가.
+   *
+   * 예전에는 실패를 logger.error 로만 남기고 users 를 빈 배열로 두었다. 그러면 화면이
+   * '등록된 사용자가 없습니다.' 를 보여 주는데, 이건 **거짓말**이다 — 사용자는 "권한이
+   * 없다" 와 "데이터가 없다" 를 구분할 수 없다. ENGINEER 가 정확히 그 상태였다
+   * (메뉴는 보이는데 GET /api/users 는 403).
+   */
+  const [accessDenied, setAccessDenied] = useState(false);
 
-  // URL 파라미터에서 초기 상태값 읽기
-  const initialPage = Number(searchParams.get('page')) || 1;
-  const initialQ = searchParams.get('q') || '';
-  const initialIsActive = searchParams.get('isActive') || 'true';
+  /**
+   * **URL 이 조회 조건의 단일 진실이다.**
+   *
+   * 예전에는 목록을 두 경로가 각각 가져왔다: (1) 입력 onChange → searchQuery 상태 →
+   * fetchUsers 의 의존성, (2) 제출/필터 → updateUrl → router.push → searchParams 효과.
+   * 두 응답이 경합해 늦게 도착한 쪽이 상태를 덮었고, E2E 에서 '검색했는데 대상 행이
+   * 나타나지 않음' 이 4회 중 1회 재현됐다. 취소(AbortController)를 덧대는 것보다
+   * 중복 경로를 없애는 편이 낫다 — SRsDataTable 이 이미 그 방식이다(검색·필터·정렬·
+   * 페이지 전부 URL). 부수 효과로 검색 결과가 공유·북마크 가능해진다.
+   *
+   * 아래 applied* 는 URL 에서 파생한 "지금 적용된" 조건이고, searchQuery 는 입력창의
+   * 로컬 값일 뿐이다(디바운스 후 URL 로 반영된다).
+   */
+  const appliedPage = Number(searchParams.get('page')) || 1;
+  const appliedQ = searchParams.get('q') || '';
+  const appliedIsActive = searchParams.get('isActive') || 'true';
+
+  const initialPage = appliedPage;
+  const initialQ = appliedQ;
+  const initialIsActive = appliedIsActive;
 
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: initialPage,
@@ -93,10 +122,11 @@ export default function UsersClient() {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: pagination.currentPage.toString(),
+        page: appliedPage.toString(),
         pageSize: pagination.pageSize.toString(),
-        search: searchQuery,
-        isActive: statusFilter,
+        // 입력 상태(searchQuery)가 아니라 URL 파생값을 쓴다 — 이게 경로를 하나로 만드는 핵심이다.
+        search: appliedQ,
+        isActive: appliedIsActive,
       });
 
       const url = `/api/users?${params}`;
@@ -111,8 +141,14 @@ export default function UsersClient() {
           errorData = 'Failed to read error body';
         }
         logger.error('사용자 목록 조회 실패', undefined, { status: response.status, errorData });
+        if (response.status === 403) {
+          setAccessDenied(true);
+          setUsers([]);
+          return;
+        }
         throw new Error(`Failed to fetch users: ${response.status}`);
       }
+      setAccessDenied(false);
 
       const result = await response.json();
 
@@ -132,7 +168,7 @@ export default function UsersClient() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.currentPage, pagination.pageSize, searchQuery, statusFilter]);
+  }, [appliedPage, appliedQ, appliedIsActive, pagination.pageSize]);
 
   // 메타데이터(고객사, 역할) 로딩
   const fetchMetadata = useCallback(async () => {
@@ -165,13 +201,24 @@ export default function UsersClient() {
     fetchUsers();
   }, [fetchUsers]);
 
+  // 입력 → URL (디바운스). 조회는 URL 변화가 유발하므로 여기서 fetch 하지 않는다.
+  // 값이 이미 URL 과 같으면 아무것도 하지 않는다 — 뒤로가기로 URL 이 바뀌어 입력이
+  // 동기화된 직후 그 값을 다시 push 해 히스토리를 오염시키는 것을 막는다.
+  useEffect(() => {
+    if (searchQuery === appliedQ) return;
+    const timer = setTimeout(() => {
+      updateUrl(1, searchQuery, statusFilter);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, appliedQ, statusFilter, updateUrl]);
+
   useEffect(() => {
     fetchMetadata();
   }, [fetchMetadata]);
 
+  // 제출은 디바운스를 기다리지 않고 즉시 URL 에 반영한다. 조회는 여전히 URL 이 유발한다.
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setPagination((prev) => ({ ...prev, currentPage: 1 }));
     updateUrl(1, searchQuery, statusFilter);
   };
 
@@ -258,6 +305,29 @@ export default function UsersClient() {
     setIsDeleteDialogOpen(false);
     setUserToDelete(null);
   };
+
+  // 권한이 없으면 "데이터가 없다" 로 위장하지 않고 그렇다고 말한다.
+  // 메뉴는 permission 으로 게이트되지만(config/navigation.ts) URL 직접 접근은 남는다.
+  if (accessDenied) {
+    return (
+      <div className="space-y-6">
+        <div className="sr-card-template">
+          <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
+            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+              사용자 목록
+            </h3>
+          </div>
+          <div className="flex flex-col items-center justify-center gap-2 py-16">
+            <p className="text-muted-foreground">사용자 목록을 볼 권한이 없습니다.</p>
+            <p className="text-sm text-muted-foreground">
+              필요하면 시스템 관리자에게 권한을 요청하세요.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="sr-card-template">
@@ -361,10 +431,17 @@ export default function UsersClient() {
                     </div>
                   );
                 })()}
-              <Button onClick={handleCreateUser} className="sr-btn-template-primary">
-                <Plus className="mr-2 h-4 w-4" />
-                사용자 등록
-              </Button>
+              {/*
+                권한 게이트가 없어 CLIENT_USER·ENGINEER 에게도 버튼이 보였다. 서버가 POST 를
+                403 으로 막으므로 데이터가 새지는 않았지만, 누르면 반드시 실패하는 버튼이다.
+                서버와 **같은 규칙**(USER:CREATE, ADMIN 은 우회)으로 판정한다.
+              */}
+              {canCreateUser && (
+                <Button onClick={handleCreateUser} className="sr-btn-template-primary">
+                  <Plus className="mr-2 h-4 w-4" />
+                  사용자 등록
+                </Button>
+              )}
             </div>
           </div>
 

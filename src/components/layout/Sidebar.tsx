@@ -5,7 +5,14 @@ import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui';
-import { NAVIGATION_CONFIG, type NavSection, type NavSubItem } from '@/config/navigation';
+import {
+  canAccessNavSubItem,
+  canAccessTopNavItem,
+  NAVIGATION_CONFIG,
+  type NavSection,
+  type NavSubItem,
+  type NavViewer,
+} from '@/config/navigation';
 import { usePermissions } from '@/hooks/use-permissions';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +23,7 @@ interface SidebarProps {
 
 export function Sidebar({ isMobile = false, showAllSections = false }: SidebarProps) {
   const pathname = usePathname();
-  const { hasPermission, hasRole, hasAnyRole } = usePermissions();
+  const { roles, permissions } = usePermissions();
 
   // 현재 활성 메뉴 판단
   const getActiveTopMenu = () => {
@@ -31,25 +38,12 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
 
   const activeTopMenu = getActiveTopMenu();
 
-  const canAccessItem = (item: NavSubItem): boolean => {
-    if (item.role) {
-      return hasRole(item.role);
-    }
-    if (item.roles && item.roles.length > 0) {
-      return hasAnyRole(item.roles);
-    }
-    if (item.permission) {
-      return hasPermission(item.permission.resource, item.permission.action);
-    }
-    return true;
-  };
-
-  const canAccessTopItem = (item: (typeof NAVIGATION_CONFIG)[0]): boolean => {
-    if (item.roles && item.roles.length > 0) {
-      return hasAnyRole(item.roles);
-    }
-    return true;
-  };
+  // 판정은 Header 와 **같은 함수**로 한다. 예전에는 두 컴포넌트가 각자 필터를 들고 있어서
+  // 상위 메뉴는 보이는데 사이드바는 비는(또는 그 반대) 상태가 가능했다.
+  const viewer: NavViewer = { roles, permissions };
+  const canAccessItem = (item: NavSubItem): boolean => canAccessNavSubItem(item, viewer);
+  const canAccessTopItem = (item: (typeof NAVIGATION_CONFIG)[0]): boolean =>
+    canAccessTopNavItem(item, viewer);
 
   // 섹션별 기본 열림 상태 (활성 메뉴가 있는 섹션은 열림)
   const getDefaultOpen = (section: NavSection) => {

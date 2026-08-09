@@ -18,7 +18,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui';
-import { NAVIGATION_CONFIG } from '@/config/navigation';
+import { canAccessTopNavItem, NAVIGATION_CONFIG } from '@/config/navigation';
 import { cn } from '@/lib/utils';
 
 const UserNav = dynamic(() => import('./UserNav').then((mod) => ({ default: mod.UserNav })), {
@@ -108,18 +108,17 @@ export function Header({ user: initialUser }: HeaderProps) {
         {/* 메뉴 및 사용자 정보 영역 */}
         <div className="flex items-center justify-end md:justify-between px-4 md:px-8 flex-1 md:flex-[1]">
           <nav aria-label="주 메뉴" className="hidden md:flex items-center gap-1">
-            {NAVIGATION_CONFIG.filter((item) => {
-              if (item.roles && item.roles.length > 0) {
-                // 위에서 서버 props 와 병합해 둔 `user` 를 쓴다.
-                // 예전에는 `hasAnyRole()` 을 직접 불렀는데, 그 훅은 클라이언트 세션만 보므로
-                // 세션이 도착하기 전에는 서버가 이미 알고 있는 역할을 무시하고 false 를
-                // 돌려줬다. 그래서 ADMIN 으로 로그인해도 '조직 관리'·'권한 관리' 가
-                // 사라졌다가 뒤늦게 나타났고, 세션 요청이 실패하면 영영 안 나타났다.
-                const currentRoles = user?.roles ?? [];
-                return item.roles.some((role) => currentRoles.includes(role));
-              }
-              return true;
-            }).map((item) => (
+            {/*
+              위에서 서버 props 와 병합해 둔 `user` 를 넘긴다.
+              예전에는 `hasAnyRole()` 을 직접 불렀는데, 그 훅은 클라이언트 세션만 보므로
+              세션이 도착하기 전에는 서버가 이미 알고 있는 역할을 무시하고 false 를
+              돌려줬다. 그래서 ADMIN 으로 로그인해도 '조직 관리'·'권한 관리' 가
+              사라졌다가 뒤늦게 나타났고, 세션 요청이 실패하면 영영 안 나타났다.
+
+              판정 자체는 Sidebar 와 **같은 함수**를 쓴다. 예전에는 두 컴포넌트가 각자
+              필터를 들고 있어서 서로 다른 메뉴를 그릴 수 있었다.
+            */}
+            {NAVIGATION_CONFIG.filter((item) => canAccessTopNavItem(item, user)).map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

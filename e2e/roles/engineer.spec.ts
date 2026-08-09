@@ -331,7 +331,20 @@ test.describe('ENGINEER: 관리 카탈로그 차단 (음성)', () => {
  * 기대 동작은 test.fixme 로 따로 적어 둔다.
  */
 test.describe('ENGINEER: 네비게이션 계약과 그 화면의 실제 모습', () => {
-  test('조직 관리·권한 관리 메뉴가 보이고 클릭으로 실제 페이지에 도달한다', async ({ page }) => {
+  /**
+   * 메뉴는 이제 **하위 항목의 permission** 으로 판정된다(src/config/navigation.ts).
+   *
+   * 예전에는 상위·하위 모두 `roles: ['ADMIN','MANAGER','ENGINEER']` 였고, 그래서
+   * ENGINEER 에게 '권한 관리' 가 보이는데 그 화면의 GET /api/roles 는 403 이었다.
+   * 눌러도 아무 데도 갈 수 없는 메뉴였다.
+   *
+   * 지금 계약:
+   *  - 상위 roles 는 **내부/외부 경계**만 본다 (CLIENT_ADMIN 도 USER:READ·CLIENT:READ 를
+   *    갖지만 내부 운영 메뉴에 들어와서는 안 되므로 권한만으로는 게이트할 수 없다).
+   *  - 하위는 permission 으로 판정한다. 하위가 전부 막히면 상위도 자동으로 감춰진다.
+   * ENGINEER 기준 실측: CLIENT:READ 있음 / USER:READ 없음 / ROLE:READ 없음.
+   */
+  test('실제로 쓸 수 있는 메뉴만 보인다', async ({ page }) => {
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
     const nav = mainNav(page);
@@ -340,16 +353,21 @@ test.describe('ENGINEER: 네비게이션 계약과 그 화면의 실제 모습',
       .map((text) => text.trim())
       .filter(Boolean);
 
-    // navigation.ts 의 roles 계약. ENGINEER 가 여기서 빠지면 조직/권한 화면으로 가는 문이 사라진다.
-    expect(labels).toEqual(
-      expect.arrayContaining(['Dashboard', 'SR 관리', '조직 관리', '권한 관리'])
-    );
+    // '조직 관리' 는 남는다 — 하위의 조직 구조·고객사 목록이 CLIENT:READ 로 실제 동작한다.
+    expect(labels).toEqual(expect.arrayContaining(['Dashboard', 'SR 관리', '조직 관리']));
 
+    // '권한 관리' 는 사라진다 — 하위가 '역할 관리'(ROLE:READ) 하나뿐이고 ENGINEER 에게 없다.
+    expect(
+      labels,
+      'ENGINEER 에게 권한 관리 메뉴가 보입니다. 눌러도 403 이라 막다른 길입니다.'
+    ).not.toContain('권한 관리');
+
+    // 메뉴가 존재하는 것과 실제로 데려다주는 것은 다른 문제다.
     await nav.getByRole('link', { name: '조직 관리' }).click();
     await expect(page).toHaveURL(/\/organization/);
   });
 
-  test('사용자 목록 화면은 403 을 "등록된 사용자가 없습니다" 로 표시한다', async ({ page }) => {
+  test('사용자 목록 화면은 403 을 "권한 없음" 으로 알린다', async ({ page }) => {
     const usersResponse = page.waitForResponse(
       (response) => response.url().includes('/api/users') && response.request().method() === 'GET',
       { timeout: 20000 }
@@ -362,25 +380,24 @@ test.describe('ENGINEER: 네비게이션 계약과 그 화면의 실제 모습',
       'ENGINEER 에게 /api/users 가 열렸습니다. 위 음성 테스트와 함께 깨진 것입니다.'
     ).toBe(403);
 
-    // (2) 그런데 화면은 정상적으로 렌더된다. 여기서 멈추면 "권한 없음" 안내가 아니라
-    //     빈 목록이 보인다 — UsersClient.tsx 의 fetchUsers catch 절이 logger.error 만
-    //     남기고 users 를 [] 로 둔 채 끝나기 때문이다(토스트조차 없다).
+    // (2) 화면은 "권한이 없다" 고 말해야 한다.
+    //     예전에는 빈 목록('등록된 사용자가 없습니다.')으로 위장했고, 그러면 사용자는
+    //     "권한 없음" 과 "데이터 없음" 을 구분할 수 없다.
     await expect(page.getByRole('heading', { name: '사용자 목록', exact: true })).toBeVisible({
       timeout: 20000,
     });
-    // 같은 문구가 데스크톱 테이블(td)과 모바일 카드(p) 양쪽에 있으므로 셀로 범위를 좁힌다.
+    await expect(page.getByText('사용자 목록을 볼 권한이 없습니다.')).toBeVisible();
     await expect(
-      page.getByRole('cell', { name: /등록된 사용자가 없습니다/ }),
-      '403 화면의 안내 문구가 바뀌었습니다. 개선(권한 안내 추가)이라면 이 테스트를 갱신하세요.'
-    ).toBeVisible();
+      page.getByText(/등록된 사용자가 없습니다/),
+      '권한 없음 화면에서 빈 목록 문구가 함께 보입니다 — 두 상태가 다시 섞였습니다.'
+    ).toHaveCount(0);
 
     // (3) 사용자 데이터는 한 줄도 그려지면 안 된다 — 403 인데 목록이 채워지면 그게 유출이다.
-    //     시드 계정 이메일을 앵커로 쓴다(prisma/seed.ts 의 admin/engineer/client 계정).
     await expect(page.getByText(ENGINEER_EMAIL, { exact: true })).toHaveCount(0);
     await expect(page.getByText('admin@example.com', { exact: true })).toHaveCount(0);
   });
 
-  test('역할 목록 화면은 403 을 "등록된 역할이 없습니다" 로 표시한다', async ({ page }) => {
+  test('역할 목록 화면은 403 을 "권한 없음" 으로 알린다', async ({ page }) => {
     const rolesResponse = page.waitForResponse(
       (response) => response.url().includes('/api/roles') && response.request().method() === 'GET',
       { timeout: 20000 }
@@ -389,31 +406,20 @@ test.describe('ENGINEER: 네비게이션 계약과 그 화면의 실제 모습',
 
     expect((await rolesResponse).status(), 'ENGINEER 에게 /api/roles 가 열렸습니다.').toBe(403);
 
-    // roles/page.tsx 는 실패 시 토스트를 띄우지만 roles 는 [] 로 남아 목록은 "비어 있음"이 된다.
     await expect(page.getByRole('heading', { name: '역할 목록', exact: true })).toBeVisible({
       timeout: 20000,
     });
-    // 같은 문구가 데스크톱 테이블(td)과 모바일 카드(p) 양쪽에 있으므로 셀로 범위를 좁힌다.
-    await expect(page.getByRole('cell', { name: /등록된 역할이 없습니다/ })).toBeVisible();
+    await expect(page.getByText('역할 목록을 볼 권한이 없습니다.')).toBeVisible();
+    await expect(page.getByText(/등록된 역할이 없습니다/)).toHaveCount(0);
   });
 
-  /**
-   * 기대 동작이 확정되지 않아 fixme 로 둔다.
-   *
-   * 근거(앱 코드):
-   *  - src/config/navigation.ts:70,101 이 '조직 관리'·'권한 관리' 를 ENGINEER 에게 노출한다.
-   *  - 그 화면이 부르는 src/app/api/users/route.ts · src/app/api/roles/route.ts 는
-   *    ENGINEER 를 403 으로 막는다(USER:READ / ROLE:READ 없음).
-   *  - src/app/(dashboard)/users/UsersClient.tsx:127-134 의 catch 는 logger.error 만 하고
-   *    사용자에게 아무것도 알리지 않는다. src/app/(dashboard)/roles/page.tsx:36-44 는
-   *    토스트를 띄우지만 목록은 여전히 "등록된 역할이 없습니다."로 남는다.
-   *
-   * 그 결과 "권한이 없다"와 "데이터가 없다"가 화면에서 구분되지 않는다.
-   * 어느 쪽으로 고칠지(메뉴에서 제외 / 화면에 권한 안내 표시 / API 를 열기)는 제품 결정이라
-   * 여기서 임의로 단언하지 않는다. 결정되면 아래 본문을 그 계약으로 바꾸면 된다.
-   */
-  test.fixme('권한 없는 화면은 빈 목록이 아니라 접근 불가를 알린다', async ({ page }) => {
+  test('권한 없는 화면에는 등록 버튼도 보이지 않는다', async ({ page }) => {
+    // 서버가 POST 를 403 으로 막으므로 데이터가 새지는 않았지만, 누르면 반드시 실패하는
+    // 버튼을 보여 주는 것은 결함이다. 서버와 같은 규칙(USER:CREATE)으로 감춘다.
     await page.goto('/users', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByText(/권한이 없습니다/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: '사용자 목록', exact: true })).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByRole('button', { name: '사용자 등록' })).toHaveCount(0);
   });
 });

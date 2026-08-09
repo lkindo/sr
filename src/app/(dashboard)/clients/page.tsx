@@ -9,6 +9,7 @@ import { ClientTable } from '@/components/clients/ClientTable';
 import { ClientUsersSheet } from '@/components/clients/ClientUsersSheet';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 
 interface Client {
@@ -33,6 +34,11 @@ interface PaginationMeta {
 }
 
 export default function ClientsPage() {
+  const { hasPermission, isAdmin } = usePermissions();
+
+  // 서버(src/lib/policies.ts 의 canCreateClient)와 같은 규칙이다: ADMIN 이거나 CLIENT:CREATE.
+  const canCreateClient = isAdmin() || hasPermission('CLIENT', 'CREATE');
+
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -162,10 +168,13 @@ export default function ClientsPage() {
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
               고객사 목록
             </h3>
-            <Button onClick={handleCreateClient} className="sr-btn-template-primary">
-              <Plus className="mr-2 h-4 w-4" />
-              등록
-            </Button>
+            {/* 위 사용자 등록 버튼과 같은 이유 — 서버와 같은 규칙(CLIENT:CREATE)으로 판정한다. */}
+            {canCreateClient && (
+              <Button onClick={handleCreateClient} className="sr-btn-template-primary">
+                <Plus className="mr-2 h-4 w-4" />
+                등록
+              </Button>
+            )}
           </div>
 
           {/* 검색 및 필터 영역 - 데스크톱/모바일 최적화 */}
