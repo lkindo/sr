@@ -115,6 +115,11 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
   /** TEST002(타 테넌트)에 실재하는 SR. 음성 테스트가 공허해지지 않도록 반드시 존재시킨다. */
   let otherTenantSrId: string;
   let otherTenantSrNumber: string;
+  /**
+   * 이 스펙이 **직접 만든** 경우에만 true. 기존 SR 을 재사용했다면 지우면 안 된다 —
+   * 남의 데이터를 치우는 것이 되고, 다음 실행의 전제를 오히려 무너뜨린다.
+   */
+  let createdOtherTenantSr = false;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(180_000);
@@ -233,12 +238,21 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
       const createdSr = (await createResponse.json()) as SrListItem;
       otherTenantSrId = createdSr.id;
       otherTenantSrNumber = createdSr.srNumber;
+      createdOtherTenantSr = true;
     }
 
     expect(otherTenantSrId, '타 테넌트 SR 픽스처를 확보하지 못했습니다.').toBeTruthy();
   });
 
   test.afterAll(async () => {
+    // 정리가 없던 동안 '타 테넌트 격리 검증용 SR' 이 매 실행 쌓였다. 다음 실행은 그것을
+    // 재사용하므로 증상이 드러나지 않았을 뿐, TEST002 의 SR 이 계속 늘고 있었다.
+    if (managerContext && createdOtherTenantSr && otherTenantSrId) {
+      const response = await managerRequest.delete(`/api/srs/${otherTenantSrId}`);
+      if (!response.ok()) {
+        console.warn(`타 테넌트 SR 정리 실패: ${otherTenantSrId} → ${response.status()}`);
+      }
+    }
     if (managerContext) {
       await managerContext.close();
     }

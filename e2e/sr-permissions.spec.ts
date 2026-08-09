@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 
 import prisma from '../src/lib/prisma';
 
-import { apiRequestWithRateLimitRetry, createTestSR } from './helpers/test-helpers';
+import { deleteSeededSRs, seedSR } from './fixtures/sr';
+import { apiRequestWithRateLimitRetry } from './helpers/test-helpers';
 
 // 이 테스트는 setup 프로젝트에서 생성한 인증 상태를 사용합니다
 // playwright.config.ts에서 storageState가 설정되어 있어야 합니다
@@ -12,19 +13,22 @@ let srId: string; // 모든 describe 블록에서 공유하기 위해 상위 스
 
 test.describe('SR 권한 및 접수 기능 테스트', () => {
   test.beforeAll(async ({ browser }) => {
-    // 테스트용 SR 생성 (Manager 권한 필요)
-    // 생성이 실패하면 이후 권한 검증이 전부 무의미하므로 예외를 삼키지 않고 그대로 터뜨린다.
-    // (예전에는 try/catch 로 삼킨 뒤 test.skip 으로 넘어가서, SR 생성이 깨져도 조용히 통과했다.)
-    const page = await browser.newPage({ storageState: './playwright/.auth/manager.json' });
-    try {
-      srId = await createTestSR(page, {
-        title: `권한 테스트용 SR ${Date.now()}`,
-        description: '권한 및 접수 기능 테스트를 위한 자동 생성 SR입니다.',
-      });
-    } finally {
-      await page.close();
-    }
+    // 준비용 SR 은 UI 가 아니라 API 로 만든다. 이 파일이 검증하는 것은 권한이지
+    // 등록 다이얼로그가 아니다(그건 04-sr-create 소관). 생성이 실패하면 이후 권한 검증이
+    // 전부 무의미하므로 픽스처가 즉시 크게 실패한다.
+    const seeded = await seedSR(browser, {
+      title: `권한 테스트용 SR ${Date.now()}`,
+      description: '권한 및 접수 기능 테스트를 위한 자동 생성 SR입니다.',
+    });
+    srId = seeded.id;
     expect(srId, '권한 테스트용 SR 생성에 실패했습니다.').toBeTruthy();
+  });
+
+  // 공유 DB 라 정리하지 않으면 '권한 테스트용 SR' 이 매 실행 쌓인다. 실제로 그렇게 쌓여
+  // /srs 목록의 행 수·페이지 수가 달라졌고, 30-accessibility 가 '기한 초과 배지' 때문에
+  // 실패하는 원인이 되었다.
+  test.afterAll(async ({ browser }) => {
+    await deleteSeededSRs(browser, [srId]);
   });
 
   test('SR 목록 페이지 접근 및 기본 UI 확인', async ({ page }) => {
@@ -96,15 +100,18 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
     await expect(page.getByRole('combobox', { name: '담당자 *' })).toBeVisible();
   });
 
-  test('SR 삭제 권한 확인 및 Audit Log 적재 검증 (ADMIN)', async ({ page }) => {
+  test('SR 삭제 권한 확인 및 Audit Log 적재 검증 (ADMIN)', async ({ browser, page }) => {
     test.setTimeout(120_000);
 
     // 이 테스트는 대상 SR을 파괴하므로 공용 srId 를 쓰지 않고 전용 SR을 새로 만든다.
     // (fullyParallel 환경에서 같은 워커의 다른 테스트가 삭제된 SR을 참조하는 것을 막는다.)
-    const targetSrId = await createTestSR(page, {
-      title: `삭제 검증용 SR ${Date.now()}`,
-      description: '삭제 권한 및 감사 로그 검증을 위한 자동 생성 SR입니다.',
-    });
+    // 삭제 자체가 검증 대상이므로 별도 정리는 필요 없다 — 테스트가 끝나면 SR 은 이미 없다.
+    const targetSrId = (
+      await seedSR(browser, {
+        title: `삭제 검증용 SR ${Date.now()}`,
+        description: '삭제 권한 및 감사 로그 검증을 위한 자동 생성 SR입니다.',
+      })
+    ).id;
 
     await page.goto(`/srs/${targetSrId}`);
 

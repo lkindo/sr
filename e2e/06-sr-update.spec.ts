@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { createTestSR } from './helpers/test-helpers';
+import { deleteSeededSRs, seedSR } from './fixtures/sr';
 
 /**
  * SR 수정 플로우 테스트
@@ -10,12 +10,23 @@ test.describe('SR 수정', () => {
   // 레이트 리미트 정책이 로컬 메모리 기반(MemoryRateLimiter)으로 전면 통합되어 쿼터 제한 없이 안전하게 구동됨
   test.use({ storageState: './playwright/.auth/manager.json' });
 
-  test('SR 생성 후 수정 플로우', async ({ page }) => {
-    // 1. 테스트용 SR 생성 (Helper 함수 사용)
-    const srId = await createTestSR(page, {
+  const createdSRIds: string[] = [];
+
+  // 정리가 없던 동안 '수정된 제목 <timestamp>' 가 매 실행 쌓였다. 공유 DB 라
+  // 그 누적이 목록·카운트 단언과 접근성 검사를 흔든다.
+  test.afterAll(async ({ browser }) => {
+    await deleteSeededSRs(browser, createdSRIds);
+  });
+
+  test('SR 수정 플로우', async ({ browser, page }) => {
+    // 준비용 SR 은 API 로 만든다 — 이 파일이 검증하는 것은 수정 다이얼로그이지
+    // 등록 다이얼로그가 아니다(그건 04-sr-create 소관).
+    const seeded = await seedSR(browser, {
       title: `수정 테스트용 SR ${Date.now()}`,
       description: '이 SR은 수정 테스트를 위해 생성되었습니다.',
     });
+    const srId = seeded.id;
+    createdSRIds.push(srId);
 
     // 2. 상세 페이지로 이동
     const detailResponsePromise = page
