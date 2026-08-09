@@ -11,12 +11,6 @@
     "05-sr-detail.spec.ts:SR 탭 네비게이션",
     "08-user-management.spec.ts:사용자 목록 페이지 접근 제한 확인",
     "09-client-management.spec.ts:고객사 목록 페이지 접근 시 본인 고객사만 보이거나 제한됨",
-    "20-notification-system.spec.ts:2. MANAGER: SR 접수 및 담당자 배정 → ENGINEER에게 알림",
-    "20-notification-system.spec.ts:4. ENGINEER: SR 진행 중으로 변경 및 댓글 작성 → CLIENT에게 알림",
-    "20-notification-system.spec.ts:7. MANAGER: 상태 변경 (완료) → CLIENT에게 알림",
-    "20-notification-system.spec.ts:모든 알림 읽음 처리",
-    "20-notification-system.spec.ts:알림 정렬 (최신순)",
-    "20-notification-system.spec.ts:알림 필터링 (읽음/안읽음)",
     "21-sr-status-transitions.spec.ts:7. 잘못된 상태 전이 차단 테스트",
     "21-sr-status-transitions.spec.ts:CONFIRMED → IN_PROGRESS 재오픈 (7일 이내)",
     "21-sr-status-transitions.spec.ts:재오픈 7일 제한 안내 UI 확인",
@@ -29,12 +23,6 @@
       "fixedWaitCalls": 10,
       "fixedWaitMs": 15000
     },
-    "03-sr-list.spec.ts": {
-      "tolerantBranch": 0,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 2,
-      "fixedWaitMs": 3000
-    },
     "04-sr-create.spec.ts": {
       "tolerantBranch": 0,
       "vacuousAssertion": 0,
@@ -46,12 +34,6 @@
       "vacuousAssertion": 0,
       "fixedWaitCalls": 2,
       "fixedWaitMs": 800
-    },
-    "07-sr-filter-search.spec.ts": {
-      "tolerantBranch": 2,
-      "vacuousAssertion": 1,
-      "fixedWaitCalls": 7,
-      "fixedWaitMs": 3500
     },
     "08-user-management.spec.ts": {
       "tolerantBranch": 3,
@@ -77,24 +59,6 @@
       "fixedWaitCalls": 2,
       "fixedWaitMs": 1000
     },
-    "14-dashboard-overview.spec.ts": {
-      "tolerantBranch": 2,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 1,
-      "fixedWaitMs": 500
-    },
-    "15-pagination-sorting.spec.ts": {
-      "tolerantBranch": 1,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 3,
-      "fixedWaitMs": 1300
-    },
-    "16-user-profile-management.spec.ts": {
-      "tolerantBranch": 6,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 0,
-      "fixedWaitMs": 0
-    },
     "17-multi-user-collaboration.spec.ts": {
       "tolerantBranch": 5,
       "vacuousAssertion": 0,
@@ -112,12 +76,6 @@
       "vacuousAssertion": 0,
       "fixedWaitCalls": 15,
       "fixedWaitMs": 17300
-    },
-    "20-notification-system.spec.ts": {
-      "tolerantBranch": 20,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 19,
-      "fixedWaitMs": 20800
     },
     "21-sr-status-transitions.spec.ts": {
       "tolerantBranch": 14,

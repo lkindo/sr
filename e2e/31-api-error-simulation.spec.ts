@@ -43,9 +43,12 @@ test.describe('API 에러 시뮬레이션 및 UI 대응 검증', () => {
       await clientCombobox.click();
       await page.getByRole('option').first().click();
 
-      await expect(page.getByText('서비스 카테고리 목록을 불러오지 못했습니다.')).toBeVisible({
-        timeout: 10000,
-      });
+      // exact 를 붙이는 이유: Radix Toast 는 같은 문구를 스크린리더용
+      // `<span role="status" aria-live="assertive">` 에 한 번 더 심는다. 그쪽 텍스트는
+      // "Notification 오류<본문>" 이라 부분 일치로는 둘 다 걸려 strict mode 위반이 난다.
+      await expect(
+        page.getByText('서비스 카테고리 목록을 불러오지 못했습니다.', { exact: true })
+      ).toBeVisible({ timeout: 10000 });
     });
   });
 
@@ -65,9 +68,9 @@ test.describe('API 에러 시뮬레이션 및 UI 대응 검증', () => {
       // 앱은 그 필드를 읽지 않으므로 나올 수 없는 단언이었다.
       await page.getByRole('button', { name: '저장' }).click();
 
-      await expect(page.getByText('고객사와 카테고리를 모두 선택해주세요.')).toBeVisible({
-        timeout: 10000,
-      });
+      await expect(
+        page.getByText('고객사와 카테고리를 모두 선택해주세요.', { exact: true })
+      ).toBeVisible({ timeout: 10000 });
     });
   });
 });

@@ -153,7 +153,6 @@ export default defineConfig({
         '**/17-*.spec.ts',
         '**/18-*.spec.ts',
         '**/19-*.spec.ts',
-        '**/20-*.spec.ts',
         '**/21-*.spec.ts',
         '**/22-*.spec.ts',
         '**/23-*.spec.ts',
@@ -163,7 +162,11 @@ export default defineConfig({
     // Multi-user 테스트 - multi-user-setup에 의존 (권한별 테스트)
     {
       name: 'multi-user',
-      testMatch: /(08|09|17|18|19|20|21|22|23)-.*\.spec\.ts/,
+      // 20-notification-system 은 삭제했다. 앱에 /notifications 라우트도 알림 벨 UI 도
+      // 없어서(알림은 서버 사이드 outbox/listener 뿐이다) 12개 테스트가 전부
+      // "요소를 못 찾음 → 로그 → 통과" 였다. 알림 회귀는 notification-outbox.test.ts 와
+      // sr-notification.listener.test.ts 가 덮는다.
+      testMatch: /(08|09|17|18|19|21|22|23)-.*\.spec\.ts/,
       // Serial 테스트에서 retry 시 상태 초기화 문제 방지
       retries: 0,
       use: {

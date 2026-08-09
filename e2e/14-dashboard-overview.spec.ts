@@ -1,167 +1,117 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * 대시보드 개요 테스트
- * - 기본 UI 확인
- * - Dashboard 통계 확인
- * - 빠른 액션 동작
+ * 대시보드 — 화면에 그려진 숫자가 API 가 준 숫자와 같은가.
  *
- * ⚠️ networkidle 금지
- * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
- * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
- * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
- * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
- * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
- * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 예전 6개 테스트는 전부 무엇도 지키지 못했다.
+ *  - '대시보드 페이지 접근' / '통계 요소 화면 표시 확인' — `main` 이나 `[class*="card"]` 만
+ *    확인했다. 후자는 Tailwind 유틸리티라 무엇이든 매칭되어 항상 참이었다.
+ *  - 'Dashboard API 응답 검증' — 응답을 못 잡으면 `main` 확인으로 통과했고, 잡아도
+ *    `expect(statsResponse).toBeDefined()` 가 전부였다.
+ *  - '최근 SR 또는 활동 섹션' / '빠른 액션 버튼' — 못 찾으면 로그만 남기고 통과했다.
+ * 라우트가 열리는지는 00-smoke.spec.ts 가 본다. 여기서는 **값의 일치**만 본다.
+ *
+ * ⚠️ networkidle 금지 — 인증된 페이지는 /api/realtime SSE 를 계속 열어 둔다.
  */
 
+interface DashboardStats {
+  summary: {
+    total: number;
+    inProgress: number;
+    completed: number;
+    pending: number;
+    urgent: number;
+  };
+  byStatus: Record<string, number>;
+  recentSRs: Array<{ id: string; srNumber: string; title: string }>;
+}
+
+/** 통계 카드 제목 → 그 카드가 보여 줘야 하는 summary 필드 */
+const STAT_CARDS = [
+  { title: '총 SR', field: 'total' },
+  { title: '진행 중', field: 'inProgress' },
+  { title: '완료', field: 'completed' },
+  { title: '대기 중', field: 'pending' },
+] as const;
+
 test.describe('대시보드', () => {
-  test('대시보드 페이지 접근', async ({ page }) => {
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+  test('통계 카드의 숫자가 API 응답과 일치한다', async ({ page }) => {
+    // 화면과 대조할 기준값을 먼저 API 에서 직접 받는다.
+    // (페이지가 부르는 응답을 가로채지 않는 이유: 그러면 "화면이 그 응답을 실제로
+    //  반영했는가" 가 아니라 "같은 응답을 두 번 봤다" 가 되어 버린다.)
+    const apiResponse = await page.request.get('/api/dashboard/stats');
+    expect(apiResponse.status(), 'GET /api/dashboard/stats').toBe(200);
+    const stats = (await apiResponse.json()) as DashboardStats;
 
-    // 대시보드 콘텐츠가 반드시 보여야 함
-    const dashboardContent = page.locator('main, [role="main"]');
-    await expect(dashboardContent).toBeVisible({ timeout: 10000 });
-    console.log('✅ 대시보드 페이지 접근 성공');
-  });
-
-  test('SR 통계 카드 확인', async ({ page }) => {
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
-
-    // 통계 카드가 반드시 있어야 함
-    const statCards = page.locator('[class*="card"], [class*="Card"]');
-    await expect(statCards.first()).toBeVisible({ timeout: 10000 });
-
-    const cardCount = await statCards.count();
-    expect(cardCount).toBeGreaterThan(0);
-    console.log(`✅ 통계 카드: ${cardCount}개`);
-  });
-
-  test('Dashboard API 응답 검증', async ({ page }) => {
-    // API 응답 캡처를 위한 Promise 설정
-    const statsResponsePromise = page
-      .waitForResponse(
-        (resp) => resp.url().includes('/api/dashboard/stats') || resp.url().includes('/api/srs'),
-        { timeout: 15000 }
-      )
-      .catch(() => null);
+    expect(stats.summary, '응답에 summary 가 없다').toBeTruthy();
+    expect(typeof stats.summary.total, 'summary.total 이 숫자가 아니다').toBe('number');
 
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: '대시보드', exact: true })).toBeVisible({
+      timeout: 20000,
+    });
 
-    // API 응답 대기
-    const response = await statsResponsePromise;
-
-    if (response) {
-      try {
-        const statsResponse = await response.json();
-        console.log('✅ Dashboard API 응답 수신');
-        expect(statsResponse).toBeDefined();
-
-        // 총 SR 수 확인
-        const total =
-          statsResponse.total ?? statsResponse.summary?.total ?? statsResponse.data?.length;
-        if (total !== undefined) {
-          console.log(`✅ 총 SR 개수: ${total}`);
-        }
-
-        // 상태별 통계 확인
-        if (statsResponse.byStatus) {
-          console.log('📊 상태별 SR 분포:', statsResponse.byStatus);
-        }
-      } catch {
-        console.log('ℹ️ API 응답 파싱 불가 - 페이지 로드 확인만 진행');
-      }
-    } else {
-      // API 응답이 없어도 페이지가 정상 로드되면 통과
-      await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
-      console.log('ℹ️ API 응답 캡처 실패 - 페이지 로드 확인됨');
+    for (const { title, field } of STAT_CARDS) {
+      // 카드 제목과 숫자는 같은 Card 안에 있다. 제목으로 카드를 특정한 뒤
+      // 그 안에서 숫자를 읽어야 다른 카드의 숫자를 잘못 집지 않는다.
+      const card = page.locator('.sr-card').filter({ hasText: title }).first();
+      await expect(card, `'${title}' 카드가 없다`).toBeVisible({ timeout: 15000 });
+      await expect(
+        card,
+        `'${title}' 카드가 API 값(${stats.summary[field]})과 다른 숫자를 보여 준다`
+      ).toContainText(String(stats.summary[field]));
     }
   });
 
-  test('통계 요소 화면 표시 확인', async ({ page }) => {
+  test('최근 SR 활동 섹션이 API 의 recentSRs 를 그대로 보여 준다', async ({ page }) => {
+    const apiResponse = await page.request.get('/api/dashboard/stats');
+    expect(apiResponse.status()).toBe(200);
+    const stats = (await apiResponse.json()) as DashboardStats;
+
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
-    // 대시보드 메인 콘텐츠 확인
-    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
+    const section = page.locator('.sr-card').filter({ hasText: '최근 SR 활동' }).first();
+    await expect(section).toBeVisible({ timeout: 20000 });
 
-    // 통계 관련 요소 찾기 (다양한 형태 지원)
-    const statsElements = page.locator(
-      '[class*="stat"], [class*="count"], [class*="total"], [class*="card"]'
+    if (stats.recentSRs.length === 0) {
+      // 빈 상태도 계약이다 — 문구가 사라지면 사용자는 로딩 실패와 구분할 수 없다.
+      await expect(section).toContainText('아직 SR이 없습니다');
+      return;
+    }
+
+    // 목록이 있으면 각 항목이 상세로 가는 링크를 가져야 한다.
+    const links = section.locator('a[href^="/srs/"]');
+    await expect(links.first()).toBeVisible({ timeout: 15000 });
+    expect(await links.count(), '최근 SR 링크 수가 API 응답보다 적다').toBeGreaterThanOrEqual(
+      Math.min(stats.recentSRs.length, 10)
     );
-    const hasStats = await statsElements
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
 
-    if (hasStats) {
-      const count = await statsElements.count();
-      console.log(`✅ 통계 요소: ${count}개 발견`);
-    } else {
-      console.log('ℹ️ 통계 요소 미발견 - 대시보드 구조가 다를 수 있음');
-    }
+    // 첫 항목의 SR 번호가 실제로 화면에 있어야 한다.
+    await expect(section).toContainText(stats.recentSRs[0]!.srNumber);
   });
 
-  test('최근 SR 또는 활동 섹션 확인', async ({ page }) => {
+  test('빠른 접근 카드가 실제로 해당 화면으로 데려간다', async ({ page }) => {
+    // 예전 테스트는 '새 SR|생성|등록|요청' 중 아무 버튼이나 찾아 클릭하고, 다이얼로그가
+    // 뜨든 페이지가 바뀌든 로그만 남겼다. 대시보드의 빠른 접근은 Link 카드 3개이고
+    // 각각 목적지가 정해져 있다(page.tsx 의 Quick Access Cards).
     await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('heading', { name: '대시보드', exact: true })).toBeVisible({
+      timeout: 20000,
+    });
 
-    // 섹션 탐색 전에 대시보드 본문 렌더링을 기다린다
-    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
+    const quickLinks = [
+      { title: '내 요청 SR', url: /\/my-requests$/ },
+      { title: 'SR 전체 목록', url: /\/srs$/ },
+    ];
 
-    // 최근 SR, 활동, 테이블 등 찾기
-    const recentSection = page
-      .locator('section, div, table')
-      .filter({ hasText: /최근|Recent|활동|Activity/i });
-    const hasRecent = await recentSection
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (hasRecent) {
-      console.log('✅ 최근 SR/활동 섹션 확인');
-    } else {
-      // 대시보드 기본 콘텐츠만 확인
-      await expect(page.locator('main')).toBeVisible();
-      console.log('ℹ️ 최근 섹션 미발견 - 대시보드 로드 확인');
-    }
-  });
-
-  test('빠른 액션 버튼 확인', async ({ page }) => {
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
-
-    // 버튼 탐색 전에 대시보드 본문 렌더링을 기다린다
-    await expect(page.locator('main')).toBeVisible({ timeout: 10000 });
-
-    // 빠른 액션 버튼 찾기
-    const quickActions = page
-      .locator('button, a')
-      .filter({ hasText: /새 SR|New SR|생성|등록|요청/i });
-    const hasQuickAction = await quickActions
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (hasQuickAction) {
-      console.log('✅ 빠른 액션 버튼 확인');
-
-      // 버튼 클릭 테스트
-      await quickActions.first().click();
-      await page.waitForTimeout(500);
-
-      // Dialog 또는 페이지 이동 확인
-      const dialog = page.locator('[role="dialog"]');
-      const dialogVisible = await dialog.isVisible({ timeout: 3000 }).catch(() => false);
-
-      if (dialogVisible) {
-        console.log('✅ SR 생성 Dialog 열림');
-        await page.keyboard.press('Escape');
-      } else if (page.url().includes('/srs') || page.url().includes('/create')) {
-        console.log('✅ SR 생성 페이지로 이동');
-        await page.goto('/dashboard');
-      }
-    } else {
-      // 빠른 액션이 없어도 대시보드가 정상이면 통과
-      await expect(page.locator('main')).toBeVisible();
-      console.log('ℹ️ 빠른 액션 버튼 미발견 - 대시보드 로드 확인');
+    for (const { title, url } of quickLinks) {
+      await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+      const card = page.locator('a').filter({ hasText: title }).first();
+      await expect(card, `'${title}' 빠른 접근 카드가 없다`).toBeVisible({ timeout: 15000 });
+      await card.click();
+      await expect(page, `'${title}' 카드가 엉뚱한 곳으로 보낸다`).toHaveURL(url, {
+        timeout: 15000,
+      });
     }
   });
 });

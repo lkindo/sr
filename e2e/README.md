@@ -13,28 +13,38 @@
 
 ## 테스트 구조
 
-### 기본 테스트 (01-16)
+### 기본 테스트 (00-15)
 
-- `01-basic.spec.ts` - 기본 페이지 로딩 테스트
+- `00-smoke.spec.ts` - **라우트 스모크**. 모든 화면이 콘텐츠(앵커 heading)까지 렌더되는가.
+  "페이지가 열리는가" 를 확인하던 21개의 중복 단언을 여기로 모았다.
+- `01-basic.spec.ts` - 로그인/회원가입 화면 요소
 - `02-auth.spec.ts` - 인증 기능 테스트
-- `03-sr-list.spec.ts` - SR 목록 테스트
-- `04-sr-create.spec.ts` - SR 생성 테스트
+- `04-sr-create.spec.ts` - SR 생성 테스트 (SR 등록 **UI 플로우**를 검증하는 유일한 곳)
 - `05-sr-detail.spec.ts` - SR 상세 조회 테스트
 - `06-sr-update.spec.ts` - SR 수정 테스트
-- `07-sr-filter-search.spec.ts` - SR 필터링 및 검색 테스트
+- `07-sr-filter-search.spec.ts` - SR 검색·필터. 필터 적용 후 **목록이 실제로 좁혀지는지**까지 확인
 - `08-user-management.spec.ts` - 사용자 관리 테스트
 - `09-client-management.spec.ts` - 고객사 관리 테스트
 - `10-sr-workflow-integrated.spec.ts` - **SR 워크플로우 통합 테스트** (접수 + 상태 변경 + 댓글)
 - `12-role-management.spec.ts` - 역할 관리 테스트
-- `14-dashboard-overview.spec.ts` - 대시보드 개요 테스트
-- `15-pagination-sorting.spec.ts` - 페이지네이션 및 정렬 테스트
-- `16-user-profile-management.spec.ts` - 사용자 프로필 관리 테스트
+- `14-dashboard-overview.spec.ts` - 대시보드. 화면의 숫자가 API 값과 일치하는지 대조
+- `15-pagination-sorting.spec.ts` - 정렬·페이지네이션. URL·aria-sort·행 순서를 함께 확인
+
+삭제된 파일과 사유:
+
+- `03-sr-list.spec.ts` — 목록 열림 확인은 `00-smoke`, 필터/빈 상태는 `07` 로 흡수했다.
+- `16-user-profile-management.spec.ts` — 5개 테스트 전부 "요소가 없으면 로그만 남기고 통과" 였고,
+  검증 내용은 `26-settings-pages.spec.ts` 와 겹쳤다.
+- `20-notification-system.spec.ts` — 앱에 `/notifications` 라우트도 알림 벨 UI 도 없다
+  (알림은 서버 사이드 outbox/listener 뿐). 12개 테스트가 존재하지 않는 화면을 찾다가
+  전부 통과하고 있었다. 회귀는 `notification-outbox.test.ts` 와
+  `sr-notification.listener.test.ts` 가 덮는다.
 
 ### 권한 테스트
 
 - `sr-permissions.spec.ts` - **역할별 권한 검증 테스트**
 
-### 🆕 고도화 테스트 (17-23)
+### 고도화 테스트 (17-23)
 
 #### 17. 다중 사용자 협업 시나리오 (`17-multi-user-collaboration.spec.ts`)
 
@@ -86,24 +96,6 @@ pnpm test:e2e e2e/18-sr-reassignment-escalation.spec.ts
 
 ```bash
 pnpm test:e2e e2e/19-file-upload-download.spec.ts
-```
-
-#### 20. 알림 시스템 통합 (`20-notification-system.spec.ts`)
-
-실시간 알림 기능의 전체 플로우 테스트:
-
-- SR 생성 시 담당자에게 알림 발송
-- 댓글 작성 시 관련자에게 알림
-- 상태 변경 시 알림
-- 알림 목록 확인
-- 알림 읽음 처리
-- 알림 배지/카운트 확인
-- 알림 필터링 및 정렬
-
-**실행:**
-
-```bash
-pnpm test:e2e e2e/20-notification-system.spec.ts
 ```
 
 #### 21. SR 상태 전이 (`21-sr-status-transitions.spec.ts`) 🆕
@@ -213,7 +205,7 @@ pnpm exec playwright show-report
 
 ## 다중 사용자 테스트
 
-고도화 테스트(17-20)는 다중 사용자 시나리오를 테스트하기 위해 세 가지 역할의 인증 상태를 사용합니다:
+고도화 테스트(17-23)는 다중 사용자 시나리오를 테스트하기 위해 세 가지 역할의 인증 상태를 사용합니다:
 
 - **CLIENT** (`clientuser@example.com`)
 - **MANAGER** (`admin@example.com`)

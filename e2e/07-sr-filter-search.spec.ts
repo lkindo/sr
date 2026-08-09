@@ -1,188 +1,179 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 /**
- * SR 필터링 및 검색 테스트
+ * SR 목록의 검색과 필터 — **목록이 실제로 좁혀지는가**.
  *
- * 모든 사용자에게 SR 목록 및 필터링 기능이 제공됨
+ * 예전 5개 테스트는 필터 UI 를 찾기만 하고 결과를 보지 않았다. 전형적으로
+ * "고급 필터 버튼이 있으면 클릭 → 옵션이 있으면 개수를 로그" 로 끝났고,
+ * 필터가 아무 일도 하지 않아도 통과했다. 03-sr-list.spec.ts 에도 같은 검사가
+ * 중복돼 있었고(그 파일은 이 커밋에서 삭제했다), 03 의 '빈 SR 목록 처리' 는
+ * 오류 다이얼로그가 없는지만 보고 빈 상태 화면 자체는 확인하지 않았다.
  *
- * ⚠️ networkidle 금지
- * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
- * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
- * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
- * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
- * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
- * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 여기서는 필터를 적용한 뒤 (1) URL 파라미터, (2) 남은 행의 실제 값, (3) 빈 결과일 때의
+ * 안내 화면까지 대조한다. 목록이 열리는지는 00-smoke.spec.ts 가 본다.
+ *
+ * ⚠️ networkidle 금지 — 인증된 페이지는 /api/realtime SSE 를 계속 열어 둔다.
  */
 
-test.describe('SR 필터링 및 검색', () => {
-  test('SR 목록 페이지 로드', async ({ page }) => {
-    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+async function expectListRendered(page: Page) {
+  await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({ timeout: 20000 });
+}
 
-    // SR 목록 테이블이 반드시 보여야 함
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 10000,
-    });
-    console.log('✅ SR 목록 테이블 확인');
+/** 상세 필터 패널을 연다 (기본은 접혀 있다). */
+async function openAdvancedFilters(page: Page) {
+  await page.getByRole('button', { name: '상세 필터' }).click();
+  await expect(page.getByRole('region', { name: '상세 필터 옵션' })).toBeVisible({
+    timeout: 10000,
   });
+}
 
-  test('검색 기능 테스트', async ({ page }) => {
+/** 지정한 열의 보이는 값들을 읽는다 (1-based). */
+async function columnTexts(page: Page, nth: number): Promise<string[]> {
+  const texts = await page.locator(`tbody tr td:nth-child(${nth})`).allInnerTexts();
+  return texts.map((t) => t.trim());
+}
+
+/**
+ * SR 번호 열에서 번호만 뽑는다.
+ * 셀 안에는 복사 버튼이 함께 있어서 innerText 가 "SR-20260807-0001 복사" 가 된다.
+ */
+async function visibleSrNumbers(page: Page): Promise<string[]> {
+  return (await columnTexts(page, 1))
+    .map((text) => text.match(/SR-\d{8}-\d{4}/)?.[0])
+    .filter((n): n is string => Boolean(n));
+}
+
+/**
+ * 빈 상태 안내. 데스크톱 테이블과 모바일 카드가 각각 EmptyState 를 렌더하므로
+ * (한쪽은 CSS 로 숨겨진다) 보이는 것만 겨냥해야 strict mode 위반이 나지 않는다.
+ */
+const emptyState = (page: Page) => page.getByText('검색 결과가 없습니다').filter({ visible: true });
+
+test.describe('SR 검색', () => {
+  test('검색어를 넣으면 그 문자열을 가진 SR 만 남는다', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    // 목록이 렌더링된 뒤에 검색 필드를 탐색해야 한다.
-    // (렌더 전에 isVisible 로 확인하면 검색 필드가 있어도 없는 쪽 분기로 빠진다)
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 10000,
-    });
+    await expectListRendered(page);
 
-    // 검색 입력 필드 찾기 (다양한 셀렉터 시도)
-    const searchInput = page
-      .locator(
-        'input[type="search"], input[placeholder*="검색"], input[placeholder*="Search"], input[name*="search"]'
-      )
-      .first();
-    const hasSearch = await searchInput.isVisible({ timeout: 5000 }).catch(() => false);
+    // 기준값: 지금 목록의 첫 SR 번호. 그것으로 검색하면 그 건만 남아야 한다.
+    const allNumbers = await visibleSrNumbers(page);
+    expect(allNumbers.length, '검색을 확인하려면 SR 이 최소 1건 있어야 한다').toBeGreaterThan(0);
+    const target = allNumbers[0]!;
 
-    if (hasSearch) {
-      await searchInput.fill('test');
-      await page.waitForTimeout(500);
+    const search = page.getByRole('textbox', { name: '검색어 입력' });
+    await search.fill(target);
 
-      const results = page.locator('tbody tr');
-      const count = await results.count();
-      expect(count).toBeGreaterThanOrEqual(0);
-      console.log(`✅ 검색 결과: ${count}개`);
-    } else {
-      // 검색 필드가 없는 경우 - 테이블만 확인
-      await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-        timeout: 10000,
-      });
-      console.log('ℹ️ 검색 필드 없음 - SR 목록 테이블 확인됨');
+    // 검색은 500ms 디바운스 후 URL 로 반영된다(SRsDataTable 의 useDebounce).
+    // 고정 대기 대신 그 관측 가능한 결과인 URL 변화를 기다린다.
+    // URLSearchParams 는 공백을 '+' 로 쓰므로 encodeURIComponent 로는 맞출 수 없다.
+    // SR 번호에는 인코딩이 필요한 문자가 없으니 그대로 넣는다.
+    await expect(page).toHaveURL(new RegExp(`search=${target}`), { timeout: 15000 });
+    await expectListRendered(page);
+
+    const filtered = await visibleSrNumbers(page);
+    expect(filtered.length, '검색 결과가 비었다').toBeGreaterThan(0);
+    for (const number of filtered) {
+      expect(number, `검색어 "${target}" 와 무관한 행이 남아 있다`).toBe(target);
     }
   });
 
-  test('상태 필터 테스트', async ({ page }) => {
+  test('결과가 없는 검색어는 빈 상태 화면을 보여 준다', async ({ page }) => {
+    // 03-sr-list.spec.ts 의 '빈 SR 목록 처리' 를 흡수한 것. 원래는 오류 다이얼로그가
+    // 없는지만 확인했는데, 그건 화면이 통째로 비어 있어도 통과한다.
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    // 목록 렌더링을 기다린 뒤 필터 UI 를 탐색한다 (고정 sleep 대체)
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 10000,
-    });
+    await expectListRendered(page);
 
-    // 고급 필터 버튼 찾기
-    const advancedFilterButton = page
-      .locator('button')
-      .filter({ hasText: /고급 필터|Advanced|Filter|필터/i })
-      .first();
-    const hasFilter = await advancedFilterButton.isVisible({ timeout: 5000 }).catch(() => false);
+    const search = page.getByRole('textbox', { name: '검색어 입력' });
+    await search.fill('존재하지않는SR검색어-zzzz-0000');
 
-    if (hasFilter) {
-      await advancedFilterButton.click();
-      await page.waitForTimeout(500);
+    await expect(emptyState(page)).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByText('다른 검색어나 필터를 시도해보세요.').filter({ visible: true })
+    ).toBeVisible();
 
-      // 상태 필터 Label 확인
-      const statusLabel = page.locator('label').filter({ hasText: /상태/i }).first();
-      if (await statusLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
-        // 상태 Select 찾기 및 클릭
-        const statusSection = page
-          .locator('div')
-          .filter({ has: page.locator('label:has-text("상태")') })
-          .first();
-        const statusSelect = statusSection.locator('button[role="combobox"]').first();
+    // 빈 상태에는 빠져나갈 길이 있어야 한다.
+    await expect(page.getByRole('button', { name: '필터 초기화' }).first()).toBeVisible();
+  });
+});
 
-        if (await statusSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await statusSelect.click();
-          await page.waitForTimeout(500);
+test.describe('SR 상세 필터', () => {
+  test('상태 필터를 걸면 그 상태의 SR 만 남는다', async ({ page }) => {
+    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    await expectListRendered(page);
+    await openAdvancedFilters(page);
 
-          const options = page.locator('[role="option"]');
-          const optionCount = await options.count();
-          if (optionCount > 0) {
-            console.log(`✅ 상태 필터 옵션: ${optionCount}개`);
-            await options.first().click();
-          }
-        }
-      }
-    } else {
-      // 고급 필터가 없는 경우 - 테이블만 확인
-      await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-        timeout: 10000,
-      });
-      console.log('ℹ️ 고급 필터 버튼 없음 - SR 목록 테이블 확인됨');
+    await page.getByLabel('상태', { exact: true }).click();
+    await page.getByRole('option', { name: '요청됨', exact: true }).click();
+
+    await expect(page).toHaveURL(/status=REQUESTED/, { timeout: 15000 });
+
+    // 결과가 0건일 수도 있다. 그때는 빈 상태가, 아니면 모든 행이 '요청됨' 이어야 한다.
+    // 어느 쪽이든 단언한다 — "행이 없으면 통과" 로 두면 필터가 전부 지워 버려도 모른다.
+    const empty = emptyState(page);
+    const table = page.locator('table:not([data-skeleton]):visible');
+    await expect(empty.or(table).first()).toBeVisible({ timeout: 15000 });
+
+    if (await empty.isVisible()) {
+      const api = await page.request.get('/api/srs?status=REQUESTED&pageSize=1');
+      const body = (await api.json()) as { meta?: { totalItems?: number } };
+      expect(body.meta?.totalItems ?? 0, 'REQUESTED SR 이 있는데 화면은 비어 있다').toBe(0);
+      return;
+    }
+
+    // 상태 열은 7번째다 (SR번호/제목/고객사/요청자/담당자/우선순위/상태).
+    const statuses = await columnTexts(page, 7);
+    expect(statuses.length).toBeGreaterThan(0);
+    for (const status of statuses) {
+      expect(status, 'status=REQUESTED 필터인데 다른 상태의 행이 남아 있다').toContain('요청됨');
     }
   });
 
-  test('우선순위 필터 테스트', async ({ page }) => {
+  test('우선순위 필터를 걸면 그 우선순위의 SR 만 남는다', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    // 목록 렌더링을 기다린 뒤 필터 UI 를 탐색한다 (고정 sleep 대체)
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 10000,
-    });
+    await expectListRendered(page);
+    await openAdvancedFilters(page);
 
-    // 고급 필터 버튼 찾기
-    const advancedFilterButton = page
-      .locator('button')
-      .filter({ hasText: /고급 필터|Advanced|Filter|필터/i })
-      .first();
-    const hasFilter = await advancedFilterButton.isVisible({ timeout: 5000 }).catch(() => false);
+    await page.getByLabel('우선순위', { exact: true }).click();
+    await page.getByRole('option', { name: '보통', exact: true }).click();
 
-    if (hasFilter) {
-      await advancedFilterButton.click();
-      await page.waitForTimeout(500);
+    await expect(page).toHaveURL(/priority=MEDIUM/, { timeout: 15000 });
 
-      // 우선순위 필터 Label 확인
-      const priorityLabel = page
-        .locator('label')
-        .filter({ hasText: /우선순위/i })
-        .first();
-      if (await priorityLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
-        const prioritySection = page
-          .locator('div')
-          .filter({ has: page.locator('label:has-text("우선순위")') })
-          .first();
-        const prioritySelect = prioritySection.locator('button[role="combobox"]').first();
+    const empty = emptyState(page);
+    const table = page.locator('table:not([data-skeleton]):visible');
+    await expect(empty.or(table).first()).toBeVisible({ timeout: 15000 });
 
-        if (await prioritySelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await prioritySelect.click();
-          await page.waitForTimeout(500);
+    if (await empty.isVisible()) {
+      const api = await page.request.get('/api/srs?priority=MEDIUM&pageSize=1');
+      const body = (await api.json()) as { meta?: { totalItems?: number } };
+      expect(body.meta?.totalItems ?? 0, 'MEDIUM SR 이 있는데 화면은 비어 있다').toBe(0);
+      return;
+    }
 
-          const options = page.locator('[role="option"]');
-          const optionCount = await options.count();
-          if (optionCount > 0) {
-            console.log(`✅ 우선순위 필터 옵션: ${optionCount}개`);
-          }
-        }
-      }
-    } else {
-      await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-        timeout: 10000,
-      });
-      console.log('ℹ️ 고급 필터 버튼 없음 - SR 목록 테이블 확인됨');
+    const priorities = await columnTexts(page, 6);
+    expect(priorities.length).toBeGreaterThan(0);
+    for (const priority of priorities) {
+      expect(priority, 'priority=MEDIUM 필터인데 다른 우선순위의 행이 남아 있다').toContain('보통');
     }
   });
 
-  test('필터 초기화 테스트', async ({ page }) => {
+  test('필터 초기화는 URL 파라미터와 목록을 모두 원래대로 돌린다', async ({ page }) => {
     await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 10000,
-    });
+    await expectListRendered(page);
+    const before = (await visibleSrNumbers(page)).length;
 
-    // 고급 필터 열기
-    const advancedFilterButton = page
-      .locator('button')
-      .filter({ hasText: /고급 필터|Advanced|Filter/i })
-      .first();
-    if (await advancedFilterButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await advancedFilterButton.click();
-      await page.waitForTimeout(500);
+    await openAdvancedFilters(page);
+    await page.getByLabel('상태', { exact: true }).click();
+    await page.getByRole('option', { name: '요청됨', exact: true }).click();
+    await expect(page).toHaveURL(/status=REQUESTED/, { timeout: 15000 });
 
-      // 초기화 버튼 찾기
-      const resetButton = page
-        .locator('button')
-        .filter({ hasText: /초기화|Reset|Clear/i })
-        .first();
-      if (await resetButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await resetButton.click();
-        await page.waitForTimeout(500);
-        console.log('✅ 필터 초기화 완료');
-      } else {
-        console.log('ℹ️ 초기화 버튼이 없거나 다른 형태');
-      }
-    }
+    await page.getByRole('button', { name: '필터 초기화' }).first().click();
+
+    await expect(page, '초기화했는데 status 파라미터가 남아 있다').not.toHaveURL(
+      /status=REQUESTED/,
+      { timeout: 15000 }
+    );
+    await expectListRendered(page);
+    expect((await visibleSrNumbers(page)).length, '초기화 후 행 수가 필터 걸기 전과 다르다').toBe(
+      before
+    );
   });
 });
