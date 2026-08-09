@@ -362,16 +362,27 @@ jobs:
 
   # E2E 테스트
   #
-  # push(main) 와 pull_request 양쪽에서 실행된다.
-  #  - main push: 전체 선택(2026-07-30 `--list` 실측 185개)을 돌린다. deploy.yml 이 이 워크플로의
-  #    최종 결론에 매달려 있으므로, 여기서 실패하면 운영 배포가 차단된다.
-  #  - pull_request: 보안·권한 스펙만 골라 돌린다(실측 24 + 26 = 50개, 아래 "PR 범위" 참고).
-  #    나쁜 머지를 배포 전에 막는 것이 목적이며, 머지 후 main push 에서 전체가 다시 돌아
-  #    공백을 메운다.
-  #    (deploy.yml 은 `workflow_run.event == 'push'` 를 요구하므로 PR 실행이 배포를 유발하지 않는다.)
+  # push(main) 와 pull_request 양쪽에서 **같은 전체 선택**을 돌린다.
+  # deploy.yml 이 이 워크플로의 최종 결론에 매달려 있으므로 여기서 실패하면 운영 배포가
+  # 차단된다. (deploy.yml 은 `workflow_run.event == 'push'` 를 요구하므로 PR 실행이
+  # 배포를 유발하지는 않는다.)
   #
-  # 왜 PR 에서 전체를 돌리지 않는가: workers=1 · retries=2 로 185개를 돌리면 빌드 포함 시간이
-  # timeout-minutes: 120 에 육박한다. 전량 실행은 PR 마다 감당할 비용이 아니다.
+  # ── PR 부분 실행을 걷어낸 이유 (2026-08-09) ──────────────────────────────
+  # 예전에는 PR 에서 보안·권한 스펙 50개만 돌렸다. 근거는 "workers=1 · retries=2 로
+  # 185개를 돌리면 timeout-minutes: 120 에 육박한다" 였고, 그 시점에는 사실이었다.
+  # 그 대가도 실제로 치렀다 — 의존성 PR #250 이 부분집합을 통과해 머지된 뒤 main 에서
+  # 4건이 깨졌다.
+  #
+  # 그 근거가 사라졌다. 스위트 정비 후 실측(프로덕션 빌드, workers=1, 4개 프로젝트 전량):
+  #   175개 수집 / 165 passed · 10 skipped · 0 failed · 0 flaky — **5.9분**
+  # 줄어든 것은 테스트 수(185 → 175)가 아니라 낭비다:
+  #   - 고정 대기 167회 173.6초 → 27회 19초
+  #   - SR 을 UI 로 만들던 준비 12벌 → API 픽스처 (1벌당 20~40초 → 스위트 전체 16초)
+  #   - 존재하지 않는 기능을 훑던 스펙(20-notification 12개) 삭제
+  # 이제 PR 전량 실행이 부분 실행보다 싸다 — 부분 실행은 어차피 빌드·시드·서버 기동을
+  # 똑같이 치르고 테스트만 덜 돌렸다.
+  #
+  # 되돌리고 싶어지면 숫자를 먼저 재라. `--list` 와 실행 시간을 이 주석에 갱신할 것.
   e2e-test:
     name: E2E Tests
     runs-on: ubuntu-latest
@@ -379,7 +390,10 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       github.event_name == 'pull_request'
-    timeout-minutes: 120
+    # 실측 기준 E2E 자체는 6분, 빌드·시드·브라우저 설치를 더해도 25분 안쪽이다.
+    # 120분은 "언제 끝나는지 아무도 모르던" 시절의 값이라, 늘어지는 실패를 30분씩
+    # 방치하는 역할만 했다.
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16-alpine
@@ -544,75 +558,13 @@ jobs:
       # Captures'는 검증이 아니라 문서용 스크린샷 생성이라 scripts/capture-manual.ts 로
       # 옮겨 playwright 수집 대상에서 빠졌다. 같은 이유로 항상 빨간불이던 firefox /
       # webkit / Mobile Chrome 프로젝트도 playwright.config.ts 에서 제거했다.
-      # 의존성이 바뀐 PR 인가?
-      #
-      # PR 은 비용 때문에 보안 핵심 부분집합만 돌린다(아래 참고). 그 절충은 사람이 쓰는
-      # 기능 PR 에는 맞지만 **의존성 업데이트에는 맞지 않는다.** 무엇이 깨질지 범위를 좁혀
-      # 예측할 수 없기 때문이다.
-      #
-      # 2026-08-08 에 그 대가를 치렀다. 의존성 58개 PR(#250)이 부분집합을 통과해 머지됐고,
-      # main 의 전체 스위트에서 4건이 깨졌다 — axe 4.12 가 로딩 스켈레톤을 검사해 낸 가짜
-      # h1 위반 1건과, @radix-ui/react-select 2.3.7 에서 force 클릭이 메뉴를 열지 못해 생긴
-      # 담당자 선택 실패 3건. 둘 다 부분집합에 포함되지 않는 프로젝트였다.
-      #
-      # 서드파티 액션을 쓰지 않는다. gh 는 러너에 기본 설치되어 있고, 변경 파일 목록은
-      # API 가 그대로 준다 — git diff 를 쓰려면 fetch-depth 를 늘려야 해서 더 비싸다.
-      - name: Detect dependency changes
-        id: deps
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path' \
-               | grep -qE '^(package\.json|pnpm-lock\.yaml)$'; then
-            echo 'full=true' >> "$GITHUB_OUTPUT"
-            echo '의존성 변경 감지 — 전체 E2E 선택을 실행한다.'
-          else
-            echo 'full=false' >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run E2E tests (full selection)
-        if: github.event_name == 'push' || steps.deps.outputs.full == 'true'
-        run: |
-          pnpm exec playwright test \
-            --project=chromium \
-            --project=multi-user \
-            --project=role-personas \
-            --project=permissions
-
-      # ── PR 범위 ───────────────────────────────────────────────────────────
-      # 목적: 최근 감사가 고친 테넌트 경계 / RBAC 회귀를 "머지 전에" 막는다.
-      #
-      # 돌리는 것 (2026-07-30 `--list` 실측, 총 50회 실행):
-      #  1) 첫 명령(24) = role-personas(11) + permissions(7) + 의존 6
-      #     - role-personas: e2e/roles/*.spec.ts. MANAGER / CLIENT_ADMIN 행위 검증.
-      #       감사에서 나온 치명 결함(CLIENT_ADMIN 이 타 고객사 SR/사용자 조회, clientIds 자가 상향)이
-      #       E2E 로 재발 검증되는 유일한 곳이다.
-      #     - permissions: sr-permissions.spec.ts. ENGINEER 가 배정되지 않은 SR 을 조회/수정할 때
-      #       403 인지, ADMIN 삭제가 감사 로그에 남는지.
-      #     - 의존: setup(1) / multi-user-setup(3) / role-persona-setup(2).
-      #       role-persona-setup 은 시드에 MANAGER/CLIENT_ADMIN 계정이 없으면 실패하는 계약
-      #       게이트다. 이 스텝이 그 게이트를 머지 전으로 끌어온다.
-      #  2) 둘째 명령(26) = multi-user 중 08 / 09 / 23(22) + 의존 setup·multi-user-setup(4)
-      #     - 사용자·고객사 관리 화면의 역할별 접근 통제와 역할 배타성.
-      #     - 위치 인자(파일 필터)는 의존 프로젝트에는 적용되지 않는다(실측 확인).
-      #
-      # 돌리지 않는 것 (= PR 에서 검증되지 않음, main push 에서만 검증됨):
-      #  - chromium: 00-smoke / 01~07 / 10~15 / 24~31 등 일반 기능 스펙.
-      #  - multi-user 의 17~22: 협업, 재배정, 파일 업로드, 상태 전이, 접수 프로세스.
-      #  - firefox / webkit / Mobile Chrome: 어디서도 돌지 않는다(위 "제외 사유" 참고).
-      #
-      # 두 명령을 나눈 이유: 위치 인자(파일 필터)를 붙이면 명시적으로 지정한 프로젝트에도
-      # 그 필터가 적용되어 role-persona-setup 이 0개로 잘려 나간다(실측 확인).
-      - name: Run E2E tests (pull request — security-critical subset)
-        if: github.event_name == 'pull_request' && steps.deps.outputs.full != 'true'
-        run: |
-          pnpm exec playwright test \
-            --project=permissions \
-            --project=role-personas
-          pnpm exec playwright test \
-            --project=multi-user \
-            08-user-management 09-client-management 23-role-exclusivity
+      - name: Run E2E tests
+        run: >-
+          pnpm exec playwright test
+          --project=chromium
+          --project=multi-user
+          --project=role-personas
+          --project=permissions
 
       # 리포터는 test-results/ 로 출력한다(playwright.config.ts 의 outputDir/html outputFolder).
       # 기존 설정은 존재하지 않는 playwright-report/ 를 올려 빈 아티팩트만 남겼다.
