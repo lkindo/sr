@@ -17,12 +17,20 @@ function deepSerialize(value: any): any {
   }
 
   // Handle Prisma / decimal.js Decimal
-  if (
-    value &&
-    typeof value.toNumber === 'function' &&
-    value.constructor &&
-    value.constructor.name === 'Decimal'
-  ) {
+  //
+  // ⚠️ `value.constructor.name === 'Decimal'` 로 판별하지 말 것.
+  // 프로덕션 번들은 클래스 이름을 축약하므로 실제 Prisma Decimal 의 constructor.name 은
+  // 'Decimal' 이 아니라 'i' 같은 한 글자다. 그 조건이 붙어 있던 동안 이 분기가
+  // 프로덕션에서만 통째로 건너뛰어졌고, Decimal 값이 toJSON() 을 타고 **문자열**로 나갔다.
+  // 실제 피해: GET /api/srs/{id}/intake 의 estimatedHours 가 "4"(string)로 내려와
+  // 접수 정보 수정 폼(z.number())이 로드 즉시 무효가 되고, 저장을 눌러도 PATCH 가
+  // 한 번도 나가지 않았다 — 프로덕션에서 접수 정보 수정이 불가능했다.
+  //
+  // 이 결함이 오래 남은 이유는 단위 테스트가 자체 정의한 `class Decimal` 을 썼기 때문이다.
+  // 그 가짜의 constructor.name 은 'Decimal' 이라 언제나 통과했다.
+  // 아래 덕 타이핑은 축약에 영향받지 않는다. (Prisma 결과 객체 중 toNumber() 를 가진 것은
+  // Decimal 뿐이다.)
+  if (value && typeof value.toNumber === 'function') {
     return value.toNumber();
   }
 

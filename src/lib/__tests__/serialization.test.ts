@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 
 import { serializeDates, serializeMany, serializeResponse } from '@/lib/serialization';
@@ -33,6 +34,26 @@ describe('serialization utility', () => {
       };
       const result = serializeResponse(input);
       expect(result.estimatedHours).toBe(15.5);
+    });
+
+    /**
+     * 위 테스트는 **가짜 Decimal** 을 쓴다. 그 클래스의 constructor.name 은 언제나
+     * 'Decimal' 이므로, 구현이 `constructor.name === 'Decimal'` 로 판별하던 시절에도
+     * 통과했다. 그 사이 실제 Prisma Decimal 은 프로덕션 번들에서 이름이 축약되어
+     * ('i' 같은 한 글자) 분기를 통째로 건너뛰었고, estimatedHours 가 문자열로 나갔다.
+     *
+     * 그래서 진짜 Prisma Decimal 로도 검증한다. 이 테스트가 있었다면 결함이
+     * 프로덕션까지 가지 못했다.
+     */
+    it('should convert the real Prisma Decimal (not just a look-alike class)', () => {
+      const real = new Prisma.Decimal('4.00');
+
+      // 전제 확인: 실제 클래스 이름은 'Decimal' 이 아닐 수 있다. 그것이 이 테스트의 요점이다.
+      expect(typeof real.toNumber).toBe('function');
+
+      const result = serializeResponse({ id: 1, estimatedHours: real });
+      expect(result.estimatedHours).toBe(4);
+      expect(typeof result.estimatedHours).toBe('number');
     });
 
     it('should handle arrays', () => {

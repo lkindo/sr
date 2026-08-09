@@ -122,42 +122,18 @@ async function selectActualPriority(page: Page, optionLabel: string): Promise<vo
 }
 
 /**
- * 예상 작업 시간을 같은 값으로 다시 입력한다.
- *
- * ⚠️ 앱 결함 우회다. 없으면 저장 버튼을 눌러도 PATCH 가 **한 번도** 나가지 않는다.
- * 프로덕션 빌드의 GET /api/srs/{id}/intake 는 estimatedHours 를 숫자가 아니라
- * 문자열("4")로 준다. serializeResponse(src/lib/serialization.ts)가 Decimal 을
- * `value.constructor.name === 'Decimal'` 로 판별하는데 프로덕션 번들에서는 클래스명이
- * 축약돼 그 조건이 빗나가고, 다음 분기인 `toJSON()`(= 문자열)으로 떨어지기 때문이다.
- * use-intake-form.ts 는 그 값을 그대로 form.setValue 하고 폼 스키마는 z.number() 라
- * "Invalid input" 에서 제출이 막힌다. 화면에서 값을 다시 넣으면 입력 핸들러가
- * Number() 로 변환하므로 통과한다.
- *
- * 값을 바꾸지 않고 **읽은 값 그대로** 넣는다 — 이 우회가 검증 대상(담당자·우선순위)에
- * 영향을 주지 않아야 한다. 결함 자체는 보고서에 남긴다.
- */
-async function reenterEstimatedHours(page: Page): Promise<void> {
-  const hoursInput = page.getByRole('spinbutton', { name: '예상 작업 시간' });
-  await expect(hoursInput).toBeVisible({ timeout: 15000 });
-
-  const current = Number(await hoursInput.inputValue());
-  expect(current, '접수 폼에 예상 작업 시간이 채워져 있지 않습니다.').toBeGreaterThan(0);
-
-  // 같은 문자열을 그대로 채우면 React 의 입력 추적기가 "값이 안 바뀌었다"고 보고 onChange 를
-  // 삼켜서 폼 상태(문자열)가 그대로 남는다. 비웠다가 다시 넣어야 변환이 실제로 일어난다.
-  await hoursInput.fill('');
-  await hoursInput.fill(String(current));
-}
-
-/**
  * 저장 → PATCH 응답을 관찰한다.
  *
  * 버튼만 눌리고 아무 일도 일어나지 않은 것을 성공으로 오인하지 않기 위해, 응답을
  * 기다리는 약속을 클릭 **전에** 걸어 둔다.
  */
 async function saveIntakeAndExpectPatch(page: Page, sr: SeededSR): Promise<void> {
-  await reenterEstimatedHours(page);
-
+  // 예전에는 여기에 reenterEstimatedHours() 우회가 있었다. 프로덕션 빌드의
+  // GET /api/srs/{id}/intake 가 estimatedHours 를 문자열("4")로 주는 바람에 폼 스키마
+  // (z.number())가 로드 즉시 무효가 되어, 저장을 눌러도 PATCH 가 한 번도 나가지 않았다.
+  // 원인이던 serialization.ts 의 Decimal 판별(`constructor.name === 'Decimal'` — 프로덕션
+  // 번들에서 클래스명이 축약돼 빗나갔다)을 고쳤으므로 우회를 걷어냈다.
+  // 이 함수가 우회 없이 통과한다는 것 자체가 그 회귀의 감시다.
   const patchPromise = page.waitForResponse(
     (response) =>
       response.url().includes(`/api/srs/${sr.id}/intake`) &&
