@@ -123,6 +123,17 @@ class EmailService {
     link: string
   ): RenderedEmail {
     const subject = `[SR System] SR 상태가 변경되었습니다: ${srNumber}`;
+    /**
+     * 상태 라벨 — 정본(constants/sr.ts)의 **의도적 사본**이다.
+     *
+     * `statusLabelOf` 로 직결하지 않는 이유: 그 순간 UI 배지 문구의 정본이 곧 외부
+     * 발송 문구의 정본이 된다. 이후 누군가 목록 배지를 조정하면 고객 메일이 아무도
+     * 모르게 함께 바뀐다 — 외부 발송은 조용한 변경이 가장 위험한 표면이다.
+     * 대신 email.service.test.ts 가 7키를 문자 그대로 단언한다. 정본이 바뀌면
+     * 그 테스트가 깨지면서 "메일도 바꿀 것인가" 를 사람에게 묻는다.
+     *
+     * REJECTED 는 '거절' 이다(2026-08-10). 예전에는 '거절됨' 이라 화면과 어긋났다.
+     */
     const statusMap = new Map<string, string>([
       ['REQUESTED', '요청됨'],
       ['INTAKE', '접수'],
@@ -130,7 +141,7 @@ class EmailService {
       ['ON_HOLD', '보류'],
       ['COMPLETED', '완료'],
       ['CONFIRMED', '확인완료'],
-      ['REJECTED', '거절됨'],
+      ['REJECTED', '거절'],
     ]);
 
     const html = `

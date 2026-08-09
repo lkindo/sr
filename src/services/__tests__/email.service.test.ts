@@ -142,6 +142,41 @@ describe('EmailService', () => {
       expect(mail.html).toContain('진행중');
     });
 
+    it('7개 상태 라벨을 전부 한글로 표기한다 — 정본과 어긋나면 여기서 걸린다', async () => {
+      // 메일 문구는 정본의 **의도적 사본**이다(email.service.ts 주석 참조).
+      // 값을 여기 문자 그대로 적는다 — 정본을 import 해 비교하면 자동 추종이 되어
+      // 감지력이 사라진다. 정본이 바뀌면 이 테스트가 깨지면서 "고객에게 나가는
+      // 문구도 바꿀 것인가" 를 사람에게 묻는 것이 목적이다.
+      //
+      // 예전에는 REQUESTED/IN_PROGRESS 두 키만 단언해서 ON_HOLD 도 REJECTED 도
+      // 무방비였다. 실제로 REJECTED 가 '거절됨' 으로 화면('거부')과 어긋나 있었다.
+      vi.resetModules();
+      const { emailService } = await import('../email.service');
+
+      const expected: Array<[string, string]> = [
+        ['REQUESTED', '요청됨'],
+        ['INTAKE', '접수'],
+        ['IN_PROGRESS', '진행중'],
+        ['ON_HOLD', '보류'],
+        ['COMPLETED', '완료'],
+        ['CONFIRMED', '확인완료'],
+        ['REJECTED', '거절'],
+      ];
+
+      for (const [status, label] of expected) {
+        const mail = emailService.buildSRStatusChanged(
+          'user@test.com',
+          'SR-777',
+          'Label SR',
+          status,
+          status,
+          'http://example.com/sr/777'
+        );
+        expect(mail.html, `${status} 라벨이 '${label}' 이 아닙니다.`).toContain(label);
+        expect(mail.html, `${status} 가 영문 enum 으로 새고 있습니다.`).not.toContain(status);
+      }
+    });
+
     it('댓글 추가: 댓글 내용을 본문에 담는다', async () => {
       vi.resetModules();
       const { emailService } = await import('../email.service');
