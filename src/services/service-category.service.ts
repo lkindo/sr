@@ -87,20 +87,6 @@ export class ServiceCategoryService {
   }
 
   /**
-   * 활성 서비스 카테고리만 조회
-   */
-  async getActiveCategories() {
-    return prisma.serviceCategory.findMany({
-      where: { isActive: true },
-      include: {
-        client: { select: CLIENT_SUMMARY_SELECT },
-        handler: { select: { id: true, name: true } },
-      },
-      orderBy: { categoryName: 'asc' },
-    });
-  }
-
-  /**
    * 선택용 간소화된 목록 조회 (드롭다운 등)
    */
   async getForSelection(clientId?: string) {

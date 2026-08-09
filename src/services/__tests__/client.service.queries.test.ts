@@ -178,5 +178,51 @@ describe('ClientService Coverage', () => {
       expect(result?.users).toHaveLength(1);
       expect(result?.users[0].user.id).toBe('user');
     });
+
+    // ── 테넌트 유출 회귀 가드 ────────────────────────────────────────────
+    // 예전에는 이 메서드가 serviceCategoryService.getActiveCategories() 로
+    // **전 고객사의** 활성 카테고리를 가져와, 관계로 이미 스코프된 값을 덮어썼다.
+    // 그 조회에는 clientId 필터가 없고 client 관계까지 include 해서, 자사 상세를
+    // 여는 것만으로 타 고객사의 카테고리명·고객사명·코드가 응답에 실려 나갔다.
+    // 실측(CLIENT_ADMIN/TEST001): 5건 중 2건이 TEST002 의 것이었다.
+    it('관계로 스코프된 카테고리를 그대로 돌려준다 — 전역 조회로 덮어쓰지 않는다', async () => {
+      const own = [{ id: 'cat-own', categoryName: '자사 분류', clientId: 'c1' }];
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({
+        id: 'c1',
+        users: [],
+        serviceCategories: own,
+      } as any);
+      // 이 메서드가 카테고리를 **다시 조회하면** 아래 목이 응답에 섞여 들어온다.
+      vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([
+        { id: 'cat-other', categoryName: '남의 분류', clientId: 'c2' },
+      ] as any);
+
+      const result = await clientService.getClientWithDetailsAndCategories('c1');
+
+      expect(result?.serviceCategories).toEqual(own);
+      expect(
+        prisma.serviceCategory.findMany,
+        'serviceCategory 를 별도 조회하면 테넌트 스코프가 사라진다.'
+      ).not.toHaveBeenCalled();
+    });
+
+    it('상세 조회가 카테고리를 이 고객사로만 스코프하고 담당자까지 가져온다', async () => {
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', users: [] } as any);
+
+      await clientService.getClientWithDetailsAndCategories('c1');
+
+      // 관계 조회이므로 clientId 필터는 Prisma 가 붙인다. 여기서 고정할 것은
+      // (1) where 로 c1 을 찍었는가, (2) 화면이 쓰는 handler 를 함께 가져오는가.
+      expect(prisma.client.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'c1' },
+          include: expect.objectContaining({
+            serviceCategories: expect.objectContaining({
+              include: expect.objectContaining({ handler: expect.anything() }),
+            }),
+          }),
+        })
+      );
+    });
   });
 });

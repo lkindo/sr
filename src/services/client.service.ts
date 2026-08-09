@@ -92,7 +92,17 @@ export class ClientService {
             users: true,
           },
         },
-        serviceCategories: true,
+        // 이 고객사의 카테고리만 온다(Prisma 관계이므로 `clientId = id` 로 자동 스코프).
+        // `handler` 를 여기서 함께 가져오는 이유: 상세 화면이 담당자 이름/이메일을
+        // 렌더한다(clients/[id]/page.tsx:489). 예전에는 이 값을 쓰지 않고 아래
+        // getClientWithDetailsAndCategories 가 **전 고객사 카탈로그**로 덮어썼는데,
+        // 그 경로가 handler 를 포함했기 때문에 화면이 우연히 동작하고 있었다.
+        serviceCategories: {
+          include: {
+            handler: { select: { id: true, name: true, email: true } },
+          },
+          orderBy: { categoryName: 'asc' },
+        },
         clientHandlers: {
           include: {
             user: {
@@ -320,8 +330,16 @@ export class ClientService {
       return null;
     }
 
-    // 모든 활성화된 서비스 카테고리 조회 - ServiceCategoryService 활용
-    const serviceCategories = await serviceCategoryService.getActiveCategories();
+    // ⚠️ 여기서 serviceCategories 를 다시 조회하지 않는다.
+    //
+    // 예전에는 `serviceCategoryService.getActiveCategories()` 로 **전 고객사의**
+    // 활성 카테고리를 가져와 위에서 이미 스코프된 값을 덮어썼다. 그 조회에는
+    // clientId 필터가 없고 `client` 관계까지 include 하므로, 자사 상세를 여는
+    // 것만으로 타 고객사의 카테고리명·고객사명·코드가 응답에 실려 나갔다.
+    // 실측(CLIENT_ADMIN/TEST001): 카테고리 5건 중 2건이 TEST002 의 것이었다.
+    //
+    // 격리 원칙 위반이면서, 화면상으로도 "이 고객사의 서비스 카테고리 (5)" 가
+    // 남의 것을 세고 있었다.
 
     // ADMIN 역할을 가진 사용자 제외
     const filteredUsers =
@@ -332,10 +350,10 @@ export class ClientService {
         return !hasAdminRole;
       }) || [];
 
+    // serviceCategories 는 `...client` 로 그대로 전달된다 — 이미 이 고객사로 스코프돼 있다.
     return {
       ...client,
       users: filteredUsers,
-      serviceCategories,
     };
   }
 }

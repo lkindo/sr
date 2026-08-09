@@ -326,6 +326,41 @@ test.describe('CLIENT_ADMIN 테넌트 경계', () => {
     ).toBeGreaterThan(0);
   });
 
+  test('자사 상세의 서비스 카테고리에 타 고객사 것이 섞이지 않는다', async ({ request }) => {
+    // ── 실제로 새고 있었다 ──────────────────────────────────────────────
+    // client.service.getClientWithDetailsAndCategories 가 관계로 이미 스코프된
+    // serviceCategories 를 getActiveCategories()(clientId 필터 없음, client 관계
+    // include)의 결과로 덮어썼다. 자사 상세를 여는 것만으로 타 고객사의
+    // 카테고리명·고객사명·코드가 응답에 실려 나갔다.
+    // 실측: CLIENT_ADMIN/TEST001 이 5건을 받았고 그중 2건이 TEST002 의 것이었다.
+    //
+    // 403 만 단언하는 음성 테스트로는 이런 유출을 못 잡는다 — 응답 코드는 200 이고
+    // 요청도 자사 것이기 때문이다. 본문의 소속을 봐야 한다.
+    const response = await apiRequestWithRateLimitRetry(
+      request,
+      'get',
+      `/api/clients/${ownClientId}`
+    );
+    expect(response.status()).toBe(200);
+
+    const detail = (await response.json()) as {
+      serviceCategories?: Array<{ id: string; categoryName: string; clientId: string | null }>;
+    };
+    const categories = detail.serviceCategories ?? [];
+
+    // 시드가 자사에 카테고리를 넣는다. 0건이면 이 검증이 공허해진다.
+    expect(
+      categories.length,
+      '자사 서비스 카테고리가 0건이라 스코프 검증이 공허합니다. 시드를 확인하세요.'
+    ).toBeGreaterThan(0);
+
+    const foreign = categories.filter((category) => category.clientId !== ownClientId);
+    expect(
+      foreign.map((category) => `${category.categoryName}(${category.clientId})`),
+      `자사(${OWN_CLIENT_CODE}) 상세에 타 고객사 서비스 카테고리가 포함되었습니다.`
+    ).toEqual([]);
+  });
+
   test('타 고객사 상세 조회는 403 으로 차단된다 (감사 3.6)', async ({ request }) => {
     const detailResponse = await apiRequestWithRateLimitRetry(
       request,

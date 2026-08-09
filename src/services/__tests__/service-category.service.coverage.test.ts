@@ -69,18 +69,6 @@ describe('ServiceCategoryService', () => {
     });
   });
 
-  describe('getActiveCategories', () => {
-    it('queries only active categories', async () => {
-      vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
-
-      await service.getActiveCategories();
-
-      expect(prisma.serviceCategory.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { isActive: true } })
-      );
-    });
-  });
-
   describe('getForSelection', () => {
     it('omits clientId filter when not provided', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
