@@ -48,7 +48,9 @@ async function globalSetup(config: FullConfig) {
           waitUntil: 'domcontentloaded',
           timeout: 30000,
         });
-        await page.waitForTimeout(1000); // 컴파일 완료 대기
+        // allow-fixed-wait -- 워밍업의 목적은 Next.js 사전 컴파일 유발이지 화면 확인이 아니다.
+        // 기다릴 응답도 단정할 요소도 없고, 컴파일이 끝났음을 알려 주는 신호도 없다.
+        await page.waitForTimeout(1000);
         console.log(`  ✓ ${pagePath}`);
       } catch (err) {
         console.log(`  ⚠ ${pagePath} 워밍업 실패 (무시)`);

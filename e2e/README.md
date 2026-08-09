@@ -352,13 +352,89 @@ echo "Test content" > playwright/.test-files/test-document.txt
 
 ### Best Practices
 
-1. **serial 모드 사용**: 다중 사용자 워크플로우는 순차 실행이 필요합니다.
+이 절은 한동안 정확히 반대를 가르치고 있었다 — `networkidle`, `waitForTimeout`,
+그리고 "요소가 없으면 로그만 남기고 통과" 를 모범 사례로 실어 두었다. 그 결과가
+관용 분기 96건과 고정 대기 167회다. 게이트(`pnpm check:e2e-assertions`)가 이제
+그 셋을 막으므로, 문서도 같은 방향을 가리켜야 한다.
+
+#### 1. 대기는 "관측 가능한 결과" 로 표현한다
+
+`networkidle` 은 **쓰지 않는다.** 로그인 상태의 모든 페이지는 루트 레이아웃
+(`src/app/layout.tsx` → `ClientLayout` → `RealtimeProvider` → `use-realtime-status.ts`)에서
+`/api/realtime` SSE 스트림을 계속 열어 둔다. "500ms 동안 네트워크 요청 0건" 이라는
+조건이 영원히 성립하지 않아 항상 타임아웃난다.
+
+`waitForTimeout` 도 쓰지 않는다. 느린 CI 에서는 모자라고 빠른 로컬에서는 남는다 —
+어느 쪽이든 검증이 아니라 도박이다.
 
 ```typescript
-test.describe.configure({ mode: 'serial' });
+// ❌ 하지 말 것
+await page.goto('/srs', { waitUntil: 'networkidle' });
+await page.waitForTimeout(1000);
+
+// ✅ 내비게이션은 domcontentloaded 로 확정하고,
+//    실제로 필요한 것은 응답이나 요소로 기다린다 (expect 는 자동 재시도한다)
+const listLoaded = page.waitForResponse(
+  (r) => r.url().includes('/api/srs') && r.request().method() === 'GET'
+);
+await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+await listLoaded;
+await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible();
 ```
 
-2. **컨텍스트 정리**: 테스트 후 반드시 브라우저 컨텍스트를 닫습니다.
+기다릴 이벤트가 **존재하지 않는** 경우에만 고정 대기를 쓰고, 바로 윗줄에 사유를 남긴다.
+사유 없는 예외는 게이트가 거부한다.
+
+```typescript
+// allow-fixed-wait -- Next.js 사전 컴파일 유발이 목적이라 기다릴 응답이 없다
+await page.waitForTimeout(1000);
+```
+
+#### 2. 요소가 없을 수 있는 자리에서도 "통과" 로 빠지지 않는다
+
+`isVisible()` 은 **재시도하지 않는다.** 렌더 전에 물어보면 요소가 있어도 `false` 다.
+그래서 아래 형태는 화면이 통째로 망가져도 초록불이 된다.
+
+```typescript
+// ❌ 하지 말 것 — 이 테스트는 실패할 줄 모른다
+if (await button.isVisible({ timeout: 3000 }).catch(() => false)) {
+  await button.click();
+} else {
+  console.log('⚠️ 버튼을 찾을 수 없습니다.');
+}
+```
+
+셋 중 하나를 고른다.
+
+```typescript
+// ✅ 있어야 정상이면 — 없으면 실패하게 둔다
+await expect(button).toBeVisible();
+await button.click();
+
+// ✅ 없어야 정상이면 — 부재 자체를 단언한다 (화면이 렌더된 뒤에!)
+await expect(page.getByRole('heading', { name: '상세 정보' })).toBeVisible();
+await expect(page.getByRole('button', { name: '삭제' })).toHaveCount(0);
+
+// ✅ 아직 없는 기능이면 — 통과로 위장하지 말고 미구현이라고 적는다
+test.fixme('첨부파일 미리보기', async ({ page }) => {
+  /* … */
+});
+```
+
+#### 3. 준비(arrange)는 API 로, 검증(assert)은 UI 로
+
+SR 생성 다이얼로그와 접수 폼을 **검증하는** 스펙은 각각 하나면 충분하다
+(`04-sr-create`, `22-sr-intake-process`). 다른 스펙이 SR 이 필요할 뿐이라면
+`e2e/fixtures/` 의 헬퍼로 API 를 통해 만든다 — UI 로 만들면 한 번에 20~40초가 들고,
+그 시간은 검증이 아니라 준비에 쓰인다.
+
+#### 4. 단언은 상태를 겨냥한다
+
+`text=/완료|COMPLETED/i` 같은 넓은 텍스트 매칭은 '완료 처리' **버튼** 에도 걸린다.
+상태가 바뀌지 않아도 통과하므로 상태 검증으로서 의미가 없다. `data-testid` 나
+`getByRole` 로 대상을 특정한다.
+
+#### 5. 컨텍스트는 반드시 정리한다
 
 ```typescript
 try {
@@ -368,28 +444,15 @@ try {
 }
 ```
 
-3. **명시적 대기**: `waitForLoadState`, `waitForTimeout` 사용
+생성한 데이터도 마찬가지다. 공유 DB 를 쓰므로 `afterAll` 에서 API 로 지운다.
+남의 행(특히 시드 데이터)을 수정·비활성화하지 않는다 — 다른 스펙이 그 값을 계약으로
+단언하고 있을 수 있다.
 
-```typescript
-await page.goto('/srs', { waitUntil: 'networkidle' });
-await page.waitForTimeout(1000);
-```
+#### 6. serial 은 최후의 수단이다
 
-4. **에러 처리**: UI 요소가 없을 수 있는 경우 안전하게 처리
-
-```typescript
-if (await button.isVisible({ timeout: 3000 }).catch(() => false)) {
-  await button.click();
-} else {
-  console.log('⚠️ 버튼을 찾을 수 없습니다.');
-}
-```
-
-5. **로깅**: 테스트 진행 상황을 콘솔에 출력
-
-```typescript
-console.log(`✅ SR 생성 완료: ${srId}`);
-```
+`test.describe.configure({ mode: 'serial' })` 는 1번이 실패하면 나머지가 skip 되고,
+리포트에는 "실패 1건" 으로만 보인다. 실제로는 그 뒤 전부가 미검증이다.
+준비를 API 픽스처로 옮기면 대부분의 serial 은 필요 없어진다.
 
 ## CI/CD 통합
 

@@ -110,6 +110,8 @@ export async function findSRInList(
 
     console.log(`⚠️  Retry ${i + 1}/${maxRetries}: SR not found, reloading page...`);
     await page.reload({ waitUntil: 'load' });
+    // allow-fixed-wait -- 재시도 루프의 백오프 간격. 앞선 시도가 이미 실패했으므로
+    // 기다릴 응답도 나타날 요소도 없다(그게 있으면 위의 isVisible 이 이미 통과했다).
     await page.waitForTimeout(500);
   }
 

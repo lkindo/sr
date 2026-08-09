@@ -143,6 +143,8 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
       if (auditLogRecord) {
         break;
       }
+      // allow-fixed-wait -- 감사 로그는 요청 응답과 별개로 비동기 적재되므로 적재 완료를
+      // 알리는 응답이 없다. 찾으면 즉시 break 하는 폴링이라 성공 경로에서는 대기하지 않는다.
       await page.waitForTimeout(500);
     }
 

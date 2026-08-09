@@ -48,6 +48,8 @@ function registerPersonaSetup(persona: Persona, titleSuffix = '') {
       for (const pagePath of ['/dashboard']) {
         try {
           await page.goto(pagePath, { waitUntil: 'domcontentloaded', timeout: 15000 });
+          // allow-fixed-wait -- global-setup.ts 와 같은 이유. Next.js 사전 컴파일 유발이
+          // 목적이라 기다릴 응답이 없다.
           await page.waitForTimeout(500);
           console.log(`  ✓ ${pagePath} 워밍업 완료`);
         } catch {
