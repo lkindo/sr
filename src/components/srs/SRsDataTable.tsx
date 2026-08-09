@@ -338,7 +338,10 @@ export function SRsDataTable({
                       className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'waiting'
                           ? 'bg-background text-foreground font-bold'
-                          : 'bg-destructive text-white'
+                          : // --destructive(#ef4444) 위 흰 글씨는 3.76:1 로 AA(4.5:1) 미달이다.
+                            // 채움 배경에는 --destructive-solid 를 쓴다 — Button 의 destructive
+                            // variant 가 같은 이유로 이미 그렇게 바뀌어 있다(ui/button.tsx).
+                            'bg-destructive-solid text-destructive-foreground'
                       }`}
                     >
                       {counts.waiting}
@@ -382,7 +385,10 @@ export function SRsDataTable({
                       className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'urgent'
                           ? 'bg-background text-foreground font-bold'
-                          : 'bg-destructive text-white'
+                          : // --destructive(#ef4444) 위 흰 글씨는 3.76:1 로 AA(4.5:1) 미달이다.
+                            // 채움 배경에는 --destructive-solid 를 쓴다 — Button 의 destructive
+                            // variant 가 같은 이유로 이미 그렇게 바뀌어 있다(ui/button.tsx).
+                            'bg-destructive-solid text-destructive-foreground'
                       }`}
                     >
                       {counts.urgent}
@@ -803,9 +809,12 @@ export function SRsDataTable({
                       }
                     />
                   </PaginationItem>
-                  <div className="flex items-center gap-1 text-sm font-medium mx-2">
+                  {/* PaginationContent 는 <ul> 이므로 직계 자식은 <li> 여야 한다.
+                      <div> 를 그대로 두면 axe 의 list/only-listitems 위반(serious)이 되고,
+                      낭독기는 목록 항목 수를 잘못 읽는다. PaginationItem 이 <li> 를 렌더한다. */}
+                  <PaginationItem className="flex items-center gap-1 text-sm font-medium mx-2">
                     {paginationInfo.currentPage} / {paginationInfo.totalPages}
-                  </div>
+                  </PaginationItem>
                   <PaginationItem>
                     <PaginationNext
                       href="#"

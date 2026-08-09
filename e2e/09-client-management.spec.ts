@@ -190,11 +190,9 @@ test.describe('고객사 관리 - ADMIN 권한', () => {
   });
 
   /**
-   * ⛔ 미구현 — 고객사 비활성화가 **동작하지 않는다.** (2026-08-09 확인)
+   * 고객사 비활성화 회귀 가드.
    *
-   * 증상: 수정 다이얼로그의 '활성 상태' 체크박스를 풀고 저장해도 고객사는 계속 활성이다.
-   *
-   * 원인: 두 경로 모두 isActive 를 버린다.
+   * 이 테스트는 한동안 test.fixme 였다. 두 경로 모두 isActive 를 버리고 있었기 때문이다:
    *   1) Server Action — src/components/clients/ClientDialog.tsx:103 이
    *      `formData.append('isActive', String(isActive))` 로 값을 보내지만,
    *      src/actions/client.actions.ts:58-67 의 updateClientAction 이 만드는 `data` 객체에
@@ -209,12 +207,11 @@ test.describe('고객사 관리 - ADMIN 권한', () => {
    * 삭제/비활성 버튼을 찾다가 못 찾으면 `console.log('ℹ️ 삭제 버튼이 행 내부에 없음')` 으로
    * 통과했다. 애초에 존재하지 않는 UI 를 찾고 있었으니 진짜 결함에는 닿지도 못했다.
    *
-   * 고치는 방법: clientCreateSchema 에 `isActive: z.boolean().optional()` 을 넣고,
-   * updateClientAction 의 data 에 isActive 를 더하고(FormData 값은 문자열이므로
-   * `=== 'true'` 로 파싱), client.service.ts 의 updateClient 매핑에도 넣는다.
-   * 고친 뒤 fixme 를 떼면 이 테스트가 그대로 회귀 가드가 된다.
+   * 셋 다 고쳤다(clientCreateSchema 에 isActive 추가 / updateClientAction 이 FormData 의
+   * 문자열을 boolean 으로 파싱 / client.service.ts 의 updateClient 매핑에 반영).
+   * 이제 이 테스트가 그 수정의 회귀 가드다.
    */
-  test.fixme('고객사 비활성화가 서버 상태를 바꾼다', async ({ page }) => {
+  test('고객사 비활성화가 서버 상태를 바꾼다', async ({ page }) => {
     expect(testClientId, '앞선 생성 테스트에서 대상 고객사가 준비되어야 함').toBeTruthy();
 
     await page.goto(`/clients/${testClientId}`, { waitUntil: 'domcontentloaded' });

@@ -18,6 +18,19 @@ import { services } from '@/services/service-registry';
 type ClientCreateResult = Awaited<ReturnType<ClientService['createClient']>>;
 type ClientGetResult = Awaited<ReturnType<ClientService['getClientById']>>;
 
+/**
+ * FormData 의 체크박스 값을 boolean 으로 읽는다.
+ *
+ * FormData 는 값이 전부 문자열이라 `String(isActive)` 로 실린 'true'/'false' 가 그대로 온다.
+ * 이 변환이 없으면 zod 의 z.boolean() 이 거부하거나(문자열), 필드를 아예 안 읽어
+ * 비활성화가 조용히 무시된다 — 실제로 후자였다.
+ */
+function getFormDataBoolean(formData: FormData, key: string): boolean | undefined {
+  const raw = getFormDataValue(formData, key);
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  return raw === 'true';
+}
+
 export async function createClientAction(formData: FormData): Promise<Result<ClientCreateResult>> {
   try {
     const data = {
@@ -30,6 +43,7 @@ export async function createClientAction(formData: FormData): Promise<Result<Cli
       address: getFormDataValue(formData, 'address') || undefined,
       contractStartDate: getFormDataValue(formData, 'contractStartDate') || undefined,
       contractEndDate: getFormDataValue(formData, 'contractEndDate') || undefined,
+      isActive: getFormDataBoolean(formData, 'isActive'),
     };
 
     const validationResult = validateWithSchema(data, clientCreateSchema);
@@ -64,6 +78,7 @@ export async function updateClientAction(id: string, formData: FormData) {
       address: getFormDataValue(formData, 'address') || undefined,
       contractStartDate: getFormDataValue(formData, 'contractStartDate') || undefined,
       contractEndDate: getFormDataValue(formData, 'contractEndDate') || undefined,
+      isActive: getFormDataBoolean(formData, 'isActive'),
     };
 
     const validationResult = validateWithSchema(data, clientUpdateSchema);

@@ -52,6 +52,26 @@ test.describe('Accessibility (A11y) 검증', () => {
       });
     });
 
+    /**
+     * 목록을 **기본 데이터로만** 검사하면 조건부로만 나타나는 UI 가 통째로 빠진다.
+     *
+     * 실제로 그랬다. 페이지네이션 컨트롤은 총 페이지가 2 이상일 때만 렌더되는데,
+     * 시드 SR 3건 + 기본 20건/페이지에서는 절대 나타나지 않는다. 그래서 그 안의
+     * `<ul>` 직계 `<div>`(axe list/only-listitems, serious)가 오래 숨어 있었고,
+     * E2E 잔여 SR 이 쌓여 페이지가 2쪽이 된 날에야 우연히 드러났다.
+     * 즉 이 검사 결과가 **데이터 구성에 따라 달라지고 있었다.**
+     *
+     * itemsPerPage=1 로 페이지 수를 강제해 그 조건을 데이터와 무관하게 고정한다.
+     * (pageSize 는 1~100 이면 되고, 목록 화면의 선택지 5종에 없어도 URL 로는 통한다 —
+     *  src/lib/pagination.ts 의 z.number().int().positive().max(100))
+     */
+    test('SR 목록 페이지 접근성 확인 (페이지네이션 표시 상태)', async ({ browser }) => {
+      await withAuthContext(browser, 'manager', async (page) => {
+        await page.goto('/srs?itemsPerPage=1');
+        await checkA11y(page, 'SR List (paginated)', 'nav[aria-label="페이지 탐색"]');
+      });
+    });
+
     test('SR 상세 페이지 접근성 확인', async ({ browser }) => {
       // 매니저 권한으로 첫 번째 SR 상세 페이지 접근
       await withAuthContext(browser, 'manager', async (page) => {

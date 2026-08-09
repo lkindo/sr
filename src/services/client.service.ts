@@ -203,7 +203,9 @@ export class ClientService {
             ? new Date(validated.contractStartDate)
             : null,
           contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
-          isActive: true,
+          // 기본은 활성이지만, 명시적으로 false 를 보내면 존중한다.
+          // 하드코딩된 true 로 두면 update 쪽과 계약이 어긋나 "받아 놓고 버리는" 필드가 또 생긴다.
+          isActive: validated.isActive ?? true,
         },
       });
 
@@ -246,6 +248,8 @@ export class ClientService {
           ? new Date(validated.contractStartDate)
           : null,
         contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+        // undefined 면 Prisma 가 해당 컬럼을 건드리지 않으므로 부분 수정이 그대로 유지된다.
+        isActive: validated.isActive,
       },
     });
 

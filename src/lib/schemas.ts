@@ -129,6 +129,16 @@ export const clientCreateSchema = z.object({
   ),
   contactPhone: z.preprocess(emptyStringToUndefined, z.string().max(FIELD_LIMITS.PHONE).optional()),
   address: z.preprocess(emptyStringToUndefined, z.string().max(FIELD_LIMITS.ADDRESS).optional()),
+  /**
+   * 활성 여부.
+   *
+   * 이 필드가 없던 동안 고객사 비활성화가 **동작하지 않았다.** ClientDialog 는
+   * `formData.append('isActive', ...)` 로 값을 보냈지만 clientUpdateSchema 가
+   * `clientCreateSchema.omit({ code }).partial()` 이라 여기 없는 키는 zod 가 조용히
+   * 제거했다. REST 는 200 을 주면서 아무 일도 하지 않았고, 하드 삭제는 기본 서비스
+   * 분류 때문에 409 라, 고객사를 정리할 방법이 아예 없었다.
+   */
+  isActive: z.boolean().optional(),
   contractStartDate: z.preprocess(emptyStringToUndefined, z.string().optional()),
   contractEndDate: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
