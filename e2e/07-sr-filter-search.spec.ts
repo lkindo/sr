@@ -35,11 +35,14 @@ async function columnTexts(page: Page, nth: number): Promise<string[]> {
 
 /**
  * SR 번호 열에서 번호만 뽑는다.
+ *
  * 셀 안에는 복사 버튼이 함께 있어서 innerText 가 "SR-20260807-0001 복사" 가 된다.
+ * 자릿수를 고정하지 않는 이유: 시드 SR 은 `SR-2024-001`(4-3자리)이고 런타임 생성분은
+ * `SR-20260809-0001`(8-4자리)이다. 한쪽만 맞추면 데이터 구성에 따라 조용히 0건이 된다.
  */
 async function visibleSrNumbers(page: Page): Promise<string[]> {
   return (await columnTexts(page, 1))
-    .map((text) => text.match(/SR-\d{8}-\d{4}/)?.[0])
+    .map((text) => text.match(/SR-\d+-\d+/)?.[0])
     .filter((n): n is string => Boolean(n));
 }
 

@@ -108,7 +108,9 @@ test.describe('SR 목록 페이지네이션', () => {
     await page.goto('/srs?itemsPerPage=10', { waitUntil: 'domcontentloaded' });
     await expectListRendered(page);
 
-    const pagination = page.getByRole('navigation', { name: /pagination/i });
+    // shadcn 기본값('pagination')이 아니라 이 저장소가 지정한 한국어 라벨이다
+    // (src/components/ui/pagination.tsx:10 aria-label="페이지 탐색").
+    const pagination = page.getByRole('navigation', { name: '페이지 탐색' });
 
     if (totalPages > 1) {
       await expect(pagination, `총 ${totalPages}페이지인데 컨트롤이 없다`).toBeVisible({

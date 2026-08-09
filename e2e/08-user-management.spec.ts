@@ -1,171 +1,151 @@
 import { expect, test } from '@playwright/test';
-import path from 'path';
+
+import { PERSONA_AUTH_FILES } from './helpers/auth-helpers';
 
 /**
- * 사용자 관리 테스트 - 권한별 시나리오
- *
- * ADMIN/MANAGER: 사용자 CRUD 전체 권한
- * CLIENT: 읽기 전용 (사용자 페이지 접근 불가 또는 제한)
+ * 사용자 관리 — ADMIN 의 CRUD 와 CLIENT_USER 의 경계.
  *
  * ⚠️ networkidle 금지
  * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
  * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
- * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
- * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
- * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
- * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 계속 열어 둔다. "500ms 동안 네트워크 요청 0건" 이 성립하지 않아 항상 타임아웃난다.
+ *
+ * '사용자 목록 페이지 접근' 테스트는 00-smoke.spec.ts 로 옮겼다 — 라우트가 열리는지는
+ * 한 곳에서만 확인한다.
  */
 
-const authFiles = {
-  admin: path.join(__dirname, '../playwright/.auth/user.json'),
-  manager: path.join(__dirname, '../playwright/.auth/manager.json'),
-  client: path.join(__dirname, '../playwright/.auth/client.json'),
-};
-
 // ============================================
-// ADMIN/MANAGER 권한 테스트
+// ADMIN 권한
 // ============================================
-test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
-  test.use({ storageState: authFiles.admin });
+test.describe('사용자 관리 - ADMIN 권한', () => {
+  test.use({ storageState: PERSONA_AUTH_FILES.admin });
   test.describe.configure({ mode: 'serial' });
 
   let testUserEmail: string;
   let testUserName: string;
+  let testUserId: string | undefined;
 
-  test('사용자 목록 페이지 접근', async ({ page }) => {
-    await page.goto('/users', { waitUntil: 'domcontentloaded' });
-
-    // ADMIN은 사용자 목록 테이블이 보여야 함
-    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
-      timeout: 10000,
-    });
-    console.log('✅ ADMIN: 사용자 목록 테이블 확인');
+  test.afterAll(async ({ browser }) => {
+    // 공유 DB 를 쓰므로 만든 계정은 반드시 지운다. 예전에는 정리가 없어
+    // 'E2E Test User <timestamp>' 가 실행할 때마다 쌓였고, 그만큼 사용자 목록의
+    // 행 수·페이지 수가 매 실행 달라졌다.
+    if (!testUserId) return;
+    const context = await browser.newContext({ storageState: PERSONA_AUTH_FILES.admin });
+    try {
+      const response = await context.request.delete(`/api/users/${testUserId}?hard=true`);
+      if (!response.ok()) {
+        console.warn(`사용자 정리 실패: DELETE /api/users/${testUserId} → ${response.status()}`);
+      }
+    } finally {
+      await context.close();
+    }
   });
 
-  test('사용자 검색 기능', async ({ page }) => {
+  test('검색어를 넣으면 그 사용자만 남는다', async ({ page }) => {
     await page.goto('/users', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
+      timeout: 20000,
+    });
 
-    // 검색 입력 필드가 있어야 함
-    const searchInput = page.locator('input[type="search"], input[placeholder*="검색"]').first();
-    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    // 예전에는 'test' 를 입력하고 500ms 기다린 뒤 아무것도 확인하지 않았다.
+    // 시드에 반드시 있는 계정으로 검색해 결과가 실제로 좁혀지는지 본다.
+    const search = page.locator('input[type="search"], input[placeholder*="검색"]').first();
+    await expect(search).toBeVisible({ timeout: 10000 });
+    await search.fill('engineeruser@example.com');
 
-    await searchInput.fill('test');
-    await page.waitForTimeout(500);
-
-    console.log('✅ ADMIN: 검색 기능 동작 확인');
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(1, { timeout: 15000 });
+    await expect(rows.first()).toContainText('engineeruser@example.com');
   });
 
   test('사용자 등록 버튼이 보여야 함', async ({ page }) => {
     await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
-    // ADMIN은 사용자 등록 버튼이 반드시 보여야 함
-    const createButton = page
-      .locator('button')
-      .filter({ hasText: /등록|추가|생성|New User/i })
-      .first();
-    await expect(createButton).toBeVisible({ timeout: 10000 });
-    console.log('✅ ADMIN: 사용자 등록 버튼 확인');
+    const createButton = page.getByRole('button', { name: '사용자 등록' });
+    await expect(createButton).toBeVisible({ timeout: 20000 });
   });
 
   test('사용자 생성 전체 플로우', async ({ page }) => {
     await page.goto('/users', { waitUntil: 'domcontentloaded' });
 
-    // 등록 버튼 클릭
-    const createButton = page
-      .locator('button')
-      .filter({ hasText: /등록|추가|생성|New User/i })
-      .first();
-    await createButton.click();
-    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: '사용자 등록' }).click();
 
-    // Dialog 확인
-    const dialog = page.locator('[role="dialog"], .dialog, .modal').first();
-    await expect(dialog).toBeVisible({ timeout: 5000 });
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
 
-    // 사용자 정보 입력
     const timestamp = Date.now();
     testUserName = `E2E Test User ${timestamp}`;
     testUserEmail = `e2etest${timestamp}@example.com`;
 
-    // 이름 입력
-    const nameInput = dialog
+    await dialog
       .locator('input[name="name"], input[placeholder*="이름"], input[id*="name"]')
-      .first();
-    await nameInput.fill(testUserName);
+      .first()
+      .fill(testUserName);
+    await dialog.locator('input[name="email"], input[type="email"]').first().fill(testUserEmail);
 
-    // 이메일 입력
-    const emailInput = dialog.locator('input[name="email"], input[type="email"]').first();
-    await emailInput.fill(testUserEmail);
-
-    // 비밀번호 입력 (있을 경우)
     const passwordInput = dialog.locator('input[name="password"], input[type="password"]').first();
-    if (await passwordInput.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (await passwordInput.count()) {
       await passwordInput.fill('Test1234!');
-
-      // 비밀번호 확인 입력 (필수)
-      const confirmPasswordInput = dialog
+      const confirmPassword = dialog
         .locator('input[name="confirmPassword"], input[placeholder*="확인"], input[id*="confirm"]')
         .first();
-      if (await confirmPasswordInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await confirmPasswordInput.fill('Test1234!');
+      if (await confirmPassword.count()) {
+        await confirmPassword.fill('Test1234!');
       }
     }
 
-    // 저장 버튼 클릭
-    const saveButton = dialog
+    // 저장이 실제로 서버에 닿았는지 확인한다. 예전에는 2초를 기다린 뒤 목록에서
+    // 찾았기 때문에, 생성이 실패해도 "목록 갱신이 늦었나" 로 보였다.
+    const createResponse = page.waitForResponse(
+      (resp) => resp.url().includes('/api/users') && resp.request().method() === 'POST',
+      { timeout: 20000 }
+    );
+    await dialog
       .locator('button')
       .filter({ hasText: /저장|등록|생성|Save|Create/i })
-      .first();
-    await saveButton.click();
+      .first()
+      .click();
 
-    // API 응답 대기
-    await page.waitForTimeout(2000);
+    const response = await createResponse;
+    expect(response.status(), `사용자 생성 실패: ${await response.text()}`).toBe(201);
+    testUserId = ((await response.json()) as { id: string }).id;
 
-    // 목록 새로고침 및 확인
-    await page.goto('/users', { waitUntil: 'domcontentloaded' });
-
-    // 생성된 사용자 확인 (재시도 로직)
-    let userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first();
-    for (let retry = 0; retry < 3; retry++) {
-      if (await userRow.isVisible({ timeout: 3000 }).catch(() => false)) break;
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      userRow = page.locator('tbody tr').filter({ hasText: testUserName }).first();
-    }
-
-    await expect(userRow).toBeVisible({ timeout: 10000 });
-    console.log(`✅ ADMIN: 사용자 생성 완료 - ${testUserName}`);
+    // 목록에도 나타나야 한다.
+    await page.goto(`/users?q=${encodeURIComponent(testUserEmail)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.locator('tbody tr').filter({ hasText: testUserEmail })).toBeVisible({
+      timeout: 20000,
+    });
   });
 
-  test('역할 관리 플로우 (신규 UI)', async ({ page }) => {
-    await page.goto('/users', { waitUntil: 'domcontentloaded' });
+  test('역할 관리 다이얼로그를 열 수 있다', async ({ page }) => {
+    expect(testUserEmail, '앞선 생성 테스트에서 대상 계정이 준비되어야 함').toBeTruthy();
 
-    // 첫 번째 사용자 선택 (체크박스 클릭)
-    const firstRow = page.locator('tbody tr').first();
-    await expect(firstRow).toBeVisible({ timeout: 10000 });
+    await page.goto(`/users?q=${encodeURIComponent(testUserEmail)}`, {
+      waitUntil: 'domcontentloaded',
+    });
 
-    const checkbox = firstRow.locator('button').first(); // 첫 번째 버튼이 체크박스
-    await checkbox.click();
+    const targetRow = page.locator('tbody tr').filter({ hasText: testUserEmail });
+    await expect(targetRow).toBeVisible({ timeout: 20000 });
 
-    // 상단 일괄 작업 영역의 '역할 관리' 버튼 확인 및 클릭
-    const roleManageButton = page.locator('button').filter({ hasText: '역할 관리' });
-    await expect(roleManageButton).toBeVisible({ timeout: 5000 });
-    await roleManageButton.click();
+    await targetRow.locator('button').first().click();
+    await expect(page.getByText('1명 선택')).toBeVisible({ timeout: 10000 });
 
-    // 역할 관리 Dialog 확인
-    const dialog = page
-      .locator('[role="dialog"]')
-      .filter({ hasText: /역할|Role/i })
-      .first();
-    await expect(dialog).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: '역할 관리' }).click();
 
-    // 취소/닫기
-    const closeButton = dialog
+    const dialog = page.getByRole('dialog').filter({ hasText: /역할|Role/i });
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+
+    // 다이얼로그가 실제 역할 카탈로그를 보여 줘야 한다 — 껍데기만 열리는 회귀를 잡는다.
+    await expect(dialog.getByText('ENGINEER', { exact: true })).toBeVisible({ timeout: 10000 });
+
+    await dialog
       .locator('button')
       .filter({ hasText: /취소|닫기|Close|Cancel/i })
-      .first();
-    await closeButton.click();
-
-    console.log('✅ ADMIN: 역할 관리 다이얼로그 접근 확인');
+      .first()
+      .click();
+    await expect(dialog).not.toBeVisible({ timeout: 10000 });
   });
 
   test('사용자 비활성/활성 상태 전환 (신규 UI)', async ({ page }) => {
@@ -185,7 +165,7 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
     // 있는데(UserTable.tsx colSpan=7), 예전 코드는 그 행을 "첫 번째 사용자"로 잡아 상태를
     // 잘못 읽었다. 이메일 필터는 플레이스홀더와 절대 겹치지 않아 고정 대기 없이 경합이 사라진다.
     const targetRow = page.locator('tbody tr').filter({ hasText: testUserEmail });
-    await expect(targetRow).toBeVisible({ timeout: 15000 });
+    await expect(targetRow).toBeVisible({ timeout: 20000 });
 
     // 상태 Badge 는 정확히 '활성' 또는 '비활성' 이다(UserTable.tsx:173-175).
     // '비활성'.includes('활성') === true 이므로 부분 문자열 비교는 금지, 완전 일치로 읽는다.
@@ -213,7 +193,6 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
 
     // 토스트만 믿지 않고 목록 갱신 후 상태 Badge 가 실제로 뒤집혔는지 확인한다.
     await expect(statusBadge).toHaveText(isCurrentlyActive ? '비활성' : '활성', { timeout: 10000 });
-    console.log(`✅ ADMIN: 사용자 상태 전환 확인 (${isCurrentlyActive ? '비활성화' : '활성화'})`);
 
     // 2) 반대 버튼까지 실제로 검증하고 계정 상태를 원래대로 되돌린다.
     // 선택은 유지되므로(selectedUserIds 는 id 기준) 일괄 작업 바가 그대로 남아 있다.
@@ -223,61 +202,59 @@ test.describe('사용자 관리 - ADMIN/MANAGER 권한', () => {
     await revertButton.click();
 
     await expect(statusBadge).toHaveText(isCurrentlyActive ? '활성' : '비활성', { timeout: 10000 });
-    console.log(`✅ ADMIN: 사용자 상태 원복 확인 (${isCurrentlyActive ? '활성화' : '비활성화'})`);
   });
 });
 
 // ============================================
-// CLIENT 권한 테스트 (제한된 접근)
+// CLIENT_USER 경계
 // ============================================
-test.describe('사용자 관리 - CLIENT 권한', () => {
-  test.use({ storageState: authFiles.client });
+test.describe('사용자 관리 - CLIENT_USER 경계', () => {
+  test.use({ storageState: PERSONA_AUTH_FILES.client });
 
-  test('사용자 목록 페이지 접근 제한 확인', async ({ page }) => {
-    // 아래 분기 판정은 관용적(isVisible 프로브)이므로, 화면이 확정되기 전에 프로브하면
-    // 어떤 분기도 타지 않고 조용히 통과한다. 그래서 목록 API 응답(403 이든 200 이든)까지
-    // 기다린다. 응답이 오지 않는 경우(클라이언트 리다이렉트 등)는 null 로 흘려 보낸다.
-    const usersApiResponse = page
-      .waitForResponse(
-        (resp) => resp.url().includes('/api/users') && resp.request().method() === 'GET',
-        { timeout: 15000 }
-      )
-      .catch(() => null);
+  /**
+   * 예전 이 테스트는 세 갈래 if 였고 **모든 갈래가 통과**였다. 등록 버튼이 보이면
+   * `console.log('⚠️ CLIENT에게 등록 버튼이 보임 - 권한 설정 확인 필요')` 를 찍고 넘어갔다.
+   * 즉 권한 상승이 실제로 일어나도 초록불이었다.
+   *
+   * 실측(2026-08-09)으로 확정한 계약: CLIENT_USER 에게 사용자 API 는 읽기·쓰기 모두 403 이다.
+   * 그 경계를 단언한다.
+   *
+   * 알려진 UI 결함(이 스펙이 드러낸 것): `/users` 의 '사용자 등록' 버튼은 권한 게이트가 없어
+   * CLIENT_USER 에게도 렌더된다(UsersClient.tsx:364). 서버가 POST 를 403 으로 막으므로
+   * 데이터가 새지는 않지만, 누르면 실패하는 버튼을 보여 주는 것은 결함이다.
+   * 버튼 부재를 단언하면 지금 빨간불이 되므로, **막혀 있는 것이 확실한 서버 경계**를 단언하고
+   * UI 게이트는 앱 수정과 함께 별도로 다룬다.
+   */
+  test('사용자 API 는 읽기·쓰기 모두 403 으로 차단된다', async ({ request }) => {
+    const list = await request.get('/api/users?pageSize=5');
+    expect(
+      list.status(),
+      `CLIENT_USER 가 사용자 목록을 조회했습니다. 응답: ${await list.text()}`
+    ).toBe(403);
+
+    const create = await request.post('/api/users', {
+      data: {
+        name: 'CLIENT 권한 확인용',
+        email: `client-escalation-${Date.now()}@example.com`,
+        password: 'Test1234!',
+      },
+    });
+    expect(
+      create.status(),
+      `CLIENT_USER 가 사용자를 생성했습니다(권한 상승). 응답: ${await create.text()}`
+    ).toBe(403);
+  });
+
+  test('사용자 화면에 다른 사용자 데이터가 노출되지 않는다', async ({ page }) => {
     await page.goto('/users', { waitUntil: 'domcontentloaded' });
-    await usersApiResponse;
 
-    // CLIENT는 사용자 페이지에 접근 제한될 수 있음
-    // 1) 403/Unauthorized 페이지 표시
-    // 2) 또는 목록은 보이나 등록 버튼 없음
+    // 화면이 렌더된 것을 먼저 확정한다. 렌더 전에 "행이 없다" 를 확인하면
+    // 아직 안 그려진 것과 구분할 수 없어 아무것도 검증하지 못한다.
+    await expect(page.getByRole('heading', { name: '사용자 목록', exact: true })).toBeVisible({
+      timeout: 20000,
+    });
 
-    const unauthorizedMessage = page.locator('text=/권한|unauthorized|forbidden|접근 거부/i');
-    const table = page.locator('table:not([data-skeleton]):visible');
-
-    const isUnauthorized = await unauthorizedMessage
-      .isVisible({ timeout: 3000 })
-      .catch(() => false);
-    const isTableVisible = await table.isVisible({ timeout: 3000 }).catch(() => false);
-
-    if (isUnauthorized) {
-      console.log('✅ CLIENT: 사용자 페이지 접근 거부됨 (예상대로)');
-    } else if (isTableVisible) {
-      // 테이블이 보이면 등록 버튼이 없어야 함
-      const createButton = page
-        .locator('button')
-        .filter({ hasText: /등록|추가|생성|New User/i })
-        .first();
-      const createButtonVisible = await createButton
-        .isVisible({ timeout: 2000 })
-        .catch(() => false);
-
-      if (!createButtonVisible) {
-        console.log('✅ CLIENT: 사용자 목록 보임, 등록 버튼 없음 (예상대로)');
-      } else {
-        // 버튼이 있으면 권한 문제일 수 있음 - 경고
-        console.log('⚠️ CLIENT에게 등록 버튼이 보임 - 권한 설정 확인 필요');
-      }
-    } else {
-      console.log('⚠️ 예상치 못한 UI 상태');
-    }
+    // API 가 403 이므로 목록에는 어떤 사용자 행도 있어서는 안 된다.
+    await expect(page.locator('tbody tr').filter({ hasText: '@example.com' })).toHaveCount(0);
   });
 });

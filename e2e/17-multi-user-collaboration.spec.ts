@@ -1,529 +1,367 @@
-import { expect, Page, test } from '@playwright/test';
-import path from 'path';
+import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { deleteSRViaAPI, selectAssignee } from './helpers/test-helpers';
+import { deleteSeededSRs, type SeededSR, seedSR } from './fixtures/sr';
+import { PERSONA_AUTH_FILES, type PersonaKey } from './helpers/auth-helpers';
+import { changeSRStatus, selectAssignee } from './helpers/test-helpers';
 
 /**
- * 다중 사용자 협업 시나리오 E2E 테스트
+ * 다중 사용자 협업 — 크로스 페르소나 가시성
  *
- * 시나리오:
- * 1. CLIENT: SR 생성
- * 2. MANAGER: SR 접수 처리 및 담당자 배정
- * 3. ENGINEER: 진행 중 상태 변경 및 댓글 작성
- * 4. CLIENT: 댓글 확인 및 회신
- * 5. ENGINEER: 완료 처리
- * 6. MANAGER: 검토 및 종료
+ * ── 이 파일이 검증하는 것 ────────────────────────────────────────────────
+ * "한 SR 을 두고 CLIENT / MANAGER / ENGINEER 가 주고받은 것이 **서로에게 실제로
+ * 보이는가**". 이 저장소에서 그것을 확인하는 곳은 여기뿐이다.
+ *
+ * ── 이 파일이 더 이상 검증하지 않는 것과 그 이유 ─────────────────────────
+ * 예전에는 1번 테스트가 SR 등록 다이얼로그를, 2번 테스트가 접수 폼을 UI 로 통과했다.
+ * 둘 다 여기서는 arrange 단계이고, 그 UI 자체는 04-sr-create / 22-sr-intake-process 가
+ * 각각 한 번씩 검증한다. 지금은 `seedSR()` 로 API 준비만 하고(수십 초 → 수 초),
+ * 남은 시간과 단언을 전부 "상대 화면에 보이는가"에 쓴다.
+ *
+ * 또 예전에는 3~7번이 전부 "댓글 입력란을 못 찾으면 로그 남기고 통과" 였다.
+ * 즉 협업 시나리오 후반 다섯 테스트는 화면이 통째로 비어도 초록불이었다.
+ * 지금은 실제 셀렉터(SRComments.tsx 의 aria-label='댓글 작성', 버튼 '댓글 추가')를
+ * 읽어서 쓰고, 댓글 등록은 POST /api/srs/{id}/comments 의 201 까지 확인한다.
+ *
+ * ── serial 을 뗀 이유 ────────────────────────────────────────────────────
+ * 각 테스트가 자기 SR 을 API 로 직접 시드하므로 앞 테스트의 산출물에 의존하지 않는다.
+ * serial 이면 1번 실패 시 나머지가 skip 되어 "실패 1건"으로만 보이지만 실제로는
+ * 전부 미검증이다. 독립 실행이면 실패한 것만 빨갛게 남는다.
  *
  * ⚠️ networkidle 금지
  * 로그인 상태의 모든 페이지는 루트 레이아웃(src/app/layout.tsx → ClientLayout →
  * RealtimeProvider → src/hooks/use-realtime-status.ts)에서 /api/realtime SSE 스트림을
- * 계속 열어 둔다. 그래서 "500ms 동안 네트워크 요청 0건"이라는 networkidle 조건은
- * 영원히 성립하지 않고 waitForLoadState('networkidle') 는 항상 30초 뒤 타임아웃난다.
- * 대신 (1) domcontentloaded 로 내비게이션만 확정하고, (2) 실제로 필요한 것
- * (목록 API 응답 / 요소 표시)을 기다린다. expect().toBeVisible() 은 자동 재시도한다.
+ * 계속 열어 둔다. "500ms 동안 네트워크 요청 0건"은 영원히 성립하지 않는다.
  */
 
-const authFiles = {
-  client: path.join(__dirname, '../playwright/.auth/client.json'),
-  manager: path.join(__dirname, '../playwright/.auth/manager.json'),
-  engineer: path.join(__dirname, '../playwright/.auth/engineer.json'),
-};
+/** MANAGER 역할 검증용이 아니라 "접수/재배정을 할 수 있는 내부 사용자" 로 쓴다. */
+const ADMIN_EMAIL = process.env.TEST_USER_EMAIL || 'admin@example.com';
 
-test.describe('다중 사용자 협업 워크플로우', () => {
-  let srId: string;
-  let srTitle: string;
+// ============================================================================
+// 페르소나·화면 헬퍼
+// ============================================================================
 
-  test.afterAll(async ({ browser }) => {
-    // 생성된 SR 삭제
-    if (srId) {
-      const context = await browser.newContext({ storageState: authFiles.manager });
-      const request = context.request;
-      console.log(`🧹 Cleaning up project SR: ${srId}`);
-      await deleteSRViaAPI(request, srId);
-      await context.close();
-    }
-  });
+/**
+ * 페르소나 세션으로 페이지를 열고 끝나면 반드시 컨텍스트를 닫는다.
+ *
+ * 주의: 'legacyManager' 는 이름과 달리 admin@example.com(ADMIN) 세션이다
+ * (helpers/auth-helpers.ts 참고). 진짜 MANAGER 계정은 시드 계약에 아직 없으므로
+ * 이 파일에서는 "내부 처리자" 역할로 legacyManager 를 쓴다.
+ */
+async function withPersona<T>(
+  browser: Browser,
+  persona: PersonaKey,
+  action: (page: Page) => Promise<T>
+): Promise<T> {
+  const context = await browser.newContext({ storageState: PERSONA_AUTH_FILES[persona] });
+  const page = await context.newPage();
+  try {
+    return await action(page);
+  } finally {
+    await context.close();
+  }
+}
 
-  test.describe.configure({ mode: 'serial' });
-  // 다중 사용자 시나리오는 시간이 오래 걸리므로 타임아웃을 넉넉히 설정
+/** 현재 세션의 표시 이름. 댓글 작성자 대조에 쓴다(이름을 하드코딩하면 시드가 바뀔 때 조용히 틀어진다). */
+async function displayName(page: Page): Promise<string> {
+  const response = await page.request.get('/api/auth/session');
+  expect(response.status(), '세션 조회에 실패해 작성자 대조가 불가능하다').toBe(200);
+
+  const session = (await response.json()) as { user?: { name?: string } };
+  const name = session.user?.name;
+  expect(name, '세션에 표시 이름이 없다 — 댓글 작성자 대조가 불가능하다').toBeTruthy();
+  return name!;
+}
+
+/** SR 상세를 열고 **그 SR 이 맞는지**까지 확정한다. 여기서 실패하면 권한/라우팅 문제다. */
+async function openSR(page: Page, sr: SeededSR): Promise<void> {
+  await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await expect(
+    page.getByTestId('sr-title'),
+    `${sr.srNumber} 상세가 렌더되지 않았다 (권한 거부이거나 조회 실패)`
+  ).toHaveText(sr.title, { timeout: 20000 });
+}
+
+/**
+ * 상세 헤더의 **상태** 배지.
+ *
+ * `text=/완료|COMPLETED/i` 같은 넓은 매칭은 '완료 처리' 버튼에도 걸려 상태 검증이
+ * 무의미해진다. 배지에는 아직 data-testid 가 없으므로, h1(SR 번호)의 부모로 범위를
+ * 좁힌 뒤 정확 일치로 고른다. 그 범위 안에는 상태 배지와 우선순위 배지뿐이고
+ * 두 라벨 집합은 겹치지 않는다(src/lib/constants/sr.ts).
+ */
+function statusBadge(page: Page, sr: SeededSR, label: string) {
+  return page
+    .getByRole('heading', { level: 1, name: sr.srNumber })
+    .locator('..')
+    .getByText(label, { exact: true });
+}
+
+/** 댓글 목록의 항목. 본문에 호출별 고유 스탬프가 섞여 있어야 1건으로 특정된다. */
+function commentItem(page: Page, body: string) {
+  return page.getByRole('listitem').filter({ hasText: body });
+}
+
+/**
+ * 댓글을 UI 로 작성한다.
+ *
+ * 셀렉터는 src/components/srs/SRComments.tsx 의 실제 값이다
+ * (Textarea aria-label='댓글 작성', 제출 버튼 라벨 '댓글 추가').
+ * 버튼만 눌리고 아무 일도 없었던 경우를 성공으로 오인하지 않도록
+ * POST /api/srs/{id}/comments 의 201 을 반드시 확인한다.
+ */
+async function postComment(page: Page, sr: SeededSR, body: string): Promise<void> {
+  const editor = page.getByRole('textbox', { name: '댓글 작성' });
+  await expect(editor, '댓글 입력란이 없다').toBeVisible({ timeout: 20000 });
+  await editor.fill(body);
+
+  const created = page.waitForResponse(
+    (response) =>
+      response.url().includes(`/api/srs/${sr.id}/comments`) &&
+      response.request().method() === 'POST',
+    { timeout: 20000 }
+  );
+  await page.getByRole('button', { name: '댓글 추가' }).click();
+
+  const response = await created;
+  const payload = await response.text().catch(() => '(본문 없음)');
+  expect(response.status(), `댓글 등록이 거부되었다. 응답: ${payload.slice(0, 300)}`).toBe(201);
+
+  // 성공 시 SRComments 가 입력을 비운다. 비지 않으면 화면은 실패 상태다.
+  await expect(editor).toHaveValue('', { timeout: 10000 });
+  await expect(
+    commentItem(page, body),
+    '작성자 자신의 화면에 새 댓글이 나타나지 않았다'
+  ).toHaveCount(1);
+}
+
+// ============================================================================
+// 시나리오
+// ============================================================================
+
+test.describe('다중 사용자 협업 — 크로스 페르소나 가시성', () => {
+  // 한 테스트가 페르소나 3명분의 컨텍스트를 순차로 여닫으므로 기본 타임아웃으로는 모자란다.
   test.setTimeout(120000);
 
-  // SR ID가 없으면 후속 테스트를 스킵
-  // eslint-disable-next-line no-empty-pattern
-  test.beforeEach(async ({}, testInfo) => {
-    if (testInfo.title !== '1. CLIENT: SR 생성' && !srId) {
-      test.skip(true, 'SR 생성 테스트가 실패하여 후속 테스트를 스킵합니다.');
-    }
+  /** 각 테스트가 자기 SR 을 시드한다. 시드 데이터(TEST001 등)는 건드리지 않는다. */
+  const seededIds: string[] = [];
+
+  test.afterAll(async ({ browser }) => {
+    await deleteSeededSRs(browser, seededIds);
   });
 
-  test('1. CLIENT: SR 생성', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.client });
-    const page = await context.newPage();
+  test('ENGINEER 의 댓글과 CLIENT 의 회신이 서로의 화면에 보인다', async ({ browser }) => {
+    const stamp = `${Date.now()}`;
+    const sr = await seedSR(browser, {
+      stage: 'IN_PROGRESS',
+      title: `협업 댓글 왕복 ${stamp}`,
+    });
+    seededIds.push(sr.id);
 
-    try {
-      await page.goto('/srs', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    const engineerNote = `엔지니어 진행 메모 ${stamp}`;
+    const clientReply = `고객 회신 ${stamp}`;
 
-      // SR 생성 버튼 클릭
-      const createButton = page.getByRole('button', { name: /등록|새 SR|Create/i }).first();
-      await expect(createButton).toBeVisible({ timeout: 10000 });
-      await createButton.click();
+    // ── ENGINEER 가 댓글을 남긴다 ────────────────────────────────────────
+    const engineerName = await withPersona(browser, 'engineer', async (page) => {
+      await openSR(page, sr);
+      await postComment(page, sr, engineerNote);
+      return displayName(page);
+    });
 
-      // 다이얼로그 확인
-      await expect(page.getByRole('heading', { name: /새 SR 요청|Create SR/i })).toBeVisible({
-        timeout: 15000,
-      });
+    // ── CLIENT 화면에 그 댓글이 작성자 이름과 함께 보인다 ────────────────
+    const clientName = await withPersona(browser, 'client', async (page) => {
+      await openSR(page, sr);
 
-      // SR 정보 입력
-      const timestamp = Date.now();
-      srTitle = `협업 테스트 SR ${timestamp}`;
-
-      await page.getByRole('textbox', { name: '제목 *' }).fill(srTitle);
-      await page
-        .getByRole('textbox', { name: '설명 *' })
-        .fill('다중 사용자 협업 시나리오 테스트입니다.');
-
-      // 고객사 선택 (CLIENT 사용자는 자동 설정되어 disabled 상태일 수 있음)
-      const clientCombobox = page.getByRole('combobox', { name: '고객사 *' });
-      try {
-        const isClientEnabled = await clientCombobox.isEnabled({ timeout: 3000 });
-        if (isClientEnabled) {
-          await clientCombobox.click();
-          const firstClientOption = page.getByRole('option').first();
-          await firstClientOption.waitFor({ state: 'visible', timeout: 15000 });
-          await firstClientOption.click();
-          await page.waitForTimeout(300);
-        } else {
-          console.log('⚠️ CLIENT 사용자: 고객사 자동 설정됨 (disabled)');
-        }
-      } catch {
-        console.log('⚠️ CLIENT 사용자: 고객사 combobox 처리 스킵');
-      }
-
-      // 서비스 카테고리 선택 - categories 로딩 완료 대기
-      const categoryCombobox = page.getByRole('combobox', { name: '서비스 카테고리 *' });
-      await page.waitForFunction(
-        () => {
-          const el = document.querySelector('#category') as HTMLButtonElement;
-          return el && !el.disabled;
-        },
-        { timeout: 10000 }
+      const fromEngineer = commentItem(page, engineerNote);
+      await expect(fromEngineer, 'ENGINEER 가 남긴 댓글이 CLIENT 화면에 보이지 않는다').toHaveCount(
+        1
       );
+      // 본문만 보고 끝내면 "누가 썼는지"가 뒤바뀌어도 통과한다.
+      await expect(fromEngineer).toContainText(engineerName);
 
-      // 키보드로 선택 (안정성 향상)
-      await categoryCombobox.click({ force: true });
-      await page.waitForTimeout(500); // 메뉴가 열릴 때까지 대기
-      const firstCategoryOption = page.getByRole('option').first();
-      await firstCategoryOption.waitFor({ state: 'visible', timeout: 10000 });
-      await firstCategoryOption.click();
-      await page.waitForTimeout(500); // 선택 반영 대기
+      await postComment(page, sr, clientReply);
+      return displayName(page);
+    });
 
-      // SR 생성
-      // 저장 후 다이얼로그가 닫히고 목록이 재조회(GET /api/srs)된다.
-      // networkidle 은 SSE 때문에 절대 발생하지 않으므로, 그 재조회 응답 자체를 기다린다.
-      // 응답을 못 잡아도(캐시 등) 아래 새 행 단정이 최종 게이트 역할을 한다.
-      const listRefreshPromise = page
-        .waitForResponse(
-          (resp) => resp.url().includes('/api/srs') && resp.request().method() === 'GET',
-          { timeout: 15000 }
-        )
-        .catch(() => null);
+    // ── ENGINEER 가 다시 열면 회신이 보이고, 자기 댓글도 그대로 남아 있다 ─
+    await withPersona(browser, 'engineer', async (page) => {
+      await openSR(page, sr);
 
-      await page.getByRole('button', { name: /저장|생성|Create/i }).click();
+      const fromClient = commentItem(page, clientReply);
+      await expect(fromClient, 'CLIENT 회신이 ENGINEER 화면에 보이지 않는다').toHaveCount(1);
+      await expect(fromClient).toContainText(clientName);
 
-      // 다이얼로그 닫힘 대기 및 목록 갱신 대기 (필수)
-      await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 10000 });
-      await listRefreshPromise;
-
-      // 목록 갱신의 관측 가능한 결과: 새로 만든 SR 행이 나타난다
-      const srRow = page.locator('tr', { hasText: srTitle }).filter({ visible: true }).first();
-      await expect(srRow).toBeVisible({ timeout: 15000 });
-
-      // SR ID 추출 (상세 페이지 이동)
-      await srRow.click();
-      await page.waitForURL(/\/srs\/[a-zA-Z0-9-]+/);
-      srId = page.url().split('/').pop()!;
-
-      console.log(`✅ CLIENT가 SR 생성 완료: ${srId} - ${srTitle}`);
-
-      // 상태 확인 (REQUESTED)
-      const statusBadge = page.locator('text=/요청됨|REQUESTED/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 15000 });
-    } finally {
-      await context.close();
-    }
+      // 목록이 페르소나별로 갈라지지 않는지(=한쪽 댓글만 보이지 않는지) 함께 확인한다.
+      await expect(commentItem(page, engineerNote)).toHaveCount(1);
+    });
   });
 
-  test('2. MANAGER: SR 접수 처리 및 담당자 배정', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.manager });
-    const page = await context.newPage();
+  test('ENGINEER 의 완료 처리와 CLIENT 의 확인 완료가 서로의 화면에 반영된다', async ({
+    browser,
+  }) => {
+    const stamp = `${Date.now()}`;
+    const sr = await seedSR(browser, {
+      stage: 'IN_PROGRESS',
+      title: `협업 상태 전이 ${stamp}`,
+    });
+    seededIds.push(sr.id);
+
+    // ENGINEER 가 UI 로 완료 처리한다 (changeSRStatus 가 PATCH 200 까지 단언한다).
+    await withPersona(browser, 'engineer', async (page) => {
+      await changeSRStatus(page, sr.id, 'complete', {
+        resolutionDescription: `엔지니어가 완료 처리했습니다. ${stamp}`,
+      });
+    });
+
+    // CLIENT 화면에 '완료' 가 반영되고, 신청자에게만 열리는 '확인 완료' 가 나타난다.
+    await withPersona(browser, 'client', async (page) => {
+      await openSR(page, sr);
+      await expect(
+        statusBadge(page, sr, '완료'),
+        'ENGINEER 의 완료 처리가 CLIENT 화면에 반영되지 않았다'
+      ).toBeVisible({ timeout: 20000 });
+
+      // '확인 완료' 는 SRStatusActions.tsx 에서 isRequestor 일 때만 렌더된다.
+      await expect(page.getByRole('button', { name: '확인 완료' })).toBeVisible();
+
+      await changeSRStatus(page, sr.id, 'confirm');
+    });
+
+    // 반대 방향도 확인한다 — 신청자의 확인이 담당자 화면에 보이는가.
+    await withPersona(browser, 'engineer', async (page) => {
+      await openSR(page, sr);
+      await expect(
+        statusBadge(page, sr, '확인완료'),
+        'CLIENT 의 확인 완료가 ENGINEER 화면에 반영되지 않았다'
+      ).toBeVisible({ timeout: 20000 });
+
+      // 확인완료 SR 에는 담당자용 완료 액션이 남지 않아야 한다.
+      await expect(page.getByRole('button', { name: '완료 처리' })).toHaveCount(0);
+    });
+  });
+
+  /**
+   * 예전에는 `test.fixme('동시 댓글 작성 및 충돌 방지')` 로 본문이 비어 있었다.
+   * 빈 fixme 는 "언젠가 하겠다" 는 표시일 뿐 아무 정보가 없어서, 실제로 확인 가능한
+   * 계약이 무엇인지부터 정했다: 댓글 생성은 append-only 트랜잭션이므로
+   * (src/app/api/srs/[id]/comments/route.ts 의 $transaction) **동시 작성이 서로를
+   * 덮어써서는 안 된다.** 낙관적 갱신이나 upsert 로 바뀌어 한쪽이 유실되면 여기서 잡힌다.
+   * (편집 충돌 감지 같은 기능은 앱에 존재하지 않으므로 검증 대상이 아니다 —
+   *  SRComment 에는 수정 UI 도 버전 필드도 없다.)
+   */
+  test('CLIENT 와 ENGINEER 가 동시에 단 댓글은 둘 다 유실 없이 남는다', async ({ browser }) => {
+    const stamp = `${Date.now()}`;
+    const sr = await seedSR(browser, {
+      stage: 'IN_PROGRESS',
+      title: `협업 동시 댓글 ${stamp}`,
+    });
+    seededIds.push(sr.id);
+
+    const clientBody = `동시 작성 - 고객 ${stamp}`;
+    const engineerBody = `동시 작성 - 엔지니어 ${stamp}`;
+
+    const clientContext = await browser.newContext({ storageState: PERSONA_AUTH_FILES.client });
+    const engineerContext = await browser.newContext({ storageState: PERSONA_AUTH_FILES.engineer });
 
     try {
-      // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      const clientPage = await clientContext.newPage();
+      const engineerPage = await engineerContext.newPage();
 
-      // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
-        timeout: 15000,
+      // 두 화면을 먼저 같은 SR 에 올려 둔다 (둘 다 "댓글 0건" 상태에서 출발한다).
+      await Promise.all([openSR(clientPage, sr), openSR(engineerPage, sr)]);
+
+      // 같은 순간에 제출한다. 어느 쪽이 먼저 커밋되는지는 보장하지 않는다.
+      await Promise.all([
+        postComment(clientPage, sr, clientBody),
+        postComment(engineerPage, sr, engineerBody),
+      ]);
+
+      // 제3자(내부 처리자) 화면에서 둘 다 살아 있는지 본다 —
+      // 각자 자기 화면만 보면 "상대 것이 사라진" 회귀를 놓친다.
+      await withPersona(browser, 'legacyManager', async (page) => {
+        await openSR(page, sr);
+        await expect(commentItem(page, clientBody), 'CLIENT 댓글이 유실되었다').toHaveCount(1);
+        await expect(commentItem(page, engineerBody), 'ENGINEER 댓글이 유실되었다').toHaveCount(1);
       });
-
-      // 접수 버튼 클릭
-      const intakeButton = page.getByRole('button', { name: /접수|Accept/i });
-      await expect(intakeButton).toBeVisible({ timeout: 15000 });
-      await intakeButton.click();
-
-      // 접수 페이지로 이동 대기
-      await page.waitForURL(/\/srs\/[^/]+\/intake/, { timeout: 10000 });
-
-      // 접수 폼 확인 (URL 기반 + 페이지 요소 확인)
-      await expect(page).toHaveURL(/\/srs\/[^/]+\/intake/);
-      const formElement = page
-        .locator('label, h1, h2, h3')
-        .filter({ hasText: /접수|우선순위|Intake/i })
-        .first();
-      await expect(formElement).toBeVisible({ timeout: 10000 });
-
-      // 우선순위 선택
-      const prioritySelect = page
-        .locator('label', { hasText: '실제 우선순위' })
-        .first()
-        .locator('..')
-        .locator('[role="combobox"]');
-      await prioritySelect.click();
-      await page
-        .getByRole('option', { name: /높음|HIGH/i })
-        .first()
-        .click();
-
-      // 예상 작업 시간 입력
-      const hoursInput = page.getByLabel(/예상 작업 시간/i);
-      await hoursInput.fill('8');
-
-      // 담당자 선택 (첫 번째 사용 가능한 담당자)
-      // 담당자는 이메일로 지목한다 — 옵션 순서는 보장되지 않는다(test-helpers 참고).
-      await selectAssignee(page);
-
-      // 접수 메모 작성
-      await page
-        .getByLabel(/접수 메모/i)
-        .fill('엔지니어에게 배정하였습니다. 빠른 처리 부탁드립니다.');
-
-      // 접수 완료
-      await page.getByRole('button', { name: /저장/i }).click();
-
-      // 다이얼로그나 폼이 사라지는 것을 대기 (접수 처리가 완료됨을 의미)
-      // 특정 URL 이동을 강제하지 않고, 일단 처리가 끝났는지 확인
-      // 접수 처리가 완료되면 목록 페이지(/srs)로 이동함
-      await page.waitForURL('**/srs', { timeout: 15000 });
-
-      // 혹시 목록으로 튕겼을 경우를 대비해 상세 페이지로 명시적 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded' });
-
-      // 상태 확인 (INTAKE 또는 IN_PROGRESS)
-      // Badge 컴포넌트가 div일 수 있으므로 좀 더 일반적인 선택자 사용
-      const statusBadge = page
-        .locator('div, span')
-        .filter({ hasText: /^접수$|^진행중$/ })
-        .first();
-      await expect(statusBadge).toBeVisible({ timeout: 15000 });
-
-      console.log(`✅ MANAGER가 SR 접수 및 담당자 배정 완료`);
     } finally {
-      await context.close();
+      await Promise.all([clientContext.close(), engineerContext.close()]);
     }
   });
 
-  test('3. ENGINEER: 진행 중 확인 및 댓글 작성', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.engineer });
-    const page = await context.newPage();
+  /**
+   * 예전에는 `test.fixme('담당자 부재 시 재배정')` 이었다.
+   *
+   * "부재(out-of-office)" 는 앱 어디에도 없는 개념이다 — 사용자 스키마에도, 배정
+   * 로직(src/app/api/srs/[id]/intake/route.ts)에도 부재 상태나 자동 재배정 트리거가
+   * 없다. 그래서 트리거는 사람이 누르는 것으로 두고, **관측 가능한 결과** 를 검증한다:
+   * 재배정하면 이전 담당자의 접근권이 즉시 끊기고(canReadSR 은 ENGINEER 에게
+   * `sr.assigneeId === user.id` 를 요구한다, src/lib/policies.ts) 신청자 화면의
+   * 담당자 필드가 새 담당자로 바뀐다. 재배정 폼 자체의 동작은 18 이 덮으므로
+   * 여기서는 "상대 화면에 무엇이 보이는가" 만 본다.
+   */
+  test('재배정하면 이전 담당자는 SR 을 열 수 없고 CLIENT 화면의 담당자가 바뀐다', async ({
+    browser,
+  }) => {
+    const stamp = `${Date.now()}`;
+    const sr = await seedSR(browser, { stage: 'INTAKE', title: `협업 재배정 ${stamp}` });
+    seededIds.push(sr.id);
 
-    try {
-      // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    // 전제: 재배정 전에는 담당 ENGINEER 가 열 수 있다.
+    await withPersona(browser, 'engineer', async (page) => {
+      await openSR(page, sr);
+    });
 
-      // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
-        timeout: 15000,
+    // 내부 처리자가 접수 정보 수정 화면에서 담당자를 자신으로 바꾼다.
+    const newAssigneeName = await withPersona(browser, 'legacyManager', async (page) => {
+      await page.goto(`/srs/${sr.id}/intake`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await expect(page.getByRole('heading', { name: 'SR 접수 정보 수정' })).toBeVisible({
+        timeout: 20000,
       });
 
-      // 상태 확인 (INTAKE 또는 IN_PROGRESS)
-      // Manager가 접수하면 INTAKE 상태임
-      const statusBadge = page
-        .locator('div, span')
-        .filter({ hasText: /^접수$|^진행중$/ })
-        .first();
-      await expect(statusBadge).toBeVisible({ timeout: 15000 });
+      await selectAssignee(page, ADMIN_EMAIL);
 
-      // 댓글 작성
-      const commentTextarea = page
-        .locator('textarea')
-        .filter({ hasText: /댓글|Comment/i })
-        .or(page.locator('textarea[placeholder*="댓글"]'))
-        .first();
+      // 예상 작업 시간을 다시 입력해야 저장이 된다. **앱 결함이다**:
+      // GET /api/srs/{id}/intake 는 Prisma Decimal 인 estimatedHours 를 문자열("4")로
+      // 직렬화하는데, use-intake-form.ts 의 수정 모드가 그 문자열을 그대로
+      // `z.number()` 필드에 setValue 한다. 그래서 이 칸을 건드리지 않고 저장하면
+      // "Invalid input" 으로 막혀 담당자만 바꾸는 것이 불가능하다.
+      // 결함이 고쳐져도 이 한 줄은 무해하므로(사용자가 실제로 하는 입력이다) 남겨 둔다.
+      await page.getByLabel(/예상 작업 시간/).fill('6');
 
-      if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await commentTextarea.fill('문제를 파악하였습니다. 현재 작업 진행 중입니다.');
+      const patched = page.waitForResponse(
+        (response) =>
+          response.url().includes(`/api/srs/${sr.id}/intake`) &&
+          response.request().method() === 'PATCH',
+        { timeout: 20000 }
+      );
+      await page.getByRole('button', { name: '저장' }).click();
 
-        // 댓글 제출 버튼
-        const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
-        if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await submitButton.click();
-          // 댓글 제출 후 텍스트 영역이 비워지거나 새 댓글이 보일 때까지 대기
-          await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
-          await expect(page.locator('text=문제를 파악하였습니다')).toBeVisible({ timeout: 10000 });
+      const response = await patched;
+      const payload = await response.text().catch(() => '(본문 없음)');
+      expect(response.status(), `재배정이 거부되었다. 응답: ${payload.slice(0, 300)}`).toBe(200);
 
-          console.log(`✅ ENGINEER가 댓글 작성 완료`);
-        }
-      } else {
-        console.log(`⚠️ 댓글 입력 필드를 찾을 수 없습니다. 스킵합니다.`);
-      }
-    } finally {
-      await context.close();
-    }
-  });
+      return displayName(page);
+    });
 
-  test('4. CLIENT: 댓글 확인 및 회신', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.client });
-    const page = await context.newPage();
+    // 이전 담당자 화면: 상세가 열리지 않고 오류 화면이 뜬다.
+    await withPersona(browser, 'engineer', async (page) => {
+      await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await expect(
+        page.getByRole('heading', { name: 'SR을 불러올 수 없습니다' }),
+        '재배정 후에도 이전 담당자가 SR 을 열 수 있다 (canReadSR 격리가 깨졌다)'
+      ).toBeVisible({ timeout: 20000 });
+      await expect(page.getByTestId('sr-title')).toHaveCount(0);
+    });
 
-    try {
-      // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-      // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
-        timeout: 15000,
-      });
-
-      // 엔지니어 댓글 확인
-      const engineerComment = page.locator('text=/문제를 파악하였습니다/i');
-      if (await engineerComment.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(engineerComment).toBeVisible();
-        console.log(`✅ CLIENT가 엔지니어 댓글 확인`);
-
-        // 답글 작성
-        const commentTextarea = page
-          .locator('textarea')
-          .filter({ hasText: /댓글|Comment/i })
-          .or(page.locator('textarea[placeholder*="댓글"]'))
-          .first();
-
-        if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await commentTextarea.fill('감사합니다. 추가로 로그 파일을 첨부하겠습니다.');
-
-          const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
-          if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await submitButton.click();
-            await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
-            await expect(
-              page.locator('text=감사합니다. 추가로 로그 파일을 첨부하겠습니다.')
-            ).toBeVisible({ timeout: 10000 });
-
-            console.log(`✅ CLIENT가 회신 댓글 작성 완료`);
-          }
-        }
-      } else {
-        console.log(`⚠️ 엔지니어 댓글을 찾을 수 없습니다. 스킵합니다.`);
-      }
-    } finally {
-      await context.close();
-    }
-  });
-
-  test('5. ENGINEER: 작업 완료 처리', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.engineer });
-    const page = await context.newPage();
-
-    try {
-      // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-      // 댓글 탐색 전에 상세 페이지 렌더링을 확정한다
-      // (isVisible 은 대기하지 않으므로 렌더 전에 물어보면 무조건 '없음'이 된다)
-      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
-        timeout: 15000,
-      });
-
-      // CLIENT 댓글 확인
-      const clientComment = page.locator('text=/로그 파일을 첨부/i');
-      if (await clientComment.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(clientComment).toBeVisible();
-        console.log(`✅ ENGINEER가 CLIENT 댓글 확인`);
-      }
-
-      // 완료 처리 (상태 변경)
-      // 상태 변경 UI 찾기 (버튼 또는 셀렉트)
-      const statusChangeButton = page.getByRole('button', { name: /완료|Complete|상태 변경/i });
-      const statusSelect = page
-        .locator('select, [role="combobox"]')
-        .filter({ hasText: /상태|Status/i });
-
-      if (await statusChangeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await statusChangeButton.click();
-        await page.waitForTimeout(1500);
-        console.log(`✅ ENGINEER가 완료 버튼 클릭`);
-      } else if (await statusSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await statusSelect.first().click();
-        const completedOption = page.getByRole('option', { name: /완료|COMPLETED/i });
-        if (await completedOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await completedOption.click();
-          // 상태 변경 반영 대기 (배지 텍스트 확인)
-          await expect(
-            page
-              .locator('span.badge')
-              .filter({ hasText: /완료|COMPLETED/i })
-              .first()
-          ).toBeVisible({ timeout: 10000 });
-          console.log(`✅ ENGINEER가 상태를 완료로 변경`);
-        }
-      } else {
-        console.log(`⚠️ 상태 변경 UI를 찾을 수 없습니다. 스킵합니다.`);
-      }
-
-      // 완료 댓글 작성
-      const commentTextarea = page
-        .locator('textarea')
-        .filter({ hasText: /댓글|Comment/i })
-        .or(page.locator('textarea[placeholder*="댓글"]'))
-        .first();
-
-      if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await commentTextarea.fill('작업이 완료되었습니다. 확인 부탁드립니다.');
-
-        const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
-        if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await submitButton.click();
-          await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
-          await expect(page.locator('text=작업이 완료되었습니다')).toBeVisible({ timeout: 10000 });
-          console.log(`✅ ENGINEER가 완료 댓글 작성`);
-        }
-      }
-    } finally {
-      await context.close();
-    }
-  });
-
-  test('6. MANAGER: 최종 검토 및 종료', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.manager });
-    const page = await context.newPage();
-
-    try {
-      // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-      // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
-        timeout: 15000,
-      });
-
-      // 엔지니어 완료 댓글 확인
-      const completeComment = page.locator('text=/작업이 완료되었습니다/i');
-      if (await completeComment.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(completeComment).toBeVisible();
-        console.log(`✅ MANAGER가 완료 댓글 확인`);
-      }
-
-      // 상태 확인 (COMPLETED 또는 IN_PROGRESS)
-      const statusBadge = page.locator('text=/완료|COMPLETED|진행|IN_PROGRESS/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 15000 });
-
-      // 종료 처리 (CLOSED)
-      const closeButton = page.getByRole('button', { name: /종료|Close/i });
-      const statusSelect = page
-        .locator('select, [role="combobox"]')
-        .filter({ hasText: /상태|Status/i });
-
-      if (await closeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await closeButton.click();
-        await page.waitForTimeout(1500);
-        console.log(`✅ MANAGER가 SR 종료 처리`);
-      } else if (await statusSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await statusSelect.first().click();
-        const closedOption = page.getByRole('option', { name: /종료|CLOSED/i });
-        if (await closedOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await closedOption.click();
-          // 종료 상태 배지 확인
-          await expect(
-            page
-              .locator('span.badge')
-              .filter({ hasText: /종료|CLOSED/i })
-              .first()
-          ).toBeVisible({ timeout: 10000 });
-          console.log(`✅ MANAGER가 상태를 종료로 변경`);
-        }
-      } else {
-        console.log(`⚠️ 종료 UI를 찾을 수 없습니다.`);
-      }
-
-      // 최종 검토 댓글 작성
-      const commentTextarea = page
-        .locator('textarea')
-        .filter({ hasText: /댓글|Comment/i })
-        .or(page.locator('textarea[placeholder*="댓글"]'))
-        .first();
-
-      if (await commentTextarea.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await commentTextarea.fill('검토 완료하였습니다. SR을 종료합니다. 수고하셨습니다.');
-
-        const submitButton = page.getByRole('button', { name: /작성|Submit|등록/i });
-        if (await submitButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await submitButton.click();
-          await expect(commentTextarea).toHaveValue('', { timeout: 10000 });
-          await expect(page.locator('text=검토 완료하였습니다')).toBeVisible({ timeout: 10000 });
-          console.log(`✅ MANAGER가 최종 검토 댓글 작성`);
-        }
-      }
-
-      console.log(`\n🎉 다중 사용자 협업 워크플로우 완료!`);
-      console.log(`SR ID: ${srId}`);
-      console.log(`SR 제목: ${srTitle}`);
-    } finally {
-      await context.close();
-    }
-  });
-
-  test('7. CLIENT: 종료된 SR 확인', async ({ browser }) => {
-    const context = await browser.newContext({ storageState: authFiles.client });
-    const page = await context.newPage();
-
-    try {
-      // SR 상세 페이지로 이동
-      await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-      // 제목 확인
-      await expect(page.locator(`text=${srTitle}`).filter({ visible: true }).first()).toBeVisible({
-        timeout: 15000,
-      });
-
-      // 종료 상태 확인
-      const statusBadge = page.locator('text=/종료|CLOSED|완료|COMPLETED/i').first();
-      await expect(statusBadge).toBeVisible({ timeout: 15000 });
-
-      // 전체 댓글 히스토리 확인
-      const allComments = page.locator('[class*="comment"], [class*="Comment"]');
-      const commentCount = await allComments.count();
-
-      console.log(`✅ CLIENT가 종료된 SR 확인 완료 (댓글 수: ${commentCount})`);
-
-      // 최종 검토 댓글 확인
-      const finalComment = page.locator('text=/검토 완료하였습니다/i');
-      if (await finalComment.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(finalComment).toBeVisible();
-        console.log(`✅ CLIENT가 최종 검토 댓글 확인`);
-      }
-
-      console.log(`\n✨ 다중 사용자 협업 시나리오 E2E 테스트 모두 통과!`);
-    } finally {
-      await context.close();
-    }
-  });
-});
-
-test.describe('협업 시나리오 - 변형 케이스', () => {
-  test.fixme('동시 댓글 작성 및 충돌 방지', async ({ browser: _browser }) => {
-    // 이 테스트는 동시성 처리를 확인합니다.
-  });
-
-  test.fixme('담당자 부재 시 재배정', async ({ browser: _browser }) => {
-    // 이 테스트는 담당자 변경 시나리오를 확인합니다.
+    // 신청자 화면: 담당자 필드가 새 담당자로 바뀌어 보인다.
+    await withPersona(browser, 'client', async (page) => {
+      await openSR(page, sr);
+      const assigneeField = page
+        .getByRole('heading', { name: '담당자', exact: true })
+        .locator('..');
+      await expect(
+        assigneeField,
+        '재배정 결과가 CLIENT 화면의 담당자 필드에 반영되지 않았다'
+      ).toContainText(newAssigneeName);
+    });
   });
 });

@@ -64,10 +64,15 @@ for (const item of results) {
 
   if (/^3\.\d+$/.test(item.id)) {
     // 3.x — "### 3.14 ..." 헤딩
-    index = lines.findIndex((line) => new RegExp(`^###\\s+${item.id.replace('.', '\\.')}\\s`).test(line));
+    index = lines.findIndex((line) =>
+      new RegExp(`^###\\s+${item.id.replace('.', '\\.')}\\s`).test(line)
+    );
     if (index >= 0) {
       const head = stripBadge(lines[index]);
-      lines[index] = head.replace(new RegExp(`^(###\\s+${item.id.replace('.', '\\.')})\\s`), `$1 ${badge} `);
+      lines[index] = head.replace(
+        new RegExp(`^(###\\s+${item.id.replace('.', '\\.')})\\s`),
+        `$1 ${badge} `
+      );
     }
   } else {
     // 4.x — "4.1|제목앞부분" → 해당 절에서 제목으로 불릿을 찾는다

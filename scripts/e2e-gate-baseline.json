@@ -7,22 +7,8 @@
     "noAssertionAllowlist 는 단언 없이 통과 중인 기존 테스트의 유예 목록이다. 새 항목 추가 금지.",
     "측정하지 않는 영역: \"관측 조건 if 안에 갇힌 expect\"(약 52건). 문법은 멀쩡하지만 요소를 못 찾으면 실행되지 않아 결과는 공허한 단언과 같다. 예산이 0 이 되어도 이 영역은 남는다."
   ],
-  "noAssertionAllowlist": [
-    "05-sr-detail.spec.ts:SR 탭 네비게이션",
-    "08-user-management.spec.ts:사용자 목록 페이지 접근 제한 확인",
-    "09-client-management.spec.ts:고객사 목록 페이지 접근 시 본인 고객사만 보이거나 제한됨",
-    "21-sr-status-transitions.spec.ts:7. 잘못된 상태 전이 차단 테스트",
-    "21-sr-status-transitions.spec.ts:CONFIRMED → IN_PROGRESS 재오픈 (7일 이내)",
-    "21-sr-status-transitions.spec.ts:재오픈 7일 제한 안내 UI 확인",
-    "22-sr-intake-process.spec.ts:6. Activity 로그 확인 (SR 상세 페이지)"
-  ],
+  "noAssertionAllowlist": ["05-sr-detail.spec.ts:SR 탭 네비게이션"],
   "files": {
-    "02-auth.spec.ts": {
-      "tolerantBranch": 1,
-      "vacuousAssertion": 1,
-      "fixedWaitCalls": 10,
-      "fixedWaitMs": 15000
-    },
     "04-sr-create.spec.ts": {
       "tolerantBranch": 0,
       "vacuousAssertion": 0,
@@ -35,59 +21,11 @@
       "fixedWaitCalls": 2,
       "fixedWaitMs": 800
     },
-    "08-user-management.spec.ts": {
-      "tolerantBranch": 3,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 3,
-      "fixedWaitMs": 3000
-    },
-    "09-client-management.spec.ts": {
-      "tolerantBranch": 6,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 10,
-      "fixedWaitMs": 7500
-    },
-    "10-sr-workflow-integrated.spec.ts": {
-      "tolerantBranch": 2,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 5,
-      "fixedWaitMs": 10000
-    },
     "12-role-management.spec.ts": {
       "tolerantBranch": 1,
       "vacuousAssertion": 0,
       "fixedWaitCalls": 2,
       "fixedWaitMs": 1000
-    },
-    "17-multi-user-collaboration.spec.ts": {
-      "tolerantBranch": 5,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 5,
-      "fixedWaitMs": 4300
-    },
-    "18-sr-reassignment-escalation.spec.ts": {
-      "tolerantBranch": 5,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 12,
-      "fixedWaitMs": 15800
-    },
-    "19-file-upload-download.spec.ts": {
-      "tolerantBranch": 13,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 15,
-      "fixedWaitMs": 17300
-    },
-    "21-sr-status-transitions.spec.ts": {
-      "tolerantBranch": 14,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 25,
-      "fixedWaitMs": 35600
-    },
-    "22-sr-intake-process.spec.ts": {
-      "tolerantBranch": 5,
-      "vacuousAssertion": 0,
-      "fixedWaitCalls": 23,
-      "fixedWaitMs": 17000
     },
     "24-organization-page.spec.ts": {
       "tolerantBranch": 0,
