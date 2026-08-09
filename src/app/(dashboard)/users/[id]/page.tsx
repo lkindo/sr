@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { notFound, useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Pencil, Shield, UserX } from 'lucide-react';
 
@@ -83,6 +83,13 @@ export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  /**
+   * 대상 사용자가 없다.
+   *
+   * notFound() 를 async 콜백(fetchUser) 안에서 부르면 React 가 그 예외를 렌더 에러로
+   * 잡지 못해 아무 일도 일어나지 않는다. 상태로 옮겨 **렌더 중에** 호출한다.
+   */
+  const [userMissing, setUserMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAssignRolesDialogOpen, setIsAssignRolesDialogOpen] = useState(false);
@@ -94,12 +101,12 @@ export default function UserDetailPage() {
       const response = await fetch(`/api/users/${params.id}`);
       if (!response.ok) {
         if (response.status === 404) {
-          toast({
-            title: '오류',
-            description: '사용자를 찾을 수 없습니다.',
-            variant: 'destructive',
-          });
-          router.push('/users');
+          // 예전에는 토스트를 띄우고 router.push('/users') 로 튕겼다. 그러면 (1) URL 이
+          // 목록으로 바뀌어 링크를 공유·북마크한 사람은 왜 튕겼는지 알 수 없고,
+          // (2) 뒤로가기를 누르면 다시 튕기는 루프가 되며, (3) 응답 자체는 200 이라
+          // 없는 페이지가 크롤러·모니터링에 정상으로 잡힌다.
+          // 이제 not-found 경계를 띄운다(호출은 아래 렌더 단계에서 한다).
+          setUserMissing(true);
           return;
         }
         throw new Error('Failed to fetch user');
@@ -132,6 +139,11 @@ export default function UserDetailPage() {
     fetchUser();
     setIsAssignRolesDialogOpen(false);
   };
+
+  // 렌더 중 호출이어야 Next 가 not-found 경계를 띄운다.
+  if (userMissing) {
+    notFound();
+  }
 
   if (loading) {
     return (

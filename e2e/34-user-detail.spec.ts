@@ -175,24 +175,24 @@ test.describe('/users/[id] 사용자 상세 (ADMIN)', () => {
     await expect(page.getByRole('heading', { name: user.name, level: 1 })).toBeVisible();
   });
 
-  test('존재하지 않는 id 는 404 를 받고 목록으로 되돌려보낸다', async ({ page }) => {
-    // 관측한 사실: 라우트 자체는 200 으로 열리고(클라이언트 컴포넌트),
-    // 클라이언트의 `GET /api/users/[id]` 가 404 를 받으면
-    // page.tsx:96-103 이 토스트를 띄운 뒤 router.push('/users') 로 되돌린다.
-    // 즉 "404 화면" 이 아니라 "목록으로 리디렉션" 이 이 화면의 계약이다.
+  test('존재하지 않는 id 는 404 화면을 보여 준다', async ({ page }) => {
+    // 예전 계약은 "토스트를 띄우고 /users 로 되돌리기" 였다. 그 방식은 URL 이 목록으로
+    // 바뀌어 링크를 공유·북마크한 사람이 왜 튕겼는지 알 수 없고, 뒤로가기를 누르면 다시
+    // 튕기는 루프가 되며, 응답 자체는 200 이라 없는 페이지가 정상으로 잡혔다.
+    // 이제 notFound() 로 Next 의 not-found 경계를 띄운다 — URL 이 유지된다.
     const detailFetch = page.waitForResponse(
       (response) =>
         response.url().includes(`/api/users/${MISSING_USER_ID}`) &&
         response.request().method() === 'GET'
     );
 
-    const navigation = await page.goto(`/users/${MISSING_USER_ID}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    expect(navigation?.status(), '동적 라우트 자체는 정상 렌더된다').toBe(200);
+    await page.goto(`/users/${MISSING_USER_ID}`, { waitUntil: 'domcontentloaded' });
     expect((await detailFetch).status(), 'API 는 404 를 돌려줘야 한다').toBe(404);
 
-    await page.waitForURL(/\/users$/);
-    await expect(page.getByRole('heading', { name: '사용자 목록', exact: true })).toBeVisible();
+    // not-found 화면이 떠야 한다 (src/app/not-found.tsx 의 문구).
+    await expect(page.getByText('페이지를 찾을 수 없습니다')).toBeVisible({ timeout: 20000 });
+
+    // URL 이 유지되어야 링크 공유·북마크·뒤로가기가 정상 동작한다.
+    await expect(page).toHaveURL(new RegExp(`/users/${MISSING_USER_ID}$`));
   });
 });
