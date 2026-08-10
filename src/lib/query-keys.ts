@@ -26,10 +26,22 @@
  * 남아 있는 `router.refresh()` 를 함께 걷어낼지 판단해야 한다.
  */
 
-/** 목록 쿼리의 파라미터. `undefined` 는 "그 필터를 걸지 않음" 이다. */
-export type ListParams = Record<string, string | number | boolean | undefined | null>;
+/**
+ * 목록 쿼리의 파라미터. `undefined` 는 "그 필터를 걸지 않음" 이다.
+ *
+ * export 하지 않는다 — 호출부는 객체 리터럴을 그대로 넘기므로 이 이름을 쓸 일이 없고,
+ * 내보내면 knip 이 미사용 export 로 잡는다.
+ */
+type ListParams = Record<string, string | number | boolean | undefined | null>;
 
-export const queryKeys = {
+/**
+ * 호출부에서 `qk.clients.list({...})` 로 읽힌다.
+ *
+ * 이름을 하나만 내보낸다. 예전에는 `queryKeys` 와 별칭 `qk` 를 함께 내보냈는데,
+ * 소비처 25곳이 전부 `qk` 만 쓰는데도 두 이름이 남아 knip 이 미사용 export +
+ * 중복 export 로 잡았다(2026-08-10 CI Dead code check 실패).
+ */
+export const qk = {
   /**
    * SR. `sr` 루트는 기존 훅(use-sr.ts, use-sr-infinite.ts)이 이미 쓰던 관례를 그대로 옮긴 것이다.
    *
@@ -96,6 +108,3 @@ export const queryKeys = {
     notifications: ['settings', 'notifications'] as const,
   },
 } as const;
-
-/** 짧게 쓰는 별칭. 호출부에서 `qk.clients.list({...})` 로 읽힌다. */
-export const qk = queryKeys;
