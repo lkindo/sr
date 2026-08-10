@@ -113,7 +113,7 @@
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^17.9.0",
     "husky": "^9.1.7",
-    "jsdom": "^28.1.0",
+    "jsdom": "^30.0.1",
     "knip": "^6.32.0",
     "lint-staged": "^16.2.7",
     "playwright": "^1.62.1",
