@@ -17,7 +17,12 @@ interface UserCardContextMenuProps {
   userName: string;
   isActive: boolean;
   children: React.ReactNode;
-  onToggleStatus?: (userId: string) => Promise<void>;
+  /**
+   * ⚠️ 두 번째 인자는 **현재 상태**다("원하는 상태" 가 아니다). 뒤집기는 받는 쪽이 한다 —
+   * `UsersClient.tsx` 의 `handleToggleActive(u.id, u.isActive)` 와 같은 관례다.
+   * 예전에는 `userId` 만 넘겨서 페이지가 보낼 값을 알 수 없었고, 그 결과 빈 본문이 나갔다.
+   */
+  onToggleStatus?: (userId: string, isActive: boolean) => Promise<void>;
 }
 
 export function UserCardContextMenu({
@@ -49,7 +54,8 @@ export function UserCardContextMenu({
     }
 
     try {
-      await onToggleStatus(userId);
+      // 현재 상태를 그대로 넘긴다. 뒤집는 책임은 페이지 쪽 mutation 에 있다.
+      await onToggleStatus(userId, isActive);
       toast({
         title: '성공',
         description: `${userName}이(가) ${isActive ? '비활성화' : '활성화'}되었습니다.`,

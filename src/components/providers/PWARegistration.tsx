@@ -60,9 +60,15 @@ export function PWARegistration() {
     }
 
     // 2. 설치 프로모션 이벤트 캡처 (모바일에서만 실행)
+    //
+    // 순서가 중요하다. `preventDefault()` 는 브라우저의 **네이티브 설치 프롬프트를
+    // 억제**하는 행위이지 "우리가 이벤트를 쓰겠다" 는 표시가 아니다. 예전 구현은
+    // 유예 검사보다 먼저 preventDefault() 를 불러서, 배너를 한 번 닫은 사용자에게
+    // 7일 동안 우리 배너도 네이티브 프롬프트도 뜨지 않는 — 앱을 설치할 방법이
+    // 아예 없는 — 상태를 만들었다.
+    // 따라서 유예 검사를 먼저 하고, **배너를 띄우기로 결정한 경우에만** 억제한다.
+    // 유예 중에는 아무것도 하지 않고 반환해 네이티브 프롬프트에 길을 내준다.
     const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-
       // 배너 유예 기간 확인 (7일 유예)
       try {
         const dismissedAt = localStorage.getItem('pwa-banner-dismissed-at');
@@ -73,17 +79,22 @@ export function PWARegistration() {
             const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;
 
             if (now - lastDismissed <= sevenDaysInMs) {
-              return; // 7일 이내라면 배너를 띄우지 않음
+              // 7일 이내라면 우리 배너는 띄우지 않는다. preventDefault() 를 부르지
+              // 않으므로 브라우저가 자체 설치 UI 를 그대로 띄울 수 있다.
+              return;
             }
           }
         }
       } catch (err) {
+        // 스토리지를 못 읽으면 유예 여부를 알 수 없다 — 배너를 띄우는 쪽으로 간다.
         logger.error(
           '[PWA] Error checking dismissed status',
           err instanceof Error ? err : new Error(String(err))
         );
       }
 
+      // 배너를 띄우기로 확정된 시점에만 네이티브 프롬프트를 억제한다.
+      e.preventDefault();
       setInstallPrompt(e);
       setShowInstallBanner(true);
     };

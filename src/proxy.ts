@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import NextAuth from 'next-auth';
 
-import { authConfig } from '@/auth.config';
+import { authConfig, isAuthPagePath } from '@/auth.config';
 
 // Edge-safe한 auth 설정만 사용하여 Edge Function 크기 제한 준수
 // bcryptjs, Prisma 등 Node.js 전용 의존성을 번들에서 제외
@@ -14,16 +14,29 @@ const ratelimit = rateLimiters.middleware;
 export default auth(async (req) => {
   // Next.js 내부 요청 및 static 자산은 미들웨어 로직을 건너뜀 (더블 슬래시 static chunk 로드 버그 방지)
   const { pathname } = req.nextUrl;
+  const isApiRoute = pathname.startsWith('/api/');
+
+  /**
+   * 확장자 기반 skip 은 **`/api/` 밖에서만** 적용한다.
+   *
+   * 예전에는 확장자만 보고 조기 반환했다. 그래서 `/api/files/report.json` 처럼 확장자로
+   * 끝나는 API 경로가 아래 레이트리밋을 **아예 타지 않았다.** 인가는 하위 `withAuth` 가
+   * 하므로 인증 우회는 아니었지만, `.json` 을 붙이는 것만으로 미들웨어 레이트리밋 예산을
+   * 무제한으로 쓸 수 있었다.
+   *
+   * `/_next/` 와 `/static/` 접두사는 `/api/` 와 겹칠 수 없으므로 그대로 둔다 —
+   * skip 의 원래 목적(더블 슬래시 static chunk 로드 버그 방지)은 이 두 접두사와
+   * 앱 정적 자산의 확장자 매칭으로 유지된다.
+   */
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/static/') ||
-    pathname.match(/\.(js|css|png|jpg|jpeg|gif|ico|svg|json|wasm)$/)
+    (!isApiRoute && /\.(js|css|png|jpg|jpeg|gif|ico|svg|json|wasm)$/.test(pathname))
   ) {
     return NextResponse.next();
   }
 
   // 1. API 라우트 및 Server Actions Rate Limiting
-  const isApiRoute = req.nextUrl.pathname.startsWith('/api/');
   const isServerAction = req.method === 'POST' && req.headers.has('next-action');
 
   if (isApiRoute || isServerAction) {
@@ -45,12 +58,13 @@ export default auth(async (req) => {
 
   // 2. 인증 처리
   const isLoggedIn = !!req.auth?.user;
-  const isAuthPage =
-    req.nextUrl.pathname.startsWith('/login') || req.nextUrl.pathname.startsWith('/register');
-  const isRootPath = req.nextUrl.pathname === '/';
+  // 판정은 `auth.config.ts` 의 단일 출처를 쓴다. 여기서 별도 구현을 갖고 있으면
+  // authorized() 콜백과 미들웨어가 서로 다른 경로를 "인증 페이지"로 볼 수 있다.
+  const isAuthPage = isAuthPagePath(pathname);
+  const isRootPath = pathname === '/';
 
   // 보호된 경로(API 제외)에 대해 명시적 리다이렉트 처리 (Edge-safe)
-  const isProtectedPath = !isAuthPage && !isRootPath && !req.nextUrl.pathname.startsWith('/api/');
+  const isProtectedPath = !isAuthPage && !isRootPath && !isApiRoute;
 
   if (!isLoggedIn && isProtectedPath) {
     return NextResponse.redirect(new URL('/login', req.nextUrl));

@@ -64,7 +64,6 @@ output.css
 .vercel
 .github
 .husky
-.storybook
 .stryker-tmp
 docs
 e2e
@@ -72,7 +71,7 @@ playwright
 playwright.config.ts
 vitest.config.ts
 vitest.setup.ts
-vitest.shims.d.ts
+vitest.setup.node.ts
 vitest.stryker.config.ts
 vitest.integration.setup.ts
 stryker.config.mjs
@@ -98,20 +97,23 @@ nginx
 
 # 테스트 파일은 운영 이미지에 들어갈 이유가 없고, 들어오면 오히려 빌드를 깨뜨린다.
 #
-# 2026-08-08 배포 실패가 그랬다. 이 파일은 vitest.shims.d.ts 를 제외하는데 테스트
-# 파일은 제외하지 않았다. 그 shim 의 `/// <reference types="@vitest/browser-playwright" />`
-# 가 jest-dom 매처를 vitest 의 Assertion 에 붙이는 유일한 경로였고, 도커에는 shim 없이
-# 테스트만 복사되어 `next build` 의 타입 검사가 매처를 못 찾고 205건을 쏟아냈다
+# 2026-08-08 배포 실패가 그랬다. 이 파일은 `vitest.shims.d.ts` 를 제외하는데 테스트
+# 파일은 제외하지 않았다. 그 shim 의 triple-slash 참조가 jest-dom 매처를 vitest 의
+# Assertion 에 붙이는 유일한 경로였고, 도커에는 shim 없이 테스트만 복사되어
+# `next build` 의 타입 검사가 매처를 못 찾고 205건을 쏟아냈다
 # (toBeInTheDocument does not exist on type 'Assertion<HTMLElement>').
 #
-# 직접 원인은 @vitest/browser 4.0.18 → 4.1.10 이지만, 진짜 문제는 **테스트 도구가
-# 없는 이미지에서 테스트를 타입 검사하고 있었다**는 구조다. shim 을 되돌려 넣는 것은
-# 같은 사고를 다음 버전까지 미루는 것에 불과하다. 테스트를 아예 보내지 않는다.
+# 진짜 문제는 **테스트 도구가 없는 이미지에서 테스트를 타입 검사하고 있었다**는 구조다.
+# shim 을 되돌려 넣는 것은 같은 사고를 다음 버전까지 미루는 것에 불과하다.
+# 테스트를 아예 보내지 않는다.
+#
+# 2026-08-10 갱신: Storybook 제거와 함께 `vitest.shims.d.ts` 자체가 사라졌다.
+# 매처 타입은 이제 `vitest.setup.ts` 의 `@testing-library/jest-dom/vitest` 서브패스가
+# 직접 제공한다(그쪽이 `declare module 'vitest'` 로 Assertion 을 증강한다).
+# 아래 제외 목록은 그대로 유지한다 — 사고의 구조적 원인은 shim 이 아니라 이 목록이었다.
 # 패턴 앞의 `**/` 는 필수다. docker 의 .dockerignore 는 최상위부터 매칭하므로
 # `__tests__` 만 쓰면 루트의 __tests__ 디렉터리 하나만 걸리고 src/ 하위는 그대로 들어온다.
 **/__tests__
 **/*.test.ts
 **/*.test.tsx
-**/*.stories.tsx
 tests
-.storybook

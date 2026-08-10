@@ -174,9 +174,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-        timeout-minutes: 5
+      # Playwright 브라우저 설치 스텝을 제거했다(2026-08-10).
+      # 이 잡은 E2E 를 돌리지 않는다. 브라우저가 필요했던 유일한 이유가
+      # `pnpm test:coverage` 안에 있던 Storybook 브라우저 모드 프로젝트였고,
+      # Storybook 을 제거하면서 그 프로젝트도 사라졌다. e2e-test 잡과 e2e.yml 의
+      # 동일 스텝은 **그대로 두어야 한다** — 그쪽은 실제로 브라우저를 쓴다.
 
       # `db push` 가 아니라 `migrate deploy` 를 쓴다.
       # 마이그레이션 파일이 빈 DB에 순서대로 적용되지 않으면 여기서 빨간불이 켜진다.

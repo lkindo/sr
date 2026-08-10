@@ -1,9 +1,11 @@
+import { createElement, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useToast } from '@/hooks/use-toast';
 
-import { AssignRolesDialog } from '../AssignRolesDialog';
+import { type AssignableRole, AssignRolesDialog } from '../AssignRolesDialog';
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: vi.fn() }));
 
@@ -24,7 +26,7 @@ vi.mock('@/components/ui', async () => (await import('@/__tests__/mocks/ui-primi
 
 const toast = vi.fn();
 
-const ROLES = [
+const ROLES: AssignableRole[] = [
   { id: 'r-1', name: 'ENGINEER', description: '기술 지원' },
   { id: 'r-2', name: 'CLIENT_USER', description: null },
   { id: 'r-3', name: 'MANAGER', description: '관리자' },
@@ -47,11 +49,40 @@ const baseProps = {
 
 const save = () => fireEvent.click(screen.getByRole('button', { name: /저장|할당/ }));
 
+/**
+ * 실물 Provider 로 감싼다.
+ *
+ * `@tanstack/react-query` 를 통째로 목킹하면 useQuery 만 있고 useMutation 이 없어서 죽는다.
+ * `retry: false` / `gcTime: 0` 은 실패 케이스(거절·네트워크 오류)가 재시도로 타임아웃나지
+ * 않게 하고, 테스트끼리 캐시가 새지 않게 한다.
+ */
+function renderDialog(props: Partial<Parameters<typeof AssignRolesDialog>[0]> = {}) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client }, children);
+  return render(<AssignRolesDialog {...baseProps} {...props} />, { wrapper });
+}
+
+/**
+ * api-client 는 성공 응답에서 `text()` 로 본문을 읽고(204·빈 본문 허용), 실패 응답에서만
+ * `json()` 을 읽는다. 목이 둘 다 갖고 있어야 진짜 응답처럼 굴러간다.
+ */
+function jsonResponse(status: number, body: unknown) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  } as unknown as Response;
+}
+
 /** 서버가 이 본문으로 거절했다고 가정한다. */
 const rejectWith = (body: unknown) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: false, json: async () => body }))
+    vi.fn(async () => jsonResponse(400, body))
   );
 
 beforeEach(() => {
@@ -59,26 +90,30 @@ beforeEach(() => {
   vi.mocked(useToast).mockReturnValue({ toast } as never);
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true, json: async () => ({}) }))
+    vi.fn(async () => jsonResponse(200, {}))
   );
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('AssignRolesDialog — 표시', () => {
   it('전달받은 역할 목록을 보여 준다', () => {
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     expect(screen.getByText('ENGINEER')).toBeInTheDocument();
     expect(screen.getByText('CLIENT_USER')).toBeInTheDocument();
   });
 
   it('availableRoles 를 주면 /api/roles 를 부르지 않는다', () => {
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it('검색어로 역할을 좁힌다', () => {
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     fireEvent.change(screen.getByPlaceholderText('역할 검색...'), {
       target: { value: 'client' },
@@ -90,7 +125,7 @@ describe('AssignRolesDialog — 표시', () => {
   });
 
   it('닫혀 있으면 렌더하지 않는다', () => {
-    render(<AssignRolesDialog {...baseProps} open={false} />);
+    renderDialog({ open: false });
 
     expect(screen.queryByText('ENGINEER')).not.toBeInTheDocument();
   });
@@ -98,7 +133,7 @@ describe('AssignRolesDialog — 표시', () => {
 
 describe('AssignRolesDialog — 저장', () => {
   it('선택한 역할 id 로 POST 한다', async () => {
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
     fireEvent.click(screen.getByText('CLIENT_USER'));
 
     save();
@@ -113,7 +148,7 @@ describe('AssignRolesDialog — 저장', () => {
   it('성공하면 onSaved 와 닫기를 부른다', async () => {
     const onSaved = vi.fn();
     const onOpenChange = vi.fn();
-    render(<AssignRolesDialog {...baseProps} onSaved={onSaved} onOpenChange={onOpenChange} />);
+    renderDialog({ onSaved, onOpenChange });
 
     save();
 
@@ -125,7 +160,7 @@ describe('AssignRolesDialog — 저장', () => {
   // 역할 하나를 추가하려다 나머지를 전부 날리게 된다 — 이 라우트는 교체(replace)라
   // 보내지 않은 역할은 회수된다.
   it('기존 역할이 미리 선택된 채 열린다', async () => {
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     save();
 
@@ -135,7 +170,7 @@ describe('AssignRolesDialog — 저장', () => {
 
   // 반대로 전부 해제하는 것도 정당한 요청이다. 빈 배열이 막히면 회수할 방법이 없다.
   it('전부 해제하면 빈 배열로 보낸다', async () => {
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
     fireEvent.click(screen.getByText('ENGINEER'));
 
     save();
@@ -156,7 +191,7 @@ describe('AssignRolesDialog — 서버 거절 사유 전달', () => {
       suggestion: '하나의 역할 그룹만 선택하세요.',
     });
     const onOpenChange = vi.fn();
-    render(<AssignRolesDialog {...baseProps} onOpenChange={onOpenChange} />);
+    renderDialog({ onOpenChange });
 
     save();
 
@@ -175,7 +210,7 @@ describe('AssignRolesDialog — 서버 거절 사유 전달', () => {
       assignedClients: [{ id: 'c-1', name: '테스트 고객사 A' }],
       suggestion: '먼저 고객사 할당을 해제하세요.',
     });
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     save();
 
@@ -189,7 +224,7 @@ describe('AssignRolesDialog — 서버 거절 사유 전달', () => {
   // 위 두 형태에 해당하지 않는 거절은 서버 메시지를 그대로 보여 준다.
   it('그 밖의 거절은 서버 메시지를 그대로 보여 준다', async () => {
     rejectWith({ error: '역할을 할당할 권한이 없습니다.' });
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     save();
 
@@ -207,7 +242,7 @@ describe('AssignRolesDialog — 서버 거절 사유 전달', () => {
         throw new Error('Network error');
       })
     );
-    render(<AssignRolesDialog {...baseProps} />);
+    renderDialog();
 
     save();
 

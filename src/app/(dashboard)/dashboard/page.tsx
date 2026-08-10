@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   AlertTriangle,
@@ -23,12 +24,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet, retryUnlessClientError } from '@/lib/api-client';
 import {
   priorityBadgeVariants as priorityColors,
   priorityLabels,
   statusBadgeVariants as statusColors,
   statusLabelOf,
 } from '@/lib/constants/sr';
+import { qk } from '@/lib/query-keys';
 
 import { DashboardSkeleton } from './DashboardSkeleton';
 
@@ -120,8 +123,6 @@ interface DashboardStats {
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { hasAnyRole } = usePermissions();
   const router = useRouter();
@@ -129,28 +130,33 @@ export default function DashboardPage() {
   const isAdminManagerEngineer = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const isEngineer = hasAnyRole(['ENGINEER']);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/dashboard/stats');
-      if (!response.ok) throw new Error('Failed to fetch stats');
-      const data = await response.json();
-      setStats(data);
-    } catch {
-      toast({
-        title: '오류',
-        description: '대시보드 통계를 불러오는데 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const {
+    data: stats,
+    isPending,
+    error,
+  } = useQuery({
+    queryKey: qk.dashboard.stats,
+    queryFn: () => apiGet<DashboardStats>('/api/dashboard/stats'),
+    // 401/403 은 다시 물어도 같은 답이 온다. 통계 한 벌 때문에 사용자를 두 번 기다리게 하지 않는다.
+    retry: retryUnlessClientError,
+  });
 
+  // 실패는 토스트로만 알린다 — 화면에는 에러 UI 대신 스켈레톤이 그대로 남는 것이
+  // 이 화면의 원래 동작이다(아래 early return 의 `!stats` 가 그 계약을 유지한다).
+  // `error` 객체를 의존성으로 두면 실패 한 번에 토스트 한 번이 된다.
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    if (!error) return;
+    toast({
+      title: '오류',
+      description: '대시보드 통계를 불러오는데 실패했습니다.',
+      variant: 'destructive',
+    });
+  }, [error, toast]);
 
-  if (loading || !stats) {
+  // ⚠️ `isFetching` 이 아니라 `isPending` 이다. 재조회(포커스 복귀·무효화)마다
+  //    스켈레톤으로 되돌아가면 화면이 깜빡인다. `!stats` 는 실패해서 데이터가
+  //    끝내 없는 경우를 덮는다 — 위 토스트만 뜨고 스켈레톤이 유지된다.
+  if (isPending || !stats) {
     return <DashboardSkeleton />;
   }
 

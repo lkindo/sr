@@ -83,7 +83,8 @@ export const POST = withAuthAndRateLimit(
     }
 
     // ServiceCategoryService를 활용한 카테고리 생성
-    const category = await serviceCategoryService.create(validated);
+    // 행위자를 넘겨야 감사 로그가 남는다. IP 는 저장소 전체 관례대로 null 이다.
+    const category = await serviceCategoryService.create(validated, session.user.id, null);
 
     return NextResponse.json(category, { status: 201 });
   },

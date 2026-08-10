@@ -88,8 +88,17 @@ describe('PATCH/DELETE /api/clients/[id]/categories/[categoryId]', () => {
     expect(response.status).toBe(200);
     expect(mocks.update).toHaveBeenCalledWith(
       'cat-1',
-      expect.objectContaining({ categoryName: '수정됨', slaHours: 8 })
+      expect.objectContaining({ categoryName: '수정됨', slaHours: 8 }),
+      ADMIN.id,
+      null
     );
+  });
+
+  // 감사 로그의 userId 는 행위자다. 라우트가 세션을 넘기지 않으면 서비스는 익명으로 기록한다.
+  it('수정 시 행위자 id 를 서비스에 넘긴다', async () => {
+    await patch({ categoryName: 'x' }, CLIENT_ADMIN);
+
+    expect(mocks.update).toHaveBeenCalledWith('cat-1', expect.anything(), CLIENT_ADMIN.id, null);
   });
 
   it('바디의 clientId 는 무시한다 (카테고리를 타 고객사로 옮길 수 없다)', async () => {
@@ -145,7 +154,7 @@ describe('PATCH/DELETE /api/clients/[id]/categories/[categoryId]', () => {
     const response = await del();
 
     expect(response.status).toBe(200);
-    expect(mocks.remove).toHaveBeenCalledWith('cat-1');
+    expect(mocks.remove).toHaveBeenCalledWith('cat-1', ADMIN.id, null);
   });
 
   it('삭제도 타 고객사 카테고리는 404 로 막는다', async () => {

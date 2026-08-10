@@ -1,5 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Prisma 목과 부분 픽스처에 `as any` 를 쓴다. 실제 모델 타입을 전부 채우면
+// 테스트가 검증하려는 필드가 무관한 필드 수십 개에 묻힌다. 저장소의 다른
+// 테스트 17개가 같은 이유로 같은 지시자를 쓰고 있다.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { domainEvents } from '@/lib/domain-events';
 import {
   BadRequestError,
   BusinessRuleError,
@@ -10,6 +15,9 @@ import {
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { deleteAttachmentBlob } from '@/lib/storage';
+import { emailService } from '@/services/email.service';
+import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
+import { pushService } from '@/services/push.service';
 import { SRService } from '@/services/sr.service';
 
 // Mock dependencies
@@ -341,15 +349,15 @@ describe('SRService', () => {
         return callback(txMock as any);
       });
 
-      // Mock services
-      const { emailService } = await import('@/services/email.service');
-      const { pushService } = await import('@/services/push.service');
-      const { domainEvents } = await import('@/lib/domain-events');
-      const { registerSRNotificationListeners } =
-        await import('@/services/listeners/sr-notification.listener');
-
-      // Ensure listeners are registered
-      domainEvents.removeAllListeners('sr:status_changed');
+      // 리스너 재등록 전에 **전부** 지운다.
+      //
+      // 예전에는 `removeAllListeners('sr:status_changed')` 로 한 종류만 지우고
+      // registerSRNotificationListeners() 가 3종(created/status_changed/assigned)을
+      // 다시 붙였다. 그 결과 sr:created·sr:assigned 리스너가 매번 하나씩 쌓여
+      // 이 파일 뒤쪽 테스트로 누수됐고, 실행 로그에 `Failed to handle sr:assigned
+      // notification` 이 찍혔다. 실패를 만들지는 않지만 잡음과 불필요한 비동기 작업이다.
+      // 인자 없는 형태가 정답이며, sr-notification.listener.test.ts 가 이미 그렇게 쓴다.
+      domainEvents.removeAllListeners();
       registerSRNotificationListeners();
 
       vi.mocked(prisma.user.findUnique).mockResolvedValue({
@@ -368,8 +376,17 @@ describe('SRService', () => {
       const data = { status: 'IN_PROGRESS' as const };
       await srService.updateSR('sr-1', data, mockUser);
 
-      // Wait for async domain event listeners to execute
-      await new Promise((resolve) => setTimeout(resolve, 15));
+      // 도메인 이벤트 리스너는 완료 신호를 주지 않는다 — domain-events.ts 의 emit 은
+      // 트랜잭션 컨텍스트 밖에서 동기 fire-and-forget 이고, 단위 테스트는 prisma 를
+      // 통째로 mock 하므로 AsyncLocalStorage 스토어가 만들어지지 않는다.
+      //
+      // 예전에는 `setTimeout(resolve, 15)` 라는 임의 상수로 기다렸다. 리스너 경로에
+      // await 틱이 하나만 더 늘어도 깨지는 구조였다. 관측 가능한 부작용이 실제로
+      // 나타날 때까지 폴링하면 그 취약함이 사라지고, 보통 15ms 보다 빨리 끝난다.
+      await vi.waitFor(() => {
+        expect(sendEmailSpy).toHaveBeenCalled();
+        expect(sendPushSpy).toHaveBeenCalled();
+      });
 
       // Verify
       expect(txMock.sR.update).toHaveBeenCalled();

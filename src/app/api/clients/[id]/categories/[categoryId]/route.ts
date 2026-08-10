@@ -74,7 +74,12 @@ export const PATCH = withAuthAndRateLimit(
       throw error;
     }
 
-    const category = await serviceCategoryService.update(categoryId, validated);
+    const category = await serviceCategoryService.update(
+      categoryId,
+      validated,
+      session.user.id,
+      null
+    );
 
     return NextResponse.json(category);
   },
@@ -90,7 +95,7 @@ export const DELETE = withAuthAndRateLimit(
     await ensureCategoryOfClient(id, categoryId);
     ensureCanManageCategories(session.user, id);
 
-    await serviceCategoryService.delete(categoryId);
+    await serviceCategoryService.delete(categoryId, session.user.id, null);
 
     return NextResponse.json({ success: true });
   },

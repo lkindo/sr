@@ -5,6 +5,7 @@ import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/
 import prisma from '@/lib/prisma';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
 
+import { auditService } from './audit.service';
 import { UserService } from './user.service';
 
 type ClientCreateData = z.infer<typeof clientCreateSchema>;
@@ -203,7 +204,7 @@ export class ClientService {
    * });
    * ```
    */
-  async createClient(data: ClientCreateData) {
+  async createClient(data: ClientCreateData, actorId?: string | null, ipAddress?: string | null) {
     const validated = clientCreateSchema.parse(data);
 
     // 코드 중복 확인
@@ -238,7 +239,7 @@ export class ClientService {
         },
       });
 
-      await tx.serviceCategory.create({
+      const defaultCategory = await tx.serviceCategory.create({
         data: {
           clientId: client.id,
           categoryName: DEFAULT_SERVICE_CATEGORY.categoryName,
@@ -249,44 +250,90 @@ export class ClientService {
         },
       });
 
+      // 감사 로그도 같은 트랜잭션 안에서 남긴다. auditService.createLog 는 실패 시
+      // 예외를 전파해 원자적 롤백을 트리거하므로, 트랜잭션 밖에서 부르면
+      // "고객사는 생겼는데 기록은 없다" 가 된다.
+      await auditService.createLog(tx, {
+        userId: actorId,
+        actionType: 'CLIENT_CREATE',
+        targetEntity: 'Client',
+        targetId: client.id,
+        changes: {
+          after: client,
+          // 함께 시드된 기본 카테고리도 요약으로 남긴다 — 이 생성이 왜 카테고리를
+          // 하나 만들었는지 나중에 추적할 수 있어야 한다(감사 3.18).
+          defaultServiceCategory: {
+            id: defaultCategory.id,
+            categoryName: defaultCategory.categoryName,
+          },
+        },
+        ipAddress,
+      });
+
       return client;
     });
 
     return result;
   }
 
-  async updateClient(id: string, data: ClientUpdateData) {
+  /**
+   * 고객사를 수정합니다.
+   *
+   * 활성/비활성 토글도 이 경로다(`isActive`). 별도 메서드가 없으므로 감사 로그도
+   * `CLIENT_UPDATE` 하나로 덮인다 — before/after 를 보면 무엇이 바뀌었는지 나온다.
+   */
+  async updateClient(
+    id: string,
+    data: ClientUpdateData,
+    actorId?: string | null,
+    ipAddress?: string | null
+  ) {
     const validated = clientUpdateSchema.parse(data);
 
-    // 기존 고객사 정보 확인
+    // 기존 고객사 정보 확인 (감사 로그의 `before` 로도 그대로 쓴다)
     const existingClient = await prisma.client.findUnique({ where: { id } });
     if (!existingClient) {
       throw new NotFoundError('고객사', id);
     }
 
-    const result = await prisma.client.update({
-      where: { id },
-      data: {
-        name: validated.name,
-        industry: validated.industry,
-        contactPerson: validated.contactPerson,
-        contactEmail: validated.contactEmail,
-        contactPhone: validated.contactPhone,
-        address: validated.address,
-        contractStartDate: validated.contractStartDate
-          ? new Date(validated.contractStartDate)
-          : null,
-        contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
-        // undefined 면 Prisma 가 해당 컬럼을 건드리지 않으므로 부분 수정이 그대로 유지된다.
-        isActive: validated.isActive,
-      },
+    // 감사 로그 실패는 예외를 던져 롤백을 트리거한다. 그래서 수정과 로그는
+    // 반드시 한 트랜잭션이어야 한다 — 밖에서 부르면 "수정은 됐는데 기록은 없다" 가 된다.
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.client.update({
+        where: { id },
+        data: {
+          name: validated.name,
+          industry: validated.industry,
+          contactPerson: validated.contactPerson,
+          contactEmail: validated.contactEmail,
+          contactPhone: validated.contactPhone,
+          address: validated.address,
+          contractStartDate: validated.contractStartDate
+            ? new Date(validated.contractStartDate)
+            : null,
+          contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+          // undefined 면 Prisma 가 해당 컬럼을 건드리지 않으므로 부분 수정이 그대로 유지된다.
+          isActive: validated.isActive,
+        },
+      });
+
+      await auditService.createLog(tx, {
+        userId: actorId,
+        actionType: 'CLIENT_UPDATE',
+        targetEntity: 'Client',
+        targetId: id,
+        changes: { before: existingClient, after: updated },
+        ipAddress,
+      });
+
+      return updated;
     });
 
     return result;
   }
 
-  async deleteClient(id: string) {
-    // 고객사 삭제 전 관련 데이터 확인
+  async deleteClient(id: string, actorId?: string | null, ipAddress?: string | null) {
+    // 고객사 삭제 전 관련 데이터 확인 (감사 로그의 `before` 로도 그대로 쓴다)
     const client = await prisma.client.findUnique({ where: { id } });
     if (!client) {
       throw new NotFoundError('고객사', id);
@@ -317,8 +364,22 @@ export class ClientService {
       );
     }
 
-    // 관련 데이터가 없으면 삭제 진행
-    const result = await prisma.client.delete({ where: { id } });
+    // 관련 데이터가 없으면 삭제 진행.
+    // 참조 무결성 검사는 위(트랜잭션 밖)에 그대로 둔다 — role.service.deleteRole 과 같은 구조다.
+    const result = await prisma.$transaction(async (tx) => {
+      const deleted = await tx.client.delete({ where: { id } });
+
+      await auditService.createLog(tx, {
+        userId: actorId,
+        actionType: 'CLIENT_DELETE',
+        targetEntity: 'Client',
+        targetId: id,
+        changes: { before: client },
+        ipAddress,
+      });
+
+      return deleted;
+    });
 
     return result;
   }

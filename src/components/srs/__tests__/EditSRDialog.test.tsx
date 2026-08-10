@@ -56,8 +56,27 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 // Mock components
+// 파일 선택을 흉내낼 수 있어야 한다. 첨부 업로드 경로(부분 실패 포함)는
+// `files.length > 0` 일 때만 돌기 때문에, 값을 밀어 넣을 수 있는 버튼이 하나 필요하다.
 vi.mock('@/components/ui/file-upload', () => ({
-  FileUpload: () => <div data-testid="file-upload" />,
+  FileUpload: ({ onChange, disabled }: any) => (
+    <div data-testid="file-upload">
+      <button
+        type="button"
+        data-testid="pick-files"
+        disabled={disabled}
+        onClick={() =>
+          onChange([
+            new File(['ok'], 'ok.pdf', { type: 'application/pdf' }),
+            new File(['bad'], 'bad.exe', { type: 'application/octet-stream' }),
+            new File(['huge'], 'huge.zip', { type: 'application/zip' }),
+          ])
+        }
+      >
+        파일 선택
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
@@ -168,9 +187,13 @@ describe('EditSRDialog Component', () => {
       },
     });
 
+    // `text` 를 함께 준다. api-client 는 204 와 빈 본문을 구분하려고 성공 경로에서
+    // `response.text()` 를 읽으므로, `json` 만 있는 목은 TypeError 로 실패 경로에 빠진다.
     vi.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({ ...mockSR }),
+      text: async () => JSON.stringify({ ...mockSR }),
     } as Response);
   });
 
@@ -213,8 +236,14 @@ describe('EditSRDialog Component', () => {
 
   it('handles attachment deletion', async () => {
     vi.spyOn(global, 'fetch')
-      .mockResolvedValueOnce({ ok: true, json: async () => mockSR } as Response)
-      .mockResolvedValueOnce({ ok: true } as Response);
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => mockSR,
+        text: async () => JSON.stringify(mockSR),
+      } as Response)
+      // 삭제 응답은 본문이 없다. `text` 가 빈 문자열이면 api-client 가 undefined 를 돌려준다.
+      .mockResolvedValueOnce({ ok: true, status: 204, text: async () => '' } as Response);
 
     render(<EditSRDialog {...defaultProps} />);
 
@@ -328,6 +357,126 @@ describe('EditSRDialog Component', () => {
           title: '오류',
           variant: 'destructive',
         })
+      );
+    });
+  });
+
+  describe('첨부 업로드 결과 보고', () => {
+    // POST /api/srs/[id]/attachments 는 **부분 성공을 201 로** 돌려준다 —
+    // 검증에 걸린 파일은 `data.errors[]` 에 담기고 나머지만 저장된다(전부 실패해야 400).
+    // 예전 수정 폼은 응답을 읽지 않고 `await` 만 해서, 3개 중 2개가 걸려도 사용자에게는
+    // "SR이 수정되었습니다." 만 보였다. 아래 두 테스트가 그 회귀를 막는다.
+    const mockAttachmentsPost = (body: unknown, status = 201) => {
+      vi.spyOn(global, 'fetch').mockImplementation(async (_url: any, init: any) => {
+        if (init?.method === 'POST') {
+          return {
+            ok: status < 400,
+            status,
+            json: async () => body,
+            text: async () => JSON.stringify(body),
+          } as Response;
+        }
+        // 업로드 후 기존 첨부 목록 재조회(GET /api/srs/[id])
+        return {
+          ok: true,
+          status: 200,
+          json: async () => mockSR,
+          text: async () => JSON.stringify(mockSR),
+        } as Response;
+      });
+    };
+
+    const submitWithFiles = async () => {
+      mockUpdateMutateAsync.mockResolvedValue({ success: true });
+      render(<EditSRDialog {...defaultProps} />);
+
+      await screen.findByDisplayValue('Existing SR Title', {}, { timeout: 5000 });
+      fireEvent.click(screen.getByTestId('pick-files'));
+      fireEvent.submit(screen.getByTestId('edit-sr-form'));
+    };
+
+    it('부분 실패(201 + errors[])를 사용자에게 알린다', async () => {
+      mockAttachmentsPost({
+        success: true,
+        message: '1개의 파일이 업로드되었습니다.',
+        data: {
+          attachments: [{ id: 'att-2', fileName: 'ok.pdf' }],
+          errors: [
+            { fileName: 'bad.exe', error: '허용되지 않는 파일 형식입니다.' },
+            { fileName: 'huge.zip', error: '파일 크기가 너무 큽니다.' },
+          ],
+        },
+      });
+
+      await submitWithFiles();
+
+      await waitFor(
+        () => {
+          expect(global.fetch).toHaveBeenCalledWith(
+            '/api/srs/sr-123/attachments',
+            expect.objectContaining({ method: 'POST' })
+          );
+          expect(mockToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: '일부 첨부파일이 업로드되지 않았습니다',
+              variant: 'destructive',
+              description: expect.stringContaining('1개 업로드 / 2개 실패'),
+            })
+          );
+        },
+        { timeout: 5000 }
+      );
+
+      // 거부 사유를 그대로 보여 줘야 사용자가 다시 올릴지 판단할 수 있다.
+      const partialToast = mockToast.mock.calls.find(
+        (call) => call[0]?.title === '일부 첨부파일이 업로드되지 않았습니다'
+      );
+      expect(partialToast?.[0]?.description).toContain('bad.exe: 허용되지 않는 파일 형식입니다.');
+      expect(partialToast?.[0]?.description).toContain('huge.zip: 파일 크기가 너무 큽니다.');
+
+      // 실패를 덮는 "성공" 토스트가 함께 뜨면 안 된다. (이것이 원래 버그의 증상이었다)
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ title: '성공' }));
+    });
+
+    it('전부 저장되면 실제 저장된 개수를 성공 토스트에 담는다', async () => {
+      mockAttachmentsPost({
+        success: true,
+        message: '3개의 파일이 업로드되었습니다.',
+        data: {
+          attachments: [{ id: 'att-2' }, { id: 'att-3' }, { id: 'att-4' }],
+          errors: undefined,
+        },
+      });
+
+      await submitWithFiles();
+
+      await waitFor(
+        () => {
+          expect(mockToast).toHaveBeenCalledWith({
+            title: '성공',
+            description: 'SR이 수정되었습니다. (첨부파일 3개 업로드)',
+          });
+        },
+        { timeout: 5000 }
+      );
+    });
+
+    it('전부 실패(400)면 기존의 업로드 실패 경고를 유지한다', async () => {
+      mockAttachmentsPost({ error: '업로드할 수 있는 파일이 없습니다.' }, 400);
+
+      await submitWithFiles();
+
+      await waitFor(
+        () => {
+          expect(mockToast).toHaveBeenCalledWith(
+            expect.objectContaining({
+              title: '경고',
+              description: 'SR은 수정되었으나 첨부파일 업로드에 실패했습니다.',
+              variant: 'destructive',
+            })
+          );
+        },
+        { timeout: 5000 }
       );
     });
   });

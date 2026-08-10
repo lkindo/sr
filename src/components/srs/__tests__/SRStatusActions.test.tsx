@@ -1,5 +1,4 @@
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,13 +16,22 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: vi.fn(),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: vi.fn(),
-}));
-
 vi.mock('@/hooks/use-sr', () => ({
   useChangeSRStatus: vi.fn(),
 }));
+
+/**
+ * ⚠️ `@tanstack/react-query` 는 **목킹하지 않는다.**
+ *
+ * 예전에는 여기 `vi.mock('@tanstack/react-query', () => ({ useQueryClient: vi.fn() }))` 가
+ * 있었다. 팩토리가 모듈 전체를 갈아치우면서 내보내는 것은 함수 하나뿐이라, 이 트리의
+ * 어떤 컴포넌트가 `useMutation` 을 쓰기 시작하는 순간 `useMutation is not a function`
+ * 으로 죽는 지뢰였다(실제로 SRStatusChangeDialog 가 그렇게 됐다).
+ *
+ * 그리고 애초에 필요가 없다 — SRStatusActions 자신은 react-query 를 직접 import 하지
+ * 않고, 캐시를 만지는 두 경로는 아래에서 각각 목으로 대체돼 있다:
+ * 상태 전이는 `useChangeSRStatus`, 다이얼로그는 `../SRStatusChangeDialog`.
+ */
 
 // 다이얼로그는 하나로 합쳐졌다(SRStatusChangeDialog). action 을 testid 에 실어
 // "어떤 전이의 다이얼로그가 열렸는가"를 예전과 같은 수준으로 계속 구분할 수 있게 한다.
@@ -37,14 +45,12 @@ describe('SRStatusActions Component', () => {
   const mockPush = vi.fn();
   const mockRefresh = vi.fn();
   const mockToast = vi.fn();
-  const mockInvalidateQueries = vi.fn();
   const mockMutateAsync = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     (useRouter as any).mockReturnValue({ push: mockPush, refresh: mockRefresh });
     (useToast as any).mockReturnValue({ toast: mockToast });
-    (useQueryClient as any).mockReturnValue({ invalidateQueries: mockInvalidateQueries });
     (useChangeSRStatus as any).mockReturnValue({ mutateAsync: mockMutateAsync });
 
     // Mock global fetch

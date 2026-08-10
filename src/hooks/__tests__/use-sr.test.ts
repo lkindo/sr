@@ -223,10 +223,18 @@ describe('useDeleteSR', () => {
 });
 
 describe('useChangeSRStatus', () => {
+  // `status` 와 `text` 를 함께 준다. `useChangeSRStatus` 는 이제 api-client 를 거치는데,
+  // 그쪽은 204 와 빈 본문을 구분하려고 성공 경로에서 `response.text()` 를 읽는다.
+  // `json` 만 있는 목은 TypeError 로 실패 경로에 빠진다.
   const okFetch = () =>
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({ ok: true, json: async () => ({ success: true }) }))
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+        text: async () => JSON.stringify({ success: true }),
+      }))
     );
 
   it('상태 변경 요청을 action 과 payload 로 보낸다', async () => {
@@ -277,7 +285,7 @@ describe('useChangeSRStatus', () => {
       expect(client.getQueryData(['sr', 'sr-1'])).toMatchObject({ status: expected })
     );
 
-    release({ ok: true, json: async () => ({}) });
+    release({ ok: true, status: 200, json: async () => ({}), text: async () => '{}' });
   });
 
   it('모르는 액션이면 상태를 바꾸지 않는다', async () => {

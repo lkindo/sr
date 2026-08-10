@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { notFound, useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Pencil, Shield, UserX } from 'lucide-react';
 
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
@@ -14,6 +15,8 @@ import { Separator } from '@/components/ui';
 import { AssignRolesDialog } from '@/components/users/AssignRolesDialog';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';
+import { apiDelete, ApiError, apiGet, apiPatch, retryUnlessClientError } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 import { getUserTypeBadgeVariant } from '@/lib/user-helpers';
 
 interface Permission {
@@ -79,76 +82,177 @@ const getUserTypeLabelLegacy = (user: User): string => {
   return '기술 지원팀';
 };
 
+/**
+ * 서버가 준 삭제 실패 메시지를 이 화면의 문구로 옮긴다.
+ *
+ * 서버 메시지를 그대로 띄우지 않는 이유는 문장이 API 문맥으로 쓰여 있기 때문이다
+ * ("본인 계정은 삭제할 수 없습니다" 는 삭제 주체가 누구인지가 화면에서만 분명하다).
+ * 다섯 갈래 전부가 계약이다 — 특히 **진행 중인 SR** 갈래는 서버가 SR 번호를 붙여 보내므로
+ * 재작성하면 사용자가 어느 SR 때문에 막혔는지 알 수 없게 된다. 그래서 그대로 통과시킨다.
+ */
+function toDeleteErrorMessage(serverMessage: string): string {
+  if (serverMessage.includes('본인 계정은 삭제할 수 없습니다')) {
+    return '자신의 계정은 삭제할 수 없습니다.';
+  }
+  if (serverMessage.includes('진행 중인 SR이 할당되어 있습니다')) {
+    // 서버에서 보낸 상세 메시지(SR 번호 포함)를 그대로 사용
+    return serverMessage;
+  }
+  if (serverMessage.includes('시스템 운영팀')) {
+    return '시스템 운영팀 사용자는 삭제할 수 없습니다.';
+  }
+  if (serverMessage.includes('SR 요청 또는 처리 이력')) {
+    return 'SR 요청/처리 이력이 있는 사용자는 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.';
+  }
+  // 어느 갈래에도 맞지 않으면 서버 문구를 그대로 쓴다. 서버가 메시지를 주지 않았을 때의
+  // 기본값('삭제 실패')은 apiDelete 의 fallbackMessage 가 채운다.
+  return serverMessage;
+}
+
 export default function UserDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  /**
-   * 대상 사용자가 없다.
-   *
-   * notFound() 를 async 콜백(fetchUser) 안에서 부르면 React 가 그 예외를 렌더 에러로
-   * 잡지 못해 아무 일도 일어나지 않는다. 상태로 옮겨 **렌더 중에** 호출한다.
-   */
-  const [userMissing, setUserMissing] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isAssignRolesDialogOpen, setIsAssignRolesDialogOpen] = useState(false);
   const { toast } = useToast();
   const { data: session, update } = useSession();
 
-  const fetchUser = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/users/${params.id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          // 예전에는 토스트를 띄우고 router.push('/users') 로 튕겼다. 그러면 (1) URL 이
-          // 목록으로 바뀌어 링크를 공유·북마크한 사람은 왜 튕겼는지 알 수 없고,
-          // (2) 뒤로가기를 누르면 다시 튕기는 루프가 되며, (3) 응답 자체는 200 이라
-          // 없는 페이지가 크롤러·모니터링에 정상으로 잡힌다.
-          // 이제 not-found 경계를 띄운다(호출은 아래 렌더 단계에서 한다).
-          setUserMissing(true);
-          return;
-        }
-        throw new Error('Failed to fetch user');
-      }
-      const data = await response.json();
-      setUser(data);
-    } catch {
+  // useParams 는 동적 세그먼트를 `string | string[]` 로 준다. 이 라우트의 세그먼트는
+  // 하나뿐이라 문자열이지만, URL 을 템플릿 리터럴로 만들던 기존 동작과 어긋나지 않도록
+  // 같은 방식으로 문자열화한다(쿼리 키도 문자열을 요구한다).
+  const userId = String(params.id ?? '');
+
+  const {
+    data: user,
+    isPending,
+    error,
+  } = useQuery({
+    queryKey: qk.users.detail(userId),
+    // `/api/users/[id]` 는 봉투 없이 단건을 그대로 준다.
+    queryFn: () => apiGet<User>(`/api/users/${userId}`),
+    enabled: userId.length > 0,
+    // 404 를 재시도하면 아래 notFound() 가 그만큼 늦게 뜬다. 4xx 는 다시 물어도 답이 같다.
+    retry: retryUnlessClientError,
+  });
+
+  // 조회 실패 토스트. v5 의 useQuery 에는 onError 가 없어 effect 로 옮겼다.
+  // `error` 는 실패마다 새 객체이므로 실패 1회당 정확히 1번 뜬다.
+  useEffect(() => {
+    if (!error) return;
+    // 404 는 오류가 아니라 "없는 대상" 이다 — 토스트 없이 아래 렌더 단계의 notFound() 가
+    // 처리한다. 예전 fetchUser 도 404 만 따로 걸러 토스트를 띄우지 않았다.
+    if (error instanceof ApiError && error.status === 404) return;
+    toast({
+      title: '오류',
+      description: '사용자 정보를 불러오는데 실패했습니다.',
+      variant: 'destructive',
+    });
+  }, [error, toast]);
+
+  /**
+   * 상세를 다시 읽는다. 예전 `fetchUser()` 재호출이 하던 일.
+   *
+   * ⚠️ 두 호출의 **순서가 의미를 갖는다.** `qk.users.all`(['users'])은
+   * `qk.users.detail(id)`(['users', id])의 접두사라 둘 다 기본값으로 무효화하면 같은 상세를
+   * 두 번 겨냥한다. 그리고 invalidateQueries 의 `cancelRefetch` 기본값이 true 라, 뒤 호출이
+   * 앞 호출이 띄운 조회를 **취소하고 다시 띄운다** — 네트워크 요청이 한 번이 아니라 두 번 나간다.
+   * 그래서 목록 쪽은 stale 표시만 남기고(`refetchType: 'none'`), 지금 화면에 떠 있는 상세만
+   * 실제로 다시 읽는다. 목록은 /users 로 돌아갈 때 새로 읽힌다.
+   */
+  const refreshUser = () => {
+    // 이름·상태가 바뀌면 목록 화면의 행도 낡는다.
+    queryClient.invalidateQueries({ queryKey: qk.users.all, refetchType: 'none' });
+    queryClient.invalidateQueries({ queryKey: qk.users.detail(userId) });
+  };
+
+  const activateUser = useMutation({
+    mutationFn: () =>
+      apiPatch(`/api/users/${userId}`, { isActive: true }, { fallbackMessage: '활성화 실패' }),
+    onSuccess: () => {
       toast({
-        title: '오류',
-        description: '사용자 정보를 불러오는데 실패했습니다.',
+        title: '활성화 완료',
+        // 낙관적 갱신을 하지 않으므로 토스트 시점의 `user` 는 아직 활성화 전 값이다.
+        // 이름만 쓰므로 문구는 예전과 같다.
+        description: `사용자 ${user?.name}이(가) 활성화되었습니다.`,
+      });
+      refreshUser();
+    },
+    // 실패 시에는 재조회하지 않는다 — 예전에도 catch 블록은 토스트만 띄웠다.
+    onError: () => {
+      toast({
+        title: '오류 발생',
+        description: '사용자 활성화에 실패했습니다.',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
-    }
-    // `router` 는 더 이상 이 콜백 안에서 쓰이지 않는다 — 404 를 튕김이 아니라
-    // not-found 경계로 처리하도록 바꾸면서 router.push 가 빠졌다. 의존성에 남겨 두면
-    // 무엇이 이 콜백을 다시 만드는지 오해하게 되므로 함께 지운다.
-  }, [params.id, toast]);
+    },
+  });
 
-  useEffect(() => {
-    if (params.id) {
-      fetchUser();
-    }
-  }, [params.id, fetchUser]);
+  const deleteUser = useMutation({
+    mutationFn: ({ hard }: { hard: boolean }) =>
+      apiDelete(hard ? `/api/users/${userId}?hard=true` : `/api/users/${userId}`, {
+        fallbackMessage: '삭제 실패',
+      }),
+    onSuccess: (_data, { hard }) => {
+      toast({
+        title: hard ? '완전 삭제 완료' : '비활성화 완료',
+        description: hard
+          ? '사용자가 영구적으로 삭제되었습니다.'
+          : '사용자가 성공적으로 비활성화되었습니다.',
+      });
+
+      // ⚠️ `refetchType: 'none'` 이 필수다. `qk.users.all`(['users'])은
+      // `qk.users.detail(id)`(['users', id])의 **접두사**라, 기본 무효화는 방금 지운
+      // 사용자의 상세까지 곧바로 다시 조회한다. 그 404 가 아래 notFound() 를 때리면
+      // /users 로 이동하기 전에 not-found 화면이 번쩍인다. 여기서는 stale 표시만 남기고,
+      // 목록 화면이 마운트될 때 새로 읽게 한다.
+      queryClient.invalidateQueries({ queryKey: qk.users.all, refetchType: 'none' });
+
+      router.push('/users');
+    },
+    onError: (error) => {
+      // 응답을 받았으면(ApiError) 서버 문구를 재매핑하고, 네트워크 오류처럼 응답 자체가
+      // 없으면 예전 catch 블록과 같은 고정 문구를 쓴다. 두 경우의 제목은 원래 같았다.
+      toast({
+        title: '삭제 실패',
+        description:
+          error instanceof ApiError
+            ? toDeleteErrorMessage(error.message)
+            : '사용자 삭제에 실패했습니다.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const handleUserUpdated = () => {
-    fetchUser();
+    refreshUser();
     setIsEditDialogOpen(false);
   };
 
   const handleRolesUpdated = () => {
-    fetchUser();
+    refreshUser();
     setIsAssignRolesDialogOpen(false);
   };
 
-  // 렌더 중 호출이어야 Next 가 not-found 경계를 띄운다.
-  if (userMissing) {
+  /**
+   * 대상 사용자가 없다.
+   *
+   * notFound() 를 async 콜백이나 effect 안에서 부르면 React 가 그 예외를 렌더 에러로
+   * 잡지 못해 **아무 일도 일어나지 않는다**. v5 에서 사라진 onError 콜백도 마찬가지다.
+   * 그래서 404 는 쿼리의 `error` 로 받아 두고 **렌더 중에** 호출한다.
+   *
+   * 예전 계약은 토스트를 띄우고 router.push('/users') 로 튕기는 것이었다. 그러면 (1) URL 이
+   * 목록으로 바뀌어 링크를 공유·북마크한 사람은 왜 튕겼는지 알 수 없고, (2) 뒤로가기를
+   * 누르면 다시 튕기는 루프가 되며, (3) 응답 자체는 200 이라 없는 페이지가 크롤러·모니터링에
+   * 정상으로 잡힌다. e2e/34-user-detail.spec.ts 가 이 계약(URL 유지 + not-found 화면)을 지킨다.
+   */
+  if (error instanceof ApiError && error.status === 404) {
     notFound();
   }
 
-  if (loading) {
+  // 첫 로딩만 스피너다. 변이 뒤 무효화로 도는 재조회(isFetching)에서는 화면이 깜빡이면
+  // 안 된다 — 예전 fetchUser 도 재호출 때 loading 을 다시 켜지 않았다.
+  if (isPending) {
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-muted-foreground">로딩 중...</p>
@@ -219,29 +323,7 @@ export default function UserDetailPage() {
                 variant="outline"
                 className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4 text-green-600 border-green-600 hover:bg-green-50"
                 title="활성화"
-                onClick={async () => {
-                  try {
-                    const response = await fetch(`/api/users/${user.id}`, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ isActive: true }),
-                    });
-
-                    if (!response.ok) throw new Error('Failed to activate user');
-
-                    toast({
-                      title: '활성화 완료',
-                      description: `사용자 ${user.name}이(가) 활성화되었습니다.`,
-                    });
-                    fetchUser();
-                  } catch {
-                    toast({
-                      title: '오류 발생',
-                      description: '사용자 활성화에 실패했습니다.',
-                      variant: 'destructive',
-                    });
-                  }
-                }}
+                onClick={() => activateUser.mutate()}
               >
                 <svg
                   className="h-4 w-4 md:mr-2"
@@ -309,53 +391,9 @@ export default function UserDetailPage() {
                   : `정말 사용자 ${user.name} (이메일: ${user.email}) 을 비활성화하시겠습니까?\n\n경고: 이 작업은 되돌릴 수 없습니다.`;
 
                 if (window.confirm(confirmMessage)) {
-                  try {
-                    const url = isHardDelete
-                      ? `/api/users/${user.id}?hard=true`
-                      : `/api/users/${user.id}`;
-                    const res = await fetch(url, {
-                      method: 'DELETE',
-                    });
-
-                    if (!res.ok) {
-                      const errorData = await res.json().catch(() => ({}));
-                      let errorMessage = errorData.error || errorData.message || '삭제 실패';
-
-                      if (errorMessage.includes('본인 계정은 삭제할 수 없습니다')) {
-                        errorMessage = '자신의 계정은 삭제할 수 없습니다.';
-                      } else if (errorMessage.includes('진행 중인 SR이 할당되어 있습니다')) {
-                        // 서버에서 보낸 상세 메시지(SR 번호 포함)를 그대로 사용
-                        // errorMessage = errorMessage;
-                      } else if (errorMessage.includes('시스템 운영팀')) {
-                        errorMessage = '시스템 운영팀 사용자는 삭제할 수 없습니다.';
-                      } else if (errorMessage.includes('SR 요청 또는 처리 이력')) {
-                        errorMessage =
-                          'SR 요청/처리 이력이 있는 사용자는 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.';
-                      }
-
-                      toast({
-                        title: '삭제 실패',
-                        description: errorMessage,
-                        variant: 'destructive',
-                      });
-                      return;
-                    }
-
-                    toast({
-                      title: isHardDelete ? '완전 삭제 완료' : '비활성화 완료',
-                      description: isHardDelete
-                        ? '사용자가 영구적으로 삭제되었습니다.'
-                        : '사용자가 성공적으로 비활성화되었습니다.',
-                    });
-
-                    router.push('/users');
-                  } catch {
-                    toast({
-                      title: '삭제 실패',
-                      description: '사용자 삭제에 실패했습니다.',
-                      variant: 'destructive',
-                    });
-                  }
+                  // 성공·실패 토스트와 이동은 deleteUser 의 onSuccess/onError 가 맡는다.
+                  // 서버 문구 재매핑도 그쪽(toDeleteErrorMessage)에 있다.
+                  deleteUser.mutate({ hard: isHardDelete });
                 }
               }}
               className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4 text-destructive border-destructive hover:bg-destructive hover:text-white"

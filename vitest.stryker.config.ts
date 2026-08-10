@@ -80,7 +80,6 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     setupFiles: ['./vitest.setup.ts'],
     exclude: [
-      'src/stories/**',
       '**/node_modules/**',
       '**/dist/**',
       '**/e2e/**',

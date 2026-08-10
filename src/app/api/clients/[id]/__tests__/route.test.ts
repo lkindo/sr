@@ -115,7 +115,8 @@ describe('PATCH — 교차 테넌트 수정 차단', () => {
     const res = await (PATCH as any)(patchReq(), ctx(member));
 
     expect(res.status).toBe(200);
-    expect(mocks.updateClient).toHaveBeenCalledWith(TARGET, expect.any(Object));
+    // 행위자 id 와 ipAddress 가 서비스로 함께 내려가야 감사 로그가 누가 했는지 남긴다.
+    expect(mocks.updateClient).toHaveBeenCalledWith(TARGET, expect.any(Object), member.id, null);
   });
 
   it('내부 사용자는 수정할 수 있다', async () => {
@@ -143,7 +144,7 @@ describe('DELETE — 교차 테넌트 삭제 차단', () => {
     );
 
     expect(res.status).toBe(200);
-    expect(mocks.deleteClient).toHaveBeenCalledWith(TARGET);
+    expect(mocks.deleteClient).toHaveBeenCalledWith(TARGET, member.id, null);
   });
 
   it('권한 자체가 없으면 소속이어도 거부한다', async () => {

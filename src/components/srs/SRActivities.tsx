@@ -23,6 +23,17 @@ interface SRActivitiesProps {
  * STATUS_CHANGED / COMMENTED / ATTACHMENT_ADDED 처럼 다른 이름이라, 12개 유형 중
  * 10개가 `|| activity.type` 폴백으로 떨어져 한국어 화면에 "ATTACHMENT_ADDED" 같은
  * 영문 enum 이 그대로 찍혔다. 이제 유형이 늘면 여기서 컴파일이 깨진다.
+ *
+ * ⚠️ 이것은 **활동 유형(SRActivityType) 라벨**이지 상태 라벨이 아니다 —
+ * `lib/constants/sr.ts` 의 `statusLabels`(SRStatus) 와 키 공간이 다르므로 그 맵을
+ * 그대로 쓸 수 없고, 활동 유형용 정본 맵은 아직 없다(2026-08-10 기준).
+ *
+ * 다만 **겹치는 이름은 문구를 정본에 맞춘다.** REJECTED 는 '거절' 이다 —
+ * `statusLabels.REJECTED` 와 같은 문구이고, 그 근거(‘거부’ 는 인가·검증 실패의 지배
+ * 어휘라 충돌, ‘반려’ 는 재제출을 함의하는데 상태 기계가 REJECTED 를 종착으로 봉인)는
+ * `lib/constants/sr.ts` 주석에 있다. 2026-08-10 라벨 통합 때 이 사본만 '반려' 로
+ * 남아, SR 상세 화면에서 상태 타임라인의 '거절' 배지와 활동 이력의 '반려' 배지가
+ * 나란히 보였다. 문구를 바꾸려면 정본을 먼저 바꾸고 여기로 내려올 것.
  */
 const activityTypeLabels: Record<SRActivityType, string> = {
   CREATED: '생성',
@@ -35,7 +46,7 @@ const activityTypeLabels: Record<SRActivityType, string> = {
   ATTACHMENT_REMOVED: '첨부 삭제',
   REOPENED: '재요청',
   COMPLETED: '완료',
-  REJECTED: '반려',
+  REJECTED: '거절', // statusLabels.REJECTED 와 같은 문구여야 한다(위 주석 참조).
   INTAKE_UPDATED: '접수 정보 수정',
 };
 

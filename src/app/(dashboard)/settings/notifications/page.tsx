@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Bell, CheckCircle2, Loader2, Mail, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui';
@@ -10,6 +11,8 @@ import { Separator } from '@/components/ui';
 import { Switch } from '@/components/ui';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet, apiPut } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 
 interface NotificationPreferences {
   emailSRCreated: boolean;
@@ -22,8 +25,25 @@ interface NotificationPreferences {
   pushCommentAdded: boolean;
 }
 
+/**
+ * 서버 값이 없거나 조회가 실패했을 때 화면에 보일 값.
+ *
+ * 폼 초기값이자 조회 실패 시의 폴백이다 — 두 곳에서 같은 기본값을 써야 하므로 상수로 둔다.
+ */
+const DEFAULT_PREFERENCES: NotificationPreferences = {
+  emailSRCreated: true,
+  emailSRAssigned: true,
+  emailSRStatusChanged: true,
+  emailCommentAdded: false,
+  pushSRCreated: true,
+  pushSRAssigned: true,
+  pushSRStatusChanged: false,
+  pushCommentAdded: false,
+};
+
 export default function NotificationsPage() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const {
     isSupported,
     isSubscribed,
@@ -34,46 +54,45 @@ export default function NotificationsPage() {
     unsubscribe,
   } = usePushNotifications();
 
-  const [isLoadingPrefs, setIsLoadingPrefs] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [preferences, setPreferences] = useState<NotificationPreferences>({
-    emailSRCreated: true,
-    emailSRAssigned: true,
-    emailSRStatusChanged: true,
-    emailCommentAdded: false,
-    pushSRCreated: true,
-    pushSRAssigned: true,
-    pushSRStatusChanged: false,
-    pushCommentAdded: false,
-  });
+  const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
 
   // Load preferences from API
-  const loadPreferences = useCallback(async () => {
-    try {
-      const response = await fetch('/api/settings/notifications');
-      if (response.ok) {
-        const data = await response.json();
-        setPreferences({
-          emailSRCreated: data.emailSRCreated ?? true,
-          emailSRAssigned: data.emailSRAssigned ?? true,
-          emailSRStatusChanged: data.emailSRStatusChanged ?? true,
-          emailCommentAdded: data.emailCommentAdded ?? false,
-          pushSRCreated: data.pushSRCreated ?? true,
-          pushSRAssigned: data.pushSRAssigned ?? true,
-          pushSRStatusChanged: data.pushSRStatusChanged ?? false,
-          pushCommentAdded: data.pushCommentAdded ?? false,
-        });
-      }
-    } catch {
-      // 실패 시 기본값 유지
-    } finally {
-      setIsLoadingPrefs(false);
-    }
-  }, []);
+  //
+  // ⚠️ **조회 실패는 의도적으로 조용하다.** 예전 `catch {}` 에 적혀 있던 "실패 시 기본값 유지"
+  //    가 이 쿼리의 계약이다. 그래서 `error` 를 화면에도 토스트에도 내보내지 않는다 —
+  //    실패하면 아래 폼은 DEFAULT_PREFERENCES 를 그대로 보여 준다.
+  //
+  // `retry: false` 인 이유: 이 화면의 로딩 스피너는 "조회가 끝날 때까지" 돈다(`isPending`).
+  // 전역 기본값 `retry: 1` 을 그대로 두면 실패했을 때 백오프만큼 스피너가 더 돌다가 결국
+  // 같은 기본값을 보여 준다 — 사용자를 기다리게 만들 뿐 결과가 달라지지 않는다.
+  // 한 번 시도하고 곧장 기본값으로 넘어가던 예전 동작을 그대로 유지한다.
+  const { data: serverPreferences, isPending: isLoadingPrefs } = useQuery({
+    queryKey: qk.settings.notifications,
+    queryFn: () => apiGet<Partial<NotificationPreferences>>('/api/settings/notifications'),
+    retry: false,
+  });
 
+  // 서버 값이 도착하면 폼을 초기화한다.
+  //
+  // ⚠️ 여기서 `serverPreferences` 를 의존성에 넣고 조건 없이 setState 하면, 저장 후 무효화로
+  //    일어나는 재조회가 사용자가 방금 만진 스위치를 되돌려 놓는다. ref 로 "최초 1회" 를
+  //    못박아, 마운트 때 한 번만 읽던 예전 동작을 그대로 유지한다.
+  const hasHydratedRef = useRef(false);
   useEffect(() => {
-    loadPreferences();
-  }, [loadPreferences]);
+    if (!serverPreferences || hasHydratedRef.current) return;
+    hasHydratedRef.current = true;
+    // 서버가 일부 키를 빠뜨리면 그 키만 기본값으로 남긴다(예전 `data.x ?? 기본값` 과 동일).
+    setPreferences((defaults) => ({
+      emailSRCreated: serverPreferences.emailSRCreated ?? defaults.emailSRCreated,
+      emailSRAssigned: serverPreferences.emailSRAssigned ?? defaults.emailSRAssigned,
+      emailSRStatusChanged: serverPreferences.emailSRStatusChanged ?? defaults.emailSRStatusChanged,
+      emailCommentAdded: serverPreferences.emailCommentAdded ?? defaults.emailCommentAdded,
+      pushSRCreated: serverPreferences.pushSRCreated ?? defaults.pushSRCreated,
+      pushSRAssigned: serverPreferences.pushSRAssigned ?? defaults.pushSRAssigned,
+      pushSRStatusChanged: serverPreferences.pushSRStatusChanged ?? defaults.pushSRStatusChanged,
+      pushCommentAdded: serverPreferences.pushCommentAdded ?? defaults.pushCommentAdded,
+    }));
+  }, [serverPreferences]);
 
   // Handle preference change
   const handlePreferenceChange = (key: keyof NotificationPreferences, value: boolean) => {
@@ -81,33 +100,31 @@ export default function NotificationsPage() {
   };
 
   // Save preferences
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const response = await fetch('/api/settings/notifications', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(preferences),
-      });
-
-      if (response.ok) {
-        toast({
-          title: '성공',
-          description: '알림 설정이 저장되었습니다.',
-        });
-      } else {
-        throw new Error('Failed to save preferences');
-      }
-    } catch {
+  //
+  // 실패 문구는 서버 메시지가 아니라 고정 문구다 — 400('잘못된 설정 데이터입니다.')이든
+  // 500이든 사용자에게는 같은 안내를 보여 주던 기존 동작을 유지한다.
+  const { mutate: savePreferences, isPending: isSaving } = useMutation({
+    mutationFn: (next: NotificationPreferences) =>
+      apiPut<{ message: string; preferences: unknown }>('/api/settings/notifications', next),
+    onError: () => {
       toast({
         title: '오류',
         description: '알림 설정 저장에 실패했습니다.',
         variant: 'destructive',
       });
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    },
+    onSuccess: () => {
+      toast({
+        title: '성공',
+        description: '알림 설정이 저장되었습니다.',
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: qk.settings.notifications });
+    },
+  });
+
+  const handleSave = () => savePreferences(preferences);
 
   // Handle push subscription toggle
   const handlePushToggle = async () => {

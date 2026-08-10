@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SRStatus } from '@prisma/client';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, Clock, FileText, Filter } from 'lucide-react';
@@ -14,7 +15,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Progress } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet, buildQuery, retryUnlessClientError } from '@/lib/api-client';
 import { statusLabelOf } from '@/lib/constants/sr';
+import type { PaginationMeta } from '@/lib/pagination';
+import { qk } from '@/lib/query-keys';
 
 interface MySR {
   id: string;
@@ -67,6 +71,23 @@ interface MyRequestStats {
   requested: number;
   inProgress: number;
   completed: number;
+}
+
+/**
+ * 이 라우트의 응답은 **봉투 규약 밖**이다.
+ *
+ * 목록 규약은 `{data, meta}`(src/lib/pagination.ts 상단)인데 여기에는 `stats` 가 하나 더
+ * 붙는다 — 요청자 전체 SR 기준으로 서버가 계산한 값이고, 화면 위쪽 통계 카드 4개가 그것만
+ * 본다. `apiList` 는 `{data, meta}` 만 아는 타입이라 `stats` 를 타입에서 잃어버리므로,
+ * 이 조회만은 봉투를 벗기지 않는 `apiGet` 으로 **통째로** 받는다.
+ *
+ * 필드가 전부 선택인 것은 예전 fetch 경로의 방어(`body.data ?? []`, `body.meta?.totalPages ?? 1`)를
+ * 타입으로 옮긴 것이다. 봉투가 깨진 응답이 와도 화면이 죽지 않아야 한다.
+ */
+interface MyRequestsResponse {
+  data?: MySR[];
+  meta?: Partial<PaginationMeta>;
+  stats?: MyRequestStats;
 }
 
 /**
@@ -128,56 +149,94 @@ const PAGE_SIZE = 20;
 const EMPTY_STATS: MyRequestStats = { total: 0, requested: 0, inProgress: 0, completed: 0 };
 
 export default function MyRequestsPage() {
-  const [srs, setSrs] = useState<MySR[]>([]);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  // 통계는 페이지가 아니라 서버가 요청자 전체 SR 기준으로 계산해 내려준다.
-  const [stats, setStats] = useState<MyRequestStats>(EMPTY_STATS);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchMyRequests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      params.append('sortBy', sortBy);
-      params.append('page', String(page));
-      params.append('pageSize', String(PAGE_SIZE));
+  /**
+   * queryKey 와 URL 을 **같은 객체**에서 파생시킨다. 두 곳에 따로 적으면 조회하는 키와
+   * 실제로 부른 주소가 조용히 어긋난다.
+   *
+   * 키 순서는 예전 `URLSearchParams` 조립 순서(status → sortBy → page → pageSize)를 그대로
+   * 유지한다. `statusFilter === 'all'` 일 때 `undefined` 가 되는 것도 예전
+   * `if (statusFilter !== 'all')` 가드와 같다 — buildQuery 가 그 키를 통째로 뺀다.
+   */
+  const listParams = {
+    status: statusFilter === 'all' ? undefined : statusFilter,
+    sortBy,
+    page,
+    pageSize: PAGE_SIZE,
+  };
 
-      const response = await fetch(`/api/srs/my-requests?${params.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch my requests');
+  /**
+   * 내가 요청한 SR 목록.
+   *
+   * 필터·정렬·페이지 세 축이 전부 queryKey 안에 있으므로, 늦게 도착한 이전 조건의 응답이
+   * 현재 화면을 덮어쓸 경로가 없다(응답은 자기 키의 캐시에만 들어간다).
+   */
+  const {
+    data: myRequests,
+    isPending: loading,
+    error,
+  } = useQuery({
+    queryKey: qk.myRequests.list(listParams),
+    queryFn: ({ signal }) =>
+      apiGet<MyRequestsResponse>(`/api/srs/my-requests${buildQuery(listParams)}`, { signal }),
+    // 페이지를 넘길 때 목록이 빈 상태를 거쳐 가지 않게 한다(목록 화면 공통 규칙).
+    placeholderData: keepPreviousData,
+    // 목록은 항상 신선해야 한다. 전역 staleTime 60초를 그대로 두면 방금 만든 SR 이
+    // 목록에 안 잡히는 것처럼 보인다.
+    staleTime: 0,
+    // 4xx 는 다시 물어봐도 같은 답이다. 5xx·네트워크 오류만 한 번 더 시도한다(전역 기본값과 동일).
+    retry: retryUnlessClientError,
+  });
 
-      const body = await response.json();
-      setSrs(body.data ?? []);
-      setStats(body.stats ?? EMPTY_STATS);
-      setTotalPages(body.meta?.totalPages ?? 1);
-      setTotalItems(body.meta?.totalItems ?? 0);
-    } catch {
-      // 에러는 toast로 사용자에게 표시
-      toast({
-        title: '오류',
-        description: '요청 목록을 불러오는데 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [statusFilter, sortBy, page, toast]);
+  const srs = myRequests?.data ?? [];
+  // 통계는 페이지가 아니라 서버가 요청자 전체 SR 기준으로 계산해 내려준다.
+  const stats = myRequests?.stats ?? EMPTY_STATS;
+  const totalPages = myRequests?.meta?.totalPages ?? 1;
+  const totalItems = myRequests?.meta?.totalItems ?? 0;
 
+  /**
+   * 조회 실패 토스트. v5 의 useQuery 에는 `onError` 가 없어 effect 로 옮겼다.
+   * `error` 는 실패마다 새 객체이므로 실패 1회당 정확히 한 번 뜬다 — 기존 catch 와 같다.
+   */
   useEffect(() => {
-    fetchMyRequests();
-  }, [fetchMyRequests]);
+    if (!error) return;
+    toast({
+      title: '오류',
+      description: '요청 목록을 불러오는데 실패했습니다.',
+      variant: 'destructive',
+    });
+  }, [error, toast]);
 
-  // 필터·정렬이 바뀌면 첫 페이지로 되돌린다. 그렇지 않으면 결과가 없는 페이지에 머무를 수 있다.
-  useEffect(() => {
+  /**
+   * 필터·정렬이 바뀌면 첫 페이지로 되돌린다. 그렇지 않으면 결과가 없는 페이지에 머무를 수 있다.
+   *
+   * ⚠️ 예전에는 이 일을 `useEffect([statusFilter, sortBy])` 가 했다. page 가 queryKey 에
+   * 들어간 지금 그 형태를 남기면 **요청이 두 번 나간다** — 필터가 바뀌어 키가 한 번 바뀌고,
+   * 뒤이어 effect 가 page 를 1로 되돌려 키가 또 바뀐다. 같은 이벤트에서 함께 되돌리면
+   * 렌더 한 번에 키가 한 번만 바뀐다.
+   */
+  const handleStatusFilterChange = (value: string) => {
+    setStatusFilter(value);
     setPage(1);
-  }, [statusFilter, sortBy]);
+  };
 
+  const handleSortByChange = (value: string) => {
+    setSortBy(value);
+    setPage(1);
+  };
+
+  /**
+   * 첫 조회 중에만 전체화면 로딩을 보여 준다(`isPending`).
+   *
+   * `isFetching` 을 물리면 필터를 바꿀 때마다 화면 전체가 스피너로 바뀐다 —
+   * `placeholderData: keepPreviousData` 로 이전 목록을 유지하는 이유가 사라진다.
+   */
   if (loading) {
     return (
       <div className="sr-loading">
@@ -260,7 +319,7 @@ export default function MyRequestsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">상태</label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="전체 상태" />
                 </SelectTrigger>
@@ -277,7 +336,7 @@ export default function MyRequestsPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">정렬 기준</label>
-              <Select value={sortBy} onValueChange={setSortBy}>
+              <Select value={sortBy} onValueChange={handleSortByChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -471,7 +530,11 @@ export default function MyRequestsPage() {
         onOpenChange={setCreateDialogOpen}
         onCreated={() => {
           setCreateDialogOpen(false);
-          fetchMyRequests(); // SR 목록 새로고침
+          // SR 목록 새로고침. 예전 `fetchMyRequests()` 자리다 — 무효화는 캐시를 남겨 둔 채
+          // 배경에서 다시 가져오므로 목록이 보이는 상태 그대로 갱신된다.
+          // `qk.myRequests.all` 은 필터·정렬·페이지가 다른 모든 목록 키의 접두사라
+          // 한 번으로 전부 무효화된다.
+          queryClient.invalidateQueries({ queryKey: qk.myRequests.all });
         }}
       />
     </div>

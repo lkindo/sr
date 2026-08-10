@@ -56,7 +56,7 @@ export const PATCH = withAuthAndRateLimit(
 
     // Service 레이어를 통해 고객사 수정
     const clientService = new ClientService();
-    await clientService.updateClient(id, validated);
+    await clientService.updateClient(id, validated, session.user.id, null);
 
     // 수정된 고객사 정보와 서비스 카테고리 조회
     const clientWithCategories = await clientService.getClientWithDetailsAndCategories(id);
@@ -82,7 +82,7 @@ export const DELETE = withAuthAndRateLimit(
 
     // Service 레이어를 통해 고객사 삭제
     const clientService = new ClientService();
-    await clientService.deleteClient(id);
+    await clientService.deleteClient(id, session.user.id, null);
 
     return NextResponse.json({ success: true });
   },

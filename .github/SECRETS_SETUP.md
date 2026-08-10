@@ -34,35 +34,14 @@
 
 6. **NEXTAUTH_URL**
    - 설명: 애플리케이션 URL
-   - Production: `https://your-domain.vercel.app`
-   - Preview: 자동으로 Vercel에서 설정
+   - Production: 배포 도메인(예: `https://sr.example.com`)
 
-### Vercel 배포
-
-7. **VERCEL_TOKEN**
-   - 설명: Vercel 배포를 위한 토큰
-   - 생성 경로: Vercel Dashboard → Settings → Tokens
-   - 권한: "Full Access" 또는 "Deploy" 권한 필요
-
-8. **VERCEL_ORG_ID**
-   - 설명: Vercel 조직 ID
-   - 확인 방법: Vercel Dashboard → Settings → General
-   - 또는 `.vercel/project.json` 파일에서 확인
-
-9. **VERCEL_PROJECT_ID**
-   - 설명: Vercel 프로젝트 ID
-   - 확인 방법: Vercel Dashboard → Project Settings
-   - 또는 `.vercel/project.json` 파일에서 확인
-
-### 선택사항 (권장)
-
-10. **UPSTASH_REDIS_REST_URL**
-    - 설명: Redis 캐시 URL
-    - Upstash Dashboard에서 확인
-
-11. **UPSTASH_REDIS_REST_TOKEN**
-    - 설명: Redis 인증 토큰
-    - Upstash Dashboard에서 확인
+> **2026-08-10 정리** — `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 와
+> `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` 항목을 삭제했다.
+> 이 프로젝트는 자체 호스팅(Docker Compose + nginx)으로 배포하며, 워크플로 7개 어디에서도
+> 이 secret 들을 참조하지 않는다(`grep -rn 'VERCEL_\|UPSTASH' .github/workflows/` → 0건).
+> 캐시는 `next/cache` 의 `unstable_cache`, 레이트리밋은 앱 인메모리 구현을 쓴다.
+> 배포에 실제로 필요한 secret 은 아래 서버 접속 정보(`SERVER_HOST` 등)다.
 
 ---
 
@@ -89,9 +68,6 @@ gh secret set TEST_DATABASE_URL
 gh secret set TEST_DIRECT_URL
 gh secret set NEXTAUTH_SECRET
 gh secret set NEXTAUTH_URL
-gh secret set VERCEL_TOKEN
-gh secret set VERCEL_ORG_ID
-gh secret set VERCEL_PROJECT_ID
 ```
 
 ---
@@ -161,11 +137,12 @@ Secrets가 올바르게 설정되었는지 확인하려면:
 - 데이터베이스 서버의 IP 허용 목록(방화벽) 확인 (CI/배포 환경에서의 접근 허용 필요)
 - SSL 모드 확인 (`?sslmode=require` 추가 필요할 수 있음)
 
-### Vercel 배포 실패
+### 배포 실패 (자체 호스팅 Docker 서버)
 
-- VERCEL_TOKEN이 유효한지 확인
-- Token 권한이 충분한지 확인
-- VERCEL_ORG_ID와 VERCEL_PROJECT_ID가 정확한지 확인
+- `SERVER_HOST` / `SERVER_USER` / SSH 키 secret 이 설정되어 있는지 확인
+- 서버에서 `docker compose -f docker-compose.prod.yml config` 가 통과하는지 확인
+  (`POSTGRES_USER` 등은 기본값이 없어 비면 즉시 실패한다)
+- 배포는 `CI/CD Pipeline` 이 성공한 push 에만 트리거된다 — CI 가 빨간불이면 배포는 아예 돌지 않는다
 
 ---
 

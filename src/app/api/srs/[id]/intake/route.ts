@@ -405,13 +405,23 @@ export const PATCH = withAuthAndRateLimit(
     //    존재 여부만 확인하면 비활성 사용자에게도 배정되어, 로그인할 수 없는 담당자에게
     //    묶인 orphan SR 이 생기고 이후 그 사용자를 정상적으로 비활성화할 수도 없다.
     //    (updateSR 과 동일한 규칙을 쓰도록 assertAssignable 를 공유한다.)
-    let newAssignee: { id: string; name: string; email: string } | null = null;
-    const isAssigneeChanged =
-      validated.assigneeId !== undefined && validated.assigneeId !== sr.assigneeId;
-
-    if (isAssigneeChanged && validated.assigneeId) {
-      newAssignee = await assertAssignable(validated.assigneeId);
-    }
+    //
+    // ⚠️ 담당자 "해제"는 **아직 구현돼 있지 않다**(기능을 뺀 것이 아니라 애초에 없었다).
+    //    `intakeUpdateSchema.assigneeId` 는 `z.string().min(1).optional()` 로 `.nullable()`
+    //    이 없어 null·빈 문자열이 400 이고, `src/hooks/use-intake-form.ts` 의 폼 스키마도
+    //    같아서 UI 에는 '미배정' 선택지 자체가 없다. 그래서 예전에 이 아래에 깔려 있던
+    //    해제 분기(assigneeId=null 저장 · REASSIGNED 활동 · assigneeName=null 이벤트)는
+    //    양쪽 끝에서 도달 불가능한 죽은 코드였고, 지금은 걷어냈다.
+    //    지원하려면 (1) 이 라우트의 스키마와 use-intake-form.ts 의 폼 스키마 양쪽에
+    //    `.nullable()` 을 추가하고, (2) UI 에 '미배정' 선택지를 넣은 뒤,
+    //    (3) 해제 분기를 다시 세워야 한다.
+    //
+    // 그러므로 아래 조건이 참이면 `validated.assigneeId` 는 반드시 "비어 있지 않은 새 id"다.
+    // `newAssignee !== null` 은 곧 "담당자가 바뀌었다"와 동치이므로 이후 분기는 이 값 하나로 판단한다.
+    const newAssignee =
+      validated.assigneeId !== undefined && validated.assigneeId !== sr.assigneeId
+        ? await assertAssignable(validated.assigneeId)
+        : null;
 
     // 7. SR 업데이트
     const updateData: Prisma.SRUncheckedUpdateInput = {};
@@ -431,33 +441,16 @@ export const PATCH = withAuthAndRateLimit(
       updateData.intakeNotes = validated.intakeNotes || null;
     }
     if (validated.assigneeId !== undefined) {
-      updateData.assigneeId = validated.assigneeId || null;
+      updateData.assigneeId = validated.assigneeId;
     }
     if (dueDate && validated.actualPriority && validated.actualPriority !== sr.actualPriority) {
       updateData.dueDate = dueDate;
     }
 
-    // 낙관적 동시성 제어: 스냅샷(sr.status) 이후 상태가 바뀌지 않았을 때만 수정한다.
-    // (동시 인테이크 수정으로 인한 lost update 방지 — updateSR/intake POST 와 동일 패턴)
-    const updatedSR = await prisma.$transaction(async (tx) => {
-      const guard = await tx.sR.updateMany({
-        where: { id, status: sr.status },
-        data: { updatedAt: new Date() },
-      });
-      if (guard.count === 0) {
-        throw new ConflictError(
-          '다른 사용자가 먼저 이 SR을 변경했습니다. 새로고침 후 다시 시도해주세요.'
-        );
-      }
-
-      return tx.sR.update({
-        where: { id },
-        data: updateData,
-        include: SR_INTAKE_INCLUDE,
-      });
-    });
-
-    // 8. 변경 사항 추적 및 이력 생성
+    // 8. 변경 사항 추적.
+    //    트랜잭션 **진입 전에** 계산해 클로저로 캡처한다 — 아래 활동 로그가 SR 수정과
+    //    같은 트랜잭션 안에서 만들어져야 하기 때문이다. 계산에 필요한 값(previousValues,
+    //    newAssignee, validated)은 모두 이 시점에 확정돼 있고 tx 결과에 의존하지 않는다.
     const changes: string[] = [];
     const newValues: {
       actualPriority?: string;
@@ -498,64 +491,88 @@ export const PATCH = withAuthAndRateLimit(
       changes.push('접수 메모 수정');
       newValues.intakeNotes = validated.intakeNotes;
     }
-    if (isAssigneeChanged) {
-      const newAssigneeName = validated.assigneeId ? newAssignee?.name || '미배정' : '미배정';
-      changes.push(`담당자: ${previousValues.assigneeName || '미배정'} → ${newAssigneeName}`);
-      newValues.assigneeId = validated.assigneeId || undefined;
-      newValues.assigneeName = newAssignee?.name || null;
+    if (newAssignee) {
+      changes.push(`담당자: ${previousValues.assigneeName || '미배정'} → ${newAssignee.name}`);
+      newValues.assigneeId = newAssignee.id;
+      newValues.assigneeName = newAssignee.name;
     }
 
-    // 9. 접수 수정 Activity 로그 생성
-    if (changes.length > 0) {
-      await prisma.sRActivity.create({
-        data: {
-          srId: id,
-          userId: session.user.id,
-          type: $Enums.SRActivityType.INTAKE_UPDATED,
-          description: `접수 정보가 수정되었습니다: ${changes.join(', ')}`,
-          metadata: {
-            previousValues,
-            newValues,
-            changes,
-            updatedBy: session.user.name || session.user.email,
-          },
-        },
+    // 9. SR 수정 + 활동 로그를 하나의 트랜잭션에서 원자적으로 커밋한다.
+    //    낙관적 동시성 제어: 스냅샷(sr.status) 이후 상태가 바뀌지 않았을 때만 수정한다.
+    //    (동시 인테이크 수정으로 인한 lost update 방지 — updateSR/intake POST 와 동일 패턴)
+    //
+    //    활동 로그 2건은 예전에 트랜잭션 **밖**(커밋 이후)에 있었다. POST 는 같은 파일에서
+    //    "부분 기록이 남지 않도록" 상태 변경 + 이력 + 활동을 함께 커밋하는데 PATCH 만
+    //    비대칭이어서, 활동 생성이 실패하면 SR 은 이미 바뀐 채 이력만 사라졌다.
+    //    (POST 가 막겠다고 한 바로 그 상태다.) 이제 둘 다 tx 안에서 만든다.
+    const updatedSR = await prisma.$transaction(async (tx) => {
+      const guard = await tx.sR.updateMany({
+        where: { id, status: sr.status },
+        data: { updatedAt: new Date() },
       });
-    }
+      if (guard.count === 0) {
+        throw new ConflictError(
+          '다른 사용자가 먼저 이 SR을 변경했습니다. 새로고침 후 다시 시도해주세요.'
+        );
+      }
 
-    // 10. 담당자 변경 시 알림 발송 및 Activity 로그
-    if (isAssigneeChanged) {
+      const result = await tx.sR.update({
+        where: { id },
+        data: updateData,
+        include: SR_INTAKE_INCLUDE,
+      });
+
+      // 접수 수정 Activity 로그
+      if (changes.length > 0) {
+        await tx.sRActivity.create({
+          data: {
+            srId: id,
+            userId: session.user.id,
+            type: $Enums.SRActivityType.INTAKE_UPDATED,
+            description: `접수 정보가 수정되었습니다: ${changes.join(', ')}`,
+            metadata: {
+              previousValues,
+              newValues,
+              changes,
+              updatedBy: session.user.name || session.user.email,
+            },
+          },
+        });
+      }
+
       // 담당자 배정 Activity 로그
-      const newAssigneeName = validated.assigneeId ? newAssignee?.name || '미배정' : '미배정';
-      await prisma.sRActivity.create({
-        data: {
-          srId: id,
-          userId: session.user.id,
-          type: validated.assigneeId
-            ? $Enums.SRActivityType.ASSIGNED
-            : $Enums.SRActivityType.REASSIGNED,
-          description: validated.assigneeId
-            ? `담당자가 변경되었습니다: ${previousValues.assigneeName || '미배정'} → ${newAssigneeName}`
-            : `담당자가 해제되었습니다: ${previousValues.assigneeName || '미배정'}`,
-          metadata: {
-            previousAssigneeId: previousValues.assigneeId,
-            previousAssigneeName: previousValues.assigneeName,
-            newAssigneeId: validated.assigneeId || null,
-            newAssigneeName: newAssignee?.name || null,
+      if (newAssignee) {
+        await tx.sRActivity.create({
+          data: {
+            srId: id,
+            userId: session.user.id,
+            type: $Enums.SRActivityType.ASSIGNED,
+            description: `담당자가 변경되었습니다: ${previousValues.assigneeName || '미배정'} → ${newAssignee.name}`,
+            metadata: {
+              previousAssigneeId: previousValues.assigneeId,
+              previousAssigneeName: previousValues.assigneeName,
+              newAssigneeId: newAssignee.id,
+              newAssigneeName: newAssignee.name,
+            },
           },
-        },
-      });
+        });
+      }
 
+      return result;
+    });
+
+    // 10. 트랜잭션 커밋 후 사이드 이펙트 발행. 롤백된 트랜잭션에 대해 알림이 나가면 안 되므로
+    //     이벤트는 반드시 커밋 **이후**다.
+    if (newAssignee) {
       // 배정 이벤트 발행 — 알림 리스너가 새 담당자에게 메일/푸시를 보낸다.
       // 이 자리에는 "새 담당자에게만 메일 발송" 이라는 주석만 있고 구현이 없어서,
       // 재배정된 담당자가 자기에게 일이 왔다는 사실을 전혀 통보받지 못했다(감사 3.21).
-      // 배정 해제(null)도 발행한다 — 이전 담당자 화면의 상태를 정리해야 한다.
       domainEvents.emit('sr:assigned', {
         srId: updatedSR.id,
         srNumber: updatedSR.srNumber,
         title: updatedSR.title,
-        assigneeId: validated.assigneeId || null,
-        assigneeName: validated.assigneeId ? newAssignee?.name || '알 수 없음' : null,
+        assigneeId: newAssignee.id,
+        assigneeName: newAssignee.name,
       });
     }
 

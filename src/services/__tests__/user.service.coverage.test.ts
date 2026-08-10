@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Prisma 목과 부분 픽스처에 `as any` 를 쓴다. 실제 모델 타입을 전부 채우면
+// 테스트가 검증하려는 필드가 무관한 필드 수십 개에 묻힌다. 저장소의 다른
+// 테스트 17개가 같은 이유로 같은 지시자를 쓰고 있다.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BusinessRuleError } from '@/lib/errors';

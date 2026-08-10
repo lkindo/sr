@@ -9,12 +9,10 @@
     "src/proxy.ts",
     "src/auth.ts",
     "src/auth.config.ts",
-    "src/**/*.stories.tsx",
     "prisma/**",
     "e2e/**",
     "tests/**",
     "scripts/**",
-    ".storybook/*.{ts,tsx}",
 
     // shadcn 프리미티브는 벤더링된 라이브러리 표면이다. 미사용 하위 export
     // (DialogPortal, ContextMenu*, TableCaption, useFormField 등 약 40개)를 지우면

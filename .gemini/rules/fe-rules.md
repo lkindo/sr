@@ -1,6 +1,6 @@
 # 🎨 기술 규칙: 프론트엔드 (fe-rules.md)
 
-본 문서는 프론트엔드 레이어(Next.js App Router, Tailwind CSS, Storybook)와 관련된 기술 헌법 및 WOW UI 스타일 가이드이다. 프로젝트 ID `SaaSify-UI-Kit` 디자인 시스템을 준수한다.
+본 문서는 프론트엔드 레이어(Next.js App Router, Tailwind CSS)와 관련된 기술 헌법 및 WOW UI 스타일 가이드이다. 프로젝트 ID `SaaSify-UI-Kit` 디자인 시스템을 준수한다.
 
 ---
 
@@ -150,7 +150,13 @@ SaaSify UI Kit의 견고한 구조 위에 사용자가 처음 웹 어플리케�
 
 ---
 
-## 5. Storybook 및 컴포넌트 재사용 규칙
+## 5. 컴포넌트 재사용 및 검증 규칙
 
-- **독립적 UI 개발**: 주요 공통 UI 컴포넌트(Button, Select, Modal, Input 등)는 반드시 Storybook 스토리 파일(`*.stories.tsx`)을 작성하여 컴포넌트 단위로 격리 검증이 가능하도록 설계한다.
-- **Props 타입 안전성**: 컴포넌트의 모든 인터페이스는 TypeScript의 `interface` 또는 `type`으로 정의하며, Storybook의 Control 패널을 통해 다양한 속성이 실시간 변경되는지 검증이 가능해야 한다.
+> 2026-08-10: Storybook 을 제거했다. 스토리 파일이 1개뿐이라 사실상 쓰이지 않으면서
+> vitest 에 브라우저 모드 프로젝트를 물고 있었다. 컴포넌트 격리 검증은
+> **Vitest + @testing-library/react 렌더 테스트**(`__tests__/<Name>.test.tsx`)가 담당한다.
+
+- **독립적 UI 개발**: 주요 공통 UI 컴포넌트(Button, Select, Modal, Input 등)는 props 조합별
+  렌더 테스트를 작성해 컴포넌트 단위로 격리 검증이 가능하도록 설계한다.
+- **Props 타입 안전성**: 컴포넌트의 모든 인터페이스는 TypeScript의 `interface` 또는 `type`으로
+  정의하며, 각 속성의 양쪽 경로(있음/없음, true/false)가 테스트로 덮여야 한다.

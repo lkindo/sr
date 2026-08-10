@@ -54,7 +54,7 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 - **Email**: Nodemailer (SMTP)
 - **Auth**: NextAuth.js (v5 beta)
 - **Validation**: Zod (서버 사이드 검증)
-- **Testing**: Vitest, Playwright, Stryker, Storybook
+- **Testing**: Vitest, Playwright, Stryker
 - **Container**: Docker / Compose V2
 - **Package Manager**: pnpm
 
@@ -184,12 +184,6 @@ pnpm test:e2e:debug    # 디버깅 모드
 
 ```bash
 pnpm test:mutation
-```
-
-### UI 컴포넌트 테스트 (Storybook)
-
-```bash
-pnpm storybook         # 스토리북 실행 (6006 포트)
 ```
 
 ---

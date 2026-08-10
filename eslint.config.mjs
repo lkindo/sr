@@ -1,6 +1,3 @@
-// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
-import storybook from 'eslint-plugin-storybook';
-
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import security from 'eslint-plugin-security';
@@ -22,11 +19,6 @@ const eslintConfig = [
       '**/*.config.js',
       '**/*.config.ts',
       '**/.stryker-tmp/**',
-      // Storybook 빌드 결과물 및 관련 파일 제외
-      'storybook-static/',
-      '.storybook/',
-      '**/*.stories.ts',
-      '**/*.stories.tsx',
       // 빌드 결과물 제외
       'public/sw.js',
       'public/workbox-*.js',
@@ -123,7 +115,6 @@ const eslintConfig = [
       'security/detect-non-literal-regexp': 'off',
     },
   },
-  ...storybook.configs['flat/recommended'],
 ];
 
 export default eslintConfig;

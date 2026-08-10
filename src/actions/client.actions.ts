@@ -52,14 +52,15 @@ export async function createClientAction(formData: FormData): Promise<Result<Cli
     }
     const validated = validationResult.data;
 
-    // 인증 및 권한 확인
-    await authenticateAndAuthorize('client:create');
+    // 인증 및 권한 확인. 세션은 감사 로그의 행위자(actor)로도 쓰이므로 버리지 않는다 —
+    // 예전에는 반환값을 버려서 이 경로의 생성이 누가 했는지 남지 않았다.
+    const session = await authenticateAndAuthorize('client:create');
 
     // ClientService 인스턴스 생성
     const clientService = services.clientService;
 
     // 고객사 생성
-    const client = await clientService.createClient(validated);
+    const client = await clientService.createClient(validated, session.user.id, null);
 
     return ok(client);
   } catch (error) {
@@ -101,7 +102,7 @@ export async function updateClientAction(id: string, formData: FormData) {
     const clientService = services.clientService;
 
     // 고객사 업데이트
-    const client = await clientService.updateClient(id, validated);
+    const client = await clientService.updateClient(id, validated, session.user.id, null);
 
     return {
       success: true,
@@ -125,7 +126,7 @@ export async function deleteClientAction(id: string) {
     const clientService = services.clientService;
 
     // 고객사 삭제
-    await clientService.deleteClient(id);
+    await clientService.deleteClient(id, session.user.id, null);
 
     return {
       success: true,

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, PauseCircle, RotateCcw, XCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui';
@@ -17,6 +17,8 @@ import {
 import { Label } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { apiPatch } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 
 /**
  * SR 상태 변경 다이얼로그 (완료 / 보류 / 거절 / 재오픈 공용).
@@ -134,14 +136,66 @@ export function SRStatusChangeDialog({
   const Icon = config.icon;
 
   const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const blocked = Boolean(disabledReason);
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  /**
+   * 상태 전이 요청.
+   *
+   * ── 왜 `use-sr.ts` 의 `useChangeSRStatus` 를 재사용하지 않는가 ─────────────
+   * 같은 `PATCH /api/srs/[id]/status` 를 부르므로 합치고 싶어지지만, 그 훅의 계약이
+   * 이 다이얼로그의 계약과 **세 군데에서 정면으로 충돌한다.**
+   *
+   *  1. 그 훅은 `onSettled` 에서 `invalidateQueries` + `router.refresh()` 를 한다.
+   *     `onSettled` 는 `mutateAsync` 가 resolve 되기 **전에** 끝나야 하므로, 여기서
+   *     `await mutateAsync(...)` 한 뒤 다이얼로그를 닫으면 아래 ⚠️ 의 순서가 그대로
+   *     뒤집힌다 — 되살아나는 것이 바로 이중 제출이다.
+   *  2. 그 훅은 `onSettled` 라서 **실패했을 때도** `router.refresh()` 를 한다.
+   *     이 다이얼로그는 실패 시 아무것도 갱신하지 않고 열린 채로 남아야 한다.
+   *  3. 그 훅은 `onMutate` 에서 `['sr', id]` 를 낙관적으로 고친다. 이 다이얼로그는
+   *     서버 판정(완료 조건·거절 권한·재오픈 7일 창)에 걸릴 수 있는 전이만 다루므로,
+   *     낙관적으로 찍었다가 되돌리면 상태 배지가 잘못된 값으로 한 번 깜빡인다.
+   *
+   * 즉 겹치는 것은 URL 과 메서드뿐이고 성공/실패 후 처리는 서로 반대다. 지금은
+   * 중복을 남긴다 — 합치려면 그 훅에서 `onSettled` 를 걷어내고 호출부가 후처리를
+   * 정하는 형태로 먼저 바꿔야 한다.
+   */
+  const { mutate: changeStatus, isPending: loading } = useMutation({
+    mutationFn: (trimmed: string) =>
+      apiPatch(
+        `/api/srs/${srId}/status`,
+        config.bodyKey === 'resolutionDescription'
+          ? { action, resolutionDescription: trimmed }
+          : { action, reason: trimmed },
+        { fallbackMessage: '상태 변경에 실패했습니다.' }
+      ),
+    onSuccess: async () => {
+      // UI 를 먼저 정리한 뒤 백그라운드로 갱신한다. 순서를 뒤집으면 이미 처리된
+      // 다이얼로그가 갱신이 끝날 때까지 열려 있어 사용자가 두 번 제출하게 된다.
+      setText('');
+      onOpenChange(false);
+
+      toast({ title: '성공', description: config.successMessage });
+
+      // 여기서만 `await` 한다. onSuccess 가 끝날 때까지 `isPending` 이 유지되므로
+      // 기존의 `finally { setLoading(false) }` 와 같은 시점에 잠금이 풀린다.
+      await queryClient.invalidateQueries({ queryKey: qk.sr.detail(srId) });
+      router.refresh();
+      router.push('/srs');
+    },
+    onError: (error) => {
+      toast({
+        title: '오류',
+        description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (blocked) return;
 
@@ -151,43 +205,7 @@ export function SRStatusChangeDialog({
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const response = await fetch(`/api/srs/${srId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          config.bodyKey === 'resolutionDescription'
-            ? { action, resolutionDescription: trimmed }
-            : { action, reason: trimmed }
-        ),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || '상태 변경에 실패했습니다.');
-      }
-
-      // UI 를 먼저 정리한 뒤 백그라운드로 갱신한다. 순서를 뒤집으면 이미 처리된
-      // 다이얼로그가 갱신이 끝날 때까지 열려 있어 사용자가 두 번 제출하게 된다.
-      setText('');
-      onOpenChange(false);
-
-      toast({ title: '성공', description: config.successMessage });
-
-      await queryClient.invalidateQueries({ queryKey: ['sr', srId] });
-      router.refresh();
-      router.push('/srs');
-    } catch (error) {
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+    changeStatus(trimmed);
   };
 
   return (

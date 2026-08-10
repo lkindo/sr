@@ -9,6 +9,7 @@ import type { EditableSR } from '@/components/srs/EditSRDialog';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
+import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import type { ClientSummary } from '@/types/client.types';
 import type { SRAttachmentView } from '@/types/sr.types';
 
@@ -104,13 +105,16 @@ export function useEditSRForm({
 
   const fetchExistingAttachments = useCallback(async (srId: string) => {
     try {
-      const response = await fetch(`/api/srs/${srId}`);
-      if (response.ok) {
-        const data = await response.json();
-        setExistingAttachments(data.attachments || []);
-      }
+      const data = await apiGet<{ attachments?: SRAttachmentView[] }>(`/api/srs/${srId}`);
+      setExistingAttachments(data?.attachments || []);
     } catch {
       // ignore
+      //
+      // 실패를 삼키는 것이 의도다. 이 조회는 폼을 채우는 **보조** 경로다 —
+      // 부모가 첨부 목록을 이미 넘겨줬으면 아예 부르지도 않는다. 여기서 토스트를 띄우면
+      // 다이얼로그를 열 때마다 사용자가 요청하지도 않은 실패가 뜨고, 정작 수정 자체는
+      // 정상 동작한다. 기존 목록은 비어 있는 채로 두고 조용히 넘어간다.
+      // (이전에도 `response.ok` 가 아니면 아무것도 하지 않았다. ApiError 도 같게 다룬다.)
     }
   }, []);
 
@@ -185,8 +189,7 @@ export function useEditSRForm({
     setFileToDelete(null);
 
     try {
-      const response = await fetch(`/api/attachments/${attachmentId}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error('파일 삭제 실패');
+      await apiDelete(`/api/attachments/${attachmentId}`, { fallbackMessage: '파일 삭제 실패' });
       setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
       toast({ title: '성공', description: '파일이 삭제되었습니다.' });
     } catch (error) {
@@ -198,21 +201,54 @@ export function useEditSRForm({
     }
   };
 
-  const uploadAttachments = async (srId: string, filesToUpload: File[]) => {
+  /**
+   * 배치 업로드 결과. `uploaded` 는 **서버에 실제로 저장된** 개수다.
+   *
+   * POST /api/srs/[id]/attachments 는 부분 성공을 201 로 돌려준다 —
+   * 검증에 걸린 파일은 `data.errors[]` 에 담기고 나머지만 저장된다.
+   * (전부 실패한 경우에만 400 이다.)
+   *
+   * 생성 폼(`use-create-sr-form.ts`)과 **동일한 계약**이다. 두 폼이 같은 라우트를
+   * 부르므로 결과를 다루는 방식도 갈라지면 안 된다.
+   */
+  interface AttachmentUploadOutcome {
+    uploaded: number;
+    rejected: Array<{ fileName: string; error: string }>;
+  }
+
+  const uploadAttachments = async (
+    srId: string,
+    filesToUpload: File[]
+  ): Promise<AttachmentUploadOutcome> => {
     const formData = new FormData();
     filesToUpload.forEach((file) => formData.append('files', file));
     try {
-      const response = await fetch(`/api/srs/${srId}/attachments`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) throw new Error('Failed to upload attachments');
+      // ⚠️ FormData 는 그대로 넘긴다 — `api-client` 가 Content-Type 을 붙이지 않아야
+      //    브라우저가 multipart boundary 를 계산해 붙인다.
+      //
+      // **던지지 않았다고 다 올라간 것이 아니다.** 예전에는 `await apiPost(...)` 만 하고
+      // 응답을 아예 읽지 않았다. 3개 중 2개가 확장자·크기 검증에 걸려도 응답은 201 이므로
+      // 사용자에게는 "SR이 수정되었습니다." 만 보였고, 상세를 다시 열어야 비로소 파일이
+      // 없다는 것을 알 수 있었다. 저장된 개수와 거부 사유는 응답이 알려 준다.
+      // (생성 폼에서 이미 한 번 고쳤던 회귀가 수정 폼에 남아 있었다.)
+      const body = await apiPost<{
+        data?: {
+          attachments?: unknown[];
+          errors?: Array<{ fileName: string; error: string }>;
+        };
+      }>(`/api/srs/${srId}/attachments`, formData);
+      return {
+        uploaded: body?.data?.attachments?.length ?? 0,
+        rejected: body?.data?.errors ?? [],
+      };
     } catch {
+      // 전부 실패(400)·네트워크 오류. 여기서만 "업로드에 실패했습니다" 를 띄운다.
       toast({
         title: '경고',
         description: 'SR은 수정되었으나 첨부파일 업로드에 실패했습니다.',
         variant: 'destructive',
       });
+      return { uploaded: 0, rejected: [] };
     }
   };
 
@@ -260,12 +296,29 @@ export function useEditSRForm({
 
     try {
       await updateSR(formData);
+
+      let upload: AttachmentUploadOutcome = { uploaded: 0, rejected: [] };
       if (files.length > 0) {
-        await uploadAttachments(sr.id, files);
+        upload = await uploadAttachments(sr.id, files);
         await fetchExistingAttachments(sr.id);
       }
 
-      toast({ title: '성공', description: 'SR이 수정되었습니다.' });
+      // 거부된 파일이 있으면 성공 토스트로 덮지 않고 사유를 그대로 보여 준다.
+      // 사용자가 다시 올릴지 판단하려면 어떤 파일이 왜 걸렸는지가 필요하다.
+      if (upload.rejected.length > 0) {
+        toast({
+          title: '일부 첨부파일이 업로드되지 않았습니다',
+          description: `SR은 수정되었습니다. ${upload.uploaded}개 업로드 / ${upload.rejected.length}개 실패 — ${upload.rejected
+            .map((r) => `${r.fileName}: ${r.error}`)
+            .join(', ')}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: '성공',
+          description: `SR이 수정되었습니다.${upload.uploaded > 0 ? ` (첨부파일 ${upload.uploaded}개 업로드)` : ''}`,
+        });
+      }
       onOpenChange(false);
 
       await Promise.all([

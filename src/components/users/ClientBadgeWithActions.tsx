@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
-import { useToast } from '@/hooks/use-toast';
+import { useAssignClient, useRemoveClient } from '@/hooks/use-client-assignment';
 
 interface Client {
   id: string;
@@ -42,97 +42,44 @@ export function ClientBadgeWithActions({
 }: ClientBadgeWithActionsProps) {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [showChangePopover, setShowChangePopover] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  // 진행 중인 SR 때문에 서버가 거부한 변경 요청 (확인 후 강제 재시도용)
-  const [pendingChange, setPendingChange] = useState<{
-    clientId: string;
-    clientName: string;
-    ongoingSRCount: number;
-  } | null>(null);
-  const { toast } = useToast();
 
-  const handleRemove = async () => {
-    setIsProcessing(true);
-    try {
-      // 고객사 제거는 UserClient 레코드 삭제
-      const response = await fetch(`/api/users/${userId}/client`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || 'Failed to remove client');
-      }
-
-      toast({
-        title: '성공',
-        description: `${userName}님의 고객사 소속이 해제되었습니다.`,
-      });
-
+  // 고객사 제거는 UserClient 레코드 삭제
+  const { remove: handleRemove, isProcessing: isRemoving } = useRemoveClient({
+    userId,
+    fallbackMessage: 'Failed to remove client',
+    successDescription: `${userName}님의 고객사 소속이 해제되었습니다.`,
+    errorDescription: '고객사 소속 해제에 실패했습니다.',
+    onRemoved: () => {
       setShowRemoveDialog(false);
       onChanged?.();
-    } catch (error) {
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '고객사 소속 해제에 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    },
+  });
 
-  const handleChange = async (newClientId: string, newClientName: string, force = false) => {
-    setIsProcessing(true);
-    try {
-      const response = await fetch(`/api/users/${userId}/client`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          force ? { clientId: newClientId, force: true } : { clientId: newClientId }
-        ),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        // 진행 중인 SR이 있어 서버가 거부한 경우 - 확인 후 강제 변경
-        if (response.status === 409 && result.code === 'ONGOING_SRS') {
-          setPendingChange({
-            clientId: newClientId,
-            clientName: newClientName,
-            ongoingSRCount: result.data?.ongoingSRCount || 0,
-          });
-          setShowChangePopover(false);
-          return;
-        }
-
-        throw new Error(result.error || 'Failed to change client');
-      }
-
-      const ongoingSRsHandled = result.data?.ongoingSRsHandled || 0;
-      toast({
-        title: '성공',
-        description:
-          ongoingSRsHandled > 0
-            ? `${userName}님의 고객사가 ${newClientName}(으)로 변경되었습니다. 진행 중인 SR ${ongoingSRsHandled}건은 재할당을 권장합니다.`
-            : `${userName}님의 고객사가 ${newClientName}(으)로 변경되었습니다.`,
-      });
-
-      setPendingChange(null);
+  // 409(진행 중인 SR)를 확인 다이얼로그로 바꾸는 플로우는 훅이 들고 있다.
+  // `pendingChange` 가 null 이 아니면 강제 변경 확인 다이얼로그가 열린다.
+  const {
+    assign: handleChange,
+    pending: pendingChange,
+    clearPending,
+    isProcessing: isChanging,
+  } = useAssignClient({
+    userId,
+    fallbackMessage: 'Failed to change client',
+    successDescription: ({ clientName }, ongoingSRsHandled) =>
+      ongoingSRsHandled > 0
+        ? `${userName}님의 고객사가 ${clientName}(으)로 변경되었습니다. 진행 중인 SR ${ongoingSRsHandled}건은 재할당을 권장합니다.`
+        : `${userName}님의 고객사가 ${clientName}(으)로 변경되었습니다.`,
+    errorDescription: '고객사 변경에 실패했습니다.',
+    onBlocked: () => setShowChangePopover(false),
+    onApplied: () => {
       setShowChangePopover(false);
       onChanged?.();
-    } catch (error) {
-      setPendingChange(null);
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '고객사 변경에 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+    },
+  });
+
+  // 두 변이는 원래 하나의 `isProcessing` state 를 공유했다 — 어느 쪽이든 도는 동안
+  // 변경·해제 버튼이 모두 잠긴다. 그 동작을 그대로 유지한다.
+  const isProcessing = isRemoving || isChanging;
 
   return (
     <div className="flex items-center gap-2">
@@ -165,7 +112,7 @@ export function ClientBadgeWithActions({
                   .map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => handleChange(c.id, c.name)}
+                      onClick={() => handleChange({ clientId: c.id, clientName: c.name })}
                       disabled={isProcessing}
                       className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors disabled:opacity-50"
                     >
@@ -221,7 +168,7 @@ export function ClientBadgeWithActions({
         open={pendingChange !== null}
         onOpenChange={(next) => {
           if (!next) {
-            setPendingChange(null);
+            clearPending();
           }
         }}
       >
@@ -242,7 +189,7 @@ export function ClientBadgeWithActions({
             <AlertDialogAction
               onClick={() => {
                 if (pendingChange) {
-                  handleChange(pendingChange.clientId, pendingChange.clientName, true);
+                  handleChange(pendingChange, true);
                 }
               }}
               disabled={isProcessing}

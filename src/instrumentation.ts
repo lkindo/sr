@@ -1,5 +1,4 @@
 /* eslint-disable no-console */
-import type { Instrumentation } from 'next';
 
 /**
  * Instrumentation Hook
@@ -11,15 +10,6 @@ import type { Instrumentation } from 'next';
  */
 
 export async function register() {
-  // 에러 트래킹은 가장 먼저 켠다. 이 아래에서 터지는 것도 잡아야 하기 때문이다.
-  // DSN 이 없으면 initSentry 가 즉시 반환하므로 오버헤드는 0 이다.
-  const { initSentry } = await import('@/lib/sentry-init');
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    initSentry('server');
-  } else if (process.env.NEXT_RUNTIME === 'edge') {
-    initSentry('edge');
-  }
-
   // 서버 사이드에서만 실행
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     // 서버 시작 시 이벤트 리스너(service-registry) 즉시 로드 적용
@@ -46,15 +36,3 @@ export async function register() {
     validateAndPrintEnv();
   }
 }
-
-/**
- * Next.js 가 서버에서 처리되지 않은 예외를 만났을 때 부른다(App Router 전용 훅).
- *
- * 이게 없으면 라우트 핸들러와 RSC 에서 터진 예외가 Sentry 에 도달하지 않는다 —
- * `Sentry.init` 만으로는 클라이언트 쪽만 잡힌다.
- */
-export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
-  if (!process.env.SENTRY_DSN && !process.env.NEXT_PUBLIC_SENTRY_DSN) return;
-  const { captureRequestError } = await import('@sentry/nextjs');
-  return captureRequestError(err, request, context);
-};

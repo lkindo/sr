@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   FileText,
@@ -25,6 +26,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';
+import { apiDelete, ApiError, apiGet, apiPatch, retryUnlessClientError } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 
 interface ServiceCategory {
   id: string;
@@ -78,6 +81,16 @@ interface ClientDetail {
   srs: SR[];
 }
 
+/**
+ * `/api/users/[id]` 응답 중 "사용자 제외" 가 쓰는 부분만.
+ *
+ * 이 화면은 사용자의 소속 고객사 id 목록만 필요하다 — 전체 응답을 다시 적으면 서버가
+ * 필드를 늘릴 때마다 여기가 거짓말을 하게 된다.
+ */
+interface UserClients {
+  clients?: Array<{ client: { id: string } }>;
+}
+
 import {
   priorityBadgeVariants as priorityColors,
   priorityLabels,
@@ -88,8 +101,9 @@ import {
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [client, setClient] = useState<ClientDetail | null>(null);
-  const [loading, setLoading] = useState(true);
+  // `[id]` 는 캐치올 세그먼트가 아니라 항상 문자열이지만 useParams 의 타입은 배열도 허용한다.
+  // queryKey 와 URL 이 같은 값에서 나와야 하므로 여기서 한 번만 좁힌다.
+  const clientId = typeof params.id === 'string' ? params.id : '';
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
@@ -98,43 +112,62 @@ export default function ClientDetailPage() {
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
   const { toast } = useToast();
 
-  // useCallback 으로 신원을 고정해야 아래 effect 의 deps 에 넣을 수 있다.
-  const fetchClient = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/clients/${params.id}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          toast({
-            title: '오류',
-            description: '고객사를 찾을 수 없습니다.',
-            variant: 'destructive',
-          });
-          router.push('/clients');
-          return;
-        }
-        throw new Error('Failed to fetch client');
-      }
-      const data = await response.json();
-      setClient(data);
-    } catch {
+  /**
+   * 고객사 상세.
+   *
+   * ⚠️ `/api/clients/[id]` 는 목록 봉투(`{data, meta}`)를 쓰지 않고 bare object 를 준다
+   * (예외 라우트 — src/lib/pagination.ts 상단에 문서화돼 있다). 그래서 apiList 가 아니라
+   * apiGet 이다.
+   *
+   * 예전에는 fetchClient 를 useCallback 으로 감싸 신원을 고정하고 effect 의 deps 에 넣었다.
+   * 그 역할은 queryKey 가 대신한다 — id 가 바뀌면 다른 쿼리가 되고, 같으면 다시 돌지 않는다.
+   *
+   * `staleTime: 0` 은 "화면에 들어올 때마다 다시 조회한다" 는 기존 동작을 지키기 위한 것이다.
+   * 전역 기본값 60초를 그대로 두면 목록에서 되돌아왔을 때 방금 지운 카테고리가 남아 보인다.
+   *
+   * `enabled` 는 예전 effect 의 `if (params.id)` 가드를 그대로 옮긴 것이다. id 가 없으면
+   * 쿼리가 아예 돌지 않고 isPending 에 머문다 — 예전에도 loading 이 true 로 남았다.
+   */
+  const {
+    data: client,
+    isPending,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: qk.clients.detail(clientId),
+    queryFn: () => apiGet<ClientDetail>(`/api/clients/${clientId}`),
+    enabled: !!clientId,
+    staleTime: 0,
+    retry: retryUnlessClientError,
+  });
+
+  // 조회 실패는 토스트로 알린다. v5 의 useQuery 에는 onError 가 없어 effect 로 옮긴다.
+  // `error` 는 실패마다 새 객체이므로 실패 1회당 정확히 한 번 실행된다 — 기존 catch 와 같다.
+  //
+  // 404 만 다르게 다룬다: 없는 고객사를 붙잡고 있어 봐야 할 일이 없으므로 목록으로 돌려보낸다.
+  // 예전에는 이 분기를 `response.status === 404` 로 했고, 지금은 ApiError 가 status 를 싣고
+  // 온다 — 그러라고 만든 타입이다.
+  useEffect(() => {
+    if (!error) return;
+    if (error instanceof ApiError && error.status === 404) {
       toast({
         title: '오류',
-        description: '고객사 정보를 불러오는데 실패했습니다.',
+        description: '고객사를 찾을 수 없습니다.',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
+      router.push('/clients');
+      return;
     }
-  }, [params.id, toast, router]);
-
-  useEffect(() => {
-    if (params.id) {
-      fetchClient();
-    }
-  }, [params.id, fetchClient]);
+    toast({
+      title: '오류',
+      description: '고객사 정보를 불러오는데 실패했습니다.',
+      variant: 'destructive',
+    });
+  }, [error, toast, router]);
 
   const handleClientUpdated = () => {
-    fetchClient();
+    // 예전에는 fetchClient() 를 다시 불렀다. refetch 가 같은 일을 한다.
+    void refetch();
     setIsEditDialogOpen(false);
   };
 
@@ -147,7 +180,7 @@ export default function ClientDetailPage() {
   };
 
   const handleUserSaved = () => {
-    fetchClient();
+    void refetch();
     setIsUserDialogOpen(false);
   };
 
@@ -162,74 +195,101 @@ export default function ClientDetailPage() {
   };
 
   const handleCategorySaved = () => {
-    fetchClient();
+    void refetch();
     setIsCategoryDialogOpen(false);
     setEditingCategory(null);
   };
 
-  const handleDeleteCategory = async (category: ServiceCategory) => {
-    if (!confirm(`'${category.categoryName}' 카테고리를 삭제하시겠습니까?`)) return;
-
-    try {
-      const response = await fetch(`/api/clients/${params.id}/categories/${category.id}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}));
-        // SR 이 연결된 카테고리는 서버가 막는다(참조 무결성). 그 이유를 그대로 보여준다 —
-        // "삭제 실패"로 뭉뚱그리면 사용자는 비활성화하라는 안내를 볼 수 없다.
-        throw new Error(body.error || '카테고리 삭제에 실패했습니다.');
-      }
-
+  /**
+   * 서비스 카테고리 삭제.
+   *
+   * SR 이 연결된 카테고리는 서버가 막는다(참조 무결성). 그 이유를 **그대로** 보여준다 —
+   * "삭제 실패"로 뭉뚱그리면 사용자는 비활성화하라는 안내를 볼 수 없다. 이건 계약이므로
+   * 고정 문구로 바꾸지 말 것.
+   *
+   * 예전에는 `body.error || '카테고리 삭제에 실패했습니다.'` 를 손으로 언랩했다. 지금은
+   * api-client 가 서버의 `error` 필드를 ApiError.message 로 옮겨 주고, 서버가 아무 메시지도
+   * 주지 않았을 때만 아래 fallbackMessage 가 쓰인다 — 우변이 그대로 이사한 것이다.
+   */
+  const deleteCategory = useMutation({
+    mutationFn: (category: ServiceCategory) =>
+      apiDelete(`/api/clients/${clientId}/categories/${category.id}`, {
+        fallbackMessage: '카테고리 삭제에 실패했습니다.',
+      }),
+    onSuccess: () => {
       toast({ title: '성공', description: '서비스 카테고리가 삭제되었습니다.' });
-      fetchClient();
-    } catch (error) {
+      void refetch();
+    },
+    onError: (error) => {
       toast({
         title: '오류',
         description: error instanceof Error ? error.message : '카테고리 삭제에 실패했습니다.',
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const handleDeleteCategory = (category: ServiceCategory) => {
+    // confirm 은 서버를 거치지 않는 검사라 mutation 밖에 남긴다 — 취소했을 때
+    // pending 상태를 스치지 않아야 한다.
+    if (!confirm(`'${category.categoryName}' 카테고리를 삭제하시겠습니까?`)) return;
+    deleteCategory.mutate(category);
   };
 
-  const handleRemoveUser = async (userId: string) => {
-    if (!confirm('정말 이 사용자를 고객사에서 제외하시겠습니까?')) return;
-
-    try {
+  /**
+   * 사용자를 이 고객사에서 제외.
+   *
+   * ⚠️ **읽기-수정-쓰기다.** 서버에 "이 한 건만 해제" 라우트가 없어서, 사용자의 소속 목록
+   * 전체를 GET 으로 읽고 이 고객사만 빼서 PATCH 로 되쓴다.
+   *
+   * 두 호출을 하나의 mutationFn 안에 순차로 두지만 **원자성은 없다.** GET 과 PATCH 사이에
+   * 다른 화면이 같은 사용자의 소속을 바꾸면 그 변경을 조용히 덮어쓴다. 이 경합은 fetch 를
+   * 쓰던 시절과 **동일**하며(여기서 새로 생긴 것이 아니다), 없애려면 서버 라우트가 필요하다.
+   */
+  const removeUser = useMutation({
+    mutationFn: async (userId: string) => {
       // 1. Get current user details to find other clients
-      const userRes = await fetch(`/api/users/${userId}`);
-      if (!userRes.ok) throw new Error('Failed to fetch user details');
-      const userData = await userRes.json();
-
-      // 2. Filter out this client
-      const currentClientIds = userData.clients?.map((uc: any) => uc.client.id) || [];
-      const newClientIds = currentClientIds.filter((id: string) => id !== client?.id);
-
-      // 3. Update user
-      const updateRes = await fetch(`/api/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientIds: newClientIds }),
+      const userData = await apiGet<UserClients>(`/api/users/${userId}`, {
+        fallbackMessage: 'Failed to fetch user details',
       });
 
-      if (!updateRes.ok) throw new Error('Failed to unlink user');
+      // 2. Filter out this client
+      const currentClientIds = userData.clients?.map((uc) => uc.client.id) || [];
+      const newClientIds = currentClientIds.filter((id) => id !== client?.id);
 
+      // 3. Update user
+      await apiPatch(
+        `/api/users/${userId}`,
+        { clientIds: newClientIds },
+        { fallbackMessage: 'Failed to unlink user' }
+      );
+    },
+    onSuccess: () => {
       toast({
         title: '성공',
         description: '사용자가 고객사에서 제외되었습니다.',
       });
-      fetchClient();
-    } catch {
+      void refetch();
+    },
+    onError: () => {
+      // 어느 단계에서 왜 실패했는지 구분하지 않고 항상 같은 문장을 보여 준다. 서버 메시지를
+      // 삼키는 것은 기존 catch 의 계약이다(위 카테고리 삭제와 반대인 점에 주의).
       toast({
         title: '오류',
         description: '사용자 제외에 실패했습니다.',
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const handleRemoveUser = (userId: string) => {
+    if (!confirm('정말 이 사용자를 고객사에서 제외하시겠습니까?')) return;
+    removeUser.mutate(userId);
   };
 
-  if (loading) {
+  // 예전 `loading` state 는 최초 조회에서만 켜졌다 — 재조회(fetchClient 재호출)는 그것을
+  // 다시 true 로 만들지 않았다. 그래서 isFetching 이 아니라 isPending 이다.
+  if (isPending) {
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-muted-foreground">로딩 중...</p>

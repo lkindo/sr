@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { deleteSRAction, getSRDetailsAction, updateSRAction } from '@/actions/sr.actions';
 import { useToast } from '@/hooks/use-toast';
+import { apiPatch } from '@/lib/api-client';
 import type { SRDetails } from '@/types/sr.types';
 
 /**
@@ -161,19 +162,11 @@ export function useChangeSRStatus(srId: string) {
       action: string;
       payload?: Record<string, any>;
     }) => {
-      const response = await fetch(`/api/srs/${srId}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ action, ...payload }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || '상태 변경에 실패했습니다.');
-      }
-      return await response.json();
+      return apiPatch<unknown>(
+        `/api/srs/${srId}/status`,
+        { action, ...payload },
+        { fallbackMessage: '상태 변경에 실패했습니다.' }
+      );
     },
     onMutate: async ({ action }) => {
       // 진행 중인 쿼리 취소

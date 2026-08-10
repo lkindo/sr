@@ -56,7 +56,11 @@ interface OrganizationTreeProps {
   onToggleClient: (clientId: string) => void;
   onAddUser: (clientId: string) => void;
   onToggleClientStatus?: (clientId: string) => Promise<void>;
-  onToggleUserStatus?: (userId: string) => Promise<void>;
+  /**
+   * 두 번째 인자는 **현재 상태**다(UserCardContextMenu 주석 참조). 트리는 값을 만들지 않고
+   * `user.isActive` 를 그대로 실어 보내기만 한다.
+   */
+  onToggleUserStatus?: (userId: string, isActive: boolean) => Promise<void>;
   onDragEnd?: (event: DragEndEvent) => void;
   onDragStart?: (event: DragStartEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
@@ -89,7 +93,7 @@ interface DraggableUserCardProps {
   user: User;
   clientId: string;
   searchQuery: string;
-  onToggleUserStatus?: (userId: string) => Promise<void>;
+  onToggleUserStatus?: (userId: string, isActive: boolean) => Promise<void>;
 }
 
 function DraggableUserCard({

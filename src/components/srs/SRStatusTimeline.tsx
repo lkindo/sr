@@ -46,7 +46,16 @@ const statusIcons: Record<string, React.ElementType> = {
 };
 
 /**
- * 경과 시간을 한국어로 표시
+ * 경과 시간을 한국어로 표시.
+ *
+ * 주 단위와 월 단위의 경계는 **둘 다 일수(`diffDays`)로 자른다.** 예전에는 주 가지가
+ * `diffWeeks < 4`(=27일까지)로 끊기는데 월 가지는 `floor(diffDays / 30)` 이라,
+ * 28·29일이 어느 쪽에도 속하지 못하고 `floor(28/30) = 0` → **"0개월 전"** 으로 샜다
+ * (2026-08-10 수정). 이제 28·29일은 "4주 전" 이고 30일부터 "1개월 전" 이다.
+ *
+ * 즉 `${diffMonths}개월 전` 은 `diffDays >= 30` 일 때만 도달하므로 diffMonths >= 1 이
+ * 보장된다. 경계값은 `__tests__/SRStatusTimeline.test.tsx` 가 26~31일 전수로 잠근다 —
+ * 구간 조건을 만질 때 두 가지가 같은 단위를 쓰는지 반드시 다시 확인할 것.
  */
 const getTimeAgo = (date: Date | string): string => {
   const now = new Date();
@@ -63,7 +72,7 @@ const getTimeAgo = (date: Date | string): string => {
   if (diffMinutes < 60) return `${diffMinutes}분 전`;
   if (diffHours < 24) return `${diffHours}시간 전`;
   if (diffDays < 7) return `${diffDays}일 전`;
-  if (diffWeeks < 4) return `${diffWeeks}주 전`;
+  if (diffDays < 30) return `${diffWeeks}주 전`;
   return `${diffMonths}개월 전`;
 };
 

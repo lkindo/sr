@@ -11,6 +11,7 @@ import * as z from 'zod';
 
 import { getSRHandlersForSelection } from '@/actions/user.actions';
 import { useToast } from '@/hooks/use-toast';
+import { apiGet } from '@/lib/api-client';
 import type { SRDetails } from '@/types/sr.types';
 
 interface User {
@@ -67,10 +68,11 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
       try {
         setLoading(true);
 
-        // SR 정보 조회
-        const srResponse = await fetch(`/api/srs/${srId}/intake`);
-        if (!srResponse.ok) throw new Error('SR을 불러오는데 실패했습니다');
-        const srData = await srResponse.json();
+        // SR 정보 조회.
+        // 실패는 아래 catch 가 한 문장으로 받는다 — 조회가 안 되면 이 화면에서 할 수 있는
+        // 일이 없으므로 서버가 준 이유를 세분해 봐야 사용자가 할 행동이 달라지지 않는다.
+        // (제출 실패는 반대다. 거기서는 이유마다 다음 행동이 다르므로 아래에서 풀어 쓴다.)
+        const srData = await apiGet<SRDetails>(`/api/srs/${srId}/intake`);
 
         // 상태에 따라 모드 결정
         if (srData.status === 'REQUESTED') {
@@ -120,7 +122,14 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
         if (srData.status === 'INTAKE' || srData.status === 'IN_PROGRESS') {
           // 수정 모드: 기존 접수 정보 로드
           form.setValue('actualPriority', srData.actualPriority || 'MEDIUM');
-          form.setValue('estimatedHours', srData.estimatedHours || srData.serviceCategory.slaHours);
+          // ⚠️ `estimatedHours` 는 Prisma 스키마상 `Decimal?` 이지만 JSON 을 건너오면
+          //    number 다. 이관 전에는 `response.json()` 이 any 라 이 어긋남이 드러나지
+          //    않았다. `Number()` 는 그 사실을 명시할 뿐 런타임 값은 그대로다.
+          //    (`??` 가 아니라 `||` 인 것도 의도다 — 0시간은 "안 정해짐" 으로 보고 SLA 로 돌아간다.)
+          form.setValue(
+            'estimatedHours',
+            Number(srData.estimatedHours || srData.serviceCategory.slaHours)
+          );
           form.setValue(
             'estimatedCompletionDate',
             srData.estimatedCompletionDate ? new Date(srData.estimatedCompletionDate) : new Date()
@@ -175,6 +184,15 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
     try {
       setSubmitting(true);
 
+      // ⚠️ 여기는 `fetch` 를 그대로 둔다 — `apiPost`/`apiPatch` 로 바꾸면 아래 세 갈래
+      //    메시지 중 두 갈래가 사라진다. api-client 는 에러 본문을 `response.json()` 으로만
+      //    읽고 실패하면 삼키므로(프록시 502 HTML 을 토스트에 그대로 뿌리지 않으려는 의도된
+      //    설계다), **비 JSON 본문 원문**과 `statusText` 가 ApiError 에 남지 않는다.
+      //    접수 화면에서는 그 두 가지가 사용자의 다음 행동을 가른다:
+      //      - JSON `{error}`      → "담당자가 비활성 상태입니다" → 담당자를 바꿔서 재시도
+      //      - 비 JSON 본문        → 게이트웨이/WAF 가 낸 문장 그대로 → 관리자에게 전달
+      //      - 본문 없음           → "서버 오류 (500): ..." → 상태코드로 문의
+      //    첫 갈래만 api-client 로 재현되므로, 세 갈래를 유지하기 위해 이 한 곳은 남긴다.
       const response = await fetch(url, {
         method,
         headers: {

@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertCircle,
   ArrowLeft,
@@ -32,6 +33,8 @@ import { Input, PasswordInput } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import { apiList, retryUnlessClientError } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 import type { ClientSummary } from '@/types/client.types';
 
 /** `calculatePasswordStrength` 가 돌려주는 개별 규칙 충족 여부. */
@@ -125,44 +128,38 @@ export default function RegisterForm() {
 
   // 새로운 상태
   const [accountType, setAccountType] = useState<'ENGINEER' | 'CLIENT'>('CLIENT');
-  const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
-  const [loadingClients, setLoadingClients] = useState(false);
 
   // 비밀번호 강도 상태
   const [password, setPassword] = useState('');
   const [passwordStrength, setPasswordStrength] = useState(calculatePasswordStrength(''));
 
-  // 고객사 목록 로드 (CLIENT 선택 시)
-  // useCallback 으로 신원을 고정해야 아래 effect 의 의존성 배열에 넣을 수 있다.
-  // (매 렌더 새 함수였기 때문에 그동안 deps 에서 빠져 있었다)
-  const fetchClients = useCallback(async () => {
-    if (clients.length > 0) return; // 이미 로드됨
-
-    setLoadingClients(true);
-    try {
-      const response = await fetch('/api/clients/public');
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      const result = await response.json();
-      setClients(Array.isArray(result) ? result : result.data || []);
-    } catch {
-      // 에러 발생 시 빈 배열로 설정 (사용자에게 "등록된 고객사가 없습니다" 메시지 표시)
-      setClients([]);
-    } finally {
-      setLoadingClients(false);
-    }
-  }, [clients.length]);
-
-  // 컴포넌트 마운트 시 고객사 목록 로드 (기본값이 CLIENT이므로)
-  useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
+  /**
+   * 고객사 목록 (회원가입용 무인증 공개 라우트).
+   *
+   * 기본 계정 유형이 CLIENT 라 마운트 시 곧바로 필요하다. 예전에는 `useEffect` +
+   * `fetch` 로 직접 받아오면서 `if (clients.length > 0) return` 자기참조 가드와
+   * `[clients.length]` 의존성으로 "한 번만 로드" 를 흉내 냈다. 그 캐싱은 이제 React
+   * Query 가 한다 — 마운트와 계정 유형 전환이 같은 키를 보므로 요청은 한 번뿐이고,
+   * 가드도 deps 도 필요 없다.
+   *
+   * 이 목록은 거의 바뀌지 않으므로 staleTime 을 길게 준다(전역 기본값은 1분).
+   */
+  const { data: clients = [], isPending: loadingClients } = useQuery({
+    queryKey: qk.clients.publicList,
+    // 이 라우트는 bare 배열을 돌려준다. `apiList` 가 봉투/bare 양쪽을 받아 주므로
+    // 예전의 `Array.isArray(result) ? result : result.data || []` 분기는 불필요하다.
+    queryFn: async () => (await apiList<ClientSummary>('/api/clients/public')).data,
+    staleTime: 5 * 60 * 1000,
+    retry: retryUnlessClientError,
+  });
+  // 실패는 화면에 노출하지 않는다(계약). `error` 를 읽지 않으면 clients 가 빈 배열로
+  // 남아 아래의 "등록된 고객사가 없습니다" 안내가 그대로 뜬다 — 회원가입 화면에
+  // 토스트를 새로 띄우는 것은 회귀다.
 
   const handleAccountTypeChange = (value: 'ENGINEER' | 'CLIENT') => {
     setAccountType(value);
-    if (value === 'CLIENT') {
-      fetchClients();
-    } else {
+    if (value !== 'CLIENT') {
       setSelectedClientId(''); // ENGINEER로 변경 시 선택 초기화
     }
   };

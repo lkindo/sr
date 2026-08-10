@@ -1,3 +1,5 @@
+import type { ReactElement, ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,6 +25,10 @@ vi.mock('@/components/ui', async () => (await import('@/__tests__/mocks/ui-primi
  *
  * 그리고 `clientId` 는 **prop 으로 받은 값**만 쓴다. 라우트도 URL 의 id 만 신뢰하므로
  * (본문 값은 무시한다) 양쪽이 같은 규칙이어야 경로가 어긋나지 않는다.
+ *
+ * 저장이 React Query 로 옮겨졌으므로 렌더는 `QueryClientProvider` 를 요구한다. 단언은
+ * 그대로다 — `fetch` 스텁의 호출 인자(url·method·body)를 보는 방식이 유효한 것은
+ * `apiPost`/`apiPatch` 가 결국 같은 인자로 `fetch` 를 부르기 때문이다.
  */
 
 const toast = vi.fn();
@@ -52,11 +58,44 @@ const fill = (id: string, value: string) =>
  */
 const submit = () => fireEvent.click(screen.getByRole('button', { name: /추가|수정/ }));
 
-const okFetch = () =>
+/**
+ * 실제 `Response` 를 돌려준다.
+ *
+ * 손으로 만든 `{ ok, json }` 리터럴로는 부족하다 — `api-client` 는 성공 응답에서 `status`
+ * (204 판별)와 `text()`(빈 본문 허용)를 함께 읽기 때문이다. 대역이 진짜 계약보다 좁으면
+ * 컴포넌트가 아니라 대역이 통과 여부를 정하게 된다.
+ */
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const stubFetch = (respond: () => Response | Promise<Response>) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true, json: async () => ({}) }))
+    vi.fn(async () => respond())
   );
+
+const okFetch = () => stubFetch(() => jsonResponse({}));
+
+/**
+ * 저장 mutation 하나뿐이라 조회 옵션은 쓰이지 않지만, 저장소의 다이얼로그 테스트 관례를
+ * 그대로 따른다(`retry: false` / `gcTime: 0`). 재시도가 켜져 있으면 실패 케이스가
+ * 백오프 때문에 늘어진다.
+ */
+const renderDialog = (ui: ReactElement) => {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return render(ui, { wrapper });
+};
 
 /** 마지막 요청의 URL·메서드·본문. */
 const sent = () => {
@@ -72,21 +111,21 @@ beforeEach(() => {
 
 describe('ServiceCategoryDialog — 모드', () => {
   it('category 가 없으면 기본값으로 연다', () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
 
     // SLA 기본값이 비어 있으면 사용자가 매번 직접 채워야 한다.
     expect((document.getElementById('slaHours') as HTMLInputElement).value).toBe('24');
   });
 
   it('category 가 있으면 기존 값을 채운다', () => {
-    render(<ServiceCategoryDialog {...baseProps} category={CATEGORY} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} category={CATEGORY} />);
 
     expect((document.getElementById('categoryName') as HTMLInputElement).value).toBe('장애 대응');
     expect((document.getElementById('slaHours') as HTMLInputElement).value).toBe('8');
   });
 
   it('닫혀 있으면 렌더하지 않는다', () => {
-    render(<ServiceCategoryDialog {...baseProps} open={false} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} open={false} />);
 
     expect(screen.queryByRole('button', { name: /추가|수정/ })).not.toBeInTheDocument();
   });
@@ -119,7 +158,7 @@ describe('ServiceCategoryDialog — 검증', () => {
   };
 
   it('카테고리명이 비면 보내지 않는다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
 
     submitBypassingHtmlValidation();
 
@@ -128,7 +167,7 @@ describe('ServiceCategoryDialog — 검증', () => {
 
   // 공백만 넣은 이름은 목록에서 빈 줄로 보인다.
   it('공백만 있는 이름도 막는다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '   ');
 
     submitBypassingHtmlValidation();
@@ -143,7 +182,7 @@ describe('ServiceCategoryDialog — 검증', () => {
     ['소수', '1.5'],
     ['숫자 아님', 'abc'],
   ])('SLA 가 %s 이면 막는다', async (_label, value) => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '장애 대응');
     fill('slaHours', value);
 
@@ -155,7 +194,7 @@ describe('ServiceCategoryDialog — 검증', () => {
 
 describe('ServiceCategoryDialog — 저장', () => {
   it('생성은 고객사 하위 경로로 POST 한다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '장애 대응');
 
     submit();
@@ -167,7 +206,7 @@ describe('ServiceCategoryDialog — 저장', () => {
   });
 
   it('수정은 카테고리 id 까지 붙여 PATCH 한다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} category={CATEGORY} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} category={CATEGORY} />);
     fill('categoryName', '이름 변경');
 
     submit();
@@ -178,7 +217,7 @@ describe('ServiceCategoryDialog — 저장', () => {
   });
 
   it('이름 앞뒤 공백은 잘라서 보낸다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '  장애 대응  ');
 
     submit();
@@ -188,7 +227,7 @@ describe('ServiceCategoryDialog — 저장', () => {
   });
 
   it('설명이 비면 아예 보내지 않는다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '장애 대응');
 
     submit();
@@ -199,7 +238,7 @@ describe('ServiceCategoryDialog — 저장', () => {
   });
 
   it('SLA 를 숫자로 변환해 보낸다', async () => {
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '장애 대응');
     fill('slaHours', '48');
 
@@ -212,7 +251,7 @@ describe('ServiceCategoryDialog — 저장', () => {
 
   it('성공하면 onSaved 를 부른다', async () => {
     const onSaved = vi.fn();
-    render(<ServiceCategoryDialog {...baseProps} onSaved={onSaved} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} onSaved={onSaved} />);
     fill('categoryName', '장애 대응');
 
     submit();
@@ -223,15 +262,10 @@ describe('ServiceCategoryDialog — 저장', () => {
 
 describe('ServiceCategoryDialog — 실패 처리', () => {
   it('서버가 거절하면 그 사유를 보여 준다', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        json: async () => ({ error: '같은 이름의 카테고리가 이미 있습니다.' }),
-      }))
-    );
+    // 4xx 로 만든다 — 저장은 재시도하지 않지만, 실패 응답의 의미도 "고쳐서 다시 보내라" 다.
+    stubFetch(() => jsonResponse({ error: '같은 이름의 카테고리가 이미 있습니다.' }, 409));
     const onSaved = vi.fn();
-    render(<ServiceCategoryDialog {...baseProps} onSaved={onSaved} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} onSaved={onSaved} />);
     fill('categoryName', '장애 대응');
 
     submit();
@@ -249,16 +283,8 @@ describe('ServiceCategoryDialog — 실패 처리', () => {
 
   // 502 처럼 본문이 JSON 이 아닐 때 파싱에서 죽으면 원래 오류가 가려진다.
   it('에러 본문이 JSON 이 아니어도 안내한다', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        json: async () => {
-          throw new Error('not json');
-        },
-      }))
-    );
-    render(<ServiceCategoryDialog {...baseProps} />);
+    stubFetch(() => new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '장애 대응');
 
     submit();
@@ -277,7 +303,7 @@ describe('ServiceCategoryDialog — 실패 처리', () => {
         throw new Error('Network error');
       })
     );
-    render(<ServiceCategoryDialog {...baseProps} />);
+    renderDialog(<ServiceCategoryDialog {...baseProps} />);
     fill('categoryName', '장애 대응');
 
     submit();

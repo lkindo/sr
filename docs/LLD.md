@@ -190,7 +190,6 @@ sr/
 │   │                                 # use-push-notifications, use-realtime-status …
 │   ├── types/                        # sr.types.ts, session.ts, next-auth.d.ts …
 │   ├── config/                       # navigation 등 정적 설정
-│   ├── stories/                      # Storybook 스토리
 │   ├── auth.ts  auth.config.ts       # NextAuth(Auth.js v5) 설정
 │   ├── proxy.ts                      # 미들웨어(요청 게이트, rate limit)
 │   └── instrumentation.ts            # 부팅 훅 (환경변수 검증 fail-fast)
@@ -3380,7 +3379,6 @@ NextAuth.js가 자동으로 처리:
 | 목적            | 도구                                                     | 실행 명령                                     |
 | --------------- | -------------------------------------------------------- | --------------------------------------------- |
 | 단위/컴포넌트   | **vitest 4.0** (`@vitest/coverage-v8` v8 프로바이더)     | `pnpm test`, `pnpm test:coverage`             |
-| 컴포넌트 스토리 | Storybook 10 + `@storybook/addon-vitest` (브라우저 모드) | `pnpm test:coverage` 에 포함                  |
 | E2E             | **Playwright 1.58**                                      | `pnpm test:e2e`                               |
 | 뮤테이션        | **Stryker 9.5.1** (`@stryker-mutator/vitest-runner`)     | `pnpm test:mutation`, `pnpm test:mutation:ci` |
 | 접근성          | `@axe-core/playwright`                                   | `e2e/30-accessibility.spec.ts`                |
@@ -3398,8 +3396,9 @@ NextAuth.js가 자동으로 처리:
 
 ### 커버리지 기준선 (실측)
 
-**측정 시점: 2026-07-30. 명령: `pnpm test:coverage`(= `vitest run --coverage`, unit + storybook
-두 프로젝트 전부 — CI 와 동일한 명령).**
+**명령: `pnpm test:coverage`(= `vitest run --coverage`, CI 와 동일). 2026-08-10 부터 vitest
+프로젝트는 `unit`(node) · `unit-dom`(jsdom) · `integration` 셋이다 — Storybook 프로젝트는
+제거했고, DOM 이 필요 없는 138개 파일을 node 환경으로 분리해 스위트가 773s → 187s 가 되었다.**
 
 | 지표       | 실측    | 게이트 임계값 | 절대 개수     |
 | ---------- | ------- | ------------- | ------------- |
@@ -3457,10 +3456,12 @@ Playwright 프로젝트는 `setup`, `multi-user-setup`, `role-persona-setup`(의
 - **pull request**: 보안·권한 스펙만(실측 50개). `permissions` + `role-personas`, 그리고
   `multi-user` 중 `08-user-management` / `09-client-management` / `23-role-exclusivity`.
 - **어디서도 실행되지 않는 것**: `firefox` / `webkit` / `Mobile Chrome`
-  (`testIgnore` 가 없어 멀티유저 스펙을 단일 인증 상태로 중복 실행한다 — 설정 결함),
-  `Dashboard Visual & Performance`(스냅샷이 `*-win32.png` 뿐이라 리눅스에서 반드시 실패하고
-  일부는 :6006 Storybook 서버를 요구한다), `Manual Screen Captures`(검증이 아니라 문서용
-  스크린샷 생성). PR 에서는 `chromium` 일반 기능 스펙과 `multi-user` 17~22 도 돌지 않는다.
+  (`testIgnore` 가 없어 멀티유저 스펙을 단일 인증 상태로 중복 실행한다 — 설정 결함).
+  PR 에서는 `chromium` 일반 기능 스펙과 `multi-user` 17~22 도 돌지 않는다.
+
+  > 2026-08-10 갱신: 이 목록에 있던 `Dashboard Visual & Performance`(:6006 Storybook 서버
+  > 의존)와 `Manual Screen Captures` 는 **playwright.config.ts 에서 이미 사라졌다.**
+  > 현재 프로젝트는 setup 3종 + `chromium` / `multi-user` / `role-personas` / `permissions` 뿐이다.
 
 E2E 는 `next dev` 가 아니라 **프로덕션 빌드**(`pnpm build` → `pnpm start`)를 대상으로 돌린다.
 `next dev` 는 라우트별 온디맨드 컴파일로 CI 에서 타임아웃 플레이크를 만든다.
@@ -3631,10 +3632,11 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
 `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`,
 `AXIOM_TOKEN`, `AXIOM_ORG_ID`.
 
-> **주의**: `.env.example` 에는 아직 `BLOB_READ_WRITE_TOKEN`, `UPSTASH_REDIS_REST_URL`,
-> `UPSTASH_REDIS_REST_TOKEN` 항목이 남아 있다. `src/lib/env-validation.ts` 는 이 세 개를
-> 검증 목록에 넣지 않으므로 동작에는 영향이 없으나, 신규 참여자가 필요한 값으로 오해할 수 있는
-> 잔재다(코드 정리 대상).
+> 2026-08-10 정리 완료 — `.env.example` 에 남아 있던 `BLOB_READ_WRITE_TOKEN`,
+> `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` 세 줄을 제거했다. 같은 커밋에서
+> 코드가 실제로 읽지만 템플릿에 없던 `NEXT_PUBLIC_APP_URL`·`AUTH_TRUST_HOST`·`STORAGE_DIR`
+> 을 추가했고, `STORAGE_DIR` 은 `env-validation.ts` 에도 등록해 선언만 있고 항목이 0개였던
+> `storage` 카테고리를 되살렸다.
 
 ### 관측성 현황
 

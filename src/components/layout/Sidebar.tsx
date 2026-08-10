@@ -95,6 +95,25 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
       ));
   };
 
+  // 데스크톱 분기는 활성 상위 메뉴 **하나**의 섹션만 그린다. 여기서도 판정은
+  // showAllSections 분기와 똑같이 `canAccessTopNavItem` 으로 시작해야 한다.
+  // 예전에는 이 분기가 상위 메뉴를 href 로 찾아 그 sections 를 곧바로 넘겨서
+  // **하위 항목의 permission 만** 보았다. 그래서 CLIENT_ADMIN(시드에서 CLIENT:READ·
+  // USER:READ 를 받는다)이 /organization·/clients·/users 로 직접 URL 진입하면,
+  // Header 가 같은 사용자에게 감춘 내부 운영용 '조직 관리' 하위 메뉴가 사이드바에는
+  // 그대로 그려졌다 — navigation.ts 가 경고한 "권한만으로 게이트하면 내부/외부 경계가
+  // 사라진다" 바로 그 상태다. (서버 인가는 별개로 살아 있어 데이터 유출은 아니었고,
+  // 문제는 메뉴 노출 경계였다.)
+  const activeTopItem = NAVIGATION_CONFIG.find((item) => item.href === activeTopMenu);
+
+  // find 자체는 실패하지 않는다: activeTopMenu 는 getActiveTopMenu 가 돌려주는 고정된
+  // href 집합이고, 그중 '/dashboard' 는 위에서 이미 return null 로 빠졌다. 따라서
+  // 여기서 섹션이 비는 유일한 이유는 **접근 판정에서 걸러졌을 때**다.
+  // (`?? []` 는 TopNavItem.sections 가 타입상 optional 이라 남겨 둔 것으로,
+  //  현재 설정값은 모든 항목이 sections 를 정의한다.)
+  const activeSections =
+    activeTopItem && canAccessTopItem(activeTopItem) ? (activeTopItem.sections ?? []) : [];
+
   return (
     <aside
       className={cn(
@@ -137,11 +156,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
           </div>
         ) : (
           /* Desktop / Partial Mode: Render only active sections */
-          <div>
-            {renderSections(
-              NAVIGATION_CONFIG.find((item) => item.href === activeTopMenu)?.sections || []
-            )}
-          </div>
+          <div>{renderSections(activeSections)}</div>
         )}
       </nav>
     </aside>

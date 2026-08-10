@@ -99,7 +99,7 @@ describe('updateClientAction', () => {
     const result: any = await updateClientAction(TARGET, form());
 
     expect(result.success).toBe(true);
-    expect(mocks.updateClient).toHaveBeenCalledWith(TARGET, expect.any(Object));
+    expect(mocks.updateClient).toHaveBeenCalledWith(TARGET, expect.any(Object), member.id, null);
   });
 
   it('내부 사용자는 소속과 무관하게 수정할 수 있다', async () => {
@@ -128,7 +128,7 @@ describe('deleteClientAction', () => {
     const result: any = await deleteClientAction(TARGET);
 
     expect(result.success).toBe(true);
-    expect(mocks.deleteClient).toHaveBeenCalledWith(TARGET);
+    expect(mocks.deleteClient).toHaveBeenCalledWith(TARGET, member.id, null);
   });
 
   it('내부 사용자는 삭제할 수 있다', async () => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2, MessageSquare, Send } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui';
 import { useSRCommentsInfinite } from '@/hooks/use-sr-infinite';
 import { useToast } from '@/hooks/use-toast';
+import { apiPost } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 
 interface SRCommentsProps {
   srId: string;
@@ -18,7 +20,6 @@ interface SRCommentsProps {
 
 export function SRComments({ srId }: SRCommentsProps) {
   const [newComment, setNewComment] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -46,7 +47,50 @@ export function SRComments({ srId }: SRCommentsProps) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * 댓글 작성.
+   *
+   * 읽기는 이미 React Query(`useSRCommentsInfinite`)인데 쓰기만 raw fetch 로 남아 있던
+   * 반쪽 상태였다. 손으로 들고 있던 `submitting` state 는 `isPending` 이 대신한다.
+   *
+   * ⚠️ **무효화를 `await` 하지 않는 것은 의도다.** 원래 코드도 `setSubmitting(false)` 로
+   *    버튼을 먼저 풀고 `Promise.all` 은 띄워만 뒀다. 여기서 `await` 하면(=onSuccess 가
+   *    그 Promise 를 돌려주면) 재조회가 끝날 때까지 `isPending` 이 true 로 남아
+   *    입력창과 버튼이 계속 잠긴다 — 사용자가 보던 것보다 느려진다.
+   */
+  const { mutate: addComment, isPending: submitting } = useMutation({
+    mutationFn: (content: string) =>
+      apiPost(
+        `/api/srs/${srId}/comments`,
+        { content },
+        // 서버가 메시지를 주지 않을 때의 문구. 기존 `error.error || ...` 와 같은 값이다.
+        { fallbackMessage: 'Failed to create comment' }
+      ),
+    onSuccess: () => {
+      setNewComment('');
+
+      toast({
+        title: '성공',
+        description: '댓글이 추가되었습니다.',
+      });
+
+      // React Query 캐시 무효화 및 서버 컴포넌트 갱신 (비동기로 실행)
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: qk.sr.comments(srId) }),
+        // router.refresh()는 Promise를 반환하지 않지만 비동기적 효과가 있음
+        Promise.resolve(router.refresh()),
+      ]);
+    },
+    onError: (error) => {
+      toast({
+        title: '오류',
+        description: error instanceof Error ? error.message : '댓글 추가에 실패했습니다.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!newComment.trim()) {
@@ -58,46 +102,8 @@ export function SRComments({ srId }: SRCommentsProps) {
       return;
     }
 
-    setSubmitting(true);
-
-    try {
-      const response = await fetch(`/api/srs/${srId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: newComment,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create comment');
-      }
-
-      setNewComment('');
-      setSubmitting(false); // UI 먼저 해제
-
-      toast({
-        title: '성공',
-        description: '댓글이 추가되었습니다.',
-      });
-
-      // React Query 캐시 무효화 및 서버 컴포넌트 갱신 (비동기로 실행)
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['sr', srId, 'comments'] }),
-        // router.refresh()는 Promise를 반환하지 않지만 비동기적 효과가 있음
-        Promise.resolve(router.refresh()),
-      ]);
-    } catch (error) {
-      setSubmitting(false); // 에러 발생 시에도 해제
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '댓글 추가에 실패했습니다.',
-        variant: 'destructive',
-      });
-    }
+    // 서버로는 trim 하지 않은 원문을 보낸다(기존 동작). 비었는지 판정에만 trim 을 쓴다.
+    addComment(newComment);
   };
 
   const getInitials = (name: string) => {

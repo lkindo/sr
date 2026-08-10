@@ -6,6 +6,7 @@ import { createSRAction } from '@/actions/sr.actions';
 import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
+import { apiPost } from '@/lib/api-client';
 import type { ClientSummary } from '@/types/client.types';
 
 const MIN_TITLE_LENGTH = 5;
@@ -145,22 +146,21 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     const formData = new FormData();
     filesToUpload.forEach((file) => formData.append('files', file));
     try {
-      const response = await fetch(`/api/srs/${srId}/attachments`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) throw new Error('Failed to upload attachments');
-
-      // `response.ok` 만 보면 안 된다. 예전에는 여기서 끝내고 호출부가 **고른 파일 수**로
-      // "첨부파일 N개 업로드" 를 띄웠다. 3개 중 2개가 확장자·크기 검증에 걸려도
-      // 응답은 201 이므로 사용자에게는 3개 다 올라간 것으로 보였고, 상세를 열어야
+      // ⚠️ FormData 를 그대로 넘긴다. `api-client` 가 이때 Content-Type 을 붙이지 않으므로
+      //    브라우저가 multipart boundary 를 계산해 붙인다. 직접 헤더를 주면 서버가
+      //    본문을 파싱하지 못한다.
+      //
+      // **성공 여부만 보고 끝내면 안 된다.** 예전에는 `response.ok` 만 확인하고 호출부가
+      // **고른 파일 수**로 "첨부파일 N개 업로드" 를 띄웠다. 3개 중 2개가 확장자·크기 검증에
+      // 걸려도 응답은 201 이므로 사용자에게는 3개 다 올라간 것으로 보였고, 상세를 열어야
       // 비로소 없다는 것을 알 수 있었다. 저장된 개수는 응답이 알려 준다.
-      const body = (await response.json()) as {
+      // (전부 실패한 경우에만 400 이고, 그때는 ApiError 가 던져져 아래 catch 로 간다.)
+      const body = await apiPost<{
         data?: {
           attachments?: unknown[];
           errors?: Array<{ fileName: string; error: string }>;
         };
-      };
+      }>(`/api/srs/${srId}/attachments`, formData);
       return {
         uploaded: body.data?.attachments?.length ?? 0,
         rejected: body.data?.errors ?? [],

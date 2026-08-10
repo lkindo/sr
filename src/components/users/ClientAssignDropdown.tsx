@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
-import { useToast } from '@/hooks/use-toast';
+import { useAssignClient } from '@/hooks/use-client-assignment';
 import { cn } from '@/lib/utils';
 
 interface Client {
@@ -40,70 +40,34 @@ export function ClientAssignDropdown({
 }: ClientAssignDropdownProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isAssigning, setIsAssigning] = useState(false);
-  // 진행 중인 SR 때문에 서버가 거부한 할당 요청 (확인 후 강제 재시도용)
-  const [pendingAssign, setPendingAssign] = useState<{
-    clientId: string;
-    clientName: string;
-    ongoingSRCount: number;
-  } | null>(null);
-  const { toast } = useToast();
+
+  // 409(진행 중인 SR)를 확인 다이얼로그로 바꾸는 플로우는 훅이 들고 있다.
+  // `pendingAssign` 이 null 이 아니면 강제 할당 확인 다이얼로그가 열린다.
+  const {
+    assign: handleAssign,
+    pending: pendingAssign,
+    clearPending,
+    isProcessing: isAssigning,
+  } = useAssignClient({
+    userId,
+    fallbackMessage: 'Failed to assign client',
+    successDescription: ({ clientName }, ongoingSRsHandled) =>
+      ongoingSRsHandled > 0
+        ? `${userName}님이 ${clientName}에 할당되었습니다. 진행 중인 SR ${ongoingSRsHandled}건은 재할당을 권장합니다.`
+        : `${userName}님이 ${clientName}에 할당되었습니다.`,
+    errorDescription: '고객사 할당에 실패했습니다.',
+    onBlocked: () => setOpen(false),
+    onApplied: () => {
+      setOpen(false);
+      onAssigned?.();
+    },
+  });
 
   const filteredClients = clients.filter(
     (client) =>
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleAssign = async (clientId: string, clientName: string, force = false) => {
-    setIsAssigning(true);
-    try {
-      const response = await fetch(`/api/users/${userId}/client`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(force ? { clientId, force: true } : { clientId }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        // 진행 중인 SR이 있어 서버가 거부한 경우 - 확인 후 강제 할당
-        if (response.status === 409 && result.code === 'ONGOING_SRS') {
-          setPendingAssign({
-            clientId,
-            clientName,
-            ongoingSRCount: result.data?.ongoingSRCount || 0,
-          });
-          setOpen(false);
-          return;
-        }
-
-        throw new Error(result.error || 'Failed to assign client');
-      }
-
-      const ongoingSRsHandled = result.data?.ongoingSRsHandled || 0;
-      toast({
-        title: '성공',
-        description:
-          ongoingSRsHandled > 0
-            ? `${userName}님이 ${clientName}에 할당되었습니다. 진행 중인 SR ${ongoingSRsHandled}건은 재할당을 권장합니다.`
-            : `${userName}님이 ${clientName}에 할당되었습니다.`,
-      });
-
-      setPendingAssign(null);
-      setOpen(false);
-      onAssigned?.();
-    } catch (error) {
-      setPendingAssign(null);
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '고객사 할당에 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsAssigning(false);
-    }
-  };
 
   return (
     <>
@@ -149,7 +113,7 @@ export function ClientAssignDropdown({
                   {filteredClients.map((client) => (
                     <button
                       key={client.id}
-                      onClick={() => handleAssign(client.id, client.name)}
+                      onClick={() => handleAssign({ clientId: client.id, clientName: client.name })}
                       disabled={isAssigning}
                       className={cn(
                         'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md hover:bg-accent transition-colors text-left',
@@ -175,7 +139,7 @@ export function ClientAssignDropdown({
         open={pendingAssign !== null}
         onOpenChange={(next) => {
           if (!next) {
-            setPendingAssign(null);
+            clearPending();
           }
         }}
       >
@@ -195,7 +159,7 @@ export function ClientAssignDropdown({
             <AlertDialogAction
               onClick={() => {
                 if (pendingAssign) {
-                  handleAssign(pendingAssign.clientId, pendingAssign.clientName, true);
+                  handleAssign(pendingAssign, true);
                 }
               }}
               disabled={isAssigning}

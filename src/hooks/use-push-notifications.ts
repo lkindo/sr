@@ -2,6 +2,22 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { apiDelete, ApiError, apiGet, apiPost } from '@/lib/api-client';
+
+/**
+ * ⚠️ 이 훅은 의도적으로 React Query 를 쓰지 않는다.
+ *
+ * 네 번의 서버 왕복이 전부 브라우저 권한 API 와 한 흐름으로 엮여 있다:
+ * `Notification.requestPermission()` → `serviceWorker.register()` →
+ * `pushManager.subscribe()` → 그 결과를 서버에 저장. 중간 단계가 사용자 제스처와
+ * 권한 프롬프트에 묶여 있어 선언적 쿼리로 쪼개면 순서 보장이 오히려 어려워지고,
+ * 훅의 반환 계약(`subscribe(): Promise<boolean>`)도 바뀐다. 호출부(알림 설정 화면)는
+ * 그 boolean 으로 분기한다.
+ *
+ * 그래서 여기서 통일한 것은 **에러 언랩뿐**이다 — 네 곳 모두 `api-client` 를 지나므로
+ * 실패가 `ApiError`(status/code/body 를 실은)로 올라온다. 상태 기계는 그대로다.
+ */
+
 interface PushNotificationState {
   isSupported: boolean;
   isSubscribed: boolean;
@@ -46,13 +62,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   // Get current subscription status from API
   const checkSubscriptionStatus = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch('/api/push/subscribe');
-      if (response.ok) {
-        const data = await response.json();
-        return data.isSubscribed;
-      }
-      return false;
+      const data = await apiGet<{ isSubscribed?: boolean }>('/api/push/subscribe');
+      return data?.isSubscribed ?? false;
     } catch {
+      // 조회 실패(401·5xx·네트워크 단절)를 미구독과 같게 다룬다. 푸시는 부가 기능이라
+      // 여기서 던지면 알림 설정 화면 전체가 로딩에 갇힌다.
       return false;
     }
   }, []);
@@ -131,9 +145,16 @@ export function usePushNotifications(): UsePushNotificationsReturn {
 
       if (!vapidPublicKey || vapidPublicKey.length < 20) {
         // Fallback: API에서 가져오기
-        const vapidResponse = await fetch('/api/push/vapid-key');
-        if (!vapidResponse.ok) {
+        try {
+          const vapidData = await apiGet<{ vapidPublicKey?: string }>('/api/push/vapid-key');
+          vapidPublicKey = vapidData?.vapidPublicKey;
+        } catch (error) {
           // 서버에 푸시가 설정되지 않은 경우(503 등). 사용자에게 상태로 알린다.
+          //
+          // `ApiError` 일 때만 이 안내로 바꾼다 — 그래야 "서버가 응답은 했는데 푸시 설정이
+          // 없다" 와 "네트워크가 끊겼다/본문이 깨졌다" 가 구분된다. 후자는 아래 catch 가
+          // 원래 메시지를 그대로 error 에 싣던 동작을 유지해야 한다.
+          if (!(error instanceof ApiError)) throw error;
           setState((prev) => ({
             ...prev,
             isLoading: false,
@@ -141,9 +162,6 @@ export function usePushNotifications(): UsePushNotificationsReturn {
           }));
           return false;
         }
-
-        const vapidData = await vapidResponse.json();
-        vapidPublicKey = vapidData.vapidPublicKey;
       }
 
       if (!vapidPublicKey || vapidPublicKey.length < 20) {
@@ -162,16 +180,11 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         applicationServerKey: applicationServerKey.buffer as ArrayBuffer,
       });
 
-      // Send subscription to server
-      const response = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription.toJSON()),
+      // Send subscription to server.
+      // 서버가 이유를 주면 그것을 쓰고, 없을 때만 이 문구로 떨어진다(예전에는 항상 이 문구였다).
+      await apiPost('/api/push/subscribe', subscription.toJSON(), {
+        fallbackMessage: 'Failed to save subscription on server',
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save subscription on server');
-      }
 
       setState((prev) => ({
         ...prev,
@@ -205,8 +218,14 @@ export function usePushNotifications(): UsePushNotificationsReturn {
         }
       }
 
-      // Remove from server
-      await fetch('/api/push/subscribe', { method: 'DELETE' });
+      // Remove from server.
+      //
+      // ⚠️ 응답을 보지 않는다 — fetch 를 직접 쓰던 시절부터의 동작을 유지한 것이다.
+      // 이 시점에 브라우저 구독은 이미 해제됐으므로 서버 삭제가 실패해도 사용자에게는
+      // 알림이 오지 않는다. 여기서 던지면 "해제 실패" 라고 말하면서 실제로는 해제된
+      // 모순된 상태가 되고, 사용자가 다시 눌러도 지울 구독이 없어 나아지지 않는다.
+      // (서버에 남은 유령 구독은 발송 시 410 으로 정리된다.)
+      await apiDelete('/api/push/subscribe').catch(() => undefined);
 
       setState((prev) => ({
         ...prev,

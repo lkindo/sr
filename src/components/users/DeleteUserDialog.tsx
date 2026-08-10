@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui';
 import {
@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { apiDelete } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 
 interface User {
   id: string;
@@ -25,45 +27,47 @@ interface DeleteUserDialogProps {
 }
 
 export function DeleteUserDialog({ open, onOpenChange, user, onDeleted }: DeleteUserDialogProps) {
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const isHardDelete = user?.isActive === false;
 
-  const handleDelete = async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
+  const mutation = useMutation({
+    mutationFn: (target: User) =>
       // 이미 비활성화된 사용자는 완전 삭제(hard delete) 수행
-      const url = isHardDelete ? `/api/users/${user.id}?hard=true` : `/api/users/${user.id}`;
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || errorData.error || 'Failed to delete user');
-      }
-
+      apiDelete<unknown>(
+        target.isActive === false ? `/api/users/${target.id}?hard=true` : `/api/users/${target.id}`,
+        { fallbackMessage: 'Failed to delete user' }
+      ),
+    onSuccess: (_data, target) => {
       toast({
         title: '성공',
-        description: isHardDelete
-          ? '사용자가 영구 삭제되었습니다.'
-          : '사용자가 비활성화되었습니다.',
+        description:
+          target.isActive === false
+            ? '사용자가 영구 삭제되었습니다.'
+            : '사용자가 비활성화되었습니다.',
       });
 
+      queryClient.invalidateQueries({ queryKey: qk.users.all });
       onDeleted();
       onOpenChange(false);
-    } catch (error: any) {
+    },
+    onError: (error) => {
       toast({
         title: '삭제 실패',
+        // ApiError 는 서버 본문의 `error` 를 메시지로 싣는다 — 이 라우트의 실패 본문은
+        // `{ error }` 뿐이므로(api-error-handler.ts) 원래의 `message || error` 와 같은 값이다.
         description: error.message || '사용자 삭제 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
-    }
+    },
+  });
+
+  const loading = mutation.isPending;
+
+  const handleDelete = () => {
+    if (!user) return;
+    mutation.mutate(user);
   };
 
   return (

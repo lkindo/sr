@@ -1,4 +1,4 @@
-import { SRPriority } from '@prisma/client';
+import { ServiceCategory, SRPriority } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { z } from 'zod';
 
@@ -7,8 +7,31 @@ import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { serviceCategoryCreateSchema, serviceCategoryUpdateSchema } from '@/lib/schemas';
 
+import { auditService } from './audit.service';
+
 type ServiceCategoryCreateData = z.infer<typeof serviceCategoryCreateSchema>;
 type ServiceCategoryUpdateData = z.infer<typeof serviceCategoryUpdateSchema>;
+
+/**
+ * 감사 로그 `changes` 에 실을 스칼라 스냅샷.
+ *
+ * create/update 는 `include: { client, handler, backupHandler }` 로 관계를 붙여 반환한다.
+ * 반환값을 그대로 `after` 에 넣으면 **담당자 이메일이 감사 로그에 그대로 적재된다**.
+ * delete 가 쓰는 사전 조회는 `_count: { srs }` 를 달고 오므로 그것도 뺀다.
+ */
+function toAuditSnapshot(category: ServiceCategory) {
+  return {
+    id: category.id,
+    categoryName: category.categoryName,
+    description: category.description,
+    slaHours: category.slaHours,
+    priority: category.priority,
+    clientId: category.clientId,
+    handlerId: category.handlerId,
+    backupHandlerId: category.backupHandlerId,
+    isActive: category.isActive,
+  };
+}
 
 /**
  * SLA 우선순위별 시간 배율
@@ -117,7 +140,11 @@ export class ServiceCategoryService {
   /**
    * 서비스 카테고리 생성
    */
-  async create(data: ServiceCategoryCreateData) {
+  async create(
+    data: ServiceCategoryCreateData,
+    actorId?: string | null,
+    ipAddress?: string | null
+  ) {
     const validated = serviceCategoryCreateSchema.parse(data);
 
     // 사전 확인은 사용자에게 빠른 피드백을 주기 위한 것이지 중복 방지 수단이 아니다.
@@ -135,22 +162,42 @@ export class ServiceCategoryService {
     }
 
     try {
-      return await prisma.serviceCategory.create({
-        data: {
-          categoryName: validated.categoryName,
-          description: validated.description,
-          slaHours: validated.slaHours,
-          priority: validated.priority,
-          clientId: validated.clientId,
-          handlerId: validated.handlerId,
-          backupHandlerId: validated.backupHandlerId,
-          isActive: true,
-        },
-        include: {
-          client: { select: CLIENT_SUMMARY_SELECT },
-          handler: { select: USER_SUMMARY_SELECT },
-          backupHandler: { select: USER_SUMMARY_SELECT },
-        },
+      // 감사 로그 실패는 예외를 던져 트랜잭션을 롤백시킨다(audit.service). 따라서
+      // 생성과 로그는 반드시 같은 트랜잭션 안에 있어야 "카테고리는 생겼는데 로그만
+      // 없는" 상태가 나오지 않는다.
+      //
+      // P2002 catch 는 `$transaction` **바깥**이어야 한다. 콜백 안에서 잡으면 이미
+      // 롤백된 트랜잭션 위에서 계속 진행하다 `Transaction already closed` 로
+      // 에러 형태가 바뀌어 DuplicateError(409) 가 500 으로 둔갑한다.
+      return await prisma.$transaction(async (tx) => {
+        const category = await tx.serviceCategory.create({
+          data: {
+            categoryName: validated.categoryName,
+            description: validated.description,
+            slaHours: validated.slaHours,
+            priority: validated.priority,
+            clientId: validated.clientId,
+            handlerId: validated.handlerId,
+            backupHandlerId: validated.backupHandlerId,
+            isActive: true,
+          },
+          include: {
+            client: { select: CLIENT_SUMMARY_SELECT },
+            handler: { select: USER_SUMMARY_SELECT },
+            backupHandler: { select: USER_SUMMARY_SELECT },
+          },
+        });
+
+        await auditService.createLog(tx, {
+          userId: actorId,
+          actionType: 'SERVICE_CATEGORY_CREATE',
+          targetEntity: 'ServiceCategory',
+          targetId: category.id,
+          changes: { after: toAuditSnapshot(category) },
+          ipAddress,
+        });
+
+        return category;
       });
     } catch (error) {
       // 경쟁에서 진 쪽. 그대로 두면 raw Prisma 오류가 500 으로 표면화된다.
@@ -164,7 +211,12 @@ export class ServiceCategoryService {
   /**
    * 서비스 카테고리 수정
    */
-  async update(id: string, data: ServiceCategoryUpdateData) {
+  async update(
+    id: string,
+    data: ServiceCategoryUpdateData,
+    actorId?: string | null,
+    ipAddress?: string | null
+  ) {
     const validated = serviceCategoryUpdateSchema.parse(data);
 
     const existing = await prisma.serviceCategory.findUnique({ where: { id } });
@@ -188,22 +240,36 @@ export class ServiceCategoryService {
     }
 
     try {
-      return await prisma.serviceCategory.update({
-        where: { id },
-        data: {
-          categoryName: validated.categoryName,
-          description: validated.description,
-          slaHours: validated.slaHours,
-          priority: validated.priority,
-          clientId: validated.clientId,
-          handlerId: validated.handlerId,
-          backupHandlerId: validated.backupHandlerId,
-        },
-        include: {
-          client: { select: CLIENT_SUMMARY_SELECT },
-          handler: { select: USER_SUMMARY_SELECT },
-          backupHandler: { select: USER_SUMMARY_SELECT },
-        },
+      // create 와 같은 이유로 catch 는 `$transaction` 바깥이다.
+      return await prisma.$transaction(async (tx) => {
+        const updated = await tx.serviceCategory.update({
+          where: { id },
+          data: {
+            categoryName: validated.categoryName,
+            description: validated.description,
+            slaHours: validated.slaHours,
+            priority: validated.priority,
+            clientId: validated.clientId,
+            handlerId: validated.handlerId,
+            backupHandlerId: validated.backupHandlerId,
+          },
+          include: {
+            client: { select: CLIENT_SUMMARY_SELECT },
+            handler: { select: USER_SUMMARY_SELECT },
+            backupHandler: { select: USER_SUMMARY_SELECT },
+          },
+        });
+
+        await auditService.createLog(tx, {
+          userId: actorId,
+          actionType: 'SERVICE_CATEGORY_UPDATE',
+          targetEntity: 'ServiceCategory',
+          targetId: id,
+          changes: { before: existing, after: toAuditSnapshot(updated) },
+          ipAddress,
+        });
+
+        return updated;
       });
     } catch (error) {
       // 위 중복 확인도 create 와 같은 TOCTOU 다. 이름을 바꾸는 두 요청이 동시에
@@ -222,7 +288,7 @@ export class ServiceCategoryService {
   /**
    * 서비스 카테고리 삭제
    */
-  async delete(id: string) {
+  async delete(id: string, actorId?: string | null, ipAddress?: string | null) {
     const existing = await prisma.serviceCategory.findUnique({
       where: { id },
       include: { _count: { select: { srs: true } } },
@@ -240,7 +306,21 @@ export class ServiceCategoryService {
       );
     }
 
-    return prisma.serviceCategory.delete({ where: { id } });
+    return prisma.$transaction(async (tx) => {
+      const deleted = await tx.serviceCategory.delete({ where: { id } });
+
+      await auditService.createLog(tx, {
+        userId: actorId,
+        actionType: 'SERVICE_CATEGORY_DELETE',
+        targetEntity: 'ServiceCategory',
+        targetId: id,
+        // `existing` 은 `_count: { srs }` 를 달고 왔다 — 스냅샷에서 뺀다.
+        changes: { before: toAuditSnapshot(existing) },
+        ipAddress,
+      });
+
+      return deleted;
+    });
   }
 
   // ============================================================================

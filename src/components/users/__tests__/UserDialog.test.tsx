@@ -1,3 +1,5 @@
+import type { ReactElement, ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,6 +34,10 @@ vi.mock('@/components/ui', async () => (await import('@/__tests__/mocks/ui-primi
  * 그리고 수정 모드에서는 **비밀번호를 비워 두면 검사하지 않는다** — 이름만 고치려는데
  * 비밀번호를 다시 입력하라고 요구하면 못 쓴다. 이 분기가 이 폼에서 가장 헷갈리는 곳이라
  * 양쪽 모두 단언한다.
+ *
+ * 조회·저장이 React Query 로 옮겨졌으므로 렌더는 `QueryClientProvider` 를 요구한다.
+ * 단언은 그대로다 — `fetch` 스텁의 호출 인자(url·method·body)를 보는 방식이 유효한 것은
+ * `apiPost`/`apiPatch` 가 결국 같은 인자로 `fetch` 를 부르기 때문이다.
  */
 
 const toast = vi.fn();
@@ -58,11 +64,47 @@ const fill = (id: string, value: string) => {
 
 const submit = () => fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
-const okFetch = () =>
+/**
+ * 실제 `Response` 를 돌려준다.
+ *
+ * 손으로 만든 `{ ok, json }` 리터럴로는 부족하다 — `api-client` 는 성공 응답에서 `status`
+ * (204 판별)와 `text()`(빈 본문 허용)를 함께 읽기 때문이다. 대역이 진짜 계약보다 좁으면
+ * 컴포넌트가 아니라 대역이 통과 여부를 정하게 된다.
+ */
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const stubFetch = (respond: () => Response | Promise<Response>) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: true, json: async () => ({ id: 'u-9' }) }))
+    vi.fn(async () => respond())
   );
+
+const okFetch = () => stubFetch(() => jsonResponse({ id: 'u-9' }));
+
+/**
+ * `retry: false` / `gcTime: 0` 은 저장소의 훅 테스트 관례를 따른다. 재시도를 켜 두면
+ * 실패 케이스가 타임아웃난다.
+ *
+ * ⚠️ `queries.retry` 는 컴포넌트가 쿼리별로 `retryUnlessClientError` 를 지정하므로 여기서
+ * 꺼도 덮이지 않는다. 아래 고객사 조회 실패 테스트가 4xx 를 쓰는 이유다 — 4xx 는 그 함수가
+ * 재시도하지 않는다.
+ */
+const renderDialog = (ui: ReactElement) => {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+  return render(ui, { wrapper });
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -72,13 +114,13 @@ beforeEach(() => {
 
 describe('UserDialog — 모드', () => {
   it('user 가 없으면 생성 모드로 연다', () => {
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
 
     expect(screen.getByText('새 사용자 추가')).toBeInTheDocument();
   });
 
   it('user 가 있으면 수정 모드로 열고 기존 값을 채운다', () => {
-    render(
+    renderDialog(
       <UserDialog
         {...baseProps}
         user={{ id: 'u-1', name: '홍길동', email: 'hong@example.com', isActive: true }}
@@ -91,14 +133,14 @@ describe('UserDialog — 모드', () => {
   });
 
   it('닫혀 있으면 아무것도 렌더하지 않는다', () => {
-    render(<UserDialog {...baseProps} open={false} />);
+    renderDialog(<UserDialog {...baseProps} open={false} />);
 
     expect(screen.queryByText('새 사용자 추가')).not.toBeInTheDocument();
   });
 
   // 역할에서 유형을 추론한다. 고객사가 붙어 있는데 ENGINEER 로 열리면 소속이 날아간다.
   it('고객사 역할을 가진 사용자는 고객사 담당자 유형으로 연다', () => {
-    render(
+    renderDialog(
       <UserDialog
         {...baseProps}
         user={{
@@ -116,9 +158,84 @@ describe('UserDialog — 모드', () => {
   });
 
   it('defaultClientId 를 주면 고객사 담당자로 시작한다', () => {
-    render(<UserDialog {...baseProps} defaultClientId="c-1" />);
+    renderDialog(<UserDialog {...baseProps} defaultClientId="c-1" />);
 
     expect(screen.getByText('소속 고객사 *')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 고객사 목록 조회.
+ *
+ * prop 으로 목록을 받으면 **조회하지 않는다**. 예전에는 `if (propClients) return` 가드와
+ * `loadingClients` state 가 그 계약을 지켰고, 지금은 쿼리의 `enabled` 가 지킨다. 가드가
+ * 사라졌으니 계약이 그대로인지는 여기서 확인해야 한다.
+ */
+describe('UserDialog — 고객사 목록 조회', () => {
+  const LOADING = '고객사 목록 로딩 중...';
+  const EMPTY = '등록된 고객사가 없습니다.';
+
+  /** clients prop 없이 여는 경우. baseProps 는 목록을 넘기므로 따로 만든다. */
+  const propsWithoutClients = {
+    open: true,
+    onOpenChange: vi.fn(),
+    user: null,
+    onSaved: vi.fn(),
+  };
+
+  it('clients prop 이 있으면 조회하지 않는다', () => {
+    renderDialog(<UserDialog {...baseProps} />);
+
+    expect(screen.queryByText(LOADING)).not.toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('clients prop 이 없으면 목록을 부르고 그동안 로딩을 보여준다', async () => {
+    stubFetch(() => jsonResponse(CLIENTS));
+    renderDialog(<UserDialog {...propsWithoutClients} />);
+
+    expect(screen.getByText(LOADING)).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.queryByText(LOADING)).not.toBeInTheDocument());
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('/api/clients?pageSize=100');
+    expect(screen.getByText('테스트 고객사 A (C001)')).toBeInTheDocument();
+  });
+
+  // 예전에는 호출부에서 `Array.isArray(result) ? result : result.data || []` 로 갈랐다.
+  // 그 분기는 apiList 로 옮겨졌으므로 봉투 응답이 여전히 읽히는지 여기서 지킨다.
+  it('{data, meta} 봉투로 와도 목록으로 읽는다', async () => {
+    stubFetch(() =>
+      jsonResponse({
+        data: CLIENTS,
+        meta: {
+          currentPage: 1,
+          pageSize: 2,
+          totalItems: 2,
+          totalPages: 1,
+          hasPreviousPage: false,
+          hasNextPage: false,
+        },
+      })
+    );
+    renderDialog(<UserDialog {...propsWithoutClients} />);
+
+    await waitFor(() => expect(screen.getByText('테스트 고객사 B (C002)')).toBeInTheDocument());
+  });
+
+  // 실패해도 로딩이 걸린 채로 남으면 폼을 아예 쓸 수 없다. 목록은 비고, 토스트만 뜬다.
+  it('조회에 실패하면 토스트를 띄우고 빈 목록 안내로 넘어간다', async () => {
+    stubFetch(() => jsonResponse({ error: '권한이 없습니다.' }, 403));
+    renderDialog(<UserDialog {...propsWithoutClients} />);
+
+    await waitFor(() => expect(screen.getByText(EMPTY)).toBeInTheDocument());
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: 'destructive',
+        description: '고객사 목록을 불러오는데 실패했습니다.',
+      })
+    );
+    // 서버가 준 문구는 새지 않는다 — 이 조회는 실패 원인을 구분해 보여 주지 않는다.
+    expect(screen.queryByText('권한이 없습니다.')).not.toBeInTheDocument();
   });
 });
 
@@ -137,7 +254,7 @@ describe('UserDialog — 제출 전 검증', () => {
   };
 
   it('이름이 2자 미만이면 보내지 않는다', async () => {
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
     fill('name', '홍');
     fill('email', 'a@example.com');
     fill('password', GOOD_PW);
@@ -156,7 +273,7 @@ describe('UserDialog — 제출 전 검증', () => {
     ['숫자 없음', 'Abcdefg!'],
     ['대문자 없음', 'abcdefg1!'],
   ])('%s 는 서버 규칙으로 걸러 낸다', async (_label, pw) => {
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
     fill('name', '홍길동');
     fill('email', 'a@example.com');
     fill('password', pw);
@@ -171,7 +288,7 @@ describe('UserDialog — 제출 전 검증', () => {
   });
 
   it('비밀번호와 확인이 다르면 보내지 않는다', async () => {
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
     fill('name', '홍길동');
     fill('email', 'a@example.com');
     fill('password', GOOD_PW);
@@ -184,7 +301,7 @@ describe('UserDialog — 제출 전 검증', () => {
 
   // 소속 없는 고객사 사용자는 아무 SR 도 볼 수 없는 계정이 된다.
   it('고객사 담당자인데 고객사를 고르지 않으면 보내지 않는다', async () => {
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
     fireEvent.change(screen.getAllByTestId('select')[0]!, { target: { value: 'CLIENT' } });
     fill('name', '홍길동');
     fill('email', 'a@example.com');
@@ -198,7 +315,7 @@ describe('UserDialog — 제출 전 검증', () => {
 
   // 이름만 고치려는데 비밀번호를 다시 입력하라고 하면 쓸 수 없는 폼이 된다.
   it('수정 모드에서 비밀번호를 비워 두면 검사하지 않는다', async () => {
-    render(
+    renderDialog(
       <UserDialog
         {...baseProps}
         user={{ id: 'u-1', name: '홍길동', email: 'hong@example.com', isActive: true }}
@@ -215,7 +332,7 @@ describe('UserDialog — 제출 전 검증', () => {
   });
 
   it('수정 모드에서도 비밀번호를 입력하면 규칙을 검사한다', async () => {
-    render(
+    renderDialog(
       <UserDialog
         {...baseProps}
         user={{ id: 'u-1', name: '홍길동', email: 'hong@example.com', isActive: true }}
@@ -235,7 +352,7 @@ describe('UserDialog — 제출 전 검증', () => {
 
 describe('UserDialog — 저장', () => {
   it('생성은 POST /api/users 로 보낸다', async () => {
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
     fill('name', '홍길동');
     fill('email', 'a@example.com');
     fill('password', GOOD_PW);
@@ -255,7 +372,7 @@ describe('UserDialog — 저장', () => {
   });
 
   it('수정은 PATCH /api/users/:id 로 보낸다', async () => {
-    render(
+    renderDialog(
       <UserDialog
         {...baseProps}
         user={{ id: 'u-1', name: '홍길동', email: 'hong@example.com', isActive: true }}
@@ -274,7 +391,7 @@ describe('UserDialog — 저장', () => {
   it('성공하면 onSaved 와 닫기를 부른다', async () => {
     const onSaved = vi.fn();
     const onOpenChange = vi.fn();
-    render(<UserDialog {...baseProps} onSaved={onSaved} onOpenChange={onOpenChange} />);
+    renderDialog(<UserDialog {...baseProps} onSaved={onSaved} onOpenChange={onOpenChange} />);
     fill('name', '홍길동');
     fill('email', 'a@example.com');
     fill('password', GOOD_PW);
@@ -288,15 +405,9 @@ describe('UserDialog — 저장', () => {
 
   // 서버가 주는 이유(중복 이메일 등)를 그대로 보여 줘야 사용자가 고칠 수 있다.
   it('서버가 거절하면 그 사유를 보여 주고 닫지 않는다', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => ({
-        ok: false,
-        json: async () => ({ error: '이미 사용 중인 이메일입니다.' }),
-      }))
-    );
+    stubFetch(() => jsonResponse({ error: '이미 사용 중인 이메일입니다.' }, 400));
     const onOpenChange = vi.fn();
-    render(<UserDialog {...baseProps} onOpenChange={onOpenChange} />);
+    renderDialog(<UserDialog {...baseProps} onOpenChange={onOpenChange} />);
     fill('name', '홍길동');
     fill('email', 'a@example.com');
     fill('password', GOOD_PW);
@@ -323,7 +434,7 @@ describe('UserDialog — 저장', () => {
         throw new Error('Network error');
       })
     );
-    render(<UserDialog {...baseProps} />);
+    renderDialog(<UserDialog {...baseProps} />);
     fill('name', '홍길동');
     fill('email', 'a@example.com');
     fill('password', GOOD_PW);
@@ -331,7 +442,7 @@ describe('UserDialog — 저장', () => {
 
     submit();
 
-    // loading 이 안 풀리면 버튼이 영구 비활성이 되어 재시도할 수 없다.
+    // pending 이 안 풀리면 버튼이 영구 비활성이 되어 재시도할 수 없다.
     await waitFor(() => expect(screen.getByRole('button', { name: '저장' })).not.toBeDisabled());
   });
 });

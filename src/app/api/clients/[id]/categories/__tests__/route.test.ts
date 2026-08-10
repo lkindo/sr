@@ -172,7 +172,18 @@ describe('POST /api/clients/[id]/categories', () => {
 
     await POST(req(), context);
 
-    expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ clientId: 'c-1' }));
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: 'c-1' }),
+      'u-1',
+      null
+    );
+  });
+
+  // 감사 로그의 userId 는 행위자다. 라우트가 세션을 넘기지 않으면 서비스는 익명으로 기록한다.
+  it('행위자 id 를 서비스에 넘겨 감사 로그에 남게 한다', async () => {
+    await POST(req(), context);
+
+    expect(mockCreate).toHaveBeenCalledWith(expect.anything(), 'u-1', null);
   });
 
   it('없는 고객사면 404 이고 만들지 않는다', async () => {

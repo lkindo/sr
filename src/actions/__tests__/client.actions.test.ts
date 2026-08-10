@@ -100,8 +100,12 @@ describe('client.actions coverage', () => {
         expect(result.data).toEqual(created);
       }
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('client:create');
+      // 세션의 행위자 id 가 서비스로 내려가야 감사 로그에 누가 만들었는지 남는다.
+      // (예전에는 이 액션이 authenticateAndAuthorize 의 반환값을 통째로 버렸다.)
       expect(mockClientService.createClient).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'ACME', name: 'Acme Corp' })
+        expect.objectContaining({ code: 'ACME', name: 'Acme Corp' }),
+        'u1',
+        null
       );
     });
 
@@ -196,7 +200,9 @@ describe('client.actions coverage', () => {
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('client:update');
       expect(mockClientService.updateClient).toHaveBeenCalledWith(
         'c1',
-        expect.objectContaining({ name: 'New Name' })
+        expect.objectContaining({ name: 'New Name' }),
+        'u1',
+        null
       );
     });
 
@@ -237,7 +243,7 @@ describe('client.actions coverage', () => {
       expect(result.success).toBe(true);
       expect(result.message).toMatch(/삭제/);
       expect(authenticateAndAuthorize).toHaveBeenCalledWith('client:delete');
-      expect(mockClientService.deleteClient).toHaveBeenCalledWith('c1');
+      expect(mockClientService.deleteClient).toHaveBeenCalledWith('c1', 'u1', null);
     });
 
     it('converts authorization errors into a result', async () => {

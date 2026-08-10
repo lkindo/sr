@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui';
 import { Checkbox } from '@/components/ui';
@@ -16,12 +17,37 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { apiList, apiPatch, apiPost, buildQuery, retryUnlessClientError } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
+import { qk } from '@/lib/query-keys';
 import { passwordSchema } from '@/lib/schemas';
 import type { ClientSummary } from '@/types/client.types';
 
 /** 서버 `passwordSchema` 가 실제로 요구하는 규칙. 입력 힌트와 검증을 한 곳에서 맞춘다. */
 const PASSWORD_RULE_HINT = '8자 이상, 대문자·소문자·숫자·특수문자 각 1개 이상';
+
+/**
+ * 고객사 목록 조회 파라미터.
+ *
+ * 한 객체에서 queryKey 와 URL 을 함께 파생시킨다 — 둘이 따로 적히면 캐시 키와 실제로 부른
+ * 주소가 조용히 어긋난다. `pageSize` 를 크게 잡는 이유는 예전 그대로다: 이 다이얼로그는
+ * 페이지네이션 UI 없이 전체 고객사를 한 번에 보여 준다.
+ */
+const CLIENT_LIST_PARAMS = { pageSize: 100 } as const;
+
+/** 조회 실패 시 쓰는 문구. 서버 메시지를 쓰지 않는 것은 기존 계약 그대로다. */
+const CLIENTS_LOAD_ERROR_MESSAGE = '고객사 목록을 불러오는데 실패했습니다.';
+
+/** 저장 요청 본문. 서버가 부분 갱신을 받으므로 전부 선택 필드다. */
+interface UserPayload {
+  name?: string;
+  email?: string;
+  password?: string;
+  isActive?: boolean;
+  userType?: string;
+  roleIds?: string[];
+  clientIds?: string[];
+}
 
 interface User {
   id: string;
@@ -69,70 +95,60 @@ export function UserDialog({
   // 고객사 담당자(CLIENT): 단일 선택(소속 고객사)
   const [selectedClientId, setSelectedClientId] = useState<string>('');
 
-  // Use passed clients or empty array initially
-  const [clients, setClients] = useState<ClientSummary[]>(propClients || []);
-  const [loading, setLoading] = useState(false);
-  const [loadingClients, setLoadingClients] = useState(!propClients);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const isEditMode = !!user;
 
-  // Update clients if prop changes
+  /**
+   * 고객사 목록.
+   *
+   * 예전에는 `useState` 사본 + "prop 이 바뀌면 사본을 덮어쓰는" effect 로 두 벌을 굴렸다.
+   * 사본이 필요했던 이유는 fetch 결과를 담을 곳이 있어야 했기 때문인데, 그 자리를 이제
+   * React Query 가 맡으므로 사본과 동기화 effect 를 함께 지운다. prop 이 있으면 prop 이
+   * 곧 값이다.
+   *
+   * ⚠️ 봉투/bare 분기(`Array.isArray(result) ? result : result.data || []`)는 `apiList` 가
+   * 흡수했다. 그 아래 있던 "형식이 올바르지 않습니다" 토스트는 **도달할 수 없는 가지**였다 —
+   * 삼항식의 세 갈래가 모두 배열이라 바로 뒤의 `Array.isArray` 가 항상 참이었다. 사라진
+   * 것은 죽은 코드이지 동작이 아니다.
+   */
+  const {
+    data: fetchedClients = [],
+    isPending: clientsPending,
+    error: clientsError,
+  } = useQuery({
+    queryKey: qk.clients.list(CLIENT_LIST_PARAMS),
+    queryFn: async () =>
+      (await apiList<ClientSummary>(`/api/clients${buildQuery(CLIENT_LIST_PARAMS)}`)).data,
+    // 예전 effect 의 `open && !propClients` 가드를 그대로 옮긴 것이다.
+    enabled: open && !propClients,
+    // 다이얼로그를 닫았다 열 때마다 다시 조회하던 동작을 유지한다. 전역 기본값 60초를 그대로
+    // 두면 방금 만든 고객사가 선택지에 안 잡힌다.
+    staleTime: 0,
+    retry: retryUnlessClientError,
+  });
+
+  const clients = propClients ?? fetchedClients;
+  // prop 으로 받았을 때는 조회 자체가 없으므로 로딩도 없다. 쿼리가 disabled 인 동안
+  // `isPending` 은 계속 true 이므로 여기서 걸러 주지 않으면 영영 "로딩 중" 이 남는다.
+  const loadingClients = !propClients && clientsPending;
+
+  // 실패는 토스트로만 알리고 목록은 빈 채로 둔다(= 예전 catch 의 `setClients([])`).
+  // v5 의 useQuery 에는 onError 가 없어 effect 로 옮긴다. `error` 는 실패마다 새 객체이므로
+  // 실패 1회당 정확히 한 번 뜬다 — 기존 catch 와 같은 횟수다.
   useEffect(() => {
-    if (propClients) {
-      setClients(propClients);
-      setLoadingClients(false);
-    }
-  }, [propClients]);
-
-  const fetchClients = useCallback(async () => {
-    if (propClients) return; // Skip if provided via props
-
-    try {
-      const response = await fetch('/api/clients?pageSize=100'); // 충분한 수의 고객사를 가져오기 위해 pageSize 증가
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      const result = await response.json();
-
-      // 페이지네이션 된 응답({ data: [], meta: {} })과 일반 배열 응답([]) 모두 처리
-      const clientData = Array.isArray(result)
-        ? result
-        : Array.isArray(result.data)
-          ? result.data
-          : [];
-
-      if (Array.isArray(clientData)) {
-        setClients(clientData);
-      } else {
-        const msg = `Unexpected API response format: ${JSON.stringify(result)}`;
-        logger.error(msg, new Error(msg));
-        setClients([]);
-        toast({
-          title: '데이터 오류',
-          description: '고객사 목록 형식이 올바르지 않습니다.',
-          variant: 'destructive',
-        });
-      }
-    } catch (error) {
-      logger.error(
-        'Error fetching clients',
-        error instanceof Error ? error : new Error(String(error))
-      );
-      setClients([]);
-      toast({
-        title: '오류',
-        description: '고객사 목록을 불러오는데 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoadingClients(false);
-    }
-  }, [toast, propClients]);
-
-  useEffect(() => {
-    if (open && !propClients) {
-      fetchClients();
-    }
-  }, [open, fetchClients, propClients]);
+    if (!clientsError) return;
+    logger.error(
+      'Error fetching clients',
+      clientsError instanceof Error ? clientsError : new Error(String(clientsError))
+    );
+    toast({
+      title: '오류',
+      description: CLIENTS_LOAD_ERROR_MESSAGE,
+      variant: 'destructive',
+    });
+  }, [clientsError, toast]);
 
   const toggleClient = (clientId: string) => {
     setSelectedClientIds((prev) =>
@@ -182,7 +198,51 @@ export function UserDialog({
     }
   }, [open, user, defaultClientId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /**
+   * 생성/수정 저장.
+   *
+   * url·method 를 `isEditMode` 로 동시에 분기하던 것을 `apiPost`/`apiPatch` 두 갈래로 나눴다.
+   * `user` 를 그대로 좁히므로 `user!.id` 같은 단언이 필요 없다(`isEditMode` 는 `!!user` 다).
+   *
+   * `fallbackMessage` 는 서버가 `error` 를 주지 않았을 때의 기존 문구와 같은 값이다 —
+   * 예전 코드의 `error.error || 'Failed to save user'` 를 그대로 옮긴 것이다.
+   */
+  const saveUser = useMutation({
+    mutationFn: (payload: UserPayload) =>
+      user
+        ? apiPatch<unknown>(`/api/users/${user.id}`, payload, {
+            fallbackMessage: 'Failed to save user',
+          })
+        : apiPost<unknown>('/api/users', payload, { fallbackMessage: 'Failed to save user' }),
+    onSuccess: () => {
+      toast({
+        title: '성공',
+        description: `사용자가 ${isEditMode ? '수정' : '생성'}되었습니다.`,
+      });
+
+      // 부모(사용자 목록/고객사 상세)는 아직 마이그레이션되지 않아 이 콜백으로 재조회한다.
+      // prop 계약을 그대로 둔다 — 순서(토스트 → onSaved → 닫기)도 예전과 같다.
+      onSaved();
+      onOpenChange(false);
+    },
+    onError: (error) => {
+      toast({
+        title: '오류',
+        description: error instanceof Error ? error.message : '사용자 저장에 실패했습니다.',
+        variant: 'destructive',
+      });
+      // 닫지 않는다. 입력한 내용을 잃지 않고 고쳐서 다시 보낼 수 있어야 한다.
+    },
+    onSettled: () => {
+      // 부모가 클라이언트 쿼리로 옮겨지면 이 무효화가 `onSaved` 를 대신한다. 그 전까지는
+      // 등록된 쿼리가 없어 무동작이므로 지금 넣어 두어도 요청이 늘지 않는다.
+      queryClient.invalidateQueries({ queryKey: qk.users.all });
+    },
+  });
+
+  const loading = saveUser.isPending;
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (name.length < 2) {
@@ -226,62 +286,21 @@ export function UserDialog({
       return;
     }
 
-    setLoading(true);
+    const payload: UserPayload = {
+      name,
+      email,
+      isActive,
+      userType,
+      clientIds:
+        userType === 'CLIENT' ? (selectedClientId ? [selectedClientId] : []) : selectedClientIds,
+    };
 
-    try {
-      const payload: {
-        name?: string;
-        email?: string;
-        password?: string;
-        isActive?: boolean;
-        userType?: string;
-        roleIds?: string[];
-        clientIds?: string[];
-      } = {
-        name,
-        email,
-        isActive,
-        userType,
-        clientIds:
-          userType === 'CLIENT' ? (selectedClientId ? [selectedClientId] : []) : selectedClientIds,
-      };
-
-      if (password) {
-        payload.password = password;
-      }
-
-      const url = isEditMode ? `/api/users/${user.id}` : '/api/users';
-      const method = isEditMode ? 'PATCH' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to save user');
-      }
-
-      toast({
-        title: '성공',
-        description: `사용자가 ${isEditMode ? '수정' : '생성'}되었습니다.`,
-      });
-
-      onSaved();
-      onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: '오류',
-        description: error instanceof Error ? error.message : '사용자 저장에 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+    // 빈 비밀번호를 실어 보내면 서버가 그것으로 덮어쓸 수 있다. 수정 모드에서 비워 둔 경우다.
+    if (password) {
+      payload.password = password;
     }
+
+    saveUser.mutate(payload);
   };
 
   return (

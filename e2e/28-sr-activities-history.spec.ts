@@ -109,7 +109,10 @@ test.describe('SR 활동 이력', () => {
       ATTACHMENT_REMOVED: '첨부 삭제',
       REOPENED: '재요청',
       COMPLETED: '완료',
-      REJECTED: '반려',
+      // 2026-08-10: 상태 라벨 정본(`src/lib/constants/sr.ts` 의 statusLabels)이 '거절' 로
+      // 확정됐고, SRActivities 의 사본만 '반려' 로 남아 한 화면에 두 이름이 보였다.
+      // 그 사본을 정본에 맞추면서 이 기대값도 함께 옮긴다.
+      REJECTED: '거절',
       INTAKE_UPDATED: '접수 정보 수정',
     };
 

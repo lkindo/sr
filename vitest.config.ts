@@ -2,20 +2,50 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { fileURLToPath } from 'node:url';
-import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
-import { playwright } from '@vitest/browser-playwright';
 const dirname =
   typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
-// More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
+// jsdom 이 **실제로 필요한** 파일만 추린 목록. 추정이 아니라 실측이다 —
+// 2026-08-10 에 `src/**/*.test.ts` 149개 전량을 environment:'node' 로 돌린 결과
+// 정확히 11개만 실패했고(테스트 1,486개 통과), 그 11개가 아래 두 글롭으로 떨어진다:
+//   - src/hooks/__tests__/*.test.ts 10개 전부 (전원 renderHook 사용)
+//   - src/lib/__tests__/logger.coverage.test.ts (파일 주석이 window 의존을 명시)
+// `.test.tsx` 46개는 컴포넌트 렌더이므로 자명하게 jsdom 이다.
+//
+// 나머지 138개가 jsdom 을 지불할 이유가 없다. 통제 실험(동일 35파일, environment 만 교체):
+//   node  : wall 25.84s  / environment   0.037s
+//   jsdom : wall 197.18s / environment 851.40s   ← 7.6배
+// 파일당 jsdom environment 비용은 이 저장소에서 약 9.4초이고, 195파일 × 9.4s 는
+// 분리 전 실측 누적치(environment 2,724s)와 일치한다.
+//
+// 왜 이 방법뿐인가: `environmentMatchGlobs` 는 vitest 3 에서 제거되어 현재 배포물에
+// 심볼 자체가 없다(대체제가 바로 이 projects 분리다). unit 프로젝트가 `environment` 를
+// 명시하고 있어 CLI `--environment=node` 도 무시된다(실측 확인).
+//
+// fail-loud: 앞으로 누군가 src/services/** 테스트에 renderHook 을 쓰면 node 프로젝트에서
+// `ReferenceError: document is not defined` 로 즉시 시끄럽게 실패한다. 조용히 통과하는
+// 실패 양식이 아니다.
+const DOM_TEST_GLOBS = [
+  'src/**/*.test.tsx',
+  'src/hooks/**/*.test.ts',
+  'src/lib/__tests__/logger.coverage.test.ts',
+];
+
+const COMMON_TEST_EXCLUDE = ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'];
+
 export default defineConfig({
   plugins: [react()],
   test: {
-    environment: 'jsdom',
     globals: true,
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
-    setupFiles: ['./vitest.setup.ts'],
-    exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
+    // ⚠️ 루트에 `include` / `environment` / `setupFiles` 를 두지 않는다.
+    //
+    // 루트 값은 `extends: true` 인 프로젝트에 **상속되어 프로젝트의 include 와 합쳐진다.**
+    // 실측으로 확인했다: unit-dom 의 include 를 DOM 글롭 3개로 좁혔는데도 파일 211개를
+    // 수집했다(기대 57개). 아래 integration 프로젝트가 `exclude: ['src/**']` 를 굳이
+    // 명시해 온 것도 같은 상속 때문이다 — 그 주석이 증상을 기록해 두었다.
+    //
+    // 그래서 파일 수집에 관여하는 세 옵션은 **프로젝트마다 자기 것을 명시**한다.
+    // 여기 남는 것은 프로젝트가 공유해야 하는 것(coverage, alias, globals)뿐이다.
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -122,11 +152,33 @@ export default defineConfig({
       // UserDialog·ClientDialog·AssignRolesDialog·ServiceCategoryDialog 를 덮어
       // src/components 36.0% → 47.9%. 전부 사용자 입력이 서버로 넘어가는 경계라,
       // 남은 컴포넌트(표현 위주)보다 투자 대비 효과가 크다.
+      //
+      // ── 2026-08-10 대규모 보강 후 재측정 ────────────────────────────────
+      //   statements 80.71 (5733/7103) · branches 72.53 (3644/5024)
+      //   functions  74.73 (1260/1686) · lines    81.17 (5484/6756)
+      //   (`SKIP_DB_TESTS=true vitest run --project=unit --project=unit-dom --coverage`,
+      //    228파일 2558테스트 전원 통과)
+      //
+      // 무엇이 올렸나. 세 가지 작업이 겹쳤다:
+      //   1. **화면 단위 테스트 15개 신설** — React Query 이관과 함께 `(dashboard)` 페이지
+      //      10개에 처음으로 단위 테스트가 생겼다. 위 2026-08-08 주석이 "0.4% 라 가치가 낮다"
+      //      고 적었던 바로 그 구간인데, 이관으로 조회·변이가 훅으로 빠지면서 테스트가
+      //      가능해졌다. 그 판단은 이관 전 구조에서만 맞았다.
+      //   2. **무테스트 고분기 모듈 15개 보강** — intake 라우트(분기 12/146 → 130/146),
+      //      Sidebar(0/42 → 41/42), proxy+auth.config(0/43 → 43/43), users/clients/srs 표현
+      //      컴포넌트, PermissionGuard, PWARegistration, LoginForm.
+      //   3. **api-client 신설과 그 테스트** — 컴포넌트 26개가 의존하는 단일 진입점이라
+      //      계약을 문장 단위로 고정했다.
+      //
+      // 분모(5,024 분기)는 Storybook 제거로 소폭 줄었을 뿐 페이지·레이아웃을 exclude 하지
+      // 않았다 — 위 22~25행과 146~148행이 금지한 분모 축소는 하지 않았다.
+      //
+      // 임계값은 관례대로 실측보다 약 1%p 낮게 잡는다. 이 값이 앞으로의 하한이다.
       thresholds: {
-        statements: 59.5,
-        branches: 49.7,
-        functions: 54.9,
-        lines: 60.1,
+        statements: 79.5,
+        branches: 71.5,
+        functions: 73.5,
+        lines: 80.0,
       },
     },
     alias: {
@@ -137,20 +189,43 @@ export default defineConfig({
     },
     projects: [
       {
+        // DOM 을 쓰지 않는 유닛 테스트(138파일). 이름을 `unit` 으로 유지하는 이유는
+        // `--project=unit` 을 적어 둔 기존 명령·문서·훅 주석을 깨지 않기 위해서다.
         extends: true,
         test: {
           name: 'unit',
           globals: true,
-          environment: 'jsdom',
+          environment: 'node',
           // `tests/**/*.unit.test.ts` 도 집는다.
           //
           // 통합 테스트 인프라 중 **부수 효과가 없는 순수 모듈**(현재는 db-guard)은
           // DB 없이 검증되어야 한다. 그 가드가 지키는 상황이 정확히 "테스트 DB 가 없는
           // 환경" 이라, 검증이 DB 를 요구하면 정작 필요한 곳에서 돌지 않는다.
           // 아래 integration 프로젝트는 같은 패턴을 exclude 해서 중복 실행을 막는다.
-          include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/**/*.unit.test.ts'],
-          exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/.next/**'],
+          include: ['src/**/*.test.ts', 'tests/**/*.unit.test.ts'],
+          // DOM 글롭을 빼서 아래 unit-dom 과 서로소가 되게 한다. 두 프로젝트의 합집합은
+          // 분리 전 include 와 정확히 같다 — 어느 파일도 빠지거나 중복되지 않으므로
+          // 커버리지 분자·분모가 그대로다.
+          exclude: [...COMMON_TEST_EXCLUDE, ...DOM_TEST_GLOBS],
+          setupFiles: ['./vitest.setup.node.ts'],
+          // 부하 시 타임아웃에 대한 안전망. 이 프로젝트에서 가장 느린 테스트가
+          // 10ms 미만이므로 비용은 0이고, CI 의 CPU 경합으로 5초 기본값을 스치는
+          // 사고만 막는다. (플레이키의 실제 원인은 테스트 본문 내 동적 import 였고,
+          // 그건 sr.service.test.ts 에서 static import 로 옮겨 이미 고쳤다.)
+          testTimeout: 15_000,
+        },
+      },
+      {
+        // DOM 이 필요한 유닛 테스트(57파일). 여기만 jsdom + @testing-library 비용을 낸다.
+        extends: true,
+        test: {
+          name: 'unit-dom',
+          globals: true,
+          environment: 'jsdom',
+          include: DOM_TEST_GLOBS,
+          exclude: COMMON_TEST_EXCLUDE,
           setupFiles: ['./vitest.setup.ts'],
+          testTimeout: 15_000,
         },
       },
       {
@@ -187,27 +262,6 @@ export default defineConfig({
           fileParallelism: false,
           testTimeout: 30_000,
           hookTimeout: 60_000,
-        },
-      },
-      {
-        plugins: [
-          storybookTest({
-            configDir: path.join(dirname, '.storybook'),
-          }),
-        ],
-        test: {
-          name: 'storybook',
-          browser: {
-            enabled: true,
-            headless: true,
-            provider: playwright({}),
-            instances: [
-              {
-                browser: 'chromium',
-              },
-            ],
-          },
-          setupFiles: ['.storybook/vitest.setup.ts'],
         },
       },
     ],

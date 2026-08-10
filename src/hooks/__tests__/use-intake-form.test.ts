@@ -50,7 +50,23 @@ function stubFetch(responses: Array<Partial<Response> & { json?: () => Promise<u
   return fn;
 }
 
-const okSR = (data: unknown) => ({ ok: true, json: async () => data });
+/**
+ * 성공 응답 대역.
+ *
+ * ⚠️ `text` 를 함께 준다. SR 조회가 `@/lib/api-client` 를 거치면서 성공 본문을
+ * `response.text()` 로 읽기 때문이다(204·빈 본문을 함께 다루려는 설계). `json` 만 있는
+ * 목은 성공 경로에서 "text is not a function" 으로 죽고, 그 TypeError 는 훅의 catch 에
+ * 걸려 **조회 실패 케이스처럼 위장된 통과**를 만든다.
+ *
+ * 제출(POST/PATCH)은 아직 `fetch` 를 직접 쓰므로 `json` 만으로도 동작하지만, 두 경로가
+ * 같은 대역을 공유하도록 여기서 한 번에 준다.
+ */
+const okSR = (data: unknown) => ({
+  ok: true,
+  status: 200,
+  json: async () => data,
+  text: async () => JSON.stringify(data),
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

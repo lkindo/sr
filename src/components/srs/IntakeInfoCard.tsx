@@ -54,16 +54,20 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <h4 className="text-sm font-medium text-muted-foreground">접수 일시</h4>
             </div>
+            {/*
+              위 `if (!showIntakeInfo || !sr.intakeAt) return null;` 을 지나온 지점이므로
+              `sr.intakeAt` 은 반드시 있다. 예전에는 여기서 `? ... : 'N/A'` 로 한 번 더
+              분기했는데 false 가지가 **도달 불가**라 테스트로 덮을 수 없었다 —
+              가드를 없애거나 옮기지 않는 한 삼항을 되살릴 이유가 없다(2026-08-10).
+            */}
             <p className="mt-1 text-foreground">
-              {sr.intakeAt
-                ? new Date(sr.intakeAt).toLocaleString('ko-KR', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : 'N/A'}
+              {new Date(sr.intakeAt).toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
             </p>
           </div>
         </div>

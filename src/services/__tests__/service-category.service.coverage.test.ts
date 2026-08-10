@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -5,8 +6,11 @@ import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/
 import prisma from '@/lib/prisma';
 import { ServiceCategoryService } from '@/services/service-category.service';
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
+// create/update/delete 는 감사 로그와 함께 `$transaction` 안에서 돈다 — 감사 로그
+// 실패가 본 작업을 롤백시켜야 하기 때문이다. 콜백에 같은 mockPrisma 를 넘겨
+// `tx.serviceCategory.*` 가 곧 `prisma.serviceCategory.*` 이 되게 한다.
+vi.mock('@/lib/prisma', () => {
+  const mockPrisma: any = {
     serviceCategory: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -18,8 +22,13 @@ vi.mock('@/lib/prisma', () => ({
     user: {
       findUnique: vi.fn(),
     },
-  },
-}));
+    auditLog: {
+      create: vi.fn(),
+    },
+    $transaction: vi.fn((cb: any) => cb(mockPrisma)),
+  };
+  return { default: mockPrisma };
+});
 
 describe('ServiceCategoryService', () => {
   let service: ServiceCategoryService;
@@ -27,6 +36,9 @@ describe('ServiceCategoryService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new ServiceCategoryService();
+    // clearAllMocks 가 팩토리의 구현까지 지운다 — 매번 다시 심지 않으면
+    // $transaction 이 undefined 를 돌려준다.
+    vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(prisma));
   });
 
   // ==========================================================================

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 
 import { DeleteRoleDialog } from '@/components/roles/DeleteRoleDialog';
@@ -10,53 +11,73 @@ import { RoleMobileList } from '@/components/roles/RoleMobileList';
 import { RoleTable } from '@/components/roles/RoleTable';
 import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { ApiError, apiGet, retryUnlessClientError } from '@/lib/api-client';
+import { qk } from '@/lib/query-keys';
 import { RoleItem as Role } from '@/types/role';
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [loading, setLoading] = useState(true);
-  /** 접근이 거부됐는가. 빈 목록과 구분해서 보여 주기 위한 상태다. */
-  const [accessDenied, setAccessDenied] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [isPermissionDialogOpen, setIsPermissionDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchRoles = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/roles');
-      if (response.status === 403) {
-        // 403 을 토스트로만 알리고 목록을 비우면 화면은 '등록된 역할이 없습니다.' 가 된다.
-        // 그건 "권한 없음" 과 "데이터 없음" 을 구분할 수 없게 만드는 거짓말이다.
-        setAccessDenied(true);
-        setRoles([]);
-        return;
-      }
-      if (!response.ok) throw new Error('Failed to fetch roles');
-      setAccessDenied(false);
-      const data: Role[] = await response.json();
+  const {
+    data: roles = [],
+    isPending,
+    error,
+  } = useQuery({
+    queryKey: qk.roles.all,
+    queryFn: async () => {
+      // `/api/roles` 는 봉투 없이 bare 배열을 돌려준다(route.ts 가 `NextResponse.json(roles)`).
+      // 그래서 `apiList` 가 아니라 `apiGet` 이다 — meta 를 합성해 봐야 쓸 데가 없다.
+      const data = await apiGet<Role[]>('/api/roles');
       // 권한 데이터가 없는 경우 빈 배열로 초기화
-      const rolesWithPermissions = data.map((role) => ({
+      return data.map((role) => ({
         ...role,
         permissions: role.permissions || [],
       }));
-      setRoles(rolesWithPermissions);
-    } catch {
-      toast({
-        title: '오류',
-        description: '역할 목록을 불러오는데 실패했습니다.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+    },
+    // 403 은 다시 물어봐도 403 이다. 전역 기본값 `retry: 1` 이면 권한 없음 화면이
+    // 한 박자 늦게 뜬다.
+    retry: retryUnlessClientError,
+    // 목록은 항상 신선해야 한다. 전역 staleTime 60초를 그대로 두면 방금 만든 역할이
+    // 목록에 안 잡히는 것처럼 보인다.
+    staleTime: 0,
+  });
 
+  /**
+   * 접근이 거부됐는가. 빈 목록과 구분해서 보여 주기 위한 판정이다.
+   *
+   * 403 은 이제 성공 경로의 조기 return 이 아니라 `error` 로 온다. 다만 계약은 그대로다:
+   * 403 을 토스트로만 알리고 목록을 비우면 화면은 '등록된 역할이 없습니다.' 가 되는데,
+   * 그건 "권한 없음" 과 "데이터 없음" 을 구분할 수 없게 만드는 거짓말이다.
+   */
+  const accessDenied = error instanceof ApiError && error.status === 403;
+
+  // 403 이 아닌 실패만 토스트로 알린다(403 은 아래 전용 화면이 대신 말해 준다).
+  // 실패해도 목록은 빈 배열로 남고 평소 화면을 그린다 — 기존 동작 그대로다.
   useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+    if (!error || accessDenied) return;
+    toast({
+      title: '오류',
+      description: '역할 목록을 불러오는데 실패했습니다.',
+      variant: 'destructive',
+    });
+  }, [error, accessDenied, toast]);
+
+  /**
+   * 저장·삭제 후 목록 갱신.
+   *
+   * 예전에는 `setLoading(true)` 로 화면 전체를 '로딩 중...' 으로 덮었지만, 무효화는
+   * 캐시를 남겨 둔 채 배경에서 다시 가져오므로 표가 그대로 보인 상태로 갱신된다.
+   * 아래 스피너 분기가 `isPending`(첫 로딩)인 이유이기도 하다 — `isFetching` 을 물리면
+   * 저장할 때마다 표가 사라졌다 나타난다.
+   */
+  const refreshRoles = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: qk.roles.all });
+  }, [queryClient]);
 
   const handleCreateRole = () => {
     setSelectedRole(null);
@@ -79,21 +100,21 @@ export default function RolesPage() {
   };
 
   const handleRoleSaved = () => {
-    fetchRoles();
+    refreshRoles();
     setIsRoleDialogOpen(false);
   };
 
   const handlePermissionsSaved = () => {
-    fetchRoles();
+    refreshRoles();
     setIsPermissionDialogOpen(false);
   };
 
   const handleRoleDeleted = () => {
-    fetchRoles();
+    refreshRoles();
     setIsDeleteDialogOpen(false);
   };
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="flex items-center justify-center h-96">
         <p className="text-muted-foreground">로딩 중...</p>

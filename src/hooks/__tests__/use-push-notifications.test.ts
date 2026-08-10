@@ -48,6 +48,24 @@ function supportPush(permission: NotificationPermission = 'granted') {
 /** 32바이트 이상이면 urlBase64ToUint8Array 가 정상 동작한다. */
 const VAPID = 'B'.repeat(88);
 
+/**
+ * 성공 응답 대역.
+ *
+ * ⚠️ `text` 를 반드시 함께 준다. 훅이 `@/lib/api-client` 를 거치면서 성공 본문을
+ * `response.text()` 로 읽기 때문이다 — 그래야 204 와 빈 본문을 구분 없이 다룰 수 있다.
+ * `json` 만 있는 목은 성공 경로에서 "text is not a function" 으로 죽고, 그 TypeError 는
+ * 훅의 catch 에 걸려 **엉뚱한 실패 케이스처럼 보이는 통과/실패**를 만든다.
+ *
+ * 실패 응답은 일부러 `text`·`json` 없이 둔 곳이 있다(503·본문 없는 실패). api-client 가
+ * 본문 파싱 실패를 삼키고 상태코드만으로 ApiError 를 만드는 경로를 그대로 태우기 위함이다.
+ */
+const okRes = (data?: unknown) => ({
+  ok: true,
+  status: 200,
+  text: async () => (data === undefined ? '' : JSON.stringify(data)),
+  json: async () => data,
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   // 로컬 .env 에 키가 있으면 훅이 API 폴백을 건너뛴다. 테스트가 실행 환경에 따라
@@ -79,10 +97,7 @@ describe('usePushNotifications — 초기화', () => {
 
   it('지원하면 서버에서 현재 구독 여부를 읽어 온다', async () => {
     supportPush('granted');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ isSubscribed: true }) })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okRes({ isSubscribed: true })));
 
     const { result } = renderHook(() => usePushNotifications());
 
@@ -114,9 +129,9 @@ describe('usePushNotifications — 구독', () => {
     supportPush('granted');
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ isSubscribed: false }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ vapidPublicKey: VAPID }) })
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(okRes({ isSubscribed: false }))
+      .mockResolvedValueOnce(okRes({ vapidPublicKey: VAPID }))
+      .mockResolvedValueOnce(okRes());
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await ready();
@@ -136,10 +151,7 @@ describe('usePushNotifications — 구독', () => {
 
   it('사용자가 권한을 거부하면 이유를 남기고 멈춘다', async () => {
     supportPush('denied');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ isSubscribed: false }) })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okRes({ isSubscribed: false })));
 
     const result = await ready();
     let ok!: boolean;
@@ -161,7 +173,8 @@ describe('usePushNotifications — 구독', () => {
       'fetch',
       vi
         .fn()
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ isSubscribed: false }) })
+        .mockResolvedValueOnce(okRes({ isSubscribed: false }))
+        // 본문 없는 503. api-client 는 파싱 실패를 삼키고 상태코드만 실은 ApiError 를 낸다.
         .mockResolvedValueOnce({ ok: false, status: 503 })
     );
 
@@ -174,14 +187,38 @@ describe('usePushNotifications — 구독', () => {
     expect(result.current.isLoading).toBe(false);
   });
 
+  // "서버가 응답은 했는데 푸시 설정이 없다" 와 "서버까지 닿지도 못했다" 는 다른 사건이다.
+  // 후자를 관리자 문의로 안내하면 사용자는 되지도 않을 문의를 하게 되고, 정작 해야 할
+  // 재시도는 하지 않는다. 그래서 훅은 ApiError 일 때만 설정 안내로 바꾼다.
+  it('VAPID 키 조회가 네트워크 오류면 설정 문제로 오인하지 않는다', async () => {
+    supportPush('granted');
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(okRes({ isSubscribed: false }))
+        .mockRejectedValueOnce(new Error('Failed to fetch'))
+    );
+
+    const result = await ready();
+    let ok!: boolean;
+    await act(async () => {
+      ok = await result.current.subscribe();
+    });
+
+    expect(ok).toBe(false);
+    expect(result.current.error).toBe('Failed to fetch');
+    expect(result.current.isLoading).toBe(false);
+  });
+
   it('VAPID 키가 비정상적으로 짧으면 거부한다', async () => {
     supportPush('granted');
     vi.stubGlobal(
       'fetch',
       vi
         .fn()
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ isSubscribed: false }) })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ vapidPublicKey: 'short' }) })
+        .mockResolvedValueOnce(okRes({ isSubscribed: false }))
+        .mockResolvedValueOnce(okRes({ vapidPublicKey: 'short' }))
     );
 
     const result = await ready();
@@ -198,8 +235,9 @@ describe('usePushNotifications — 구독', () => {
       'fetch',
       vi
         .fn()
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ isSubscribed: false }) })
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ vapidPublicKey: VAPID }) })
+        .mockResolvedValueOnce(okRes({ isSubscribed: false }))
+        .mockResolvedValueOnce(okRes({ vapidPublicKey: VAPID }))
+        // 이유를 주지 않는 실패. 서버 메시지가 없으므로 fallbackMessage 가 그대로 남는다.
         .mockResolvedValueOnce({ ok: false })
     );
 
@@ -222,8 +260,8 @@ describe('usePushNotifications — 구독', () => {
     vi.stubEnv('NEXT_PUBLIC_VAPID_PUBLIC_KEY', VAPID);
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ isSubscribed: false }) })
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(okRes({ isSubscribed: false }))
+      .mockResolvedValueOnce(okRes());
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await ready();
@@ -255,8 +293,8 @@ describe('usePushNotifications — 구독 해제 / 권한 요청', () => {
     supportPush('granted');
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ isSubscribed: true }) })
-      .mockResolvedValueOnce({ ok: true });
+      .mockResolvedValueOnce(okRes({ isSubscribed: true }))
+      .mockResolvedValueOnce(okRes());
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderHook(() => usePushNotifications());
@@ -278,10 +316,7 @@ describe('usePushNotifications — 구독 해제 / 권한 요청', () => {
 
   it('해제 중 오류가 나도 로딩을 풀고 이유를 남긴다', async () => {
     supportPush('granted');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ isSubscribed: true }) })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okRes({ isSubscribed: true })));
     subscription.unsubscribe.mockRejectedValue(new Error('해제 실패'));
 
     const { result } = renderHook(() => usePushNotifications());
@@ -314,10 +349,7 @@ describe('usePushNotifications — 구독 해제 / 권한 요청', () => {
 
   it('지원하면 브라우저 권한 요청 결과를 상태에 반영한다', async () => {
     supportPush('default');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ isSubscribed: false }) })
-    );
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okRes({ isSubscribed: false })));
 
     const { result } = renderHook(() => usePushNotifications());
     await waitFor(() => expect(result.current.isLoading).toBe(false));

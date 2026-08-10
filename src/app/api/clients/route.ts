@@ -83,7 +83,7 @@ export const POST = withAuthAndRateLimit(
     const body = await validateRequestBody(request, clientCreateSchema);
 
     const clientService = new ClientService();
-    const client = await clientService.createClient(body);
+    const client = await clientService.createClient(body, session.user.id, null);
 
     return NextResponse.json(client, { status: 201 });
   },
