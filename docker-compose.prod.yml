@@ -32,6 +32,15 @@ services:
     image: ghcr.io/lkindo/sr:${APP_IMAGE_TAG:-latest}
     container_name: sr-app
     restart: always
+    # 앱이 SIGTERM 을 받고 진행 중인 응답을 끝낼 시간을 준다.
+    #
+    # `src/instrumentation.ts` 가 `SHUTDOWN_GRACE_MS`(기본 15초) 동안 기다렸다가 종료한다.
+    # 도커 기본 유예는 10초라, 이 값을 명시하지 않으면 앱의 유예가 끝나기 전에 SIGKILL 이
+    # 날아가 절반만 작동한다 — 5만 행 CSV 스트리밍이 잘린 파일로 저장되고, 업로드는
+    # DB 행 없는 고아 파일을 남긴다.
+    #
+    # **앱의 유예보다 길어야 한다.** 둘 중 하나를 바꾸면 다른 쪽도 함께 본다.
+    stop_grace_period: 20s
     expose:
       - '3000'
     env_file:

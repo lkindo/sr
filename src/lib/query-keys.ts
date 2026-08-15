@@ -107,4 +107,9 @@ export const qk = {
     system: ['settings', 'system'] as const,
     notifications: ['settings', 'notifications'] as const,
   },
+
+  /** 알림 아웃박스(ADMIN 전용). 상태 필터가 키에 들어가야 탭 전환이 캐시를 갈라 쓴다. */
+  outbox: {
+    list: (status: string) => ['outbox', status] as const,
+  },
 } as const;

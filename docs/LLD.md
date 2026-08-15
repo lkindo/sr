@@ -1026,6 +1026,69 @@ export async function deleteComment(id: string) {
 }
 ```
 
+### API 엔드포인트 카탈로그 (실측)
+
+> `find src/app/api -name route.ts` 로 뽑은 **전수 목록**이다. 예전에는 이 문서가
+> "…등" 으로 얼버무려 무엇이 있는지 알 수 없었고, 그래서 문서에만 있는 유령 엔드포인트와
+> 코드에만 있는 미문서화 엔드포인트를 아무도 구분하지 못했다.
+>
+> **래퍼 열이 곧 통제 여부다.** `withAuthAndRateLimit` 을 경유하지 않으면 인증·레이트리밋·
+> 성능 계측·오류 매핑이 모두 빠진다(be-rules §1·§2). 아래 4개는 의도된 예외다.
+>
+> | 예외 | 이유 |
+> | --- | --- |
+> | `/api/auth/[...nextauth]` | NextAuth 가 제공하는 핸들러다. 우리 래퍼로 감쌀 수 없다. |
+> | `/api/health` | 헬스체크는 인증을 요구하면 안 된다. 도커·nginx 가 호출한다. |
+> | `/api/push/vapid-key` | VAPID **공개** 키다. 비밀이 아니다. |
+> | `/api/realtime` | SSE 스트림. 래퍼의 요청/응답 모델과 맞지 않아 핸들러가 직접 `auth()` 를 호출하고 연결 상한을 건다. |
+>
+> `/api/clients/public` 은 회원가입 화면이 쓰는 유일한 비인증 조회다. 인증은 없지만
+> `withErrorHandler` 는 경유해 오류 매핑과 계측을 받는다.
+
+| 경로 | 메서드 | 래퍼 | 구현 파일 |
+| --- | --- | --- | --- |
+| `/api/attachments` | POST | withAuthAndRateLimit | `src/app/api/attachments/route.ts` |
+| `/api/attachments/[id]` | DELETE / GET | withAuthAndRateLimit | `src/app/api/attachments/[id]/route.ts` |
+| `/api/attachments/[id]/download` | GET | withAuthAndRateLimit | `src/app/api/attachments/[id]/download/route.ts` |
+| `/api/auth/[...nextauth]` | GET / POST | **래퍼 없음** | `src/app/api/auth/[...nextauth]/route.ts` |
+| `/api/clients` | GET / POST | withAuthAndRateLimit | `src/app/api/clients/route.ts` |
+| `/api/clients/[id]` | DELETE / GET / PATCH | withAuthAndRateLimit | `src/app/api/clients/[id]/route.ts` |
+| `/api/clients/[id]/categories` | GET / POST | withAuthAndRateLimit | `src/app/api/clients/[id]/categories/route.ts` |
+| `/api/clients/[id]/categories/[categoryId]` | DELETE / PATCH | withAuthAndRateLimit | `src/app/api/clients/[id]/categories/[categoryId]/route.ts` |
+| `/api/clients/public` | GET | withErrorHandler (인증 없음) | `src/app/api/clients/public/route.ts` |
+| `/api/dashboard/stats` | GET | withAuthAndRateLimit | `src/app/api/dashboard/stats/route.ts` |
+| `/api/health` | GET | **래퍼 없음** | `src/app/api/health/route.ts` |
+| `/api/notifications/outbox` | GET / POST | withAuthAndRateLimit | `src/app/api/notifications/outbox/route.ts` |
+| `/api/permissions` | GET | withAuthAndRateLimit | `src/app/api/permissions/route.ts` |
+| `/api/permissions/check` | POST | withAuthAndRateLimit | `src/app/api/permissions/check/route.ts` |
+| `/api/profile` | GET / PATCH | withAuthAndRateLimit | `src/app/api/profile/route.ts` |
+| `/api/profile/password` | POST | withAuthAndRateLimit | `src/app/api/profile/password/route.ts` |
+| `/api/push/subscribe` | DELETE / GET / POST | withAuthAndRateLimit | `src/app/api/push/subscribe/route.ts` |
+| `/api/push/test` | POST | withAuthAndRateLimit | `src/app/api/push/test/route.ts` |
+| `/api/push/vapid-key` | GET | **래퍼 없음** | `src/app/api/push/vapid-key/route.ts` |
+| `/api/realtime` | GET | **래퍼 없음** | `src/app/api/realtime/route.ts` |
+| `/api/reports/export` | GET | withAuthAndRateLimit | `src/app/api/reports/export/route.ts` |
+| `/api/roles` | GET | withAuthAndRateLimit | `src/app/api/roles/route.ts` |
+| `/api/service-categories` | GET | withAuthAndRateLimit | `src/app/api/service-categories/route.ts` |
+| `/api/settings/notifications` | GET / PUT | withAuthAndRateLimit | `src/app/api/settings/notifications/route.ts` |
+| `/api/settings/system` | GET / PUT | withAuthAndRateLimit | `src/app/api/settings/system/route.ts` |
+| `/api/srs` | GET / POST | withAuthAndRateLimit | `src/app/api/srs/route.ts` |
+| `/api/srs/[id]` | DELETE / GET / PATCH | withAuthAndRateLimit | `src/app/api/srs/[id]/route.ts` |
+| `/api/srs/[id]/activities` | GET | withAuthAndRateLimit | `src/app/api/srs/[id]/activities/route.ts` |
+| `/api/srs/[id]/attachments` | GET / POST | withAuthAndRateLimit | `src/app/api/srs/[id]/attachments/route.ts` |
+| `/api/srs/[id]/comments` | GET / POST | withAuthAndRateLimit | `src/app/api/srs/[id]/comments/route.ts` |
+| `/api/srs/[id]/intake` | GET / PATCH / POST | withAuthAndRateLimit | `src/app/api/srs/[id]/intake/route.ts` |
+| `/api/srs/[id]/status` | PATCH | withAuthAndRateLimit | `src/app/api/srs/[id]/status/route.ts` |
+| `/api/srs/[id]/status-history` | GET | withAuthAndRateLimit | `src/app/api/srs/[id]/status-history/route.ts` |
+| `/api/srs/my-requests` | GET | withAuthAndRateLimit | `src/app/api/srs/my-requests/route.ts` |
+| `/api/users` | GET / POST | withAuthAndRateLimit | `src/app/api/users/route.ts` |
+| `/api/users/[id]` | DELETE / GET / PATCH | withAuthAndRateLimit | `src/app/api/users/[id]/route.ts` |
+| `/api/users/[id]/client` | DELETE / PATCH | withAuthAndRateLimit | `src/app/api/users/[id]/client/route.ts` |
+| `/api/users/[id]/client/approve` | DELETE / POST | withAuthAndRateLimit | `src/app/api/users/[id]/client/approve/route.ts` |
+| `/api/users/[id]/roles` | POST | withAuthAndRateLimit | `src/app/api/users/[id]/roles/route.ts` |
+
+---
+
 ### REST API 엔드포인트
 
 > **⚠️ 아래 예시는 초안이다.** 실물 `src/app/api/srs/route.ts` 는 핸들러를

@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { NotificationStatus, Prisma } from '@prisma/client';
 import { z } from 'zod';
 
+import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { usePagination } from '@/lib/pagination';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
@@ -25,6 +27,11 @@ export const runtime = 'nodejs';
 
 const querySchema = z.object({
   status: z.preprocess((v) => v || undefined, z.nativeEnum(NotificationStatus).optional()),
+});
+
+/** 재발송 요청. 한 번에 되살릴 수 있는 건수를 제한해 실수로 전량을 재발송하지 못하게 한다. */
+const resendSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1, '재발송할 알림을 선택해주세요.').max(100),
 });
 
 export const GET = withAuthAndRateLimit(
@@ -80,4 +87,51 @@ export const GET = withAuthAndRateLimit(
     );
   },
   { preset: 'relaxed' }
+);
+
+/**
+ * POST /api/notifications/outbox — 실패한 알림 재발송 (ADMIN 전용)
+ *
+ * 헌법 §4.1 은 "실패한 알림을 운영자가 확인하고 재발송할 수 있는 경로를 제공한다" 고
+ * 규정한다. 조회만으로는 절반이다 — SMTP 가 일시적으로 죽어 dead-letter 로 떨어진 알림을
+ * 되살릴 방법이 없으면 운영자가 할 수 있는 일은 DB 를 직접 고치는 것뿐이다.
+ *
+ * 재발송은 새 행을 만들지 않고 기존 행을 `PENDING` 으로 되돌린다. 그래야 원래의 수신자·
+ * 제목·metadata 가 유지되고, `attempts` 를 0 으로 리셋해야 백오프가 처음부터 다시 센다.
+ * 실제 발송은 다음 디스패처 tick(최대 30초)이 맡는다.
+ */
+export const POST = withAuthAndRateLimit(
+  async (request: NextRequest, { session }) => {
+    if (!session.user.roles?.includes('ADMIN')) {
+      throw new ForbiddenError('알림 재발송은 시스템 관리자만 수행할 수 있습니다.');
+    }
+
+    const body = await parseJsonBody(request);
+    const { ids } = resendSchema.parse(body);
+
+    // **`FAILED` 만 되살린다.** PENDING 은 아직 디스패처가 처리할 예정이고,
+    // SENT 를 되살리면 수신자에게 같은 메일이 한 번 더 간다.
+    const { count } = await prisma.notification.updateMany({
+      where: { id: { in: ids }, status: 'FAILED' },
+      data: { status: 'PENDING', attempts: 0, failReason: null, nextAttemptAt: null },
+    });
+
+    logger.info('[Outbox] 실패 알림 재발송 요청', {
+      userId: session.user.id,
+      custom_requested: ids.length,
+      custom_requeued: count,
+    });
+
+    return NextResponse.json({
+      success: true,
+      requeued: count,
+      // 요청한 것과 실제 되살린 수가 다를 수 있다(이미 SENT 이거나 없는 id).
+      skipped: ids.length - count,
+      message:
+        count > 0
+          ? `${count}건을 재발송 대기열에 넣었습니다. 최대 30초 내에 발송됩니다.`
+          : '재발송할 수 있는 실패 알림이 없습니다.',
+    });
+  },
+  { preset: 'strict' }
 );

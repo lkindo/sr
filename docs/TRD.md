@@ -84,16 +84,20 @@
 > Monitoring=Sentry + Axiom, Next.js=14.x 로 기술하고 있었다. **여덟 항목 모두 채택되지 않았다.**
 > 아래는 `package.json` · `docker-compose.prod.yml` · `Dockerfile` · `nginx/nginx.conf` ·
 > `.github/workflows/` 에서 실측한 값이다. 표에 없는 것은 시스템에 없다.
+>
+> **버전은 메이저·마이너까지만 적는다.** 패치 자릿수까지 박아 두면 dependabot PR 하나마다
+> 이 표가 틀려지고, 아무도 고치지 않아 결국 전부 신뢰할 수 없게 된다. 정확한 값은
+> `package.json` 과 `pnpm-lock.yaml` 이 단일 진실이다.
 
-| 분류                | 기술                                                                           | 버전 (2026-07-30 실측)                          |
+| 분류                | 기술                                                                           | 버전 (메이저·마이너만)                          |
 | ------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
-| **Frontend**        | Next.js (App Router)                                                           | 16.1.6                                          |
-|                     | React / React DOM                                                              | 19.2.4                                          |
+| **Frontend**        | Next.js (App Router)                                                           | 16.3                                            |
+|                     | React / React DOM                                                              | 19.2                                            |
 |                     | TypeScript                                                                     | 5.x                                             |
 |                     | Tailwind CSS                                                                   | 3.4                                             |
 |                     | Shadcn/ui (Radix UI 프리미티브 기반, 소스 복사 방식)                           | 패키지 버전 없음 (`src/components/ui/`)         |
 |                     | Recharts (대시보드 차트)                                                       | 3.7.0                                           |
-| **Backend**         | Next.js Server Actions / Route Handlers                                        | 16.1.6                                          |
+| **Backend**         | Next.js Server Actions / Route Handlers                                        | 16.3                                            |
 |                     | Node.js 런타임                                                                 | 22.x (`package.json` engines, `node:22` 이미지) |
 |                     | pnpm (패키지 매니저)                                                           | 10                                              |
 | **Database**        | PostgreSQL — `postgres:16-alpine` 컨테이너(앱과 같은 호스트)                   | 16                                              |
@@ -103,26 +107,27 @@
 |                     | 오브젝트 스토리지 / CDN                                                        | **없음**                                        |
 | **Cache**           | Next.js `unstable_cache` (프로세스 내 메모리, `src/lib/cache.ts`)              | Next.js 내장                                    |
 |                     | 외부 캐시 서버 (Redis 등)                                                      | **없음**                                        |
-| **Background Jobs** | `backgroundTask` (`src/lib/wait-until.ts`) — 응답 후 fire-and-forget           | 영속 큐 **없음**                                |
-|                     | 정기 작업                                                                      | GitHub Actions 스케줄(백업·품질 점검)만         |
+| **Background Jobs** | 이메일 아웃박스 (`src/services/notification-outbox.ts`) — DB 영속 + 재시도     | 30초 폴링 디스패처                              |
+|                     | `backgroundTask` (`src/lib/wait-until.ts`) — 웹 푸시 등 best-effort            | 영속 큐 **없음**                                |
+|                     | 시간 기반 정기 작업(Cron)                                                      | **없음** — GitHub Actions 스케줄만              |
 | **Authentication**  | NextAuth / Auth.js — JWT 세션 전략 (`src/auth.config.ts`)                      | 5.0.0-beta.32                                   |
 |                     | bcryptjs (work factor 12, `src/lib/constants.ts:115`)                          | 3.0                                             |
-| **Validation**      | Zod                                                                            | 4.3                                             |
-|                     | react-hook-form (+ `@hookform/resolvers`)                                      | 7.71                                            |
-| **Server State**    | `@tanstack/react-query`                                                        | 5.90                                            |
-| **Email**           | nodemailer (SMTP, `src/services/email.service.ts`)                             | 7.0                                             |
+| **Validation**      | Zod                                                                            | 4.4                                             |
+|                     | react-hook-form (+ `@hookform/resolvers`)                                      | 7.84                                            |
+| **Server State**    | `@tanstack/react-query`                                                        | 5.101                                           |
+| **Email**           | nodemailer (SMTP, `src/services/email.service.ts`)                             | 9.0                                             |
 | **Web Push**        | web-push (VAPID, `src/services/push.service.ts`)                               | 3.6                                             |
 | **Realtime**        | 자체 SSE 엔드포인트 `GET /api/realtime` + Node `EventEmitter`                  | —                                               |
 | **Reverse Proxy**   | nginx — `nginx:alpine` 컨테이너 (TLS 종료, 80→443 리다이렉트)                  | alpine                                          |
 | **Deployment**      | 자체 서버(Oracle Cloud VM) + Docker Compose (`/home/opc/sr`)                   | —                                               |
 |                     | 이미지 레지스트리 — GHCR `ghcr.io/lkindo/sr` (`:latest` / `:dev`)              | —                                               |
 |                     | CI/CD — GitHub Actions (`CI/CD Pipeline` → `workflow_run` 배포)                | —                                               |
-|                     | TLS — Let's Encrypt (certbot, 갱신 자동화 없음)                                | —                                               |
+|                     | TLS — Let's Encrypt (certbot). 갱신은 `scripts/renew-letsencrypt.sh` 를 호스트 cron `0 3 * * *` 로 실행하며, cron 설치는 `.github/workflows/deploy.yml` 이 배포마다 멱등 수행한다 | —                                               |
 | **Logging**         | pino → stdout → Docker `json-file` 드라이버 (3 × 10MB 로테이션)                | 10.3                                            |
 |                     | 호스트 밖 로그 전송                                                            | **없음**                                        |
 | **Monitoring**      | uptime-kuma 컨테이너 (서버에서 구동 중, 저장소의 compose 파일에는 없음)        | 미확인                                          |
 |                     | 에러 추적 서비스                                                               | **없음** — Sentry 미사용 결정(2026-07-30)       |
-| **Testing**         | vitest (유닛) / Playwright (e2e) / Stryker (뮤테이션)                          | 4.0 / 1.58 / 9.5.1                              |
+| **Testing**         | vitest (유닛) / Playwright (e2e) / Stryker (뮤테이션)                          | 4.1 / 1.62 / 9.6                                |
 
 ---
 
@@ -589,7 +594,7 @@
 
 ### 8. nodemailer (SMTP) + web-push (VAPID)
 
-**버전**: nodemailer **7.0**, web-push **3.6**
+**버전**: nodemailer **9.0**, web-push **3.6**
 
 > **정정(2026-07-30)**: 1.3 까지 이 절은 Resend + React Email 을 **"✅ 선택"** 으로 표기하고
 > 발송 실패 재시도를 Inngest 에 위임한다고 서술했다. **Resend·React Email·Inngest 모두

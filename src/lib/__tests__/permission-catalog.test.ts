@@ -54,3 +54,45 @@ describe('권한 카탈로그 자체', () => {
     }
   });
 });
+
+/**
+ * 감사 D-20 회귀 방어 — **소스에 흩어진 권한 리터럴**.
+ *
+ * 위 스위트는 `PERMISSIONS` 상수와 전이표만 검사했다. 그런데 정책 코드가 검사하는
+ * 문자열은 상수를 거치지 않고 호출부에 직접 적힐 수도 있고, 실제로 그랬다 —
+ * `role.actions.ts` 가 `authenticateAndAuthorize('role:update_permissions')` 를 요구했는데
+ * 카탈로그의 실제 값은 `ROLE:ASSIGN_PERMISSION` 이었다.
+ *
+ * 비교는 양쪽을 대문자로 정규화하므로 그 문자열은 `ROLE:UPDATE_PERMISSIONS` 가 되고,
+ * 그런 행은 존재하지 않는다. 즉 **ADMIN 단락을 제외한 누구도 역할 권한을 편집할 수
+ * 없는** 죽은 통제였다. 상수만 검사해서는 이 종류를 절대 못 잡는다.
+ */
+describe('소스에 직접 적힌 권한 리터럴', () => {
+  it('authenticateAndAuthorize 리터럴은 전부 카탈로그에 있다', async () => {
+    const { readFileSync, readdirSync } = await import('fs');
+    const { join } = await import('path');
+
+    const actionsDir = join(process.cwd(), 'src', 'actions');
+    const files = readdirSync(actionsDir).filter((name) => name.endsWith('.ts'));
+
+    /** `authenticateAndAuthorize('resource:action')` 의 인용 부호 인자만 뽑는다. */
+    const literalPattern = /authenticateAndAuthorize\(\s*['"]([^'"]+)['"]\s*\)/g;
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = readFileSync(join(actionsDir, file), 'utf8');
+      for (const match of source.matchAll(literalPattern)) {
+        const literal = match[1]!;
+        // 비교는 대문자로 정규화된다(permission.service.checkPermission).
+        if (!catalogKeys.has(literal.toUpperCase())) {
+          offenders.push(`${file}: '${literal}'`);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      `카탈로그에 없는 권한 리터럴 — 이 경로는 ADMIN 외 누구도 통과할 수 없다:\n${offenders.join('\n')}`
+    ).toEqual([]);
+  });
+});

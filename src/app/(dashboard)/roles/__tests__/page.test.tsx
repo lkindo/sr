@@ -3,10 +3,18 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import RolesPage from '../page';
+import RolesClient from '../RolesClient';
 
 /**
  * 역할 목록 화면의 조회 계층.
+ *
+ * **2026-08-15 변경**: `page.tsx` 는 서버 컴포넌트가 되어 서비스 계층을 직접 호출하고,
+ * 상호작용은 `RolesClient` 가 맡는다(fe-rules §1). 이 스위트는 그 클라이언트 컴포넌트를
+ * 직접 렌더한다 — 서버 컴포넌트를 import 하면 `@/auth` 를 통해 next-auth 모듈 그래프가
+ * 딸려 와 jsdom 에서 로드되지 않는다.
+ *
+ * `initialRoles` 를 주지 않는(=undefined) 형태로 렌더해 **기존 클라이언트 조회 경로**를
+ * 그대로 태운다. 이 파일이 지키려는 계약(403 과 빈 목록의 구분)이 거기 있기 때문이다.
  *
  * 이 화면의 위험은 표를 예쁘게 그리는 데 있지 않다. **403 과 빈 목록을 구분하는 것**에 있다.
  * 둘을 뭉개면 권한이 없는 사용자에게 "등록된 역할이 없습니다." 라고 말하게 되는데, 그건
@@ -41,13 +49,17 @@ vi.mock('@/hooks/use-toast', () => ({
  * `retry: false` / `gcTime: 0` 은 실패 케이스가 재시도로 타임아웃나지 않게 하기 위한 것이다.
  * (403 은 컴포넌트가 준 `retryUnlessClientError` 가 이미 막지만, 그 밖의 실패는 여기서 막힌다.)
  */
-function renderPage() {
+function makeWrapper() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
-  const wrapper = ({ children }: { children: ReactNode }) =>
+  return ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client }, children);
-  return render(<RolesPage />, { wrapper });
+}
+
+function renderPage() {
+  // initialRoles 를 주지 않으면 예전처럼 클라이언트가 조회한다 — 이 스위트의 관심사다.
+  return render(<RolesClient initialRoles={undefined as never} />, { wrapper: makeWrapper() });
 }
 
 /** 이 라우트는 봉투 없이 bare 배열을 돌려준다. 목도 그 형태를 지켜야 의미가 있다. */
@@ -68,7 +80,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('RolesPage', () => {
+describe('RolesClient', () => {
   it('bare 배열 응답을 목록으로 그린다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse(200, [
@@ -140,5 +152,37 @@ describe('RolesPage', () => {
     renderPage();
 
     expect(screen.getByText('로딩 중...')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 서버 주입 경로 (fe-rules §1 — RSC 우선).
+ *
+ * `page.tsx` 가 서비스 계층에서 미리 조회한 목록을 props 로 내려준다. 그때는 첫 렌더에
+ * 이미 데이터가 있어야 한다 — 스피너가 한 번 도는 것을 없애는 것이 이 전환의 목적이다.
+ */
+describe('RolesClient — 서버가 주입한 초기 데이터', () => {
+  const SERVER_ROLES = [
+    { id: 'r-1', name: 'ADMIN', description: '관리자', permissions: [], _count: { users: 2 } },
+    { id: 'r-2', name: 'MANAGER', description: '운영', permissions: [], _count: { users: 5 } },
+  ] as never;
+
+  it('초기 데이터가 있으면 로딩 없이 곧바로 목록을 그린다', () => {
+    // fetch 를 영원히 매달아 둔다 — 그럼에도 목록이 보여야 서버 렌더가 실효를 가진다.
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+
+    render(<RolesClient initialRoles={SERVER_ROLES} />, { wrapper: makeWrapper() });
+
+    expect(screen.queryByText('로딩 중...')).not.toBeInTheDocument();
+    expect(screen.getByTestId('role-table')).toHaveTextContent('2');
+  });
+
+  it('서버 조회가 인가에 막히면(null) 빈 목록이 아니라 접근 거부를 보여 준다', () => {
+    // 권한 없는 사용자에게 "등록된 역할이 없습니다." 라고 말하는 것은 화면이 하는 거짓말이다.
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+
+    render(<RolesClient initialRoles={null} />, { wrapper: makeWrapper() });
+
+    expect(screen.queryByText('등록된 역할이 없습니다.')).not.toBeInTheDocument();
   });
 });

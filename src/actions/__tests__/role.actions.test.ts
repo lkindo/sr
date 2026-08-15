@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authenticateAndAuthorize, validateWithSchema } from '@/lib/action-helpers';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { services } from '@/services/service-registry';
 
 /**
@@ -83,7 +84,7 @@ describe('role.actions', () => {
       if (result.success) {
         expect(result.data).toEqual(mockRole);
       }
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:create');
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.ROLE.CREATE);
       // 생성 경로도 형제 연산과 똑같이 actor 를 넘겨야 한다. 넘기지 않으면
       // ROLE_CREATE 감사 로그의 userId 가 비어 "누가 만들었나"에 답할 수 없고,
       // 서비스가 정책을 판정할 수도 없다. update/delete 는 감사 3.11 에서 고쳤는데
@@ -128,7 +129,7 @@ describe('role.actions', () => {
       if (result.success) {
         expect(result.data).toEqual(mockRole);
       }
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:update');
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.ROLE.UPDATE);
       expect(mockRoleService.updateRole).toHaveBeenCalledWith(
         'r1',
         { name: 'UPDATED_ROLE', description: 'new desc' },
@@ -146,7 +147,7 @@ describe('role.actions', () => {
       const result = await deleteRoleAction('r1');
 
       expect(result.success).toBe(true);
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:delete');
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.ROLE.DELETE);
       // actor 를 넘겨야 서비스의 불변식이 작동한다(감사 3.11).
       expect(mockRoleService.deleteRole).toHaveBeenCalledWith(
         'r1',
@@ -164,7 +165,10 @@ describe('role.actions', () => {
       const result = await updateRolePermissionsAction('r1', ['p1', 'p2']);
 
       expect(result.success).toBe(true);
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('role:update_permissions');
+      // 카탈로그에 실재하는 값이어야 한다. 예전 리터럴 'role:update_permissions' 는
+      // 대문자 정규화 후 ROLE:UPDATE_PERMISSIONS 가 되는데 그런 행이 없어서,
+      // 이 액션은 ADMIN 단락을 뺀 누구도 통과할 수 없는 죽은 통제였다(감사 D-20).
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.ROLE.ASSIGN_PERMISSION);
       expect(mockRoleService.updateRolePermissions).toHaveBeenCalledWith(
         'r1',
         ['p1', 'p2'],
