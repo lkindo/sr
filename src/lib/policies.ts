@@ -6,7 +6,7 @@
 
 import { Client, Role, SR, User } from '@prisma/client';
 
-import { ForbiddenError } from '@/lib/errors';
+import { BusinessRuleError, ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { AuthenticatedUser } from '@/types/session';
 
@@ -222,7 +222,11 @@ export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): 
  */
 export function canDeleteAttachment(
   user: AuthenticatedUser,
-  sr: SRAccessFields & { requesterId?: string | null; status?: string }
+  // `status` 는 **필수**다. 선택적으로 두면 호출부가 select 로 필드를 좁혔을 때
+  // 타입 오류 없이 `undefined` 가 들어오고, 아래 `status === 'REQUESTED'` 분기가
+  // 영원히 거짓이 되어 **요청자 본인의 첨부 삭제가 조용히 막힌다.**
+  // 인가에 쓰는 값은 없으면 컴파일이 실패하는 편이 낫다(감사 D-20).
+  sr: SRAccessFields & { requesterId?: string | null; status: string }
 ): boolean {
   if (!canUpdateSR(user, sr)) return false;
 
@@ -234,7 +238,7 @@ export function canDeleteAttachment(
 
 export function ensureCanDeleteAttachment(
   user: AuthenticatedUser,
-  sr: SRAccessFields & { requesterId?: string | null; status?: string }
+  sr: SRAccessFields & { requesterId?: string | null; status: string }
 ): void {
   if (!canDeleteAttachment(user, sr)) {
     throw new ForbiddenError('첨부파일 삭제 권한이 없습니다.');
@@ -751,4 +755,50 @@ export function resolveClientIdFilter(
   }
 
   return { in: userClientIds };
+}
+
+/**
+ * 고객사에 종속된 역할. 시스템 운영 역할(`INTERNAL_ROLES`)과 상호 배타적이다.
+ * 모듈 내부 전용 — 판정은 `ensureRoleClientExclusivity` 를 거치게 해서
+ * 호출부가 역할명 배열을 다시 복제하지 않게 한다.
+ */
+const CLIENT_ROLES = ['CLIENT_ADMIN', 'CLIENT_USER'];
+
+/**
+ * 헌법 §1.3 역할 상호 배타성 판정 — **단일 술어**.
+ *
+ * 두 가지를 함께 본다.
+ *   1. 시스템 운영 역할과 고객사 역할을 한 사용자에게 동시에 부여할 수 없다.
+ *   2. 시스템 운영 역할 보유자에게 고객사를 할당할 수 없고, 그 역도 성립한다
+ *      (고객사에 소속된 사용자는 시스템 역할을 받을 수 없다).
+ *
+ * 이 규칙은 원래 **역할 교체 경로와 사용자 수정 경로에 각자 다른 사본**으로 있었고,
+ * 정작 **사용자 생성 경로에는 없었다**(감사 D-12). 그래서 ADMIN 이 생성 다이얼로그에서
+ * ENGINEER + 고객사 2곳을 고르면 헌법이 금지한 조합이 그대로 저장됐다.
+ * 사본이 셋이면 하나는 반드시 뒤처진다 — 판정을 여기 한 곳에 둔다.
+ *
+ * @throws {BusinessRuleError} 배타성을 어기는 조합일 때
+ */
+export function ensureRoleClientExclusivity(roleNames: string[], clientIds: string[]): void {
+  const systemRoles = roleNames.filter((name) => INTERNAL_ROLES.includes(name));
+  const clientRoles = roleNames.filter((name) => CLIENT_ROLES.includes(name));
+
+  if (systemRoles.length > 0 && clientRoles.length > 0) {
+    throw new BusinessRuleError(
+      `시스템 운영팀 역할(${systemRoles.join(', ')})과 고객사 역할(${clientRoles.join(', ')})은 ` +
+        `한 사용자에게 동시에 부여할 수 없습니다. 하나의 역할 그룹만 선택하세요.`
+    );
+  }
+
+  if (systemRoles.length > 0 && clientIds.length > 0) {
+    throw new BusinessRuleError(
+      `시스템 운영팀 역할(${systemRoles.join(', ')}) 보유자에게는 고객사를 할당할 수 없습니다.`
+    );
+  }
+
+  if (clientRoles.length > 0 && clientIds.length === 0) {
+    throw new BusinessRuleError(
+      `고객사 역할(${clientRoles.join(', ')})은 소속 고객사가 지정되어야 부여할 수 있습니다.`
+    );
+  }
 }

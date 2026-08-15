@@ -5,6 +5,7 @@ import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
 import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
+import { startOfAppZoneDay } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
 
 type Props = {
@@ -171,11 +172,13 @@ export default async function SRsPage({ searchParams }: Props) {
   // 열리는 방향으로 실패하지 않게 하려는 의도다.
   const badgeClientIds = isAdminManagerEngineer ? null : userClientIds;
 
-  // 오늘 날짜 및 마감일 범위 계산
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  // 오늘 날짜 및 마감일 범위 계산.
+  //
+  // `setHours(0,0,0,0)` 은 **앰비언트 로컬 타임존**의 자정이라 UTC 컨테이너에서는
+  // 09:00 KST 를 가리켰다 — "오늘 마감" 배지 집계가 매일 9시간씩 어긋났다.
+  // 서버 코드에 남아 있던 마지막 앰비언트 타임존 사용처다.
+  const today = startOfAppZoneDay();
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
   // Fetch all data in parallel
   const [srData, totalCount, globalCounts, clients, users] = await Promise.all([

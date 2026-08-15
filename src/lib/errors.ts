@@ -215,6 +215,18 @@ export function mapPrismaError(error: unknown): ServiceError | null {
     return new BadRequestError('존재하지 않는 대상을 참조했습니다. 입력값을 다시 확인해주세요.');
   }
 
+  // P2000: 값이 컬럼 폭을 초과 → 400.
+  //
+  // `src/lib/schemas.ts` 머리말이 "zod 상한이 컬럼보다 크면 검증은 통과하고 DB 가 거부해
+  // 사용자에게는 원인을 알 수 없는 500 으로 보인다" 고 적어 두었는데, 정작 그 경로가
+  // 매핑되어 있지 않았다. 상한을 빠뜨린 필드가 남아 있더라도 5xx 가 아니라 4xx 로
+  // 드러나게 하는 안전망이다.
+  //
+  // 원문 메시지는 전달하지 않는다 — 컬럼명과 모델명이 그대로 실려 스키마가 노출된다.
+  if (code === 'P2000') {
+    return new BadRequestError('입력값이 허용된 길이를 초과했습니다. 내용을 줄여주세요.');
+  }
+
   // P2014: 필수 관계를 끊는 변경 → 409. 참조가 남아 있어 지울 수 없는 경우다.
   if (code === 'P2014') {
     return new ReferentialIntegrityError(

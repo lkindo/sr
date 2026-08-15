@@ -85,6 +85,13 @@ const sent = () => {
 
 const field = () => screen.getByRole('textbox');
 const write = (value: string) => fireEvent.change(field(), { target: { value } });
+/**
+ * 보류의 예상 해제일 입력. 헌법 §2 는 보류에 사유 **와** 예상 해제일을 모두 요구하므로
+ * hold 다이얼로그는 사유만으로 제출되지 않는다.
+ */
+const HOLD_RELEASE_DATE = '2026-09-01';
+const writeHoldDate = (value: string = HOLD_RELEASE_DATE) =>
+  fireEvent.change(screen.getByLabelText(/예상 해제일/), { target: { value } });
 const submit = (label: string | RegExp) =>
   fireEvent.click(screen.getByRole('button', { name: label }));
 
@@ -144,11 +151,16 @@ describe('SRStatusChangeDialog — 액션별 설정', () => {
     render(<SRStatusChangeDialog {...baseProps} action={action} />, { wrapper });
 
     write('  사유 본문  ');
+    if (action === 'hold') writeHoldDate();
     submit(/보류 처리|거절 처리|재오픈/);
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    // 앞뒤 공백은 잘라서 보낸다.
-    expect(sent().body).toEqual({ action, reason: '사유 본문' });
+    // 앞뒤 공백은 잘라서 보낸다. 보류만 예상 해제일이 함께 실린다.
+    expect(sent().body).toEqual({
+      action,
+      reason: '사유 본문',
+      ...(action === 'hold' ? { expectedHoldReleaseDate: HOLD_RELEASE_DATE } : {}),
+    });
   });
 });
 
@@ -205,10 +217,15 @@ describe('SRStatusChangeDialog — 검증', () => {
     render(<SRStatusChangeDialog {...baseProps} action="hold" />, { wrapper });
 
     write('자재 대기');
+    writeHoldDate();
     fireEvent.keyDown(field(), { key: 'Enter', ctrlKey: true });
 
     await waitFor(() => expect(fetch).toHaveBeenCalled());
-    expect(sent().body).toEqual({ action: 'hold', reason: '자재 대기' });
+    expect(sent().body).toEqual({
+      action: 'hold',
+      reason: '자재 대기',
+      expectedHoldReleaseDate: HOLD_RELEASE_DATE,
+    });
   });
 });
 
@@ -265,6 +282,7 @@ describe('SRStatusChangeDialog — 성공 후 순서', () => {
     render(<SRStatusChangeDialog {...baseProps} action="hold" />, { wrapper });
 
     write('자재 대기');
+    writeHoldDate();
     submit('보류 처리');
 
     await waitFor(() => expect(screen.getByRole('button', { name: '처리 중...' })).toBeDisabled());

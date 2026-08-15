@@ -27,7 +27,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+  logger: { logError: vi.fn(), logRequest: vi.fn(), warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 let SESSION_USER: { id: string; roles: string[] } = { id: 'admin-1', roles: ['ADMIN'] };
@@ -148,14 +148,18 @@ describe('GET /api/reports/export', () => {
 
     await call();
 
-    expect(mocks.getAllSRs.mock.calls[0]![0].where).toEqual({ assigneeId: 'eng-1' });
+    expect(mocks.getAllSRs.mock.calls[0]![0].where).toEqual({
+      deletedAt: null,
+      assigneeId: 'eng-1',
+    });
   });
 
   it('ADMIN 은 전체를 대상으로 한다', async () => {
     seedRows(1);
     await call();
 
-    expect(mocks.getAllSRs.mock.calls[0]![0].where).toEqual({});
+    // 삭제된 SR 은 ADMIN 의 전체 내보내기에서도 빠진다(db-rules §2).
+    expect(mocks.getAllSRs.mock.calls[0]![0].where).toEqual({ deletedAt: null });
   });
 
   it('권한 없는 역할은 403', async () => {

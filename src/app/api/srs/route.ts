@@ -7,6 +7,7 @@ import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
 import { ensureCanCreateSR, resolveAssigneeScope, resolveClientIdFilter } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { srCreateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { srService } from '@/services/sr.service';
@@ -54,6 +55,7 @@ export const GET = withAuthAndRateLimit(
 
     // 필터 파라미터 (전부 위 스키마를 통과한 값이다)
     const filters: Prisma.SRWhereInput = {
+      ...SR_ALIVE,
       status: query.status,
       clientId: clientIdFilter,
       priority: query.priority,

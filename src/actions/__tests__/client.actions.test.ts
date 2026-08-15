@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { authenticateAndAuthorize } from '@/lib/action-helpers';
 import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import { PERMISSIONS } from '@/lib/permission-helpers';
 import { isInternalUser } from '@/lib/policies';
 
 import {
@@ -99,7 +100,7 @@ describe('client.actions coverage', () => {
       if (result.success) {
         expect(result.data).toEqual(created);
       }
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('client:create');
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.CLIENT.CREATE);
       // 세션의 행위자 id 가 서비스로 내려가야 감사 로그에 누가 만들었는지 남는다.
       // (예전에는 이 액션이 authenticateAndAuthorize 의 반환값을 통째로 버렸다.)
       expect(mockClientService.createClient).toHaveBeenCalledWith(
@@ -197,7 +198,7 @@ describe('client.actions coverage', () => {
       expect(result.success).toBe(true);
       expect(result.data).toEqual(updated);
       expect(result.message).toMatch(/업데이트/);
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('client:update');
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.CLIENT.UPDATE);
       expect(mockClientService.updateClient).toHaveBeenCalledWith(
         'c1',
         expect.objectContaining({ name: 'New Name' }),
@@ -242,7 +243,7 @@ describe('client.actions coverage', () => {
 
       expect(result.success).toBe(true);
       expect(result.message).toMatch(/삭제/);
-      expect(authenticateAndAuthorize).toHaveBeenCalledWith('client:delete');
+      expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.CLIENT.DELETE);
       expect(mockClientService.deleteClient).toHaveBeenCalledWith('c1', 'u1', null);
     });
 

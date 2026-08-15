@@ -31,11 +31,7 @@ vi.mock('web-push', () => ({
 
 // Mock logger
 vi.mock('../../lib/logger', () => ({
-  logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  },
+  logger: { logError: vi.fn(), logRequest: vi.fn(), warn: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 describe('PushService', () => {

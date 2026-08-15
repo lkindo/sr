@@ -2,9 +2,14 @@
 /**
  * `/api/srs/[id]/status` 전이 사전조건 계약.
  *
- * 이 라우트만 갖고 있는 두 규칙 — **7일 재오픈 창**과 **요청자 전용 확인** — 은
- * 상태머신에도 `updateSR` 에도 없다(감사 4.3). 즉 이 파일이 그 규칙의 유일한 구현이고,
- * 테스트가 하나도 없었다. 여기가 깨지면 CONFIRMED 가 사실상 비종단 상태가 된다.
+ * **2026-08-15 변경**: 7일 재오픈 창은 더 이상 이 라우트에 없다.
+ * 예전에는 라우트가 자체 사본을 들고 있었고, 그 사본이 CONFIRMED 출발에도 `completedAt` 을
+ * 보고 `completedAt` 이 NULL 이면 통과시켰다(fail-open). 사본을 두면 두 곳 중 하나만
+ * 고쳐지므로 판정을 `validateTransition` 한 곳으로 모았다 —
+ * 창 규칙의 계약은 `src/lib/__tests__/sr-state-machine.*.test.ts` 가 검증한다.
+ *
+ * 이 파일이 지키는 것은 **라우트가 자체 판정 없이 위임하는가**와, 라우트에만 있는
+ * 액션별 사전조건(출발 상태·필수 입력)이다.
  */
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -59,19 +64,31 @@ beforeEach(() => {
   mocks.updateSR.mockResolvedValue({ id: 'sr-1', status: 'IN_PROGRESS' });
 });
 
-describe('재오픈 7일 창', () => {
-  it('완료 후 7일이 지나면 거부한다', async () => {
-    mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED', completedAt: daysAgo(8) }));
+describe('재오픈 — 라우트는 창 판정을 위임한다', () => {
+  it('사유가 없으면 라우트가 먼저 거부한다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED', completedAt: daysAgo(3) }));
+
+    const res = await call({ action: 'reopen' });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain('재오픈 사유');
+    expect(mocks.updateSR).not.toHaveBeenCalled();
+  });
+
+  it('완료/확인완료가 아닌 상태에서는 거부한다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'IN_PROGRESS' }));
 
     const res = await call({ action: 'reopen', reason: '재작업 필요' });
 
     expect(res.status).toBe(400);
-    expect((await res.json()).error).toContain('7일');
     expect(mocks.updateSR).not.toHaveBeenCalled();
   });
 
-  it('7일 이내면 허용한다', async () => {
-    mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED', completedAt: daysAgo(3) }));
+  it('사전조건을 통과하면 창 판정은 updateSR 에 맡긴다', async () => {
+    // 라우트는 7일을 세지 않는다. 8일 지난 SR 도 여기서는 통과하고,
+    // 실제 거부는 updateSR 안의 validateTransition 이 한다.
+    // (라우트가 자체 사본을 다시 갖게 되면 이 단언이 깨진다.)
+    mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED', completedAt: daysAgo(8) }));
 
     const res = await call({ action: 'reopen', reason: '재작업 필요' });
 
@@ -81,23 +98,6 @@ describe('재오픈 7일 창', () => {
       expect.objectContaining({ status: 'IN_PROGRESS' }),
       expect.anything()
     );
-  });
-
-  it('CONFIRMED 도 같은 창을 적용받는다', async () => {
-    mocks.getSRById.mockResolvedValue(sr({ status: 'CONFIRMED', completedAt: daysAgo(30) }));
-
-    const res = await call({ action: 'reopen', reason: '재작업 필요' });
-
-    expect(res.status).toBe(400);
-  });
-
-  it('completedAt 이 없으면 창 검사를 건너뛴다', async () => {
-    // 완료 시각을 모르면 막을 근거가 없다. 이 분기가 사라지면 legacy 데이터가 전부 막힌다.
-    mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED', completedAt: null }));
-
-    const res = await call({ action: 'reopen', reason: '재작업 필요' });
-
-    expect(res.status).toBe(200);
   });
 
   it('사유 없이는 재오픈할 수 없다', async () => {
@@ -160,14 +160,42 @@ describe('나머지 전이 사전조건', () => {
   ])('%s 액션은 %s 상태에서 %d 를 반환한다', async (action, status, expected) => {
     mocks.getSRById.mockResolvedValue(sr({ status }));
 
-    // 사유·해결내용이 필요한 액션에는 함께 넣는다(그 검사는 별도 테스트가 다룬다).
+    // 사유·해결내용·예상 해제일이 필요한 액션에는 함께 넣는다
+    // (각 필수 검사는 별도 테스트가 다룬다).
     const res = await call({
       action,
       reason: '사유',
       resolutionDescription: '해결 내용',
+      expectedHoldReleaseDate: '2026-09-01',
     });
 
     expect(res.status).toBe(expected);
+  });
+
+  // 헌법 §2: 보류는 사유 **와** 예상 해제일을 함께 명시한다.
+  it('보류에는 예상 해제일이 필수다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'IN_PROGRESS' }));
+
+    const res = await call({ action: 'hold', reason: '고객 자료 대기' });
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toContain('예상 해제일');
+    expect(mocks.updateSR).not.toHaveBeenCalled();
+  });
+
+  it('보류 해제(resume)는 예상 해제일을 비운다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'ON_HOLD' }));
+
+    const res = await call({ action: 'resume' });
+
+    expect(res.status).toBe(200);
+    // null 은 "약속을 지운다"는 의미 있는 값이다. truthy 검사로 걸러지면
+    // 진행중 SR 에 유효하지 않은 해제 예정일이 남는다.
+    expect(mocks.updateSR).toHaveBeenCalledWith(
+      'sr-1',
+      expect.objectContaining({ expectedHoldReleaseDate: null }),
+      expect.anything()
+    );
   });
 
   it('완료에는 해결 내용이 필수다', async () => {

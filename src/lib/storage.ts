@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';

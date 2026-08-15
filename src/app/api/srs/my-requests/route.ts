@@ -4,6 +4,7 @@ import { Prisma, SRStatus } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { usePagination } from '@/lib/pagination';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 
 // Force Node.js runtime
@@ -43,6 +44,7 @@ export const GET = withAuthAndRateLimit(
     const orderBy = ORDER_BY.get(sortBy) ?? DEFAULT_ORDER_BY;
 
     const where: Prisma.SRWhereInput = {
+      ...SR_ALIVE,
       requesterId: session.user.id,
     };
 
@@ -114,7 +116,9 @@ export const GET = withAuthAndRateLimit(
       // (상태 필터를 걸었다고 "완료 0건"으로 보이면 안 된다)
       prisma.sR.groupBy({
         by: ['status'],
-        where: { requesterId: session.user.id },
+        // 상태 필터는 일부러 빼지만 soft delete 필터는 뺄 수 없다 —
+        // 목록에서 사라진 SR 이 통계 카드에만 남으면 사용자가 합계를 맞춰 볼 수 없다.
+        where: { ...SR_ALIVE, requesterId: session.user.id },
         _count: { _all: true },
       }),
     ]);

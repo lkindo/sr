@@ -257,6 +257,7 @@ export default function RegisterForm() {
                 <Label htmlFor="name">이름</Label>
                 <Input
                   id="name"
+                  maxLength={50}
                   name="name"
                   type="text"
                   placeholder="홍길동"
@@ -269,6 +270,7 @@ export default function RegisterForm() {
                 <Label htmlFor="email">이메일</Label>
                 <Input
                   id="email"
+                  maxLength={255}
                   name="email"
                   type="email"
                   placeholder="name@example.com"

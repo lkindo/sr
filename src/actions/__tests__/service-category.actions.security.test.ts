@@ -111,7 +111,7 @@ describe('Service Category Actions Security', () => {
      * 이제 clientId 를 받되, 외부 사용자가 임의 clientId 를 넣어 타 테넌트 카탈로그를
      * 열람하지 못하도록 소속을 검증한다.
      */
-    it('clientId 를 서비스 계층까지 전달한다', async () => {
+    it('내부 사용자는 전체 스코프로 조회한다', async () => {
       (getAuthenticatedSession as any).mockResolvedValue({
         user: { id: 'user-1', roles: ['ADMIN'], permissions: [], clientIds: [] },
       });
@@ -119,7 +119,62 @@ describe('Service Category Actions Security', () => {
       const result = await getServiceCategoriesForSelection('client-1');
 
       expect(result.success).toBe(true);
-      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith('client-1');
+      // ADMIN/MANAGER/ENGINEER 는 카테고리 관리 화면이 전체를 필요로 한다.
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith('all');
+    });
+
+    it('외부 사용자는 지정한 고객사로 스코프해 전달한다', async () => {
+      (getAuthenticatedSession as any).mockResolvedValue({
+        user: {
+          id: 'user-1',
+          roles: ['CLIENT_ADMIN'],
+          permissions: ['CLIENT:READ'],
+          clientIds: ['client-1'],
+        },
+      });
+
+      const result = await getServiceCategoriesForSelection('client-1');
+
+      expect(result.success).toBe(true);
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({
+        clientIds: ['client-1'],
+      });
+    });
+
+    /**
+     * 감사 D-13 회귀 방어 — **이것이 실제 익스플로잇이었다.**
+     *
+     * 예전에는 `if (clientId)` 로 인가 검사를 감싸고 서비스에도 `undefined` 를 넘겼다.
+     * 그래서 유효 세션을 가진 CLIENT_USER 가 이 액션을 **인자 없이** 호출하는 것만으로
+     * 전 고객사의 서비스 카탈로그와 SLA 시간을 받아 갔다.
+     */
+    it('외부 사용자가 인자 없이 불러도 전체가 나오지 않는다', async () => {
+      (getAuthenticatedSession as any).mockResolvedValue({
+        user: {
+          id: 'user-1',
+          roles: ['CLIENT_USER'],
+          permissions: [],
+          clientIds: ['client-1'],
+        },
+      });
+
+      const result = await getServiceCategoriesForSelection();
+
+      expect(result.success).toBe(true);
+      // 'all' 이 넘어가면 이 단언이 깨진다 — 그 순간이 격리가 뚫리는 순간이다.
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({
+        clientIds: ['client-1'],
+      });
+    });
+
+    it('소속 고객사가 없는 외부 사용자는 빈 스코프를 받는다 (fail-closed)', async () => {
+      (getAuthenticatedSession as any).mockResolvedValue({
+        user: { id: 'user-1', roles: ['CLIENT_USER'], permissions: [], clientIds: [] },
+      });
+
+      await getServiceCategoriesForSelection();
+
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({ clientIds: [] });
     });
 
     it('소속되지 않은 고객사의 카테고리 조회를 거부한다', async () => {
@@ -152,7 +207,9 @@ describe('Service Category Actions Security', () => {
       const result = await getServiceCategoriesForSelection('client-1');
 
       expect(result.success).toBe(true);
-      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith('client-1');
+      expect(serviceCategoryService.getForSelection).toHaveBeenCalledWith({
+        clientIds: ['client-1'],
+      });
     });
   });
 });

@@ -7,7 +7,7 @@ import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { ensureCanReadSR, INTERNAL_ROLES, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
+import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
@@ -58,7 +58,7 @@ export const POST = withAuthAndRateLimit(
 
     // 2. SR 조회 및 상태 확인
     const sr = await prisma.sR.findUnique({
-      where: { id },
+      where: { id, ...SR_ALIVE },
       include: {
         serviceCategory: true,
         client: true,
@@ -255,7 +255,7 @@ export const GET = withAuthAndRateLimit(
     const { id } = await params;
 
     const sr = await prisma.sR.findUnique({
-      where: { id },
+      where: { id, ...SR_ALIVE },
       select: {
         id: true,
         clientId: true,
@@ -376,7 +376,7 @@ export const PATCH = withAuthAndRateLimit(
 
     // 3. SR 조회 및 상태 확인
     const sr = await prisma.sR.findUnique({
-      where: { id },
+      where: { id, ...SR_ALIVE },
       include: {
         serviceCategory: true,
         assignee: {

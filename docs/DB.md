@@ -1,9 +1,9 @@
 # SR Management System - Database Design Document
 
 **문서 종류:** DB
-**문서 버전:** 1.4
+**문서 버전:** 1.5
 **작성일:** 2025-11-06
-**최종 수정일:** 2026-07-30
+**최종 수정일:** git 이력이 정본 (`git log -1 -- docs/DB.md`)
 **작성자:** Development Team
 **검수자:** [검수자 정보]
 
@@ -33,8 +33,9 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 > - `NotificationType.MATTERMOST` 및 `client_handlers.mattermost_id` (마이그레이션
 >   `20260730000000_drop_mattermost` 에서 제거됨)
 >
-> 본 버전은 `prisma/schema.prisma`(494줄)와 `prisma/migrations/` 9개 마이그레이션을 직접
-> 읽어 대조한 결과로 갱신했다.
+> 본 버전은 `prisma/schema.prisma` 와 `prisma/migrations/` 전체를 직접 읽어 대조한 결과로 갱신했다.
+> (2026-08-15 기준 19개 모델, 17개 마이그레이션. **줄 수·개수를 본문에 박아 두는 관행은
+> 폐지한다** — 코드가 움직일 때마다 조용히 틀려지고, 아무도 고치지 않는다.)
 
 ---
 
@@ -477,7 +478,7 @@ erDiagram
 
 ## 테이블 명세
 
-전체 16개 테이블. 아래 순서는 ERD 순서를 따른다.
+아래 순서는 ERD 순서를 따른다. (테이블 목록의 정본은 `prisma/schema.prisma` 다.)
 
 ### 1. users (사용자)
 
@@ -492,6 +493,7 @@ erDiagram
 | email_verified | TIMESTAMPTZ   | YES  | NULL   | 이메일 인증 시간 (미사용)      |
 | image          | VARCHAR(1024) | YES  | NULL   | 프로필 이미지 URL              |
 | is_active      | BOOLEAN       | NO   | true   | 활성화 상태                    |
+| session_version| INTEGER       | NO   | 0      | 세션 무효화 카운터 — JWT 클레임과 비교해 불일치 시 기존 토큰 거부 |
 | created_at     | TIMESTAMPTZ   | NO   | now()  | 생성 시간                      |
 | updated_at     | TIMESTAMPTZ   | NO   | -      | 수정 시간 (`@updatedAt`)       |
 
@@ -703,6 +705,7 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 | rejection_reason          | TEXT           | YES  | NULL        | 거부 사유                             |
 | satisfaction_rating       | SMALLINT       | YES  | NULL        | 만족도 평가 (CHECK: NULL 또는 1~5)    |
 | additional_feedback       | TEXT           | YES  | NULL        | 추가 피드백                           |
+| version                   | INTEGER        | NO   | 0           | 낙관적 잠금 카운터 — 갱신 시 불일치면 409 |
 | created_at                | TIMESTAMPTZ    | NO   | now()       | 생성 시간                             |
 | updated_at                | TIMESTAMPTZ    | NO   | -           | 수정 시간                             |
 
@@ -966,7 +969,7 @@ RETURNING "seq"
 
 ## 스키마 원본 (Prisma)
 
-전체 모델 정의는 **`prisma/schema.prisma`** (494줄)에 있다. 이 문서에 스키마 전문을
+전체 모델 정의는 **`prisma/schema.prisma`** 에 있다. 이 문서에 스키마 전문을
 복사해 두면 필연적으로 드리프트가 발생하므로(1.3 버전이 실제로 그렇게 어긋났다) 복사하지
 않는다. 대신 커넥션 설정 블록만 아래에 옮긴다.
 
@@ -1219,8 +1222,19 @@ SEED_DEV_FIXTURES=true SEED_ADMIN_PASSWORD=... pnpm db:seed
 | `20260703010000_sr_constraints`            | `sr_number` → `VARCHAR(30)`, `satisfaction_rating` 1~5 CHECK 추가                                    |
 | `20260703020000_user_client_approval`      | `UserClientStatus` enum, `user_clients.status`/`approved_at` 추가 + 기존 행 백필                     |
 | `20260730000000_drop_mattermost`           | `NotificationType.MATTERMOST` 제거(타입 재생성), `client_handlers.mattermost_id` 삭제                |
+| `20260801114021_add_sr_created_at_indexes` | `srs(created_at)` 계열 목록 정렬 인덱스 추가                                                          |
+| `20260801120000_add_trgm_search_indexes`   | `pg_trgm` 기반 부분일치 검색 인덱스 추가                                                              |
+| `20260801130000_service_category_unique_name` | 고객사 내 서비스 카테고리 이름 유니크 제약 추가                                                   |
+| `20260802010000_drop_redundant_indexes`    | 상위 인덱스에 포섭되는 중복 인덱스 정리                                                               |
+| `20260802030000_notification_outbox_retry` | `notifications` 를 아웃박스로 승격 — `attempts`/`next_attempt_at`/`fail_reason` 추가                 |
+| `20260809120000_client_admin_sr_delete`    | **데이터 마이그레이션** — `CLIENT_ADMIN` 역할에 `SR:DELETE` 권한 부여                                |
+| `20260814211500_user_session_version`      | `users.session_version` 추가 (비밀번호 변경 시 기존 JWT 즉시 무효화)                                 |
+| `20260814213000_sr_version`                | `srs.version` 추가 (낙관적 잠금, 불일치 시 409)                                                      |
 
 `migration_lock.toml` provider 는 `postgresql`.
+
+> **유지 규칙(2026-08-15)**: 이 표는 `prisma/migrations/` 하위 디렉터리와 1:1 이어야 한다.
+> 2026-08-15 감사 시점에 8건이 누락되어 있었다. 마이그레이션을 추가하면 이 표에도 함께 넣는다.
 
 ---
 

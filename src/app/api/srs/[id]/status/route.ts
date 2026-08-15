@@ -22,7 +22,8 @@ export const PATCH = withAuthAndRateLimit(
     const body = await parseJsonBody(request);
 
     // 검증 실패 시 ZodError 를 던져 handleApiError 가 400 으로 매핑하게 한다.
-    const { action, reason, resolutionDescription } = statusActionSchema.parse(body);
+    const { action, reason, resolutionDescription, expectedHoldReleaseDate } =
+      statusActionSchema.parse(body);
 
     // 현재 SR 조회
     const currentSR = await srService.getSRById(srId);
@@ -36,6 +37,7 @@ export const PATCH = withAuthAndRateLimit(
     interface UpdateData {
       resolutionDescription?: string;
       rejectionReason?: string;
+      expectedHoldReleaseDate?: string | null;
     }
     const updateData: UpdateData = {};
 
@@ -79,7 +81,12 @@ export const PATCH = withAuthAndRateLimit(
         if (!reason) {
           return NextResponse.json({ error: '보류 사유를 입력해주세요.' }, { status: 400 });
         }
+        // 헌법 §2: 보류는 사유 **와** 예상 해제일을 함께 명시한다.
+        if (!expectedHoldReleaseDate) {
+          return NextResponse.json({ error: '예상 해제일을 입력해주세요.' }, { status: 400 });
+        }
         newStatus = 'ON_HOLD';
+        updateData.expectedHoldReleaseDate = expectedHoldReleaseDate;
         break;
 
       case 'resume':
@@ -91,6 +98,9 @@ export const PATCH = withAuthAndRateLimit(
           );
         }
         newStatus = 'IN_PROGRESS';
+        // 보류가 풀렸으므로 지난 약속을 비운다. 남겨 두면 진행중 SR 에 유효하지 않은
+        // 해제 예정일이 붙어 있고, 다음 보류 때 그 값으로 필수 검사를 통과해 버린다.
+        updateData.expectedHoldReleaseDate = null;
         break;
 
       case 'reject':
@@ -133,18 +143,10 @@ export const PATCH = withAuthAndRateLimit(
         if (!reason) {
           return NextResponse.json({ error: '재오픈 사유를 입력해주세요.' }, { status: 400 });
         }
-        // 7일 이내 확인 (completedAt 이 기록된 경우)
-        if (currentSR.completedAt) {
-          const daysSinceCompletion =
-            (new Date().getTime() - new Date(currentSR.completedAt).getTime()) /
-            (1000 * 60 * 60 * 24);
-          if (daysSinceCompletion > 7) {
-            return NextResponse.json(
-              { error: '완료 후 7일이 지나 재오픈할 수 없습니다.' },
-              { status: 400 }
-            );
-          }
-        }
+        // 7일 창 판정은 여기서 하지 않는다 — `validateStatusTransition` 이 단일 판정 지점이다.
+        // 예전에는 라우트가 자체 사본을 들고 있었는데, 그 사본은 CONFIRMED 출발에도
+        // completedAt 을 보고 completedAt 이 NULL 이면 통과시켰다(fail-open).
+        // 사본을 두면 두 곳 중 하나만 고쳐지고 판정이 갈린다.
         newStatus = 'IN_PROGRESS';
         break;
 
@@ -164,6 +166,10 @@ export const PATCH = withAuthAndRateLimit(
         }),
         ...(updateData.rejectionReason && {
           rejectionReason: updateData.rejectionReason,
+        }),
+        // null(보류 해제)도 의미 있는 값이라 truthy 검사로 거르면 안 된다.
+        ...(updateData.expectedHoldReleaseDate !== undefined && {
+          expectedHoldReleaseDate: updateData.expectedHoldReleaseDate,
         }),
       },
       session.user

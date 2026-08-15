@@ -1,9 +1,9 @@
 # SR(Service Request) 관리 시스템 TRD
 
 **문서 종류:** TRD (Technical Requirements Document)
-**문서 버전:** 1.4
+**문서 버전:** 1.5
 **작성일:** 2025-11-06
-**최종 수정일:** 2026-07-30
+**최종 수정일:** git 이력이 정본 (`git log -1 -- docs/TRD.md`)
 **작성자:** Development Team
 **검수자:** [검수자 정보]
 
@@ -84,16 +84,20 @@
 > Monitoring=Sentry + Axiom, Next.js=14.x 로 기술하고 있었다. **여덟 항목 모두 채택되지 않았다.**
 > 아래는 `package.json` · `docker-compose.prod.yml` · `Dockerfile` · `nginx/nginx.conf` ·
 > `.github/workflows/` 에서 실측한 값이다. 표에 없는 것은 시스템에 없다.
+>
+> **버전은 메이저·마이너까지만 적는다.** 패치 자릿수까지 박아 두면 dependabot PR 하나마다
+> 이 표가 틀려지고, 아무도 고치지 않아 결국 전부 신뢰할 수 없게 된다. 정확한 값은
+> `package.json` 과 `pnpm-lock.yaml` 이 단일 진실이다.
 
-| 분류                | 기술                                                                           | 버전 (2026-07-30 실측)                          |
+| 분류                | 기술                                                                           | 버전 (메이저·마이너만)                          |
 | ------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
-| **Frontend**        | Next.js (App Router)                                                           | 16.1.6                                          |
-|                     | React / React DOM                                                              | 19.2.4                                          |
+| **Frontend**        | Next.js (App Router)                                                           | 16.3                                            |
+|                     | React / React DOM                                                              | 19.2                                            |
 |                     | TypeScript                                                                     | 5.x                                             |
 |                     | Tailwind CSS                                                                   | 3.4                                             |
 |                     | Shadcn/ui (Radix UI 프리미티브 기반, 소스 복사 방식)                           | 패키지 버전 없음 (`src/components/ui/`)         |
 |                     | Recharts (대시보드 차트)                                                       | 3.7.0                                           |
-| **Backend**         | Next.js Server Actions / Route Handlers                                        | 16.1.6                                          |
+| **Backend**         | Next.js Server Actions / Route Handlers                                        | 16.3                                            |
 |                     | Node.js 런타임                                                                 | 22.x (`package.json` engines, `node:22` 이미지) |
 |                     | pnpm (패키지 매니저)                                                           | 10                                              |
 | **Database**        | PostgreSQL — `postgres:16-alpine` 컨테이너(앱과 같은 호스트)                   | 16                                              |
@@ -103,26 +107,27 @@
 |                     | 오브젝트 스토리지 / CDN                                                        | **없음**                                        |
 | **Cache**           | Next.js `unstable_cache` (프로세스 내 메모리, `src/lib/cache.ts`)              | Next.js 내장                                    |
 |                     | 외부 캐시 서버 (Redis 등)                                                      | **없음**                                        |
-| **Background Jobs** | `backgroundTask` (`src/lib/wait-until.ts`) — 응답 후 fire-and-forget           | 영속 큐 **없음**                                |
-|                     | 정기 작업                                                                      | GitHub Actions 스케줄(백업·품질 점검)만         |
+| **Background Jobs** | 이메일 아웃박스 (`src/services/notification-outbox.ts`) — DB 영속 + 재시도     | 30초 폴링 디스패처                              |
+|                     | `backgroundTask` (`src/lib/wait-until.ts`) — 웹 푸시 등 best-effort            | 영속 큐 **없음**                                |
+|                     | 시간 기반 정기 작업(Cron)                                                      | **없음** — GitHub Actions 스케줄만              |
 | **Authentication**  | NextAuth / Auth.js — JWT 세션 전략 (`src/auth.config.ts`)                      | 5.0.0-beta.32                                   |
 |                     | bcryptjs (work factor 12, `src/lib/constants.ts:115`)                          | 3.0                                             |
-| **Validation**      | Zod                                                                            | 4.3                                             |
-|                     | react-hook-form (+ `@hookform/resolvers`)                                      | 7.71                                            |
-| **Server State**    | `@tanstack/react-query`                                                        | 5.90                                            |
-| **Email**           | nodemailer (SMTP, `src/services/email.service.ts`)                             | 7.0                                             |
+| **Validation**      | Zod                                                                            | 4.4                                             |
+|                     | react-hook-form (+ `@hookform/resolvers`)                                      | 7.84                                            |
+| **Server State**    | `@tanstack/react-query`                                                        | 5.101                                           |
+| **Email**           | nodemailer (SMTP, `src/services/email.service.ts`)                             | 9.0                                             |
 | **Web Push**        | web-push (VAPID, `src/services/push.service.ts`)                               | 3.6                                             |
 | **Realtime**        | 자체 SSE 엔드포인트 `GET /api/realtime` + Node `EventEmitter`                  | —                                               |
 | **Reverse Proxy**   | nginx — `nginx:alpine` 컨테이너 (TLS 종료, 80→443 리다이렉트)                  | alpine                                          |
 | **Deployment**      | 자체 서버(Oracle Cloud VM) + Docker Compose (`/home/opc/sr`)                   | —                                               |
 |                     | 이미지 레지스트리 — GHCR `ghcr.io/lkindo/sr` (`:latest` / `:dev`)              | —                                               |
 |                     | CI/CD — GitHub Actions (`CI/CD Pipeline` → `workflow_run` 배포)                | —                                               |
-|                     | TLS — Let's Encrypt (certbot, 갱신 자동화 없음)                                | —                                               |
+|                     | TLS — Let's Encrypt (certbot). 갱신은 `scripts/renew-letsencrypt.sh` 를 호스트 cron `0 3 * * *` 로 실행하며, cron 설치는 `.github/workflows/deploy.yml` 이 배포마다 멱등 수행한다 | —                                               |
 | **Logging**         | pino → stdout → Docker `json-file` 드라이버 (3 × 10MB 로테이션)                | 10.3                                            |
 |                     | 호스트 밖 로그 전송                                                            | **없음**                                        |
 | **Monitoring**      | uptime-kuma 컨테이너 (서버에서 구동 중, 저장소의 compose 파일에는 없음)        | 미확인                                          |
 |                     | 에러 추적 서비스                                                               | **없음** — Sentry 미사용 결정(2026-07-30)       |
-| **Testing**         | vitest (유닛) / Playwright (e2e) / Stryker (뮤테이션)                          | 4.0 / 1.58 / 9.5.1                              |
+| **Testing**         | vitest (유닛) / Playwright (e2e) / Stryker (뮤테이션)                          | 4.1 / 1.62 / 9.6                                |
 
 ---
 
@@ -589,7 +594,7 @@
 
 ### 8. nodemailer (SMTP) + web-push (VAPID)
 
-**버전**: nodemailer **7.0**, web-push **3.6**
+**버전**: nodemailer **9.0**, web-push **3.6**
 
 > **정정(2026-07-30)**: 1.3 까지 이 절은 Resend + React Email 을 **"✅ 선택"** 으로 표기하고
 > 발송 실패 재시도를 Inngest 에 위임한다고 서술했다. **Resend·React Email·Inngest 모두
@@ -603,10 +608,13 @@
 - **TLS 검증**: 프로덕션에서 `rejectUnauthorized: true` (MITM 자격증명 탈취 방지),
   로컬 개발에서만 완화
 - **타임아웃**: connection 10s / greeting 10s / socket 15s
-- **자격증명 미설정 시**: 경고 로그만 남기고 발송을 건너뛴다(예외를 던지지 않는다)
+- **자격증명 미설정 시**: 예외를 던진다. 조용히 성공한 척하면 환경 변수 하나가 빠졌을 때
+  알림이 통째로 안 나가는데도 애플리케이션이 정상으로 보인다(`email.service.ts:80-82`).
 - **템플릿**: 서비스 내부의 HTML 문자열 메서드(`sendSRCreated`, `sendSRStatusChanged`,
   `sendSRAssigned` 등). JSX 기반 React Email 은 사용하지 않는다.
-- **발송 실패 처리**: 로그 기록뿐이다. **재시도·outbox·Dead Letter Queue 는 구현되어 있지 않다.**
+- **발송 실패 처리**: **아웃박스 + 지수 백오프 재시도 + dead-letter 가 구현되어 있다**
+  (2026-08-02, `src/services/notification-outbox.ts`). 상세는 아래 9절 참조.
+  `sendMail` 은 실패를 삼키지 않고 던지며, 그 예외를 디스패처가 받아 `failReason` 에 기록한다.
 
 **웹 푸시 (`src/services/push.service.ts`)**:
 
@@ -618,7 +626,7 @@
 
 | 기술                   | 장점                                                  | 단점                                          | 선택 여부                   |
 | ---------------------- | ----------------------------------------------------- | --------------------------------------------- | --------------------------- |
-| **nodemailer + SMTP**  | 외부 SaaS 의존 없음, 기존 SMTP 자산 재사용, 비용 없음 | 전달률·바운스 관리를 직접 책임, 재시도 미구현 | ✅ 선택 (실제 채택)         |
+| **nodemailer + SMTP**  | 외부 SaaS 의존 없음, 기존 SMTP 자산 재사용, 비용 없음 | 전달률·바운스 관리를 직접 책임                | ✅ 선택 (실제 채택)         |
 | Resend (+ React Email) | 간단, JSX 템플릿                                      | 외부 의존, 비용                               | ❌ 초기 설계안 / **미채택** |
 | SendGrid               | 강력, 다양한 기능                                     | 복잡한 API, 비용 높음                         | ❌                          |
 | AWS SES                | 저렴, 확장 가능                                       | 설정 복잡, 전달률 관리 필요                   | ❌                          |
@@ -635,8 +643,13 @@
 
 > **정정(2026-07-30)**: 1.3 까지 이 절은 Inngest 를 **"✅ 선택"** 으로 표기하고 일일 리포트,
 > 만료 알림, 파일 정리 Cron, 이메일 재시도, Dead Letter Queue 를 규정했다.
-> **Inngest 는 채택되지 않았고, 열거된 다섯 작업 중 어느 것도 구현되어 있지 않다.**
-> 영속 큐·스케줄러·재시도 기반이 시스템에 존재하지 않는다.
+> **Inngest 는 채택되지 않았다.**
+>
+> **재정정(2026-08-15)**: 위 문단은 "재시도 기반이 시스템에 존재하지 않는다" 고 단언했으나
+> 2026-08-02 이후로 사실이 아니다. **이메일 재시도와 Dead Letter Queue 는 DB 기반 아웃박스로
+> 구현되어 있다**(`src/services/notification-outbox.ts`, 마이그레이션
+> `20260802030000_notification_outbox_retry`). 미구현으로 남은 것은 일일 리포트·만료 알림·
+> 파일 정리 Cron 3종이다.
 
 **실제 동작**:
 
@@ -645,9 +658,28 @@
 - `@vercel/functions` 의 `waitUntil` 을 시도하지만, 상시 구동 Node 서버에서는 호출이 실패하고
   일반 fire-and-forget 으로 완료된다(의도된 폴백).
 - **한계(반드시 인지할 것)**: 큐가 아니다. 컨테이너가 종료·재시작되면 진행 중인 작업은 **유실**되고
-  재시도되지 않는다. 알림 발송이 이 경로를 쓴다.
+  재시도되지 않는다.
+- **이메일은 이 한계에서 벗어나 있다**: 알림 이메일은 `backgroundTask` 로 직접 발송하지 않고
+  도메인 트랜잭션 안에서 `notifications` 테이블에 `PENDING` 으로 적재한 뒤
+  아웃박스 디스패처가 집어간다(아래 "이메일 아웃박스" 참조). 웹 푸시는 여전히
+  best-effort 이며 `backgroundTask` 경로를 쓴다.
 
-**현재 존재하는 정기 작업**: 앱 내부에는 없다. GitHub Actions 스케줄만 있다.
+#### 이메일 아웃박스 (2026-08-02 구현)
+
+**구현**: `src/services/notification-outbox.ts`, 테이블 `notifications`
+
+- **적재**: `enqueueEmails(tx, ...)` 가 도메인 트랜잭션 **안에서** `PENDING` 행을 만든다.
+  트랜잭션이 롤백되면 알림도 함께 사라지므로 "없던 일에 대한 알림" 이 나가지 않는다.
+- **디스패처**: `startNotificationDispatcher()` 를 `src/instrumentation.ts` 가 부팅 시 기동한다.
+  기본 30초 주기로 최대 20건을 집는다.
+- **claim**: 단일 CTE 안에서 `FOR UPDATE SKIP LOCKED` 로 행을 잠그고 `next_attempt_at` 을
+  임대(lease) 시간만큼 미래로 밀어 다중 인스턴스에서도 중복 발송을 막는다.
+- **재시도**: 실패 시 지수 백오프(1·5·15·60분)로 재시도하며 상한은 5회다.
+  정본 상수는 `MAX_ATTEMPTS` / `BACKOFF_MINUTES` 이며 이 문서는 숫자를 복제하지 않는다.
+- **dead-letter**: 상한 도달 시 `FAILED` 로 고정하고 `failReason` 에 마지막 예외를 남긴다.
+- **범위**: 현재 `type = 'EMAIL'` 행만 처리한다. 웹 푸시는 아웃박스에 적재되지 않는다.
+
+**현재 존재하는 정기 작업**: 앱 내부에는 아웃박스 디스패처가 있고, 그 밖은 GitHub Actions 스케줄이다.
 
 | 작업                    | 위치                                     | 주기                           |
 | ----------------------- | ---------------------------------------- | ------------------------------ |
@@ -659,14 +691,16 @@
 
 | 기술                               | 장점                           | 단점                                             | 선택 여부                   |
 | ---------------------------------- | ------------------------------ | ------------------------------------------------ | --------------------------- |
-| **`backgroundTask` (프로세스 내)** | 의존성 0, 즉시 실행, 비용 없음 | 영속성·재시도·스케줄링 전부 없음, 재시작 시 유실 | ✅ 선택 (실제 채택)         |
+| **`backgroundTask` (프로세스 내)** | 의존성 0, 즉시 실행, 비용 없음 | 스케줄링 없음, 재시작 시 유실(이메일은 아웃박스가 보완) | ✅ 선택 (실제 채택)         |
+| **DB 아웃박스 + 폴링 디스패처**    | 의존성 0, 영속·재시도·DLQ 확보 | 폴링 지연(최대 30초), 스케줄링은 여전히 없음     | ✅ 선택 (이메일 한정, 2026-08-02) |
 | Inngest                            | Type-safe, 재시도, Cron        | 외부 의존, 비용                                  | ❌ 초기 설계안 / **미채택** |
 | Vercel Cron                        | Vercel 통합                    | Vercel 미사용이므로 해당 없음                    | ❌ 초기 설계안 / 미채택     |
 | BullMQ                             | 강력, 성숙, 자체 호스팅 가능   | Redis 필요                                       | ❌ 향후 후보                |
 | Trigger.dev                        | 강력, 다양한 통합              | 비용 높음                                        | ❌                          |
 
-> **향후 방향**: 영속 큐가 필요해지면(알림 재시도, 만료 알림 스케줄) 자체 호스팅 가능한
-> 방향 — DB 기반 outbox 테이블 + 폴링, 또는 Redis 컨테이너 + BullMQ — 을 검토한다.
+> **경과**: 위 두 후보 중 **DB 기반 outbox 테이블 + 폴링을 2026-08-02 에 채택·구현**했다
+> (이메일 한정). 남은 미해결 과제는 **스케줄링**(만료 알림, 파일 정리 같은 시간 기반 작업)이며,
+> 필요해지면 Redis 컨테이너 + BullMQ 를 검토한다.
 > 외부 SaaS 큐는 현재 인프라 방침(호스트 밖으로 데이터를 보내지 않음)과 맞지 않는다.
 
 ---
@@ -1123,15 +1157,18 @@ SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted`
 
 ### 알림 발송 전략 (현재 상태)
 
-1. **실행 경로**: 도메인 이벤트 → 리스너 → `backgroundTask` 로 응답 후 발송
+1. **실행 경로**: 이메일은 도메인 트랜잭션 안에서 `notifications` 아웃박스에 `PENDING` 적재 →
+   디스패처가 폴링·claim·발송. 웹 푸시는 도메인 이벤트 → 리스너 → `backgroundTask` 직접 발송.
 2. **사용자 설정**: `notification_preferences` 로 유형별 이메일 On/Off, `push_subscriptions` 로
    푸시 구독 관리
 3. **배치 발송 / 중복 방지 창**: **미구현** (초기 설계안의 "5분 간격 배치", "5분 내 중복 방지" 는
-   구현되지 않았다)
-4. **재시도**: **미구현.** 발송 실패는 로그로만 남는다. 큐도 outbox 도 Dead Letter Queue 도 없다.
-5. **발송 이력**: `Notification` 테이블과 `NotificationStatus`(PENDING/SENT/FAILED) ENUM 은
-   스키마에 존재한다. 다만 위 리스너 경로는 이 테이블에 레코드를 쓰지 않으므로,
-   **발송 이력이 자동으로 축적되지는 않는다** — 개선 대상이다.
+   구현되지 않았다). 디스패처의 배치는 처리량 조절용이며 알림을 묶어 보내지 않는다.
+4. **재시도**: **이메일은 구현되어 있다.** 지수 백오프(1·5·15·60분)로 최대 5회 재시도하고
+   상한 도달 시 `FAILED` dead-letter 로 고정한다(`src/services/notification-outbox.ts`).
+   **웹 푸시는 재시도하지 않는다** — best-effort 채널이며 만료 구독(410/404)만 정리한다.
+5. **발송 이력**: 이메일은 `Notification` 테이블에 `PENDING → SENT | FAILED` 로 축적된다.
+   실패 사유는 `failReason`, 시도 횟수는 `attempts` 에 남는다.
+   **웹 푸시는 이 테이블에 기록되지 않는다** — 푸시 발송 이력은 여전히 남지 않는다.
 
 ### 이메일 템플릿
 
@@ -1147,28 +1184,31 @@ SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted`
 
 ## 백그라운드 작업 전략
 
-> **⚠️ 이 절은 전면 정정되었다(2026-07-30).**
+> **⚠️ 이 절은 전면 정정되었다(2026-07-30, 2026-08-15 재정정).**
 > 1.3 은 Inngest 기반 Cron 작업 5종(일일 리포트, 만료 알림, 파일 정리, 이메일 재시도,
 > 데이터 동기화)과 3회 재시도 · Dead Letter Queue · Sentry 에러 보고를 규정했다.
-> **Inngest 는 채택되지 않았고, 열거된 작업과 재시도 기반 중 구현된 것은 하나도 없다.**
-> 아래가 실제 상태다.
+> **Inngest 는 채택되지 않았다.** 다만 그중 **이메일 재시도와 Dead Letter Queue 는
+> 2026-08-02 에 DB 아웃박스로 자체 구현**되었다(Inngest 없이). 나머지 Cron 작업 4종과
+> Sentry 보고는 여전히 미구현이다. 아래가 실제 상태다.
 
 ### `backgroundTask` 선택 이유 (실제 채택)
 
 - **의존성 0**: 외부 SaaS·Redis·별도 워커 프로세스가 필요하지 않다
 - **상시 구동 서버라 성립**: 컨테이너가 항상 살아 있으므로 응답 후에도 프로미스가 완주한다
   (서버리스에서 함수가 동결되어 fire-and-forget 이 유실되는 문제가 없다)
-- **감수하는 단점**: 영속성·재시도·스케줄링·백프레셔가 전부 없다
+- **감수하는 단점**: 스케줄링·백프레셔가 없다. 영속성·재시도는 이메일에 한해
+  아웃박스로 보완했고, 웹 푸시는 여전히 감수 대상이다.
 
 ### 실제 백그라운드 실행 경로
 
-| 작업               | 트리거                         | 실행 방식                                 | 재시도    |
-| ------------------ | ------------------------------ | ----------------------------------------- | --------- |
-| 이메일 발송        | 도메인 이벤트(`sr:created` 등) | `backgroundTask` (응답 후, 같은 프로세스) | **없음**  |
-| 웹 푸시 발송       | 동일                           | `backgroundTask`                          | **없음**  |
-| 실시간 이벤트 발행 | 트랜잭션 커밋 후               | `EventEmitter` → SSE 스트림               | 해당 없음 |
+| 작업               | 트리거                         | 실행 방식                                       | 재시도                     |
+| ------------------ | ------------------------------ | ----------------------------------------------- | -------------------------- |
+| 이메일 발송        | 도메인 이벤트(`sr:created` 등) | 트랜잭션 내 아웃박스 적재 → 디스패처 폴링(30초) | **최대 5회, 1·5·15·60분**  |
+| 웹 푸시 발송       | 동일                           | `backgroundTask` (응답 후, 같은 프로세스)       | **없음**                   |
+| 실시간 이벤트 발행 | 트랜잭션 커밋 후               | `EventEmitter` → SSE 스트림                     | 해당 없음                  |
 
-앱 내부에 스케줄러(Cron)는 없다. 정기 작업은 GitHub Actions 에만 존재한다:
+앱 내부의 유일한 주기 실행은 아웃박스 디스패처(30초 간격)이며, 시간 기반 스케줄러(Cron)는 없다.
+정기 작업은 GitHub Actions 에만 존재한다:
 
 | 워크플로               | 스케줄                         | 내용                                       |
 | ---------------------- | ------------------------------ | ------------------------------------------ |
@@ -1176,12 +1216,16 @@ SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted`
 | `scheduled-checks.yml` | `0 0 * * *` (UTC)              | 의존성 점검, 번들 분석, 성능 벤치마크      |
 | `prewarm.yml`          | 수동(`workflow_dispatch`)      | 대시보드 캐시 워밍                         |
 
-### 재시도 전략 (현재 없음)
+### 재시도 전략
 
-1. **자동 재시도**: 없다. 실패는 `logger.error` 로만 남는다.
-2. **에러 핸들링**: 로그 출력뿐이다. 외부 에러 추적기로 보고하지 않는다
+1. **자동 재시도(이메일)**: 아웃박스 디스패처가 지수 백오프(1·5·15·60분)로 최대 5회 재시도한다.
+   상한과 간격의 정본은 `src/services/notification-outbox.ts` 의 `MAX_ATTEMPTS`·`BACKOFF_MINUTES`
+   상수이며 이 문서는 숫자를 복제하지 않는다.
+2. **자동 재시도(웹 푸시·그 외 `backgroundTask`)**: 없다. 실패는 `logger.error` 로만 남는다.
+3. **에러 핸들링**: 로그 출력뿐이다. 외부 에러 추적기로 보고하지 않는다
    (Sentry 미사용 결정 — 「관측성」 절 참조).
-3. **Dead Letter Queue**: 없다.
+4. **Dead Letter Queue**: 이메일은 `notifications.status = 'FAILED'` + `failReason` 이 DLQ 역할을 한다.
+   웹 푸시에는 없다.
 
 > **개선 방향(미구현)**: 알림 신뢰성이 필요하면 DB 기반 outbox 테이블(`Notification` 을
 > PENDING → SENT/FAILED 로 실제 전이시키는 방식) + 폴링 워커가 현재 인프라에 가장 잘 맞는다.

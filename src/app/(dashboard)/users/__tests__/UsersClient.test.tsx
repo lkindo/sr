@@ -29,7 +29,14 @@ const push = vi.fn();
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 vi.mock('@/lib/logger', () => ({
-  logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
+  logger: {
+    logError: vi.fn(),
+    logRequest: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 vi.mock('next-auth/react', () => ({ useSession: () => ({ data: null, update: vi.fn() }) }));
 vi.mock('@/hooks/use-permissions', () => ({

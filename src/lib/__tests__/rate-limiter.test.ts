@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getClientIdentifier, MemoryRateLimiter, RateLimitPresets } from '../rate-limiter';
+import {
+  getClientIdentifier,
+  MemoryRateLimiter,
+  RateLimitPresets,
+  resolveRateLimitKeys,
+} from '../rate-limiter';
 
 describe('MemoryRateLimiter', () => {
   let rateLimiter: MemoryRateLimiter;
@@ -261,5 +266,91 @@ describe('getClientIdentifier', () => {
 
     const ip = getClientIdentifier(request);
     expect(ip).toBe('unknown');
+  });
+});
+
+/**
+ * 감사 D-1 회귀 방어.
+ *
+ * 세션 쿠키 값은 서명 검증 없이 버킷 키가 된다 — 즉 클라이언트가 키를 갈아 끼울 수 있다.
+ * 이 스위트는 ① 읽지 않는 레거시 쿠키 이름이 키 재료가 되지 않고 ② 세션 키에는 반드시
+ * IP 천장이 함께 붙는다는 두 가지를 고정한다. 둘 중 하나라도 풀리면 유효 계정 하나로
+ * 전 제한을 무한 우회할 수 있다.
+ */
+describe('resolveRateLimitKeys — 쿠키 위조 방어', () => {
+  const withCookie = (cookie: string, ip = '5.6.7.8') =>
+    new Request('http://localhost', { headers: { cookie, 'x-real-ip': ip } });
+
+  it('세션이 없으면 IP 로만 키잉하고 천장을 두지 않는다', () => {
+    const keys = resolveRateLimitKeys(
+      new Request('http://localhost', {
+        headers: { 'x-real-ip': '5.6.7.8' },
+      })
+    );
+
+    expect(keys.primary).toBe('5.6.7.8');
+    // 주 버킷이 곧 IP 버킷이므로 중복 검사하지 않는다.
+    expect(keys.ceiling).toBeNull();
+  });
+
+  it('Auth.js v5 세션 쿠키는 세션 키 + IP 천장을 함께 만든다', () => {
+    const keys = resolveRateLimitKeys(withCookie('__Secure-authjs.session-token=real-token'));
+
+    expect(keys.primary).toMatch(/^s:/);
+    expect(keys.ceiling).not.toBeNull();
+    expect(keys.ceiling!.key).toBe('ip:5.6.7.8');
+    expect(keys.ceiling!.multiplier).toBeGreaterThan(1);
+  });
+
+  it('v5 가 읽지 않는 레거시 v4 쿠키 이름은 키 재료가 되지 않는다', () => {
+    // 이것이 실제 익스플로잇이었다: v4 이름을 **앞에** 끼워 넣으면 파서가 그 난수를
+    // 먼저 만나 키로 썼고, Auth.js v5 는 그 이름을 읽지 않으므로 인증은 그대로 성립했다.
+    // 결과적으로 인증된 사용자가 요청마다 새 버킷을 얻었다.
+    const forged = resolveRateLimitKeys(
+      withCookie('next-auth.session-token=RANDOM-1; __Secure-authjs.session-token=real-token')
+    );
+    const clean = resolveRateLimitKeys(withCookie('__Secure-authjs.session-token=real-token'));
+
+    // 위조 쿠키를 앞에 붙여도 키가 달라지지 않는다.
+    expect(forged.primary).toBe(clean.primary);
+  });
+
+  it('레거시 쿠키만 있으면 세션으로 인정하지 않는다 (IP 키로 떨어진다)', () => {
+    const keys = resolveRateLimitKeys(withCookie('next-auth.session-token=RANDOM-2'));
+
+    expect(keys.primary).toBe('5.6.7.8');
+    expect(keys.ceiling).toBeNull();
+  });
+
+  it('세션 값이 바뀌면 주 키는 달라지지만 IP 천장은 같다', () => {
+    const a = resolveRateLimitKeys(withCookie('authjs.session-token=aaa'));
+    const b = resolveRateLimitKeys(withCookie('authjs.session-token=bbb'));
+
+    expect(a.primary).not.toBe(b.primary);
+    // 키를 회전시켜도 이 천장이 같으므로 무한 우회가 되지 않는다.
+    expect(a.ceiling!.key).toBe(b.ceiling!.key);
+  });
+});
+
+describe('MemoryRateLimiter — 배수 한도', () => {
+  it('배수를 주면 한도가 그만큼 커진다', async () => {
+    const limiter = new MemoryRateLimiter({ windowMs: 60_000, maxRequests: 2 });
+
+    const first = await limiter.check('ip:1.1.1.1', 3);
+    expect(first.limit).toBe(6);
+
+    // 2회가 아니라 6회까지 허용된다.
+    for (let i = 0; i < 5; i++) await limiter.check('ip:1.1.1.1', 3);
+    const overflow = await limiter.check('ip:1.1.1.1', 3);
+    expect(overflow.allowed).toBe(false);
+  });
+
+  it('배수가 1 미만이어도 한도를 0 으로 만들지 않는다', async () => {
+    // 잘못된 환경변수가 모든 요청을 거부하는 장애를 만들지 않아야 한다.
+    const limiter = new MemoryRateLimiter({ windowMs: 60_000, maxRequests: 5 });
+
+    const result = await limiter.check('ip:2.2.2.2', 0);
+    expect(result.limit).toBe(5);
+    expect(result.allowed).toBe(true);
   });
 });

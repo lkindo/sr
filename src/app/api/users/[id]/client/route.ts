@@ -5,7 +5,9 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
 import { INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { clientAssignSchema } from '@/lib/schemas';
+import { auditService } from '@/services/audit.service';
 
 /**
  * 고객사 할당/변경 요청 바디 스키마
@@ -73,8 +75,19 @@ export const DELETE = withAuthAndRateLimit(
       );
     }
 
-    await prisma.userClient.delete({
-      where: { id: existingRelation.id },
+    // 소속 해제는 그 사용자가 볼 수 있는 데이터 범위를 바꾸는 민감 행위다.
+    // 헌법 §1.2 는 이런 행위를 감사 로그로 영구 저장하라고 규정하는데, 이 경로만
+    // 빠져 있었다(감사 D-16) — 형제 경로인 `approve` 는 처음부터 남기고 있었다.
+    // 삭제와 로그를 같은 트랜잭션에 묶어 "바뀌었는데 기록이 없는" 상태를 막는다.
+    await prisma.$transaction(async (tx) => {
+      await tx.userClient.delete({ where: { id: existingRelation.id } });
+      await auditService.createLog(tx, {
+        userId: session.user.id,
+        actionType: 'DELETE',
+        targetEntity: 'UserClient',
+        targetId: existingRelation.id,
+        changes: { userId, clientId: existingRelation.clientId },
+      });
     });
 
     return NextResponse.json({
@@ -142,6 +155,7 @@ export const PATCH = withAuthAndRateLimit(
     // 진행 중인 SR 확인 (요청자, 담당자, 접수자로 참여 중인 SR)
     const ongoingSRs = await prisma.sR.findMany({
       where: {
+        ...SR_ALIVE,
         OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
         status: {
           in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'],
@@ -190,22 +204,39 @@ export const PATCH = withAuthAndRateLimit(
       );
     }
 
-    // UserClient 관계 업데이트 또는 생성
-    if (existingRelation) {
-      // 이미 다른 고객사에 소속되어 있으면 업데이트
-      await prisma.userClient.update({
-        where: { id: existingRelation.id },
-        data: { clientId },
-      });
-    } else {
-      // 소속이 없으면 새로 생성
-      await prisma.userClient.create({
-        data: {
-          userId,
-          clientId,
-        },
-      });
-    }
+    // UserClient 관계 업데이트 또는 생성 — 감사 로그와 같은 트랜잭션에서 수행한다.
+    // 소속 변경은 데이터 접근 범위를 바꾸므로 "누가 언제 어디서 어디로" 가 남아야 한다.
+    await prisma.$transaction(async (tx) => {
+      if (existingRelation) {
+        // 이미 다른 고객사에 소속되어 있으면 업데이트
+        await tx.userClient.update({
+          where: { id: existingRelation.id },
+          data: { clientId },
+        });
+        await auditService.createLog(tx, {
+          userId: session.user.id,
+          actionType: 'UPDATE',
+          targetEntity: 'UserClient',
+          targetId: existingRelation.id,
+          changes: { userId, before: existingRelation.clientId, after: clientId },
+        });
+      } else {
+        // 소속이 없으면 새로 생성
+        const created = await tx.userClient.create({
+          data: {
+            userId,
+            clientId,
+          },
+        });
+        await auditService.createLog(tx, {
+          userId: session.user.id,
+          actionType: 'CREATE',
+          targetEntity: 'UserClient',
+          targetId: created.id,
+          changes: { userId, before: null, after: clientId },
+        });
+      }
+    });
 
     return NextResponse.json({
       success: true,

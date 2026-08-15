@@ -6,7 +6,7 @@ import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
 import { ensureCanCreateClient, ensureCanReadClient, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { clientCreateSchema } from '@/lib/schemas';
+import { clientCreateSchema, clientListQuerySchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -22,10 +22,11 @@ export const GET = withAuthAndRateLimit(
 
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.clients);
-
-    const search = searchParams.get('search');
-    const industry = searchParams.get('industry');
-    const isActive = searchParams.get('isActive');
+    const { search, industry, isActive } = clientListQuerySchema.parse({
+      search: searchParams.get('search'),
+      industry: searchParams.get('industry'),
+      isActive: searchParams.get('isActive'),
+    });
 
     const where: Prisma.ClientWhereInput = {};
 

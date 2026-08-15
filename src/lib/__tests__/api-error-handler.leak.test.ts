@@ -19,7 +19,7 @@ vi.mock('next/server', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { logError: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { logRequest: vi.fn(), logError: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 type HandledResponse = { data: { error: string; code: string }; status: number };
@@ -117,6 +117,26 @@ describe('Prisma 오류 매핑', () => {
     const response = handle(prismaError('P2003'));
 
     expect(response.status).toBe(400);
+  });
+
+  /**
+   * `src/lib/schemas.ts` 머리말이 경고한 경로다 — zod 상한이 컬럼 폭보다 크면(또는 없으면)
+   * 검증은 통과하고 DB 가 거부해 **원인을 알 수 없는 500** 이 된다.
+   * 상한을 빠뜨린 필드가 남아 있어도 4xx 로 드러나게 하는 안전망이므로 여기서 고정한다.
+   */
+  it('P2000(값이 컬럼 폭 초과)을 400 으로 매핑한다', () => {
+    const response = handle(prismaError('P2000'));
+
+    expect(response.status).toBe(400);
+  });
+
+  it('P2000 응답에 컬럼·모델명이 새지 않는다', () => {
+    // Prisma 원문은 `The provided value for the column is too long for the column's type.
+    // Column: name` 처럼 컬럼명을 담는다. 그대로 전달하면 스키마가 노출된다.
+    const response = handle(prismaError('P2000', { column_name: 'name' }));
+
+    expect(JSON.stringify(response.data)).not.toContain('name');
+    expect(JSON.stringify(response.data)).not.toContain('column');
   });
 
   it('P2014(필수 관계 위반)를 409 로 매핑한다', () => {

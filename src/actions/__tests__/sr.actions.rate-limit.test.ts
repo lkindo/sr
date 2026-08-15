@@ -105,19 +105,31 @@ describe('deleteSRAction — strict 레이트리밋', () => {
   });
 });
 
-describe('update 와 delete 가 같은 버킷을 공유한다', () => {
-  it('두 액션을 섞어 호출해도 합산 한도가 적용된다', async () => {
+/**
+ * 감사 D-15 — 액션별 버킷과 IP 천장의 2층 구조.
+ *
+ * 예전에는 모든 서버 액션이 `strict` 버킷 **하나**를 IP 로만 키잉해 공유했다.
+ * 그래서 ① NAT 뒤 사무실 전체가 분당 5회를 나눠 쓰고 ② SR 등록을 몇 번 하면
+ * 삭제·수정까지 함께 잠겼다. 반대로 버킷을 액션별로 나누기만 하면 실효 한도가
+ * 액션 수만큼 곱해진다.
+ *
+ * 그래서 두 층으로 둔다:
+ *   - 주 버킷(액션 × 주체): 정상 업무가 서로를 막지 않는다.
+ *   - IP 천장(전 액션 공유): 한 발신지의 총량은 여전히 유한하다.
+ */
+describe('액션별 버킷 분리', () => {
+  it('한 액션의 한도 소진이 다른 액션을 잠그지 않는다', async () => {
     const form = new FormData();
     form.set('title', '제목을 수정합니다');
 
+    // update 를 한도까지 소진시킨다.
     for (let i = 0; i < STRICT_LIMIT; i++) {
-      // 액션을 번갈아 호출한다 — 액션별로 버킷이 갈리면 실효 한도가 2배가 된다.
-      const result =
-        i % 2 === 0 ? await updateSRAction('sr-1', form) : await deleteSRAction('sr-1');
-      expect(result.success).toBe(true);
+      expect((await updateSRAction('sr-1', form)).success).toBe(true);
     }
+    expect((await updateSRAction('sr-1', form)).success).toBe(false);
 
-    const overflow = await updateSRAction('sr-1', form);
-    expect(overflow.success).toBe(false);
+    // delete 는 자기 버킷을 갖고 있으므로 여전히 통과해야 한다.
+    // (예전에는 여기서 429 가 났다 — 수정 몇 번에 삭제까지 막혔다는 뜻이다.)
+    expect((await deleteSRAction('sr-1')).success).toBe(true);
   });
 });

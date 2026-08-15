@@ -10,9 +10,11 @@ import {
 } from '@/lib/file-validator';
 import { ensureCanAttachToSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
+import { singleAttachmentUploadSchema } from '@/lib/upload-schemas';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -25,12 +27,10 @@ export const POST = withAuthAndRateLimit(
     assertUploadSizeWithinLimit(request);
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const srId = formData.get('srId') as string;
-
-    if (!file || !srId) {
-      throw new BadRequestError('파일과 SR ID가 필요합니다.');
-    }
+    const { file, srId } = singleAttachmentUploadSchema.parse({
+      file: formData.get('file'),
+      srId: formData.get('srId'),
+    });
 
     // 파일 크기 검증
     if (file.size > MAX_UPLOAD_FILE_SIZE) {
@@ -42,7 +42,7 @@ export const POST = withAuthAndRateLimit(
     // SR 존재 + 쓰기 권한 체크 (IDOR 방지 — 임의 SR 에 첨부 금지)
     // 업로드는 쓰기이므로 읽기 권한이 아니라 수정 권한으로 게이트한다(감사 4.1).
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
       select: { id: true, clientId: true, requesterId: true, assigneeId: true, status: true },
     });
 

@@ -52,6 +52,9 @@ export async function enqueueSRStatusChangedEmail(
     requesterId: string | null | undefined;
     previousStatus: string | null;
     currentStatus: string;
+    /** 완료 내용(COMPLETED) 또는 거절 사유(REJECTED). 본문에 실어 보낸다. */
+    resolutionDescription?: string | null;
+    rejectionReason?: string | null;
   }
 ): Promise<number> {
   if (!payload.requesterId) return 0;
@@ -59,8 +62,31 @@ export async function enqueueSRStatusChangedEmail(
     where: { id: payload.requesterId },
     select: { email: true, notificationPreference: true },
   });
-  const enabled = requester?.notificationPreference?.emailSRStatusChanged ?? false;
-  if (!requester?.email || !enabled) return 0;
+  if (!requester?.email) return 0;
+
+  // 헌법 §4: 완료·거절은 **필수 알림**이다. 신청자가 처리 결과를 통보받지 못하는 상태를
+  // 시스템 기본값으로 두어서는 안 된다.
+  //
+  // 예전에는 모든 상태 전이가 `emailSRStatusChanged` 하나로 묶여 있었고 그 기본값이
+  // false 였다. 설정 화면을 한 번도 열지 않은 사용자 — 즉 사실상 전원 — 에게
+  // 완료/거절 메일이 **한 통도 나가지 않았다.** 아웃박스·재시도·dead-letter 를 갖춰 놓고
+  // 게이트 한 줄에 막혀 있던 셈이다.
+  //
+  // 나머지 전이(접수·진행중·보류·확인완료)는 정보성이므로 사용자 설정을 존중한다.
+  const MANDATORY_STATUSES = new Set(['COMPLETED', 'REJECTED']);
+  const isMandatory = MANDATORY_STATUSES.has(payload.currentStatus);
+
+  if (!isMandatory) {
+    const enabled = requester.notificationPreference?.emailSRStatusChanged ?? false;
+    if (!enabled) return 0;
+  }
+
+  const detail =
+    payload.currentStatus === 'COMPLETED' && payload.resolutionDescription
+      ? { label: '완료 내용', body: payload.resolutionDescription }
+      : payload.currentStatus === 'REJECTED' && payload.rejectionReason
+        ? { label: '거절 사유', body: payload.rejectionReason }
+        : null;
 
   return enqueueEmails(
     [
@@ -71,7 +97,8 @@ export async function enqueueSRStatusChangedEmail(
           payload.title,
           payload.previousStatus ?? '없음',
           payload.currentStatus,
-          getSRUrl(payload.srId)
+          getSRUrl(payload.srId),
+          detail
         ),
         metadata: { srId: payload.srId, kind: 'sr-status-changed' },
       },

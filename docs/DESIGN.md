@@ -340,6 +340,32 @@ components:
     padding: 64px 32px
 ---
 
+## 이 문서의 적용 범위 (2026-08-15)
+
+> **이 문서는 Framer 마케팅 사이트를 분석한 원본이다.** SR 관리 앱의 화면 명세가 아니다.
+>
+> 그럼에도 **디자인 토큰의 정본은 이 문서다**(fe-rules §3). 앱이 실제로 채택한 것은
+> 아래 범위이며, 구현 진입점은 `src/app/globals.css` 의 CSS 변수와 `tailwind.config.ts` 다.
+>
+> **채택한 것**
+> - `colors` 팔레트 — 특히 canvas `#090909`, ink `#ffffff` (다크 캔버스 체계)
+> - `rounded` · `spacing` · `typography` 스케일
+> - `status-badge` · `text-input` 계열 토큰
+>
+> **채택하지 않은 것 (마케팅 사이트 전용 어휘)**
+> - `pricing-*`, `template-card`, `product-mockup-tile`
+> - `feature-row`, `comparison-row`, `faq-row`
+> - `top-nav`, `footer`
+>
+> **주의할 불일치**
+> - 원본은 "모든 CTA 는 흰색 pill" 이라고 규정하지만, 이 앱의 버튼은 `rounded-[8px]` 다
+>   (`src/components/ui/button.tsx`). pill 은 마케팅 사이트 어휘이며 SR 화면에 적용하지 않는다.
+> - 원본이 지정하는 `GT Walsheim` 등 웹폰트는 **이 앱에 하나도 로드되어 있지 않다**
+>   (`src/app/layout.tsx` 에 next/font 선언이 없고 `tailwind.config.ts` 에 fontFamily 확장이 없다).
+>   따라서 타이포그래피는 크기·행간·자간 **스케일만** 참조 대상이다.
+> - `gradient-spotlight` 변형은 이 문서가 3종, `globals.css` 가 2종을 정의하고 실사용은 0건이다.
+
+
 ## Overview
 
 Framer's marketing canvas is a near-pure black artboard. The dominant surface is `{colors.canvas}` — almost pure black with a faint warmth — and on top of it sits oversized white display type set in **GT Walsheim Medium** with letter-spacing pulled to extreme negative values (-5.5px on the 110px display, -4.25px on the 85px hero). The page reads like a poster: one assertive statement per band, generous breathing room above and below.

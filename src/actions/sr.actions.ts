@@ -20,7 +20,8 @@ import { SRCreateResult, SRDetails, SRUpdateResult } from '@/types/sr.types';
 
 export async function createSRAction(formData: FormData): Promise<Result<SRCreateResult>> {
   try {
-    await requireRateLimit('strict');
+    // 액션별 네임스페이스를 준다 — 한 액션의 폭주가 나머지를 잠그지 않는다(감사 D-15).
+    await requireRateLimit('strict', 'sr-create');
     const payload = buildSRCreateInput(formData);
     const validationResult = validateWithSchema(payload, srCreateSchema);
     if (!validationResult.success) {
@@ -49,7 +50,7 @@ export async function updateSRAction(
     // 서버 액션은 유효 세션 + `Next-Action` 헤더만으로 도달 가능한 공개 POST 이므로,
     // 여기에 제한이 없으면 액션 경로로 그 한도를 그대로 우회할 수 있었다.
     // 담당자 변경마다 대상에게 이메일 + 푸시가 발화하므로 무제한 알림 폭주가 가능했다.
-    await requireRateLimit('strict');
+    await requireRateLimit('strict', 'sr-update');
 
     const processedData = buildSRUpdateInput(formData);
     const validationResult = validateWithSchema(processedData, srPatchSchema);
@@ -74,7 +75,7 @@ export async function updateSRAction(
 export async function deleteSRAction(id: string): Promise<Result<void>> {
   try {
     // REST 트윈과 동일하게 strict. 삭제는 되돌릴 수 없으므로 더욱 그렇다(감사 4.3).
-    await requireRateLimit('strict');
+    await requireRateLimit('strict', 'sr-delete');
 
     // SR 삭제 권한 체크는 서비스 레이어에서 처리
     const session = await getAuthenticatedSession();

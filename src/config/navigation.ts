@@ -145,6 +145,19 @@ export const NAVIGATION_CONFIG: TopNavItem[] = [
           },
         ],
       },
+      {
+        title: '운영',
+        items: [
+          {
+            // 발송 실패한 알림을 확인하고 되살리는 화면(헌법 §4.1).
+            // 아웃박스는 실패를 DB 에 남기지만, 보여 주는 곳이 없으면 아무도 확인하지 않는다.
+            title: '알림 발송 이력',
+            href: '/settings/outbox',
+            icon: Bell,
+            role: 'ADMIN',
+          },
+        ],
+      },
       /*
       {
         title: '일반 설정',

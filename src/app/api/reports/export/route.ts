@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { priorityLabels, statusLabelOf } from '@/lib/constants/sr';
 import { logger } from '@/lib/logger';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { formatAppZoneDate, formatISODateInAppZone } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
 
@@ -86,7 +87,9 @@ export const GET = withAuthAndRateLimit(
 
     // 데이터 격리: ENGINEER 는 자신에게 배정된 SR 만 내보낼 수 있다(canReadSR 정책과 일치).
     // ADMIN/MANAGER 는 전체 조회 가능.
-    const where: Prisma.SRWhereInput = isAdminOrManager ? {} : { assigneeId: session.user.id };
+    const where: Prisma.SRWhereInput = isAdminOrManager
+      ? { ...SR_ALIVE }
+      : { ...SR_ALIVE, assigneeId: session.user.id };
 
     const encoder = new TextEncoder();
     const userId = session.user.id;

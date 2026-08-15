@@ -4,10 +4,7 @@ import { logger } from '@/lib/logger';
 import { backgroundTask, backgroundTasks } from '@/lib/wait-until';
 
 vi.mock('@/lib/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    error: vi.fn(),
-  },
+  logger: { logError: vi.fn(), logRequest: vi.fn(), info: vi.fn(), error: vi.fn() },
 }));
 
 describe('wait-until', () => {

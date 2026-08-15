@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { auth } from '@/auth';
 import { parseJsonBody } from '@/lib/api-helpers';
-import { logger } from '@/lib/logger';
+import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { pushService } from '@/services/push.service';
+
+/**
+ * 감사 D-11: 예전에는 `auth()` 를 직접 부르고 광역 try/catch 로 모든 오류를 500 으로
+ * 뭉갰다 — `parseJsonBody` 의 `BadRequestError`(400)까지 500 이 됐다.
+ * 래퍼를 경유하지 않아 레이트리밋과 성능 계측(be-rules §1)도 빠져 있었다.
+ */
 
 const preferencesSchema = z.object({
   emailSRCreated: z.boolean().optional(),
@@ -20,50 +25,26 @@ const preferencesSchema = z.object({
 /**
  * GET /api/settings/notifications - Get notification preferences
  */
-export async function GET() {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
-    }
-
+export const GET = withAuthAndRateLimit(
+  async (_request: NextRequest, { session }) => {
     const preferences = await pushService.getOrCreatePreferences(session.user.id);
-
     return NextResponse.json(preferences);
-  } catch (error) {
-    logger.error('알림 설정 조회 오류', error instanceof Error ? error : undefined);
-    return NextResponse.json({ error: '알림 설정 조회에 실패했습니다.' }, { status: 500 });
-  }
-}
+  },
+  { preset: 'relaxed' }
+);
 
 /**
  * PUT /api/settings/notifications - Update notification preferences
  */
-export async function PUT(request: NextRequest) {
-  try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
-    }
+export const PUT = withAuthAndRateLimit(async (request: NextRequest, { session }) => {
+  const body = await parseJsonBody(request);
+  // ZodError 는 handleApiError 가 400 으로 매핑한다.
+  const validated = preferencesSchema.parse(body);
 
-    const body = await parseJsonBody(request);
-    const result = preferencesSchema.safeParse(body);
+  const preferences = await pushService.updatePreferences(session.user.id, validated);
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: '잘못된 설정 데이터입니다.', details: result.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const preferences = await pushService.updatePreferences(session.user.id, result.data);
-
-    return NextResponse.json({
-      message: '알림 설정이 저장되었습니다.',
-      preferences,
-    });
-  } catch (error) {
-    logger.error('알림 설정 변경 오류', error instanceof Error ? error : undefined);
-    return NextResponse.json({ error: '알림 설정 저장에 실패했습니다.' }, { status: 500 });
-  }
-}
+  return NextResponse.json({
+    message: '알림 설정이 저장되었습니다.',
+    preferences,
+  });
+});

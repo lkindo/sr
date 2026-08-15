@@ -6,7 +6,7 @@ const { mockGetAllUsers, mockCreateUser, mockHandleApiError } = vi.hoisted(() =>
   mockGetAllUsers: vi.fn(),
   mockCreateUser: vi.fn(),
   mockHandleApiError: vi.fn((error) => {
-    const status = error.statusCode || 500;
+    const status = error?.name === 'ZodError' ? 400 : error.statusCode || 500;
     return NextResponse.json({ error: error.message || 'Error' }, { status });
   }),
 }));
@@ -56,12 +56,48 @@ describe('API Route: /api/users (Integration)', () => {
       mockGetAllUsers.mockResolvedValue(mockData);
 
       const req = new NextRequest('http://localhost/api/users?page=1&pageSize=10');
-      const res = await GET(req, { params: Promise.resolve({}) } as any);
+      const res = await GET(req, { params: Promise.resolve({}) } as never);
 
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.data).toEqual(mockData.data);
       expect(data.meta.totalItems).toBe(1);
+    });
+
+    it('지원하지 않는 활성 상태 필터는 400으로 거부한다', async () => {
+      const req = new NextRequest('http://localhost/api/users?isActive=yes');
+
+      const res = await GET(req, { params: Promise.resolve({}) } as never);
+
+      expect(res.status).toBe(400);
+      expect(mockGetAllUsers).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['userType', 'ADMIN'],
+      ['search', 'a'.repeat(256)],
+      ['roleId', 'r'.repeat(31)],
+      ['role', 'r'.repeat(51)],
+      ['clientId', 'c'.repeat(31)],
+    ])('%s 필터의 허용 범위를 벗어나면 400으로 거부한다', async (key, value) => {
+      const req = new NextRequest(`http://localhost/api/users?${key}=${encodeURIComponent(value)}`);
+
+      const res = await GET(req, { params: Promise.resolve({}) } as never);
+
+      expect(res.status).toBe(400);
+      expect(mockGetAllUsers).not.toHaveBeenCalled();
+    });
+
+    it('UI의 all 필터 값은 유효한 계약으로 유지한다', async () => {
+      mockGetAllUsers.mockResolvedValue({ data: [], total: 0 });
+      const req = new NextRequest(
+        'http://localhost/api/users?isActive=all&userType=all&roleId=all&clientId=all'
+      );
+
+      const res = await GET(req, { params: Promise.resolve({}) } as never);
+
+      expect(res.status).toBe(200);
+      expect(mockGetAllUsers).toHaveBeenCalledTimes(1);
     });
   });
 

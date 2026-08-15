@@ -9,7 +9,14 @@ import { UserDialog } from '../UserDialog';
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  logger: {
+    logError: vi.fn(),
+    logRequest: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 /**
@@ -183,6 +190,18 @@ describe('UserDialog — 고객사 목록 조회', () => {
     onSaved: vi.fn(),
   };
 
+  /**
+   * 고객사 선택 UI 는 **CLIENT 유형에서만** 렌더된다.
+   *
+   * 기본 유형은 ENGINEER 인데, 예전에는 ENGINEER 에게도 "할당 고객사" 다중 선택이
+   * 있어서 이 문구들이 기본 상태에서 보였다. 헌법 §1.3(시스템 역할과 고객사 소속의
+   * 배타성)을 서버가 강제하게 되면서 그 입력은 누르면 반드시 실패하는 죽은 UI 가 되어
+   * 제거했다(감사 D-12). 그래서 목록 조회 계약을 보려면 유형을 CLIENT 로 바꿔야 한다.
+   */
+  const switchToClientType = () => {
+    fireEvent.change(screen.getAllByTestId('select')[0]!, { target: { value: 'CLIENT' } });
+  };
+
   it('clients prop 이 있으면 조회하지 않는다', () => {
     renderDialog(<UserDialog {...baseProps} />);
 
@@ -193,6 +212,7 @@ describe('UserDialog — 고객사 목록 조회', () => {
   it('clients prop 이 없으면 목록을 부르고 그동안 로딩을 보여준다', async () => {
     stubFetch(() => jsonResponse(CLIENTS));
     renderDialog(<UserDialog {...propsWithoutClients} />);
+    switchToClientType();
 
     expect(screen.getByText(LOADING)).toBeInTheDocument();
 
@@ -218,6 +238,7 @@ describe('UserDialog — 고객사 목록 조회', () => {
       })
     );
     renderDialog(<UserDialog {...propsWithoutClients} />);
+    switchToClientType();
 
     await waitFor(() => expect(screen.getByText('테스트 고객사 B (C002)')).toBeInTheDocument());
   });
@@ -226,6 +247,7 @@ describe('UserDialog — 고객사 목록 조회', () => {
   it('조회에 실패하면 토스트를 띄우고 빈 목록 안내로 넘어간다', async () => {
     stubFetch(() => jsonResponse({ error: '권한이 없습니다.' }, 403));
     renderDialog(<UserDialog {...propsWithoutClients} />);
+    switchToClientType();
 
     await waitFor(() => expect(screen.getByText(EMPTY)).toBeInTheDocument());
     expect(toast).toHaveBeenCalledWith(

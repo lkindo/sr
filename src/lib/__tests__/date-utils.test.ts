@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getDaysUntilDue, getDueDateStatus } from '@/lib/date-utils';
 import { formatISODateInAppZone } from '@/lib/timezone';
@@ -96,27 +96,60 @@ describe('date-utils', () => {
       });
     });
 
-    it('should return urgent status for D-Day', () => {
-      const today = new Date();
-      const status = getDueDateStatus(today.toISOString(), 'IN_PROGRESS');
-      expect(status).toEqual({
-        label: '오늘 마감',
-        variant: 'destructive',
-        isOverdue: false,
-        isUrgent: true,
-      });
+    /**
+     * 헌법 §3: **초과 판정은 달력일이 아니라 시각으로 한다.**
+     *
+     * 예전에는 달력일 차이(`daysUntil < 0`)로만 판정해서, 오늘 09:00 이 마감인 SR 이
+     * 18:00 에도 "오늘 마감 / isOverdue:false" 였다. 12시간짜리 SLA 에서는 위반 상태가
+     * 하루 종일 정상으로 보인다는 뜻이다.
+     */
+    it('마감 시각을 넘겼으면 같은 날이어도 초과로 판정한다', () => {
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      const status = getDueDateStatus(twoHoursAgo.toISOString(), 'IN_PROGRESS');
+
+      expect(status?.isOverdue).toBe(true);
+      expect(status?.label).toBe('2시간 지연');
+    });
+
+    it('24시간 미만 지연은 일이 아니라 시간으로 표기한다', () => {
+      const almostADayAgo = new Date(Date.now() - 23 * 60 * 60 * 1000);
+      const status = getDueDateStatus(almostADayAgo.toISOString(), 'IN_PROGRESS');
+
+      expect(status?.label).toBe('23시간 지연');
+      expect(status?.isOverdue).toBe(true);
+    });
+
+    it('마감이 24시간 안으로 들어오면 날짜가 아니라 시각을 보여 준다', () => {
+      // "오늘 마감"만으로는 아침 9시인지 밤 11시인지 알 수 없어 대응 순서를 정할 수 없다.
+      const inSixHours = new Date(Date.now() + 6 * 60 * 60 * 1000);
+      const status = getDueDateStatus(inSixHours.toISOString(), 'IN_PROGRESS');
+
+      expect(status?.label).toMatch(/^\d{2}:\d{2} 마감$/);
+      expect(status?.isOverdue).toBe(false);
+      expect(status?.isUrgent).toBe(true);
     });
 
     it('should return urgent status for D-1', () => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const status = getDueDateStatus(tomorrow.toISOString(), 'IN_PROGRESS');
-      expect(status).toEqual({
-        label: '내일 마감',
-        variant: 'destructive',
-        isOverdue: false,
-        isUrgent: true,
-      });
+      // "내일 마감"은 **달력상 내일이면서 24시간보다 먼** 좁은 창이다.
+      // (24시간 안쪽은 시각 표기로 떨어진다.) 지금 시각에 따라 그 창이 존재하기도
+      // 하고 아니기도 하므로 시스템 시각을 고정해 결정적으로 만든다.
+      vi.useFakeTimers();
+      try {
+        // 2026-03-10 01:00 KST 로 고정 → 내일 23:00 KST 는 46시간 뒤, 달력상 D-1.
+        vi.setSystemTime(new Date('2026-03-09T16:00:00Z'));
+        const tomorrowLate = new Date('2026-03-11T14:00:00Z'); // 2026-03-11 23:00 KST (달력상 내일)
+
+        const status = getDueDateStatus(tomorrowLate.toISOString(), 'IN_PROGRESS');
+
+        expect(status).toEqual({
+          label: '내일 마감',
+          variant: 'destructive',
+          isOverdue: false,
+          isUrgent: true,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should return D-2 as urgent', () => {

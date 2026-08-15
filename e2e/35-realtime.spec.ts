@@ -91,6 +91,17 @@ async function sessionUserId(request: APIRequestContext): Promise<string> {
 }
 
 /** 다른 페르소나 세션으로 상태를 전이시킨다. 트리거이자 전제이므로 응답을 단언한다. */
+/**
+ * 보류(hold)에 필요한 예상 해제일.
+ *
+ * 헌법 §2 가 "보류 사유 **와** 예상 해제일" 을 함께 요구하며 라우트가 이를 강제한다.
+ * 고정 날짜를 쓰면 그 날이 지난 뒤 시한폭탄이 되므로 실행 시점 기준 상대값으로 만든다.
+ */
+function holdReleaseDate(): string {
+  const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
 async function transitionAs(
   browser: Browser,
   persona: 'engineer' | 'client',
@@ -224,7 +235,11 @@ test.describe('실시간 갱신 (SSE)', () => {
     // 한 스트림의 전달 순서는 발행 순서와 같으므로, 세 번째 이벤트가 도착한 시점에는
     // 두 번째(본인 유발)가 전달될 예정이었다면 이미 도착해 있어야 한다.
     // 그래서 "아직 안 왔을 뿐" 과 "오지 않는다" 를 고정 대기 없이 구분할 수 있다.
-    await transitionAs(browser, 'engineer', sr.id, { action: 'hold', reason: 'E2E 보류 1' });
+    await transitionAs(browser, 'engineer', sr.id, {
+      action: 'hold',
+      reason: 'E2E 보류 1',
+      expectedHoldReleaseDate: holdReleaseDate(),
+    });
 
     const resumeResponse = await page.request.patch(`/api/srs/${sr.id}/status`, {
       data: { action: 'resume' },
@@ -234,7 +249,11 @@ test.describe('실시간 갱신 (SSE)', () => {
       `관찰자(ADMIN) 본인의 전이가 실패했습니다: ${await resumeResponse.text()}`
     ).toBe(200);
 
-    await transitionAs(browser, 'engineer', sr.id, { action: 'hold', reason: 'E2E 보류 2' });
+    await transitionAs(browser, 'engineer', sr.id, {
+      action: 'hold',
+      reason: 'E2E 보류 2',
+      expectedHoldReleaseDate: holdReleaseDate(),
+    });
 
     await expect
       .poll(async () => (await eventsForSR()).length, {

@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   txAttachmentUpdate: vi.fn(),
   txActivityCreateMany: vi.fn(),
   mkdir: vi.fn(),
+  uploadBlob: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -48,6 +49,7 @@ vi.mock('@/lib/serialization', () => ({
 
 vi.mock('@/lib/storage', () => ({
   deleteAttachmentBlob: mocks.deleteBlob,
+  uploadAttachmentBlob: mocks.uploadBlob,
   STORAGE_DIR: '/tmp/storage',
 }));
 
@@ -123,9 +125,70 @@ beforeEach(() => {
   mocks.txAttachmentUpdate.mockResolvedValue({});
   mocks.txActivityCreateMany.mockResolvedValue({ count: 2 });
   mocks.deleteBlob.mockResolvedValue(undefined);
+  // 실제 `uploadAttachmentBlob` 과 같은 규칙: SR 별 하위 디렉터리 + UUID 파일명.
+  let blobSeq = 0;
+  mocks.uploadBlob.mockImplementation(async (srId: string, file: File) => {
+    const pathname = `attachments/${srId}/uuid-${blobSeq++}-${file.name}`;
+    return { url: pathname, pathname, size: 1, type: 'text/plain' };
+  });
+});
+
+/**
+ * 감사 D-8 회귀 방어 — 교차 테넌트 파일 유출.
+ *
+ * 예전에는 이 라우트만 자체 파일명 규칙(`${timestamp}_${index}_${safeFileName}`)을 갖고
+ * 전 고객사가 `attachments/` 평면 디렉터리를 공유했다. 세 조각 중 어느 것도 테넌트를
+ * 구분하지 않으므로, 서로 다른 SR 의 사용자가 같은 밀리초에 같은 이름의 파일을 같은
+ * 순번으로 올리면 경로가 **정확히 같아졌다.** `createWriteStream` 기본 모드는 덮어쓰므로
+ * 나중 것이 앞 것을 truncate 했고, DB 에는 서로 다른 SR 을 가리키는 두 행이 같은
+ * storagePath 를 갖게 되어 A사 사용자가 B사 파일을 내려받을 수 있었다.
+ */
+describe('POST /api/srs/[id]/attachments — 저장 경로 격리', () => {
+  it('저장은 공용 uploadAttachmentBlob 에 위임한다', async () => {
+    await call(['보고서.pdf']);
+
+    // 라우트가 자체 파일 쓰기를 하면 이 단언이 깨진다 — 그때가 규칙이 갈라지는 순간이다.
+    expect(mocks.uploadBlob).toHaveBeenCalledTimes(1);
+    expect(mocks.uploadBlob).toHaveBeenCalledWith('sr-1', expect.any(File));
+  });
+
+  it('storagePath 는 SR 별 하위 디렉터리를 포함한다', async () => {
+    await call(['보고서.pdf']);
+
+    const [{ data }] = mocks.txCreateManyAndReturn.mock.calls[0]!;
+    // 평면 `attachments/<파일명>` 이면 테넌트 간 경로가 겹칠 수 있다.
+    expect(data[0].storagePath).toMatch(/^attachments\/sr-1\//);
+  });
+
+  it('같은 이름의 파일을 여러 개 올려도 storagePath 가 서로 다르다', async () => {
+    await call(['보고서.pdf', '보고서.pdf']);
+
+    const [{ data }] = mocks.txCreateManyAndReturn.mock.calls[0]!;
+    expect(data).toHaveLength(2);
+    expect(data[0].storagePath).not.toBe(data[1].storagePath);
+  });
 });
 
 describe('POST /api/srs/[id]/attachments — 배치 업로드', () => {
+  it('files 이름의 텍스트 파트는 파일 검증 전에 거부한다', async () => {
+    const form = new FormData();
+    form.append('files', 'not-a-file');
+
+    await expect(
+      (POST as any)(
+        {
+          formData: async () => form,
+          url: 'http://localhost:3000/api/srs/sr-1/attachments',
+          headers: new Headers(),
+        },
+        { params: Promise.resolve({ id: 'sr-1' }) }
+      )
+    ).rejects.toThrow('올바른 파일을 선택해주세요.');
+
+    expect(mocks.validateFile).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it('삽입·fileUrl 갱신·활동 로그가 한 트랜잭션 안에서 일어난다', async () => {
     await call(['a.txt', 'b.txt']);
 
@@ -151,5 +214,18 @@ describe('POST /api/srs/[id]/attachments — 배치 업로드', () => {
     await expect(call(['a.txt', 'b.txt'])).rejects.toThrow('db down');
 
     expect(mocks.deleteBlob).toHaveBeenCalledTimes(2);
+  });
+
+  it('형제 파일 저장이 실패하면 이미 저장된 blob을 되돌리고 DB를 호출하지 않는다', async () => {
+    mocks.uploadBlob.mockImplementation(async (srId: string, file: File) => {
+      if (file.name === 'b.txt') throw new Error('disk full');
+      const pathname = `attachments/${srId}/uuid-${file.name}`;
+      return { url: pathname, pathname, size: 1, type: 'text/plain' };
+    });
+
+    await expect(call(['a.txt', 'b.txt'])).rejects.toThrow('disk full');
+
+    expect(mocks.deleteBlob).toHaveBeenCalledWith('attachments/sr-1/uuid-a.txt');
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 });

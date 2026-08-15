@@ -4,9 +4,9 @@ import { z } from 'zod';
 
 import { SECURITY } from '@/lib/constants';
 import { BusinessRuleError, NotFoundError, ValidationError } from '@/lib/errors';
-import { INTERNAL_ROLES } from '@/lib/policies';
+import { ensureRoleClientExclusivity, INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { CLIENT_SUMMARY_SELECT, USER_WITH_ROLES_INCLUDE } from '@/lib/prisma-selects';
+import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_WITH_ROLES_INCLUDE } from '@/lib/prisma-selects';
 import { userUpdateSchema } from '@/lib/schemas';
 import { excludePassword } from '@/lib/user-helpers';
 
@@ -306,13 +306,13 @@ export class UserService {
         })) as { roles: { role: { name: string } }[] } | null;
 
         if (userRoles) {
-          const isSystemTeam = userRoles.roles.some((ur) =>
-            ['ADMIN', 'MANAGER', 'ENGINEER'].includes(ur.role.name)
+          // 판정은 `policies.ensureRoleClientExclusivity` 한 곳에 있다(헌법 §1.3).
+          // 예전에는 이 자리에 역할명 배열을 인라인으로 적은 사본이 있었고, 같은 규칙의
+          // 또 다른 사본이 역할 교체 라우트에 있었으며, 생성 경로에는 아무것도 없었다.
+          ensureRoleClientExclusivity(
+            userRoles.roles.map((ur) => ur.role.name),
+            clientIds
           );
-
-          if (isSystemTeam && clientIds.length > 0) {
-            throw new BusinessRuleError('시스템 운영팀은 고객사를 할당할 수 없습니다.');
-          }
         }
 
         // 기존 소속은 유지(승인 상태/승인일시 보존)하고, 제출되지 않은 소속만 제거한다.
@@ -388,6 +388,7 @@ export class UserService {
       //     남는 문제를 줄인다. 배정 경로의 isActive 가드와 함께 동작.)
       const activeSRs = await tx.sR.findMany({
         where: {
+          ...SR_ALIVE,
           assigneeId: userId,
           status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
         },
@@ -429,6 +430,10 @@ export class UserService {
     ipAddress?: string | null
   ): Promise<Omit<User, 'password'>> {
     // ⚡ Bolt: 1-4 연관 데이터 확인을 병렬로 처리하여 지연 시간 단축
+    //
+    // 이 카운트에는 **의도적으로 `SR_ALIVE` 를 붙이지 않는다.** 사용자 영구 삭제를 막는
+    // 참조 무결성 가드이며, soft delete 된 SR 도 `requester_id` FK 로 이 사용자를 계속
+    // 가리킨다. 여기서 제외하면 앱 검사는 통과하고 실제 DELETE 에서 FK 위반이 터진다.
     const [relatedDataCount, activityCount, commentCount, statusHistoryCount] = await Promise.all([
       prisma.sR.count({
         where: {

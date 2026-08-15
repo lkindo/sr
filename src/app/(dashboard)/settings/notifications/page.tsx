@@ -30,10 +30,13 @@ interface NotificationPreferences {
  *
  * 폼 초기값이자 조회 실패 시의 폴백이다 — 두 곳에서 같은 기본값을 써야 하므로 상수로 둔다.
  */
+// 이 기본값은 `prisma/schema.prisma` 의 NotificationPreference 컬럼 기본값과 **일치해야 한다.**
+// 어긋나면 설정 행이 없는 사용자에게 화면은 켜짐으로 보이는데 서버는 꺼짐으로 판정한다.
+// (emailSRStatusChanged 가 실제로 그랬다 — 화면 true / 스키마 false.)
 const DEFAULT_PREFERENCES: NotificationPreferences = {
   emailSRCreated: true,
   emailSRAssigned: true,
-  emailSRStatusChanged: true,
+  emailSRStatusChanged: false,
   emailCommentAdded: false,
   pushSRCreated: true,
   pushSRAssigned: true,
@@ -254,7 +257,12 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="email-sr-status">상태 변경</Label>
-              <p className="text-sm text-muted-foreground">SR 상태가 변경되었을 때</p>
+              <p className="text-sm text-muted-foreground">
+                접수·진행중·보류·확인완료로 바뀌었을 때
+              </p>
+              <p className="text-sm text-muted-foreground">
+                완료·거절 알림은 이 설정과 무관하게 항상 발송됩니다.
+              </p>
             </div>
             <Switch
               id="email-sr-status"

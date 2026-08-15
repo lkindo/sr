@@ -54,7 +54,7 @@ export async function createClientAction(formData: FormData): Promise<Result<Cli
 
     // 인증 및 권한 확인. 세션은 감사 로그의 행위자(actor)로도 쓰이므로 버리지 않는다 —
     // 예전에는 반환값을 버려서 이 경로의 생성이 누가 했는지 남지 않았다.
-    const session = await authenticateAndAuthorize('client:create');
+    const session = await authenticateAndAuthorize(PERMISSIONS.CLIENT.CREATE);
 
     // ClientService 인스턴스 생성
     const clientService = services.clientService;
@@ -92,7 +92,7 @@ export async function updateClientAction(id: string, formData: FormData) {
     const validated = validationResult.data;
 
     // 인증 및 권한 확인
-    const session = await authenticateAndAuthorize('client:update');
+    const session = await authenticateAndAuthorize(PERMISSIONS.CLIENT.UPDATE);
 
     // 테넌트 경계 — REST 트윈(PATCH /api/clients/[id])에는 있었지만 이 액션에는 없었다.
     // 권한 플래그만으로 남의 고객사를 수정할 수 있었다(감사 4.1).
@@ -117,7 +117,7 @@ export async function updateClientAction(id: string, formData: FormData) {
 export async function deleteClientAction(id: string) {
   try {
     // 인증 및 권한 확인
-    const session = await authenticateAndAuthorize('client:delete');
+    const session = await authenticateAndAuthorize(PERMISSIONS.CLIENT.DELETE);
 
     // 테넌트 경계. 삭제는 되돌릴 수 없으므로 수정보다 느슨하면 안 된다(감사 4.1).
     ensureCanWriteClient(session.user, id);

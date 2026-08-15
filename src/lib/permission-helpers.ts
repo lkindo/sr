@@ -27,6 +27,10 @@ export const PERMISSIONS = {
     UPDATE: 'ROLE:UPDATE',
     DELETE: 'ROLE:DELETE',
     ASSIGN: 'ROLE:ASSIGN',
+    // 역할에 권한을 붙이거나 떼는 행위. `role.actions.ts` 가 오랫동안
+    // `'role:update_permissions'` 라는 **카탈로그에 없는 문자열**을 요구해서,
+    // 그 액션은 ADMIN 을 제외한 누구에게도 부여될 수 없는 죽은 통제였다(감사 D-20).
+    ASSIGN_PERMISSION: 'ROLE:ASSIGN_PERMISSION',
   },
   /**
    * 댓글·첨부 권한은 카탈로그에 있고 다섯 역할 모두에 부여되지만, 오랫동안

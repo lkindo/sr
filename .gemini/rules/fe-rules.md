@@ -1,6 +1,14 @@
 # 🎨 기술 규칙: 프론트엔드 (fe-rules.md)
 
-본 문서는 프론트엔드 레이어(Next.js App Router, Tailwind CSS)와 관련된 기술 헌법 및 WOW UI 스타일 가이드이다. 프로젝트 ID `SaaSify-UI-Kit` 디자인 시스템을 준수한다.
+본 문서는 프론트엔드 레이어(Next.js App Router, Tailwind CSS)와 관련된 기술 헌법 및 UI 스타일 가이드이다.
+
+> **디자인 정본 선언(2026-08-15)**: 색상·타이포그래피·radius·spacing 토큰의 단일 정본은
+> **`docs/DESIGN.md`(다크 캔버스 체계)** 이며, 구현 진입점은 `src/app/globals.css`의 CSS 변수와
+> `tailwind.config.ts`다. 본 문서는 색상 값을 복제하지 않는다.
+> 과거 이 문서가 규정하던 `SaaSify-UI-Kit` 라이트 인디고 팔레트는 **폐기한다** — 실측 결과
+> 코드에 인디고 계열 사용은 0건이고 캔버스는 `#090909`다. 정본이 둘이던 동안 개발자가
+> 라이트 스펙을 그대로 옮겨 적으면서 다크 화면 위 흰 글씨·흰 상자 같은 **판독 불가 UI**가
+> 실제로 만들어졌다.
 
 ---
 
@@ -10,6 +18,21 @@
 - **클라이언트 컴포넌트 최소화**: 사용자 인터랙션(이벤트 핸들러, `useState`, `useEffect` 등)이 꼭 필요한 단말 리프(Leaf) 컴포넌트에 한해서만 파일 최상단에 `"use client"`를 선언하여 Client Component로 설계한다.
 - **경계 분리**: 데이터 조회 로직이 담긴 서버 컴포넌트 내부에 클라이언트 컴포넌트를 자식(Children)이나 Props 형태로 주입하여 성능과 데이터 로딩을 효율화한다.
 
+> ⚠️ **전환 진행 중 (2026-08-15)**: `(dashboard)` 하위 route page 16개 중 서버 컴포넌트는
+> 4개다(`srs`, `roles`, `users`, `settings`). 나머지는 아직 최상단에 `'use client'` 를 달고
+> 목록 전체를 브라우저에서 가져온다 — 열 때마다 스피너가 한 번 돌고 목록 로직이 번들에 실린다.
+>
+> **참조 구현**: `src/app/(dashboard)/roles/page.tsx` + `RolesClient.tsx`.
+> 서버가 API 와 **같은 정책 함수**로 인가를 판정하고 서비스 계층을 직접 호출해
+> `initialRoles` 로 주입하며, 클라이언트는 그것을 React Query `initialData` 로 받아
+> 이후 무효화·재조회를 그대로 이어 간다. 인가 거부는 `null` 로 구분해 "빈 목록" 과
+> 뒤섞이지 않게 한다.
+>
+> **남은 대상 (큰 것부터)**: `clients/[id]`(731줄), `organization`(658), `dashboard`(638),
+> `users/[id]`(586), `my-requests`(542), `clients`(402).
+> `clients` 계열은 필터가 로컬 state 라 서버 렌더로 옮기려면 URL searchParams 로
+> 먼저 올려야 한다(`srs/page.tsx` 가 그 형태다) — 동작 변경이 따르므로 별도 작업이다.
+
 ### 1.1. 파일명 및 배치 규칙
 
 대소문자 비구분 파일시스템(Windows)에서는 잘못된 케이스의 import 가 로컬에서 해석되지만
@@ -18,6 +41,8 @@ Linux Docker 빌드에서 module-not-found 로 터진다. 규칙을 하나로 �
 - **PascalCase 는 기능 컴포넌트만**: `SRsDataTable.tsx`, `UserDialog.tsx` 등 화면을 구성하는 컴포넌트 파일.
 - **kebab-case 는 그 외 전부**: `components/ui/` 의 shadcn 원시 컴포넌트, 훅, 유틸, 서비스, 타입.
 - **훅은 `src/hooks/` 아래에 `use-*.ts`**: 컴포넌트 디렉터리 안에 훅을 두지 않는다.
+  **단, shadcn 원시 컴포넌트가 자신의 Context를 소비하기 위해 같은 파일 안에 정의하는 훅
+  (예: `components/ui/form.tsx`의 `useFormField`)은 예외로 한다** — 밖으로 분리하면 순환 import가 생긴다.
 - **`src/actions/` 아래는 전부 Server Action**: `'use server'` 가 없는 순수 헬퍼는 `src/lib/` 로 보낸다.
   이 규칙 덕분에 RPC 공개 표면 감사가 파일 목록만으로 끝난다.
 
@@ -48,85 +73,72 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 - 부드럽고 자연스럽게 스며드는 레이어 그림자(Elevation) 처리.
 - 시각적 일관성을 유지하는 간격 규칙(8px 배수) 적용.
 
-### 3.2. 색상 팔레트 및 역할 (Color Palette & Roles)
+### 3.2. 색상 — 토큰만 사용한다
 
-- **기본색 (Primary Brand Color - Indigo 계열)**:
-  - 인디고 50 (`#EEF2FF`): 초경량 강조 배경 및 태그 배경.
-  - 인디고 100 (`#E0E7FF`): 아바타 이니셜 배경 등 보조적이고 옅은 표면색.
-  - 인디고 200 (`#C7D2FE`): 파일 드롭존 경계선 등 옅은 구분선.
-  - 인디고 500 (`#6366F1`): 주 버튼, 체크박스/라디오 등 상호작용 요소의 활성 상태 배경.
-  - 인디고 600 (`#4F46E5`): 주 브랜드 액션 컬러.
-  - 인디고 700 (`#4338CA`): 진한 텍스트 강조 및 은은한 태그 글자색.
-  - 인디고 900 (`#312E81`): 깊은 강조 및 레이아웃 구조체색.
-- **중립색 (Neutral Foundation Color - Slate 계열)**:
-  - 슬레이트 50 (`#F8FAFC`): 가장 밝은 카드 배경이나 파일 드롭존 표면색.
-  - 슬레이트 100 (`#F1F5F9`): 보조 컨테이너 배경 및 구분선.
-  - 슬레이트 200 (`#E2E8F0`): 입력 필드 기본 테두리, 구분선 및 비활성 스위치 배경.
-  - 슬레이트 400 (`#94A3B8`): 비활성 텍스트, 플레이스홀더 및 상태 배지 꼬리표 텍스트.
-  - 슬레이트 500 (`#64748B`): 서브 텍스트 및 레이블 명세.
-  - 슬레이트 600 (`#475569`): 일반 본문 텍스트.
-  - 슬레이트 800 (`#1E293B`): 주 헤드라인 텍스트 및 기본 콘텐츠 다크 텍스트.
-  - 슬레이트 900 (`#0F172A`): 메인 타이틀 텍스트.
-- **시맨틱 컬러 (Semantic Colors)**:
-  - 성공 (Success) (`#10B981`): 긍정 피드백, 온라인 상태 점 및 성공 배지/태그 배경.
-  - 경고 (Warning) (`#F59E0B`): 주의 피드백, 자리 비움 상태 점 및 경고 배지/태그 배경.
-  - 오류 (Error) (`#EF4444`): 에러 메시지 텍스트, 오류 상태 보더, 바쁨 상태 점 및 오류 배지/태그 배경.
-  - 정보 (Info) (`#3B82F6`): 시스템 알림 및 중립 정보 제공 배경.
+색상 값의 정본은 `docs/DESIGN.md`와 `src/app/globals.css`의 CSS 변수다. 본 문서는 값을 복제하지 않는다.
+
+- **hex 리터럴 하드코딩 금지**: 컴포넌트 코드에 `bg-[#…]` / `text-[#…]` / `border-[#…]` 같은
+  색상 리터럴을 쓰지 않는다. `bg-background` / `bg-card` / `bg-muted` / `text-foreground` /
+  `text-muted-foreground` / `border-border` / `bg-destructive` 등 **토큰 클래스만** 사용한다.
+- **왜 금지인가**: 다크 캔버스(`#090909`) 위에 라이트 스펙 색을 하드코딩하면 흰 패널 위 흰 글씨,
+  다크 화면 위 흰 상자처럼 **판독 불가 UI**가 만들어진다. 토큰을 쓰면 테마가 바뀌어도 대비가 유지된다.
+- **테마 대응**: 색을 지정할 때는 배경과 전경을 **짝으로** 지정한다. 배경만 바꾸고 전경을
+  상속에 맡기면 상속된 색이 그 배경과 충돌한다.
+- **`cn()` 결과에 문자열을 덧붙이지 않는다**: `cn(...)` 밖에서 템플릿 문자열로 클래스를 이어붙이면
+  tailwind-merge의 충돌 해소를 우회하게 되어 두 색 클래스가 동시에 살아남는다.
+  분기가 필요하면 처음부터 cva variant로 최종 색을 정의한다.
+
+> ✅ **준수(2026-08-15)**: `components/ui/` 의 hex 리터럴을 전부 토큰으로 교체했다.
+> `file-upload.tsx`(흰 패널 위 흰 글씨), `input.tsx`·`textarea.tsx`(다크 화면의 흰 비활성 상자),
+> `avatar.tsx`·`button.tsx`(인디고·에메랄드 하드코딩)가 대상이었다.
+> `badge.tsx` 는 `bg-destructive text-destructive`(같은 색)를 cva 가 내고 `cn()` **밖에서**
+> `bg-destructive/10` 을 덧붙여 겨우 읽히게 만들고 있었다 — variant 가 최종 색을 갖도록 고치고
+> 분기를 삭제했다.
+>
+> 재발 방지로 `eslint.config.mjs` 에 색상 hex 리터럴 금지 규칙(`no-restricted-syntax`)을 걸었다.
+> `src/**/*.{ts,tsx}` 에서 `bg-[#…]` / `text-[#…]` 계열을 쓰면 경고가 뜬다.
 
 ### 3.3. 타이포그래피 규칙 (Typography Rules)
 
-- `Pretendard Variable`, `Geist`, `Noto Sans KR` 폰트를 혼용하여 가독성과 서체 디자인의 완성도를 확보한다.
-- 소스코드 영역에는 고정폭 서체인 `JetBrains Mono`를 적용한다.
-- **텍스트 스케일 계층 구조**:
-  - **대형 디스플레이 제목 (Display)**: `48px / Bold`, 줄높이 1.1 (서비스 메인 대문용).
-  - **헤드라인 레벨 1 (H1)**: `36px / Bold`, 줄높이 1.2 (페이지 주요 섹션 제목용).
-  - **서브 헤드라인 레벨 2 (H2)**: `28px / SemiBold`, 줄높이 1.3 (서브 섹션 카드 타이틀용).
-  - **본문 크게 (Body Large)**: `16px / Regular`, 줄높이 1.5 (상세 설명 및 본문용).
-  - **코드 (Code)**: `13px / Mono`, 줄높이 1.6 (개발 소스코드 영역 전용).
+크기·행간·자간 **스케일의 정본은 `docs/DESIGN.md`** 다. 본 문서는 값을 복제하지 않는다.
+
+> ⚠️ **이 앱에는 웹폰트가 하나도 로드되어 있지 않다**(2026-08-15 실측).
+> `src/app/layout.tsx` 에 `next/font` 선언이 없고 `tailwind.config.ts` 에 `fontFamily` 확장도 없다.
+> 과거 이 절이 열거하던 `Pretendard Variable` / `Geist` / `Noto Sans KR` / `JetBrains Mono` 는
+> **적용된 적이 없다.** 폰트를 실제로 도입하려면 별도 작업으로 하고, 그전까지 이 절에서
+> 참조할 것은 스케일뿐이다.
 
 ### 3.4. 컴포넌트 스타일링 (Component Stylings)
 
-- **버튼 (Buttons)**:
-  - 모양: 모서리 반경 8px (`rounded-[8px]`)을 기본으로 유지.
-  - 크기 체계:
-    - XS: `px-[8px] py-[6px]`, 폰트 `11px` (매우 좁은 레이아웃용)
-    - SM: `px-[12px] py-[8px]`, 폰트 `13px` (테이블 행 내부 등 조밀한 영역용)
-    - MD: `px-[16px] py-[10px]`, 높이 `40px`, 폰트 `14px` (기본 표준 크기)
-    - LG: `px-[24px] py-[14px]`, 폰트 `16px` (강조 액션용)
-    - XL: `px-[32px] py-[17px]`, 폰트 `18px` (메인 가입/랜딩 페이지용)
-  - 변형 스타일:
-    - 기본형(Primary): 인디고 배경 (`bg-[#4F46E5]` 또는 `bg-[#6366F1]`) + 흰색 텍스트.
-    - 보조형(Secondary): 투명 배경 + 인디고 테두리 (`border-[#4F46E5]`) + 인디고 텍스트.
-    - 고스트(Ghost): 투명 배경 + 테두리 없음 + 인디고 텍스트.
-    - 위험(Danger): 빨간색 배경 (`bg-[#EF4444]`) + 흰색 텍스트.
-    - 성공(Success): 초록색 배경 (`bg-[#10B981]`) + 흰색 텍스트.
-  - 인터랙티브 상태: 활성 `hover:opacity-80`, 비활성 `opacity-40 select-none pointer-events-none`, 로딩 시 텍스트 전환 및 로딩 비활성 유지.
-- **카드 및 컨테이너 (Cards & Containers)**:
-  - 모서리 반경: 기본 `12px (rounded-[12px])` 혹은 넓은 영역은 `16px (rounded-[16px])` 사용.
-  - 배경색 및 선: 기본 흰색 (`bg-white`) 배경에 얇은 테두리 (`border-[#e2e8f0]`) 적용.
-  - 그림자 고도 (Elevation Shadows):
-    - XS: `shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]` (플랫한 칩 및 소형 카드)
-    - SM: `shadow-[0px_4px_6px_0px_rgba(0,0,0,0.05)]`
-    - MD: `shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),_0px_4px_6px_0px_rgba(0,0,0,0.05)]` (일반 카드/다이얼로그)
-    - LG: `shadow-[0px_20px_25px_0px_rgba(0,0,0,0.05)]`
-    - XL: `shadow-[0px_25px_50px_0px_rgba(0,0,0,0.1)]` (드롭다운 메뉴 및 오버레이 팝업)
-- **입력란 및 폼 (Inputs & Forms)**:
-  - 텍스트 입력창 (Text Inputs): 높이 `40px`, 모서리 반경 `8px` (`rounded-[8px]`).
-    - 기본: `border-[#e2e8f0]`, 플레이스홀더 `placeholder-[#94a3b8]`.
-    - 포커스: 두꺼운 인디고 보더 `focus:border-2 focus:border-[#6366f1]`.
-    - 오류: 빨간색 보더 `border-[#ef4444]`, 하단에 12px 에러 텍스트 표시.
-    - 비활성: 배경 `bg-[#f8fafc]`, 텍스트/플레이스홀더 `text-[#94a3b8]`.
-  - 텍스트 영역 (Textarea): 높이 `120px`, 모서리 반경 `8px`, 우측 하단에 글자 수 표기기(`0/500`) 배치.
-  - 선택 컨트롤 (Selection Controls):
-    - 체크박스: 선택 시 인디고 배경 사각형 (`rounded-[4px] size-[18px]`), 미선택 시 슬레이트 200 테두리.
-    - 라디오 버튼: 선택 시 두꺼운 테두리의 인디고 동그라미 (`circle r="7" stroke="#4F46E5" strokeWidth="4"`), 미선택 시 슬레이트 200 원형 테두리.
-    - 토글스위치: 선택 시 인디고 배경에 우측 원 배치 (`cx="29"`), 미선택 시 슬레이트 200 배경에 좌측 원 배치 (`cx="11"`).
-  - 파일 업로드 드롭존 (File Upload Zone): 옅은 슬레이트 배경 (`bg-[#f8fafc]`) + 인디고 200 점선 테두리 (`border-dashed border-[#c7d2fe]`), 업로드용 구름 모양 아이콘 포함.
-- **배지, 태그 및 아바타 (Badges, Tags & Avatars)**:
-  - 숫자 배지: 소형(24px), 중형(32px), 대형(48px - 아바타 우측 상단에 걸침). 알림 수 표시에 빨간색 (`bg-[#ef4444]`) 혹은 인디고 배경 사용.
-  - 상태 점: 10px 크기 동그라미. 온라인(성공 초록), 자리 비움(경고 주황), 바쁨(오류 빨강).
-  - 태그/칩 (Tags/Chips): 완전 둥근 알약 모양 (`rounded-[9999px]`). 인디고/그린/옐로우/레드 계열의 배경과 텍스트 조합. 닫기 버튼은 우측에 `x-circle` 아이콘 배치.
-  - 아바타 (Avatars): 20px(XS)부터 96px(3XL) 크기 제공. 원형 이미지 또는 인디고 100 배경 위의 영문 이니셜 텍스트로 구성.
+색상은 §3.2 에 따라 **토큰 클래스만** 쓴다. 아래는 코드가 실제로 따르는 치수 규칙이다.
+
+- **버튼 크기 체계** (`src/components/ui/button.tsx` 의 cva variant 와 1:1):
+  - XS: `px-[8px] py-[6px]`, 폰트 `11px` (매우 좁은 레이아웃용)
+  - SM: `px-[12px] py-[8px]`, 폰트 `13px` (테이블 행 내부 등 조밀한 영역용)
+  - MD: `px-[16px] py-[10px]`, 높이 `40px`, 폰트 `14px` (기본 표준 크기)
+  - LG: `px-[24px] py-[14px]`, 폰트 `16px` (강조 액션용)
+  - XL: `px-[32px] py-[17px]`, 폰트 `18px` (메인 가입/랜딩 페이지용)
+- **버튼 모양**: 모서리 반경 `rounded-[8px]`.
+  <sub>`docs/DESIGN.md` 원본은 "모든 CTA 는 흰색 pill" 이라고 규정하지만 그건 분석 대상이던
+  마케팅 사이트의 어휘다. 이 앱의 CTA 는 각진 8px 다 — 원본을 그대로 옮기지 않는다.</sub>
+- **인터랙티브 상태**: 활성 `hover:opacity-80`, 비활성 `opacity-40 select-none pointer-events-none`,
+  로딩 시 텍스트 전환 및 비활성 유지.
+- **그림자 고도 (Elevation)**:
+  - XS: `shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]` (플랫한 칩 및 소형 카드)
+  - SM: `shadow-[0px_4px_6px_0px_rgba(0,0,0,0.05)]`
+  - MD: `shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),_0px_4px_6px_0px_rgba(0,0,0,0.05)]` (일반 카드/다이얼로그)
+  - LG: `shadow-[0px_20px_25px_0px_rgba(0,0,0,0.05)]`
+  - XL: `shadow-[0px_25px_50px_0px_rgba(0,0,0,0.1)]` (드롭다운 메뉴 및 오버레이 팝업)
+- **카드 모서리**: 기본 `rounded-[12px]`, 넓은 영역은 `rounded-[16px]`.
+- **입력란**: 높이 `40px`, 모서리 반경 `rounded-[8px]`. 텍스트 영역은 최소 높이 `120px`.
+  배경·테두리·플레이스홀더 색은 토큰(`bg-background` / `border-input` / `text-muted-foreground`)을 쓴다.
+- **태그/칩**: 완전 둥근 알약(`rounded-[9999px]`).
+- **아바타**: 20px(XS)~96px(3XL). 이미지가 없으면 `bg-primary/10` 위 이니셜.
+
+<sub>정정(2026-08-15): 이 절은 원래 `bg-[#4F46E5]`·`border-[#e2e8f0]`·`bg-[#f8fafc]` 같은
+라이트 스펙 hex 를 직접 규정했다. 그 값들이 다크 캔버스(`#090909`) 위에 그대로 복사되면서
+흰 패널 위 흰 글씨·흰 비활성 상자 같은 판독 불가 UI 가 실제로 만들어졌다(§3.2 준수 기록 참조).
+색상 규정을 이 절에서 걷어내 §3.2 의 토큰 원칙과 어긋나지 않게 한다.</sub>
 
 ### 3.5. 레이아웃 원칙 (Layout Principles)
 
@@ -140,7 +152,7 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 
 SaaSify UI Kit의 견고한 구조 위에 사용자가 처음 웹 어플리케이션에 접속했을 때 시각적인 감동(WOW)을 느낄 수 있도록 아래의 프리미엄 감성 디자인 표준을 조화롭게 융합한다.
 
-- **Harmony Color Palette**: 브라우저 기본 색상 사용을 금지하며, `SaaSify-UI-Kit` 색상 계층에 있는 인디고 및 슬레이트 톤을 극대화하여 활용한다.
+- **Harmony Color Palette**: 브라우저 기본 색상 사용을 금지하며, `docs/DESIGN.md`가 정의한 다크 캔버스 토큰 계층 안에서 색을 고른다(§3.2 — hex 리터럴 금지).
 - **글래스모피즘 (Glassmorphism)**: 대시보드 카드, 모달, 네비게이션 바 등 주요 컨테이너 레이아웃에는 반투명 배경(`bg-white/10` 또는 `bg-black/30`), 백드롭 블러(`backdrop-blur-md`), 미세한 외곽선 테두리(`border border-white/20`)를 조합하여 깊이감을 극대화한다.
 - **부드러운 그라데이션**: 텍스트 타이틀이나 핵심 버튼, 하이라이트 영역에는 세련된 메탈릭 그라데이션 또는 은은한 파스텔톤 그라데이션(`bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500`)을 적용하여 고급스러운 품질을 유지한다.
 - **마이크로 애니메이션 & Hover 효과**:
@@ -154,7 +166,9 @@ SaaSify UI Kit의 견고한 구조 위에 사용자가 처음 웹 어플리케�
 
 > 2026-08-10: Storybook 을 제거했다. 스토리 파일이 1개뿐이라 사실상 쓰이지 않으면서
 > vitest 에 브라우저 모드 프로젝트를 물고 있었다. 컴포넌트 격리 검증은
-> **Vitest + @testing-library/react 렌더 테스트**(`__tests__/<Name>.test.tsx`)가 담당한다.
+> **Vitest + @testing-library/react 렌더 테스트**(`__tests__/<원본과 동일한 파일명>.test.tsx`)가
+> 담당한다. 원시 컴포넌트는 kebab-case, 기능 컴포넌트는 PascalCase 파일명을 그대로 따른다.
+> (`<Name>` 표기가 PascalCase 를 암시해 원시 컴포넌트 테스트가 중복 사본으로 만들어진 적이 있다.)
 
 - **독립적 UI 개발**: 주요 공통 UI 컴포넌트(Button, Select, Modal, Input 등)는 props 조합별
   렌더 테스트를 작성해 컴포넌트 단위로 격리 검증이 가능하도록 설계한다.

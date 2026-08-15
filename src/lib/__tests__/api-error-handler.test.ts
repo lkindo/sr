@@ -18,11 +18,7 @@ vi.mock('next/server', () => ({
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
-  logger: {
-    logError: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
+  logger: { logRequest: vi.fn(), logError: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 describe('api-error-handler', () => {

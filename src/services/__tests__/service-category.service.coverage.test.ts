@@ -81,20 +81,29 @@ describe('ServiceCategoryService', () => {
     });
   });
 
+  /**
+   * 감사 D-13 회귀 방어.
+   *
+   * 예전 시그니처는 `getForSelection(clientId?: string)` 이었고, 인자를 생략하면
+   * where 에 테넌트 조건이 붙지 않아 **전 고객사 카탈로그**가 나왔다. 스코프를 필수
+   * 인자로 바꿔 누락이 컴파일 실패가 되게 했다(헌법 §1.2).
+   */
   describe('getForSelection', () => {
-    it('omits clientId filter when not provided', async () => {
+    it('전체 조회는 의도를 명시해야만 가능하다', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
 
-      await service.getForSelection();
+      // 인자를 생략할 수 없다. 전체를 보려면 'all' 이라고 적어야 하고,
+      // 그 자리는 코드 리뷰에서 눈에 띈다.
+      await service.getForSelection('all');
 
       const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0];
       expect(call?.where).toEqual({ isActive: true });
     });
 
-    it('includes clientId filter when provided', async () => {
+    it('스코프를 주면 해당 고객사와 전역 카테고리만 조회한다', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
 
-      await service.getForSelection('client-9');
+      await service.getForSelection({ clientIds: ['client-9'] });
 
       // 해당 고객사 전용 + 전역(clientId=null) 카테고리를 함께 돌려준다.
       // 정확히 일치만 걸면 전역 카테고리만 있는 신규 고객사의 선택지가 0개가 된다.
@@ -102,20 +111,32 @@ describe('ServiceCategoryService', () => {
       const call = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0];
       expect(call?.where).toEqual({
         isActive: true,
-        OR: [{ clientId: 'client-9' }, { clientId: null }],
+        OR: [{ clientId: { in: ['client-9'] } }, { clientId: null }],
       });
     });
 
     it('타 고객사 전용 카테고리는 조건에 포함하지 않는다', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
 
-      await service.getForSelection('client-9');
+      await service.getForSelection({ clientIds: ['client-9'] });
 
       const where = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0]?.where as {
-        OR?: { clientId: string | null }[];
+        OR?: ({ clientId: { in: string[] } } | { clientId: null })[];
       };
-      const allowed = (where.OR ?? []).map((c) => c.clientId);
-      expect(allowed).toEqual(['client-9', null]);
+      expect(where.OR?.[0]).toEqual({ clientId: { in: ['client-9'] } });
+      expect(where.OR?.[1]).toEqual({ clientId: null });
+    });
+
+    it('소속 고객사가 없으면 전역 카테고리만 남는다 (fail-closed)', async () => {
+      vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([] as never);
+
+      await service.getForSelection({ clientIds: [] });
+
+      const where = vi.mocked(prisma.serviceCategory.findMany).mock.calls[0]![0]?.where as {
+        OR?: ({ clientId: { in: string[] } } | { clientId: null })[];
+      };
+      // `in: []` 는 어떤 행에도 매치되지 않는다 — 남는 것은 전역 카테고리뿐이다.
+      expect(where.OR?.[0]).toEqual({ clientId: { in: [] } });
     });
   });
 

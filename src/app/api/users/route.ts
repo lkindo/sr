@@ -8,11 +8,12 @@ import {
   ensureCanGrantRoles,
   ensureCanReadUser,
   ensureClientAssignmentsWithinScope,
+  ensureRoleClientExclusivity,
   isInternalUser,
   resolveClientIdFilter,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { userCreateSchema } from '@/lib/schemas';
+import { userCreateSchema, userListQuerySchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -28,17 +29,26 @@ export const GET = withAuthAndRateLimit(
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.users);
 
-    const clientIdFilter = resolveClientIdFilter(session.user, searchParams.get('clientId'));
+    const query = userListQuerySchema.parse({
+      search: searchParams.get('search'),
+      isActive: searchParams.get('isActive'),
+      userType: searchParams.get('userType'),
+      roleId: searchParams.get('roleId'),
+      role: searchParams.get('role'),
+      clientId: searchParams.get('clientId'),
+    });
+
+    const clientIdFilter = resolveClientIdFilter(session.user, query.clientId ?? null);
     if (typeof clientIdFilter === 'object' && clientIdFilter.in.length === 0) {
       return NextResponse.json(createResponse([], 0));
     }
 
     const filters = {
-      search: searchParams.get('search') || undefined,
-      isActive: searchParams.get('isActive') || undefined,
-      userType: searchParams.get('userType') || undefined,
-      roleId: searchParams.get('roleId') || undefined,
-      role: searchParams.get('role') || undefined,
+      search: query.search,
+      isActive: query.isActive,
+      userType: query.userType,
+      roleId: query.roleId,
+      role: query.role,
       clientId: clientIdFilter,
     };
 
@@ -85,6 +95,19 @@ export const POST = withAuthAndRateLimit(
         throw new ValidationError('존재하지 않는 역할이 포함되어 있습니다.');
       }
       ensureCanGrantRoles(session.user, rolesToAssign);
+
+      /**
+       * 헌법 §1.3 역할 상호 배타성 (감사 D-12).
+       *
+       * 이 검사는 **생성 경로에만 없었다.** 역할 교체(`PUT /api/users/[id]/roles`)와
+       * 사용자 수정(`user.service.updateUser`)에는 각자 사본이 있었는데, 정작 사용자를
+       * 처음 만드는 경로는 무검증이라 다이얼로그에서 ENGINEER + 고객사 2곳을 고르면
+       * 금지된 조합이 그대로 저장됐다. 세 경로가 이제 같은 술어를 부른다.
+       */
+      ensureRoleClientExclusivity(
+        rolesToAssign.map((role) => role.name),
+        requestedClientIds
+      );
     }
 
     const userService = new UserService();

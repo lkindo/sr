@@ -5,8 +5,10 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanDeleteAttachment, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ACCESS_SELECT, SR_ACCESS_WITH_STATUS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob } from '@/lib/storage';
+import { auditService } from '@/services/audit.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -28,8 +30,10 @@ export const GET = withAuthAndRateLimit(
     }
 
     // 권한 체크: 첨부파일이 속한 SR을 조회할 수 있어야 함 (IDOR 방지)
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
     const sr = await prisma.sR.findUnique({
-      where: { id: attachment.srId },
+      where: { id: attachment.srId, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
     });
     if (!sr) {
       throw new NotFoundError('SR');
@@ -61,9 +65,16 @@ export const DELETE = withAuthAndRateLimit(
       throw new NotFoundError('첨부파일');
     }
 
-    // SR 접근 권한 체크
+    // SR 접근 권한 체크.
+    //
+    // **여기는 반드시 status 를 포함해야 한다.** `canDeleteAttachment` 가
+    // `sr.requesterId === user.id && sr.status === 'REQUESTED'` 로 "요청자 본인이 아직
+    // 접수 전인 자기 SR 의 첨부를 지우는" 경우를 허용하는데, 그 시그니처의 `status` 가
+    // 선택적이라 4필드 select 를 주면 **타입 오류 없이** undefined 가 되어 그 분기가
+    // 영원히 거짓이 된다.
     const sr = await prisma.sR.findUnique({
-      where: { id: attachment.srId },
+      where: { id: attachment.srId, ...SR_ALIVE },
+      select: SR_ACCESS_WITH_STATUS_SELECT,
     });
 
     if (!sr) {
@@ -95,6 +106,23 @@ export const DELETE = withAuthAndRateLimit(
           userId: session.user.id,
           type: 'ATTACHMENT_REMOVED',
           description: `파일 삭제: ${attachment.fileName}`,
+        },
+      });
+
+      // SR 활동 로그와 **별개로** 감사 로그를 남긴다(감사 D-16).
+      //
+      // 활동 로그는 그 SR 을 볼 수 있는 사람에게 보이는 업무 이력이고, 감사 로그는
+      // 관리자가 시스템 전체를 훑는 통제 기록이다. 첨부 삭제는 되돌릴 수 없으므로
+      // 후자에도 남아야 하는데 이 경로만 빠져 있었다.
+      await auditService.createLog(tx, {
+        userId: session.user.id,
+        actionType: 'DELETE',
+        targetEntity: 'SRAttachment',
+        targetId: id,
+        changes: {
+          srId: attachment.srId,
+          fileName: attachment.fileName,
+          fileSize: attachment.fileSize,
         },
       });
     });

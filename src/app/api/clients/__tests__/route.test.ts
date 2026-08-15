@@ -32,7 +32,10 @@ const {
   mockEnsureCanCreateClient: vi.fn(),
   mockIsInternalUser: vi.fn(),
   mockHandleApiError: vi.fn((error: { statusCode?: number; message?: string }) =>
-    NextResponse.json({ error: error.message ?? 'Error' }, { status: error.statusCode ?? 500 })
+    NextResponse.json(
+      { error: error.message ?? 'Error' },
+      { status: (error as { name?: string }).name === 'ZodError' ? 400 : (error.statusCode ?? 500) }
+    )
   ),
 }));
 
@@ -152,6 +155,37 @@ describe('GET /api/clients — 검색·필터', () => {
 
     expect(usedWhere().id).toEqual({ in: ['c-1'] });
     expect(usedWhere().OR).toBeDefined();
+  });
+
+  it('지원하지 않는 활성 상태 필터는 400으로 거부한다', async () => {
+    const res = await GET(get('http://localhost/api/clients?isActive=yes'), {} as never);
+
+    expect(res.status).toBe(400);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['search', 'a'.repeat(256)],
+    ['industry', 'a'.repeat(101)],
+  ])('%s 필터가 너무 길면 400으로 거부한다', async (key, value) => {
+    const res = await GET(
+      get(`http://localhost/api/clients?${key}=${encodeURIComponent(value)}`),
+      {} as never
+    );
+
+    expect(res.status).toBe(400);
+    expect(mockFindMany).not.toHaveBeenCalled();
+  });
+
+  it('all 필터는 조건을 추가하지 않는다', async () => {
+    const res = await GET(
+      get('http://localhost/api/clients?industry=all&isActive=all'),
+      {} as never
+    );
+
+    expect(res.status).toBe(200);
+    expect(usedWhere().industry).toBeUndefined();
+    expect(usedWhere().isActive).toBeUndefined();
   });
 });
 

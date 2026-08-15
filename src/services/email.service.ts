@@ -148,7 +148,12 @@ class EmailService {
     title: string,
     oldStatus: string,
     newStatus: string,
-    link: string
+    link: string,
+    /**
+     * 완료 내용 또는 거절 사유. 헌법 §4 는 완료·거절 메일이 결과를 담을 것을 요구한다.
+     * 링크만 보내면 신청자가 로그인해야 사유를 알 수 있고, 그 사이 같은 요청을 다시 올린다.
+     */
+    detail?: { label: string; body: string } | null
   ): RenderedEmail {
     const subject = `[SR System] SR 상태가 변경되었습니다: ${srNumber}`;
     /**
@@ -177,12 +182,21 @@ class EmailService {
     const safeNewStatus = escapeHtml(statusMap.get(newStatus) || newStatus);
     const safeLink = safeEmailLink(link);
 
+    const detailBlock =
+      detail && detail.body.trim()
+        ? `
+        <p style="margin-bottom: 4px;"><strong>${escapeHtml(detail.label)}:</strong></p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #0070f3; margin: 10px 0;">
+          ${escapeHtml(detail.body).replaceAll('\n', '<br />')}
+        </div>`
+        : '';
+
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">SR 상태 변경 알림</h2>
         <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
         <p><strong>제목:</strong> ${safeTitle}</p>
-        <p><strong>상태:</strong> ${safeOldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${safeNewStatus}</span></p>
+        <p><strong>상태:</strong> ${safeOldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${safeNewStatus}</span></p>${detailBlock}
         <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
       </div>
     `;

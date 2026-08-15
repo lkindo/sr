@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { PAGINATION } from '@/lib/constants';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ACCESS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { commentSchema } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
 import { emailService } from '@/services/email.service';
@@ -19,8 +21,10 @@ export const GET = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
     const sr = await prisma.sR.findUnique({
-      where: { id },
+      where: { id, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
     });
 
     if (!sr) {
@@ -55,6 +59,9 @@ export const GET = withAuthAndRateLimit(
       orderBy: {
         createdAt: 'asc',
       },
+      // 상한을 건다 (감사 D-17). 서비스 계층은 커서 페이지네이션으로 상한을 지키는데
+      // 이 라우트만 전량을 조인해 왔다.
+      take: PAGINATION.MAX_PAGE_SIZE,
     });
 
     return NextResponse.json(comments);
@@ -74,7 +81,7 @@ export const POST = withAuthAndRateLimit(
 
     // Check if SR exists and get related data
     const sr = await prisma.sR.findUnique({
-      where: { id },
+      where: { id, ...SR_ALIVE },
       select: {
         id: true,
         clientId: true,

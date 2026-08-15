@@ -13,7 +13,14 @@ const toast = vi.fn();
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: {
+    logError: vi.fn(),
+    logRequest: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 /**
@@ -32,6 +39,8 @@ vi.mock('@/lib/logger', () => ({
 /** 테스트가 이벤트를 직접 쏠 수 있는 EventSource 대역. */
 class FakeEventSource {
   static last: FakeEventSource | null = null;
+  /** 몇 번 생성됐는지. 재연결이 실제로 새 연결을 만드는지 확인하는 데 쓴다. */
+  static createdCount = 0;
   listeners = new Map<string, (e: MessageEvent) => void>();
   closed = false;
   onopen: (() => void) | null = null;
@@ -39,6 +48,7 @@ class FakeEventSource {
 
   constructor(public url: string) {
     FakeEventSource.last = this;
+    FakeEventSource.createdCount++;
   }
 
   addEventListener(type: string, cb: (e: MessageEvent) => void) {
@@ -72,6 +82,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
   FakeEventSource.last = null;
+  FakeEventSource.createdCount = 0;
   vi.stubGlobal('EventSource', FakeEventSource);
   vi.mocked(useRouter).mockReturnValue(router as never);
 });
@@ -218,5 +229,100 @@ describe('useRealtimeStatus', () => {
 
     expect(() => FakeEventSource.last!.onerror?.()).not.toThrow();
     expect(() => FakeEventSource.last!.onopen?.()).not.toThrow();
+  });
+});
+
+/**
+ * 감사 D-7 회귀 방어 — 조용한 실시간 갱신 상실.
+ *
+ * EventSource 는 스펙상 non-200 응답을 받으면 **영구 CLOSED** 가 된다. 예전에는
+ * `onerror` 가 로그만 남기고 끝났고, `eventSourceRef` 가 남아 재연결 가드에 막혔다.
+ * 그래서 배포 중 nginx 가 잠깐 502 를 주면 열려 있던 모든 탭이 새로고침 전까지
+ * 실시간 갱신을 잃었다 — 화면에 아무 표시가 없어 아무도 알아채지 못했다.
+ */
+describe('useRealtimeStatus — 재연결', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('연결이 끊기면 죽은 EventSource 를 닫고 다시 연결한다', () => {
+    authenticated();
+    const { wrapper } = setup();
+
+    renderHook(() => useRealtimeStatus(), { wrapper });
+    expect(FakeEventSource.createdCount).toBe(1);
+    const dead = FakeEventSource.last!;
+
+    act(() => {
+      dead.onerror?.();
+    });
+
+    // 죽은 연결은 반드시 닫아야 한다. 열어 둔 채로 두면 ref 가 남아 재연결이 막힌다.
+    expect(dead.closed).toBe(true);
+
+    // 백오프가 지나면 새 연결이 생긴다.
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(FakeEventSource.createdCount).toBe(2);
+    expect(FakeEventSource.last).not.toBe(dead);
+  });
+
+  it('재연결 간격은 실패가 이어질수록 늘어난다', () => {
+    authenticated();
+    const { wrapper } = setup();
+
+    renderHook(() => useRealtimeStatus(), { wrapper });
+
+    // 1차 실패 → 약 1초 뒤 재연결
+    act(() => FakeEventSource.last!.onerror?.());
+    act(() => vi.advanceTimersByTime(2_100));
+    expect(FakeEventSource.createdCount).toBe(2);
+
+    // 2차 실패 → 1초로는 부족하다(백오프가 늘어났다)
+    act(() => FakeEventSource.last!.onerror?.());
+    act(() => vi.advanceTimersByTime(900));
+    expect(FakeEventSource.createdCount).toBe(2);
+
+    act(() => vi.advanceTimersByTime(2_200));
+    expect(FakeEventSource.createdCount).toBe(3);
+  });
+
+  it('연결에 성공하면 백오프가 초기화된다', () => {
+    authenticated();
+    const { wrapper } = setup();
+
+    renderHook(() => useRealtimeStatus(), { wrapper });
+
+    // 두 번 실패시켜 백오프를 키운다.
+    act(() => FakeEventSource.last!.onerror?.());
+    act(() => vi.advanceTimersByTime(2_100));
+    act(() => FakeEventSource.last!.onerror?.());
+    act(() => vi.advanceTimersByTime(3_100));
+    expect(FakeEventSource.createdCount).toBe(3);
+
+    // 성공. 이후 실패는 다시 첫 간격부터 시작해야 한다 —
+    // 그러지 않으면 한 번 끊긴 세션이 이후 재연결마다 30초를 기다리게 된다.
+    act(() => FakeEventSource.last!.onopen?.());
+    act(() => FakeEventSource.last!.onerror?.());
+    act(() => vi.advanceTimersByTime(2_100));
+    expect(FakeEventSource.createdCount).toBe(4);
+  });
+
+  it('언마운트 뒤에는 예약된 재연결이 살아나지 않는다', () => {
+    authenticated();
+    const { wrapper } = setup();
+
+    const { unmount } = renderHook(() => useRealtimeStatus(), { wrapper });
+    act(() => FakeEventSource.last!.onerror?.());
+
+    unmount();
+
+    act(() => vi.advanceTimersByTime(60_000));
+    // 언마운트 시점의 연결 수(2 = 최초 + 실패 직후 예약분 없음)에서 늘지 않아야 한다.
+    expect(FakeEventSource.createdCount).toBe(1);
   });
 });

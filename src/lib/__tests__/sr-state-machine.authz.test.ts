@@ -234,14 +234,49 @@ describe('validateTransition — 흐름 자체가 불가능한 전이', () => {
 });
 
 describe('validateTransition — 전이 맥락 규칙', () => {
-  it('보류 전이는 사유가 필수다', () => {
+  // 헌법 §2 는 보류에 사유 **와** 예상 해제일을 함께 요구한다. 하나만으로는 통과하지 않는다.
+  it('보류 전이는 사유와 예상 해제일이 모두 필수다', () => {
     const current = { assigneeId: 'eng-1' };
+    const release = new Date(Date.now() + 86_400_000).toISOString();
+
+    // 둘 다 없음
     expect(validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {}).valid).toBe(false);
+
+    // 사유만 있음 → 예상 해제일이 없어 거부
+    const reasonOnly = validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {
+      changeReason: '고객 자료 대기',
+    });
+    expect(reasonOnly.valid).toBe(false);
+    expect(reasonOnly.message).toContain('예상 해제일');
+
+    // 예상 해제일만 있음 → 사유가 없어 거부
+    const dateOnly = validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {
+      expectedHoldReleaseDate: release,
+    });
+    expect(dateOnly.valid).toBe(false);
+    expect(dateOnly.message).toContain('보류 사유');
+
+    // 둘 다 있음
     expect(
       validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {
         changeReason: '고객 자료 대기',
+        expectedHoldReleaseDate: release,
       }).valid
     ).toBe(true);
+  });
+
+  // 지난 보류의 약속 날짜가 currentData 에 남아 있어도 통과시키지 않는다.
+  // 폴백을 허용하면 "이번 보류의 예상 해제일" 이 아니게 된다.
+  it('보류 전이는 이전 보류의 예상 해제일로 통과하지 않는다', () => {
+    const current = {
+      assigneeId: 'eng-1',
+      expectedHoldReleaseDate: new Date(Date.now() + 86_400_000),
+    };
+    const result = validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {
+      changeReason: '고객 자료 대기',
+    });
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('예상 해제일');
   });
 
   it('재오픈은 사유가 필수다', () => {
@@ -275,5 +310,82 @@ describe('validateTransition — 전이 맥락 규칙', () => {
         { changeReason: '재작업' }
       ).valid
     ).toBe(true);
+  });
+
+  // ── 기산점은 출발 상태를 따른다 (헌법 §2) ────────────────────────────────
+  //
+  // 예전에는 CONFIRMED 출발에도 completedAt 만 봤다. 완료 6일 뒤에 고객이 확인하고
+  // 그 다음 날 재오픈하면, 확인한 지 하루밖에 안 됐는데도 창이 닫혀 있었다.
+
+  it('CONFIRMED 재오픈은 confirmedAt 을 기산점으로 쓴다', () => {
+    const result = validateTransition(
+      'CONFIRMED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      {
+        assigneeId: 'eng-1',
+        completedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000), // 완료는 20일 전
+        confirmedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 확인은 2일 전
+      },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('CONFIRMED 재오픈도 확인 후 7일이 지나면 거부한다', () => {
+    const result = validateTransition(
+      'CONFIRMED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      {
+        assigneeId: 'eng-1',
+        completedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        confirmedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+      },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('확인');
+  });
+
+  it('confirmedAt 이 없으면 completedAt 으로 폴백한다', () => {
+    const result = validateTransition(
+      'CONFIRMED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      { assigneeId: 'eng-1', completedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  // ── fail-closed ──────────────────────────────────────────────────────────
+  //
+  // 예전에는 `if (isReopen && currentData.completedAt)` 가드라 기산점이 NULL 이면
+  // 창 검사를 통째로 건너뛰고 통과했다. completedAt 기록이 도입되기 전에 완료된 SR 은
+  // 몇 년이 지나도 재오픈됐다. 시각을 모르면 **거부**한다.
+
+  it('기산점을 알 수 없으면 재오픈을 거부한다 (fail-closed)', () => {
+    const result = validateTransition(
+      'COMPLETED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      { assigneeId: 'eng-1', completedAt: null },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('종결 시각');
+  });
+
+  it('기산점이 파싱 불가능한 값이어도 거부한다', () => {
+    const result = validateTransition(
+      'COMPLETED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      { assigneeId: 'eng-1', completedAt: 'not-a-date' },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('종결 시각');
   });
 });

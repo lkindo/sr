@@ -7,31 +7,38 @@ import { requireRateLimit } from '@/lib/action-helpers';
 import { SECURITY } from '@/lib/constants';
 import { firstZodIssueMessage } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { passwordsMatch, registerFieldsSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
-const registerSchema = z
-  .object({
-    name: z.string().min(2, '이름은 최소 2자 이상이어야 합니다.'),
-    email: z.string().email('유효한 이메일 주소를 입력하세요.'),
-    password: z
-      .string()
-      .min(8, '비밀번호는 최소 8자 이상이어야 합니다.')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]/,
-        '대소문자, 숫자, 특수문자를 포함해야 합니다.'
-      ),
-    confirmPassword: z.string(),
+/**
+ * 가입 폼 스키마 — **정본(`@/lib/schemas`)을 확장**한다.
+ *
+ * 예전에는 이 파일이 자체 사본을 들고 있었고 거기에는 `.max()` 가 하나도 없었다.
+ * `users.name` 은 varchar(50), `users.email` 은 varchar(255) 이므로 그 길이를 넘긴 입력은
+ * 검증을 통과한 뒤 DB 가 거부해 **원인 불명의 500** 이 됐다.
+ *
+ * 더 나쁜 것은 회귀 테스트(`schemas.limits.test.ts:65`)가 "DB 컬럼 폭을 넘는 이름은
+ * 거부한다" 를 **쓰이지 않는 정본 쪽에만** 걸어 두고 계속 초록이었다는 점이다 —
+ * 감사가 닫혔다고 기록됐지만 실제 가입 경로는 한 번도 지나가지 않았다.
+ *
+ * **비밀번호 규칙도 정본(`passwordSchema`)으로 통일된다.** 사본의 정규식은
+ * `/^(?=...)[A-Za-z\d@$!%*?&#]/` 로 끝 앵커가 없어 사실상 첫 글자만 검사했고,
+ * 특수문자 집합도 좁았다. 정본은 대/소/숫자/특수를 각각 독립 검사하며 집합이 넓다 —
+ * **허용 범위가 넓어지는 방향**이고, 비밀번호 변경 경로(`changePasswordSchema`)가
+ * 이미 쓰던 규칙과 같아져 두 경로의 불일치가 사라진다.
+ */
+const registerSchema = registerFieldsSchema
+  .extend({
     accountType: z.enum(['ENGINEER', 'CLIENT']),
     clientId: z.string().optional(),
   })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: '비밀번호가 일치하지 않습니다.',
-    path: ['confirmPassword'],
-  });
+  .refine(passwordsMatch.check, passwordsMatch.options);
 
 export async function registerUser(formData: FormData) {
   try {
-    await requireRateLimit('strict');
+    // 미인증 액션이라 IP 로 키잉된다. 전용 네임스페이스를 둬서 가입 시도 폭주가
+    // 같은 IP 의 정상 SR 작업을 잠그지 않게 한다.
+    await requireRateLimit('strict', 'register');
     const clientIdValue = formData.get('clientId');
     const data = {
       name: formData.get('name') as string,

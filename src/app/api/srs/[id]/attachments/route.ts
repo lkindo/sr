@@ -1,9 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createWriteStream } from 'fs';
-import { mkdir } from 'fs/promises';
-import { join } from 'path';
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
@@ -11,15 +6,16 @@ import { BadRequestError, NotFoundError } from '@/lib/errors';
 import {
   FileValidationError,
   formatBytes,
-  MAX_UPLOAD_FILE_COUNT,
   MAX_UPLOAD_TOTAL_SIZE,
   validateFile,
 } from '@/lib/file-validator';
 import { ensureCanAttachToSR, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ACCESS_SELECT, SR_ACCESS_WITH_STATUS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeMany, serializeResponse } from '@/lib/serialization';
-import { deleteAttachmentBlob, STORAGE_DIR } from '@/lib/storage';
+import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
+import { attachmentSrIdSchema, batchAttachmentUploadSchema } from '@/lib/upload-schemas';
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';
@@ -46,16 +42,20 @@ export const POST = withAuthAndRateLimit(
     req: NextRequest,
     { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
-    const { id: srId } = await params;
+    const { id } = await params;
+    const srId = attachmentSrIdSchema.parse(id);
 
     // 본문을 힙에 물질화하기 전에 크기를 먼저 막는다.
     // `formData()` 는 모든 파트를 인메모리 Blob 으로 파싱하므로, 그 뒤에 하는
     // 타입별 크기 검증은 메모리 보호에 아무 역할도 하지 못한다(감사 3.41).
     assertUploadSizeWithinLimit(req);
 
-    // SR 존재 확인
+    // SR 존재 확인.
+    // **status 를 포함한다** — `ensureCanAttachToSR` 이 종결된 SR(COMPLETED/CONFIRMED/
+    // REJECTED)에 첨부를 붙이지 못하게 막는 판정에 그 값을 쓴다.
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
+      select: SR_ACCESS_WITH_STATUS_SELECT,
     });
 
     if (!sr) {
@@ -68,18 +68,7 @@ export const POST = withAuthAndRateLimit(
 
     // FormData에서 파일 추출
     const formData = await req.formData();
-    const files = formData.getAll('files') as File[];
-
-    if (files.length === 0) {
-      throw new BadRequestError('업로드할 파일을 선택해주세요.');
-    }
-
-    // 파일 개수 제한 (한 번에 최대 10개)
-    if (files.length > MAX_UPLOAD_FILE_COUNT) {
-      throw new BadRequestError(
-        `한 번에 최대 ${MAX_UPLOAD_FILE_COUNT}개의 파일만 업로드할 수 있습니다.`
-      );
-    }
+    const { files } = batchAttachmentUploadSchema.parse({ files: formData.getAll('files') });
 
     // 총합 가드. Content-Length 가 없는 요청(chunked)이나 헤더가 실제 크기와
     // 어긋나는 경우를 대비해, 파싱 후에도 합계를 한 번 더 확인한다.
@@ -90,27 +79,29 @@ export const POST = withAuthAndRateLimit(
       );
     }
 
-    // 업로드 디렉토리 생성 (웹루트 밖 STORAGE_DIR 기준 — 정적 서빙 차단)
-    const uploadDir = join(STORAGE_DIR, 'attachments');
-    await mkdir(uploadDir, { recursive: true });
-
-    // 모든 파일에 대해 동일한 타임스탬프 사용 (배치 처리)
-    const timestamp = Date.now();
-
+    /**
+     * 저장은 단건 업로드와 **같은 함수**(`uploadAttachmentBlob`)를 쓴다.
+     *
+     * 예전에는 이 배치 경로만 자체 구현을 갖고 있었고, 파일명이
+     * `${timestamp}_${index}_${safeFileName}` 이었다. 문제는 그 세 조각 중 어느 것도
+     * 테넌트를 구분하지 않는다는 점이다 — 전 고객사가 `attachments/` 평면 디렉터리를
+     * 공유했고, `createWriteStream` 기본 모드는 파일이 있으면 **덮어쓴다**.
+     *
+     * 그래서 A사와 B사 사용자가 같은 밀리초에 각각 `보고서.pdf` 를 첫 파일로 올리면
+     * 경로가 정확히 같아지고, 나중 스트림이 앞 파일을 truncate 했다. 결과적으로
+     * DB 에는 **서로 다른 SR 을 가리키는 두 행이 같은 storagePath** 를 갖게 되어,
+     * A사 사용자가 인가를 정상 통과한 채 B사 파일 내용을 내려받았다.
+     *
+     * 공용 함수는 UUID 파일명 · `attachments/<srId>/` 하위 디렉터리 · `wx` 플래그 ·
+     * 경로 탐색 차단을 함께 제공하므로 이 세 가지가 한 번에 닫힌다.
+     */
     const results = await Promise.all(
-      files.map(async (file, index) => {
+      files.map(async (file) => {
         try {
           // 파일 검증 (확장자, 내용, 크기)
           const { mimeType, size } = await validateFile(file);
 
-          // 파일명 생성 (타임스탬프 + 인덱스 + 원본 파일명) - 병렬 처리 시 타임스탬프 충돌 방지
-          const safeFileName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
-          const fileName = `${timestamp}_${index}_${safeFileName}`;
-          const filePath = join(uploadDir, fileName);
-
-          // 파일 저장 (스트림 사용으로 메모리 효율화)
-          const writableStream = createWriteStream(filePath);
-          await pipeline(Readable.fromWeb(file.stream() as any), writableStream);
+          const stored = await uploadAttachmentBlob(srId, file);
 
           // DB 저장 데이터 준비
           // fileUrl 은 생성 후 attachment id 기반 인증 다운로드 경로로 갱신된다(아래 참조).
@@ -121,7 +112,7 @@ export const POST = withAuthAndRateLimit(
             fileUrl: '',
             fileSize: size,
             fileType: mimeType, // 검증된 MIME 타입 사용
-            storagePath: `attachments/${fileName}`,
+            storagePath: stored.pathname,
             uploadedBy: session.user.id,
           };
 
@@ -137,14 +128,36 @@ export const POST = withAuthAndRateLimit(
               fileName: file.name,
             };
           }
-          throw error; // 예상하지 못한 에러는 상위로 전파 (Promise.all 중단)
+          return {
+            status: 'failed' as const,
+            reason: error,
+          };
         }
       })
     );
 
-    const attachmentsToInsert = results
-      .filter((r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled')
-      .map((r) => r.value);
+    // 한 작업이 예상 밖 오류로 실패해도 나머지 병렬 작업이 끝날 때까지 기다린 뒤,
+    // 이미 저장된 형제 blob을 모두 되돌린다. Promise.all을 즉시 reject하면 뒤늦게
+    // 저장을 마친 파일이 정리 단계 이후에 생겨 고아 파일로 남을 수 있다.
+    const failedResult = results.find((result) => result.status === 'failed');
+    if (failedResult) {
+      await Promise.all(
+        results.flatMap((result) =>
+          result.status === 'fulfilled'
+            ? [
+                deleteAttachmentBlob(result.value.storagePath).catch(() => {
+                  // 정리 실패가 원래 오류를 가리지 않도록 한다.
+                }),
+              ]
+            : []
+        )
+      );
+      throw failedResult.reason;
+    }
+
+    const attachmentsToInsert = results.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : []
+    );
 
     let createdAttachments: any[] = [];
     if (attachmentsToInsert.length > 0) {
@@ -247,8 +260,10 @@ export const GET = withAuthAndRateLimit(
   ) => {
     const { id: srId } = await params;
 
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
     });
 
     if (!sr) {

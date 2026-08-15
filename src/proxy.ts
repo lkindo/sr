@@ -8,7 +8,7 @@ import { authConfig, isAuthPagePath } from '@/auth.config';
 const { auth } = NextAuth(authConfig);
 
 // Rate Limiter 인스턴스 (메모리 유지 - 람다/엣지에서는 인스턴스마다 별도일 수 있음)
-import { getClientIdentifier, rateLimiters } from '@/lib/rate-limiter';
+import { getClientIp, rateLimiters } from '@/lib/rate-limiter';
 const ratelimit = rateLimiters.middleware;
 
 export default auth(async (req) => {
@@ -40,8 +40,13 @@ export default auth(async (req) => {
   const isServerAction = req.method === 'POST' && req.headers.has('next-action');
 
   if (isApiRoute || isServerAction) {
-    // 신뢰 프록시 기반 IP 해석 (조작 가능한 XFF 첫 항목 사용 금지)
-    const ip = getClientIdentifier(req);
+    // 신뢰 프록시 기반 IP 해석 (조작 가능한 XFF 첫 항목 사용 금지).
+    //
+    // **여기서는 반드시 IP 로만 키잉한다.** 예전에는 `getClientIdentifier` 를 썼는데,
+    // 그 함수는 세션 쿠키가 있으면 그 값으로 키를 만든다. 미들웨어는 인증 **이전** 단계라
+    // 쿠키를 검증할 수 없으므로, 클라이언트가 쿠키 값을 매 요청 바꾸는 것만으로
+    // 미들웨어 전역 제한(분당 100회)을 통째로 우회할 수 있었다(감사 D-1).
+    const ip = getClientIp(req.headers);
     const { allowed, limit, resetTime, remaining } = await ratelimit.check(ip);
 
     if (!allowed) {
