@@ -7,7 +7,8 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 ## 📋 주요 기능
 
 - **SR 요청 관리**: 고객 서비스 요청 생성, 조회, 수정, 삭제 및 이력 추적
-- **상태 워크플로우**: 요청됨 → 접수 → 진행중 → 완료/취소/반려의 체계적인 상태 관리
+- **상태 워크플로우**: 요청됨 → 접수 → 진행중 → 완료 → 확인완료. 진행 중 보류(ON_HOLD) 전이가
+  가능하고, 신청·접수·보류 단계에서 거절(REJECTED)할 수 있습니다. ('취소' 상태는 없습니다.)
 - **SLA & 우선순위**: 긴급도에 따른 우선순위(CRITICAL~LOW) 관리 및 SLA 마감일 추적
 - **사용자 역할**:
   - **운영팀**: ADMIN (전체 권한), MANAGER (관리), ENGINEER (실무)
@@ -70,7 +71,7 @@ src/
 ├── app/
 │   ├── (auth)/        # 인증 라우트 group
 │   ├── (dashboard)/   # 대시보드 레이아웃 group
-│   └── api/           # REST API Endpoints (External Integrations)
+│   └── api/           # Route Handlers (자사 프런트엔드 전용 REST/SSE, 외부 공개 API 아님)
 ├── components/        # React Components
 │   ├── ui/            # Shadcn UI (Atomic)
 │   ├── srs/           # SR 관련 비즈니스 컴포넌트
@@ -196,15 +197,15 @@ pnpm test:mutation
 
 ### 제품 · 설계
 
-- [SR_Management_System_PRD.md](./docs/SR_Management_System_PRD.md): 제품 요구사항 정의서(v1.3). 초기판이 기술했던 미채택 스택(Vercel/Upstash/Resend/Inngest 등)을 실제 구현 기준으로 정정했습니다.
-- [TRD.md](./docs/TRD.md): 기술 요구사항 문서(v1.4). 현재 스택의 단일 기준 문서로, 자체 서버(Oracle Cloud VM) + Docker Compose + nginx + PostgreSQL 16 구성을 실측 기반으로 기술합니다.
-- [LLD.md](./docs/LLD.md): 상세 설계 문서(v1.2). Next.js 16 + PostgreSQL 16 컨테이너 + 자체 서버 기준이며, 초안이 전제했던 Vercel/Upstash/Blob 스택 미채택을 정정 배너로 명시합니다.
+- [SR_Management_System_PRD.md](./docs/SR_Management_System_PRD.md): 제품 요구사항 정의서(v1.4). 초기판이 기술했던 미채택 스택(Vercel/Upstash/Resend/Inngest 등)을 실제 구현 기준으로 정정했습니다.
+- [TRD.md](./docs/TRD.md): 기술 요구사항 문서(v1.5). 현재 스택의 단일 기준 문서로, 자체 서버(Oracle Cloud VM) + Docker Compose + nginx + PostgreSQL 16 구성을 실측 기반으로 기술합니다.
+- [LLD.md](./docs/LLD.md): 상세 설계 문서(v1.3). Next.js 16 + PostgreSQL 16 컨테이너 + 자체 서버 기준이며, 초안이 전제했던 Vercel/Upstash/Blob 스택 미채택을 정정 배너로 명시합니다.
 - [DESIGN.md](./docs/DESIGN.md): 프런트엔드 디자인 토큰 명세. 다크 캔버스 기반 색상·타이포 팔레트를 정의한 디자인 시스템 자료입니다.
 
 ### 데이터베이스
 
 - [schema.prisma](./prisma/schema.prisma): 데이터베이스 구조의 기계 검증 원본입니다.
-- [DB.md](./docs/DB.md): 데이터베이스 설계 문서(v1.4). `prisma/schema.prisma`와 migrations가 원본이고 본 문서는 사람이 읽는 설명 계층임을 명시합니다.
+- [DB.md](./docs/DB.md): 데이터베이스 설계 문서(v1.5). `prisma/schema.prisma`와 migrations가 원본이고 본 문서는 사람이 읽는 설명 계층임을 명시합니다.
 
 ### 운영 · 보안
 
@@ -220,4 +221,4 @@ pnpm test:mutation
 
 ### 사용자 매뉴얼
 
-- [system_manual.md](./docs/system_manual.md): 화면별 기능·UI 구성요소·RBAC·SLA/상태 전이 제약을 정리한 사용자 및 운영 매뉴얼입니다. (동일 내용의 [.html](./docs/system_manual.html) / [.pptx](./docs/system_manual.pptx) 병존)
+- [system_manual.md](./docs/system_manual.md): 화면별 기능·UI 구성요소·RBAC·SLA/상태 전이 제약을 정리한 사용자 및 운영 매뉴얼입니다. **이 `.md` 가 정본입니다.** 같은 이름의 [.html](./docs/system_manual.html) / [.pptx](./docs/system_manual.pptx) 는 과거 배포용 산출물이며 내용이 동일하지 않습니다 — 기능·권한의 근거로 사용하지 마십시오.

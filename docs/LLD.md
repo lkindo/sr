@@ -1,8 +1,8 @@
 # SR Management System - Low-Level Design (LLD)
 
-**문서 버전:** 1.2
+**문서 버전:** 1.3
 **작성일:** 2025-11-06
-**최종 수정일:** 2026-07-30
+**최종 수정일:** git 이력이 정본 (`git log -1 -- docs/LLD.md`)
 **프로젝트:** SR 관리 시스템
 **기술 스택:** Next.js 16 (App Router) + PostgreSQL 16 컨테이너 + 자체 서버(Docker Compose + nginx)
 
@@ -798,19 +798,20 @@ async function generateSRNumber(clientId: string): Promise<string> {
   return `${clientCode}-${dateStr}-${sequence}`;
 }
 
-function calculateSLADeadline(priority: SRPriority): Date {
-  const SLA_HOURS: Record<SRPriority, number> = {
-    CRITICAL: 4,
-    HIGH: 24,
-    MEDIUM: 72,
-    LOW: 168,
-  };
-
-  const hours = SLA_HOURS[priority];
-  const deadline = new Date();
-  deadline.setHours(deadline.getHours() + hours);
-  return deadline;
-}
+// ⚠️ 정정(2026-08-15): 아래는 **초기 설계안의 폐기된 코드**다. 실제 구현이 아니다.
+//
+// 우선순위별 고정 시한(4/24/72/168h)은 채택되지 않았다. 정본은
+// `src/services/service-category.service.ts` 의 `calculateDueDateFromHours` 이며,
+// **서비스 카테고리의 `slaHours` × 우선순위 배율**로 마감일을 동적 산출한다
+// (CRITICAL 0.5 / HIGH 0.75 / MEDIUM 1.0 / LOW 1.5 — GEMINI.md §3).
+// 산출 시점은 생성 시가 아니라 **접수(Intake) 시점**이다.
+//
+// function calculateSLADeadline(priority: SRPriority): Date {
+//   const SLA_HOURS: Record<SRPriority, number> = {
+//     CRITICAL: 4, HIGH: 24, MEDIUM: 72, LOW: 168,
+//   };
+//   ...
+// }
 
 function validateStateTransition(
   currentStatus: SRStatus,
@@ -917,9 +918,10 @@ export async function createComment(input: z.infer<typeof createCommentSchema>) 
   });
 
   // 알림 트리거 (내부 댓글이 아닌 경우)
-  // 실제 구현(src/app/api/srs/[id]/comments/route.ts:154-190):
-  // 큐에 넣지 않고, 응답을 막지 않도록 backgroundTask 로 발송만 위임한다.
-  // 재시도·outbox 는 없다 — 프로세스가 죽으면 그 발송은 유실된다.
+  // 실제 구현(src/app/api/srs/[id]/comments/route.ts):
+  // 이메일은 같은 트랜잭션 안에서 `enqueueEmails(outbox, tx)` 로 아웃박스에 PENDING 적재하고,
+  // 디스패처가 집어 발송·재시도한다(최대 5회). 웹 푸시만 backgroundTask 로 위임하며
+  // 푸시는 재시도하지 않는다 — 프로세스가 죽으면 그 푸시는 유실된다.
   if (!validated.isInternal) {
     const sr = await db.sR.findUnique({
       where: { id: validated.srId },
@@ -1770,8 +1772,8 @@ export async function checkPermission(userId: string, action: PermissionAction):
 
   if (!user || !user.isActive) return false;
 
-  // System Admin has all permissions
-  const hasAdminRole = user.roles.some((ur) => ur.role.name === 'SYSTEM_ADMIN');
+  // ADMIN has all permissions
+  const hasAdminRole = user.roles.some((ur) => ur.role.name === 'ADMIN');
   if (hasAdminRole) return true;
 
   // Check specific permission
@@ -2076,11 +2078,16 @@ export class SRService {
 
 > **⚠️ 정정(2026-07-30) — 이 절은 원래 "Notification Service" 로서 `notifications` 테이블에
 > PENDING 레코드를 적고 Inngest 가 이를 집어 발송·재시도하는 큐 기반 파이프라인을 기술했다.**
-> 그런 파이프라인은 **구현되지 않았다.** Inngest 는 채택되지 않았고, 영속 큐도 워커도 없다.
-> 또한 `NotificationService` 라는 파일 자체가 존재하지 않으며, `notifications` 테이블은
-> 스키마에는 남아 있지만 **애플리케이션 코드가 한 번도 읽거나 쓰지 않는다**
-> (2026-07-30 `src/` 전체 grep 으로 참조 0건 확인). 발송 상태 추적·재시도·미발송 조회 기능은
-> 현재 존재하지 않는다. 실제 동작은 아래와 같다.
+> **Inngest 는 채택되지 않았고 `NotificationService` 라는 파일도 존재하지 않는다.**
+>
+> **재정정(2026-08-15)**: 위 문단은 "`notifications` 테이블을 애플리케이션 코드가 한 번도
+> 읽거나 쓰지 않는다" 고 적었으나 2026-08-02 이후로 사실이 아니다. **이메일은 아웃박스
+> 패턴으로 이 테이블을 실제로 사용한다** — 도메인 트랜잭션 안에서 `PENDING` 을 적재하고
+> (`src/services/notification-outbox.ts` 의 `enqueueEmails`), 30초 주기 디스패처가
+> `FOR UPDATE SKIP LOCKED` 로 claim 해 발송하며, 실패는 지수 백오프로 최대 5회 재시도한 뒤
+> `FAILED` 로 고정된다. 즉 **발송 상태 추적·재시도·dead-letter 는 이메일에 한해 존재한다.**
+> 여전히 없는 것은 ① 웹 푸시의 영속화·재시도 ② 미발송 알림을 조회하는 관리 화면
+> ③ Inngest 같은 외부 워커다. 실제 동작은 아래와 같다.
 
 **구성 요소 (읽은 파일)**
 
@@ -2209,12 +2216,19 @@ export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
 
 **이 설계가 보장하지 않는 것 (알려진 한계)**
 
-- **재시도 없음**: SMTP/푸시 실패는 `Promise.allSettled` 로 삼켜지고 로그만 남는다.
-- **영속성 없음**: 발송 전에 프로세스가 종료되면 그 알림은 사라진다. outbox 패턴 미구현.
-- **상태 추적 없음**: `notifications` 테이블이 쓰이지 않으므로 "무엇이 발송됐는지" 를
-  DB 에서 조회할 수 없다. 로그(pino → stdout → Docker json-file)가 유일한 기록이다.
-- **다중 인스턴스 불가**: 이벤트 버스가 프로세스 내부에 있어 인스턴스를 늘리면
-  각 인스턴스가 자기 요청에서 난 이벤트만 본다.
+> 아래 한계는 **웹 푸시와 그 밖의 `backgroundTask` 경로에만** 해당한다.
+> 이메일은 2026-08-02 아웃박스 도입으로 이 목록에서 벗어났다.
+
+- **재시도 없음(푸시)**: 웹 푸시 실패는 로그만 남는다. 이메일은 지수 백오프로 최대 5회
+  재시도하고 상한 도달 시 `FAILED` 로 고정된다.
+- **영속성 없음(푸시)**: 발송 전에 프로세스가 종료되면 그 푸시는 사라진다.
+  이메일은 도메인 트랜잭션 안에서 `notifications` 에 `PENDING` 으로 커밋되므로 살아남는다.
+- **상태 추적 부분적**: 이메일은 `notifications` 의 `status`/`attempts`/`failReason` 으로
+  DB 에서 조회 가능하다. 다만 이를 보여주는 **관리 화면이 없어** 현재는 DB 직접 조회가 필요하다.
+  웹 푸시는 아예 기록되지 않는다.
+- **다중 인스턴스 불가(SSE·캐시)**: 이벤트 버스가 프로세스 내부에 있어 인스턴스를 늘리면
+  각 인스턴스가 자기 요청에서 난 이벤트만 본다. 단 아웃박스 claim 은
+  `FOR UPDATE SKIP LOCKED` 로 잠그므로 **이메일 발송은 다중 인스턴스에서도 중복되지 않는다.**
 
 ### 스케줄 작업 (SLA 모니터링 / 정기 보고서)
 
@@ -2553,7 +2567,7 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
         where: {
           roles: {
             some: {
-              role: { name: 'SYSTEM_ADMIN' },
+              role: { name: { in: ['ADMIN', 'MANAGER'] } },
             },
           },
         },
@@ -2591,7 +2605,7 @@ export const NOTIFICATION_CONDITIONS: Record<NotificationTrigger, NotificationCo
         where: {
           roles: {
             some: {
-              role: { name: 'SYSTEM_ADMIN' },
+              role: { name: { in: ['ADMIN', 'MANAGER'] } },
             },
           },
         },
@@ -2927,7 +2941,9 @@ export class MemoryRateLimiter {
 1. **다중 인스턴스 배포**: 캐시·rate limit 버킷·SSE 연결이 프로세스에 묶여 있어 즉시 깨진다
 2. **세션 공유**: 현재는 JWT 세션이라 서버 상태가 없으나, DB 세션으로 바꾸면 필요해진다
 3. **정밀한 Rate Limiting**: 인스턴스별 독립 카운팅 문제 해소
-4. **알림 영속화/재시도**: 현재 `backgroundTask` 는 유실 가능하므로 큐 또는 outbox 가 필요하다
+4. **알림 영속화/재시도**: 이메일은 DB 아웃박스로 해결됨(2026-08-02, Redis 불필요).
+   남은 것은 **웹 푸시**의 영속화·재시도이며, 이는 아웃박스에 `type='PUSH'` 를 편입하면
+   되므로 Redis 도입 사유가 되지 않는다.
 
 ---
 
