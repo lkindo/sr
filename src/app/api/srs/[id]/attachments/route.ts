@@ -6,7 +6,6 @@ import { BadRequestError, NotFoundError } from '@/lib/errors';
 import {
   FileValidationError,
   formatBytes,
-  MAX_UPLOAD_FILE_COUNT,
   MAX_UPLOAD_TOTAL_SIZE,
   validateFile,
 } from '@/lib/file-validator';
@@ -16,6 +15,7 @@ import { SR_ACCESS_SELECT, SR_ACCESS_WITH_STATUS_SELECT, SR_ALIVE } from '@/lib/
 import { serializeMany, serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
+import { attachmentSrIdSchema, batchAttachmentUploadSchema } from '@/lib/upload-schemas';
 
 // Force Node.js runtime (file system operations require Node.js)
 export const runtime = 'nodejs';
@@ -42,7 +42,8 @@ export const POST = withAuthAndRateLimit(
     req: NextRequest,
     { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
-    const { id: srId } = await params;
+    const { id } = await params;
+    const srId = attachmentSrIdSchema.parse(id);
 
     // 본문을 힙에 물질화하기 전에 크기를 먼저 막는다.
     // `formData()` 는 모든 파트를 인메모리 Blob 으로 파싱하므로, 그 뒤에 하는
@@ -67,18 +68,7 @@ export const POST = withAuthAndRateLimit(
 
     // FormData에서 파일 추출
     const formData = await req.formData();
-    const files = formData.getAll('files') as File[];
-
-    if (files.length === 0) {
-      throw new BadRequestError('업로드할 파일을 선택해주세요.');
-    }
-
-    // 파일 개수 제한 (한 번에 최대 10개)
-    if (files.length > MAX_UPLOAD_FILE_COUNT) {
-      throw new BadRequestError(
-        `한 번에 최대 ${MAX_UPLOAD_FILE_COUNT}개의 파일만 업로드할 수 있습니다.`
-      );
-    }
+    const { files } = batchAttachmentUploadSchema.parse({ files: formData.getAll('files') });
 
     // 총합 가드. Content-Length 가 없는 요청(chunked)이나 헤더가 실제 크기와
     // 어긋나는 경우를 대비해, 파싱 후에도 합계를 한 번 더 확인한다.
@@ -138,14 +128,36 @@ export const POST = withAuthAndRateLimit(
               fileName: file.name,
             };
           }
-          throw error; // 예상하지 못한 에러는 상위로 전파 (Promise.all 중단)
+          return {
+            status: 'failed' as const,
+            reason: error,
+          };
         }
       })
     );
 
-    const attachmentsToInsert = results
-      .filter((r): r is { status: 'fulfilled'; value: any } => r.status === 'fulfilled')
-      .map((r) => r.value);
+    // 한 작업이 예상 밖 오류로 실패해도 나머지 병렬 작업이 끝날 때까지 기다린 뒤,
+    // 이미 저장된 형제 blob을 모두 되돌린다. Promise.all을 즉시 reject하면 뒤늦게
+    // 저장을 마친 파일이 정리 단계 이후에 생겨 고아 파일로 남을 수 있다.
+    const failedResult = results.find((result) => result.status === 'failed');
+    if (failedResult) {
+      await Promise.all(
+        results.flatMap((result) =>
+          result.status === 'fulfilled'
+            ? [
+                deleteAttachmentBlob(result.value.storagePath).catch(() => {
+                  // 정리 실패가 원래 오류를 가리지 않도록 한다.
+                }),
+              ]
+            : []
+        )
+      );
+      throw failedResult.reason;
+    }
+
+    const attachmentsToInsert = results.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : []
+    );
 
     let createdAttachments: any[] = [];
     if (attachmentsToInsert.length > 0) {

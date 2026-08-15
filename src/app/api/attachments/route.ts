@@ -14,6 +14,7 @@ import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
+import { singleAttachmentUploadSchema } from '@/lib/upload-schemas';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -26,12 +27,10 @@ export const POST = withAuthAndRateLimit(
     assertUploadSizeWithinLimit(request);
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
-    const srId = formData.get('srId') as string;
-
-    if (!file || !srId) {
-      throw new BadRequestError('파일과 SR ID가 필요합니다.');
-    }
+    const { file, srId } = singleAttachmentUploadSchema.parse({
+      file: formData.get('file'),
+      srId: formData.get('srId'),
+    });
 
     // 파일 크기 검증
     if (file.size > MAX_UPLOAD_FILE_SIZE) {

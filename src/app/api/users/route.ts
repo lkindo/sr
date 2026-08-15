@@ -13,7 +13,7 @@ import {
   resolveClientIdFilter,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { userCreateSchema } from '@/lib/schemas';
+import { userCreateSchema, userListQuerySchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -29,17 +29,26 @@ export const GET = withAuthAndRateLimit(
     const { searchParams } = new URL(request.url);
     const { skip, take, orderBy, createResponse } = usePagination(request, SORTABLE_FIELDS.users);
 
-    const clientIdFilter = resolveClientIdFilter(session.user, searchParams.get('clientId'));
+    const query = userListQuerySchema.parse({
+      search: searchParams.get('search'),
+      isActive: searchParams.get('isActive'),
+      userType: searchParams.get('userType'),
+      roleId: searchParams.get('roleId'),
+      role: searchParams.get('role'),
+      clientId: searchParams.get('clientId'),
+    });
+
+    const clientIdFilter = resolveClientIdFilter(session.user, query.clientId ?? null);
     if (typeof clientIdFilter === 'object' && clientIdFilter.in.length === 0) {
       return NextResponse.json(createResponse([], 0));
     }
 
     const filters = {
-      search: searchParams.get('search') || undefined,
-      isActive: searchParams.get('isActive') || undefined,
-      userType: searchParams.get('userType') || undefined,
-      roleId: searchParams.get('roleId') || undefined,
-      role: searchParams.get('role') || undefined,
+      search: query.search,
+      isActive: query.isActive,
+      userType: query.userType,
+      roleId: query.roleId,
+      role: query.role,
       clientId: clientIdFilter,
     };
 

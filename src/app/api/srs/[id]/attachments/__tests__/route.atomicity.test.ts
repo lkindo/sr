@@ -170,6 +170,25 @@ describe('POST /api/srs/[id]/attachments — 저장 경로 격리', () => {
 });
 
 describe('POST /api/srs/[id]/attachments — 배치 업로드', () => {
+  it('files 이름의 텍스트 파트는 파일 검증 전에 거부한다', async () => {
+    const form = new FormData();
+    form.append('files', 'not-a-file');
+
+    await expect(
+      (POST as any)(
+        {
+          formData: async () => form,
+          url: 'http://localhost:3000/api/srs/sr-1/attachments',
+          headers: new Headers(),
+        },
+        { params: Promise.resolve({ id: 'sr-1' }) }
+      )
+    ).rejects.toThrow('올바른 파일을 선택해주세요.');
+
+    expect(mocks.validateFile).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it('삽입·fileUrl 갱신·활동 로그가 한 트랜잭션 안에서 일어난다', async () => {
     await call(['a.txt', 'b.txt']);
 
@@ -195,5 +214,18 @@ describe('POST /api/srs/[id]/attachments — 배치 업로드', () => {
     await expect(call(['a.txt', 'b.txt'])).rejects.toThrow('db down');
 
     expect(mocks.deleteBlob).toHaveBeenCalledTimes(2);
+  });
+
+  it('형제 파일 저장이 실패하면 이미 저장된 blob을 되돌리고 DB를 호출하지 않는다', async () => {
+    mocks.uploadBlob.mockImplementation(async (srId: string, file: File) => {
+      if (file.name === 'b.txt') throw new Error('disk full');
+      const pathname = `attachments/${srId}/uuid-${file.name}`;
+      return { url: pathname, pathname, size: 1, type: 'text/plain' };
+    });
+
+    await expect(call(['a.txt', 'b.txt'])).rejects.toThrow('disk full');
+
+    expect(mocks.deleteBlob).toHaveBeenCalledWith('attachments/sr-1/uuid-a.txt');
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 });

@@ -147,6 +147,30 @@ describe('POST /api/permissions/check', () => {
     ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
   });
 
+  it('권한 조각은 대문자·숫자·밑줄 형식만 허용한다', async () => {
+    const request = new NextRequest('http://localhost/api/permissions/check', {
+      method: 'POST',
+      body: JSON.stringify({ resource: 'sr', action: 'READ' }),
+    });
+
+    const { POST } = await import('../route');
+    await expect(
+      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as never)
+    ).rejects.toThrow('권한 값은 대문자, 숫자, 밑줄만 사용할 수 있습니다.');
+  });
+
+  it('DB 컬럼 폭보다 긴 권한 조각을 거부한다', async () => {
+    const request = new NextRequest('http://localhost/api/permissions/check', {
+      method: 'POST',
+      body: JSON.stringify({ resource: 'R'.repeat(51), action: 'READ' }),
+    });
+
+    const { POST } = await import('../route');
+    await expect(
+      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as never)
+    ).rejects.toThrow('권한 값은 50자를 초과할 수 없습니다.');
+  });
+
   it('다양한 리소스와 액션 조합을 처리해야 함', async () => {
     // Arrange
     const session = {

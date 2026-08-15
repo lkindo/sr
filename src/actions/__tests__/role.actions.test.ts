@@ -43,6 +43,19 @@ describe('role.actions', () => {
     updateRolePermissions: vi.fn(),
   };
 
+  const useActualSchemaValidation = () => {
+    vi.mocked(validateWithSchema).mockImplementation((data, schema) => {
+      const parsed = schema.safeParse(data);
+      return parsed.success
+        ? { success: true, data: parsed.data }
+        : {
+            success: false,
+            error: parsed.error.issues[0]?.message ?? '입력값 검증에 실패했습니다.',
+            code: 'VALIDATION_ERROR',
+          };
+    });
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(authenticateAndAuthorize).mockResolvedValue(SESSION as never);
@@ -159,10 +172,28 @@ describe('role.actions', () => {
   });
 
   describe('updateRolePermissionsAction', () => {
-    it('성공적으로 역할 권한을 업데이트해야 함', async () => {
+    it('실제 스키마가 101개 권한을 거부하고 인가와 서비스를 호출하지 않는다', async () => {
+      useActualSchemaValidation();
+
+      const result = await updateRolePermissionsAction(
+        'r1',
+        Array.from({ length: 101 }, (_, index) => `p${index}`)
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('한 번에 최대 100개의 권한만 변경할 수 있습니다.');
+      }
+      expect(authenticateAndAuthorize).not.toHaveBeenCalled();
+      expect(mockRoleService.updateRolePermissions).not.toHaveBeenCalled();
+    });
+
+    it('실제 스키마 경계인 100개 권한을 업데이트한다', async () => {
+      useActualSchemaValidation();
+      const permissionIds = Array.from({ length: 100 }, (_, index) => `p${index}`);
       mockRoleService.updateRolePermissions.mockResolvedValue(undefined as any);
 
-      const result = await updateRolePermissionsAction('r1', ['p1', 'p2']);
+      const result = await updateRolePermissionsAction('r1', permissionIds);
 
       expect(result.success).toBe(true);
       // 카탈로그에 실재하는 값이어야 한다. 예전 리터럴 'role:update_permissions' 는
@@ -171,11 +202,25 @@ describe('role.actions', () => {
       expect(authenticateAndAuthorize).toHaveBeenCalledWith(PERMISSIONS.ROLE.ASSIGN_PERMISSION);
       expect(mockRoleService.updateRolePermissions).toHaveBeenCalledWith(
         'r1',
-        ['p1', 'p2'],
+        permissionIds,
         SESSION.user.id,
         null,
         SESSION.user
       );
+    });
+
+    it.each([
+      ['너무 긴 역할 ID', 'r'.repeat(31), ['p1'], '역할 ID가 너무 깁니다.'],
+      ['너무 긴 권한 ID', 'r1', ['p'.repeat(31)], '권한 ID가 너무 깁니다.'],
+      ['중복 권한 ID', 'r1', ['p1', 'p1'], '중복된 권한 ID가 있습니다.'],
+    ])('%s를 실제 스키마로 거부한다', async (_case, roleId, permissionIds, message) => {
+      useActualSchemaValidation();
+
+      const result = await updateRolePermissionsAction(roleId, permissionIds);
+
+      expect(result).toMatchObject({ success: false, error: message, code: 'VALIDATION_ERROR' });
+      expect(authenticateAndAuthorize).not.toHaveBeenCalled();
+      expect(mockRoleService.updateRolePermissions).not.toHaveBeenCalled();
     });
   });
 });

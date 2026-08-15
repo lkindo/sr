@@ -356,6 +356,15 @@ export const roleCreateSchema = z.object({
 
 export const roleUpdateSchema = roleCreateSchema.partial();
 
+/** 역할 권한 일괄 변경. 빈 배열은 "권한 전부 해제"라는 유효한 요청이다. */
+export const rolePermissionsUpdateSchema = z.object({
+  roleId: z.string().min(1, '역할 ID가 필요합니다.').max(30, '역할 ID가 너무 깁니다.'),
+  permissionIds: z
+    .array(z.string().min(1, '권한 ID가 비어 있습니다.').max(30, '권한 ID가 너무 깁니다.'))
+    .max(100, '한 번에 최대 100개의 권한만 변경할 수 있습니다.')
+    .refine((ids) => new Set(ids).size === ids.length, '중복된 권한 ID가 있습니다.'),
+});
+
 // SR Intake Schema - 접수 처리 전용
 export const intakeSchema = z.object({
   actualPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
@@ -463,4 +472,84 @@ export const clientAssignSchema = z.object({
 /** 사용자 역할 배정. 빈 배열은 "역할 전부 해제"라는 의미이므로 min(1) 을 걸지 않는다. */
 export const roleAssignSchema = z.object({
   roleIds: z.array(z.string()),
+});
+
+/** 시스템 설정 화면이 실제로 저장하는 세 필드. 빈 관리자 메일은 알림 수신 해제를 뜻한다. */
+export const systemSettingsUpdateSchema = z
+  .object({
+    siteName: z
+      .string()
+      .trim()
+      .min(1, '사이트 이름을 입력해주세요.')
+      .max(
+        FIELD_LIMITS.DISPLAY_NAME,
+        `사이트 이름은 ${FIELD_LIMITS.DISPLAY_NAME}자를 초과할 수 없습니다.`
+      ),
+    siteDescription: z
+      .string()
+      .trim()
+      .min(1, '사이트 설명을 입력해주세요.')
+      .max(
+        FIELD_LIMITS.SHORT_TEXT,
+        `사이트 설명은 ${FIELD_LIMITS.SHORT_TEXT}자를 초과할 수 없습니다.`
+      ),
+    adminEmail: z.preprocess(
+      (value) => (typeof value === 'string' ? value.trim() : value),
+      z
+        .string()
+        .max(FIELD_LIMITS.EMAIL, `관리자 이메일은 ${FIELD_LIMITS.EMAIL}자를 초과할 수 없습니다.`)
+        .email('유효한 관리자 이메일 주소를 입력해주세요.')
+        .or(z.literal(''))
+    ),
+  })
+  .strict();
+
+const permissionSegmentSchema = z
+  .string({ error: '리소스와 액션을 제공해야 합니다' })
+  .min(1, '리소스와 액션을 제공해야 합니다')
+  .max(FIELD_LIMITS.CODE, `권한 값은 ${FIELD_LIMITS.CODE}자를 초과할 수 없습니다.`)
+  .regex(/^[A-Z][A-Z0-9_]*$/, '권한 값은 대문자, 숫자, 밑줄만 사용할 수 있습니다.');
+
+/** 세션 권한 키(`RESOURCE:ACTION`)를 구성하는 두 조각. */
+export const permissionCheckSchema = z.object({
+  resource: permissionSegmentSchema,
+  action: permissionSegmentSchema,
+});
+
+const emptyQueryToUndefined = (value: unknown) =>
+  value === '' || value === null ? undefined : value;
+
+/** 사용자 목록의 비페이지네이션 쿼리 파라미터. */
+export const userListQuerySchema = z.object({
+  search: z.preprocess(
+    emptyQueryToUndefined,
+    z.string().max(FIELD_LIMITS.SHORT_TEXT, '검색어가 너무 깁니다.').optional()
+  ),
+  isActive: z.preprocess(emptyQueryToUndefined, z.enum(['true', 'false', 'all']).optional()),
+  userType: z.preprocess(emptyQueryToUndefined, z.enum(['ENGINEER', 'CLIENT', 'all']).optional()),
+  roleId: z.preprocess(
+    emptyQueryToUndefined,
+    z.string().max(30, '역할 ID가 너무 깁니다.').optional()
+  ),
+  role: z.preprocess(
+    emptyQueryToUndefined,
+    z.string().max(FIELD_LIMITS.NAME, '역할 필터가 너무 깁니다.').optional()
+  ),
+  clientId: z.preprocess(
+    emptyQueryToUndefined,
+    z.string().max(30, '고객사 ID가 너무 깁니다.').optional()
+  ),
+});
+
+/** 고객사 목록의 비페이지네이션 쿼리 파라미터. */
+export const clientListQuerySchema = z.object({
+  search: z.preprocess(
+    emptyQueryToUndefined,
+    z.string().max(FIELD_LIMITS.SHORT_TEXT, '검색어가 너무 깁니다.').optional()
+  ),
+  industry: z.preprocess(
+    emptyQueryToUndefined,
+    z.string().max(FIELD_LIMITS.DISPLAY_NAME, '산업 분류가 너무 깁니다.').optional()
+  ),
+  isActive: z.preprocess(emptyQueryToUndefined, z.enum(['true', 'false', 'all']).optional()),
 });

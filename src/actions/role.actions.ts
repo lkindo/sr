@@ -7,7 +7,7 @@ import { errorToResult } from '@/lib/errors';
 import { getFormDataValue } from '@/lib/form-data-parser';
 import { PERMISSIONS } from '@/lib/permission-helpers';
 import { fail, ok, Result } from '@/lib/result';
-import { roleCreateSchema, roleUpdateSchema } from '@/lib/schemas';
+import { roleCreateSchema, rolePermissionsUpdateSchema, roleUpdateSchema } from '@/lib/schemas';
 import { services } from '@/services/service-registry';
 
 export async function createRoleAction(formData: FormData): Promise<Result<Role>> {
@@ -82,12 +82,20 @@ export async function updateRolePermissionsAction(
   permissionIds: string[]
 ): Promise<Result<void>> {
   try {
+    const validationResult = validateWithSchema(
+      { roleId, permissionIds },
+      rolePermissionsUpdateSchema
+    );
+    if (!validationResult.success) {
+      return validationResult;
+    }
+
     const session = await authenticateAndAuthorize(PERMISSIONS.ROLE.ASSIGN_PERMISSION);
 
     const roleService = services.roleService;
     await roleService.updateRolePermissions(
-      roleId,
-      permissionIds,
+      validationResult.data.roleId,
+      validationResult.data.permissionIds,
       session.user.id,
       null,
       session.user

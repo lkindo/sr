@@ -129,6 +129,23 @@ beforeEach(() => {
 });
 
 describe('POST /api/attachments — 단일 업로드', () => {
+  it('텍스트 파트를 파일로 가장하면 저장 전에 거부한다', async () => {
+    const form = new FormData();
+    form.set('file', 'not-a-file');
+    form.set('srId', 'sr-1');
+
+    await expect(
+      (POST as any)({
+        formData: async () => form,
+        url: 'http://localhost:3000/api/attachments',
+        headers: new Headers(),
+      })
+    ).rejects.toThrow('올바른 파일을 선택해주세요.');
+
+    expect(mocks.validateFile).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it('행 생성·fileUrl 갱신·활동 로그가 한 트랜잭션 안에서 일어난다', async () => {
     await (POST as any)(uploadRequest());
 
