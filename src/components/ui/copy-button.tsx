@@ -36,12 +36,19 @@ export function CopyButton({
     return undefined;
   }, [hasCopied]);
 
-  const onCopy = () => {
-    navigator.clipboard.writeText(value);
-    setHasCopied(true);
-    toast({
-      description: message,
-    });
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setHasCopied(true);
+      toast({
+        description: message,
+      });
+    } catch {
+      toast({
+        description: '클립보드에 복사하지 못했습니다.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const currentLabel = hasCopied ? successLabel : label;
@@ -53,7 +60,7 @@ export function CopyButton({
       className={cn('h-6 w-6 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900', className)}
       onClick={(e) => {
         e.stopPropagation();
-        onCopy();
+        void onCopy();
       }}
       title={currentLabel}
       {...props}
