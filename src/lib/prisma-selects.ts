@@ -17,6 +17,42 @@
  */
 export const SR_ALIVE = { deletedAt: null } as const;
 
+/**
+ * 인가 판정에만 필요한 SR 필드 (db-rules §4).
+ *
+ * `policies.ts` 의 `SRAccessFields` 와 같은 모양이다. SR 은 `description`(무제한 TEXT),
+ * `intakeNotes`, `resolutionDescription`, `rejectionReason` 같은 큰 필드를 갖고 있어
+ * 인가만 하려고 전체 행을 읽으면 그 값들이 그대로 메모리에 올라온다.
+ *
+ * 쓰기 경로(첨부 삭제·업로드)에는 이것 대신 `SR_ACCESS_WITH_STATUS_SELECT` 를 쓴다 —
+ * 아래 주석 참조.
+ */
+export const SR_ACCESS_SELECT = {
+  id: true,
+  clientId: true,
+  requesterId: true,
+  assigneeId: true,
+} as const;
+
+/**
+ * 인가 + **상태**가 필요한 경로용.
+ *
+ * `canDeleteAttachment` 는 `sr.requesterId === user.id && sr.status === 'REQUESTED'` 로
+ * "요청자 본인이 아직 접수 전인 자기 SR 의 첨부를 지우는" 경우를 허용한다.
+ * 그런데 그 시그니처의 `status` 는 **선택적**(`status?: string`)이라, 위의 4필드 select 를
+ * 주면 **타입 오류 없이** `undefined` 가 되어 그 분기가 영원히 거짓이 된다 —
+ * 요청자 본인의 첨부 삭제가 조용히 불가능해진다.
+ *
+ * 첨부를 붙일 때도 마찬가지다. `ensureCanAttachToSR` 은 종결된 SR(COMPLETED/CONFIRMED/
+ * REJECTED)을 막는데, 그 판정 역시 `status` 를 읽는다.
+ *
+ * **쓰기 경로에서는 반드시 이 상수를 쓴다.**
+ */
+export const SR_ACCESS_WITH_STATUS_SELECT = {
+  ...SR_ACCESS_SELECT,
+  status: true,
+} as const;
+
 export const USER_SUMMARY_SELECT = {
   id: true,
   name: true,

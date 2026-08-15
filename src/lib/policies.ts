@@ -222,7 +222,11 @@ export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): 
  */
 export function canDeleteAttachment(
   user: AuthenticatedUser,
-  sr: SRAccessFields & { requesterId?: string | null; status?: string }
+  // `status` 는 **필수**다. 선택적으로 두면 호출부가 select 로 필드를 좁혔을 때
+  // 타입 오류 없이 `undefined` 가 들어오고, 아래 `status === 'REQUESTED'` 분기가
+  // 영원히 거짓이 되어 **요청자 본인의 첨부 삭제가 조용히 막힌다.**
+  // 인가에 쓰는 값은 없으면 컴파일이 실패하는 편이 낫다(감사 D-20).
+  sr: SRAccessFields & { requesterId?: string | null; status: string }
 ): boolean {
   if (!canUpdateSR(user, sr)) return false;
 
@@ -234,7 +238,7 @@ export function canDeleteAttachment(
 
 export function ensureCanDeleteAttachment(
   user: AuthenticatedUser,
-  sr: SRAccessFields & { requesterId?: string | null; status?: string }
+  sr: SRAccessFields & { requesterId?: string | null; status: string }
 ): void {
   if (!canDeleteAttachment(user, sr)) {
     throw new ForbiddenError('첨부파일 삭제 권한이 없습니다.');

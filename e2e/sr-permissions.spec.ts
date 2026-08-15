@@ -1,9 +1,25 @@
 import { expect, test } from '@playwright/test';
-
-import prisma from '../src/lib/prisma';
+import { PrismaClient } from '@prisma/client';
 
 import { deleteSeededSRs, seedSR } from './fixtures/sr';
 import { apiRequestWithRateLimitRetry } from './helpers/test-helpers';
+
+/**
+ * e2e 전용 Prisma 인스턴스.
+ *
+ * 앱의 싱글턴(`src/lib/prisma.ts`)을 import 하지 않는 이유: 그 모듈은 `import 'server-only'`
+ * 를 선언하고, 그 패키지는 `react-server` 조건이 없는 환경에서 **import 즉시 throw** 한다.
+ * Playwright 는 스펙을 plain Node 로 로드하므로 파일 수집 단계에서 즉사한다.
+ *
+ * 이 인스턴스는 앱 싱글턴이 붙여 둔 Client Extension(슬로우쿼리 계측)을 갖지 않는다 —
+ * **의도적 축소**다. 아래 사용처는 전부 읽기 전용 검증 조회라 결과가 동일하다.
+ */
+const prisma = new PrismaClient();
+
+test.afterAll(async () => {
+  // 끊지 않으면 Playwright 워커가 커넥션을 물고 종료를 기다린다.
+  await prisma.$disconnect();
+});
 
 // 이 테스트는 setup 프로젝트에서 생성한 인증 상태를 사용합니다
 // playwright.config.ts에서 storageState가 설정되어 있어야 합니다

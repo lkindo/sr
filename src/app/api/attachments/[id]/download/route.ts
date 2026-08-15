@@ -7,7 +7,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { SR_ALIVE } from '@/lib/prisma-selects';
+import { SR_ACCESS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { resolveAttachmentFilePath } from '@/lib/storage';
 
 // 파일 시스템 접근이 필요하므로 Node.js 런타임
@@ -41,7 +41,11 @@ export const GET = withAuthAndRateLimit(
     }
 
     // 권한 체크: 첨부파일이 속한 SR을 조회할 수 있어야 함 (IDOR 방지)
-    const sr = await prisma.sR.findUnique({ where: { id: attachment.srId, ...SR_ALIVE } });
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
+    const sr = await prisma.sR.findUnique({
+      where: { id: attachment.srId, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
+    });
     if (!sr) {
       throw new NotFoundError('SR');
     }

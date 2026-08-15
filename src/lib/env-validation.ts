@@ -1,3 +1,5 @@
+import 'server-only';
+
 import { logger } from '@/lib/logger';
 /**
  * 환경 변수 검증 모듈

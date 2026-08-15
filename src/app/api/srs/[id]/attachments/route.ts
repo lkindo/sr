@@ -12,7 +12,7 @@ import {
 } from '@/lib/file-validator';
 import { ensureCanAttachToSR, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { SR_ALIVE } from '@/lib/prisma-selects';
+import { SR_ACCESS_SELECT, SR_ACCESS_WITH_STATUS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeMany, serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
@@ -49,9 +49,12 @@ export const POST = withAuthAndRateLimit(
     // 타입별 크기 검증은 메모리 보호에 아무 역할도 하지 못한다(감사 3.41).
     assertUploadSizeWithinLimit(req);
 
-    // SR 존재 확인
+    // SR 존재 확인.
+    // **status 를 포함한다** — `ensureCanAttachToSR` 이 종결된 SR(COMPLETED/CONFIRMED/
+    // REJECTED)에 첨부를 붙이지 못하게 막는 판정에 그 값을 쓴다.
     const sr = await prisma.sR.findUnique({
       where: { id: srId, ...SR_ALIVE },
+      select: SR_ACCESS_WITH_STATUS_SELECT,
     });
 
     if (!sr) {
@@ -245,8 +248,10 @@ export const GET = withAuthAndRateLimit(
   ) => {
     const { id: srId } = await params;
 
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
     const sr = await prisma.sR.findUnique({
       where: { id: srId, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
     });
 
     if (!sr) {

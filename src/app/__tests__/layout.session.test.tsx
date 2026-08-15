@@ -17,12 +17,9 @@ vi.mock('@/auth', () => ({ auth }));
 
 vi.mock('@/components/providers/ClientLayout', () => ({ default: ClientLayoutStub }));
 
-// 루트 레이아웃이 끌고 오는 사이드이펙트들 — 세션 배선과 무관하다.
-vi.mock('next/font/google', () => ({
-  Inter: () => ({ className: 'font-inter', variable: '--font-inter' }),
-  Geist: () => ({ className: 'font-geist', variable: '--font-geist' }),
-  Geist_Mono: () => ({ className: 'font-geist-mono', variable: '--font-geist-mono' }),
-}));
+// `next/font/google` 목은 제거했다(2026-08-15). `src/app/layout.tsx` 에 next/font 선언이
+// 없어 **적용된 적이 없는 목**이었다. 남겨 두면 (a) 폰트 도입 여부를 조사하는 사람에게
+// 거짓 증거가 되고 (b) 나중에 실제로 도입할 때 새 배선이 조용히 무력화된다.
 
 /** 서버 컴포넌트는 호출해도 자식이 실행되지 않는다 — 반환된 엘리먼트 트리를 직접 훑는다. */
 const findElement = (node: unknown, type: unknown): { props: Record<string, unknown> } | null => {

@@ -133,15 +133,12 @@ export default function RolesClient({ initialRoles }: RolesClientProps) {
     setIsDeleteDialogOpen(false);
   };
 
-  if (isPending) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <p className="text-muted-foreground">로딩 중...</p>
-      </div>
-    );
-  }
-
   // 권한이 없으면 "역할이 없다" 로 위장하지 않고 그렇다고 말한다.
+  //
+  // **이 검사는 로딩보다 먼저 와야 한다.** 서버가 인가에 막혀 `initialRoles === null` 을
+  // 내려보낸 경우, 로딩 분기가 앞에 있으면 클라이언트 조회가 403 을 받아 올 때까지
+  // 권한 없는 사용자에게 "로딩 중..." 이 먼저 보인다 — 이 컴포넌트 주석이
+  // "기다리지 않고 곧바로 접근 거부" 라고 보장한 동작과 어긋난다.
   // 메뉴는 ROLE:READ 로 게이트되지만(config/navigation.ts) URL 직접 접근은 남는다.
   if (accessDenied) {
     return (
@@ -157,6 +154,14 @@ export default function RolesClient({ initialRoles }: RolesClientProps) {
             </p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">로딩 중...</p>
       </div>
     );
   }

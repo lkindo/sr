@@ -7,7 +7,7 @@ import { PAGINATION } from '@/lib/constants';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { SR_ALIVE } from '@/lib/prisma-selects';
+import { SR_ACCESS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { commentSchema } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
 import { emailService } from '@/services/email.service';
@@ -21,8 +21,10 @@ export const GET = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
     const sr = await prisma.sR.findUnique({
       where: { id, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
     });
 
     if (!sr) {

@@ -5,7 +5,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanDeleteAttachment, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { SR_ALIVE } from '@/lib/prisma-selects';
+import { SR_ACCESS_SELECT, SR_ACCESS_WITH_STATUS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob } from '@/lib/storage';
 import { auditService } from '@/services/audit.service';
@@ -30,8 +30,10 @@ export const GET = withAuthAndRateLimit(
     }
 
     // 권한 체크: 첨부파일이 속한 SR을 조회할 수 있어야 함 (IDOR 방지)
+    // 인가 판정에만 쓰므로 전체 행을 읽지 않는다(db-rules §4).
     const sr = await prisma.sR.findUnique({
       where: { id: attachment.srId, ...SR_ALIVE },
+      select: SR_ACCESS_SELECT,
     });
     if (!sr) {
       throw new NotFoundError('SR');
@@ -63,9 +65,16 @@ export const DELETE = withAuthAndRateLimit(
       throw new NotFoundError('첨부파일');
     }
 
-    // SR 접근 권한 체크
+    // SR 접근 권한 체크.
+    //
+    // **여기는 반드시 status 를 포함해야 한다.** `canDeleteAttachment` 가
+    // `sr.requesterId === user.id && sr.status === 'REQUESTED'` 로 "요청자 본인이 아직
+    // 접수 전인 자기 SR 의 첨부를 지우는" 경우를 허용하는데, 그 시그니처의 `status` 가
+    // 선택적이라 4필드 select 를 주면 **타입 오류 없이** undefined 가 되어 그 분기가
+    // 영원히 거짓이 된다.
     const sr = await prisma.sR.findUnique({
       where: { id: attachment.srId, ...SR_ALIVE },
+      select: SR_ACCESS_WITH_STATUS_SELECT,
     });
 
     if (!sr) {

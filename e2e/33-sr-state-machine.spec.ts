@@ -300,6 +300,15 @@ test.describe('SR 상태 머신: 액션별 필수 필드', () => {
       error: '보류 사유를 입력해주세요.',
     },
     {
+      // 헌법 §2 는 보류에 사유 **와** 예상 해제일을 **모두** 요구한다.
+      // 사유만 보내면 절반만 지킨 것이라 거부되어야 한다.
+      stage: 'IN_PROGRESS',
+      action: 'hold',
+      missing: 'expectedHoldReleaseDate',
+      payload: { reason: '예상 해제일 없이 사유만 보냈다' },
+      error: '예상 해제일을 입력해주세요.',
+    },
+    {
       stage: 'REQUESTED',
       action: 'reject',
       missing: 'reason',

@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ForbiddenError } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
-import { ensureCanAttachToSR } from '@/lib/policies';
+import { ensureCanAttachToSR, ensureCanDeleteAttachment } from '@/lib/policies';
 import type { AuthenticatedUser } from '@/types/session';
 
 const sr = {
@@ -95,6 +95,63 @@ describe('ensureCanAttachToSR — 종결된 SR 을 막는다', () => {
 
     expect(() => ensureCanAttachToSR(outsider, { ...sr, status: 'COMPLETED' })).toThrow(
       /권한이 없습니다/
+    );
+  });
+});
+
+/**
+ * 첨부 **삭제** 인가 (감사 D-20).
+ *
+ * 이 술어에는 테스트가 하나도 없었다. 그런데 `status` 가 선택적 필드라,
+ * 호출부가 `select` 로 조회 필드를 좁히는 순간 **타입 오류 없이** `undefined` 가 들어와
+ * 아래 "요청자 본인 + REQUESTED" 분기가 영원히 거짓이 됐다 — 요청자가 자기 SR 의
+ * 첨부를 지울 수 없게 되는데, 어떤 테스트도 그걸 잡지 못했다.
+ *
+ * `status` 를 필수로 바꿔 컴파일 타임에 막았고, 동작 자체는 여기서 고정한다.
+ */
+describe('ensureCanDeleteAttachment', () => {
+  const requester = () =>
+    user({
+      id: 'user-requester',
+      permissions: [PERMISSIONS.SR.UPDATE_SELF, PERMISSIONS.SR.READ],
+    });
+
+  it('요청자 본인은 접수 전(REQUESTED) 자기 SR 의 첨부를 지울 수 있다', () => {
+    expect(() =>
+      ensureCanDeleteAttachment(requester(), { ...sr, status: 'REQUESTED' })
+    ).not.toThrow();
+  });
+
+  it('접수된 뒤에는 요청자라도 지울 수 없다', () => {
+    // 접수 이후의 첨부는 처리 이력의 일부다.
+    expect(() => ensureCanDeleteAttachment(requester(), { ...sr, status: 'INTAKE' })).toThrow(
+      ForbiddenError
+    );
+  });
+
+  it('ADMIN 은 상태와 무관하게 지울 수 있다', () => {
+    const admin = user({ id: 'admin-1', roles: ['ADMIN'] });
+
+    expect(() => ensureCanDeleteAttachment(admin, { ...sr, status: 'COMPLETED' })).not.toThrow();
+  });
+
+  it('타 테넌트 사용자는 지울 수 없다', () => {
+    const outsider = user({
+      id: 'user-requester',
+      clientIds: ['client-B'],
+      permissions: [PERMISSIONS.SR.UPDATE_SELF],
+    });
+
+    expect(() => ensureCanDeleteAttachment(outsider, { ...sr, status: 'REQUESTED' })).toThrow(
+      ForbiddenError
+    );
+  });
+
+  it('요청자가 아닌 같은 고객사 사용자는 지울 수 없다', () => {
+    const other = user({ id: 'user-other', permissions: [PERMISSIONS.SR.UPDATE_SELF] });
+
+    expect(() => ensureCanDeleteAttachment(other, { ...sr, status: 'REQUESTED' })).toThrow(
+      ForbiddenError
     );
   });
 });

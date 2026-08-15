@@ -177,12 +177,34 @@ describe('RolesClient — 서버가 주입한 초기 데이터', () => {
     expect(screen.getByTestId('role-table')).toHaveTextContent('2');
   });
 
-  it('서버 조회가 인가에 막히면(null) 빈 목록이 아니라 접근 거부를 보여 준다', () => {
-    // 권한 없는 사용자에게 "등록된 역할이 없습니다." 라고 말하는 것은 화면이 하는 거짓말이다.
+  /**
+   * 서버가 인가에 막혔을 때는 **기다리지 않고 곧바로** 접근 거부를 보여 줘야 한다.
+   *
+   * 이 단언은 분기 **순서**를 고정한다. `if (isPending)` 이 `if (accessDenied)` 앞에 있으면
+   * 권한 없는 사용자에게 "로딩 중..." 이 먼저 뜨고, 클라이언트 조회가 403 을 받아 올
+   * 때까지 그대로 남는다 — 컴포넌트 주석이 보장한다고 적은 동작과 어긋난다.
+   * (실제로 그 상태였다.)
+   */
+  it('서버 조회가 인가에 막히면(null) 로딩을 거치지 않고 접근 거부를 보여 준다', () => {
+    // fetch 를 영원히 매달아 둔다 — 클라이언트 조회를 기다리면 이 단언이 깨진다.
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
 
     render(<RolesClient initialRoles={null} />, { wrapper: makeWrapper() });
 
+    expect(screen.getByText('역할 목록을 볼 권한이 없습니다.')).toBeInTheDocument();
+    // 순서가 뒤집히면 여기서 깨진다.
+    expect(screen.queryByText('로딩 중...')).not.toBeInTheDocument();
+    // 권한 없음을 "데이터 없음" 으로 위장하지 않는다.
     expect(screen.queryByText('등록된 역할이 없습니다.')).not.toBeInTheDocument();
+  });
+
+  it('서버가 빈 배열을 주면 접근 거부가 아니라 빈 목록이다', () => {
+    // `null`(인가 거부)과 `[]`(역할이 정말 없음)을 구분하는지 고정한다.
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+
+    render(<RolesClient initialRoles={[]} />, { wrapper: makeWrapper() });
+
+    expect(screen.queryByText('역할 목록을 볼 권한이 없습니다.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('role-table')).toHaveTextContent('0');
   });
 });

@@ -29,6 +29,23 @@ describe('Badge Component', () => {
     expect(badge).not.toHaveClass('bg-destructive');
   });
 
+  // 아래 두 variant 는 `/settings/outbox` 화면이 알림 상태 배지로 실제 사용한다.
+  // 다크 캔버스 위에서 읽히는 명도를 고른 값이므로(700 계열은 어두운 배경에 묻힌다)
+  // 색이 바뀌면 여기서 드러나야 한다.
+  it('renders with success variant', () => {
+    render(<Badge variant="success">Success</Badge>);
+    const badge = screen.getByText('Success');
+    expect(badge).toHaveClass('bg-emerald-500/10');
+    expect(badge).toHaveClass('text-emerald-400');
+  });
+
+  it('renders with warning variant', () => {
+    render(<Badge variant="warning">Warning</Badge>);
+    const badge = screen.getByText('Warning');
+    expect(badge).toHaveClass('bg-amber-500/10');
+    expect(badge).toHaveClass('text-amber-400');
+  });
+
   it('renders with outline variant', () => {
     render(<Badge variant="outline">Outline</Badge>);
     const badge = screen.getByText('Outline');

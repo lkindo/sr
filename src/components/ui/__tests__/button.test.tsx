@@ -68,6 +68,22 @@ describe('Button', () => {
     expect(button).toHaveClass('disabled:opacity-50');
   });
 
+  // 클래스가 붙었는지가 아니라 **실제로 클릭이 막히는지**를 본다.
+  // `src/components/__tests__/Button.test.tsx`(PascalCase 중복 사본)에만 있던 검증으로,
+  // 사본을 정리하면서 이쪽으로 옮겼다.
+  it('disabled 상태에서는 클릭 핸들러가 호출되지 않는다', () => {
+    const handleClick = vi.fn();
+    render(
+      <Button onClick={handleClick} disabled>
+        Disabled
+      </Button>
+    );
+
+    fireEvent.click(screen.getByRole('button'));
+
+    expect(handleClick).not.toHaveBeenCalled();
+  });
+
   it('should handle click events', () => {
     const handleClick = vi.fn();
     render(<Button onClick={handleClick}>Click Me</Button>);
