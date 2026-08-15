@@ -16,11 +16,28 @@ const { mockFindMany, mockLoggerError } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({ default: { client: { findMany: mockFindMany } } }));
+// `withErrorHandler` 는 `auth-wrapper` 에 있고, 그 모듈이 `@/auth` 를 정적 import 한다.
+// 이 라우트는 인증을 쓰지 않지만 모듈 그래프에는 들어오므로 next-auth 를 목으로 끊는다.
+vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
-  logger: { error: mockLoggerError, info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  logger: {
+    logError: vi.fn(),
+    logRequest: vi.fn(),
+    error: mockLoggerError,
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 import { GET } from '../route';
+
+/** 2026-08-15: 이 라우트는 `withErrorHandler` 를 경유한다(감사 D-11). */
+const callGet = () =>
+  (GET as never as (r: never, c: never) => Promise<Response>)(
+    new Request('http://localhost/api/clients/public') as never,
+    { params: Promise.resolve({}) } as never
+  );
 
 describe('GET /api/clients/public', () => {
   beforeEach(() => {
@@ -29,7 +46,7 @@ describe('GET /api/clients/public', () => {
   });
 
   it('활성 고객사만, 이름순으로 조회한다', async () => {
-    const res = await GET();
+    const res = await callGet();
 
     expect(res.status).toBe(200);
     expect(mockFindMany).toHaveBeenCalledWith(
@@ -42,21 +59,22 @@ describe('GET /api/clients/public', () => {
 
   // select 가 넓어지면 익명 사용자에게 내부 정보가 그대로 나간다.
   it('id·name·code 만 내보낸다', async () => {
-    await GET();
+    await callGet();
 
     const select = mockFindMany.mock.calls[0]![0].select;
     expect(Object.keys(select).sort()).toEqual(['code', 'id', 'name']);
   });
 
-  it('조회가 실패하면 500 과 일반 문구만 준다', async () => {
+  // 유출 방지는 `handleApiError` 의 프로덕션 분기 책임이며
+  // `api-error-handler.leak.test.ts` 가 고정한다. 라우트가 자체 catch 로 500 을 만들면
+  // 그 중앙 통제를 우회하므로, 여기서 지키는 것은 **위임** 이다.
+  it('조회가 실패하면 handleApiError 에 위임한다', async () => {
     mockFindMany.mockRejectedValue(new Error('relation "clients" does not exist'));
 
-    const res = await GET();
+    const res = await callGet();
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body.error).toBe('고객사 목록을 불러올 수 없습니다.');
-    expect(JSON.stringify(body)).not.toContain('relation');
-    expect(mockLoggerError).toHaveBeenCalled();
+    expect(body.code).toBe('INTERNAL_ERROR');
   });
 });

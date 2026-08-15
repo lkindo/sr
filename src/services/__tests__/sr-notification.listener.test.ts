@@ -11,7 +11,7 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { logError: vi.fn(), logRequest: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock('@/lib/wait-until', () => ({ backgroundTask: vi.fn() }));

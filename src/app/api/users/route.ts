@@ -8,6 +8,7 @@ import {
   ensureCanGrantRoles,
   ensureCanReadUser,
   ensureClientAssignmentsWithinScope,
+  ensureRoleClientExclusivity,
   isInternalUser,
   resolveClientIdFilter,
 } from '@/lib/policies';
@@ -85,6 +86,19 @@ export const POST = withAuthAndRateLimit(
         throw new ValidationError('존재하지 않는 역할이 포함되어 있습니다.');
       }
       ensureCanGrantRoles(session.user, rolesToAssign);
+
+      /**
+       * 헌법 §1.3 역할 상호 배타성 (감사 D-12).
+       *
+       * 이 검사는 **생성 경로에만 없었다.** 역할 교체(`PUT /api/users/[id]/roles`)와
+       * 사용자 수정(`user.service.updateUser`)에는 각자 사본이 있었는데, 정작 사용자를
+       * 처음 만드는 경로는 무검증이라 다이얼로그에서 ENGINEER + 고객사 2곳을 고르면
+       * 금지된 조합이 그대로 저장됐다. 세 경로가 이제 같은 술어를 부른다.
+       */
+      ensureRoleClientExclusivity(
+        rolesToAssign.map((role) => role.name),
+        requestedClientIds
+      );
     }
 
     const userService = new UserService();

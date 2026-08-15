@@ -255,6 +255,7 @@ export const srUpdateSchema = z.object({
     emptyStringToUndefined,
     z.string().max(FIELD_LIMITS.SHORT_TEXT).optional()
   ),
+  expectedHoldReleaseDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
 });
 
 /**
@@ -382,6 +383,15 @@ export const statusActionSchema = z.object({
   // trim 은 preprocess 가 아니라 스키마 단계에서 하므로 저장되는 값도 정리된다.
   reason: z.string().trim().min(1, '사유를 입력해주세요.').optional(),
   resolutionDescription: z.string().trim().min(1, '해결 내용을 입력해주세요.').optional(),
+  // 보류(hold) 전용. 헌법 §2 는 보류에 사유 **와** 예상 해제일을 모두 요구한다.
+  // 날짜 형식 검증까지 여기서 끝내 라우트가 문자열을 그대로 new Date() 에 넘기지 않게 한다.
+  expectedHoldReleaseDate: z.preprocess(
+    emptyStringToUndefined,
+    z
+      .string()
+      .refine((value) => !Number.isNaN(Date.parse(value)), '예상 해제일 형식이 올바르지 않습니다.')
+      .optional()
+  ),
 });
 
 /** 사용자 고객사 소속 변경. `force` 는 진행 중 SR 이 있어도 강행할지 여부다. */

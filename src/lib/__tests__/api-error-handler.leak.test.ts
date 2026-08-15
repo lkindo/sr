@@ -19,7 +19,7 @@ vi.mock('next/server', () => ({
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: { logError: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { logRequest: vi.fn(), logError: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 type HandledResponse = { data: { error: string; code: string }; status: number };

@@ -10,7 +10,36 @@ import { statusLabelOf } from '@/lib/constants/sr';
 export type { SRStatus };
 
 /**
- * 각 상태에서 전환 가능한 다음 상태들
+ * 재오픈 가능 창(일). 헌법 §2 의 "7일" 이 이 상수 하나로만 표현되도록 모은다.
+ * 라우트·클라이언트가 각자 7 을 하드코딩하면 한쪽만 바뀌어 판정이 갈린다.
+ */
+const REOPEN_WINDOW_DAYS = 7;
+
+/** 이 전이가 재오픈인가. 활동 이력 타입 분기 등 호출부가 같은 판정을 복제하지 않도록 export 한다. */
+export function isReopenTransition(from: SRStatus, to: SRStatus): boolean {
+  return (from === 'COMPLETED' || from === 'CONFIRMED') && to === 'IN_PROGRESS';
+}
+
+/**
+ * 재오픈 창의 기산점. 출발 상태에 따라 다르다 — 확인완료에서 되돌리면 확인 시각부터 센다.
+ * 기산점을 알 수 없으면 null 을 돌려주며, 호출부는 이를 **거부** 로 처리한다(fail-closed).
+ *
+ * 모듈 내부 전용이다. 밖으로 내보내면 라우트가 다시 자체 창 판정을 갖게 되고,
+ * 그게 정확히 2026-08-15 이전의 fail-open 버그가 생긴 경위다.
+ */
+function reopenAnchorAt(
+  from: SRStatus,
+  data: { completedAt?: Date | string | null; confirmedAt?: Date | string | null }
+): Date | null {
+  const raw = from === 'CONFIRMED' ? (data.confirmedAt ?? data.completedAt) : data.completedAt;
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/**
+ * 각 상태에서 전환 가능한 다음 상태들.
+ * `GEMINI.md` §2 의 전이표와 1:1 대응한다 — 한쪽만 고치면 규범과 구현이 갈린다.
  */
 export const VALID_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
   REQUESTED: ['INTAKE', 'REJECTED'],
@@ -130,6 +159,9 @@ export const REQUIRED_FIELDS: Partial<Record<SRStatus, string[]>> = {
   IN_PROGRESS: ['assigneeId'],
   COMPLETED: ['resolutionDescription'],
   REJECTED: ['rejectionReason'],
+  // 헌법 §2: 보류는 사유 **와** 예상 해제일을 함께 명시한다.
+  // 사유는 아래 4번(전이 맥락 규칙)에서 changeReason 으로 강제하고, 날짜는 여기서 강제한다.
+  ON_HOLD: ['expectedHoldReleaseDate'],
 };
 
 /**
@@ -274,6 +306,13 @@ export const validateTransition = (
         if (!updateData.rejectionReason && !currentData.rejectionReason) {
           missingFields.push('거절 사유(rejectionReason)');
         }
+      } else if (field === 'expectedHoldReleaseDate') {
+        // 다른 필드와 달리 currentData 로 폴백하지 않는다. 보류 해제 후 다시 보류할 때
+        // 지난번 약속 날짜가 남아 있어 통과해 버리면 "이번 보류의 예상 해제일" 이 아니다.
+        // 매 보류 전이마다 새로 받는다(해제 시 null 로 되돌린다).
+        if (!updateData.expectedHoldReleaseDate) {
+          missingFields.push('예상 해제일(expectedHoldReleaseDate)');
+        }
       }
     }
 
@@ -288,7 +327,7 @@ export const validateTransition = (
   // 4. 전이 맥락 규칙. 실제 쓰기 경로는 currentData/updateData 를 모두 넘긴다.
   // UI의 버튼 가시성 계산처럼 데이터 없이 호출하는 경우에는 흐름/인가만 판정한다.
   if (currentData && updateData) {
-    const isReopen = (from === 'COMPLETED' || from === 'CONFIRMED') && to === 'IN_PROGRESS';
+    const isReopen = isReopenTransition(from, to);
     const requiresReason = to === 'ON_HOLD' || isReopen;
 
     if (requiresReason && !updateData.changeReason?.trim()) {
@@ -298,13 +337,32 @@ export const validateTransition = (
       };
     }
 
-    // 완료 시각이 있는 SR은 완료 후 7일까지만 재오픈할 수 있다. 이 규칙을 라우트가
-    // 아니라 상태 머신에 두어 일반 서비스 호출에서도 동일하게 강제한다.
-    if (isReopen && currentData.completedAt) {
-      const completedAt = new Date(currentData.completedAt).getTime();
-      const daysSinceCompletion = (Date.now() - completedAt) / (1000 * 60 * 60 * 24);
-      if (!Number.isFinite(completedAt) || daysSinceCompletion > 7) {
-        return { valid: false, message: '완료 후 7일이 지나 재오픈할 수 없습니다.' };
+    // 재오픈은 종결 후 7일까지만 허용한다. 이 규칙을 라우트가 아니라 상태 머신에 두어
+    // 일반 서비스 호출에서도 동일하게 강제한다.
+    //
+    // **기산점은 출발 상태를 따른다.** 예전에는 CONFIRMED 출발에도 `completedAt` 만 봤다.
+    // 완료 6일 뒤에 고객이 확인하고 그 다음 날 재오픈하면, 확인한 지 하루밖에 안 됐는데도
+    // 창이 닫혀 있었다. 확인완료에서 되돌리는 것은 확인 시점부터 세는 것이 맞다.
+    //
+    // **fail-closed 다.** 예전에는 `if (isReopen && currentData.completedAt)` 라서
+    // 기산점이 NULL 이면 검사를 통째로 건너뛰고 통과했다 — `completedAt` 기록이 도입되기
+    // 전에 완료된 SR 은 몇 년이 지나도 재오픈됐다. 시각을 모르면 거부한다.
+    if (isReopen) {
+      const anchor = reopenAnchorAt(from, currentData);
+
+      if (!anchor) {
+        return {
+          valid: false,
+          message: '종결 시각을 확인할 수 없어 재오픈할 수 없습니다. 관리자에게 문의해주세요.',
+        };
+      }
+
+      const daysSinceClosure = (Date.now() - anchor.getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSinceClosure > REOPEN_WINDOW_DAYS) {
+        return {
+          valid: false,
+          message: `${from === 'CONFIRMED' ? '확인' : '완료'} 후 ${REOPEN_WINDOW_DAYS}일이 지나 재오픈할 수 없습니다.`,
+        };
       }
     }
   }

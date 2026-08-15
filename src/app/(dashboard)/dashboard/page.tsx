@@ -113,7 +113,12 @@ interface DashboardStats {
   }>;
   performance: {
     avgProcessingHours: number;
-    slaComplianceRate: number;
+    /** null 이면 집계 창 안에 마감일이 산출된 완료 SR 이 없다는 뜻이다(0% 와 구분된다). */
+    slaComplianceRate: number | null;
+    /** 준수율 분모에 들어간 건수. */
+    slaSampleCount: number;
+    /** 완료됐지만 마감일이 없어 준수 여부를 측정할 수 없는 건수. */
+    slaUnmeasurableCount: number;
     avgWaitingHours: number;
   };
   trend: Array<{
@@ -494,13 +499,37 @@ export default function DashboardPage() {
               <Target className="h-5 w-5 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {stats.performance.slaComplianceRate > 0
-                  ? `${stats.performance.slaComplianceRate}%`
-                  : '-'}
+              {/*
+                표본 없음(null)과 0% 를 구분해 표시한다. 예전에는 둘 다 '-' 였고
+                Progress 바도 숨겨져, 준수율이 0% 로 무너진 상태가 화면에서
+                "아직 데이터가 없음"과 똑같이 보였다.
+              */}
+              <div
+                className={
+                  stats.performance.slaComplianceRate === null
+                    ? 'text-2xl font-bold text-muted-foreground'
+                    : stats.performance.slaComplianceRate >= 90
+                      ? 'text-2xl font-bold text-green-600'
+                      : stats.performance.slaComplianceRate >= 70
+                        ? 'text-2xl font-bold text-yellow-600'
+                        : 'text-2xl font-bold text-destructive'
+                }
+              >
+                {stats.performance.slaComplianceRate === null
+                  ? '측정 불가'
+                  : `${stats.performance.slaComplianceRate}%`}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">마감일 준수율</p>
-              {stats.performance.slaComplianceRate > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {stats.performance.slaComplianceRate === null
+                  ? '최근 30일에 마감일이 산출된 완료 SR이 없습니다'
+                  : `마감일 준수율 (표본 ${stats.performance.slaSampleCount}건)`}
+              </p>
+              {stats.performance.slaUnmeasurableCount > 0 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  마감일 미산출 {stats.performance.slaUnmeasurableCount}건은 집계에서 제외됨
+                </p>
+              )}
+              {stats.performance.slaComplianceRate !== null && (
                 <Progress
                   value={stats.performance.slaComplianceRate}
                   aria-label="마감일 준수율"

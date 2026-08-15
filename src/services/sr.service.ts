@@ -22,11 +22,10 @@ import {
   isInternalUser,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { CLIENT_SUMMARY_SELECT, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
+import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
-import { validateTransition } from '@/lib/sr-state-machine';
-import { deleteAttachmentBlob } from '@/lib/storage';
+import { isReopenTransition, validateTransition } from '@/lib/sr-state-machine';
 import { appZoneDateStamp } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
@@ -82,20 +81,6 @@ function toNumberOrNull(value: unknown): number | null {
 function toStringOrNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null || value === '') return null;
   return value;
-}
-
-/**
- * 첨부 행에서 저장소 내부 경로를 뽑는다.
- *
- * `storagePath` 는 나중에 도입된 컬럼이라 그 이전에 올라온 행은 null 이다.
- * 그 경우 `fileUrl` 에서 되살린다 — `api/attachments/[id]` DELETE 와 동일한 규칙이라,
- * 한쪽만 고치면 옛 첨부가 경로에 따라 지워지거나 남는 차이가 생긴다.
- */
-function toStoragePathname(attachment: { storagePath: string | null; fileUrl: string }): string {
-  return (
-    attachment.storagePath ??
-    (attachment.fileUrl.startsWith('http') ? new URL(attachment.fileUrl).pathname.slice(1) : '')
-  );
 }
 
 /**
@@ -337,7 +322,7 @@ export class SRService {
   ): Promise<SRUpdateResult> {
     try {
       const validated = srUpdateSchema.parse(data);
-      const existingSR = await prisma.sR.findUnique({ where: { id } });
+      const existingSR = await prisma.sR.findUnique({ where: { id, ...SR_ALIVE } });
       if (!existingSR) throw new NotFoundError('SR');
 
       ensureCanUpdateSR(sessionUser, existingSR);
@@ -427,12 +412,8 @@ export class SRService {
         await assertAssignable(assigneeId);
       }
 
-      const { updateData, statusChanged, assigneeChanged } = await this.buildSRUpdateData(
-        validated,
-        existingSR,
-        sessionUser,
-        assigneeId
-      );
+      const { updateData, statusChanged, assigneeChanged, dueDateManuallySet } =
+        await this.buildSRUpdateData(validated, existingSR, sessionUser, assigneeId);
 
       // 1. 트랜잭션으로 업데이트 및 활동 로그 생성 (순수 DB 작업만 트랜잭션 내부에서 수행)
       const updatedSR = await prisma.$transaction(async (tx) => {
@@ -492,6 +473,28 @@ export class SRService {
             },
           });
 
+          /**
+           * 마감일 수동 조정은 감사 로그를 남긴다 (헌법 §3).
+           *
+           * 마감일은 원칙적으로 자동 산출값이다. 사람이 그것을 덮어쓰는 것은 SLA 근거를
+           * 바꾸는 행위이므로 "누가 · 언제 · 무엇에서 무엇으로 · 왜" 가 남아야 한다.
+           * 남기지 않으면 준수율이 왜 그 값인지 사후에 설명할 수 없다.
+           */
+          if (dueDateManuallySet) {
+            await auditService.createLog(tx, {
+              userId: sessionUser.id,
+              actionType: 'UPDATE',
+              targetEntity: 'SR_DUE_DATE',
+              targetId: id,
+              changes: {
+                srNumber: existingSR.srNumber,
+                before: existingSR.dueDate?.toISOString() ?? null,
+                after: currentSR.dueDate?.toISOString() ?? null,
+                reason: validated.changeReason ?? null,
+              },
+            });
+          }
+
           if (statusChanged) {
             await enqueueSRStatusChangedEmail(tx, {
               srId: currentSR.id,
@@ -500,6 +503,10 @@ export class SRService {
               requesterId: currentSR.requesterId,
               previousStatus: existingSR.status,
               currentStatus: validated.status!,
+              // 갱신 후 값을 쓴다. 이번 전이에서 들어온 사유가 아직 updateData 에만 있고
+              // existingSR 에는 없을 수 있다.
+              resolutionDescription: currentSR.resolutionDescription,
+              rejectionReason: currentSR.rejectionReason,
             });
           }
           if (assigneeChanged && assigneeId) {
@@ -621,6 +628,14 @@ export class SRService {
     ) {
       operatorFieldChanges.push('estimatedCompletionDate');
     }
+    // 서비스 카테고리는 **SLA 산정 근거**다(slaHours × 우선순위 배율 — 헌법 §3).
+    // 요청자가 자유롭게 바꿀 수 있으면 마감일을 사실상 스스로 정하게 된다.
+    if (
+      validated.serviceCategoryId !== undefined &&
+      toStringOrNull(validated.serviceCategoryId) !== toStringOrNull(existingSR.serviceCategoryId)
+    ) {
+      operatorFieldChanges.push('serviceCategoryId');
+    }
     if (
       assigneeId !== undefined &&
       toStringOrNull(assigneeId) !== toStringOrNull(existingSR.assigneeId)
@@ -646,6 +661,8 @@ export class SRService {
     updateData: Prisma.SRUncheckedUpdateInput;
     statusChanged: boolean;
     assigneeChanged: boolean;
+    /** 사람이 마감일을 직접 지정했는가. 감사 로그를 남길지 판정하는 데 쓴다(헌법 §3). */
+    dueDateManuallySet: boolean;
   }> {
     const updateData: Prisma.SRUncheckedUpdateInput = {};
 
@@ -696,6 +713,10 @@ export class SRService {
       updateData.estimatedCompletionDate = validated.estimatedCompletionDate
         ? new Date(validated.estimatedCompletionDate)
         : null;
+    if (validated.expectedHoldReleaseDate !== undefined)
+      updateData.expectedHoldReleaseDate = validated.expectedHoldReleaseDate
+        ? new Date(validated.expectedHoldReleaseDate)
+        : null;
 
     // relations
     if (validated.serviceCategoryId !== undefined) {
@@ -712,18 +733,33 @@ export class SRService {
 
     if (assigneeId !== undefined) updateData.assigneeId = assigneeId || null;
 
-    // priority SLA adjustment - ServiceCategoryService 활용
-    if (validated.actualPriority && validated.actualPriority !== existingSR.actualPriority) {
+    // SLA 마감일 재산출 (헌법 §3).
+    //
+    // 두 가지가 마감일을 움직인다: **실제 우선순위**(배율)와 **서비스 카테고리**(기준 시간).
+    // 예전에는 우선순위 변경만 트리거였고, 재산출조차 `existingSR.serviceCategoryId` 즉
+    // **변경 전** 카테고리로 계산했다. 그래서 "일반 문의(72h) → 장애(24h)" 로 바꾸면서
+    // 우선순위를 CRITICAL 로 올리면 기대 12시간 대신 36시간(72×0.5)이 저장됐다.
+    // 화면이 보여 주는 SLA 근거와 저장된 마감일이 어긋나는 상태다.
+    const nextCategoryId = validated.serviceCategoryId || existingSR.serviceCategoryId;
+    const nextPriority = validated.actualPriority ?? existingSR.actualPriority;
+    const priorityChanged =
+      validated.actualPriority !== undefined &&
+      validated.actualPriority !== existingSR.actualPriority;
+    const categoryChanged = nextCategoryId !== existingSR.serviceCategoryId;
+
+    // 운영자가 마감일을 직접 지정했다면 그 값을 자동 산출로 덮어쓰지 않는다(헌법 §3).
+    const dueDateManuallySet = validated.dueDate !== undefined;
+
+    if ((priorityChanged || categoryChanged) && nextPriority && !dueDateManuallySet) {
       try {
-        const dueDate = await serviceCategoryService.calculateDueDate(
-          existingSR.serviceCategoryId,
-          validated.actualPriority,
+        updateData.dueDate = await serviceCategoryService.calculateDueDate(
+          nextCategoryId,
+          nextPriority,
           existingSR.intakeAt || new Date()
         );
-        updateData.dueDate = dueDate;
       } catch {
         // 카테고리를 찾지 못해도 SR 업데이트는 계속 진행
-        logger.warn('SLA 기한 계산 실패', { categoryId: existingSR.serviceCategoryId });
+        logger.warn('SLA 기한 계산 실패', { categoryId: nextCategoryId });
       }
     }
 
@@ -771,10 +807,16 @@ export class SRService {
     const activitiesToCreate: Prisma.SRActivityCreateWithoutSrInput[] = [];
 
     if (statusChanged) {
+      // 재오픈은 겉으로는 IN_PROGRESS 로의 평범한 전이지만 의미가 다르다 — 재작업이다.
+      // 헌법 §2 가 `SRActivityType.REOPENED` 이력을 남기라고 규정하는데도 예전에는
+      // 전부 STATUS_CHANGED 로만 남아, 활동 로그에서 재오픈을 골라낼 수 없었다.
+      const reopened = isReopenTransition(existingSR.status, validated.status!);
       activitiesToCreate.push({
         user: { connect: { id: sessionUser.id } },
-        type: 'STATUS_CHANGED',
-        description: `상태가 ${statusLabelOf(existingSR.status)}에서 ${statusLabelOf(validated.status!)}(으)로 변경되었습니다.`,
+        type: reopened ? 'REOPENED' : 'STATUS_CHANGED',
+        description: reopened
+          ? `${statusLabelOf(existingSR.status)} 상태에서 재오픈되었습니다.`
+          : `상태가 ${statusLabelOf(existingSR.status)}에서 ${statusLabelOf(validated.status!)}(으)로 변경되었습니다.`,
       });
     }
 
@@ -792,11 +834,11 @@ export class SRService {
       };
     }
 
-    return { updateData, statusChanged, assigneeChanged };
+    return { updateData, statusChanged, assigneeChanged, dueDateManuallySet };
   }
 
   async getSRById(id: string): Promise<SR | null> {
-    return prisma.sR.findUnique({ where: { id } });
+    return prisma.sR.findUnique({ where: { id, ...SR_ALIVE } });
   }
 
   /**
@@ -827,7 +869,7 @@ export class SRService {
     const visibleCommentWhere = canReadInternalComments ? {} : { isInternal: false };
 
     return prisma.sR.findUnique({
-      where: { id },
+      where: { id, ...SR_ALIVE },
       include: {
         client: {
           select: CLIENT_SUMMARY_SELECT,
@@ -912,7 +954,7 @@ export class SRService {
     return prisma.sR.findMany({
       skip,
       take,
-      where,
+      where: { ...SR_ALIVE, ...where },
       orderBy,
       select: {
         // Scalar fields (Optimized to exclude large text fields like description)
@@ -959,7 +1001,7 @@ export class SRService {
   }
 
   async countSRs(params?: { where?: Prisma.SRWhereInput }): Promise<number> {
-    return prisma.sR.count({ where: params?.where });
+    return prisma.sR.count({ where: { ...SR_ALIVE, ...params?.where } });
   }
 
   /**
@@ -1014,7 +1056,8 @@ export class SRService {
                            AND status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD'))::int AS "dueToday",
         COUNT(*) FILTER (WHERE assignee_id = ${params.assigneeId})::int        AS "myAssigned"
       FROM srs
-      WHERE ${tenantScope}
+      -- soft delete 제외(db-rules §2). $queryRaw 는 SR_ALIVE 가 닿지 않는다.
+      WHERE deleted_at IS NULL AND ${tenantScope}
       ${assigneeScope}`;
 
     // 집계 쿼리는 행이 없어도 한 줄을 돌려주지만, 방어적으로 0 을 채운다.
@@ -1027,21 +1070,23 @@ export class SRService {
     };
   }
 
+  /**
+   * SR 삭제 — **soft delete 다**(db-rules §2).
+   *
+   * 예전에는 `tx.sR.delete()` 로 행을 지웠다. 그런데 sr_activities / sr_comments /
+   * sr_attachments / sr_status_history 가 전부 `onDelete: Cascade` 라, 삭제 한 번에
+   * 처리 이력·고객 댓글·첨부·상태 이력이 복구 불가하게 사라졌다. 감사 로그에 남는 것은
+   * `{id, title, srNumber}` 세 필드뿐이라 분쟁 시 사후 규명이 불가능했다.
+   *
+   * 첨부 blob 도 지우지 않는다 — 행이 살아 있으므로 경로를 잃지 않고, 보존 기간이 지난 뒤
+   * 배치가 정리하면 된다. 되돌릴 수 없는 작업을 사용자 요청 시점에 하지 않는 것이 핵심이다.
+   */
   async deleteSR(id: string, sessionUser: AuthenticatedUser): Promise<void> {
-    const existingSR = await prisma.sR.findUnique({ where: { id } });
+    const existingSR = await prisma.sR.findUnique({ where: { id, ...SR_ALIVE } });
     if (!existingSR) throw new NotFoundError('SR');
     // 테넌트 술어를 포함한다 — 예전에는 `existingSR` 을 가져와 놓고 인가에 쓰지 않아
     // `SR:DELETE` 보유자가 남의 테넌트 SR 을 지울 수 있었다(감사 4.1).
     ensureCanDeleteSR(sessionUser, existingSR);
-
-    // 첨부 blob 경로를 **행이 사라지기 전에** 모아 둔다.
-    // sr_attachments 는 `onDelete: Cascade` 라 SR 을 지우면 행이 함께 사라지는데,
-    // 디스크의 파일은 아무도 지우지 않아 볼륨에 영구 잔존했다(감사 4.2).
-    // 참조가 사라진 뒤에는 어떤 경로를 지워야 하는지 알아낼 방법이 없다.
-    const attachments = await prisma.sRAttachment.findMany({
-      where: { srId: id },
-      select: { storagePath: true, fileUrl: true },
-    });
 
     // 트랜잭션으로 감사 로그 적재 및 SR 삭제 원자적 실행
     await prisma.$transaction(async (tx) => {
@@ -1054,26 +1099,20 @@ export class SRService {
         changes: { id, title: existingSR.title, srNumber: existingSR.srNumber },
       });
 
-      // 2. SR 삭제 — 감사 로그와 반드시 같은 트랜잭션에서 수행한다.
+      // 2. SR 삭제 표시 — 감사 로그와 반드시 같은 트랜잭션에서 수행한다.
       //    (테스트 목이 불완전하다는 이유로 prisma 로 폴백하면 삭제가 트랜잭션 밖으로
       //     새어나가 원자성이 깨진다. 목 쪽을 고칠 일이다.)
-      await tx.sR.delete({ where: { id } });
+      //    `updateMany` + `deletedAt: null` 조건이라 동시에 두 번 눌러도 두 번째는 0건이다.
+      await tx.sR.updateMany({
+        where: { id, deletedAt: null },
+        data: { deletedAt: new Date() },
+      });
     });
 
-    // 커밋이 끝난 뒤에 blob 을 지운다 — `api/attachments/[id]` DELETE 와 같은 순서다.
-    // 반대로 하면(파일 먼저) 그 사이 실패했을 때 없는 파일을 가리키는 행이 남아
-    // 매 다운로드가 500 이 된다. 이 순서에서 최악은 참조 없는 파일이 남는 것이고,
-    // 그건 사용자에게 보이지 않는다.
-    await Promise.all(
-      attachments.map((attachment) =>
-        deleteAttachmentBlob(toStoragePathname(attachment)).catch(() => {
-          // 커밋은 이미 끝났다. 정리 실패로 삭제 자체를 실패시키면 사용자가 이미
-          // 사라진 SR 을 다시 지우려 시도하게 되므로 여기서는 삼킨다.
-        })
-      )
-    );
+    // 첨부 blob 은 지우지 않는다. 행이 살아 있으므로 경로를 잃지 않으며, 되돌릴 수 없는
+    // 파일 삭제는 보존 기간이 지난 뒤 정리 배치가 맡는다.
 
-    // 실시간 이벤트 발행
+    // 실시간 이벤트 발행 — 화면에서는 삭제와 동일하게 사라져야 한다.
     emitRealtimeEvent(REALTIME_EVENTS.SR_DELETED, {
       id,
       srNumber: existingSR.srNumber,

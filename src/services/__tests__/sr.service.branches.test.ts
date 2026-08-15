@@ -285,7 +285,9 @@ describe('SRService Extended Branches', () => {
 
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: '1' } as any);
       await srService.getSRById('1');
-      expect(prisma.sR.findUnique).toHaveBeenCalledWith({ where: { id: '1' } });
+      expect(prisma.sR.findUnique).toHaveBeenCalledWith({
+        where: { id: '1', deletedAt: null },
+      });
     });
   });
 });

@@ -16,7 +16,14 @@ const { mockQueryRaw, mockLoggerError } = vi.hoisted(() => ({
 
 vi.mock('@/lib/prisma', () => ({ default: { $queryRaw: mockQueryRaw } }));
 vi.mock('@/lib/logger', () => ({
-  logger: { error: mockLoggerError, info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  logger: {
+    logError: vi.fn(),
+    logRequest: vi.fn(),
+    error: mockLoggerError,
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 import { GET } from '../route';

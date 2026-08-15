@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  *     안에서만 `next()`/`redirect()` 를 갖춘 대역을 세운다.
  */
 
-const { MockNextResponse, checkMock, getClientIdentifierMock } = vi.hoisted(() => {
+const { MockNextResponse, checkMock, getClientIpMock } = vi.hoisted(() => {
   interface NextInit {
     request?: { headers?: Headers };
   }
@@ -53,7 +53,7 @@ const { MockNextResponse, checkMock, getClientIdentifierMock } = vi.hoisted(() =
       resetTime: 60_000,
       remaining: 99,
     })),
-    getClientIdentifierMock: vi.fn((_request: unknown) => 'client-key'),
+    getClientIpMock: vi.fn((_headers: unknown) => 'client-key'),
   };
 });
 
@@ -68,8 +68,10 @@ vi.mock('next-auth', () => ({
   })),
 }));
 
+// 미들웨어는 인증 **이전** 단계라 세션 쿠키를 검증할 수 없다. 그래서 IP 로만 키잉한다
+// (감사 D-1 — 예전에는 getClientIdentifier 를 써서 쿠키만 바꾸면 전역 제한을 우회했다).
 vi.mock('@/lib/rate-limiter', () => ({
-  getClientIdentifier: getClientIdentifierMock,
+  getClientIp: getClientIpMock,
   rateLimiters: {
     middleware: {
       check: checkMock,
@@ -116,8 +118,8 @@ const LOGGED_IN = { user: { id: 'u-1', name: '홍길동' } };
 beforeEach(() => {
   checkMock.mockReset();
   checkMock.mockResolvedValue({ allowed: true, limit: 100, resetTime: 60_000, remaining: 99 });
-  getClientIdentifierMock.mockClear();
-  getClientIdentifierMock.mockReturnValue('client-key');
+  getClientIpMock.mockClear();
+  getClientIpMock.mockReturnValue('client-key');
 });
 
 afterEach(() => {
@@ -203,14 +205,17 @@ describe('proxy (middleware)', () => {
   });
 
   describe('2. 레이트리밋', () => {
-    it('API 라우트는 클라이언트 식별자로 버킷을 조회한다', async () => {
-      getClientIdentifierMock.mockReturnValue('s:abc123');
+    // 세션 쿠키가 아니라 **IP** 로 키잉해야 한다. 미들웨어는 인증 이전 단계라 쿠키를
+    // 검증할 수 없으므로, 쿠키 값을 키로 쓰면 값을 바꾸는 것만으로 전역 제한이 무력화된다.
+    it('API 라우트는 요청 헤더에서 뽑은 IP 로 버킷을 조회한다', async () => {
+      getClientIpMock.mockReturnValue('5.6.7.8');
       const req = makeRequest({ path: '/api/sr' });
 
       await middleware(req);
 
-      expect(getClientIdentifierMock).toHaveBeenCalledWith(req);
-      expect(checkMock).toHaveBeenCalledWith('s:abc123');
+      // 요청 객체 전체가 아니라 headers 를 넘긴다 — 쿠키를 볼 수 없는 형태다.
+      expect(getClientIpMock).toHaveBeenCalledWith(req.headers);
+      expect(checkMock).toHaveBeenCalledWith('5.6.7.8');
     });
 
     it('한도를 넘으면 429 와 X-RateLimit-* 헤더를 돌려준다', async () => {
@@ -278,7 +283,7 @@ describe('proxy (middleware)', () => {
       await middleware(makeRequest({ path: '/dashboard', auth: LOGGED_IN }));
 
       expect(checkMock).not.toHaveBeenCalled();
-      expect(getClientIdentifierMock).not.toHaveBeenCalled();
+      expect(getClientIpMock).not.toHaveBeenCalled();
     });
   });
 

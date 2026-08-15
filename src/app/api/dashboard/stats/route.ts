@@ -5,7 +5,7 @@ import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
 import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
 import prisma from '@/lib/prisma';
-import { CLIENT_SUMMARY_SELECT } from '@/lib/prisma-selects';
+import { CLIENT_SUMMARY_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { formatISODateInAppZone } from '@/lib/timezone';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
@@ -34,7 +34,9 @@ export const GET = withAuthAndRateLimit(
      */
     const stats = await (async () => {
       // 역할별 필터링 조건 설정
-      const baseWhere: Prisma.SRWhereInput = {};
+      // 삭제된 SR 은 통계에서도 빠진다 — 목록에서 사라진 SR 이 카운트에는 남아 있으면
+      // 사용자가 합계를 맞춰 볼 수 없다. 아래 모든 집계가 이 객체를 공유한다.
+      const baseWhere: Prisma.SRWhereInput = { ...SR_ALIVE };
       let userClientIds: string[] = [];
 
       if (!isAdminManagerEngineer) {
@@ -123,7 +125,9 @@ export const GET = withAuthAndRateLimit(
                 : Prisma.sql`0 as "myAssignedInProgress"`
             }
           FROM "srs"
-          WHERE 1=1
+          -- soft delete 된 SR 은 집계에서 제외한다(db-rules §2).
+          -- $queryRaw 는 SR_ALIVE 헬퍼가 닿지 않으므로 여기에 직접 쓴다.
+          WHERE deleted_at IS NULL
           ${
             !isAdminManagerEngineer
               ? userClientIds.length > 0
@@ -226,7 +230,8 @@ export const GET = withAuthAndRateLimit(
         prisma.$queryRaw<Array<{ date: Date | string; count: bigint }>>`
           SELECT DATE(created_at AT TIME ZONE 'Asia/Seoul') as date, COUNT(id) as count
           FROM srs
-          WHERE created_at >= ${thirtyDaysAgo}
+          WHERE deleted_at IS NULL
+            AND created_at >= ${thirtyDaysAgo}
           ${
             !isAdminManagerEngineer
               ? userClientIds.length > 0
@@ -238,18 +243,37 @@ export const GET = withAuthAndRateLimit(
           GROUP BY DATE(created_at AT TIME ZONE 'Asia/Seoul')
         `,
         // 9. 성능 지표 계산 - DB Aggregation
+        // SLA 준수율 모수 정의는 헌법 §3 을 따른다.
+        //
+        //  - 분모는 「집계 창 내 완료된 SR 중 **마감일이 산출된 건**」이다.
+        //    예전에는 분모가 완료 건 전체라, due_date 가 NULL 이면 분자 필터
+        //    (`completed_at <= due_date` → NULL → 미집계)에서만 빠져 **영구 위반**으로
+        //    집계됐다. 측정하지 못한 것과 지키지 못한 것은 다르다.
+        //  - 창 기준을 created_at 에서 **completed_at** 으로 바꾼다. "최근 30일의 준수율"은
+        //    최근 30일에 접수된 건이 아니라 최근 30일에 **완료된** 건을 묻는 것이다.
+        //  - 표본 수를 함께 내려보내 화면이 "표본 없음"과 "준수율 0%"를 구분할 수 있게 한다.
         prisma.$queryRaw<
-          Array<{ avgProcessingHours: number | null; slaComplianceRate: number | null }>
+          Array<{
+            avgProcessingHours: number | null;
+            slaComplianceRate: number | null;
+            slaSampleCount: number | null;
+            slaUnmeasurableCount: number | null;
+          }>
         >`
           SELECT
             AVG(EXTRACT(EPOCH FROM (completed_at - intake_at)) / 3600)::float as "avgProcessingHours",
-            COUNT(*) FILTER (WHERE completed_at <= due_date)::float * 100.0 / NULLIF(COUNT(*), 0) as "slaComplianceRate"
+            COUNT(*) FILTER (WHERE due_date IS NOT NULL AND completed_at <= due_date)::float
+              * 100.0
+              / NULLIF(COUNT(*) FILTER (WHERE due_date IS NOT NULL), 0) as "slaComplianceRate",
+            COUNT(*) FILTER (WHERE due_date IS NOT NULL)::int as "slaSampleCount",
+            COUNT(*) FILTER (WHERE due_date IS NULL)::int as "slaUnmeasurableCount"
           FROM "srs"
           WHERE
-            status IN ('COMPLETED', 'CONFIRMED')
+            deleted_at IS NULL
+            AND status IN ('COMPLETED', 'CONFIRMED')
             AND intake_at IS NOT NULL
             AND completed_at IS NOT NULL
-            AND created_at >= ${thirtyDaysAgo}
+            AND completed_at >= ${thirtyDaysAgo}
             ${
               !isAdminManagerEngineer
                 ? userClientIds.length > 0
@@ -337,10 +361,17 @@ export const GET = withAuthAndRateLimit(
       const performanceStats = performanceStatsRaw[0] || {
         avgProcessingHours: null,
         slaComplianceRate: null,
+        slaSampleCount: null,
+        slaUnmeasurableCount: null,
       };
 
       const avgProcessingHours = performanceStats.avgProcessingHours ?? 0;
-      const slaComplianceRate = performanceStats.slaComplianceRate ?? 0;
+      // 표본이 없으면 **null 을 유지한다.** 0 으로 접으면 화면이 "측정할 건이 없음"과
+      // "전건 위반"을 구분할 수 없어 SLA 붕괴가 '데이터 없음'으로 읽힌다.
+      const slaSampleCount = performanceStats.slaSampleCount ?? 0;
+      const slaUnmeasurableCount = performanceStats.slaUnmeasurableCount ?? 0;
+      const slaComplianceRate =
+        slaSampleCount > 0 ? (performanceStats.slaComplianceRate ?? 0) : null;
 
       // 접수 대기 시간 통계
       const waitingTimes = waitingSRs.map((sr) => {
@@ -425,7 +456,11 @@ export const GET = withAuthAndRateLimit(
         })),
         performance: {
           avgProcessingHours: Math.round(avgProcessingHours * 10) / 10,
-          slaComplianceRate: Math.round(slaComplianceRate * 10) / 10,
+          // null = 측정할 표본이 없음. 0 = 표본은 있으나 전건 위반. 둘은 다른 사건이다.
+          slaComplianceRate:
+            slaComplianceRate === null ? null : Math.round(slaComplianceRate * 10) / 10,
+          slaSampleCount,
+          slaUnmeasurableCount,
           avgWaitingHours: Math.round(avgWaitingHours * 10) / 10,
         },
         trend: trendData,

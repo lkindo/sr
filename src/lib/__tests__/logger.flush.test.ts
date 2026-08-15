@@ -92,13 +92,22 @@ describe('logger — 종료 시 로그 플러시', () => {
     }
   });
 
-  it('SIGTERM 에서 버퍼를 동기 플러시한 뒤 종료한다', async () => {
+  /**
+   * **2026-08-15 변경**: 로거는 플러시만 하고 **프로세스를 내리지 않는다**(감사 D-9).
+   *
+   * 예전에는 여기서 `process.exit(0)` 를 동기 호출했다. 그러면 Next.js standalone
+   * 서버의 비동기 정리를 기다리지 않고 소켓이 끊겨, CSV 스트리밍은 잘린 파일이
+   * 정상 다운로드처럼 저장되고 업로드는 고아 파일을 남겼다.
+   * 종료 오케스트레이션은 `src/instrumentation.ts` 가 유예 시간을 두고 수행한다.
+   */
+  it('SIGTERM 에서 버퍼를 동기 플러시하되 프로세스를 내리지는 않는다', async () => {
     await loadLoggerAsProduction();
 
     fire('SIGTERM');
 
     expect(flushSyncSpy).toHaveBeenCalled();
-    expect(processExitSpy).toHaveBeenCalledWith(0);
+    // 로거가 exit 를 부르면 진행 중인 응답이 잘린다 — 그 책임은 로거에 없다.
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 
   it('SIGINT 에서도 플러시한다', async () => {
@@ -107,7 +116,7 @@ describe('logger — 종료 시 로그 플러시', () => {
     fire('SIGINT');
 
     expect(flushSyncSpy).toHaveBeenCalled();
-    expect(processExitSpy).toHaveBeenCalledWith(0);
+    expect(processExitSpy).not.toHaveBeenCalled();
   });
 
   it('beforeExit 에서도 플러시한다 (정상 종료 경로)', async () => {
@@ -136,14 +145,14 @@ describe('logger — 종료 시 로그 플러시', () => {
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('flushSync 가 던져도 종료를 막지 않는다', async () => {
+  it('flushSync 가 던져도 신호 처리를 막지 않는다', async () => {
     await loadLoggerAsProduction();
     flushSyncSpy.mockImplementationOnce(() => {
       throw new Error('destination closed');
     });
 
+    // 플러시 실패가 종료 경로 전체를 무너뜨리면 안 된다.
     expect(() => fire('SIGTERM')).not.toThrow();
-    expect(processExitSpy).toHaveBeenCalledWith(0);
   });
 
   it('모듈이 다시 평가돼도 핸들러를 중복 등록하지 않는다', async () => {

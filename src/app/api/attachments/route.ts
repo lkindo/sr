@@ -10,6 +10,7 @@ import {
 } from '@/lib/file-validator';
 import { ensureCanAttachToSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
@@ -42,7 +43,7 @@ export const POST = withAuthAndRateLimit(
     // SR 존재 + 쓰기 권한 체크 (IDOR 방지 — 임의 SR 에 첨부 금지)
     // 업로드는 쓰기이므로 읽기 권한이 아니라 수정 권한으로 게이트한다(감사 4.1).
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
       select: { id: true, clientId: true, requesterId: true, assigneeId: true, status: true },
     });
 

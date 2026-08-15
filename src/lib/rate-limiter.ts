@@ -84,19 +84,25 @@ export class MemoryRateLimiter {
   /**
    * Rate limit 체크
    * @param key 식별자 (IP, 사용자 ID 등)
+   * @param multiplier 이 키에만 적용할 한도 배수. IP 천장 검사가 `preset × 배수` 로
+   *   넉넉한 상한을 걸 때 쓴다. 기본 1 이면 프리셋 그대로다.
    * @returns Rate limit 결과
    */
-  async check(key: string): Promise<RateLimitResult> {
+  async check(key: string, multiplier = 1): Promise<RateLimitResult> {
     const now = Date.now();
 
     // 점진적 수동 청소 실행 (Edge Runtime 등 타이머 미지원 환경 대응)
     this.performIncrementalEviction(now);
 
+    // 배수는 1 미만으로 내려가지 않는다 — 잘못된 환경변수가 한도를 0 으로 만들어
+    // 모든 요청을 거부하는(=사실상 장애) 상황을 막는다.
+    const limit = Math.max(1, Math.floor(this.config.maxRequests * Math.max(1, multiplier)));
+
     let bucket = this.buckets.get(key);
     // 버킷이 없거나 윈도우가 만료된 경우 새로 생성
     if (!bucket || now - bucket.lastRefill >= this.config.windowMs) {
       bucket = {
-        tokens: this.config.maxRequests,
+        tokens: limit,
         lastRefill: now,
       };
       this.buckets.set(key, bucket);
@@ -110,13 +116,13 @@ export class MemoryRateLimiter {
     }
 
     const resetTime = this.config.windowMs - (now - bucket.lastRefill);
-    const current = this.config.maxRequests - bucket.tokens;
+    const current = limit - bucket.tokens;
     const remaining = Math.max(0, bucket.tokens);
 
     return {
       allowed,
       current,
-      limit: this.config.maxRequests,
+      limit,
       resetTime,
       remaining,
     };
@@ -311,15 +317,31 @@ export function getClientIp(headers: { get(name: string): string | null }): stri
 }
 
 /**
- * Auth.js v5 가 쓰는 세션 쿠키 이름들. 프로덕션(HTTPS)에서는 `__Secure-` 접두사가 붙고,
- * v4 호환 이름도 남아 있을 수 있어 모두 확인한다.
+ * Auth.js **v5** 가 실제로 읽는 세션 쿠키 이름. 프로덕션(HTTPS)에서는 `__Secure-` 접두사가 붙는다.
+ *
+ * v4 호환 이름(`next-auth.session-token`, `__Secure-next-auth.session-token`)은 **의도적으로 뺐다.**
+ * Auth.js v5 는 그 이름을 읽지 않으므로 인증에는 아무 영향이 없는데, 아래 파서는 읽고 있었다.
+ * 그래서 유효 세션 보유자가
+ *
+ *     Cookie: next-auth.session-token=<매 요청 난수>; __Secure-authjs.session-token=<진짜 세션>
+ *
+ * 처럼 보내면 **인증은 정상 성립한 채 버킷만 매 요청 새로 발급**됐다. 읽지 않는 이름을
+ * 키 재료로 삼는 것은 순수한 공격 표면이다.
  */
-const SESSION_COOKIE_NAMES = [
-  '__Secure-authjs.session-token',
-  'authjs.session-token',
-  '__Secure-next-auth.session-token',
-  'next-auth.session-token',
-];
+const SESSION_COOKIE_NAMES = ['__Secure-authjs.session-token', 'authjs.session-token'];
+
+/**
+ * 세션 키로 잡히는 요청에 **함께** 적용하는 IP 버킷의 배수.
+ *
+ * 세션 키잉은 NAT 뒤 사무실 전체가 하나의 예산을 나눠 쓰던 문제를 풀기 위한 것이라
+ * 되돌릴 수 없다. 하지만 쿠키 값은 서명 검증 없이 쓰이므로(비용 문제로 여기서 검증하지
+ * 않는다) 키를 갈아 끼우는 것 자체는 여전히 가능하다.
+ *
+ * 그래서 IP 버킷을 **넉넉한 배수로** 함께 검사한다. 정상적인 사무실은 이 천장에 닿지 않고,
+ * 쿠키를 회전시키는 단일 발신지는 무한이 아니라 `preset × 배수` 에서 멈춘다.
+ * 두 버킷 중 하나라도 거부하면 요청은 거부된다.
+ */
+const SESSION_IP_CEILING_MULTIPLIER = Number(process.env.RATE_LIMIT_IP_CEILING_MULTIPLIER ?? 20);
 
 /** 쿠키 헤더에서 세션 토큰 값을 꺼낸다. 서명 검증은 하지 않는다(키로만 쓴다). */
 function getSessionCookieValue(headers: { get(name: string): string | null }): string | null {
@@ -347,9 +369,10 @@ function getSessionCookieValue(headers: { get(name: string): string | null }): s
  * 인증 **이전에** 토큰을 소비하므로 세션 사용자 id 를 쓸 수 없었고, 그 결과 NAT 뒤 사무실
  * 전체가 댓글·SR 수정 같은 핵심 쓰기에서 strict 예산(1분 5회)을 공유했다(감사 4.1).
  *
- * 쿠키 값을 그대로 쓰지 않고 해시해 키 길이를 고정한다. 서명 검증은 하지 않는다 —
- * 위조 토큰으로는 자기만의 버킷을 얻을 뿐이고, 그건 IP 키잉으로도 이미 가능하다.
- * 실제 인가는 이 뒤의 `withAuth` 가 담당한다.
+ * 쿠키 값은 그대로 쓰지 않고 해시해 키 길이를 고정한다. **서명 검증은 하지 않는다** —
+ * 그래서 이 키만으로는 위조를 막지 못하며, 반드시 `resolveRateLimitKeys` 가 함께 돌려주는
+ * IP 천장과 **같이** 검사해야 한다. 이 함수만 단독으로 쓰면 감사에서 지적된
+ * "쿠키를 회전시켜 전 제한을 무한 우회" 가 되살아난다.
  *
  * 익명 요청은 그대로 IP 로 묶이므로 로그인 시도 폭주 방어는 영향을 받지 않는다.
  */
@@ -359,6 +382,38 @@ export function getClientIdentifier(request: Request): string {
     return `s:${fastHash(session)}`;
   }
   return getClientIp(request.headers);
+}
+
+/** `resolveRateLimitKeys` 의 결과. `ceiling` 이 null 이면 IP 천장 검사가 필요 없다. */
+export interface RateLimitKeys {
+  /** 실제 예산을 소비하는 주 버킷 키. */
+  primary: string;
+  /**
+   * 함께 검사할 IP 천장. 세션 키로 잡힌 요청에만 존재한다.
+   * 이미 IP 로 키잉된 익명 요청은 주 버킷이 곧 IP 버킷이므로 중복 검사하지 않는다.
+   */
+  ceiling: { key: string; multiplier: number } | null;
+}
+
+/**
+ * 한 요청에 적용할 버킷 키들을 정한다.
+ *
+ * 세션 쿠키는 클라이언트가 100% 통제하는 값이라 키를 무한히 갈아 끼울 수 있다.
+ * 그래서 세션 키로 잡힌 요청에는 **발신 IP 천장을 함께** 건다 — 정상 사무실은 닿지 않고,
+ * 쿠키를 회전시키는 단일 발신지는 `preset × 배수` 에서 멈춘다.
+ */
+export function resolveRateLimitKeys(request: Request): RateLimitKeys {
+  const session = getSessionCookieValue(request.headers);
+  if (!session) {
+    return { primary: getClientIp(request.headers), ceiling: null };
+  }
+  return {
+    primary: `s:${fastHash(session)}`,
+    ceiling: {
+      key: `ip:${getClientIp(request.headers)}`,
+      multiplier: SESSION_IP_CEILING_MULTIPLIER,
+    },
+  };
 }
 
 /** 키 길이를 고정하기 위한 비암호학적 해시(FNV-1a). 보안 용도가 아니다. */

@@ -14,6 +14,7 @@ vi.mock('@/auth', () => ({
 // Keep logger quiet (handleApiError logs via logger).
 vi.mock('@/lib/logger', () => ({
   logger: {
+    logRequest: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),

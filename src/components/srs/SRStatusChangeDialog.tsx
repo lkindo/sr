@@ -14,11 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { apiPatch } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { formatISODateInAppZone } from '@/lib/timezone';
 
 /**
  * SR 상태 변경 다이얼로그 (완료 / 보류 / 거절 / 재오픈 공용).
@@ -51,6 +53,16 @@ interface ActionConfig {
   /** 입력이 비었을 때의 오류 문구. */
   emptyError: string;
   successMessage: string;
+  /**
+   * 사유 외에 필수 날짜를 하나 더 받는 액션. 현재는 보류의 예상 해제일뿐이다
+   * (헌법 §2 — 보류는 사유 **와** 예상 해제일을 함께 명시한다).
+   */
+  dateField?: {
+    bodyKey: 'expectedHoldReleaseDate';
+    label: string;
+    helpText: string;
+    emptyError: string;
+  };
 }
 
 const ACTIONS: Record<SRDialogAction, ActionConfig> = {
@@ -80,6 +92,12 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
     submitVariant: 'secondary',
     emptyError: '보류 사유를 입력해주세요.',
     successMessage: 'SR이 보류 처리되었습니다.',
+    dateField: {
+      bodyKey: 'expectedHoldReleaseDate',
+      label: '예상 해제일',
+      helpText: '언제까지 보류할 예정인지 명시합니다. 보류를 해제하면 이 값은 지워집니다.',
+      emptyError: '예상 해제일을 입력해주세요.',
+    },
   },
   reject: {
     icon: XCircle,
@@ -136,6 +154,7 @@ export function SRStatusChangeDialog({
   const Icon = config.icon;
 
   const [text, setText] = useState('');
+  const [dateValue, setDateValue] = useState('');
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -164,18 +183,23 @@ export function SRStatusChangeDialog({
    * 정하는 형태로 먼저 바꿔야 한다.
    */
   const { mutate: changeStatus, isPending: loading } = useMutation({
-    mutationFn: (trimmed: string) =>
+    mutationFn: ({ trimmed, date }: { trimmed: string; date: string }) =>
       apiPatch(
         `/api/srs/${srId}/status`,
-        config.bodyKey === 'resolutionDescription'
-          ? { action, resolutionDescription: trimmed }
-          : { action, reason: trimmed },
+        {
+          action,
+          ...(config.bodyKey === 'resolutionDescription'
+            ? { resolutionDescription: trimmed }
+            : { reason: trimmed }),
+          ...(config.dateField ? { [config.dateField.bodyKey]: date } : {}),
+        },
         { fallbackMessage: '상태 변경에 실패했습니다.' }
       ),
     onSuccess: async () => {
       // UI 를 먼저 정리한 뒤 백그라운드로 갱신한다. 순서를 뒤집으면 이미 처리된
       // 다이얼로그가 갱신이 끝날 때까지 열려 있어 사용자가 두 번 제출하게 된다.
       setText('');
+      setDateValue('');
       onOpenChange(false);
 
       toast({ title: '성공', description: config.successMessage });
@@ -205,7 +229,12 @@ export function SRStatusChangeDialog({
       return;
     }
 
-    changeStatus(trimmed);
+    if (config.dateField && !dateValue) {
+      toast({ title: '오류', description: config.dateField.emptyError, variant: 'destructive' });
+      return;
+    }
+
+    changeStatus({ trimmed, date: dateValue });
   };
 
   return (
@@ -248,6 +277,23 @@ export function SRStatusChangeDialog({
               />
               <p className="text-sm text-muted-foreground">{config.helpText}</p>
             </div>
+
+            {config.dateField && (
+              <div className="space-y-2">
+                <Label htmlFor="sr-status-date">
+                  {config.dateField.label} <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="sr-status-date"
+                  type="date"
+                  value={dateValue}
+                  min={formatISODateInAppZone()}
+                  onChange={(e) => setDateValue(e.target.value)}
+                  disabled={loading || blocked}
+                />
+                <p className="text-sm text-muted-foreground">{config.dateField.helpText}</p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

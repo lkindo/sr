@@ -267,6 +267,11 @@ model SR {
   intakeAt               DateTime? @map("intake_at") @db.Timestamptz
   completedAt            DateTime? @map("completed_at") @db.Timestamptz
   confirmedAt            DateTime? @map("confirmed_at") @db.Timestamptz
+
+  /// 보류(ON_HOLD) 전이 시 필수로 받는 예상 해제일. 헌법 §2 가 "보류 사유와 예상 해제일을
+  /// 명시한다" 고 규정하는데 사유만 강제되고 이 필드가 없어 절반만 지켜지고 있었다.
+  /// 보류가 풀리면(IN_PROGRESS 복귀) null 로 되돌려 "지금 유효한 약속" 만 남긴다.
+  expectedHoldReleaseDate DateTime? @map("expected_hold_release_date") @db.Timestamptz
   dueDate                DateTime? @map("due_date") @db.Timestamptz
   expectedCompletionDate DateTime? @map("expected_completion_date") @db.Timestamptz
   actualCompletionDate   DateTime? @map("actual_completion_date") @db.Timestamptz
@@ -280,6 +285,12 @@ model SR {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  /// Soft delete 시각. NULL 이면 살아 있는 SR 이다(db-rules §2).
+  /// 물리 삭제는 활동·댓글·첨부·상태이력을 Cascade 로 함께 지워 "이력 보존" 원칙을
+  /// 통째로 무력화하므로, 삭제는 이 컬럼을 채우는 것으로 대신한다.
+  /// **모든 조회 경로는 `deletedAt: null` 을 기본 적용해야 한다** — `SR_ALIVE` 헬퍼를 쓴다.
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
   client          Client            @relation(fields: [clientId], references: [id])
   requester       User              @relation("SRRequester", fields: [requesterId], references: [id])
   assignee        User?             @relation("SRAssignee", fields: [assigneeId], references: [id])
@@ -290,6 +301,8 @@ model SR {
   attachments     SRAttachment[]
   statusHistory   SRStatusHistory[]
 
+  // 모든 목록 조회가 `deleted_at IS NULL` 을 달고 나가므로 부분 인덱스로 살아 있는 행만 담는다.
+  @@index([deletedAt])
   @@index([clientId, status])
   @@index([requesterId, createdAt])
   @@index([assigneeId, status])

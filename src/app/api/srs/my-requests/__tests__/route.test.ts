@@ -89,7 +89,9 @@ describe('GET /api/srs/my-requests', () => {
 
     const { body } = await call();
 
-    expect(mocks.count).toHaveBeenCalledWith({ where: { requesterId: 'user-1' } });
+    expect(mocks.count).toHaveBeenCalledWith({
+      where: { deletedAt: null, requesterId: 'user-1' },
+    });
     expect(body.meta.totalItems).toBe(1234);
     expect(body.data).toHaveLength(1);
   });
@@ -97,13 +99,18 @@ describe('GET /api/srs/my-requests', () => {
   it('요청자 본인의 SR 로만 범위를 제한한다', async () => {
     await call();
 
-    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({ requesterId: 'user-1' });
+    // 삭제된 SR 은 내 요청 목록에서도 빠진다(db-rules §2).
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
+      deletedAt: null,
+      requesterId: 'user-1',
+    });
   });
 
   it('유효한 상태 필터를 where 에 반영한다', async () => {
     await call('?status=IN_PROGRESS');
 
     expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
+      deletedAt: null,
       requesterId: 'user-1',
       status: 'IN_PROGRESS',
     });
@@ -112,7 +119,10 @@ describe('GET /api/srs/my-requests', () => {
   it('알 수 없는 상태 값은 필터로 쓰지 않는다', async () => {
     await call('?status=NOT_A_STATUS');
 
-    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({ requesterId: 'user-1' });
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
+      deletedAt: null,
+      requesterId: 'user-1',
+    });
   });
 
   it.each(['client', 'constructor', '__proto__', 'toString'])(
@@ -145,7 +155,7 @@ describe('GET /api/srs/my-requests', () => {
     const { body } = await call('?status=REQUESTED');
 
     expect(mocks.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { requesterId: 'user-1' } })
+      expect.objectContaining({ where: { deletedAt: null, requesterId: 'user-1' } })
     );
     expect(body.stats).toEqual({ total: 15, requested: 3, inProgress: 2, completed: 5 });
   });

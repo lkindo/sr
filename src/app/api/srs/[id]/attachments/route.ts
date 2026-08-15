@@ -1,9 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createWriteStream } from 'fs';
-import { mkdir } from 'fs/promises';
-import { join } from 'path';
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
@@ -17,8 +12,9 @@ import {
 } from '@/lib/file-validator';
 import { ensureCanAttachToSR, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeMany, serializeResponse } from '@/lib/serialization';
-import { deleteAttachmentBlob, STORAGE_DIR } from '@/lib/storage';
+import { deleteAttachmentBlob, uploadAttachmentBlob } from '@/lib/storage';
 import { assertUploadSizeWithinLimit } from '@/lib/upload-guard';
 
 // Force Node.js runtime (file system operations require Node.js)
@@ -55,7 +51,7 @@ export const POST = withAuthAndRateLimit(
 
     // SR 존재 확인
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
     });
 
     if (!sr) {
@@ -90,27 +86,29 @@ export const POST = withAuthAndRateLimit(
       );
     }
 
-    // 업로드 디렉토리 생성 (웹루트 밖 STORAGE_DIR 기준 — 정적 서빙 차단)
-    const uploadDir = join(STORAGE_DIR, 'attachments');
-    await mkdir(uploadDir, { recursive: true });
-
-    // 모든 파일에 대해 동일한 타임스탬프 사용 (배치 처리)
-    const timestamp = Date.now();
-
+    /**
+     * 저장은 단건 업로드와 **같은 함수**(`uploadAttachmentBlob`)를 쓴다.
+     *
+     * 예전에는 이 배치 경로만 자체 구현을 갖고 있었고, 파일명이
+     * `${timestamp}_${index}_${safeFileName}` 이었다. 문제는 그 세 조각 중 어느 것도
+     * 테넌트를 구분하지 않는다는 점이다 — 전 고객사가 `attachments/` 평면 디렉터리를
+     * 공유했고, `createWriteStream` 기본 모드는 파일이 있으면 **덮어쓴다**.
+     *
+     * 그래서 A사와 B사 사용자가 같은 밀리초에 각각 `보고서.pdf` 를 첫 파일로 올리면
+     * 경로가 정확히 같아지고, 나중 스트림이 앞 파일을 truncate 했다. 결과적으로
+     * DB 에는 **서로 다른 SR 을 가리키는 두 행이 같은 storagePath** 를 갖게 되어,
+     * A사 사용자가 인가를 정상 통과한 채 B사 파일 내용을 내려받았다.
+     *
+     * 공용 함수는 UUID 파일명 · `attachments/<srId>/` 하위 디렉터리 · `wx` 플래그 ·
+     * 경로 탐색 차단을 함께 제공하므로 이 세 가지가 한 번에 닫힌다.
+     */
     const results = await Promise.all(
-      files.map(async (file, index) => {
+      files.map(async (file) => {
         try {
           // 파일 검증 (확장자, 내용, 크기)
           const { mimeType, size } = await validateFile(file);
 
-          // 파일명 생성 (타임스탬프 + 인덱스 + 원본 파일명) - 병렬 처리 시 타임스탬프 충돌 방지
-          const safeFileName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
-          const fileName = `${timestamp}_${index}_${safeFileName}`;
-          const filePath = join(uploadDir, fileName);
-
-          // 파일 저장 (스트림 사용으로 메모리 효율화)
-          const writableStream = createWriteStream(filePath);
-          await pipeline(Readable.fromWeb(file.stream() as any), writableStream);
+          const stored = await uploadAttachmentBlob(srId, file);
 
           // DB 저장 데이터 준비
           // fileUrl 은 생성 후 attachment id 기반 인증 다운로드 경로로 갱신된다(아래 참조).
@@ -121,7 +119,7 @@ export const POST = withAuthAndRateLimit(
             fileUrl: '',
             fileSize: size,
             fileType: mimeType, // 검증된 MIME 타입 사용
-            storagePath: `attachments/${fileName}`,
+            storagePath: stored.pathname,
             uploadedBy: session.user.id,
           };
 
@@ -248,7 +246,7 @@ export const GET = withAuthAndRateLimit(
     const { id: srId } = await params;
 
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
     });
 
     if (!sr) {

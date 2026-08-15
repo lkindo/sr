@@ -1,4 +1,4 @@
-import { diffCalendarDaysInAppZone } from './timezone';
+import { diffCalendarDaysInAppZone, formatAppZoneTime } from './timezone';
 
 export function getDaysUntilDue(dueDate: string | Date | null | undefined): number | null {
   if (!dueDate) return null;
@@ -63,12 +63,39 @@ export function getDueDateStatus(
     return null;
   }
 
-  if (daysUntil < 0) {
+  /**
+   * **초과 판정은 달력일이 아니라 시각으로 한다** (헌법 §3).
+   *
+   * 예전에는 `daysUntil < 0` 하나로 판정했다. 달력일 차이라, 오늘 09:00 이 마감인 SR 은
+   * 18:00 이 되어 이미 9시간을 넘겼는데도 `daysUntil === 0` 이라 "오늘 마감"으로 뜨고
+   * `isOverdue` 는 거짓이었다. 카테고리 SLA 가 12시간이면 **위반 상태가 하루 종일
+   * 정상으로 보인다** — 짧은 SLA 일수록 정확히 안 보이는 구조였다.
+   */
+  const dueMs = new Date(dueDate as string | Date).getTime();
+  const remainingMs = Number.isFinite(dueMs) ? dueMs - Date.now() : null;
+
+  if (remainingMs !== null && remainingMs < 0) {
+    // 지연 폭도 시각 기준으로 센다. 24시간 미만이면 '일' 로 반올림하지 않고 시간으로 쓴다.
+    const overdueHours = Math.floor(-remainingMs / (60 * 60 * 1000));
     return {
-      label: `${Math.abs(daysUntil)}일 지연`,
+      label:
+        overdueHours < 24
+          ? `${Math.max(1, overdueHours)}시간 지연`
+          : `${Math.floor(overdueHours / 24)}일 지연`,
       variant: 'destructive',
       isOverdue: true,
       isUrgent: false,
+    };
+  }
+
+  // 24시간 안으로 들어오면 날짜가 아니라 **시각**을 보여 준다.
+  // "오늘 마감"만으로는 아침 9시인지 밤 11시인지 알 수 없어 대응 우선순위를 정할 수 없다.
+  if (remainingMs !== null && remainingMs < 24 * 60 * 60 * 1000) {
+    return {
+      label: `${formatAppZoneTime(dueDate as string | Date)} 마감`,
+      variant: 'destructive',
+      isOverdue: false,
+      isUrgent: true,
     };
   }
 

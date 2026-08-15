@@ -90,6 +90,35 @@ export function formatAppZoneShortDate(value: string | Date | number): string {
 }
 
 /**
+ * KST 기준 그 날의 자정(00:00 KST)을 가리키는 순간을 돌려준다.
+ *
+ * `d.setHours(0,0,0,0)` 은 **앰비언트 로컬 타임존**의 자정이다. UTC 로 뜨는 컨테이너에서는
+ * UTC 자정(=09:00 KST)이 되어, "오늘 마감" 범위 질의가 매일 9시간씩 어긋났다.
+ */
+export function startOfAppZoneDay(value: string | Date | number = new Date()): Date {
+  // KST 달력 날짜를 뽑아 그 날 00:00 KST 를 UTC 순간으로 되돌린다(+09:00 오프셋 명시).
+  return new Date(`${formatISODateInAppZone(value)}T00:00:00+09:00`);
+}
+
+/**
+ * KST 기준 `HH:mm`.
+ *
+ * 마감이 24시간 안으로 들어온 SR 에 "오늘/내일 마감" 대신 정확한 시각을 붙이기 위한 것이다.
+ * 12시간짜리 SLA 에서는 "오늘 마감" 이 아침 9시인지 밤 11시인지가 전부 다른 이야기다.
+ */
+export function formatAppZoneTime(value: string | Date | number): string {
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: APP_TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(value));
+  const hour = parts.find((p) => p.type === 'hour')?.value ?? '00';
+  const minute = parts.find((p) => p.type === 'minute')?.value ?? '00';
+  return `${hour}:${minute}`;
+}
+
+/**
  * SR 번호 채번용 `YYYYMMDD` (KST 달력 기준).
  *
  * `toISOString()` 기반이면 09:00 KST 에 날짜가 롤오버해서, 하루의 앞 9시간에 만든 SR 이

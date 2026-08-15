@@ -25,7 +25,48 @@ declare const globalThis: {
   prismaGlobal: ReturnType<typeof prismaClientSingleton>;
 } & typeof global;
 
-const prisma = globalThis.prismaGlobal ?? prismaClientSingleton();
+/**
+ * 슬로우 쿼리 감지를 붙인다 (db-rules §4).
+ *
+ * 예전 구현은 `$use`(Prisma Middleware) 존재 여부로 분기했는데, **Prisma 6 에서 `$use` 는
+ * 제거되어 그 분기가 한 번도 참이 되지 않았다** — 등록조차 되지 않는 죽은 코드였다.
+ * 게다가 `NODE_ENV === 'development'` 로 한정돼 있어, 설령 동작했더라도 정작 느린 쿼리가
+ * 문제되는 프로덕션에서는 아무 경고도 남지 않았다. 개발 환경에서는 `log: ['query']` 가
+ * 전체 쿼리를 찍으므로 오히려 느린 쿼리가 잡음에 묻힌다.
+ *
+ * Client Extension 으로 교체하고 환경 가드를 없앤다. 확장은 원본 인스턴스를 변형하지 않고
+ * **새 인스턴스를 돌려주므로 반드시 그 결과를 export 해야 한다.**
+ */
+function withSlowQueryLogging<T extends PrismaClient>(client: T): T {
+  const slowMs = Number(process.env.PRISMA_SLOW_MS ?? 200);
+
+  return client.$extends({
+    query: {
+      async $allOperations({ model, operation, args, query }) {
+        const startedAt = Date.now();
+        try {
+          return await query(args);
+        } finally {
+          const duration = Date.now() - startedAt;
+          if (duration >= slowMs) {
+            // logger 를 정적 import 하면 prisma ← logger ← prisma 순환이 생긴다.
+            void import('./logger').then(({ logger }) => {
+              logger.warn(`[Prisma][SlowQuery] ${model ?? 'raw'}.${operation} ${duration}ms`, {
+                model: model ?? 'raw',
+                operation,
+                durationMs: duration,
+                thresholdMs: slowMs,
+              });
+            });
+          }
+        }
+      },
+    },
+  }) as unknown as T;
+}
+
+const basePrisma = globalThis.prismaGlobal ?? prismaClientSingleton();
+const prisma = basePrisma ? withSlowQueryLogging(basePrisma) : basePrisma;
 
 if (prisma) {
   const originalTransaction = prisma.$transaction.bind(prisma);
@@ -63,53 +104,5 @@ const safePrisma = prisma ?? ({} as PrismaClient);
 
 export default safePrisma;
 
-if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = prisma;
-
-// Slow query logger (development only)
-if (process.env.NODE_ENV === 'development' && prisma) {
-  const slowMs = Number(process.env.PRISMA_SLOW_MS ?? 200);
-  const slowLogFile = process.env.PRISMA_SLOW_LOG_FILE;
-  let append: ((line: string) => void) | null = null;
-  if (slowLogFile) {
-    const { appendFileSync, mkdirSync } = require('fs');
-    const { dirname } = require('path');
-    try {
-      mkdirSync(dirname(slowLogFile), { recursive: true });
-      append = (line: string) => appendFileSync(slowLogFile, line + '\n', { encoding: 'utf8' });
-    } catch {
-      append = null;
-    }
-  }
-  // Use middleware only if supported by current Prisma version
-  type PrismaMiddlewareParams = {
-    model?: string;
-    action: string;
-    args: unknown;
-    dataPath: string[];
-    runInTransaction: boolean;
-  };
-  type PrismaMiddlewareNext = (params: PrismaMiddlewareParams) => Promise<unknown>;
-
-  const applyMw = (
-    prisma as unknown as {
-      $use?: (
-        fn: (params: PrismaMiddlewareParams, next: PrismaMiddlewareNext) => Promise<unknown>
-      ) => void;
-    }
-  ).$use;
-
-  if (typeof applyMw === 'function') {
-    applyMw(async (params: PrismaMiddlewareParams, next: PrismaMiddlewareNext) => {
-      const startedAt = Date.now();
-      const result = await next(params);
-      const duration = Date.now() - startedAt;
-      if (duration >= slowMs) {
-        const line = `[Prisma][SlowQuery] ${params.model ?? 'raw'}.${params.action} ${duration}ms`;
-        // eslint-disable-next-line no-console
-        console.warn(line);
-        if (append) append(line);
-      }
-      return result;
-    });
-  }
-}
+// 확장 **이전** 인스턴스를 캐시한다. 확장된 것을 넣으면 HMR 마다 확장이 중첩된다.
+if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = basePrisma;

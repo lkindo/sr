@@ -31,6 +31,7 @@ const { mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn().mockResolvedValue({}),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       delete: vi.fn().mockResolvedValue({}),
       count: vi.fn().mockResolvedValue(0),
     },
@@ -94,6 +95,7 @@ vi.mock('@/lib/policies', async (importOriginal) => {
 vi.mock('@/lib/sr-state-machine', () => ({
   validateTransition: vi.fn().mockReturnValue({ valid: true }),
   getRequiredFields: vi.fn().mockReturnValue([]),
+  isReopenTransition: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/lib/storage', () => ({
@@ -419,7 +421,7 @@ describe('SRService', () => {
 
       expect(result).toEqual(mockSR);
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'sr-1' } })
+        expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
       );
     });
 
@@ -508,61 +510,40 @@ describe('SRService', () => {
 
       await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow('삭제 권한이 없습니다');
     });
-    it('should delete SR successfully', async () => {
+    it('삭제는 물리 삭제가 아니라 deletedAt 을 채우는 soft delete 다', async () => {
+      // 물리 삭제는 sr_activities / sr_comments / sr_attachments / sr_status_history 를
+      // Cascade 로 함께 지워 db-rules §2 의 "이력 보존" 원칙을 통째로 무력화한다.
       const mockSR = { id: 'sr-1', clientId: 'client-1' };
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
       vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
-      vi.mocked(prisma.sR.delete).mockResolvedValue(mockSR as any);
 
       await srService.deleteSR('sr-1', mockUser);
 
-      expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+      expect(prisma.sR.delete).not.toHaveBeenCalled();
+      expect(prisma.sR.updateMany).toHaveBeenCalledWith({
+        where: { id: 'sr-1', deletedAt: null },
+        data: { deletedAt: expect.any(Date) },
+      });
     });
 
-    /**
-     * 삭제 가능한 SR 하나와 그 첨부 목록을 준비한다.
-     *
-     * 목 반환값을 `as unknown as` 로 좁혀 `any` 를 쓰지 않는다 —
-     * `--max-warnings` 래칫은 숫자를 올리지 않는 것이 규칙이라, 새로 넣는 코드가
-     * 예산을 잠식하면 기존 부채를 갚을 여지가 그만큼 줄어든다.
-     */
-    const arrangeDeletableSR = (
-      attachments: { storagePath: string | null; fileUrl: string }[] = []
-    ) => {
-      const mockSR = { id: 'sr-1', clientId: 'client-1' } as unknown as Awaited<
-        ReturnType<typeof prisma.sR.findUnique>
-      >;
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR);
+    it('이미 삭제된 SR 은 조회 단계에서 걸러져 NotFoundError 가 된다', async () => {
+      // findUnique 의 where 에 deletedAt: null 이 들어가므로 soft delete 된 행은 잡히지 않는다.
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
+
+      await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow(NotFoundError);
+      expect(prisma.sR.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('첨부 blob 은 지우지 않는다', async () => {
+      // 행이 살아 있으므로 경로를 잃지 않는다. 되돌릴 수 없는 파일 삭제를 사용자 요청
+      // 시점에 하지 않는 것이 soft delete 로 바꾼 이유의 절반이다.
+      const mockSR = { id: 'sr-1', clientId: 'client-1' };
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
       vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
-      vi.mocked(prisma.sR.delete).mockResolvedValue(
-        mockSR as unknown as Awaited<ReturnType<typeof prisma.sR.delete>>
-      );
-      vi.mocked(prisma.sRAttachment.findMany).mockResolvedValue(
-        attachments as unknown as Awaited<ReturnType<typeof prisma.sRAttachment.findMany>>
-      );
-    };
-
-    // 감사 4.2: sr_attachments 는 onDelete: Cascade 라 행은 함께 사라지지만
-    // 디스크의 파일은 아무도 지우지 않아 볼륨에 영구 잔존했다.
-    it('SR 을 지우면 첨부 blob 도 함께 정리한다', async () => {
-      arrangeDeletableSR([
-        { storagePath: 'sr-1/a.pdf', fileUrl: 'http://x/sr-1/a.pdf' },
-        // storagePath 가 도입되기 전 행은 null 이라 fileUrl 에서 되살려야 한다.
-        { storagePath: null, fileUrl: 'http://x/sr-1/legacy.png' },
-      ]);
 
       await srService.deleteSR('sr-1', mockUser);
 
-      expect(deleteAttachmentBlob).toHaveBeenCalledWith('sr-1/a.pdf');
-      expect(deleteAttachmentBlob).toHaveBeenCalledWith('sr-1/legacy.png');
-    });
-
-    it('blob 정리가 실패해도 SR 삭제는 성공으로 끝난다', async () => {
-      arrangeDeletableSR([{ storagePath: 'sr-1/a.pdf', fileUrl: '' }]);
-      vi.mocked(deleteAttachmentBlob).mockRejectedValueOnce(new Error('EACCES'));
-
-      // 커밋은 이미 끝났다. 여기서 던지면 사용자가 이미 사라진 SR 을 다시 지우려 한다.
-      await expect(srService.deleteSR('sr-1', mockUser)).resolves.toBeUndefined();
+      expect(deleteAttachmentBlob).not.toHaveBeenCalled();
     });
   });
 
@@ -581,7 +562,9 @@ describe('SRService', () => {
 
       const result = await srService.countSRs(filter);
 
-      expect(prisma.sR.count).toHaveBeenCalledWith(filter);
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { deletedAt: null, ...filter.where },
+      });
       expect(result).toBe(3);
     });
 
@@ -595,7 +578,9 @@ describe('SRService', () => {
 
       const result = await srService.countSRs(params);
 
-      expect(prisma.sR.count).toHaveBeenCalledWith(params);
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { deletedAt: null, ...params.where },
+      });
       expect(result).toBe(1);
     });
   });
@@ -625,7 +610,9 @@ describe('SRService', () => {
 
       const result = await srService.getAllSRs(params);
 
-      expect(prisma.sR.findMany).toHaveBeenCalledWith(expect.objectContaining(params));
+      expect(prisma.sR.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ ...params, where: { deletedAt: null, ...params.where } })
+      );
       expect(result).toEqual(mockSRs);
     });
 
@@ -638,7 +625,10 @@ describe('SRService', () => {
 
       await srService.getAllSRs(params);
 
-      expect(prisma.sR.findMany).toHaveBeenCalledWith(expect.objectContaining(params));
+      // where 를 주지 않아도 soft delete 필터는 항상 붙는다(db-rules §2).
+      expect(prisma.sR.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ ...params, where: { deletedAt: null } })
+      );
     });
 
     it('should pass complex where clauses correctly', async () => {
@@ -657,7 +647,9 @@ describe('SRService', () => {
 
       await srService.getAllSRs(params);
 
-      expect(prisma.sR.findMany).toHaveBeenCalledWith(expect.objectContaining(params));
+      expect(prisma.sR.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ ...params, where: { deletedAt: null, ...params.where } })
+      );
     });
   });
 
@@ -674,7 +666,7 @@ describe('SRService', () => {
 
       expect(result).toEqual(mockDetails);
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'sr-1' } })
+        expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
       );
     });
 
@@ -737,20 +729,22 @@ describe('SRService', () => {
         });
       });
 
-      it('should delete SR successfully', async () => {
+      it('should soft delete SR successfully', async () => {
         const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
         vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
-        vi.mocked(prisma.sR.delete).mockResolvedValue(mockSR as any);
 
         await srService.deleteSR('sr-1', mockUser);
 
-        // Verify findById called
+        // 조회는 살아 있는 SR 만 대상으로 한다
         expect(prisma.sR.findUnique).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { id: 'sr-1' } })
+          expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
         );
-        // Verify delete called
-        expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+        // 물리 삭제가 아니라 deletedAt 을 채운다
+        expect(prisma.sR.updateMany).toHaveBeenCalledWith({
+          where: { id: 'sr-1', deletedAt: null },
+          data: { deletedAt: expect.any(Date) },
+        });
       });
 
       it('should throw NotFoundError if SR to delete does not exist', async () => {
@@ -758,12 +752,12 @@ describe('SRService', () => {
         await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow(NotFoundError);
       });
 
-      it('should throw Error if delete fails', async () => {
+      it('should throw Error if soft delete fails', async () => {
         const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
         vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
-        vi.mocked(prisma.sR.delete).mockRejectedValue(new Error('Delete failed'));
+        vi.mocked(prisma.sR.updateMany).mockRejectedValue(new Error('Delete failed'));
 
         await expect(srService.deleteSR('sr-1', mockUser)).rejects.toThrow('Delete failed');
       });

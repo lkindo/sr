@@ -19,10 +19,53 @@ export const runtime = 'nodejs';
  *   자신이 접근할 수 없는 타 테넌트/미배정 SR 이벤트는 전송되지 않는다.
  * - 이벤트를 유발한 당사자(actorId)에게는 에코하지 않는다(중복 토스트/리페치 방지).
  */
+
+/**
+ * 사용자별 동시 연결 상한.
+ *
+ * 탭을 여러 개 열면 각 탭이 연결을 하나씩 잡는다. 정상 사용은 몇 개 수준이지만
+ * 상한이 없으면 계정 하나로 연결을 계속 열어 nginx worker_connections 와 Node 리스너를
+ * 고갈시킬 수 있다(감사 D-7). nginx 는 `/api/realtime` 을 의도적으로 `limit_conn` 밖에
+ * 두고 있어서 이 상한이 유일한 방어선이다.
+ */
+const MAX_CONNECTIONS_PER_USER = 6;
+
+/** 프로세스 전역 상한. 개별 사용자 상한을 통과해도 전체 자원은 유한하다. */
+const MAX_CONNECTIONS_TOTAL = 500;
+
+/**
+ * 연결의 절대 수명. 이 시간이 지나면 서버가 스트림을 닫고 클라이언트가 재연결한다.
+ *
+ * nginx `proxy_read_timeout` 이 1시간이라 그때까지는 유휴 연결도 살아남는다.
+ * 수명을 두면 ① 누수된 연결이 영원히 남지 않고 ② 세션 권한 변경이 늦어도 이 주기 안에
+ * 반영된다(재연결 시 `auth()` 를 다시 통과하므로).
+ */
+const CONNECTION_MAX_AGE_MS = 30 * 60 * 1000;
+
+/** 사용자별 활성 연결 수. 프로세스 로컬이며, 다중 인스턴스에서는 인스턴스별로 센다. */
+const activeConnections = new Map<string, number>();
+let totalConnections = 0;
+
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+  const userConnections = activeConnections.get(userId) ?? 0;
+
+  if (userConnections >= MAX_CONNECTIONS_PER_USER || totalConnections >= MAX_CONNECTIONS_TOTAL) {
+    logger.warn('[SSE] Connection limit reached', {
+      userId,
+      custom_userConnections: userConnections,
+      custom_totalConnections: totalConnections,
+    });
+    // 503 을 준다 — 클라이언트의 백오프 재연결이 이 응답을 받고 물러섰다가 다시 온다.
+    return NextResponse.json(
+      { error: '실시간 연결 수가 한도에 도달했습니다. 잠시 후 다시 시도해주세요.' },
+      { status: 503 }
+    );
   }
 
   const viewer: AuthenticatedUser = {
@@ -55,9 +98,37 @@ export async function GET(request: NextRequest) {
     return canReadSR(viewer, srFields);
   };
 
+  activeConnections.set(userId, userConnections + 1);
+  totalConnections++;
+
   const stream = new ReadableStream({
     start(controller) {
       let closed = false;
+
+      /** 연결 정리는 abort·수명 만료 어느 쪽으로 와도 **정확히 한 번만** 일어나야 한다. */
+      const release = (reason: string) => {
+        if (closed) return;
+        closed = true;
+        logger.info('[SSE] Client disconnected', { userId, custom_reason: reason });
+
+        const remaining = (activeConnections.get(userId) ?? 1) - 1;
+        if (remaining > 0) activeConnections.set(userId, remaining);
+        else activeConnections.delete(userId);
+        totalConnections = Math.max(0, totalConnections - 1);
+
+        clearInterval(keepAlive);
+        clearTimeout(maxAgeTimer);
+        realtimeEmitter.off(REALTIME_EVENTS.SR_UPDATED, onSRUpdated);
+        realtimeEmitter.off(REALTIME_EVENTS.SR_CREATED, onSRCreated);
+        realtimeEmitter.off(REALTIME_EVENTS.SR_DELETED, onSRDeleted);
+        realtimeEmitter.off(REALTIME_EVENTS.SR_COMMENTED, onSRCommented);
+
+        try {
+          controller.close();
+        } catch {
+          // 이미 닫혔으면 무시한다.
+        }
+      };
 
       // 연결 직후 주석 프레임 하나를 즉시 흘린다.
       //
@@ -115,16 +186,12 @@ export async function GET(request: NextRequest) {
         }
       }, 30000);
 
-      // 스트림이 닫힐 때 리스너 제거
-      request.signal.addEventListener('abort', () => {
-        closed = true;
-        logger.info('[SSE] Client disconnected (aborted)', { userId: viewer.id });
-        clearInterval(keepAlive);
-        realtimeEmitter.off(REALTIME_EVENTS.SR_UPDATED, onSRUpdated);
-        realtimeEmitter.off(REALTIME_EVENTS.SR_CREATED, onSRCreated);
-        realtimeEmitter.off(REALTIME_EVENTS.SR_DELETED, onSRDeleted);
-        realtimeEmitter.off(REALTIME_EVENTS.SR_COMMENTED, onSRCommented);
-      });
+      // 절대 수명. 만료되면 서버가 닫고 클라이언트가 백오프 없이 곧바로 재연결한다.
+      const maxAgeTimer = setTimeout(() => release('max-age'), CONNECTION_MAX_AGE_MS);
+      maxAgeTimer.unref?.();
+
+      // 스트림이 닫힐 때(클라이언트 이탈) 리스너와 카운터를 정리한다.
+      request.signal.addEventListener('abort', () => release('aborted'));
     },
   });
 

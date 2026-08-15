@@ -150,7 +150,10 @@ export function FileUpload({
           'relative border-2 border-dashed rounded-[8px] p-8 text-center cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2',
           dragActive
             ? 'border-primary bg-primary/10'
-            : 'border-[#c7d2fe] bg-[#f8fafc] hover:border-primary/50',
+            : // 라이트 스펙 hex 를 다크 캔버스(#090909) 위에 그대로 칠하면 흰 패널이 되고,
+              // 그 위 안내 문구가 --foreground(순백)를 상속해 **흰 글씨 위 흰 배경**이 된다.
+              // 실제로 SR 등록·수정 다이얼로그의 첨부 영역이 그 상태였다.
+              'border-border bg-muted hover:border-primary/50',
           disabled && 'opacity-40 cursor-not-allowed'
         )}
         onDragEnter={handleDrag}

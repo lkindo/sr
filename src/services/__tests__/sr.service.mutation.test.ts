@@ -81,6 +81,8 @@ vi.mock('@/services/email.service', () => ({
 
 vi.mock('@/lib/logger', () => ({
   logger: {
+    logError: vi.fn(),
+    logRequest: vi.fn(),
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
@@ -95,6 +97,7 @@ vi.mock('@/lib/storage', () => ({
 vi.mock('@/lib/sr-state-machine', () => ({
   validateTransition: vi.fn().mockReturnValue({ valid: true }),
   getRequiredFields: vi.fn().mockReturnValue([]),
+  isReopenTransition: vi.fn().mockReturnValue(false),
 }));
 
 describe('SRService Mutation Tests', () => {
@@ -237,7 +240,12 @@ describe('SRService Mutation Tests', () => {
 
       await srService.deleteSR('sr-1', mockUser as any);
 
-      expect(prisma.sR.delete).toHaveBeenCalledWith({ where: { id: 'sr-1' } });
+      // 물리 삭제가 아니라 soft delete 다(db-rules §2).
+      expect(prisma.sR.delete).not.toHaveBeenCalled();
+      expect(prisma.sR.updateMany).toHaveBeenCalledWith({
+        where: { id: 'sr-1', deletedAt: null },
+        data: { deletedAt: expect.any(Date) },
+      });
     });
 
     it('should throw NotFoundError if SR does not exist', async () => {
@@ -265,7 +273,7 @@ describe('SRService Mutation Tests', () => {
 
       expect(result).toEqual(mockSR);
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'sr-1' } })
+        expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
       );
     });
 

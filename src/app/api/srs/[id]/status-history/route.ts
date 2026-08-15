@@ -4,6 +4,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 
 /**
  * GET /api/srs/[id]/status-history
@@ -19,7 +20,7 @@ export const GET = withAuthAndRateLimit(
 
     // SR 존재 여부 확인 및 권한 검증
     const sr = await prisma.sR.findUnique({
-      where: { id: srId },
+      where: { id: srId, ...SR_ALIVE },
     });
 
     if (!sr) {

@@ -108,8 +108,13 @@ describe('REQUIRED_FIELDS / getRequiredFields', () => {
   it('getRequiredFields returns empty array for statuses without requirements', () => {
     expect(getRequiredFields('REQUESTED')).toEqual([]);
     expect(getRequiredFields('INTAKE')).toEqual([]);
-    expect(getRequiredFields('ON_HOLD')).toEqual([]);
     expect(getRequiredFields('CONFIRMED')).toEqual([]);
+  });
+
+  // 헌법 §2 는 보류에 사유 **와** 예상 해제일을 요구한다. 사유는 전이 맥락 규칙이,
+  // 날짜는 필수 필드 검사가 맡는다.
+  it('ON_HOLD 는 예상 해제일을 필수 필드로 요구한다', () => {
+    expect(getRequiredFields('ON_HOLD')).toEqual(['expectedHoldReleaseDate']);
   });
 
   it('getRequiredFields returns empty array for unknown status (nullish fallback)', () => {

@@ -81,6 +81,7 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/sr-state-machine', () => ({
   validateTransition: vi.fn(),
   getRequiredFields: vi.fn(),
+  isReopenTransition: vi.fn().mockReturnValue(false),
 }));
 
 describe('SRService - Expanded Coverage', () => {

@@ -291,8 +291,9 @@ export function UserDialog({
       email,
       isActive,
       userType,
-      clientIds:
-        userType === 'CLIENT' ? (selectedClientId ? [selectedClientId] : []) : selectedClientIds,
+      // 고객사 소속은 CLIENT 유형에만 존재한다. 운영팀(ENGINEER 등)에 소속을 실어 보내면
+      // 헌법 §1.3 배타성 검사에 걸려 400 이 된다 — 화면이 그 조합을 만들지 않는다.
+      clientIds: userType === 'CLIENT' ? (selectedClientId ? [selectedClientId] : []) : [],
     };
 
     // 빈 비밀번호를 실어 보내면 서버가 그것으로 덮어쓸 수 있다. 수정 모드에서 비워 둔 경우다.
@@ -399,42 +400,14 @@ export function UserDialog({
               </div>
             )}
 
-            {userType === 'ENGINEER' && (
-              <div className="space-y-2">
-                <Label>할당 고객사 (복수 선택 가능)</Label>
-                {loadingClients ? (
-                  <p className="text-sm text-muted-foreground">고객사 목록 로딩 중...</p>
-                ) : (
-                  <div className="border rounded-md p-4 space-y-2 max-h-60 overflow-y-auto">
-                    {clients.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">등록된 고객사가 없습니다.</p>
-                    ) : (
-                      (Array.isArray(clients) ? clients : []).map((client) => (
-                        <div key={client.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`eng-client-${client.id}`}
-                            checked={selectedClientIds.includes(client.id)}
-                            onCheckedChange={() => toggleClient(client.id)}
-                            disabled={loading}
-                          />
-                          <Label
-                            htmlFor={`eng-client-${client.id}`}
-                            className="cursor-pointer font-normal"
-                          >
-                            {client.name} ({client.code})
-                          </Label>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-                {selectedClientIds.length > 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedClientIds.length}개 고객사 선택됨
-                  </p>
-                )}
-              </div>
-            )}
+            {/*
+              ENGINEER 에게 "할당 고객사" 를 고르게 하던 블록을 제거했다(감사 D-12).
+
+              헌법 §1.3 은 시스템 운영 역할(ADMIN/MANAGER/ENGINEER)과 고객사 소속을
+              동시에 갖지 못하게 한다. 서버는 이제 `ensureRoleClientExclusivity` 로
+              이 조합을 거부하므로, 화면에 남겨 두면 **누르면 반드시 실패하는 입력**이 된다.
+              ENGINEER 의 담당 범위는 고객사 소속이 아니라 SR 배정으로 정해진다.
+            */}
             <div className="space-y-2">
               <Label htmlFor="password">
                 {isEditMode ? '비밀번호 (변경 시에만 입력)' : '비밀번호 *'}

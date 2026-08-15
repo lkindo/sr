@@ -26,19 +26,53 @@ const {
   mockClientFindUnique,
   mockSRFindMany,
   mockHandleApiError,
-} = vi.hoisted(() => ({
-  mockSession: { user: { id: 'actor-1', roles: ['ADMIN'], permissions: [] as string[] } },
-  mockUserRoleFindMany: vi.fn(),
-  mockUserClientFindFirst: vi.fn(),
-  mockUserClientDelete: vi.fn(),
-  mockUserClientUpdate: vi.fn(),
-  mockUserClientCreate: vi.fn(),
-  mockClientFindUnique: vi.fn(),
-  mockSRFindMany: vi.fn(),
-  mockHandleApiError: vi.fn((error: { statusCode?: number; message?: string }) =>
+  mockTransaction,
+  mockCreateAuditLog,
+  prismaMock,
+} = vi.hoisted(() => {
+  const mockSession = { user: { id: 'actor-1', roles: ['ADMIN'], permissions: [] as string[] } };
+  const mockUserRoleFindMany = vi.fn();
+  const mockUserClientFindFirst = vi.fn();
+  const mockUserClientDelete = vi.fn();
+  const mockUserClientUpdate = vi.fn();
+  const mockUserClientCreate = vi.fn();
+  const mockTransaction = vi.fn();
+  const mockCreateAuditLog = vi.fn();
+  const mockClientFindUnique = vi.fn();
+  const mockSRFindMany = vi.fn();
+  const mockHandleApiError = vi.fn((error: { statusCode?: number; message?: string }) =>
     NextResponse.json({ error: error.message ?? 'Error' }, { status: error.statusCode ?? 500 })
-  ),
-}));
+  );
+
+  // vi.mock 팩토리가 참조하므로 여기(호이스팅 블록) 안에서 만들어야 한다.
+  const prismaMock = {
+    userRole: { findMany: mockUserRoleFindMany },
+    userClient: {
+      findFirst: mockUserClientFindFirst,
+      delete: mockUserClientDelete,
+      update: mockUserClientUpdate,
+      create: mockUserClientCreate,
+    },
+    client: { findUnique: mockClientFindUnique },
+    sR: { findMany: mockSRFindMany },
+    $transaction: mockTransaction,
+  };
+
+  return {
+    mockSession,
+    mockUserRoleFindMany,
+    mockUserClientFindFirst,
+    mockUserClientDelete,
+    mockUserClientUpdate,
+    mockUserClientCreate,
+    mockClientFindUnique,
+    mockSRFindMany,
+    mockHandleApiError,
+    mockTransaction,
+    mockCreateAuditLog,
+    prismaMock,
+  };
+});
 
 vi.mock('@/lib/api-error-handler', () => ({ handleApiError: mockHandleApiError }));
 
@@ -58,18 +92,15 @@ vi.mock('@/lib/api-helpers', () => ({
   validateRequestBody: async (request: { json: () => Promise<unknown> }) => request.json(),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    userRole: { findMany: mockUserRoleFindMany },
-    userClient: {
-      findFirst: mockUserClientFindFirst,
-      delete: mockUserClientDelete,
-      update: mockUserClientUpdate,
-      create: mockUserClientCreate,
-    },
-    client: { findUnique: mockClientFindUnique },
-    sR: { findMany: mockSRFindMany },
-  },
+/**
+ * 소속 변경·해제는 이제 감사 로그와 **같은 트랜잭션**에서 일어난다(감사 D-16).
+ * 그래서 쓰기는 `prisma` 가 아니라 `tx` 로 나간다 — 트랜잭션 콜백에 같은 델리게이트를
+ * 넘겨 주어 목이 그대로 관측되게 한다.
+ */
+vi.mock('@/lib/prisma', () => ({ default: prismaMock }));
+
+vi.mock('@/services/audit.service', () => ({
+  auditService: { createLog: mockCreateAuditLog },
 }));
 
 import { DELETE, PATCH } from '../route';
@@ -82,6 +113,12 @@ const withRoles = (...names: string[]) => names.map((name) => ({ role: { name } 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // 트랜잭션 콜백에 같은 델리게이트를 넘겨 목이 그대로 관측되게 한다.
+  mockTransaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(prismaMock));
+  mockCreateAuditLog.mockResolvedValue(undefined);
+  // 감사 로그가 생성된 행의 id 를 targetId 로 쓰므로 반환값이 필요하다.
+  mockUserClientCreate.mockResolvedValue({ id: 'uc-new' });
+  mockUserClientUpdate.mockResolvedValue({ id: 'uc-1' });
   mockSession.user = { id: 'actor-1', roles: ['ADMIN'], permissions: [] };
   // 기본: 행위자는 ADMIN, 대상은 역할 없음.
   mockUserRoleFindMany.mockResolvedValue(withRoles('ADMIN'));
@@ -239,5 +276,65 @@ describe('PATCH — 진행 중인 SR 보호', () => {
 
     expect(res.status).toBe(200);
     expect(mockUserClientCreate).toHaveBeenCalled();
+  });
+});
+
+/**
+ * 감사 D-16 회귀 방어.
+ *
+ * 고객사 소속은 그 사용자가 볼 수 있는 데이터 범위를 정한다. 헌법 §1.2 는 이런 민감
+ * 행위를 감사 로그로 영구 저장하라고 규정하는데, 형제 경로인 `approve` 는 처음부터
+ * 남기고 있었던 반면 이 두 경로만 빠져 있었다 — 관리자가 소속을 몰래 바꾼 뒤
+ * 데이터를 열람해도 어떤 기록도 남지 않았다.
+ */
+describe('감사 로그 — 소속 변경은 기록된다', () => {
+  it('소속 해제를 감사 로그로 남긴다', async () => {
+    mockUserRoleFindMany.mockResolvedValue(withRoles('ADMIN'));
+    mockUserClientFindFirst.mockResolvedValue({ id: 'uc-1', clientId: 'c-0' });
+
+    await DELETE(req(), context);
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        actionType: 'DELETE',
+        targetEntity: 'UserClient',
+        targetId: 'uc-1',
+      })
+    );
+  });
+
+  it('소속 변경은 변경 전후를 함께 남긴다', async () => {
+    // 이 목은 **행위자**(인가 판정)와 **대상**(배타성 판정) 양쪽에 쓰인다.
+    // 첫 호출은 행위자(ADMIN), 두 번째는 대상(고객사 역할)이어야 한다 —
+    // 시스템 운영 역할에는 소속을 붙일 수 없기 때문이다(헌법 §1.3).
+    mockUserRoleFindMany
+      .mockResolvedValueOnce(withRoles('ADMIN'))
+      .mockResolvedValueOnce(withRoles('CLIENT_USER'));
+    mockUserClientFindFirst.mockResolvedValue({ id: 'uc-1', clientId: 'c-0' });
+
+    await PATCH(req({ clientId: 'c-1' }), context);
+
+    expect(mockCreateAuditLog).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        actionType: 'UPDATE',
+        targetEntity: 'UserClient',
+        // 어디에서 어디로 옮겼는지가 남아야 사후 규명이 된다.
+        changes: expect.objectContaining({ before: 'c-0', after: 'c-1' }),
+      })
+    );
+  });
+
+  it('쓰기와 감사 로그는 같은 트랜잭션에서 일어난다', async () => {
+    mockUserRoleFindMany
+      .mockResolvedValueOnce(withRoles('ADMIN'))
+      .mockResolvedValueOnce(withRoles('CLIENT_USER'));
+    mockUserClientFindFirst.mockResolvedValue({ id: 'uc-1', clientId: 'c-0' });
+
+    await PATCH(req({ clientId: 'c-1' }), context);
+
+    // 갈라지면 "바뀌었는데 기록이 없는" 상태나 그 반대가 생긴다.
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 });

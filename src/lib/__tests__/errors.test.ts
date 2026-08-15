@@ -14,11 +14,7 @@ import { logger } from '@/lib/logger';
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
-  logger: {
-    warn: vi.fn(),
-    error: vi.fn(),
-    logError: vi.fn(),
-  },
+  logger: { logRequest: vi.fn(), warn: vi.fn(), error: vi.fn(), logError: vi.fn() },
 }));
 
 describe('Errors Utility', () => {

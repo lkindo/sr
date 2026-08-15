@@ -116,6 +116,35 @@ const eslintConfig = [
       'security/detect-non-literal-regexp': 'off',
     },
   },
+  {
+    /**
+     * 디자인 토큰 강제 (fe-rules §3.2).
+     *
+     * 색상 hex 리터럴을 컴포넌트에 하드코딩하면 테마 토큰이 무시된다. 이 프로젝트는
+     * 다크 캔버스(#090909)인데 과거 라이트 스펙 팔레트가 문서상 정본이던 시기에
+     * `bg-[#f8fafc]` 같은 값이 그대로 들어와 **흰 패널 위 흰 글씨**가 실제로 만들어졌다.
+     * 정본을 `docs/DESIGN.md` 하나로 못 박았으므로 재유입을 여기서 막는다.
+     */
+    files: ['src/**/*.tsx', 'src/**/*.ts'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            'Literal[value=/(?:bg|text|border|ring|fill|stroke|from|via|to|shadow)-.#[0-9a-fA-F]{3,8}/]',
+          message:
+            '색상 hex 리터럴 대신 디자인 토큰 클래스를 쓰세요(bg-background / text-foreground / bg-muted / border-border 등). 정본: docs/DESIGN.md, fe-rules §3.2.',
+        },
+        {
+          selector:
+            'TemplateElement[value.raw=/(?:bg|text|border|ring|fill|stroke|from|via|to|shadow)-.#[0-9a-fA-F]{3,8}/]',
+          message:
+            '색상 hex 리터럴 대신 디자인 토큰 클래스를 쓰세요(bg-background / text-foreground / bg-muted / border-border 등). 정본: docs/DESIGN.md, fe-rules §3.2.',
+        },
+      ],
+    },
+  },
 ];
 
 export default eslintConfig;

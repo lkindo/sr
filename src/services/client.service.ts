@@ -350,6 +350,11 @@ export class ClientService {
     }
 
     // 참조 무결성 확인: 관련된 데이터가 있는지 체크
+    //
+    // **여기서만 `SR_ALIVE` 를 붙이지 않는다.** 이 카운트는 화면에 보여 줄 목록이 아니라
+    // DB 제약(`client_id` FK 는 ON DELETE RESTRICT)을 앱에서 미리 재현하는 가드다.
+    // soft delete 된 SR 도 행은 남아 있으므로, 여기서 제외하면 앱 검사는 통과하고
+    // 실제 DELETE 에서 FK 위반이 터져 500 이 된다 — 사용자에게는 원인 없는 실패로 보인다.
     const [srsCount, usersCount, serviceCategoriesCount, clientHandlersCount] = await Promise.all([
       prisma.sR.count({ where: { clientId: id } }),
       prisma.userClient.count({ where: { clientId: id } }),

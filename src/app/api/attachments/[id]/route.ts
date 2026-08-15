@@ -5,8 +5,10 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { ensureCanDeleteAttachment, ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
 import { deleteAttachmentBlob } from '@/lib/storage';
+import { auditService } from '@/services/audit.service';
 
 // Force Node.js runtime (Prisma doesn't work in Edge Runtime)
 export const runtime = 'nodejs';
@@ -29,7 +31,7 @@ export const GET = withAuthAndRateLimit(
 
     // 권한 체크: 첨부파일이 속한 SR을 조회할 수 있어야 함 (IDOR 방지)
     const sr = await prisma.sR.findUnique({
-      where: { id: attachment.srId },
+      where: { id: attachment.srId, ...SR_ALIVE },
     });
     if (!sr) {
       throw new NotFoundError('SR');
@@ -63,7 +65,7 @@ export const DELETE = withAuthAndRateLimit(
 
     // SR 접근 권한 체크
     const sr = await prisma.sR.findUnique({
-      where: { id: attachment.srId },
+      where: { id: attachment.srId, ...SR_ALIVE },
     });
 
     if (!sr) {
@@ -95,6 +97,23 @@ export const DELETE = withAuthAndRateLimit(
           userId: session.user.id,
           type: 'ATTACHMENT_REMOVED',
           description: `파일 삭제: ${attachment.fileName}`,
+        },
+      });
+
+      // SR 활동 로그와 **별개로** 감사 로그를 남긴다(감사 D-16).
+      //
+      // 활동 로그는 그 SR 을 볼 수 있는 사람에게 보이는 업무 이력이고, 감사 로그는
+      // 관리자가 시스템 전체를 훑는 통제 기록이다. 첨부 삭제는 되돌릴 수 없으므로
+      // 후자에도 남아야 하는데 이 경로만 빠져 있었다.
+      await auditService.createLog(tx, {
+        userId: session.user.id,
+        actionType: 'DELETE',
+        targetEntity: 'SRAttachment',
+        targetId: id,
+        changes: {
+          srId: attachment.srId,
+          fileName: attachment.fileName,
+          fileSize: attachment.fileSize,
         },
       });
     });

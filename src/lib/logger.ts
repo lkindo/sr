@@ -140,11 +140,17 @@ class Logger {
 
     process.on('beforeExit', flush);
 
+    // **여기서 `process.exit` 를 부르지 않는다** (감사 D-9).
+    //
+    // 예전에는 SIGTERM/SIGINT 에 `flush(); process.exit(0)` 를 동기 실행했다. 그러면
+    // Next.js standalone 서버의 비동기 정리를 기다리지 않고 소켓이 즉시 끊긴다 —
+    // 5만 행 CSV 를 스트리밍하던 클라이언트는 **잘린 파일을 정상 다운로드로 저장**하고,
+    // 50MB 첨부를 올리던 요청은 DB 행 없는 고아 파일을 디스크에 남긴다.
+    //
+    // 로거의 책임은 flush 까지다. 종료 오케스트레이션(유예 대기 후 exit)은
+    // `src/instrumentation.ts` 한 곳에서 한다.
     for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-      process.on(signal, () => {
-        flush();
-        process.exit(0);
-      });
+      process.on(signal, flush);
     }
 
     const logFatal = (label: string, cause: unknown) => {
@@ -290,7 +296,19 @@ class Logger {
     context?: LogContext
   ): void {
     const message = `${method} ${path} - ${statusCode}${duration ? ` (${duration}ms)` : ''}`;
-    const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'info';
+
+    /**
+     * 느린 요청은 2xx 여도 `warn` 으로 승격한다 (be-rules §1).
+     *
+     * 프로덕션 로거는 `info` 를 버리므로(`shouldLog`), 정상 응답에 대한 계측은 그대로 두면
+     * **전부 사라진다.** 그래서 "모든 라우트가 소요 시간을 로깅한다" 는 규칙이 예전에는
+     * 구조적으로 달성 불가능했다. 임계값을 넘는 것만 승격하면 프로덕션에서도 남으면서
+     * 정상 트래픽으로 로그가 넘치지 않는다.
+     */
+    const slowMs = Number(process.env.API_SLOW_MS ?? 500);
+    const isSlow = typeof duration === 'number' && duration >= slowMs;
+    const level =
+      statusCode >= 500 ? 'error' : statusCode >= 400 || isSlow ? 'warn' : ('info' as LogLevel);
 
     this.output(
       this.createLogEntry(level, message, {

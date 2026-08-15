@@ -31,7 +31,9 @@ const registerSchema = z
 
 export async function registerUser(formData: FormData) {
   try {
-    await requireRateLimit('strict');
+    // 미인증 액션이라 IP 로 키잉된다. 전용 네임스페이스를 둬서 가입 시도 폭주가
+    // 같은 IP 의 정상 SR 작업을 잠그지 않게 한다.
+    await requireRateLimit('strict', 'register');
     const clientIdValue = formData.get('clientId');
     const data = {
       name: formData.get('name') as string,

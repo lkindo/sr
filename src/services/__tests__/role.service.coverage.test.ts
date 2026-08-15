@@ -35,12 +35,7 @@ vi.mock('@/lib/prisma', () => {
 });
 
 vi.mock('@/lib/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    logError: vi.fn(),
-  },
+  logger: { logRequest: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), logError: vi.fn() },
 }));
 
 const sampleRole = {

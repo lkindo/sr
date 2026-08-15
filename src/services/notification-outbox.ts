@@ -33,8 +33,17 @@ const BACKOFF_MINUTES = [1, 5, 15, 60];
 /** 한 번에 집는 행 수. 너무 크면 한 배치가 오래 잡히고, 작으면 처리량이 떨어진다. */
 const DEFAULT_BATCH_SIZE = 20;
 
-/** claim 후 워커가 죽었을 때 다른 워커가 다시 집을 수 있도록 두는 임대 시간. */
-const CLAIM_LEASE_MINUTES = 5;
+/**
+ * claim 후 워커가 죽었을 때 다른 워커가 다시 집을 수 있도록 두는 임대 시간.
+ *
+ * **한 배치의 최악 처리 시간보다 길어야 한다.** 배치는 최대 `DEFAULT_BATCH_SIZE` 건을
+ * **순차** 발송하고, SMTP 는 연결 10초 + 소켓 15초까지 기다린다(email.service.ts).
+ * 즉 최악은 20 × 25초 ≈ 8분 20초다. 예전 값 5분은 그보다 짧아, SMTP 가 느려지면
+ * 임대가 먼저 만료되고 **같은 프로세스의 다음 tick 이 아직 처리 중인 행을 다시 집어**
+ * 중복 발송이 났다. 아래 산식으로 값을 코드에서 도출해 두 상수가 따로 놀지 않게 한다.
+ */
+const SMTP_WORST_CASE_SECONDS = 25; // connectionTimeout(10s) + socketTimeout(15s)
+const CLAIM_LEASE_MINUTES = Math.ceil((DEFAULT_BATCH_SIZE * SMTP_WORST_CASE_SECONDS) / 60) + 2; // 여유 2분
 
 export interface OutboxEmail {
   to: string;
@@ -141,7 +150,15 @@ export async function dispatchPendingNotifications(
 
       await prisma.notification.update({
         where: { id: row.id },
-        data: { status: 'SENT', sentAt: new Date(), attempts, failReason: null },
+        data: {
+          status: 'SENT',
+          sentAt: new Date(),
+          attempts,
+          failReason: null,
+          // 발송이 끝나면 본문은 더 쓰이지 않는다. HTML 전문을 영구 보관하면
+          // 백업이 비대해지고 수신자 정보가 무기한 남는다. 메타데이터는 유지한다.
+          content: '',
+        },
       });
       sent++;
     } catch (error) {
@@ -198,6 +215,42 @@ let dispatcherTimer: NodeJS.Timeout | null = null;
  * `FOR UPDATE SKIP LOCKED` 라 인스턴스를 늘려도 중복 발송이 나지 않으므로, 지금 단순하게
  * 가도 나중에 막히지 않는다.
  */
+/** SENT 보존 기간(일). 지나면 행 자체를 지운다. */
+const SENT_RETENTION_DAYS = Number(process.env.OUTBOX_SENT_RETENTION_DAYS ?? 90);
+
+/** FAILED(dead-letter) 보존 기간(일). 사후 조사가 필요하므로 더 길게 둔다. */
+const FAILED_RETENTION_DAYS = Number(process.env.OUTBOX_FAILED_RETENTION_DAYS ?? 365);
+
+/**
+ * 보존 기간이 지난 아웃박스 행을 지운다.
+ *
+ * 이것이 없으면 `notifications` 는 **영구히 자란다** — SR 한 건 등록마다 ADMIN/MANAGER
+ * 수만큼 행이 쌓이고 아무도 지우지 않는다. 백업이 비대해지고 수신자 이메일이 무기한 남는다.
+ *
+ * 디스패치와 같은 tick 에서 돌리되 매번 하지는 않는다(아래 `RETENTION_EVERY_N_TICKS`).
+ *
+ * 모듈 내부 전용이다 — 외부에서 임의 시점에 부르면 보존 정책이 두 곳에서 결정된다.
+ */
+async function purgeExpiredNotifications(): Promise<{ purged: number }> {
+  const now = Date.now();
+  const sentBefore = new Date(now - SENT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  const failedBefore = new Date(now - FAILED_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+
+  const { count } = await prisma.notification.deleteMany({
+    where: {
+      OR: [
+        { status: 'SENT', createdAt: { lt: sentBefore } },
+        { status: 'FAILED', createdAt: { lt: failedBefore } },
+      ],
+    },
+  });
+
+  return { purged: count };
+}
+
+/** 정리 작업을 매 tick 마다 돌리면 낭비다. 30초 × 120 = 1시간에 한 번. */
+const RETENTION_EVERY_N_TICKS = 120;
+
 export function startNotificationDispatcher(intervalMs = 30_000): void {
   if (dispatcherTimer) return;
   // 테스트 실행 중에는 절대 걸지 않는다. 30초짜리 실제 인터벌이 스위트 내내 살아
@@ -218,15 +271,33 @@ export function startNotificationDispatcher(intervalMs = 30_000): void {
     return;
   }
 
+  // **재진입 가드.** 한 배치가 최악 8분 넘게 걸릴 수 있는데 tick 은 30초마다 돈다.
+  // 가드가 없으면 이전 배치가 아직 도는 중에 다음 tick 이 겹쳐 들어와, 임대가 만료된
+  // 행을 서로 다시 집는다.
+  let running = false;
+  let tickCount = 0;
+
   const tick = async () => {
+    if (running) {
+      logger.warn('[Outbox] 이전 배치가 아직 처리 중이라 이번 순회를 건너뜁니다.');
+      return;
+    }
+    running = true;
     try {
       const result = await dispatchPendingNotifications();
       if (result.sent || result.failed || result.deadLettered) {
         logger.info('[Outbox] 알림 디스패치', result);
       }
+
+      if (++tickCount % RETENTION_EVERY_N_TICKS === 0) {
+        const { purged } = await purgeExpiredNotifications();
+        if (purged > 0) logger.info('[Outbox] 보존 기간 경과 알림 정리', { custom_purged: purged });
+      }
     } catch (error) {
       // 한 번의 실패로 타이머가 죽으면 그 뒤 알림이 전부 멈춘다.
       logger.error('[Outbox] 디스패치 순회 실패', error instanceof Error ? error : undefined);
+    } finally {
+      running = false;
     }
   };
 

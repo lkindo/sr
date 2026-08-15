@@ -111,16 +111,32 @@ export class ServiceCategoryService {
 
   /**
    * 선택용 간소화된 목록 조회 (드롭다운 등)
+   *
+   * **스코프는 필수 인자다.** 예전 시그니처는 `clientId?: string` 이라, 인자를 생략하면
+   * where 에 테넌트 조건이 붙지 않아 **전 고객사 카탈로그**가 나왔다. 호출부 한 곳이
+   * 인자를 빠뜨리는 것만으로 격리가 뚫리는 형태였고, 실제로 Server Action 이 그랬다
+   * (감사 D-13 — 유효 세션을 가진 CLIENT_USER 가 인자 없이 호출하면 전체를 받았다).
+   *
+   * 이제 스코프를 명시하지 않으면 **컴파일이 실패한다.** 전체를 보려면 그 의도를
+   * `'all'` 로 적어야 하며, 그 자리는 코드 리뷰에서 눈에 띈다.
+   * (헌법 §1.2 — "스코프 인자를 생략하면 전체가 반환되는 조회 함수를 만들지 않는다")
    */
-  async getForSelection(clientId?: string) {
+  async getForSelection(scope: { clientIds: string[] } | 'all') {
+    const tenantFilter =
+      scope === 'all'
+        ? {}
+        : {
+            // 해당 고객사 전용 + 전역(clientId=null) 카테고리를 함께 보여준다.
+            // `{ clientId }` 로 정확히 일치만 걸면 전역 카테고리가 목록에서 사라져,
+            // 전역 카테고리만 있는 신규 고객사는 선택지가 0개가 된다.
+            // (SRService.ensureCategoryBelongsToClient 가 허용하는 범위와 정확히 같다)
+            OR: [{ clientId: { in: scope.clientIds } }, { clientId: null }],
+          };
+
     return prisma.serviceCategory.findMany({
       where: {
         isActive: true,
-        // 해당 고객사 전용 + 전역(clientId=null) 카테고리를 함께 보여준다.
-        // `{ clientId }` 로 정확히 일치만 걸면 전역 카테고리가 목록에서 사라져,
-        // 전역 카테고리만 있는 신규 고객사는 선택지가 0개가 된다.
-        // (SRService.ensureCategoryBelongsToClient 가 허용하는 범위와 정확히 같다)
-        ...(clientId && { OR: [{ clientId }, { clientId: null }] }),
+        ...tenantFilter,
       },
       select: {
         id: true,
