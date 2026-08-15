@@ -7,6 +7,31 @@
 ## 1. Next.js Server Actions 및 API 아키텍처
 
 - **Server-Only 로직 강제**: 백엔드에서만 사용되어야 하는 로직이나 모듈은 파일 최상단에 `"use server"` 또는 `import 'server-only'`를 선언하여 클라이언트 측으로 노출되는 것을 컴파일 타임에 차단한다.
+
+  **두 수단은 동등하다.** `src/actions/` 의 Server Action 파일들은 `'use server'` 로 이미
+  경계가 서 있으므로 `server-only` 선언 대상이 아니다 — 그 경계가 전파를 끊는다.
+
+  **선언 대상** (서버 자원을 직접 다루는 모듈):
+  `src/lib/prisma.ts`, `src/auth.ts`, `src/lib/storage.ts`, `src/lib/env-validation.ts`,
+  `src/lib/policies.ts`, `src/lib/security.ts`, `src/lib/cache.ts`, `src/lib/domain-events.ts`,
+  `src/lib/action-helpers.ts`, `src/lib/auth-wrapper.ts`, `src/services/*.service.ts`.
+
+  **선언 금지** (선언하면 깨지는 것들 — 실측 확인):
+  - 클라이언트 번들에 정당하게 포함되는 모듈(`src/lib/utils.ts`, `src/lib/api-client.ts`,
+    `src/lib/query-keys.ts`, `src/lib/constants/*`, `src/types/*` 등)
+  - **`tsx` 스크립트가 직접 실행하는 모듈**: `src/lib/file-validator.ts`, `src/lib/serialization.ts`
+  - **Playwright 가 plain Node 로 로드하는 모듈**: `src/lib/sr-state-machine.ts`
+    (e2e 스펙이 전이표를 import 해 기대값을 만든다)
+
+  **왜 금지 목록이 필요한가**: `server-only` 패키지는 `react-server` 조건이 없는 환경에서
+  **import 즉시 throw** 한다(`node -e "require('server-only')"` 로 실측). vitest 는
+  `vitest.config.ts` 의 alias 와 `vitest.setup.node.ts` 의 mock 으로 이중 보호되지만
+  **Playwright 와 tsx 스크립트에는 그 보호가 없다.** 목록 없이 "전부 선언" 하면
+  e2e 와 스크립트가 파일 수집 단계에서 즉사한다.
+
+  **현재 상태(2026-08-15 실측)**: 클라이언트 번들로의 실제 누출은 **0건**이다.
+  이 선언은 지금 있는 사고를 막는 것이 아니라 **회귀를 컴파일 타임에 잡기 위한 것**이다.
+
 - **예외 처리 구조화**: API 및 Server Actions 내에서 발생하는 모든 예외는 적절한 HTTP 상태 코드 및 비즈니스 에러 메시지 객체 형태로 가공하여 반환한다. 호출처에서 에러의 Root Cause를 알기 쉽도록 구조적인 에러 객체를 리턴한다.
 - **성능 로깅**: 처리 소요 시간 계측은 **개별 라우트가 아니라 공용 래퍼**(`src/lib/auth-wrapper.ts`의 `withAuth`/`withErrorHandler`)에서 일괄 수행하며, 래퍼는 응답 직후 `logger.logRequest(method, path, status, duration)`를 호출한다. **모든 API 라우트와 Server Action은 이 래퍼를 경유해야 하며 예외를 두지 않는다.** 프로덕션 로그 잡음을 줄이기 위해 임계값(기본 500ms)을 넘는 요청만 `warn` 레벨로 승격한다.
   <sub>정정(2026-08-15): 이 조항은 "모든 라우트가 각자 Pino 로 소요 시간을 로깅한다" 였으나 38개 라우트 전부에서 미준수였고, 프로덕션 로거가 `info` 를 버리므로 라우트마다 로그를 붙여도 2xx 는 사라진다 — 현행 형태로는 **달성 자체가 불가능한 규칙**이었다. 래퍼 일괄 계측으로 바꾸면 한 곳 수정으로 전 라우트가 준수 상태가 된다.</sub>

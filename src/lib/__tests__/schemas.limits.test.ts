@@ -9,6 +9,7 @@ import {
   serviceCategoryCreateSchema,
   srCreateSchema,
   srUpdateSchema,
+  statusActionSchema,
   userCreateSchema,
 } from '../schemas';
 
@@ -202,5 +203,46 @@ describe('역할·카테고리·접수 메모', () => {
         intakeNotes: str(FIELD_LIMITS.NOTE + 1),
       }).success
     ).toBe(false);
+  });
+});
+
+/**
+ * 감사 D-20 회귀 방어 — 사유 필드가 **두 문**을 지난다.
+ *
+ * 상태 전이 전용 경로(`statusActionSchema`)에만 `.trim().min(1)` 이 걸려 있어서,
+ * 일반 편집 경로(`srUpdateSchema`)로는 완료 내용을 공백 한 칸으로 덮어쓸 수 있었다.
+ * 상태가 바뀌지 않으면 상태머신의 필수 필드 검사가 돌지 않기 때문이다.
+ */
+describe('사유 필드의 두 진입점이 같은 하한을 쓴다', () => {
+  it('일반 편집 경로가 완료 내용을 공백으로 덮어쓰지 못한다', () => {
+    const r = srUpdateSchema.safeParse({ resolutionDescription: '   ' });
+    expect(r.success).toBe(false);
+  });
+
+  it('일반 편집 경로가 거절 사유를 공백으로 덮어쓰지 못한다', () => {
+    const r = srUpdateSchema.safeParse({ rejectionReason: '   ' });
+    expect(r.success).toBe(false);
+  });
+
+  it('빈 문자열은 여전히 null 로 취급된다 — 값 지우기는 막지 않는다', () => {
+    const r = srUpdateSchema.safeParse({ resolutionDescription: '' });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.resolutionDescription).toBeNull();
+  });
+
+  it('상태 전이 경로의 사유에 상한이 걸려 있다', () => {
+    const r = statusActionSchema.safeParse({
+      action: 'reject',
+      reason: str(FIELD_LIMITS.SHORT_TEXT + 1),
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('상태 전이 경로의 완료 내용에 상한이 걸려 있다', () => {
+    const r = statusActionSchema.safeParse({
+      action: 'complete',
+      resolutionDescription: str(FIELD_LIMITS.NOTE + 1),
+    });
+    expect(r.success).toBe(false);
   });
 });

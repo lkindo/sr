@@ -62,22 +62,44 @@ export const passwordSchema = z
   .regex(/[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/, '비밀번호는 특수문자를 최소 1개 이상 포함해야 합니다.');
 
 /**
+ * 회원가입 필드 (refine 이전의 base object).
+ *
+ * **왜 base 를 따로 내보내는가**: `registerSchema` 는 `.refine()` 이 붙은 ZodEffects 라
+ * `.extend()` 가 없다. 가입 경로는 `accountType`/`clientId` 를 추가로 받아야 하므로
+ * 확장 가능한 형태가 필요하다.
+ *
+ * 이것이 없던 동안 `src/app/(auth)/register/actions.ts` 가 **자체 사본**을 들고 있었고,
+ * 그 사본에는 `.max()` 가 하나도 없었다. `users.name` 은 varchar(50) 이므로 51자 이름은
+ * 검증을 통과한 뒤 DB 가 거부해 원인 불명의 500 이 됐다. 더 나쁜 것은 회귀 테스트
+ * (`schemas.limits.test.ts`)가 **쓰이지 않는 이쪽만** 검증해 계속 초록이었다는 점이다.
+ */
+export const registerFieldsSchema = z.object({
+  name: z
+    .string()
+    .min(1, '이름을 입력해주세요.')
+    .max(FIELD_LIMITS.NAME, `이름은 ${FIELD_LIMITS.NAME}자를 초과할 수 없습니다.`),
+  email: z
+    .string()
+    .email('유효한 이메일 주소를 입력해주세요.')
+    .max(FIELD_LIMITS.EMAIL, `이메일은 ${FIELD_LIMITS.EMAIL}자를 초과할 수 없습니다.`),
+  password: passwordSchema,
+  confirmPassword: z.string(),
+});
+
+/** 비밀번호 확인 일치. 가입 경로와 그 확장이 공유한다. */
+export const passwordsMatch = {
+  check: (data: { password: string; confirmPassword: string }) =>
+    data.password === data.confirmPassword,
+  options: { message: '비밀번호가 일치하지 않습니다.', path: ['confirmPassword'] },
+};
+
+/**
  * 회원가입 스키마
  */
-export const registerSchema = z
-  .object({
-    name: z
-      .string()
-      .min(1, '이름을 입력해주세요.')
-      .max(FIELD_LIMITS.NAME, `이름은 ${FIELD_LIMITS.NAME}자를 초과할 수 없습니다.`),
-    email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
-    password: passwordSchema,
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: '비밀번호가 일치하지 않습니다.',
-    path: ['confirmPassword'],
-  });
+export const registerSchema = registerFieldsSchema.refine(
+  passwordsMatch.check,
+  passwordsMatch.options
+);
 
 /**
  * 로그인 스키마
@@ -157,10 +179,12 @@ export const clientUpdateSchema = clientCreateSchema
 export const srCreateSchema = z.object({
   title: z
     .string()
+    .trim()
     .min(5, '제목은 최소 5자 이상이어야 합니다.')
     .max(FIELD_LIMITS.TITLE, `제목은 ${FIELD_LIMITS.TITLE}자를 초과할 수 없습니다.`),
   description: z
     .string()
+    .trim()
     .min(10, '설명은 최소 10자 이상이어야 합니다.')
     .max(FIELD_LIMITS.LONG_TEXT, `설명은 ${FIELD_LIMITS.LONG_TEXT}자를 초과할 수 없습니다.`),
   clientId: z.string().min(1, '고객사를 선택해주세요.'),
@@ -174,6 +198,7 @@ export const srUpdateSchema = z.object({
     emptyStringToUndefined,
     z
       .string()
+      .trim()
       .min(5, '제목은 최소 5자 이상이어야 합니다.')
       .max(FIELD_LIMITS.TITLE, `제목은 ${FIELD_LIMITS.TITLE}자를 초과할 수 없습니다.`)
       .optional()
@@ -182,6 +207,7 @@ export const srUpdateSchema = z.object({
     emptyStringToUndefined,
     z
       .string()
+      .trim()
       .min(10, '설명은 최소 10자 이상이어야 합니다.')
       .max(FIELD_LIMITS.LONG_TEXT, `설명은 ${FIELD_LIMITS.LONG_TEXT}자를 초과할 수 없습니다.`)
       .optional()
@@ -218,13 +244,34 @@ export const srUpdateSchema = z.object({
   expectedCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
   dueDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
   actualCompletionDate: z.preprocess(emptyStringToNull, z.string().optional().nullable()),
+  /**
+   * 완료 내용·거절 사유는 **상태 전이 전용 경로**(`statusActionSchema`)가 정본이지만,
+   * 일반 편집 경로로도 값이 들어온다. 그쪽에만 `.trim().min(1)` 이 걸려 있어
+   * **여기로는 공백 한 칸으로 덮어쓸 수 있었다** — 상태가 바뀌지 않으면 상태머신의
+   * 필수 필드 검사가 돌지 않기 때문이다(`sr.service.ts` 의 전이 조건 참조).
+   *
+   * 헌법 §2 는 "누락 없이 작성" 을 요구하므로 두 문에 같은 하한을 건다.
+   * 빈 문자열은 위쪽 `emptyStringToNull` 이 먼저 null 로 바꾸므로 "값 지우기" 는 그대로 된다.
+   */
   resolutionDescription: z.preprocess(
     emptyStringToNull,
-    z.string().max(FIELD_LIMITS.NOTE).optional().nullable()
+    z
+      .string()
+      .trim()
+      .min(1, '완료 내용을 입력해주세요.')
+      .max(FIELD_LIMITS.NOTE)
+      .optional()
+      .nullable()
   ),
   rejectionReason: z.preprocess(
     emptyStringToNull,
-    z.string().max(FIELD_LIMITS.NOTE).optional().nullable()
+    z
+      .string()
+      .trim()
+      .min(1, '거절 사유를 입력해주세요.')
+      .max(FIELD_LIMITS.NOTE)
+      .optional()
+      .nullable()
   ),
   satisfactionRating: z.preprocess(
     (val) => (val === '' ? null : typeof val === 'string' ? parseInt(val, 10) : val),
@@ -381,8 +428,21 @@ export const statusActionSchema = z.object({
   // 공백뿐인 문자열('   ')은 truthy 라 그 검사를 그대로 통과했고, 보류·거절·재오픈의
   // 사유가 공백인 채로 상태 이력에 남았다. 감사 추적이 있으나 마나 해진다.
   // trim 은 preprocess 가 아니라 스키마 단계에서 하므로 저장되는 값도 정리된다.
-  reason: z.string().trim().min(1, '사유를 입력해주세요.').optional(),
-  resolutionDescription: z.string().trim().min(1, '해결 내용을 입력해주세요.').optional(),
+  //
+  // 상한도 함께 건다. 없으면 255 경계에서 zod **영문 기본 문구**가 그대로 토스트에 뜨거나,
+  // 하류 컬럼 폭을 넘겨 P2000 이 된다. `changeReason` 은 sr_status_history 로 흘러간다.
+  reason: z
+    .string()
+    .trim()
+    .min(1, '사유를 입력해주세요.')
+    .max(FIELD_LIMITS.SHORT_TEXT, `사유는 ${FIELD_LIMITS.SHORT_TEXT}자를 초과할 수 없습니다.`)
+    .optional(),
+  resolutionDescription: z
+    .string()
+    .trim()
+    .min(1, '해결 내용을 입력해주세요.')
+    .max(FIELD_LIMITS.NOTE, `해결 내용은 ${FIELD_LIMITS.NOTE}자를 초과할 수 없습니다.`)
+    .optional(),
   // 보류(hold) 전용. 헌법 §2 는 보류에 사유 **와** 예상 해제일을 모두 요구한다.
   // 날짜 형식 검증까지 여기서 끝내 라우트가 문자열을 그대로 new Date() 에 넘기지 않게 한다.
   expectedHoldReleaseDate: z.preprocess(
