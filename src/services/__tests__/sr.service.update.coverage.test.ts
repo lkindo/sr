@@ -5,6 +5,12 @@ import { ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRCreatedEmails: vi.fn().mockResolvedValue(0),
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 // Mock dependencies
 vi.mock('@/lib/prisma', () => ({
   default: {

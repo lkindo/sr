@@ -56,6 +56,9 @@ export const GET = withAuthAndRateLimit(
       if (assigneeScope) {
         baseWhere.assigneeId = assigneeScope;
       }
+      const rawAssigneeScope = assigneeScope
+        ? Prisma.sql`AND assignee_id = ${assigneeScope}`
+        : Prisma.empty;
 
       // Get SR trend (last 30 days)
       const thirtyDaysAgo = new Date();
@@ -128,6 +131,7 @@ export const GET = withAuthAndRateLimit(
                 : Prisma.sql`AND 1=0`
               : Prisma.empty
           }
+          ${rawAssigneeScope}
         `,
         // 4. Get SR counts by client
         prisma.sR.groupBy({
@@ -230,6 +234,7 @@ export const GET = withAuthAndRateLimit(
                 : Prisma.sql`AND 1=0`
               : Prisma.empty
           }
+          ${rawAssigneeScope}
           GROUP BY DATE(created_at AT TIME ZONE 'Asia/Seoul')
         `,
         // 9. 성능 지표 계산 - DB Aggregation
@@ -252,6 +257,7 @@ export const GET = withAuthAndRateLimit(
                   : Prisma.sql`AND 1=0`
                 : Prisma.empty
             }
+            ${rawAssigneeScope}
         `,
       ]);
 

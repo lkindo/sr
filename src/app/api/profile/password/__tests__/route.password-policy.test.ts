@@ -1,32 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { UnauthorizedError } from '@/lib/errors';
-
 // Mock dependencies
-const { mockFindUnique, mockUpdate, mockHandleApiError } = vi.hoisted(() => ({
-  mockFindUnique: vi.fn(),
-  mockUpdate: vi.fn(),
+const { mockChangePassword, mockHandleApiError } = vi.hoisted(() => ({
+  mockChangePassword: vi.fn(),
   mockHandleApiError: vi.fn((error) => {
     const status = error.statusCode || 500;
     return NextResponse.json({ error: error.message || 'Error' }, { status });
   }),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  default: {
-    user: {
-      findUnique: mockFindUnique,
-      update: mockUpdate,
-    },
-  },
-}));
-
-vi.mock('bcryptjs', () => ({
-  default: {
-    compare: vi.fn(),
-    hash: vi.fn(),
+vi.mock('@/services/user.service', () => ({
+  UserService: class {
+    changePassword = mockChangePassword;
   },
 }));
 
@@ -56,12 +42,6 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
   });
 
   it('should REJECT weak password (6 chars, no complexity)', async () => {
-    // Setup mocks
-    const mockUser = { id: 'user-1', password: 'hashed-old-password' };
-    mockFindUnique.mockResolvedValue(mockUser);
-
-    vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
-
     const req = new NextRequest('http://localhost/api/profile/password', {
       method: 'POST',
       body: JSON.stringify({
@@ -73,7 +53,7 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
 
     const context = {
       session: {
-        user: { email: 'test@example.com' },
+        user: { id: 'user-1', email: 'test@example.com' },
       },
     };
 
@@ -88,17 +68,13 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBeDefined();
+    expect(mockChangePassword).not.toHaveBeenCalled();
     // The error message comes from Zod via ValidationError
     // "비밀번호는 최소 8자 이상이어야 합니다." or similar
   });
 
   it('should ACCEPT strong password', async () => {
-    // Setup mocks
-    const mockUser = { id: 'user-1', password: 'hashed-old-password' };
-    mockFindUnique.mockResolvedValue(mockUser);
-
-    vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
-    vi.mocked(bcrypt.hash).mockResolvedValue('hashed-new-password' as never);
+    mockChangePassword.mockResolvedValue({ id: 'user-1' });
 
     const strongPassword = 'StrongPassword1!';
     const req = new NextRequest('http://localhost/api/profile/password', {
@@ -112,7 +88,7 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
 
     const context = {
       session: {
-        user: { email: 'test@example.com' },
+        user: { id: 'user-1', email: 'test@example.com' },
       },
     };
 
@@ -121,9 +97,11 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(mockUpdate).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
-      data: { password: 'hashed-new-password' },
-    });
+    expect(mockChangePassword).toHaveBeenCalledWith(
+      'user-1',
+      'old-password',
+      strongPassword,
+      'user-1'
+    );
   });
 });

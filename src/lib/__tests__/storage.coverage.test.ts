@@ -180,9 +180,10 @@ describe('uploadAttachmentBlob', () => {
     const writeBuf = mockWriteFile.mock.calls[0]![1] as Buffer;
     expect(Buffer.isBuffer(writeBuf)).toBe(true);
     expect(Array.from(writeBuf)).toEqual([1, 2, 3]);
+    expect(mockWriteFile.mock.calls[0]![2]).toEqual({ flag: 'wx' });
 
     // spaces -> '-', unsafe chars '(' ')' -> '_'
-    expect(result.pathname).toMatch(/^attachments\/sr-100\/\d+-my-report-_final_\.pdf$/);
+    expect(result.pathname).toMatch(/^attachments\/sr-100\/[0-9a-f-]{36}-my-report-_final_\.pdf$/);
     expect(result.url).toBe(result.pathname);
     expect(result.downloadUrl).toBe(result.pathname);
     expect(result.size).toBe(file.size);
@@ -193,14 +194,14 @@ describe('uploadAttachmentBlob', () => {
     const file = new File([new Uint8Array([9])], '../../etc/passwd');
     const result = await uploadAttachmentBlob('sr-1', file);
     // basename of '../../etc/passwd' is 'passwd'
-    expect(result.pathname).toMatch(/^attachments\/sr-1\/\d+-passwd$/);
+    expect(result.pathname).toMatch(/^attachments\/sr-1\/[0-9a-f-]{36}-passwd$/);
   });
 
   it('falls back to "file" when sanitized name is empty', async () => {
     const file = new File([new Uint8Array([0])], '!!!');
     const result = await uploadAttachmentBlob('sr-2', file);
     // '!!!' -> '___' which is truthy, so check a name that sanitizes to empty.
-    expect(result.pathname).toMatch(/^attachments\/sr-2\/\d+-/);
+    expect(result.pathname).toMatch(/^attachments\/sr-2\/[0-9a-f-]{36}-/);
   });
 
   it('uses "file" fallback when basename sanitizes to empty string', async () => {
@@ -210,14 +211,14 @@ describe('uploadAttachmentBlob', () => {
     // path.basename('/') === '' on posix; on win path.basename('\\') may differ. Use '.'.
     const file = new File([new Uint8Array([0])], '/');
     const result = await uploadAttachmentBlob('sr-3', file);
-    expect(result.pathname).toMatch(/^attachments\/sr-3\/\d+-file$/);
+    expect(result.pathname).toMatch(/^attachments\/sr-3\/[0-9a-f-]{36}-file$/);
   });
 
   it('applies basename to srId (defensive against traversal in srId)', async () => {
     const file = new File([new Uint8Array([1])], 'doc.txt');
     const result = await uploadAttachmentBlob('../../evil', file);
     // path.basename('../../evil') === 'evil'
-    expect(result.pathname).toMatch(/^attachments\/evil\/\d+-doc\.txt$/);
+    expect(result.pathname).toMatch(/^attachments\/evil\/[0-9a-f-]{36}-doc\.txt$/);
     const mkdirArg = mockMkdir.mock.calls[0]![0] as string;
     expect(mkdirArg).toBe(path.join(resolvedStorageRoot, 'attachments', 'evil'));
   });

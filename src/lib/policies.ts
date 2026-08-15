@@ -29,6 +29,13 @@ export type ClientAccessFields = Pick<Client, 'id'>;
  */
 export type UserIdentity = Pick<User, 'id'> & {
   clients?: { clientId: string }[] | null;
+  roles?: { role: { name: string } }[] | null;
+};
+
+/** 역할 할당 정책이 비교하는 최소 역할/권한 형태. */
+export type RoleGrantFields = {
+  name: string;
+  permissions?: { permission: { resource: string; action: string } }[] | null;
 };
 
 export function isInternalUser(user: AuthenticatedUser): boolean {
@@ -344,6 +351,10 @@ function isTargetWithinActorClients(user: AuthenticatedUser, targetUser: UserIde
   return targetClientIds.every((clientId) => actorClientIds.includes(clientId));
 }
 
+function targetHasRole(targetUser: UserIdentity, roleName: string): boolean {
+  return (targetUser.roles ?? []).some((entry) => entry.role.name === roleName);
+}
+
 export function canCreateUser(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
 }
@@ -375,6 +386,12 @@ export function canUpdateUser(user: AuthenticatedUser, targetUser: UserIdentity)
     return true;
   }
 
+  // ADMIN 계정은 이름·활성 상태·이메일·비밀번호를 포함해 ADMIN만 관리한다.
+  // 일반 USER:UPDATE 권한이 시스템 최고 권한 계정을 장악하는 통로가 되어서는 안 된다.
+  if (targetHasRole(targetUser, 'ADMIN')) {
+    return false;
+  }
+
   const isSelf = targetUser.id === user.id && hasPermissionFlag(user, PERMISSIONS.USER.UPDATE_SELF);
   if (isSelf) {
     return true;
@@ -399,7 +416,100 @@ export function canDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity)
     return false;
   }
 
-  return isAdmin || hasDelete;
+  if (isAdmin) return true;
+  if (targetHasRole(targetUser, 'ADMIN') || !hasDelete) return false;
+
+  // 내부 운영자는 전역 스코프, 외부 사용자는 자신의 테넌트 안에서만 삭제할 수 있다.
+  return isInternalUser(user) || isTargetWithinActorClients(user, targetUser);
+}
+
+/**
+ * 관리자 재설정 라우트에서 email/isActive/password/clientIds 같은 민감 필드를 바꿀 수 있는가.
+ * 본인 변경은 현재 비밀번호를 확인하는 전용 프로필 경로를 사용해야 한다.
+ */
+export function canManageSensitiveUserFields(
+  user: AuthenticatedUser,
+  targetUser: UserIdentity
+): boolean {
+  if (user.id === targetUser.id) return false;
+  if (targetHasRole(targetUser, 'ADMIN') && !user.roles?.includes('ADMIN')) return false;
+  return (
+    canUpdateUser(user, targetUser) &&
+    (user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.UPDATE))
+  );
+}
+
+function grantedPermissionSet(roles: RoleGrantFields[]): Set<string> {
+  return new Set(
+    roles.flatMap((role) =>
+      (role.permissions ?? []).map(({ permission }) =>
+        `${permission.resource}:${permission.action}`.toUpperCase()
+      )
+    )
+  );
+}
+
+function canGrantRoles(user: AuthenticatedUser, roles: RoleGrantFields[]): boolean {
+  if (user.roles?.includes('ADMIN')) return true;
+  if (!hasPermissionFlag(user, PERMISSIONS.ROLE.ASSIGN)) return false;
+  if (roles.some((role) => role.name === 'ADMIN')) return false;
+  if (!isInternalUser(user) && roles.some((role) => INTERNAL_ROLES.includes(role.name))) {
+    return false;
+  }
+
+  const held = new Set((user.permissions ?? []).map((permission) => permission.toUpperCase()));
+  return Array.from(grantedPermissionSet(roles)).every((permission) => held.has(permission));
+}
+
+export function ensureCanGrantRoles(user: AuthenticatedUser, roles: RoleGrantFields[]): void {
+  if (user.roles?.includes('ADMIN')) return;
+  if (!hasPermissionFlag(user, PERMISSIONS.ROLE.ASSIGN)) {
+    throw new ForbiddenError('역할을 직접 할당할 권한이 없습니다.');
+  }
+  if (roles.some((role) => role.name === 'ADMIN')) {
+    throw new ForbiddenError('ADMIN 역할은 ADMIN만 할당할 수 있습니다.');
+  }
+  if (!canGrantRoles(user, roles)) {
+    throw new ForbiddenError('본인이 보유하지 않은 역할·권한은 부여할 수 없습니다.');
+  }
+}
+
+/** 역할 교체 시 자기상승·상위 권한 부여·테넌트 경계 이탈을 한 곳에서 차단한다. */
+export function canAssignRolesToUser(
+  user: AuthenticatedUser,
+  targetUser: UserIdentity,
+  roles: RoleGrantFields[]
+): boolean {
+  if (user.roles?.includes('ADMIN')) return true;
+  if (!canGrantRoles(user, roles)) return false;
+  if (user.id === targetUser.id) return false;
+  if (targetHasRole(targetUser, 'ADMIN')) return false;
+  if (!canUpdateUser(user, targetUser)) return false;
+  return true;
+}
+
+export function ensureCanAssignRolesToUser(
+  user: AuthenticatedUser,
+  targetUser: UserIdentity,
+  roles: RoleGrantFields[]
+): void {
+  if (!canAssignRolesToUser(user, targetUser, roles)) {
+    throw new ForbiddenError(
+      '자신 또는 관리 범위 밖의 사용자에게 보유하지 않은 역할·권한을 부여할 수 없습니다.'
+    );
+  }
+}
+
+/** 사용자 생성/소속 변경 시 외부 행위자의 고객사 범위를 강제한다. */
+export function ensureClientAssignmentsWithinScope(
+  user: AuthenticatedUser,
+  clientIds: string[]
+): void {
+  if (isInternalUser(user)) return;
+  const actorClientIds = new Set(user.clientIds ?? []);
+  if (clientIds.some((clientId) => !actorClientIds.has(clientId))) {
+    throw new ForbiddenError('소속되지 않은 고객사에는 사용자를 생성하거나 배정할 수 없습니다.');
+  }
 }
 
 export function ensureCanCreateUser(user: AuthenticatedUser): void {

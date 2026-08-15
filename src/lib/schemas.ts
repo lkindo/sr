@@ -143,7 +143,15 @@ export const clientCreateSchema = z.object({
   contractEndDate: z.preprocess(emptyStringToUndefined, z.string().optional()),
 });
 
-export const clientUpdateSchema = clientCreateSchema.omit({ code: true }).partial();
+export const clientUpdateSchema = clientCreateSchema
+  .omit({ code: true })
+  .partial()
+  .extend({
+    // PATCH 에서 필드 생략(undefined)은 기존 값을 유지하고, 빈 문자열은 명시적인
+    // 계약일 삭제(null)로 취급한다. 두 의도를 구분해야 부분 수정 중 값이 유실되지 않는다.
+    contractStartDate: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+    contractEndDate: z.preprocess(emptyStringToNull, z.string().nullable().optional()),
+  });
 
 // SR Schemas
 export const srCreateSchema = z.object({
@@ -248,6 +256,16 @@ export const srUpdateSchema = z.object({
     z.string().max(FIELD_LIMITS.SHORT_TEXT).optional()
   ),
 });
+
+/**
+ * 일반 SR 편집 경로용 스키마.
+ *
+ * 상태 전이는 전용 `/status` 경로만 허용한다. 일반 PATCH/Server Action 이 `status` 를
+ * 받으면 전용 액션의 필수 사유와 비즈니스 규칙을 우회할 수 있으므로 알 수 없는 키도
+ * 조용히 버리지 않고 400/검증 실패로 돌려보낸다. 서비스 내부는 위 srUpdateSchema 를 써서
+ * 전용 상태 경로의 검증된 전이를 계속 처리한다.
+ */
+export const srPatchSchema = srUpdateSchema.omit({ status: true, changeReason: true }).strict();
 
 // User Schemas
 export const userCreateSchema = z.object({

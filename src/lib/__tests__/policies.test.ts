@@ -444,10 +444,29 @@ describe('Policy Functions', () => {
       expect(policies.canDeleteUser(self, target)).toBe(false);
     });
 
-    it('canDeleteUser: admin/global delete', () => {
+    it('canDeleteUser: admin and internal operator can delete globally', () => {
       expect(policies.canDeleteUser(adminUser, targetUser)).toBe(true);
-      const userDel = { ...userNoPerms, id: 'u-del', permissions: [PERMISSIONS.USER.DELETE] };
-      expect(policies.canDeleteUser(userDel, targetUser)).toBe(true);
+      const internalDeleter = {
+        ...userNoPerms,
+        id: 'u-del',
+        roles: ['MANAGER'],
+        permissions: [PERMISSIONS.USER.DELETE],
+      };
+      expect(policies.canDeleteUser(internalDeleter, targetUser)).toBe(true);
+    });
+
+    it('canDeleteUser: permission alone does not bypass tenant scope', () => {
+      const externalDeleter = {
+        ...userNoPerms,
+        id: 'u-external-del',
+        roles: ['CLIENT_ADMIN'],
+        permissions: [PERMISSIONS.USER.DELETE],
+        clientIds: ['c1'],
+      };
+      expect(policies.canDeleteUser(externalDeleter, targetUser)).toBe(true);
+      expect(policies.canDeleteUser({ ...externalDeleter, clientIds: ['other'] }, targetUser)).toBe(
+        false
+      );
     });
 
     it('ensureCanDeleteUser throws correctly', () => {

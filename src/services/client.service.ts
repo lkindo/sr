@@ -308,10 +308,20 @@ export class ClientService {
           contactEmail: validated.contactEmail,
           contactPhone: validated.contactPhone,
           address: validated.address,
-          contractStartDate: validated.contractStartDate
-            ? new Date(validated.contractStartDate)
-            : null,
-          contractEndDate: validated.contractEndDate ? new Date(validated.contractEndDate) : null,
+          ...(validated.contractStartDate !== undefined
+            ? {
+                contractStartDate: validated.contractStartDate
+                  ? new Date(validated.contractStartDate)
+                  : null,
+              }
+            : {}),
+          ...(validated.contractEndDate !== undefined
+            ? {
+                contractEndDate: validated.contractEndDate
+                  ? new Date(validated.contractEndDate)
+                  : null,
+              }
+            : {}),
           // undefined 면 Prisma 가 해당 컬럼을 건드리지 않으므로 부분 수정이 그대로 유지된다.
           isActive: validated.isActive,
         },

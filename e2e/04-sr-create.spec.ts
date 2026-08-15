@@ -67,7 +67,11 @@ async function deleteClientDeep(api: APIRequestContext, clientId: string): Promi
   if (categories.ok()) {
     const rows = (await categories.json()) as Array<{ id: string }>;
     for (const row of rows) {
-      await api.delete(`/api/clients/${clientId}/categories/${row.id}`);
+      const removedCategory = await api.delete(`/api/clients/${clientId}/categories/${row.id}`);
+      expect(
+        removedCategory.ok(),
+        `테스트 고객사 ${clientId}의 카테고리 ${row.id}를 정리하지 못했습니다: ${await removedCategory.text()}`
+      ).toBe(true);
     }
   }
   const removed = await api.delete(`/api/clients/${clientId}`);
@@ -84,8 +88,12 @@ async function deleteClientDeep(api: APIRequestContext, clientId: string): Promi
  * 뒤에야 role=option 이 잡히므로, 옵션 로케이터를 기다리는 것 자체가 동기화다.
  */
 async function openCreateDialogWithRequiredFields(page: Page, title: string): Promise<void> {
-  await page.goto('/srs', { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: /등록/ }).first().click();
+  // React 수화 전에 클릭하면 버튼은 보이지만 이벤트 핸들러가 아직 붙지 않아 클릭이
+  // 유실될 수 있다. load 완료와 버튼 활성 상태를 양성 조건으로 잡은 뒤 조작한다.
+  await page.goto('/srs', { waitUntil: 'load' });
+  const createButton = page.getByRole('button', { name: /등록/ }).first();
+  await expect(createButton).toBeEnabled();
+  await createButton.click();
   await expect(page.getByRole('heading', { name: /새 SR 요청/ })).toBeVisible();
 
   await page.getByRole('textbox', { name: '제목 *' }).fill(title);

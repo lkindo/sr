@@ -71,7 +71,7 @@ test.describe('고객사 관리 - ADMIN 권한', () => {
   });
 
   test('검색어를 넣으면 그 고객사만 남는다', async ({ page }) => {
-    await page.goto('/clients', { waitUntil: 'domcontentloaded' });
+    await page.goto('/clients', { waitUntil: 'load' });
     await expect(page.locator('table:not([data-skeleton]):visible')).toBeVisible({
       timeout: 20000,
     });
@@ -81,25 +81,26 @@ test.describe('고객사 관리 - ADMIN 권한', () => {
     const search = page.locator('input[type="search"], input[placeholder*="검색"]').first();
     await expect(search).toBeVisible({ timeout: 10000 });
 
-    // 검색어가 실제로 서버에 반영된 응답을 기다린다.
-    //
-    // 이 화면은 키 입력마다 요청을 보낸다(디바운스 없음). 예전에는 fill 직후 바로
-    // 행 수를 단언했는데, 그러면 'TEST00' 응답이 'TEST001' 응답보다 늦게 도착해
-    // 필터가 풀린 목록을 덮어쓴 순간을 그대로 본다 — 실제로 전체 실행에서 산발
-    // 실패했다. 앱에는 취소 가드를 넣었고(clients/page.tsx), 테스트도 마지막
-    // 요청의 응답을 기준으로 삼는다.
-    const filtered = page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === '/api/clients' &&
-        new URL(response.url()).searchParams.get('search') === 'TEST001' &&
-        response.status() === 200
-    );
+    // 첫 목록에 TEST001 행이 이미 있으므로 행만 기다리면 검색 입력이 수화 과정에서
+    // 유실돼도 통과할 수 있다. 정확한 검색 요청·응답을 함께 관측한다.
+    const filteredResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === 'GET' &&
+        url.pathname === '/api/clients' &&
+        url.searchParams.get('search') === 'TEST001'
+      );
+    });
     await search.fill('TEST001');
-    await filtered;
+    await expect(search).toHaveValue('TEST001');
+    const response = await filteredResponse;
+    expect(response.status(), '고객사 검색 API가 성공해야 합니다.').toBe(200);
 
     const rows = page.locator('tbody tr');
+    const matchingRow = rows.filter({ hasText: 'TEST001' });
+    await expect(matchingRow).toHaveCount(1, { timeout: 15000 });
     await expect(rows).toHaveCount(1, { timeout: 15000 });
-    await expect(rows.first()).toContainText('TEST001');
+    await expect(matchingRow).toContainText('TEST001');
   });
 
   test('고객사 생성 전체 플로우', async ({ page }) => {

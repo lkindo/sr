@@ -54,7 +54,7 @@ const emptyState = (page: Page) => page.getByText('검색 결과가 없습니다
 
 test.describe('SR 검색', () => {
   test('검색어를 넣으면 그 문자열을 가진 SR 만 남는다', async ({ page }) => {
-    await page.goto('/srs', { waitUntil: 'domcontentloaded' });
+    await page.goto('/srs', { waitUntil: 'load' });
     await expectListRendered(page);
 
     // 기준값: 지금 목록의 첫 SR 번호. 그것으로 검색하면 그 건만 남아야 한다.
@@ -64,6 +64,7 @@ test.describe('SR 검색', () => {
 
     const search = page.getByRole('textbox', { name: '검색어 입력' });
     await search.fill(target);
+    await expect(search).toHaveValue(target);
 
     // 검색은 500ms 디바운스 후 URL 로 반영된다(SRsDataTable 의 useDebounce).
     // 고정 대기 대신 그 관측 가능한 결과인 URL 변화를 기다린다.

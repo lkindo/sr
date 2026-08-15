@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { SR } from '@prisma/client';
 
 import {
   authenticateAndAuthorize,
@@ -13,7 +12,7 @@ import { errorToResult } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadSR } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
-import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
+import { srCreateSchema, srPatchSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { buildSRCreateInput, buildSRUpdateInput } from '@/lib/sr-form.utils';
 import { srService } from '@/services/sr.service';
@@ -53,7 +52,7 @@ export async function updateSRAction(
     await requireRateLimit('strict');
 
     const processedData = buildSRUpdateInput(formData);
-    const validationResult = validateWithSchema(processedData, srUpdateSchema);
+    const validationResult = validateWithSchema(processedData, srPatchSchema);
     if (!validationResult.success) {
       return validationResult;
     }
@@ -92,7 +91,7 @@ export async function deleteSRAction(id: string): Promise<Result<void>> {
 export async function getSRDetailsAction(id: string): Promise<Result<SRDetails>> {
   try {
     const session = await getAuthenticatedSession();
-    const sr = await srService.getSRDetailsById(id);
+    const sr = await srService.getSRDetailsById(id, { viewer: session.user });
 
     if (!sr) {
       return fail('SR을 찾을 수 없습니다.', 'NOT_FOUND');

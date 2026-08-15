@@ -5,20 +5,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { domainEvents } from '@/lib/domain-events';
-import {
-  BadRequestError,
-  BusinessRuleError,
-  ForbiddenError,
-  NotFoundError,
-  ServiceError,
-} from '@/lib/errors';
+import { BadRequestError, BusinessRuleError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { deleteAttachmentBlob } from '@/lib/storage';
-import { emailService } from '@/services/email.service';
 import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
 import { pushService } from '@/services/push.service';
 import { SRService } from '@/services/sr.service';
+import { enqueueSRStatusChangedEmail } from '@/services/sr-email-outbox';
+
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRCreatedEmails: vi.fn().mockResolvedValue(0),
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
 
 // Mock dependencies
 // Define mock structure using vi.hoisted to ensure availability in vi.mock factory
@@ -365,9 +365,6 @@ describe('SRService', () => {
         notificationPreference: { emailSRStatusChanged: true },
       } as any);
 
-      const sendEmailSpy = vi
-        .spyOn(emailService, 'buildSRStatusChanged')
-        .mockResolvedValue({} as any);
       // 리스너는 사용자 설정을 존중하는 `sendForEvent` 를 쓴다(감사 4.3).
       // 예전에는 `sendToUser` 를 직접 불러 `pushSRStatusChanged` 를 무시했다.
       const sendPushSpy = vi.spyOn(pushService, 'sendForEvent').mockResolvedValue(undefined);
@@ -375,6 +372,12 @@ describe('SRService', () => {
       // Execute
       const data = { status: 'IN_PROGRESS' as const };
       await srService.updateSR('sr-1', data, mockUser);
+
+      // 이메일은 상태 변경과 같은 트랜잭션 안에 먼저 적재되어야 한다.
+      expect(enqueueSRStatusChangedEmail).toHaveBeenCalledWith(
+        txMock,
+        expect.objectContaining({ srId: 'sr-1', currentStatus: 'IN_PROGRESS' })
+      );
 
       // 도메인 이벤트 리스너는 완료 신호를 주지 않는다 — domain-events.ts 의 emit 은
       // 트랜잭션 컨텍스트 밖에서 동기 fire-and-forget 이고, 단위 테스트는 prisma 를
@@ -384,7 +387,6 @@ describe('SRService', () => {
       // await 틱이 하나만 더 늘어도 깨지는 구조였다. 관측 가능한 부작용이 실제로
       // 나타날 때까지 폴링하면 그 취약함이 사라지고, 보통 15ms 보다 빨리 끝난다.
       await vi.waitFor(() => {
-        expect(sendEmailSpy).toHaveBeenCalled();
         expect(sendPushSpy).toHaveBeenCalled();
       });
 
@@ -400,14 +402,6 @@ describe('SRService', () => {
         expect.arrayContaining([expect.objectContaining({ type: 'STATUS_CHANGED' })])
       );
 
-      expect(sendEmailSpy).toHaveBeenCalledWith(
-        'req@test.com',
-        'SR-001',
-        'Test SR',
-        'REQUESTED',
-        'IN_PROGRESS',
-        expect.any(String)
-      );
       expect(sendPushSpy).toHaveBeenCalledWith(
         'SR_STATUS_CHANGED',
         ['req-1'],
@@ -426,6 +420,66 @@ describe('SRService', () => {
       expect(result).toEqual(mockSR);
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'sr-1' } })
+      );
+    });
+
+    it('외부 상세 응답은 내부 댓글과 물리 저장 경로를 제외하고 관계 수를 제한한다', async () => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1' } as any);
+
+      await srService.getSRDetailsById('sr-1', {
+        viewer: {
+          id: 'client-user',
+          email: 'client@example.com',
+          name: 'Client User',
+          image: null,
+          roles: ['CLIENT'],
+          permissions: [],
+          clientIds: ['c-1'],
+        },
+        activitiesLimit: 10_000,
+        commentsLimit: -1,
+        attachmentsLimit: 10_000,
+        statusHistoryLimit: 0,
+      });
+
+      expect(prisma.sR.findUnique).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            activities: expect.objectContaining({ take: 100 }),
+            comments: expect.objectContaining({ where: { isInternal: false }, take: 20 }),
+            attachments: expect.objectContaining({
+              take: 100,
+              select: expect.not.objectContaining({ storagePath: true }),
+            }),
+            statusHistory: expect.objectContaining({ take: 50 }),
+            _count: { select: { comments: { where: { isInternal: false } }, attachments: true } },
+          }),
+        })
+      );
+    });
+
+    it('내부 사용자는 내부 댓글과 그 개수를 조회한다', async () => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: 'sr-1' } as any);
+
+      await srService.getSRDetailsById('sr-1', {
+        viewer: {
+          id: 'admin',
+          email: 'admin@example.com',
+          name: 'Admin',
+          image: null,
+          roles: ['ADMIN'],
+          permissions: [],
+          clientIds: [],
+        },
+      });
+
+      expect(prisma.sR.findUnique).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            comments: expect.objectContaining({ where: {} }),
+            _count: { select: { comments: { where: {} }, attachments: true } },
+          }),
+        })
       );
     });
 

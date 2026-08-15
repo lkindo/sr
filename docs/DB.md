@@ -387,7 +387,7 @@ erDiagram
 
 > `Notification` 과 `SRSequence` 는 다른 테이블과 FK 관계가 없어 위 ERD 관계선에
 > 나타나지 않는다. `Notification` 의 현재 상태는
-> [14. notifications](#14-notifications-알림-outbox--미사용) 를 반드시 읽을 것.
+> [14. notifications](#14-notifications-이메일-outbox) 를 반드시 읽을 것.
 
 ### 도메인별 ERD
 
@@ -800,10 +800,10 @@ SR의 첨부파일 메타데이터. **파일 실체는 서버 디스크에 저�
 `uploaded_by` 는 사용자 ID 문자열이지만 **FK 제약이 없다** (참조 무결성 미보장).
 
 **저장 위치 (실제):** 서버 디스크 `STORAGE_DIR`(운영: `/app/var/uploads`, Docker named
-volume `sr_uploads`), 파일 경로는 `attachments/<srId>/<timestamp>-<safeName>` 형태다
+volume `sr_uploads`), 파일 경로는 `attachments/<srId>/<uuid>-<safeName>` 형태다
 (`src/lib/storage.ts`). 웹루트(`public/`) 밖에 저장되며 인증 라우트
-`/api/attachments/[id]/download` 로만 스트리밍된다. 과거 `public/uploads` 에 업로드된
-파일은 다운로드 시 폴백 경로로만 조회한다.
+`/api/attachments/[id]/download` 로만 스트리밍된다. `public/uploads` 폴백은 공개 정적
+서빙으로 인가를 우회할 수 있어 제거되었다.
 
 > **Vercel Blob 은 사용하지 않는다.** 오브젝트 스토리지·CDN 자체가 없다.
 > `file_url` 은 공개 URL이 아니라 로컬 상대 경로다.
@@ -813,19 +813,15 @@ volume `sr_uploads`), 파일 경로는 `attachments/<srId>/<timestamp>-<safeName
 
 ---
 
-### 14. notifications (알림 outbox — 미사용)
+### 14. notifications (이메일 outbox)
 
-> **⚠️ 이 테이블에는 어떤 코드도 행을 기록하지 않는다.**
-> `src/` 전역에서 `prisma.notification.*` 호출이 0건이다(2026-07-30 확인).
-> 테이블과 enum, 인덱스는 존재하지만 발송 이력/outbox 로 **동작하지 않는다.**
-> 실제 알림 경로는 아래와 같이 DB를 거치지 않는다.
->
-> - 이메일: nodemailer(SMTP) 로 도메인 이벤트 리스너에서 fire-and-forget
-> - 웹 푸시: `web-push`(VAPID) + `push_subscriptions`
-> - 실시간: 자체 SSE (`/api/realtime`)
->
-> 따라서 발송 실패는 어디에도 영속 기록되지 않으며(로그만 남는다) 재시도도 없다.
-> outbox 패턴을 실제로 쓰려면 쓰기 경로를 구현해야 한다.
+SR 생성·상태 변경·담당자 배정과 댓글 추가 이메일은 도메인 변경과 같은 트랜잭션에서
+`PENDING` 행으로 적재된다. 앱 instrumentation이 시작하는 디스패처가 30초마다 최대 20건을
+claim해 SMTP로 발송한다. claim은 단일 CTE의 `FOR UPDATE SKIP LOCKED`와 5분 임대를 사용해
+여러 워커가 같은 행을 동시에 보내지 않으며, 워커가 죽으면 임대 만료 후 다시 처리된다.
+
+실패는 1·5·15·60분 백오프로 최대 5회 시도하고, 상한에 도달하면 `FAILED` dead-letter로
+남긴다. 웹 푸시는 `push_subscriptions`, 실시간 화면 갱신은 SSE(`/api/realtime`)를 사용한다.
 
 | 컬럼명      | 데이터 타입          | NULL | 기본값    | 설명                           |
 | ----------- | -------------------- | ---- | --------- | ------------------------------ |
@@ -839,8 +835,10 @@ volume `sr_uploads`), 파일 경로는 `attachments/<srId>/<timestamp>-<safeName
 | sent_at     | TIMESTAMPTZ          | YES  | NULL      | 발송 시간                      |
 | fail_reason | VARCHAR(255)         | YES  | NULL      | 실패 사유                      |
 | created_at  | TIMESTAMPTZ          | NO   | now()     | 생성 시간                      |
+| attempts    | INTEGER              | NO   | 0         | 발송 시도 횟수                 |
+| next_attempt_at | TIMESTAMPTZ       | YES  | NULL      | 다음 시도 또는 claim 임대 시각 |
 
-**인덱스:** PK `id` / INDEX `(status, created_at)` / INDEX `recipient` /
+**인덱스:** PK `id` / INDEX `(status, next_attempt_at)` / INDEX `(status, created_at)` /
 INDEX `(recipient, created_at)`
 
 **외래 키:** 없음 (`recipient` 는 자유 문자열)
@@ -1272,11 +1270,15 @@ pnpm exec prisma migrate dev --name <변경내용>
 
 ```sh
 # docker-entrypoint.sh (요약)
-if ! prisma migrate deploy; then
-    # P3005(비어 있지 않은 DB에 마이그레이션 히스토리 없음) 대응
-    prisma migrate resolve --applied 0_init
-    prisma migrate deploy
-fi
+out="$(prisma migrate deploy 2>&1)" || {
+    echo "$out"
+    # P3005 + 사전 백업/스키마 확인 + 명시적 일회성 승인에만 baseline
+    case "$out" in
+      *P3005*) [ "${ALLOW_PRISMA_BASELINE:-}" = 1 ] && \
+        prisma migrate resolve --applied 0_init && prisma migrate deploy ;;
+      *) exit 1 ;;
+    esac
+}
 exec "$@"
 ```
 

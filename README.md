@@ -11,7 +11,7 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 - **SLA & 우선순위**: 긴급도에 따른 우선순위(CRITICAL~LOW) 관리 및 SLA 마감일 추적
 - **사용자 역할**:
   - **운영팀**: ADMIN (전체 권한), MANAGER (관리), ENGINEER (실무)
-  - **고객사**: CLIENT_ADMIN (고객사 관리), CLIENT_USER (요청 전용)
+  - **고객사**: CLIENT_ADMIN (고객사 관리), CLIENT_USER (승인된 고객사 범위의 요청·조회)
 - **모바일 최적화 (Mobile-First)**:
   - **통합 디자인 시스템**: 모든 모바일 카드에 일관된 디자인 토큰(2열 그리드 정보 배치, p-3.5 패딩) 적용
   - **콤팩트 필터**: 모바일 화면 활용도를 높이기 위한 탭/칩 스타일 필터 시스템
@@ -109,9 +109,9 @@ pnpm dev
 # http://localhost:3000 접속 (환경변수: .env 사용)
 ```
 
-> **로그인할 계정이 아직 없습니다.** 마이그레이션은 스키마만 만들고 역할·권한 데이터는 넣지 않으므로,
-> 깨끗한 DB 에서는 아무도 로그인할 수 없고 회원가입도 기본 역할을 찾지 못해 실패합니다.
-> 최초 관리자 계정을 만드는 절차는 [BOOTSTRAP](./docs/BOOTSTRAP.md)에 있습니다.
+> `pnpm db:seed`는 역할·권한 기준 데이터는 만들지만 개발 계정은 기본 생성하지 않습니다.
+> 따라서 별도 설정이 없으면 로그인할 계정은 아직 없습니다. 최초 관리자 생성은
+> [BOOTSTRAP](./docs/BOOTSTRAP.md)을 따르세요.
 
 ### 2. Docker 환경 (Production-like)
 
@@ -141,6 +141,10 @@ docker-compose up --build
 | `RATE_LIMIT_MIDDLEWARE_WINDOW_MS`     | 미들웨어 제한 시간(ms)              | 60000 (1분) |
 | `RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS`  | 미들웨어 윈도당(=분당) 최대 요청 수 | 100         |
 | `RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS` | 파일 업로드 제한                    | 20 (시간당) |
+
+> 현재 limiter 상태는 앱 프로세스 메모리에 있습니다. 운영 Compose의 앱 복제본 1개에서는
+> 정확하지만, 수평 확장 전에 Redis/PostgreSQL 기반 공유 limiter로 교체해야 합니다. 그렇지
+> 않으면 실효 한도가 복제본 수만큼 늘어납니다.
 
 ---
 

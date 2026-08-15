@@ -49,6 +49,7 @@ describe('User Policy Functions', () => {
     image: null,
     password: 'hashed',
     isActive: true,
+    sessionVersion: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

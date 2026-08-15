@@ -232,3 +232,48 @@ describe('validateTransition — 흐름 자체가 불가능한 전이', () => {
     expect(validateTransition('REJECTED', 'IN_PROGRESS', ['ADMIN']).valid).toBe(false);
   });
 });
+
+describe('validateTransition — 전이 맥락 규칙', () => {
+  it('보류 전이는 사유가 필수다', () => {
+    const current = { assigneeId: 'eng-1' };
+    expect(validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {}).valid).toBe(false);
+    expect(
+      validateTransition('IN_PROGRESS', 'ON_HOLD', ['ADMIN'], current, {
+        changeReason: '고객 자료 대기',
+      }).valid
+    ).toBe(true);
+  });
+
+  it('재오픈은 사유가 필수다', () => {
+    const current = { assigneeId: 'eng-1', completedAt: new Date() };
+    const result = validateTransition('COMPLETED', 'IN_PROGRESS', ['ADMIN'], current, {});
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('재오픈 사유');
+  });
+
+  it('완료 후 7일이 지난 SR은 일반 서비스 경로에서도 재오픈할 수 없다', () => {
+    const completedAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    const result = validateTransition(
+      'COMPLETED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      { assigneeId: 'eng-1', completedAt },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('7일');
+  });
+
+  it('완료 후 7일 이내에는 사유와 담당자가 있으면 재오픈할 수 있다', () => {
+    const completedAt = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'IN_PROGRESS',
+        ['ADMIN'],
+        { assigneeId: 'eng-1', completedAt },
+        { changeReason: '재작업' }
+      ).valid
+    ).toBe(true);
+  });
+});

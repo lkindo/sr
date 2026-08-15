@@ -17,11 +17,15 @@ test-results
 
 # Next.js
 .next/
+.next-e2e/
 out/
 
 # Misc
 .DS_Store
 *.pem
+*.key
+*.p12
+*.pfx
 .vscode
 .idea
 
@@ -37,6 +41,7 @@ pnpm-debug.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
 
 # Vercel
 .vercel

@@ -61,6 +61,13 @@ describe('Dashboard Stats API Performance', () => {
     expect(prisma.sR.count).not.toHaveBeenCalled();
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(3); // Counts, Trend, Stats
 
+    // ORM 쿼리뿐 아니라 raw 집계 3개도 ENGINEER 본인 담당 범위로 제한되어야 한다.
+    for (const queryCall of vi.mocked(prisma.$queryRaw).mock.calls) {
+      // $queryRaw 를 mock 함수로 바꾸면 tagged-template 치환값은 첫 인자의 values가 아니라
+      // 후속 인자(중첩 Prisma.Sql)에 전달된다. 전체 호출을 검사해야 실제 바인딩을 본다.
+      expect(JSON.stringify(queryCall)).toContain('user-1');
+    }
+
     // Verify values
     expect(json.summary.total).toBe(10);
     expect(json.summary.inProgress).toBe(2);

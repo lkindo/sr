@@ -92,9 +92,16 @@ describe('docker-entrypoint.sh', () => {
     expect(entrypoint).toMatch(/node\s+prisma\/seed\.bundle\.cjs/);
   });
 
-  it('시딩 실패가 부팅을 막지 않는다', () => {
-    // DB 일시 오류로 앱 전체가 뜨지 못하는 쪽이 더 나쁘다.
-    expect(entrypoint).toMatch(/seed\.bundle\.cjs\s*\|\|/);
+  it('시딩 실패를 성공으로 숨기지 않는다', () => {
+    // 기준 역할·권한이 없으면 로그인/가입이 불가능하므로 unhealthy 로 실패해야 한다.
+    expect(entrypoint).not.toMatch(/seed\.bundle\.cjs\s*\|\|/);
+  });
+
+  it('P3005와 명시적 승인일 때만 baseline 한다', () => {
+    expect(entrypoint).toContain('*P3005*');
+    expect(entrypoint).toContain('ALLOW_PRISMA_BASELINE');
+    expect(entrypoint).toContain('prisma migrate resolve --applied 0_init');
+    expect(entrypoint).toContain('reason other than P3005');
   });
 
   it('시드 실행 후 메인 프로세스를 exec 한다', () => {

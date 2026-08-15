@@ -8,6 +8,8 @@ import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/pol
 import prisma from '@/lib/prisma';
 import { commentSchema } from '@/lib/schemas';
 import { backgroundTask } from '@/lib/wait-until';
+import { emailService } from '@/services/email.service';
+import { enqueueEmails, type OutboxEmail } from '@/services/notification-outbox';
 
 // GET /api/srs/[id]/comments - SR 댓글 목록 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(
@@ -133,6 +135,43 @@ export const POST = withAuthAndRateLimit(
         },
       });
 
+      // 이메일 아웃박스도 댓글/활동과 같은 트랜잭션에 적재한다. 커밋 직후 프로세스가
+      // 종료돼도 "댓글은 있는데 보내야 할 알림 행은 없음" 상태가 생기지 않는다.
+      const outbox: OutboxEmail[] = [];
+      const shouldSendRequester = sr.requester.notificationPreference?.emailCommentAdded ?? false;
+      if (sr.requester.id !== session.user.id && sr.requester.email && shouldSendRequester) {
+        outbox.push({
+          ...emailService.buildCommentAdded(
+            sr.requester.email,
+            sr.srNumber,
+            sr.title,
+            created.user.name,
+            validated.content,
+            getSRUrl(sr.id)
+          ),
+          metadata: { srId: sr.id, kind: 'comment-added', role: 'requester' },
+        });
+      }
+
+      if (sr.assignee && sr.assignee.id !== session.user.id && sr.assignee.email) {
+        const shouldSendAssignee = sr.assignee.notificationPreference?.emailCommentAdded ?? false;
+        if (shouldSendAssignee) {
+          outbox.push({
+            ...emailService.buildCommentAdded(
+              sr.assignee.email,
+              sr.srNumber,
+              sr.title,
+              created.user.name,
+              validated.content,
+              getSRUrl(sr.id)
+            ),
+            metadata: { srId: sr.id, kind: 'comment-added', role: 'assignee' },
+          });
+        }
+      }
+
+      await enqueueEmails(outbox, tx);
+
       return created;
     });
 
@@ -149,50 +188,6 @@ export const POST = withAuthAndRateLimit(
       assigneeId: sr.assigneeId,
       actorId: session.user.id,
     });
-
-    // 이메일은 아웃박스에 적재한다. 예전에는 여기서 SMTP 로 곧장 쐈고, 실패하면
-    // 기록도 재시도도 없이 사라졌다(감사 4.2). 이제 디스패처가 집어 보내고 결과를 남긴다.
-    const { emailService } = await import('@/services/email.service');
-    const { enqueueEmails } = await import('@/services/notification-outbox');
-    const outbox = [];
-
-    // Requester check (Schema: emailCommentAdded Boolean @default(false))
-    const shouldSendRequester = sr.requester.notificationPreference?.emailCommentAdded ?? false;
-    if (sr.requester.id !== session.user.id && sr.requester.email && shouldSendRequester) {
-      outbox.push({
-        ...emailService.buildCommentAdded(
-          sr.requester.email,
-          sr.srNumber,
-          sr.title,
-          comment.user.name,
-          validated.content,
-          getSRUrl(sr.id)
-        ),
-        metadata: { srId: sr.id, kind: 'comment-added', role: 'requester' },
-      });
-    }
-
-    // Assignee check
-    if (sr.assignee && sr.assignee.id !== session.user.id && sr.assignee.email) {
-      const shouldSendAssignee = sr.assignee.notificationPreference?.emailCommentAdded ?? false;
-      if (shouldSendAssignee) {
-        outbox.push({
-          ...emailService.buildCommentAdded(
-            sr.assignee.email,
-            sr.srNumber,
-            sr.title,
-            comment.user.name,
-            validated.content,
-            getSRUrl(sr.id)
-          ),
-          metadata: { srId: sr.id, kind: 'comment-added', role: 'assignee' },
-        });
-      }
-    }
-
-    if (outbox.length > 0) {
-      await enqueueEmails(outbox);
-    }
 
     /**
      * 푸시 알림 (감사 4.3).

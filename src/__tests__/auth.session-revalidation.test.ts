@@ -46,9 +46,10 @@ import prisma from '@/lib/prisma';
 const findUnique = prisma.user.findUnique as ReturnType<typeof vi.fn>;
 
 /** DB 가 돌려주는 형태 그대로. `loadUserClaims` 의 select 와 일치해야 의미가 있다. */
-function dbUser(overrides: Partial<{ isActive: boolean }> = {}) {
+function dbUser(overrides: Partial<{ isActive: boolean; sessionVersion: number }> = {}) {
   return {
     isActive: true,
+    sessionVersion: 1,
     // 권한은 더 이상 이 쿼리가 읽지 않는다. 토큰에 담지 않기 때문이다
     // (lib/role-permissions.ts 가 세션 콜백에서 역할로부터 편다).
     roles: [{ role: { name: 'ADMIN' } }],
@@ -110,6 +111,7 @@ describe('jwt 콜백 — 클레임 재조회', () => {
     // 502 를 받은 원인이었다(2026-08-08).
     expect(result?.permissions).toBeUndefined();
     expect(result?.clientIds).toEqual(['client-1']);
+    expect(result?.sessionVersion).toBe(1);
     expect(typeof result?.checkedAt).toBe('number');
   });
 
@@ -192,6 +194,21 @@ describe('jwt 콜백 — 세션 파기', () => {
 
     const result = await runJwt({
       token: { id: 'user-1', roles: ['ADMIN'], checkedAt: Date.now() - 61_000 },
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('비밀번호 변경으로 sessionVersion이 증가하면 기존 토큰을 파기한다', async () => {
+    findUnique.mockResolvedValue(dbUser({ sessionVersion: 2 }));
+
+    const result = await runJwt({
+      token: {
+        id: 'user-1',
+        roles: ['ADMIN'],
+        sessionVersion: 1,
+        checkedAt: Date.now() - 61_000,
+      },
     });
 
     expect(result).toBeNull();

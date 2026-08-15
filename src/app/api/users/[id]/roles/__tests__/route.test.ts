@@ -77,6 +77,7 @@ const roles = (map: Record<string, string>) =>
 const targetUser = (clientNames: string[] = []) => ({
   id: 'target-1',
   clients: clientNames.map((name, i) => ({ client: { id: `c-${i}`, name } })),
+  roles: [] as { role: { name: string } }[],
 });
 
 beforeEach(() => {
@@ -103,7 +104,11 @@ describe('POST /api/users/[id]/roles — 인가', () => {
   });
 
   it('ROLE:ASSIGN 보유자는 할당할 수 있다 — 과잉 차단 방지 대조군', async () => {
-    mockSession.user = { id: 'actor-1', roles: ['MANAGER'], permissions: ['ROLE:ASSIGN'] };
+    mockSession.user = {
+      id: 'actor-1',
+      roles: ['MANAGER'],
+      permissions: ['ROLE:ASSIGN', 'USER:UPDATE'],
+    };
     mockRoleFindMany.mockResolvedValue(roles({ 'r-1': 'ENGINEER' }));
     mockUserFindUnique
       .mockResolvedValueOnce(targetUser())
@@ -117,10 +122,65 @@ describe('POST /api/users/[id]/roles — 인가', () => {
 
   // 이것이 이 라우트에서 가장 중요한 게이트다.
   it('ADMIN 이 아니면 ADMIN 역할을 할당할 수 없다', async () => {
-    mockSession.user = { id: 'actor-1', roles: ['MANAGER'], permissions: ['ROLE:ASSIGN'] };
+    mockSession.user = {
+      id: 'actor-1',
+      roles: ['MANAGER'],
+      permissions: ['ROLE:ASSIGN', 'USER:UPDATE'],
+    };
     mockRoleFindMany.mockResolvedValue(roles({ 'r-admin': 'ADMIN' }));
 
     const res = await POST(request(['r-admin']), context);
+
+    expect(res.status).toBe(403);
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('ADMIN 이 아니면 자기 자신의 역할을 교체할 수 없다', async () => {
+    mockSession.user = {
+      id: 'target-1',
+      roles: ['MANAGER'],
+      permissions: ['ROLE:ASSIGN', 'USER:UPDATE'],
+    };
+    mockRoleFindMany.mockResolvedValue(roles({ 'r-1': 'MANAGER' }));
+
+    const res = await POST(request(['r-1']), context);
+
+    expect(res.status).toBe(403);
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('보유하지 않은 권한이 포함된 역할은 부여할 수 없다', async () => {
+    mockSession.user = {
+      id: 'actor-1',
+      roles: ['MANAGER'],
+      permissions: ['ROLE:ASSIGN', 'USER:UPDATE'],
+    };
+    mockRoleFindMany.mockResolvedValue([
+      {
+        id: 'r-power',
+        name: 'POWER_USER',
+        permissions: [{ permission: { resource: 'CLIENT', action: 'DELETE' } }],
+      },
+    ]);
+
+    const res = await POST(request(['r-power']), context);
+
+    expect(res.status).toBe(403);
+    expect(mockTransaction).not.toHaveBeenCalled();
+  });
+
+  it('ADMIN 대상의 역할은 빈 목록으로도 회수할 수 없다', async () => {
+    mockSession.user = {
+      id: 'actor-1',
+      roles: ['MANAGER'],
+      permissions: ['ROLE:ASSIGN', 'USER:UPDATE'],
+    };
+    mockUserFindUnique.mockResolvedValue({
+      ...targetUser(),
+      roles: [{ role: { name: 'ADMIN' } }],
+    });
+
+    const res = await POST(request([]), context);
 
     expect(res.status).toBe(403);
     expect(mockTransaction).not.toHaveBeenCalled();

@@ -54,8 +54,11 @@ test.describe('사용자 관리 - ADMIN 권한', () => {
     await search.fill('engineeruser@example.com');
 
     const rows = page.locator('tbody tr');
+    await expect(page).toHaveURL(/q=engineeruser%40example\.com/, { timeout: 15000 });
+    const matchingRow = rows.filter({ hasText: 'engineeruser@example.com' });
+    await expect(matchingRow).toHaveCount(1, { timeout: 15000 });
     await expect(rows).toHaveCount(1, { timeout: 15000 });
-    await expect(rows.first()).toContainText('engineeruser@example.com');
+    await expect(matchingRow).toContainText('engineeruser@example.com');
   });
 
   test('사용자 등록 버튼이 보여야 함', async ({ page }) => {

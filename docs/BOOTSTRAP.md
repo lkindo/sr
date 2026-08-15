@@ -99,11 +99,13 @@ pnpm db:seed
 컨테이너에서는 마이그레이션과 시딩이 **기동 시 자동으로** 수행된다.
 `docker-entrypoint.sh` 가 앱 프로세스 실행 전에 처리한다.
 
-1. `prisma migrate deploy` — 실패하면 P3005(비어 있지 않은 DB 에 히스토리 없음)로 보고
-   `prisma migrate resolve --applied 0_init` 후 재시도한다.
+1. `prisma migrate deploy` — 일반 실패는 즉시 부팅 실패다. 출력이 P3005이고 운영자가
+   기존 스키마가 `0_init`과 일치함을 백업 후 확인하여 `ALLOW_PRISMA_BASELINE=1`을 준
+   일회성 실행에서만 `prisma migrate resolve --applied 0_init` 후 재시도한다.
 2. `node prisma/seed.bundle.cjs` — 기준 데이터 시딩과 부트스트랩 관리자 생성.
    이 번들은 이미지 빌드 중 esbuild 가 `prisma/seed.ts` 에서 생성한다(`Dockerfile:49-52`).
-   시딩이 실패해도 **부팅을 막지는 않는다** — DB 일시 오류로 앱 전체가 뜨지 못하는 쪽이 더 나쁘다.
+   시딩 실패 또는 번들 누락은 로그인 불가능한 반쪽 부팅으로 처리하지 않고 컨테이너를
+   실패시킨다.
 
 따라서 운영자가 할 일은 **환경변수를 넣어 주는 것뿐**이다.
 

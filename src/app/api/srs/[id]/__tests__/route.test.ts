@@ -50,7 +50,11 @@ vi.mock('@/lib/api-helpers', () => ({
   validateRequestBody: async (request: { json: () => Promise<unknown> }) => request.json(),
 }));
 
-vi.mock('@/lib/policies', () => ({ ensureCanReadSR: mockEnsureCanReadSR }));
+vi.mock('@/lib/policies', () => ({
+  ensureCanReadSR: mockEnsureCanReadSR,
+  isInternalUser: (user: { roles?: string[] }) =>
+    user.roles?.some((role) => ['ADMIN', 'MANAGER', 'ENGINEER'].includes(role)) ?? false,
+}));
 
 vi.mock('@/services/sr.service', () => ({
   srService: {
@@ -83,6 +87,7 @@ describe('GET /api/srs/[id]', () => {
     expect(res.status).toBe(200);
     // 세션 사용자와 **조회된 행**을 함께 넘겨야 테넌트 술어를 판정할 수 있다.
     expect(mockEnsureCanReadSR).toHaveBeenCalledWith(mockSession.user, SR);
+    expect(mockGetSRDetailsById).toHaveBeenCalledWith('sr-1', { viewer: mockSession.user });
   });
 
   it('없는 SR 은 404', async () => {

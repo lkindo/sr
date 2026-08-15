@@ -420,7 +420,7 @@ test.describe('비밀번호 변경', () => {
       await expect(session.page).toHaveURL(/\/dashboard/);
 
       // 이 엔드포인트의 핵심 통제: 현재 비밀번호를 모르면 바꿀 수 없다.
-      // (src/app/api/profile/password/route.ts 의 bcrypt.compare → UnauthorizedError)
+      // (src/services/user.service.ts 의 bcrypt.compare → ValidationError)
       const wrongCurrent = await session.page.request.post('/api/profile/password', {
         data: {
           currentPassword: WRONG_PASSWORD,
@@ -428,9 +428,9 @@ test.describe('비밀번호 변경', () => {
           confirmPassword: ROTATED_PASSWORD,
         },
       });
-      expect(wrongCurrent.status()).toBe(401);
+      expect(wrongCurrent.status()).toBe(400);
       expect((await wrongCurrent.json()) as ApiErrorBody).toMatchObject({
-        error: '현재 비밀번호가 올바르지 않습니다.',
+        error: '현재 비밀번호가 일치하지 않습니다.',
       });
 
       // 확인 값 불일치 — changePasswordSchema 의 refine.

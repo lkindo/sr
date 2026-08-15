@@ -3,6 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRCreatedEmails: vi.fn().mockResolvedValue(0),
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 /**
  * 감사 3.27 회귀 테스트 — 희망 우선순위·희망 완료일이 DB 까지 도달하는가.
  *

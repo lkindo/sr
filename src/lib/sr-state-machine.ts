@@ -285,5 +285,29 @@ export const validateTransition = (
     }
   }
 
+  // 4. 전이 맥락 규칙. 실제 쓰기 경로는 currentData/updateData 를 모두 넘긴다.
+  // UI의 버튼 가시성 계산처럼 데이터 없이 호출하는 경우에는 흐름/인가만 판정한다.
+  if (currentData && updateData) {
+    const isReopen = (from === 'COMPLETED' || from === 'CONFIRMED') && to === 'IN_PROGRESS';
+    const requiresReason = to === 'ON_HOLD' || isReopen;
+
+    if (requiresReason && !updateData.changeReason?.trim()) {
+      return {
+        valid: false,
+        message: isReopen ? '재오픈 사유를 입력해주세요.' : '보류 사유를 입력해주세요.',
+      };
+    }
+
+    // 완료 시각이 있는 SR은 완료 후 7일까지만 재오픈할 수 있다. 이 규칙을 라우트가
+    // 아니라 상태 머신에 두어 일반 서비스 호출에서도 동일하게 강제한다.
+    if (isReopen && currentData.completedAt) {
+      const completedAt = new Date(currentData.completedAt).getTime();
+      const daysSinceCompletion = (Date.now() - completedAt) / (1000 * 60 * 60 * 24);
+      if (!Number.isFinite(completedAt) || daysSinceCompletion > 7) {
+        return { valid: false, message: '완료 후 7일이 지나 재오픈할 수 없습니다.' };
+      }
+    }
+  }
+
   return { valid: true };
 };

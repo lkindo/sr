@@ -192,5 +192,25 @@ describe('EmailService', () => {
 
       expect(mail.html).toContain('This is a comment');
     });
+
+    it('사용자 입력 HTML과 위험한 링크를 실행 가능한 마크업으로 렌더링하지 않는다', async () => {
+      vi.resetModules();
+      const { emailService } = await import('../email.service');
+
+      const mail = emailService.buildCommentAdded(
+        'user@test.com',
+        'SR-005',
+        '제목',
+        '<img src=x onerror=alert(1)>',
+        '<script>alert(1)</script>\n둘째 줄',
+        'javascript:alert(1)'
+      );
+
+      expect(mail.html).not.toContain('<script>');
+      expect(mail.html).not.toContain('<img src=x');
+      expect(mail.html).toContain('&lt;script&gt;');
+      expect(mail.html).toContain('href="#"');
+      expect(mail.html).toContain('<br />둘째 줄');
+    });
   });
 });

@@ -19,6 +19,26 @@ interface EmailOptions {
   html: string;
 }
 
+/** HTML 텍스트/속성 컨텍스트에 들어가는 외부 값을 이스케이프한다. */
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+/** 메일 링크는 http(s)만 허용한다. 잘못된 설정이나 javascript: URL은 클릭 불가 처리한다. */
+function safeEmailLink(value: string): string {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? escapeHtml(url.href) : '#';
+  } catch {
+    return '#';
+  }
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter;
 
@@ -78,14 +98,18 @@ class EmailService {
     link: string
   ): RenderedEmail {
     const subject = `[SR System] 새로운 SR이 생성되었습니다: ${srNumber}`;
+    const safeSrNumber = escapeHtml(srNumber);
+    const safeTitle = escapeHtml(title);
+    const safeRequesterName = escapeHtml(requesterName);
+    const safeLink = safeEmailLink(link);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">새로운 SR 요청</h2>
-        <p><strong>SR 번호:</strong> ${srNumber}</p>
-        <p><strong>제목:</strong> ${title}</p>
-        <p><strong>요청자:</strong> ${requesterName}</p>
+        <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
+        <p><strong>제목:</strong> ${safeTitle}</p>
+        <p><strong>요청자:</strong> ${safeRequesterName}</p>
         <p>아래 링크를 클릭하여 상세 내용을 확인하세요:</p>
-        <a href="${link}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
         <hr style="margin-top: 20px; border: none; border-top: 1px solid #eee;" />
         <p style="color: #888; font-size: 12px;">이 메일은 발신 전용입니다.</p>
       </div>
@@ -101,14 +125,18 @@ class EmailService {
     link: string
   ): RenderedEmail {
     const subject = `[SR System] SR 담당자가 배정되었습니다: ${srNumber}`;
+    const safeSrNumber = escapeHtml(srNumber);
+    const safeTitle = escapeHtml(title);
+    const safeAssigneeName = escapeHtml(assigneeName);
+    const safeLink = safeEmailLink(link);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">SR 담당자 배정 알림</h2>
-        <p><strong>SR 번호:</strong> ${srNumber}</p>
-        <p><strong>제목:</strong> ${title}</p>
-        <p><strong>담당자:</strong> ${assigneeName}</p>
+        <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
+        <p><strong>제목:</strong> ${safeTitle}</p>
+        <p><strong>담당자:</strong> ${safeAssigneeName}</p>
         <p>지금 바로 확인해보세요:</p>
-        <a href="${link}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
       </div>
     `;
     return { to, subject, html };
@@ -143,14 +171,19 @@ class EmailService {
       ['CONFIRMED', '확인완료'],
       ['REJECTED', '거절'],
     ]);
+    const safeSrNumber = escapeHtml(srNumber);
+    const safeTitle = escapeHtml(title);
+    const safeOldStatus = escapeHtml(statusMap.get(oldStatus) || oldStatus);
+    const safeNewStatus = escapeHtml(statusMap.get(newStatus) || newStatus);
+    const safeLink = safeEmailLink(link);
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">SR 상태 변경 알림</h2>
-        <p><strong>SR 번호:</strong> ${srNumber}</p>
-        <p><strong>제목:</strong> ${title}</p>
-        <p><strong>상태:</strong> ${statusMap.get(oldStatus) || oldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${statusMap.get(newStatus) || newStatus}</span></p>
-        <a href="${link}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
+        <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
+        <p><strong>제목:</strong> ${safeTitle}</p>
+        <p><strong>상태:</strong> ${safeOldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${safeNewStatus}</span></p>
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
       </div>
     `;
     return { to, subject, html };
@@ -165,15 +198,19 @@ class EmailService {
     link: string
   ): RenderedEmail {
     const subject = `[SR System] SR에 새 댓글이 달렸습니다: ${srNumber}`;
+    const safeSrNumber = escapeHtml(srNumber);
+    const safeCommenterName = escapeHtml(commenterName);
+    const safeCommentContent = escapeHtml(commentContent).replaceAll('\n', '<br />');
+    const safeLink = safeEmailLink(link);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #333;">새 댓글 알림</h2>
-        <p><strong>SR 번호:</strong> ${srNumber}</p>
-        <p><strong>작성자:</strong> ${commenterName}</p>
+        <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
+        <p><strong>작성자:</strong> ${safeCommenterName}</p>
         <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #0070f3; margin: 10px 0;">
-          ${commentContent}
+          ${safeCommentContent}
         </div>
-        <a href="${link}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">댓글 확인하기</a>
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">댓글 확인하기</a>
       </div>
     `;
     return { to, subject, html };

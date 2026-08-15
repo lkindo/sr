@@ -195,6 +195,31 @@ describe('ClientService', () => {
       expect(logged.data.changes).toEqual({ before, after });
     });
 
+    it('생략한 계약일은 부분 수정 중 덮어쓰지 않는다', async () => {
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.client.update).mockResolvedValue({ id: 'client1' } as any);
+
+      await clientService.updateClient('client1', { name: 'Updated Client' });
+
+      const data = vi.mocked(prisma.client.update).mock.calls[0]![0].data;
+      expect(data).not.toHaveProperty('contractStartDate');
+      expect(data).not.toHaveProperty('contractEndDate');
+    });
+
+    it('빈 계약일은 명시적인 삭제로 저장한다', async () => {
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.client.update).mockResolvedValue({ id: 'client1' } as any);
+
+      await clientService.updateClient('client1', {
+        contractStartDate: '',
+        contractEndDate: '',
+      });
+
+      expect(vi.mocked(prisma.client.update).mock.calls[0]![0].data).toEqual(
+        expect.objectContaining({ contractStartDate: null, contractEndDate: null })
+      );
+    });
+
     it('없는 고객사는 수정도 감사 로그도 하지 않는다', async () => {
       vi.mocked(prisma.client.findUnique).mockResolvedValue(null);
 

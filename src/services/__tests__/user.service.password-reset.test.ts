@@ -89,6 +89,7 @@ describe('UserService.updateUser — 비밀번호 재설정', () => {
     const updateArgs = (prisma.user.update as any).mock.calls[0][0];
     expect(updateArgs.data.password).toBe(`hashed:${VALID_PASSWORD}`);
     expect(updateArgs.data.password).not.toBe(VALID_PASSWORD);
+    expect(updateArgs.data.sessionVersion).toEqual({ increment: 1 });
   });
 
   it('비밀번호가 없으면 password 를 건드리지 않는다', async () => {

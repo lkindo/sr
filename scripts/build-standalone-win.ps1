@@ -9,8 +9,9 @@ $ProjectDir = "d:\project\sr"
 Write-Host "========== [1] 임시 빌드 디렉토리 생성 ($TempDir) ==========" -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $TempDir | Out-Null
 
-# robocopy를 사용하여 안전하게 소스 복사 (node_modules, .next, .git 제외)
-robocopy $ProjectDir $TempDir /E /XD node_modules .next .git /XF next-build.tar *.tmp /NDL /NFL /NJH /NJS
+# robocopy를 사용하여 안전하게 소스 복사. 빌드에 불필요한 로컬 비밀은 임시
+# 작업 디렉터리에도 복사하지 않아 Next.js 파일 추적 대상이 될 수 없게 한다.
+robocopy $ProjectDir $TempDir /E /XD node_modules .next .git .claude .gemini .agent coverage test-results /XF next-build.tar *.tmp .env .env.* *.key *.pem *.p12 *.pfx /NDL /NFL /NJH /NJS
 if ($LASTEXITCODE -ge 8) {
     Write-Error "robocopy 복사 실패: $LASTEXITCODE"
     exit $LASTEXITCODE

@@ -30,6 +30,11 @@ import { deleteAttachmentBlob } from '@/lib/storage';
 import { appZoneDateStamp } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
+import {
+  enqueueSRAssignedEmail,
+  enqueueSRCreatedEmails,
+  enqueueSRStatusChangedEmail,
+} from '@/services/sr-email-outbox';
 import { UserService } from '@/services/user.service';
 import { AuthenticatedUser } from '@/types/session';
 import {
@@ -107,7 +112,11 @@ async function cursorPage<T extends { id: string }>(
   fetchPage: (args: { take: number; skip?: number; cursor?: { id: string } }) => Promise<T[]>,
   options?: { cursor?: string; limit?: number }
 ): Promise<{ items: T[]; nextCursor: string | null }> {
-  const limit = options?.limit || PAGINATION.DEFAULT_LIMIT;
+  const requestedLimit = options?.limit;
+  const limit =
+    Number.isInteger(requestedLimit) && (requestedLimit as number) > 0
+      ? Math.min(requestedLimit as number, PAGINATION.MAX_PAGE_SIZE)
+      : PAGINATION.DEFAULT_LIMIT;
   const cursor = options?.cursor;
 
   const rows = await fetchPage({
@@ -245,7 +254,7 @@ export class SRService {
       const srNumber = `SR-${dateStr}-${String(sequenceSeq).padStart(4, '0')}`;
 
       // SR 생성
-      return await tx.sR.create({
+      const created = await tx.sR.create({
         data: {
           srNumber,
           title: validated.title,
@@ -276,13 +285,22 @@ export class SRService {
           },
         },
       });
+
+      await enqueueSRCreatedEmails(tx, {
+        srId: created.id,
+        srNumber: created.srNumber,
+        title: created.title,
+        requesterName: sessionUser.name || '알 수 없음',
+      });
+
+      return created;
     });
 
     if (!sr) {
       throw new ServiceError('SR 생성에 실패했습니다.', 'SR_CREATION_FAILED');
     }
 
-    const result = await this.getSRDetailsById(sr.id);
+    const result = await this.getSRDetailsById(sr.id, { viewer: sessionUser });
     if (!result) {
       throw new ServiceError('SR 생성 후 조회에 실패했습니다.', 'SR_RETRIEVAL_FAILED');
     }
@@ -422,13 +440,13 @@ export class SRService {
 
         if (Object.keys(updateData).length > 0) {
           // 낙관적 동시성 제어:
-          // 스냅샷(existingSR)을 읽은 이후 상태가 변경되지 않았을 때만 갱신을 허용한다.
-          // updateMany 의 WHERE 에 기대 상태를 포함하면, 동시 전이 시 매칭 0건이 되어
-          // lost update / 불법 상태 전이 / 이중 처리를 방지한다.
+          // 스냅샷(existingSR)을 읽은 이후 어떤 필드라도 변경되지 않았을 때만 갱신을 허용한다.
+          // 상태만 비교하면 같은 상태 안에서 일어난 제목/담당자/기한 수정은 감지하지 못한다.
+          // 모든 SR 쓰기가 증가시키는 version 을 비교해 lost update 와 불법 상태 전이를 막는다.
           // (이 updateMany 는 행 잠금을 획득하므로 이어지는 update 도 일관성이 보장된다.)
           const guard = await tx.sR.updateMany({
-            where: { id, status: existingSR.status },
-            data: { updatedAt: new Date() },
+            where: { id, version: existingSR.version },
+            data: { version: { increment: 1 } },
           });
           if (guard.count === 0) {
             throw new ConflictError(
@@ -473,6 +491,26 @@ export class SRService {
               },
             },
           });
+
+          if (statusChanged) {
+            await enqueueSRStatusChangedEmail(tx, {
+              srId: currentSR.id,
+              srNumber: currentSR.srNumber,
+              title: currentSR.title,
+              requesterId: currentSR.requesterId,
+              previousStatus: existingSR.status,
+              currentStatus: validated.status!,
+            });
+          }
+          if (assigneeChanged && assigneeId) {
+            await enqueueSRAssignedEmail(tx, {
+              srId: currentSR.id,
+              srNumber: currentSR.srNumber,
+              title: currentSR.title,
+              assigneeId,
+              assigneeName: currentSR.assignee?.name || '알 수 없음',
+            });
+          }
         }
 
         return currentSR;
@@ -768,9 +806,25 @@ export class SRService {
    */
   async getSRDetailsById(
     id: string,
-    options?: { activitiesLimit?: number; commentsLimit?: number }
+    options?: {
+      activitiesLimit?: number;
+      commentsLimit?: number;
+      attachmentsLimit?: number;
+      statusHistoryLimit?: number;
+      viewer?: AuthenticatedUser;
+    }
   ): Promise<SRDetails | null> {
-    const { activitiesLimit = 20, commentsLimit = 20 } = options || {};
+    const boundedLimit = (value: number | undefined, fallback: number) =>
+      Number.isInteger(value) && (value as number) > 0
+        ? Math.min(value as number, PAGINATION.MAX_PAGE_SIZE)
+        : fallback;
+    const activitiesLimit = boundedLimit(options?.activitiesLimit, PAGINATION.DEFAULT_LIMIT);
+    const commentsLimit = boundedLimit(options?.commentsLimit, PAGINATION.DEFAULT_LIMIT);
+    const attachmentsLimit = boundedLimit(options?.attachmentsLimit, 50);
+    const statusHistoryLimit = boundedLimit(options?.statusHistoryLimit, 50);
+    // 호출자가 뷰어를 빠뜨리면 외부 사용자 기준으로 닫힌다(fail closed).
+    const canReadInternalComments = options?.viewer ? isInternalUser(options.viewer) : false;
+    const visibleCommentWhere = canReadInternalComments ? {} : { isInternal: false };
 
     return prisma.sR.findUnique({
       where: { id },
@@ -805,6 +859,7 @@ export class SRService {
           take: activitiesLimit,
         },
         comments: {
+          where: visibleCommentWhere,
           include: {
             user: {
               select: { id: true, name: true, image: true },
@@ -814,7 +869,18 @@ export class SRService {
           take: commentsLimit,
         },
         attachments: {
+          select: {
+            id: true,
+            srId: true,
+            fileName: true,
+            fileSize: true,
+            fileType: true,
+            fileUrl: true,
+            uploadedBy: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
+          take: attachmentsLimit,
         },
         statusHistory: {
           include: {
@@ -823,10 +889,11 @@ export class SRService {
             },
           },
           orderBy: { changedAt: 'desc' },
+          take: statusHistoryLimit,
         },
         _count: {
           select: {
-            comments: true,
+            comments: { where: visibleCommentWhere },
             attachments: true,
           },
         },
@@ -923,6 +990,8 @@ export class SRService {
     dueTo: Date;
     /** "내 담당" 배지 기준 사용자. */
     assigneeId: string;
+    /** ENGINEER 목록 정책과 동일하게 전체 배지 집계를 제한할 담당자. */
+    visibilityAssigneeId?: string;
   }): Promise<SRBadgeCounts> {
     // 빈 배열은 `= ANY('{}')` 가 항상 거짓이라 "아무것도 못 봄"이 된다.
     // 소속 고객사가 없는 외부 사용자에게 정확히 그 동작이어야 한다(fail-closed).
@@ -930,6 +999,9 @@ export class SRService {
       params.clientIds === null
         ? Prisma.sql`TRUE`
         : Prisma.sql`client_id = ANY(${params.clientIds}::text[])`;
+    const assigneeScope = params.visibilityAssigneeId
+      ? Prisma.sql`AND assignee_id = ${params.visibilityAssigneeId}`
+      : Prisma.empty;
 
     // COUNT 는 bigint 를 돌려주고 Prisma 는 그걸 BigInt 로 매핑한다.
     // JSON 직렬화가 불가능해 서버 컴포넌트 경계를 넘지 못하므로 SQL 에서 int 로 내린다.
@@ -942,7 +1014,8 @@ export class SRService {
                            AND status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD'))::int AS "dueToday",
         COUNT(*) FILTER (WHERE assignee_id = ${params.assigneeId})::int        AS "myAssigned"
       FROM srs
-      WHERE ${tenantScope}`;
+      WHERE ${tenantScope}
+      ${assigneeScope}`;
 
     // 집계 쿼리는 행이 없어도 한 줄을 돌려주지만, 방어적으로 0 을 채운다.
     return {

@@ -60,9 +60,16 @@ test.describe('SR 수정', () => {
       .fill('수정된 설명입니다. 길이를 10자 이상으로 맞춥니다.');
 
     // 6. 저장
-    // Server Action을 사용하므로 PATCH 요청이 아닌 POST 요청이 발생함
-    // 다이얼로그가 닫히는 것을 기다림
+    // Server Action을 사용하므로 PATCH 요청이 아닌 POST 요청이 발생한다. 성공 응답과
+    // 다이얼로그 닫힘을 함께 기다려 검증 오류가 UI에 남는 경우를 정확히 잡는다.
+    const updateResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.request().headers()['next-action'] !== undefined,
+      { timeout: 20000 }
+    );
     await page.getByRole('button', { name: /저장|Save/ }).click();
+    expect((await updateResponse).status()).toBe(200);
 
     // 다이얼로그가 닫히는지 확인 (타임아웃 20초)
     await expect(page.getByRole('heading', { name: /SR 수정|Edit SR/ })).not.toBeVisible({

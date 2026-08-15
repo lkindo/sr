@@ -153,6 +153,7 @@ describe('POST — 원자성', () => {
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.commentCreate).toHaveBeenCalledTimes(1);
     expect(mocks.activityCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueEmails).toHaveBeenCalledWith(expect.any(Array), expect.any(Object));
   });
 
   it('빈 본문은 400 계열로 거부한다', async () => {

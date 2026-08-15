@@ -34,6 +34,16 @@ mkdir -p "$BACKUP_DIR"
 db_file="$BACKUP_DIR/db_${ts}.dump"
 up_file="$BACKUP_DIR/uploads_${ts}.tar.gz"
 
+# 실패한 실행의 부분 산출물이 다음 복구 때 정상 백업으로 오인되지 않게 치운다.
+cleanup_incomplete() {
+  rc=$?
+  if [ "$rc" -ne 0 ]; then
+    rm -f "$db_file" "$db_file.age" "$db_file.gpg" \
+      "$up_file" "$up_file.age" "$up_file.gpg"
+  fi
+}
+trap cleanup_incomplete EXIT
+
 # docker exec 는 반드시 -t 없이 사용한다(-t 는 pseudo-tty 로 바이너리 스트림을 손상시킴).
 echo "[backup] pg_dump (custom format) -> $db_file"
 # 로컬 소켓 trust 로 접속(healthcheck 의 pg_isready 와 동일). 필요 시 PGPASSWORD 를 전달.
@@ -45,7 +55,8 @@ else
 fi
 
 echo "[backup] uploads tar.gz -> $up_file"
-docker exec "$APP_CONTAINER" sh -c "cd '$UPLOADS_DIR' 2>/dev/null && tar czf - . || true" >"$up_file"
+docker exec "$APP_CONTAINER" sh -c \
+  "test -d '$UPLOADS_DIR' && cd '$UPLOADS_DIR' && tar czf - ." >"$up_file"
 
 # 최소 무결성 확인: DB 덤프가 비어 있으면 실패로 간주(백업이 조용히 깨지는 것 방지)
 if [ ! -s "$db_file" ]; then
@@ -59,7 +70,12 @@ if ! docker exec -i "$DB_CONTAINER" pg_restore -l >/dev/null 2>&1 <"$db_file"; t
   exit 1
 fi
 if [ ! -s "$up_file" ]; then
-  echo "[backup] WARN: uploads archive empty (no attachments yet?)"
+  echo "[backup] ERROR: uploads archive is empty — aborting" >&2
+  exit 1
+fi
+if ! docker exec -i "$APP_CONTAINER" tar tzf - >/dev/null 2>&1 <"$up_file"; then
+  echo "[backup] ERROR: uploads archive failed tar validation — aborting" >&2
+  exit 1
 fi
 
 # ── 암호화 ────────────────────────────────────────────────────────────────────

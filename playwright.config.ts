@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const baseURL = process.env.BASE_URL || 'http://localhost:3000';
+const requestedWorkers = Number.parseInt(process.env.PLAYWRIGHT_WORKERS ?? '1', 10);
+const workerCount =
+  Number.isSafeInteger(requestedWorkers) && requestedWorkers > 0 ? requestedWorkers : 1;
+
 /**
  * Playwright E2E 테스트 설정
  * 문서: https://playwright.dev/docs/test-configuration
@@ -21,12 +26,15 @@ export default defineConfig({
   /* CI에서 실패 시 재시도 (로컬에서도 1회 재시도) */
   retries: process.env.CI ? 2 : 1,
 
-  /* 병렬 워커 수 (CI에서는 1개만) */
-  workers: process.env.CI ? 1 : undefined,
+  /*
+   * E2E는 공용 시드 사용자·고객사·SR을 변경하므로 기본값은 직렬 실행이다.
+   * 완전히 격리된 DB/픽스처를 준비한 환경만 PLAYWRIGHT_WORKERS로 병렬도를 명시한다.
+   */
+  workers: process.env.CI ? 1 : workerCount,
 
   /* 리포터 설정 */
   outputDir: 'test-results',
-  reporter: [['list'], ['html', { outputFolder: 'test-results', open: 'never' }]],
+  reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
 
   /* Global Setup - 로그인 상태 저장 */
   globalSetup: require.resolve('./e2e/global-setup'),
@@ -34,7 +42,7 @@ export default defineConfig({
   /* 모든 테스트에 공통 설정 */
   use: {
     /* Base URL */
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    baseURL,
 
     /* 저장된 인증 상태 사용 */
     storageState: './playwright/.auth/user.json',
@@ -69,12 +77,14 @@ export default defineConfig({
   webServer: process.env.SKIP_WEBSERVER
     ? undefined
     : {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
+        command: 'pnpm dev',
+        url: baseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
         env: {
           TEST_MODE: 'true',
+          // 직전에 실행한 `next build` 산출물과 개발 서버 캐시를 분리한다.
+          NEXT_DIST_DIR: process.env.NEXT_DIST_DIR ?? '.next-e2e',
           // 로그인은 `login:${email}:${ip}` 키로 STRICT(기본 1분 5회) 제한을 받는다.
           // 스위트는 페르소나마다 로그인하고 재시도까지 하므로 그 한도를 금방 넘긴다.
           // 그러면 로그인 폼이 비활성 상태로 굳으면서 setup 이 실패하는데, 증상만 보면
@@ -104,6 +114,7 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts$/,
+      fullyParallel: false,
       use: {
         storageState: { cookies: [], origins: [] },
       },
@@ -115,6 +126,8 @@ export default defineConfig({
       name: 'multi-user-setup',
       testMatch: /auth-multi-user\.setup\.ts/,
       grepInvert: /@role-persona/,
+      fullyParallel: false,
+      dependencies: ['setup'],
       use: {
         storageState: { cookies: [], origins: [] },
       },
@@ -127,6 +140,8 @@ export default defineConfig({
       name: 'role-persona-setup',
       testMatch: /auth-multi-user\.setup\.ts/,
       grep: /@role-persona/,
+      fullyParallel: false,
+      dependencies: ['multi-user-setup'],
       use: {
         storageState: { cookies: [], origins: [] },
       },

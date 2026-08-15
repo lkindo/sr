@@ -55,6 +55,25 @@
       display: flex;
     }
 
+    .legacy-warning {
+      position: fixed;
+      top: 0;
+      left: 320px;
+      right: 0;
+      z-index: 1000;
+      padding: 0.8rem 1.25rem;
+      color: #fff;
+      background: #9f1239;
+      border-bottom: 1px solid #fb7185;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .legacy-warning a {
+      color: #fff;
+      text-decoration: underline;
+    }
+
     /* 사이드바 스타일 (Glassmorphism + Sticky) */
     aside {
       width: 320px;
@@ -388,6 +407,10 @@
   </style>
 </head>
 <body>
+  <div class="legacy-warning" role="alert">
+    이 HTML은 과거 화면 캡처용 산출물이며 현재 기능·권한과 일치하지 않습니다.
+    정본은 <a href="system_manual.md">system_manual.md</a>입니다.
+  </div>
 
   <!-- 좌측 고정 네비게이션 바 -->
   <aside>

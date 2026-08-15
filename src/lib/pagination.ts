@@ -17,6 +17,8 @@
 
 import { z } from 'zod';
 
+import { PAGINATION } from '@/lib/constants';
+
 /**
  * 페이지네이션 파라미터 스키마
  */
@@ -29,7 +31,7 @@ export const paginationSchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val, 10) : 1))
-    .pipe(z.number().int().positive())
+    .pipe(z.number().int().positive().max(PAGINATION.MAX_PAGE))
     .catch(1),
 
   /**
@@ -39,9 +41,9 @@ export const paginationSchema = z.object({
   pageSize: z
     .string()
     .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 20))
-    .pipe(z.number().int().positive().max(100))
-    .catch(20),
+    .transform((val) => (val ? parseInt(val, 10) : PAGINATION.DEFAULT_PAGE_SIZE))
+    .pipe(z.number().int().positive().max(PAGINATION.MAX_PAGE_SIZE))
+    .catch(PAGINATION.DEFAULT_PAGE_SIZE),
 
   /**
    * 정렬 필드

@@ -13,6 +13,7 @@ import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { assertAssignable } from '@/services/sr.service';
+import { enqueueSRAssignedEmail, enqueueSRStatusChangedEmail } from '@/services/sr-email-outbox';
 
 // POST(접수)와 PATCH(접수정보 수정)의 응답 include. 두 곳에 31줄이 축자 복제돼 있었다.
 //
@@ -105,11 +106,10 @@ export const POST = withAuthAndRateLimit(
     //    상태 변경 + 상태 이력 + 활동 로그를 함께 커밋하여 중간 실패 시
     //    부분 기록(상태만 바뀌고 활동 로그 누락 등)이 남지 않도록 한다.
     const updatedSR = await prisma.$transaction(async (tx) => {
-      // 낙관적 동시성 제어: REQUESTED 상태일 때만 접수 진행 (동시 이중 접수 방지).
-      // 상태 조건 매칭이 0건이면 그 사이 다른 트랜잭션이 먼저 접수한 것이다.
+      // 낙관적 동시성 제어: 조회 이후 같은 SR의 어떤 필드라도 바뀌면 접수를 거부한다.
       const guard = await tx.sR.updateMany({
-        where: { id, status: 'REQUESTED' },
-        data: { updatedAt: new Date() },
+        where: { id, version: sr.version, status: 'REQUESTED' },
+        data: { version: { increment: 1 } },
       });
       if (guard.count === 0) {
         throw new ConflictError('이미 접수되었거나 다른 사용자가 먼저 접수 처리했습니다.');
@@ -180,6 +180,22 @@ export const POST = withAuthAndRateLimit(
             assigneeName: assignee.name,
           },
         },
+      });
+
+      await enqueueSRStatusChangedEmail(tx, {
+        srId: result.id,
+        srNumber: result.srNumber,
+        title: result.title,
+        requesterId: result.requesterId,
+        previousStatus: 'REQUESTED',
+        currentStatus: result.status,
+      });
+      await enqueueSRAssignedEmail(tx, {
+        srId: result.id,
+        srNumber: result.srNumber,
+        title: result.title,
+        assigneeId: assignee.id,
+        assigneeName: assignee.name,
       });
 
       return result;
@@ -498,7 +514,7 @@ export const PATCH = withAuthAndRateLimit(
     }
 
     // 9. SR 수정 + 활동 로그를 하나의 트랜잭션에서 원자적으로 커밋한다.
-    //    낙관적 동시성 제어: 스냅샷(sr.status) 이후 상태가 바뀌지 않았을 때만 수정한다.
+    //    낙관적 동시성 제어: 스냅샷(sr.version) 이후 어떤 필드라도 바뀌지 않았을 때만 수정한다.
     //    (동시 인테이크 수정으로 인한 lost update 방지 — updateSR/intake POST 와 동일 패턴)
     //
     //    활동 로그 2건은 예전에 트랜잭션 **밖**(커밋 이후)에 있었다. POST 는 같은 파일에서
@@ -507,8 +523,8 @@ export const PATCH = withAuthAndRateLimit(
     //    (POST 가 막겠다고 한 바로 그 상태다.) 이제 둘 다 tx 안에서 만든다.
     const updatedSR = await prisma.$transaction(async (tx) => {
       const guard = await tx.sR.updateMany({
-        where: { id, status: sr.status },
-        data: { updatedAt: new Date() },
+        where: { id, version: sr.version },
+        data: { version: { increment: 1 } },
       });
       if (guard.count === 0) {
         throw new ConflictError(
@@ -555,6 +571,14 @@ export const PATCH = withAuthAndRateLimit(
               newAssigneeName: newAssignee.name,
             },
           },
+        });
+
+        await enqueueSRAssignedEmail(tx, {
+          srId: result.id,
+          srNumber: result.srNumber,
+          title: result.title,
+          assigneeId: newAssignee.id,
+          assigneeName: newAssignee.name,
         });
       }
 

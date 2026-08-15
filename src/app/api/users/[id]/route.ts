@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { BusinessRuleError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import {
+  canManageSensitiveUserFields,
   ensureCanDeleteUser,
   ensureCanReadUser,
   ensureCanUpdateUser,
@@ -56,9 +56,7 @@ export const PATCH = withAuthAndRateLimit(
 
     // 권한 상승/테넌트 이탈 방지: 타인을 관리할 수 없는(본인 셀프 수정) 사용자는
     // 민감 필드(email/isActive/clientIds)를 변경할 수 없고 이름/이미지만 수정 가능.
-    const canManageOthers =
-      session.user.roles.includes('ADMIN') ||
-      hasPermissionFlag(session.user, PERMISSIONS.USER.UPDATE);
+    const canManageOthers = canManageSensitiveUserFields(session.user, targetUser);
 
     // 비밀번호 재설정은 관리자 전용 경로다.
     // 본인 변경은 현재 비밀번호를 요구하는 POST /api/profile/password 를 거쳐야 하므로,
@@ -70,28 +68,29 @@ export const PATCH = withAuthAndRateLimit(
       );
     }
 
-    const updateData: typeof validated = canManageOthers
-      ? { ...validated }
-      : { name: validated.name, image: validated.image };
-
     // Multi-tenant Isolation: 고객사 소속(clientIds) 변경은 내부 사용자(ADMIN/MANAGER/ENGINEER)만 가능.
     // 외부 사용자(예: CLIENT_ADMIN)가 타 테넌트를 추가하면 권한 상승이 되므로 차단한다.
     //
     // 조용히 필드만 버리면 호출자는 성공(200)으로 읽고 변경된 줄 안다.
     // 다만 UserDialog 는 편집 시 항상 clientIds 를 함께 보내므로, 무조건 거부하면
     // 자기 테넌트 내 정상 편집까지 막힌다. 따라서 "실제로 바꾸려 한 경우"에만 거부한다.
-    if (!isInternalUser(session.user) && updateData.clientIds !== undefined) {
+    if (!isInternalUser(session.user) && validated.clientIds !== undefined) {
       const currentClientIds = targetUser.clients.map((c) => c.clientId);
       const isUnchanged =
-        updateData.clientIds.length === currentClientIds.length &&
-        [...updateData.clientIds].sort().every((id, i) => id === [...currentClientIds].sort()[i]);
+        validated.clientIds.length === currentClientIds.length &&
+        [...validated.clientIds].sort().every((id, i) => id === [...currentClientIds].sort()[i]);
 
       if (!isUnchanged) {
         throw new ForbiddenError('고객사 소속은 변경할 수 없습니다.');
       }
-      // 값이 동일하면 불필요한 재작성을 피한다.
-      delete updateData.clientIds;
     }
+
+    const updateData: typeof validated = canManageOthers
+      ? { ...validated }
+      : { name: validated.name, image: validated.image };
+
+    // 외부 사용자가 동일한 소속을 다시 보낸 no-op은 허용하되 재작성은 하지 않는다.
+    if (!isInternalUser(session.user)) delete updateData.clientIds;
 
     const user = await userService.updateUser(id, updateData, session.user.id);
 
@@ -124,6 +123,9 @@ export const DELETE = withAuthAndRateLimit(
     ensureCanDeleteUser(session.user, targetUser);
 
     if (isHardDelete) {
+      if (!session.user.roles.includes('ADMIN')) {
+        throw new ForbiddenError('사용자 완전 삭제는 ADMIN만 수행할 수 있습니다.');
+      }
       await userService.hardDeleteUser(id, session.user.id);
       return NextResponse.json({ message: '사용자가 완전히 삭제되었습니다.' });
     } else {

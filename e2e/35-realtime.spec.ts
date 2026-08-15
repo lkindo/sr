@@ -109,9 +109,11 @@ async function transitionAs(
   }
 }
 
-/** SR 목록의 행. SRListItem 의 `aria-label="SR <번호> 상세 보기"` 를 겨냥한다. */
+/** SR 목록의 행. 행 전체를 버튼으로 만들지 않고 번호 링크를 기준으로 찾는다. */
 const srRow = (page: Page, srNumber: string) =>
-  page.getByRole('row', { name: `SR ${srNumber} 상세 보기` });
+  page.getByRole('row').filter({
+    has: page.getByRole('link', { name: srNumber, exact: true }),
+  });
 
 test.describe('실시간 갱신 (SSE)', () => {
   test('다른 사용자가 만든 SR 이 토스트와 목록에 실시간으로 나타난다', async ({

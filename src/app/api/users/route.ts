@@ -2,8 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError } from '@/lib/errors';
-import { ensureCanCreateUser, ensureCanReadUser, resolveClientIdFilter } from '@/lib/policies';
+import { ValidationError } from '@/lib/errors';
+import {
+  ensureCanCreateUser,
+  ensureCanGrantRoles,
+  ensureCanReadUser,
+  ensureClientAssignmentsWithinScope,
+  isInternalUser,
+  resolveClientIdFilter,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { userCreateSchema } from '@/lib/schemas';
 import { UserService } from '@/services/user.service';
@@ -50,6 +57,13 @@ export const POST = withAuthAndRateLimit(
 
     const body = await parseJsonBody(request);
     const validatedBody = userCreateSchema.parse(body);
+    const requestedClientIds =
+      validatedBody.clientIds ?? (validatedBody.clientId ? [validatedBody.clientId] : []);
+    ensureClientAssignmentsWithinScope(session.user, requestedClientIds);
+
+    if (!isInternalUser(session.user) && validatedBody.userType === 'ENGINEER') {
+      throw new ValidationError('외부 사용자는 시스템 운영팀 사용자를 생성할 수 없습니다.');
+    }
 
     // Security Check: Prevent privilege escalation via role assignment
     if (
@@ -57,32 +71,33 @@ export const POST = withAuthAndRateLimit(
       Array.isArray(validatedBody.roleIds) &&
       validatedBody.roleIds.length > 0
     ) {
-      // 1. Check if user has permission to assign roles
-      const canAssignRoles =
-        session.user.roles.includes('ADMIN') || session.user.permissions.includes('ROLE:ASSIGN');
-
-      if (!canAssignRoles) {
-        throw new ForbiddenError('역할을 직접 할당할 권한이 없습니다.');
-      }
-
-      // 2. Check if user is trying to assign ADMIN role without being ADMIN
-      if (!session.user.roles.includes('ADMIN')) {
-        const rolesToAssign = await prisma.role.findMany({
-          where: {
-            id: { in: validatedBody.roleIds },
+      const rolesToAssign = await prisma.role.findMany({
+        where: { id: { in: validatedBody.roleIds } },
+        select: {
+          id: true,
+          name: true,
+          permissions: {
+            select: { permission: { select: { resource: true, action: true } } },
           },
-          select: { name: true },
-        });
-
-        const isAssigningAdmin = rolesToAssign.some((r) => r.name === 'ADMIN');
-        if (isAssigningAdmin) {
-          throw new ForbiddenError('ADMIN 역할은 ADMIN만 할당할 수 있습니다.');
-        }
+        },
+      });
+      if (rolesToAssign.length !== new Set(validatedBody.roleIds).size) {
+        throw new ValidationError('존재하지 않는 역할이 포함되어 있습니다.');
       }
+      ensureCanGrantRoles(session.user, rolesToAssign);
     }
 
     const userService = new UserService();
-    const user = await userService.createUser(validatedBody);
+    const user = await userService.createUser(
+      {
+        ...validatedBody,
+        // 외부 관리자가 userType 을 생략해도 역할 없는 내부 사용자가 생기지 않게 한다.
+        userType: !isInternalUser(session.user) ? 'CLIENT' : validatedBody.userType,
+      },
+      session.user.id,
+      undefined,
+      { membershipStatus: isInternalUser(session.user) ? 'APPROVED' : 'PENDING' }
+    );
 
     return NextResponse.json(user, { status: 201 });
   },

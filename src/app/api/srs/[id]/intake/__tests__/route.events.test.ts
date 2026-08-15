@@ -26,6 +26,11 @@ vi.mock('@/lib/domain-events', () => ({
   domainEvents: { emit: mocks.emit },
 }));
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('@/lib/realtime-events', () => ({
   emitRealtimeEvent: mocks.emitRealtime,
   REALTIME_EVENTS: {
@@ -69,6 +74,7 @@ const ASSIGNEE = { id: 'eng-1', name: '담당 엔지니어', email: 'eng@example
 
 const EXISTING_SR = {
   id: 'sr-1',
+  version: 3,
   srNumber: 'SR-20260801-0001',
   title: '테스트 SR',
   status: 'REQUESTED',

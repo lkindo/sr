@@ -1,6 +1,5 @@
 import React, { memo } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Clock } from 'lucide-react';
 
 import { Badge } from '@/components/ui';
@@ -30,46 +29,15 @@ interface SRListItemProps {
 }
 
 export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
-  const router = useRouter();
-
-  const handleRowClick = () => {
-    router.push(`/srs/${sr.id}`);
-  };
-
-  // 키보드 조작: 행 자체가 포커스된 상태에서 Enter/Space 로 상세 이동
-  // (자식 링크/버튼의 키 입력은 무시하여 이중 동작 방지)
-  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleRowClick();
-    }
-  };
-
-  const handleIntakeClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/srs/${sr.id}/intake`);
-  };
-
   // ⚡ Bolt: Pass raw dueDate to avoid expensive new Date().toISOString()
   // Eliminates ~400ms overhead for 100k items.
   const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
   return (
-    <TableRow
-      className="cursor-pointer"
-      onClick={handleRowClick}
-      onKeyDown={handleRowKeyDown}
-      tabIndex={0}
-      aria-label={`SR ${sr.srNumber} 상세 보기`}
-    >
+    <TableRow>
       <TableCell className="text-center">
         <div className="flex items-center justify-center gap-1 group relative">
-          <Link
-            href={`/srs/${sr.id}`}
-            className="font-medium text-primary hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <Link href={`/srs/${sr.id}`} className="font-medium text-primary hover:underline">
             {sr.srNumber}
           </Link>
           <CopyButton
@@ -80,7 +48,9 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
         </div>
       </TableCell>
       <TableCell className="max-w-[200px] truncate" title={sr.title}>
-        {sr.title}
+        <Link href={`/srs/${sr.id}`} className="hover:underline focus-visible:underline">
+          {sr.title}
+        </Link>
       </TableCell>
       <TableCell>{sr.client.name}</TableCell>
       <TableCell className="text-center">{sr.requester.name}</TableCell>
@@ -98,28 +68,30 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
         {sr._count?.comments || 0} / {sr._count?.attachments || 0}
       </TableCell>
       <TableCell className="text-center">{formatFastDate(sr.createdAt)}</TableCell>
-      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+      <TableCell className="text-center">
         {canManageSRs ? (
           <>
             {sr.status === 'REQUESTED' ? (
               <Button
+                asChild
                 variant="default"
                 size="sm"
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={handleIntakeClick}
               >
-                접수
+                <Link href={`/srs/${sr.id}/intake`}>접수</Link>
               </Button>
             ) : sr.status === 'IN_PROGRESS' ? (
               <Button
+                asChild
                 variant="outline"
                 size="sm"
-                onClick={handleIntakeClick}
                 title="접수 정보 수정"
                 aria-label="접수 정보 수정"
                 className="border-border hover:bg-muted text-foreground"
               >
-                <Clock className="h-4 w-4" />
+                <Link href={`/srs/${sr.id}/intake`}>
+                  <Clock className="h-4 w-4" />
+                </Link>
               </Button>
             ) : (
               <span className="text-muted-foreground text-sm">-</span>
@@ -136,46 +108,18 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
 SRTableRow.displayName = 'SRTableRow';
 
 export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
-  const router = useRouter();
-
-  const handleCardClick = () => {
-    router.push(`/srs/${sr.id}`);
-  };
-
-  // 키보드 조작: 카드 자체 포커스 상태에서 Enter/Space 로 상세 이동
-  const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleCardClick();
-    }
-  };
-
-  const handleIntakeClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    router.push(`/srs/${sr.id}/intake`);
-  };
-
   // ⚡ Bolt: Pass raw dueDate to avoid expensive new Date().toISOString()
   // Eliminates ~400ms overhead for 100k items.
   const dueDateStatus = getDueDateStatus(sr.dueDate, sr.status);
 
   return (
-    <div
-      className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors cursor-pointer"
-      onClick={handleCardClick}
-      onKeyDown={handleCardKeyDown}
-      role="button"
-      tabIndex={0}
-      aria-label={`SR ${sr.srNumber} 상세 보기`}
-    >
+    <article className="border rounded-lg p-3.5 hover:bg-muted/50 transition-colors">
       {/* Header: SR Number, Status, Priority */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           <Link
             href={`/srs/${sr.id}`}
             className="font-semibold text-base text-primary hover:underline truncate"
-            onClick={(e) => e.stopPropagation()}
           >
             {sr.srNumber}
           </Link>
@@ -194,18 +138,22 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
         {/* Action Button */}
         {canManageSRs && sr.status === 'REQUESTED' && (
           <Button
+            asChild
             variant="default"
             size="sm"
             className="h-7 text-xs bg-primary text-primary-foreground hover:bg-primary/90 shrink-0"
-            onClick={handleIntakeClick}
           >
-            접수
+            <Link href={`/srs/${sr.id}/intake`}>접수</Link>
           </Button>
         )}
       </div>
 
       {/* Title */}
-      <h4 className="font-medium text-sm truncate mb-2">{sr.title}</h4>
+      <h4 className="font-medium text-sm truncate mb-2">
+        <Link href={`/srs/${sr.id}`} className="hover:underline focus-visible:underline">
+          {sr.title}
+        </Link>
+      </h4>
 
       {/* 2-Column Grid Info */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] leading-relaxed">
@@ -234,7 +182,7 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
           <span className="text-foreground">{formatFastShortDate(sr.createdAt)}</span>
         </div>
       </div>
-    </div>
+    </article>
   );
 });
 

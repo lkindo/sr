@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -48,12 +49,12 @@ export async function uploadAttachmentBlob(srId: string, file: File): Promise<Up
   // srId에도 경로 구분자가 끼어들 수 없도록 basename 처리 (방어적)
   const safeSrId = path.basename(srId);
 
-  const timestamp = Date.now();
-
   // SR ID별로 하위 디렉토리 생성 (웹루트 밖 STORAGE_DIR 기준)
   const srDir = path.join(STORAGE_DIR, 'attachments', safeSrId);
 
-  const filename = `${timestamp}-${safeName}`;
+  // 같은 밀리초에 같은 이름이 올라와도 충돌하지 않도록 UUID를 사용한다.
+  // writeFile의 wx 플래그는 이론적인 UUID 충돌이나 경로 재사용도 덮어쓰지 않고 실패시킨다.
+  const filename = `${randomUUID()}-${safeName}`;
   const filepath = path.join(srDir, filename);
 
   // 경로 탐색(Directory Traversal) 방지: 최종 경로가 STORAGE_DIR 내부인지 확인
@@ -69,7 +70,7 @@ export async function uploadAttachmentBlob(srId: string, file: File): Promise<Up
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  await fs.promises.writeFile(filepath, buffer);
+  await fs.promises.writeFile(filepath, buffer, { flag: 'wx' });
 
   // DB 저장용 상대 경로 (STORAGE_DIR 기준). 다운로드 라우트가 이 경로로 파일을 해석한다.
   const pathname = `attachments/${safeSrId}/${filename}`;
@@ -110,7 +111,10 @@ export function resolveAttachmentFilePath(
   const rel = storagePathOrUrl.replace(/^\/?uploads\//, '').replace(/^\/+/, '');
 
   const resolved = path.resolve(path.join(root, rel));
-  if ((resolved === root || resolved.startsWith(root + path.sep)) && fs.existsSync(resolved)) {
+  if (
+    (resolved === root || resolved.startsWith(root + path.sep)) &&
+    fs.existsSync(/* turbopackIgnore: true */ resolved)
+  ) {
     return resolved;
   }
 
@@ -123,8 +127,8 @@ export async function deleteAttachmentBlob(pathname: string) {
   try {
     // STORAGE_DIR 내부로 한정해 안전하게 경로를 해석한다.
     const filepath = resolveAttachmentFilePath(pathname);
-    if (filepath && fs.existsSync(filepath)) {
-      await fs.promises.unlink(filepath);
+    if (filepath && fs.existsSync(/* turbopackIgnore: true */ filepath)) {
+      await fs.promises.unlink(/* turbopackIgnore: true */ filepath);
     }
   } catch (error: unknown) {
     logger.error(

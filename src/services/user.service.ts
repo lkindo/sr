@@ -275,7 +275,11 @@ export class UserService {
     // API 라우트와 서버 액션 양쪽이 동시에 보호된다.
     // 빈 문자열은 스키마가 이미 걸러내므로(min 8) 여기 도달하면 실제 변경 의도다.
     const updateData: Prisma.UserUpdateInput = password
-      ? { ...rest, password: await hash(password, SECURITY.BCRYPT_WORK_FACTOR) }
+      ? {
+          ...rest,
+          password: await hash(password, SECURITY.BCRYPT_WORK_FACTOR),
+          sessionVersion: { increment: 1 },
+        }
       : { ...rest };
 
     const includeConfig = USER_WITH_ROLES_INCLUDE;
@@ -503,7 +507,8 @@ export class UserService {
       roleIds?: string[];
     },
     actorId?: string | null,
-    ipAddress?: string | null
+    ipAddress?: string | null,
+    options: { membershipStatus?: 'APPROVED' | 'PENDING' } = {}
   ): Promise<Omit<User, 'password'>> {
     const hashedPassword = await hash(userData.password, SECURITY.BCRYPT_WORK_FACTOR);
 
@@ -546,10 +551,13 @@ export class UserService {
 
       // 3. 고객사 할당
       if (clientIds.length > 0) {
+        const membershipStatus = options.membershipStatus ?? 'APPROVED';
         await tx.userClient.createMany({
           data: clientIds.map((clientId) => ({
             userId: user.id,
             clientId,
+            status: membershipStatus,
+            approvedAt: membershipStatus === 'APPROVED' ? new Date() : null,
           })),
         });
       }
@@ -675,7 +683,7 @@ export class UserService {
       return this.applyUserUpdateWithAudit(
         tx,
         userId,
-        { password: hashedPassword },
+        { password: hashedPassword, sessionVersion: { increment: 1 } },
         'PASSWORD_CHANGE',
         { note: '사용자 본인 비밀번호 변경 완료' },
         actorId || userId,

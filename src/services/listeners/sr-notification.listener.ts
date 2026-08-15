@@ -1,10 +1,7 @@
-import { getSRUrl } from '@/lib/app-url';
 import { domainEvents } from '@/lib/domain-events';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
 import { backgroundTask } from '@/lib/wait-until';
-import { emailService } from '@/services/email.service';
-import { enqueueEmails, type OutboxEmail } from '@/services/notification-outbox';
 import { pushService } from '@/services/push.service';
 
 /**
@@ -48,25 +45,8 @@ export function registerSRNotificationListeners() {
 
       // 이메일은 아웃박스에 적재한다(감사 4.2). 예전에는 여기서 SMTP 로 곧장 쐈고,
       // Promise.allSettled 가 rejection 을 삼켜 실패가 기록도 재시도도 없이 사라졌다.
-      const outbox: OutboxEmail[] = [];
-      admins.forEach((admin) => {
-        const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
-        if (admin.email && shouldSend) {
-          outbox.push({
-            ...emailService.buildSRCreated(
-              admin.email,
-              payload.srNumber,
-              payload.title,
-              payload.requesterName,
-              getSRUrl(payload.srId)
-            ),
-            metadata: { srId: payload.srId, kind: 'sr-created' },
-          });
-        }
-      });
-      await enqueueEmails(outbox);
-
-      // 푸시는 아직 즉시 발송이다(아웃박스는 이메일부터 적용).
+      // 이메일은 SR 생성 트랜잭션 안에서 이미 아웃박스에 적재된다. 이 리스너는
+      // 커밋 이후 실행해야 하는 푸시만 담당해 이메일 중복 적재를 막는다.
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
@@ -84,13 +64,6 @@ export function registerSRNotificationListeners() {
     if (!payload.requesterId) return;
 
     try {
-      const requester = await prisma.user.findUnique({
-        where: { id: payload.requesterId },
-        select: { email: true, notificationPreference: true },
-      });
-
-      if (!requester) return;
-
       const promises: Promise<unknown>[] = [];
 
       // 푸시 알림 — 사용자 설정을 존중한다(감사 4.3).
@@ -105,25 +78,7 @@ export function registerSRNotificationListeners() {
         })
       );
 
-      // 이메일은 아웃박스에 적재한다(감사 4.2).
-      const shouldSendStatusEmail = requester.notificationPreference?.emailSRStatusChanged ?? false;
-      if (requester.email && shouldSendStatusEmail) {
-        await enqueueEmails([
-          {
-            ...emailService.buildSRStatusChanged(
-              requester.email,
-              payload.srNumber,
-              payload.title,
-              payload.previousStatus || '없음',
-              payload.currentStatus,
-              getSRUrl(payload.srId)
-            ),
-            metadata: { srId: payload.srId, kind: 'sr-status-changed' },
-          },
-        ]);
-      }
-
-      // 푸시는 아직 즉시 발송이다(아웃박스는 이메일부터 적용).
+      // 이메일은 상태 변경 트랜잭션 안에서 이미 아웃박스에 적재된다.
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(
@@ -144,13 +99,6 @@ export function registerSRNotificationListeners() {
         return;
       }
 
-      const assignee = await prisma.user.findUnique({
-        where: { id: payload.assigneeId },
-        select: { email: true, notificationPreference: true },
-      });
-
-      if (!assignee) return;
-
       const promises: Promise<unknown>[] = [];
 
       // 푸시 알림 — 사용자 설정을 존중한다(감사 4.3).
@@ -163,25 +111,7 @@ export function registerSRNotificationListeners() {
         })
       );
 
-      // 이메일은 아웃박스에 적재한다(감사 4.2). 담당 배정 알림이 유실되면 SR 이
-      // 방치된 채 SLA 시계만 도는 형태가 되므로, 여기서의 유실이 가장 비싸다.
-      const shouldSendAssignEmail = assignee.notificationPreference?.emailSRAssigned ?? true;
-      if (assignee.email && shouldSendAssignEmail) {
-        await enqueueEmails([
-          {
-            ...emailService.buildSRAssigned(
-              assignee.email,
-              payload.srNumber,
-              payload.title,
-              payload.assigneeName ?? '알 수 없음',
-              getSRUrl(payload.srId)
-            ),
-            metadata: { srId: payload.srId, kind: 'sr-assigned' },
-          },
-        ]);
-      }
-
-      // 푸시는 아직 즉시 발송이다(아웃박스는 이메일부터 적용).
+      // 이메일은 담당자 배정 트랜잭션 안에서 이미 아웃박스에 적재된다.
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
     } catch (error) {
       logger.error(

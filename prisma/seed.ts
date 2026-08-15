@@ -6,7 +6,9 @@ import { PERMISSION_CATALOG, permissionKey } from './permission-catalog';
 // 환경 변수 명시적 로드 (로컬 개발 시에만 dotenv 활용, 프로덕션은 시스템 환경변수 우선 적용)
 try {
   const { config } = require('dotenv');
-  config({ override: true });
+  // CI/E2E/컨테이너가 주입한 DATABASE_URL과 부트스트랩 비밀을 .env가 덮어쓰면
+  // 의도하지 않은 데이터베이스를 시드할 수 있다. 시스템 환경변수를 항상 우선한다.
+  config({ override: false });
 } catch (e) {
   // dotenv 모듈이 없는 프로덕션 환경(Docker runner)인 경우 예외 우회
 }

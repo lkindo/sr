@@ -5,6 +5,12 @@ import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/p
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRCreatedEmails: vi.fn().mockResolvedValue(0),
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 // Mock dependencies with inline definition to avoid hoisting issues
 vi.mock('@/lib/prisma', () => {
   const mock = {

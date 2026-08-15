@@ -175,7 +175,7 @@ describe('dispatchPendingNotifications', () => {
     expect(mocks.sendMail).not.toHaveBeenCalled();
   });
 
-  it('claim 쿼리는 SKIP LOCKED 로 잠근다', async () => {
+  it('claim 쿼리는 SKIP LOCKED 대상 선택과 임대를 한 문장에서 원자적으로 수행한다', async () => {
     mocks.queryRaw.mockResolvedValue([]);
 
     await dispatchPendingNotifications();
@@ -184,6 +184,9 @@ describe('dispatchPendingNotifications', () => {
     const sql = mocks.queryRaw.mock.calls[0]![0].join('?');
     expect(sql).toContain('FOR UPDATE SKIP LOCKED');
     expect(sql).toContain("'PENDING'");
+    expect(sql).toContain('UPDATE "notifications"');
+    expect(sql).toContain('SET "next_attempt_at"');
+    expect(sql).toContain('RETURNING');
   });
 });
 
@@ -219,8 +222,19 @@ describe('알림 디스패처 타이머', () => {
   });
 
   it.each([
-    ['NODE_ENV=test', { NODE_ENV: 'test', VITEST: '' }],
-    ['VITEST 플래그', { NODE_ENV: 'production', VITEST: 'true' }],
+    ['NODE_ENV=test', { NODE_ENV: 'test', VITEST: '', TEST_MODE: '', PLAYWRIGHT_TEST: '' }],
+    [
+      'VITEST 플래그',
+      { NODE_ENV: 'production', VITEST: 'true', TEST_MODE: '', PLAYWRIGHT_TEST: '' },
+    ],
+    [
+      'TEST_MODE 플래그',
+      { NODE_ENV: 'development', VITEST: '', TEST_MODE: 'true', PLAYWRIGHT_TEST: '' },
+    ],
+    [
+      'PLAYWRIGHT_TEST 플래그',
+      { NODE_ENV: 'development', VITEST: '', TEST_MODE: '', PLAYWRIGHT_TEST: 'true' },
+    ],
   ])('테스트 실행 중에는 타이머를 걸지 않는다 (%s)', (_label, env) => {
     // 가드가 사라지면 스위트 내내 30초짜리 실제 인터벌이 살아남는다.
     for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);

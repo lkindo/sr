@@ -14,6 +14,7 @@ import {
   serviceCategoryCreateSchema,
   serviceCategoryUpdateSchema,
   srCreateSchema,
+  srPatchSchema,
   srUpdateSchema,
   userCreateSchema,
   userUpdateSchema,
@@ -252,6 +253,13 @@ describe('clientUpdateSchema', () => {
     if (r.success) {
       expect(r.data.industry).toBeUndefined();
     }
+  });
+
+  it('preserves empty contract dates as an explicit clear operation', () => {
+    expect(clientUpdateSchema.parse({ contractStartDate: '', contractEndDate: '' })).toMatchObject({
+      contractStartDate: null,
+      contractEndDate: null,
+    });
   });
 });
 
@@ -528,6 +536,17 @@ describe('srUpdateSchema', () => {
       expect(r.success).toBe(true);
       if (r.success) expect(r.data.changeReason).toBeUndefined();
     });
+  });
+});
+
+describe('srPatchSchema', () => {
+  it('accepts ordinary field edits', () => {
+    expect(srPatchSchema.safeParse({ title: 'Updated SR title' }).success).toBe(true);
+  });
+
+  it('rejects status transitions on the general edit endpoint', () => {
+    const result = srPatchSchema.safeParse({ status: 'COMPLETED' });
+    expect(result.success).toBe(false);
   });
 });
 

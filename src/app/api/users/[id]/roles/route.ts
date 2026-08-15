@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
-import { INTERNAL_ROLES } from '@/lib/policies';
+import { ensureCanAssignRolesToUser, INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { roleAssignSchema } from '@/lib/schemas';
+import { auditService } from '@/services/audit.service';
 
 // POST /api/users/[id]/roles - 사용자에게 역할 할당 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(
@@ -36,6 +37,7 @@ export const POST = withAuthAndRateLimit(
             },
           },
         },
+        roles: { select: { role: { select: { name: true } } } },
       },
     });
 
@@ -43,13 +45,25 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('사용자');
     }
 
+    let roles: Array<{
+      id: string;
+      name: string;
+      permissions?: { permission: { resource: string; action: string } }[];
+    }> = [];
+
     // 역할 상호 배타성 검증
     if (validated.roleIds.length > 0) {
-      const roles = await prisma.role.findMany({
+      roles = await prisma.role.findMany({
         where: {
           id: { in: validated.roleIds },
         },
-        select: { id: true, name: true },
+        select: {
+          id: true,
+          name: true,
+          permissions: {
+            select: { permission: { select: { resource: true, action: true } } },
+          },
+        },
       });
 
       const roleNames = roles.map((r) => r.name);
@@ -60,11 +74,6 @@ export const POST = withAuthAndRateLimit(
       const missingRoleIds = validated.roleIds.filter((rid) => !foundRoleIds.has(rid));
       if (missingRoleIds.length > 0) {
         throw new ValidationError('존재하지 않는 역할이 포함되어 있습니다.');
-      }
-
-      // 권한 상승 방지: ADMIN 역할 할당은 ADMIN만 가능
-      if (!session.user.roles.includes('ADMIN') && roleNames.includes('ADMIN')) {
-        throw new ForbiddenError('ADMIN 역할은 ADMIN만 할당할 수 있습니다.');
       }
 
       const SYSTEM_TEAM_ROLES = INTERNAL_ROLES;
@@ -126,6 +135,9 @@ export const POST = withAuthAndRateLimit(
       }
     }
 
+    // 빈 배열(모든 역할 회수)도 자기 자신/ADMIN/타 테넌트 대상이면 차단해야 한다.
+    ensureCanAssignRolesToUser(session.user, user, roles);
+
     // 역할 교체는 원자적으로 수행한다: 삭제와 생성을 하나의 트랜잭션으로 묶어,
     // 중간 실패 시 사용자가 역할 0개(잠금) 상태로 남는 것을 방지한다.
     await prisma.$transaction(async (tx) => {
@@ -136,6 +148,16 @@ export const POST = withAuthAndRateLimit(
           skipDuplicates: true,
         });
       }
+      await auditService.createLog(tx, {
+        userId: session.user.id,
+        actionType: 'USER_ROLES_REPLACE',
+        targetEntity: 'User',
+        targetId: id,
+        changes: {
+          before: (user.roles ?? []).map((entry) => entry.role.name),
+          after: roles.map((role) => role.name),
+        },
+      });
     });
 
     // Fetch updated user with roles

@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:test": "cross-env SKIP_ENV_VALIDATION=true next dev --turbopack",
-    "build": "next build",
+    "build": "next build && pnpm check:standalone-secrets",
     "start": "next start",
     "lint": "eslint . --cache --cache-location .eslintcache --max-warnings 790",
     "lint:fix": "eslint . --fix",
@@ -38,6 +38,7 @@
     "verify": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1",
     "verify:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1 -fast",
     "check:e2e-assertions": "tsx scripts/check-e2e-assertions.ts",
+    "check:standalone-secrets": "tsx scripts/check-standalone-secrets.ts",
     "check:dead": "knip --max-issues 4",
     "test:integration": "vitest run --project=integration"
   },
@@ -70,11 +71,11 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "file-type": "^21.3.0",
+    "file-type": "^21.3.4",
     "lucide-react": "^0.575.0",
     "next": "16.3.0",
     "next-auth": "5.0.0-beta.32",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^9.0.5",
     "pino": "^10.3.1",
     "react": "^19.2.8",
     "react-day-picker": "^9.13.2",
@@ -97,7 +98,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.3",
     "@types/node": "^25.3.0",
-    "@types/nodemailer": "^7.0.9",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/web-push": "^3.6.4",
@@ -147,6 +148,9 @@
   },
   "pnpm": {
     "overrides": {
+      "bn.js@<4.12.3": "4.12.5",
+      "defu@<=6.1.4": "6.1.7",
+      "effect@<3.20.0": "3.22.1",
       "fast-xml-parser@>=5.0.0 <5.3.5": ">=5.3.5"
     }
   },

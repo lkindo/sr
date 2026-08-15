@@ -5,7 +5,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { ensureCanReadSR } from '@/lib/policies';
-import { srUpdateSchema } from '@/lib/schemas';
+import { srPatchSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
 import { srService } from '@/services/sr.service';
 
@@ -21,7 +21,7 @@ export const GET = withAuthAndRateLimit(
     const { id } = await params;
 
     // Service 레이어를 통해 SR 조회
-    const sr = await srService.getSRDetailsById(id);
+    const sr = await srService.getSRDetailsById(id, { viewer: session.user });
 
     if (!sr) {
       throw new NotFoundError('SR');
@@ -60,7 +60,7 @@ export const PATCH = withAuthAndRateLimit(
     { session, params }: AuthenticatedContext<RouteContext<{ id: string }>['params']>
   ) => {
     const { id } = await params;
-    const validated = await validateRequestBody(request, srUpdateSchema);
+    const validated = await validateRequestBody(request, srPatchSchema);
 
     // Service 레이어를 통해 SR 수정 (권한 체크 포함)
     const updatedSR = await srService.updateSR(id, validated, session.user);

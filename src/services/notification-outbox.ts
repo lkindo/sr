@@ -33,6 +33,9 @@ const BACKOFF_MINUTES = [1, 5, 15, 60];
 /** 한 번에 집는 행 수. 너무 크면 한 배치가 오래 잡히고, 작으면 처리량이 떨어진다. */
 const DEFAULT_BATCH_SIZE = 20;
 
+/** claim 후 워커가 죽었을 때 다른 워커가 다시 집을 수 있도록 두는 임대 시간. */
+const CLAIM_LEASE_MINUTES = 5;
+
 export interface OutboxEmail {
   to: string;
   subject: string;
@@ -92,15 +95,28 @@ interface ClaimedRow {
 export async function dispatchPendingNotifications(
   batchSize: number = DEFAULT_BATCH_SIZE
 ): Promise<{ sent: number; failed: number; deadLettered: number }> {
+  const safeBatchSize = Math.min(Math.max(Math.trunc(batchSize), 1), 100);
+
+  // SELECT 만으로 잠그면 문장이 끝나는 순간 트랜잭션도 끝나 잠금이 풀린다. 다음 UPDATE
+  // 문장 전까지 다른 인스턴스가 같은 행을 다시 집을 수 있으므로, 한 SQL 문장에서 대상
+  // 선택과 next_attempt_at 임대를 함께 갱신한다. 워커가 죽으면 임대 만료 후 재시도된다.
   const claimed = await prisma.$queryRaw<ClaimedRow[]>`
-    SELECT "id", "recipient", "subject", "content", "attempts"
-    FROM "notifications"
-    WHERE "status" = 'PENDING'
-      AND ("next_attempt_at" IS NULL OR "next_attempt_at" <= NOW())
-      AND "type" = 'EMAIL'
-    ORDER BY "created_at" ASC
-    LIMIT ${batchSize}
-    FOR UPDATE SKIP LOCKED
+    WITH candidates AS (
+      SELECT "id"
+      FROM "notifications"
+      WHERE "status" = 'PENDING'
+        AND ("next_attempt_at" IS NULL OR "next_attempt_at" <= NOW())
+        AND "type" = 'EMAIL'
+      ORDER BY "created_at" ASC
+      LIMIT ${safeBatchSize}
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE "notifications" AS notification
+    SET "next_attempt_at" = NOW() + (${CLAIM_LEASE_MINUTES} * INTERVAL '1 minute')
+    FROM candidates
+    WHERE notification."id" = candidates."id"
+    RETURNING notification."id", notification."recipient", notification."subject",
+              notification."content", notification."attempts"
   `;
 
   if (claimed.length === 0) {
@@ -190,7 +206,13 @@ export function startNotificationDispatcher(intervalMs = 30_000): void {
   // NODE_ENV 만으로는 부족했다: 이 프로젝트의 vitest 는 NODE_ENV=development 로 돌아
   // (실측 확인) 이 가드가 실제로는 한 번도 걸리지 않았다. vitest 가 항상 세팅하는
   // VITEST 플래그를 함께 본다.
-  if (process.env.NODE_ENV === 'test' || process.env.VITEST) return;
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.VITEST ||
+    process.env.TEST_MODE === 'true' ||
+    process.env.PLAYWRIGHT_TEST === 'true'
+  )
+    return;
   if (process.env.NOTIFICATION_DISPATCHER === 'off') {
     logger.warn('[Outbox] NOTIFICATION_DISPATCHER=off — 알림이 발송되지 않습니다.');
     return;

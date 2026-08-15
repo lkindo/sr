@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRCreatedEmails: vi.fn().mockResolvedValue(0),
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 // Mock prisma with the delegates updateSR touches.
 const { mockPrisma } = vi.hoisted(() => {
   const mock = {
@@ -45,6 +51,7 @@ describe('SRService.updateSR — optimistic locking', () => {
 
   const existingSR = {
     id: 'sr-1',
+    version: 7,
     status: 'IN_PROGRESS',
     clientId: 'client-1',
     requesterId: 'req-1',
@@ -63,17 +70,17 @@ describe('SRService.updateSR — optimistic locking', () => {
     mockPrisma.sR.findUnique.mockResolvedValue(existingSR);
   });
 
-  it('throws ConflictError when the row was concurrently changed (status guard matches 0 rows)', async () => {
+  it('throws ConflictError when any field was concurrently changed (version guard matches 0 rows)', async () => {
     mockPrisma.sR.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(
       srService.updateSR('sr-1', { title: 'Updated title here' }, sessionUser)
     ).rejects.toBeInstanceOf(ConflictError);
 
-    // Guard ran against the snapshot status, and the real write never happened.
+    // Guard ran against the snapshot version, and the real write never happened.
     expect(mockPrisma.sR.updateMany).toHaveBeenCalledWith({
-      where: { id: 'sr-1', status: 'IN_PROGRESS' },
-      data: expect.objectContaining({ updatedAt: expect.any(Date) }),
+      where: { id: 'sr-1', version: 7 },
+      data: { version: { increment: 1 } },
     });
     expect(mockPrisma.sR.update).not.toHaveBeenCalled();
   });
@@ -85,8 +92,8 @@ describe('SRService.updateSR — optimistic locking', () => {
     const result = await srService.updateSR('sr-1', { title: 'Updated title here' }, sessionUser);
 
     expect(mockPrisma.sR.updateMany).toHaveBeenCalledWith({
-      where: { id: 'sr-1', status: 'IN_PROGRESS' },
-      data: expect.objectContaining({ updatedAt: expect.any(Date) }),
+      where: { id: 'sr-1', version: 7 },
+      data: { version: { increment: 1 } },
     });
     expect(mockPrisma.sR.update).toHaveBeenCalledTimes(1);
     expect(result.title).toBe('Updated title here');

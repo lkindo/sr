@@ -54,7 +54,14 @@ bash scripts/restore.sh backups/db_20260703_030000.dump backups/uploads_20260703
 docker restart sr-app
 ```
 
-복구는 파괴적이므로 `RESTORE` 입력 확인을 요구한다. 자동화 시 `FORCE=1` 로 생략 가능.
+복구는 파괴적이므로 `RESTORE` 입력 확인을 요구한다. 자동화 시 `FORCE=1` 로 생략 가능하다.
+실행 전 DB 덤프와 uploads tar를 검증하고, 현재 운영 상태를 한 번 더 백업한 뒤 앱을 내려
+쓰기 유입과 DB 연결을 차단한다. DB와 첨부 복구가 모두 끝난 뒤에만 앱을 다시 시작하고
+health 상태를 확인한다. 긴급 상황에서 현재 상태 백업을 의도적으로 생략해야 할 때만
+`SKIP_PRE_RESTORE_BACKUP=1`을 사용한다.
+
+`backup.sh`는 DB dump뿐 아니라 uploads tar도 실제로 열어 검증한다. uploads 디렉터리가
+없거나 tar 생성/검증이 실패하면 부분 파일을 지우고 non-zero로 종료한다.
 
 ### 복구 리허설 (자동화됨)
 

@@ -70,6 +70,13 @@ const admin = {
   clientIds: [],
 };
 
+const manager = {
+  id: 'manager-1',
+  roles: ['MANAGER'],
+  permissions: ['USER:UPDATE'],
+  clientIds: [],
+};
+
 const selfOnly = {
   id: 'target-1',
   roles: ['CLIENT_USER'],
@@ -103,6 +110,18 @@ describe('PATCH /api/users/[id] — 비밀번호 재설정 게이트', () => {
     expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
+  it('MANAGER는 ADMIN 계정의 비밀번호를 재설정할 수 없다', async () => {
+    mocks.getUserById.mockResolvedValue({
+      ...targetUser,
+      roles: [{ role: { name: 'ADMIN' } }],
+    });
+
+    const response = await patch({ password: VALID_PASSWORD }, manager);
+
+    expect(response.status).toBe(403);
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+  });
+
   it('셀프 수정에서 비밀번호를 빼면 이름/이미지 수정은 계속 동작한다', async () => {
     const response = await patch({ name: '새 이름' }, selfOnly);
 
@@ -112,6 +131,19 @@ describe('PATCH /api/users/[id] — 비밀번호 재설정 게이트', () => {
       expect.objectContaining({ name: '새 이름' }),
       'target-1'
     );
+  });
+
+  it('외부 사용자가 본인 소속에 타 고객사를 추가하려 하면 403으로 거부한다', async () => {
+    mocks.getUserById.mockResolvedValue({
+      ...targetUser,
+      clients: [{ clientId: 'client-1' }],
+    });
+    const externalSelf = { ...selfOnly, clientIds: ['client-1'] };
+
+    const response = await patch({ clientIds: ['client-1', 'client-2'] }, externalSelf);
+
+    expect(response.status).toBe(403);
+    expect(mocks.updateUser).not.toHaveBeenCalled();
   });
 
   it('약한 비밀번호는 스키마 검증에서 거부된다', async () => {

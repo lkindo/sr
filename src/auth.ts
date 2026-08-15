@@ -34,6 +34,7 @@ const CLAIMS_REFRESH_INTERVAL_MS = 60_000;
 type UserClaims = {
   roles: string[];
   clientIds: string[];
+  sessionVersion: number;
 };
 
 /**
@@ -50,6 +51,7 @@ async function loadUserClaims(userId: string): Promise<UserClaims | null> {
     where: { id: userId },
     select: {
       isActive: true,
+      sessionVersion: true,
       // 권한은 여기서 읽지 않는다. 토큰에 담지 않기 때문이다(role-permissions.ts 참조).
       // 4단계 중첩 조인이 사라져 이 쿼리 자체도 가벼워졌다.
       roles: {
@@ -74,6 +76,7 @@ async function loadUserClaims(userId: string): Promise<UserClaims | null> {
   return {
     roles: userWithRoles.roles.map((ur) => ur.role.name),
     clientIds: userWithRoles.clients.map((uc) => uc.clientId),
+    sessionVersion: userWithRoles.sessionVersion,
   };
 }
 
@@ -220,10 +223,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return null;
       }
 
+      // 비밀번호가 변경되면 DB sessionVersion 이 증가한다. 이전 JWT가 들고 있던
+      // 세대와 다르면 탈취된 세션을 포함해 전부 폐기한다(최대 지연은 위 재조회 TTL).
+      const tokenSessionVersion =
+        typeof token.sessionVersion === 'number' ? token.sessionVersion : undefined;
+      if (
+        !isSignIn &&
+        tokenSessionVersion !== undefined &&
+        tokenSessionVersion !== claims.sessionVersion
+      ) {
+        logger.warn('[Auth] 비밀번호 변경 이전 세션을 파기했습니다.', {
+          custom_userId: userId,
+        });
+        return null;
+      }
+
       token.roles = claims.roles;
       // permissions 는 **의도적으로 토큰에 넣지 않는다.** 쿠키 크기가 nginx 헤더 버퍼를
       // 넘겨 로그인 사용자만 502 를 받는 장애를 냈다(2026-08-08). session 콜백에서 편다.
       token.clientIds = claims.clientIds;
+      token.sessionVersion = claims.sessionVersion;
       token.checkedAt = Date.now();
 
       return token;

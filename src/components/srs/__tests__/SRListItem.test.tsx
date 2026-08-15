@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { SRListItem } from '@/types/sr.types';
 
-import { SRCardItem } from '../SRListItem';
+import { SRCardItem, SRTableRow } from '../SRListItem';
 
 // Mock dependencies
 vi.mock('next/navigation', () => ({
@@ -41,11 +41,18 @@ vi.mock('@/components/ui', async () => {
   return {
     CopyButton,
     Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-    Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => (
-      <button onClick={onClick} {...props}>
-        {children}
-      </button>
-    ),
+    Button: ({
+      children,
+      asChild,
+      ...props
+    }: React.ComponentProps<'button'> & { asChild?: boolean }) =>
+      asChild && React.isValidElement(children) ? (
+        React.cloneElement(children, props as React.HTMLAttributes<HTMLElement>)
+      ) : (
+        <button {...props}>{children}</button>
+      ),
+    TableRow: (props: React.ComponentProps<'tr'>) => <tr {...props} />,
+    TableCell: (props: React.ComponentProps<'td'>) => <td {...props} />,
   };
 });
 
@@ -92,5 +99,30 @@ describe('SRCardItem', () => {
 
     fireEvent.click(copyButton);
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('SR-2023-0001');
+  });
+
+  it('카드 컨테이너를 버튼으로 중첩하지 않고 명시적인 상세 링크를 제공한다', () => {
+    render(<SRCardItem sr={mockSR} canManageSRs={true} />);
+
+    const card = screen.getByRole('article');
+    expect(card).not.toHaveAttribute('role', 'button');
+    expect(card).not.toHaveAttribute('tabindex');
+    expect(screen.getByRole('link', { name: 'Test SR' })).toHaveAttribute('href', '/srs/sr-1');
+    expect(screen.getByRole('link', { name: '접수' })).toHaveAttribute('href', '/srs/sr-1/intake');
+  });
+
+  it('표 행도 포커스 가능한 가짜 버튼이 아니며 제목 링크로 이동한다', () => {
+    const { container } = render(
+      <table>
+        <tbody>
+          <SRTableRow sr={mockSR} canManageSRs={false} />
+        </tbody>
+      </table>
+    );
+
+    const row = container.querySelector('tr');
+    expect(row).not.toHaveAttribute('tabindex');
+    expect(row).not.toHaveAttribute('aria-label');
+    expect(screen.getByRole('link', { name: 'Test SR' })).toHaveAttribute('href', '/srs/sr-1');
   });
 });

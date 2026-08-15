@@ -26,6 +26,7 @@ model User {
   emailVerified DateTime? @map("email_verified") @db.Timestamptz
   image         String?   @db.VarChar(1024)
   isActive      Boolean   @default(true) @map("is_active")
+  sessionVersion Int      @default(0) @map("session_version")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -239,6 +240,7 @@ enum SRPriority {
 
 model SR {
   id          String     @id @default(cuid()) @db.VarChar(30)
+  version     Int        @default(0)
   srNumber    String     @unique @map("sr_number") @db.VarChar(30)
   title       String     @db.VarChar(255)
   description String

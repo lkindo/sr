@@ -10,6 +10,12 @@
  */
 export const PAGINATION = {
   /**
+   * 최대 페이지 번호. OFFSET 기반 조회가 비정상적으로 큰 값을 받아 DB를 오래
+   * 스캔하지 않도록 모든 목록 진입점에서 같은 상한을 사용한다.
+   */
+  MAX_PAGE: 10_000,
+
+  /**
    * 기본 페이지 크기
    */
   DEFAULT_PAGE_SIZE: 20,

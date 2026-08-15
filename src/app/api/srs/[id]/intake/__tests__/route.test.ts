@@ -32,6 +32,11 @@ vi.mock('@/lib/domain-events', () => ({
   domainEvents: { emit: mocks.emit },
 }));
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock('@/lib/realtime-events', () => ({
   emitRealtimeEvent: mocks.emitRealtime,
   REALTIME_EVENTS: {
@@ -75,6 +80,7 @@ const OTHER_ASSIGNEE = { id: 'eng-2', name: '새 엔지니어', email: 'eng2@exa
 
 const BASE_SR = {
   id: 'sr-1',
+  version: 3,
   srNumber: 'SR-20260801-0001',
   title: '테스트 SR',
   status: 'REQUESTED',
@@ -361,11 +367,14 @@ describe('POST /api/srs/[id]/intake — 낙관적 락', () => {
     expect(mocks.emitRealtime).not.toHaveBeenCalled();
   });
 
-  it('가드는 REQUESTED 상태로만 매칭한다', async () => {
+  it('가드는 REQUESTED 상태와 조회 시점 version 으로 매칭한다', async () => {
     await post();
 
     expect(mocks.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'sr-1', status: 'REQUESTED' } })
+      expect.objectContaining({
+        where: { id: 'sr-1', version: 3, status: 'REQUESTED' },
+        data: { version: { increment: 1 } },
+      })
     );
   });
 });
@@ -616,6 +625,7 @@ describe('GET /api/srs/[id]/intake', () => {
 
 const PATCH_SR = {
   id: 'sr-1',
+  version: 3,
   srNumber: 'SR-20260801-0001',
   title: '테스트 SR',
   status: 'INTAKE',
@@ -713,9 +723,12 @@ describe('PATCH /api/srs/[id]/intake — 상태 게이트', () => {
     const response = await patch({ actualPriority: 'HIGH' });
 
     expect(response.status).toBe(200);
-    // 낙관적 락 가드는 스냅샷 상태로 매칭한다
+    // 낙관적 락 가드는 스냅샷 version 으로 매칭한다
     expect(mocks.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: 'sr-1', status } })
+      expect.objectContaining({
+        where: { id: 'sr-1', version: 3 },
+        data: { version: { increment: 1 } },
+      })
     );
   });
 

@@ -189,6 +189,12 @@ describe('Pagination Utils', () => {
   });
 
   describe('paginationSchema', () => {
+    it('caps abusive page offsets by falling back to the first page', () => {
+      const result = paginationSchema.parse({ page: '10001' });
+
+      expect(result.page).toBe(1);
+    });
+
     it('should parse valid pagination parameters', () => {
       const result = paginationSchema.parse({
         page: '2',

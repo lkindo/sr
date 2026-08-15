@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
-import { INTERNAL_ROLES } from '@/lib/policies';
+import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
 import { srService } from '@/services/sr.service';
 
 type Props = {
@@ -16,9 +16,6 @@ type Props = {
 const getSearchParam = (param: string | string[] | undefined): string | undefined => {
   return Array.isArray(param) ? param[0] : param;
 };
-
-// 페이지 번호 상한 (과도한 OFFSET으로 인한 DB 부하 방지)
-const MAX_PAGE = 10000;
 
 /**
  * 이 화면이 제공하는 정렬 필드. 관계형 3개는 아래에서 중첩 객체로 따로 처리한다.
@@ -55,6 +52,7 @@ export default async function SRsPage({ searchParams }: Props) {
   // 고객사 사용자인 경우 해당 고객사의 SR만 조회
   // Optimized: Use clientIds from session instead of DB query
   const userClientIds: string[] = session?.user?.clientIds || [];
+  const visibilityAssigneeId = session?.user ? resolveAssigneeScope(session.user) : 'non-existent';
 
   // Start fetching filter options early (parallel execution).
   // 외부 사용자에게는 소속 고객사만 넘긴다 — `undefined`(전체)와 `[]`(없음)는 다르다.
@@ -67,7 +65,7 @@ export default async function SRsPage({ searchParams }: Props) {
     page: getSearchParam(resolvedSearchParams.page),
     pageSize: getSearchParam(resolvedSearchParams.itemsPerPage),
   });
-  const page = Math.min(parsedPagination.page, MAX_PAGE);
+  const page = parsedPagination.page;
   const itemsPerPage = parsedPagination.pageSize;
   const sort = getSearchParam(resolvedSearchParams.sort) ?? 'createdAt.desc';
   const [rawSortField, sortOrder] = sort.split('.');
@@ -114,7 +112,11 @@ export default async function SRsPage({ searchParams }: Props) {
       where.clientId = { in: [] };
     }
   }
-  if (assigneeId && assigneeId !== 'all') {
+  if (visibilityAssigneeId) {
+    // ENGINEER는 요청 쿼리와 무관하게 본인 배정 범위로 고정한다. 사용자가 임의의
+    // assigneeId를 넣어도 목록/카운트가 상세 조회 정책보다 넓어지지 않는다.
+    where.assigneeId = visibilityAssigneeId;
+  } else if (assigneeId && assigneeId !== 'all') {
     where.assigneeId = assigneeId === 'unassigned' ? null : assigneeId;
   }
   // Handle date filtering
@@ -191,6 +193,7 @@ export default async function SRsPage({ searchParams }: Props) {
       dueFrom: today,
       dueTo: tomorrow,
       assigneeId: session?.user?.id || 'non-existent',
+      visibilityAssigneeId,
     }),
     clientsPromise,
     usersPromise,

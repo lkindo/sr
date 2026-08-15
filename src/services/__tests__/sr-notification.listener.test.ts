@@ -1,369 +1,144 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { domainEvents } from '@/lib/domain-events';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
-import { emailService } from '@/services/email.service';
-import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
-import { enqueueEmails } from '@/services/notification-outbox';
+import { backgroundTask } from '@/lib/wait-until';
 import { pushService } from '@/services/push.service';
 
 vi.mock('@/lib/prisma', () => ({
-  default: {
-    user: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
-    },
-  },
-}));
-
-// buildX 는 이제 렌더만 하고, 실제 발송은 아웃박스 디스패처가 맡는다(감사 4.2).
-vi.mock('@/services/email.service', () => ({
-  emailService: {
-    buildSRCreated: vi.fn((to: string) => ({ to, subject: 's', html: 'h' })),
-    buildSRStatusChanged: vi.fn((to: string) => ({ to, subject: 's', html: 'h' })),
-    buildSRAssigned: vi.fn((to: string) => ({ to, subject: 's', html: 'h' })),
-  },
-}));
-
-vi.mock('@/services/notification-outbox', () => ({
-  enqueueEmails: vi.fn().mockResolvedValue(0),
-}));
-
-vi.mock('@/services/push.service', () => ({
-  pushService: {
-    sendToUser: vi.fn().mockResolvedValue(undefined),
-    sendToUsers: vi.fn().mockResolvedValue(undefined),
-    // 리스너는 이제 설정을 존중하는 `sendForEvent` 만 호출한다(감사 4.3).
-    // `sendToUser(s)` 는 사용자 설정을 보지 않으므로, 아래 테스트들이 그 호출이
-    // 0건임을 함께 단언한다 — 한쪽만 바꾸고 다른 쪽이 남는 것을 막는다.
-    sendForEvent: vi.fn().mockResolvedValue(undefined),
-  },
+  default: { user: { findMany: vi.fn() } },
 }));
 
 vi.mock('@/lib/logger', () => ({
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  },
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-const mockPrisma = prisma as unknown as {
-  user: {
-    findMany: ReturnType<typeof vi.fn>;
-    findUnique: ReturnType<typeof vi.fn>;
-  };
+vi.mock('@/lib/wait-until', () => ({ backgroundTask: vi.fn() }));
+
+vi.mock('@/services/push.service', () => ({
+  pushService: { sendForEvent: vi.fn().mockResolvedValue(undefined) },
+}));
+
+import { registerSRNotificationListeners } from '../listeners/sr-notification.listener';
+
+const flush = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
-/**
- * Emit a domain event and let all microtasks (the async handlers and their
- * Promise.allSettled calls) flush before assertions run.
- */
-async function emitAndFlush(event: string, payload: unknown) {
-  (domainEvents as { emit: (e: string, p: unknown) => boolean }).emit(event, payload);
-  // Flush the queued microtasks created by the async handlers.
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await Promise.resolve();
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  domainEvents.removeAllListeners();
+  registerSRNotificationListeners();
+});
 
-describe('registerSRNotificationListeners', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Remove any listeners registered by previous tests to avoid duplicate firing.
-    domainEvents.removeAllListeners();
-    registerSRNotificationListeners();
-  });
-
-  afterEach(() => {
-    domainEvents.removeAllListeners();
-  });
-
-  it('logs an info message and registers the three SR listeners', () => {
+describe('SR 알림 리스너', () => {
+  it('세 가지 푸시 리스너를 한 번씩 등록한다', () => {
     expect(logger.info).toHaveBeenCalledWith('SR Notification Listeners registered');
     expect(domainEvents.listenerCount('sr:created')).toBe(1);
     expect(domainEvents.listenerCount('sr:status_changed')).toBe(1);
     expect(domainEvents.listenerCount('sr:assigned')).toBe(1);
   });
 
-  describe('sr:created', () => {
-    const payload = {
+  it('SR 생성 시 활성 관리자·매니저에게 설정 존중 푸시를 예약한다', async () => {
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      { id: 'admin-1' },
+      { id: 'manager-1' },
+    ] as never);
+
+    domainEvents.emit('sr:created', {
       srId: 'sr-1',
       srNumber: 'SR-001',
-      title: '테스트 제목',
-      requesterId: 'req-1',
+      title: '새 요청',
+      requesterId: 'requester-1',
       requesterName: '요청자',
-    };
-
-    it('sends push to admins and email to those who opt in', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([
-        {
-          id: 'admin-1',
-          email: 'admin1@example.com',
-          notificationPreference: { emailSRCreated: true },
-        },
-        {
-          id: 'admin-2',
-          email: 'admin2@example.com',
-          notificationPreference: { emailSRCreated: false },
-        },
-      ]);
-
-      await emitAndFlush('sr:created', payload);
-
-      expect(mockPrisma.user.findMany).toHaveBeenCalledTimes(1);
-      expect(pushService.sendForEvent).toHaveBeenCalledWith(
-        'SR_CREATED',
-        ['admin-1', 'admin-2'],
-        expect.objectContaining({ tag: 'sr-created', url: '/srs/sr-1' })
-      );
-      // 설정을 보지 않는 경로는 더 이상 쓰지 않는다.
-      expect(pushService.sendToUsers).not.toHaveBeenCalled();
-      // Only admin-1 opted in.
-      expect(emailService.buildSRCreated).toHaveBeenCalledTimes(1);
-      expect(emailService.buildSRCreated).toHaveBeenCalledWith(
-        'admin1@example.com',
-        'SR-001',
-        '테스트 제목',
-        '요청자',
-        expect.stringContaining('/srs/sr-1')
-      );
-
-      // 렌더만으로는 부족하다. 실제로 아웃박스 행이 적재돼야 재시작·SMTP 장애에서
-      // 살아남는다 — 예전에는 여기서 곧장 SMTP 로 쏘고 실패를 삼켰다.
-      expect(enqueueEmails).toHaveBeenCalledWith([
-        expect.objectContaining({
-          to: 'admin1@example.com',
-          metadata: expect.objectContaining({ srId: 'sr-1', kind: 'sr-created' }),
-        }),
-      ]);
     });
+    await flush();
 
-    it('defaults emailSRCreated to true when preference is missing', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([
-        { id: 'admin-1', email: 'admin1@example.com', notificationPreference: null },
-      ]);
-
-      await emitAndFlush('sr:created', payload);
-
-      expect(emailService.buildSRCreated).toHaveBeenCalledTimes(1);
-    });
-
-    it('skips email when admin has no email address', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([
-        { id: 'admin-1', email: null, notificationPreference: { emailSRCreated: true } },
-      ]);
-
-      await emitAndFlush('sr:created', payload);
-
-      expect(pushService.sendForEvent).toHaveBeenCalledTimes(1);
-      expect(emailService.buildSRCreated).not.toHaveBeenCalled();
-    });
-
-    it('does not send push when there are no admins', async () => {
-      mockPrisma.user.findMany.mockResolvedValue([]);
-
-      await emitAndFlush('sr:created', payload);
-
-      expect(pushService.sendForEvent).not.toHaveBeenCalled();
-      expect(emailService.buildSRCreated).not.toHaveBeenCalled();
-    });
-
-    it('logs an error when prisma throws', async () => {
-      mockPrisma.user.findMany.mockRejectedValue(new Error('db down'));
-
-      await emitAndFlush('sr:created', payload);
-
-      expect(logger.error).toHaveBeenCalledWith(
-        'Failed to handle sr:created notification',
-        expect.any(Error),
-        { srId: 'sr-1' }
-      );
-    });
+    expect(pushService.sendForEvent).toHaveBeenCalledWith(
+      'SR_CREATED',
+      ['admin-1', 'manager-1'],
+      expect.objectContaining({ tag: 'sr-created', url: '/srs/sr-1' })
+    );
+    expect(backgroundTask).toHaveBeenCalledTimes(1);
   });
 
-  describe('sr:status_changed', () => {
-    const payload = {
+  it('상태 변경은 요청자에게 푸시하고 이메일 적재는 이 리스너에서 중복 수행하지 않는다', async () => {
+    domainEvents.emit('sr:status_changed', {
       srId: 'sr-2',
       srNumber: 'SR-002',
-      title: '상태 제목',
-      requesterId: 'req-2',
-      previousStatus: 'OPEN',
+      title: '상태 변경',
+      requesterId: 'requester-2',
+      previousStatus: 'INTAKE',
       currentStatus: 'IN_PROGRESS',
-    };
-
-    it('returns early without querying when requesterId is missing', async () => {
-      await emitAndFlush('sr:status_changed', { ...payload, requesterId: undefined });
-
-      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
-      expect(pushService.sendForEvent).not.toHaveBeenCalled();
     });
+    await flush();
 
-    it('returns early when the requester does not exist', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-
-      await emitAndFlush('sr:status_changed', payload);
-
-      expect(pushService.sendForEvent).not.toHaveBeenCalled();
-      expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
-    });
-
-    it('sends push and email when requester opts in', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        email: 'req@example.com',
-        notificationPreference: { emailSRStatusChanged: true },
-      });
-
-      await emitAndFlush('sr:status_changed', payload);
-
-      expect(pushService.sendForEvent).toHaveBeenCalledWith(
-        'SR_STATUS_CHANGED',
-        ['req-2'],
-        expect.objectContaining({ tag: 'sr-status-changed' })
-      );
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
-      expect(emailService.buildSRStatusChanged).toHaveBeenCalledWith(
-        'req@example.com',
-        'SR-002',
-        '상태 제목',
-        'OPEN',
-        'IN_PROGRESS',
-        expect.stringContaining('/srs/sr-2')
-      );
-    });
-
-    it('uses "없음" when previousStatus is falsy', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        email: 'req@example.com',
-        notificationPreference: { emailSRStatusChanged: true },
-      });
-
-      await emitAndFlush('sr:status_changed', { ...payload, previousStatus: null });
-
-      expect(emailService.buildSRStatusChanged).toHaveBeenCalledWith(
-        'req@example.com',
-        'SR-002',
-        '상태 제목',
-        '없음',
-        'IN_PROGRESS',
-        expect.any(String)
-      );
-    });
-
-    it('defaults status email to false (no email) when preference missing', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        email: 'req@example.com',
-        notificationPreference: null,
-      });
-
-      await emitAndFlush('sr:status_changed', payload);
-
-      expect(pushService.sendForEvent).toHaveBeenCalledTimes(1);
-      expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
-    });
-
-    it('logs an error when prisma throws', async () => {
-      mockPrisma.user.findUnique.mockRejectedValue(new Error('boom'));
-
-      await emitAndFlush('sr:status_changed', payload);
-
-      expect(logger.error).toHaveBeenCalledWith(
-        'Failed to handle sr:status_changed notification',
-        expect.any(Error),
-        { srId: 'sr-2' }
-      );
-    });
+    expect(pushService.sendForEvent).toHaveBeenCalledWith(
+      'SR_STATUS_CHANGED',
+      ['requester-2'],
+      expect.objectContaining({ tag: 'sr-status-changed' })
+    );
   });
 
-  describe('sr:assigned', () => {
-    const payload = {
+  it('요청자 없는 상태 변경은 건너뛴다', async () => {
+    domainEvents.emit('sr:status_changed', {
+      srId: 'sr-2',
+      srNumber: 'SR-002',
+      title: '상태 변경',
+      previousStatus: 'INTAKE',
+      currentStatus: 'IN_PROGRESS',
+    });
+    await flush();
+    expect(pushService.sendForEvent).not.toHaveBeenCalled();
+  });
+
+  it('담당자 배정은 새 담당자에게 푸시한다', async () => {
+    domainEvents.emit('sr:assigned', {
       srId: 'sr-3',
       srNumber: 'SR-003',
-      title: '할당 제목',
-      assigneeId: 'assignee-1',
+      title: '배정',
+      assigneeId: 'engineer-1',
       assigneeName: '담당자',
-    };
-
-    it('logs and skips notification when assigneeId is null (unassigned)', async () => {
-      await emitAndFlush('sr:assigned', { ...payload, assigneeId: null });
-
-      expect(logger.info).toHaveBeenCalledWith('SR 담당 해제 감지 (알림 생략)', { srId: 'sr-3' });
-      expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
-      expect(pushService.sendForEvent).not.toHaveBeenCalled();
     });
+    await flush();
 
-    it('returns early when the assignee does not exist', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+    expect(pushService.sendForEvent).toHaveBeenCalledWith(
+      'SR_ASSIGNED',
+      ['engineer-1'],
+      expect.objectContaining({ tag: 'sr-assigned' })
+    );
+  });
 
-      await emitAndFlush('sr:assigned', payload);
-
-      expect(pushService.sendForEvent).not.toHaveBeenCalled();
-      expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
+  it('담당 해제는 푸시하지 않는다', async () => {
+    domainEvents.emit('sr:assigned', {
+      srId: 'sr-3',
+      srNumber: 'SR-003',
+      title: '배정 해제',
+      assigneeId: null,
+      assigneeName: null,
     });
+    await flush();
 
-    it('sends push and email when assignee opts in', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        email: 'assignee@example.com',
-        notificationPreference: { emailSRAssigned: true },
-      });
+    expect(pushService.sendForEvent).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith('SR 담당 해제 감지 (알림 생략)', { srId: 'sr-3' });
+  });
 
-      await emitAndFlush('sr:assigned', payload);
-
-      expect(pushService.sendForEvent).toHaveBeenCalledWith(
-        'SR_ASSIGNED',
-        ['assignee-1'],
-        expect.objectContaining({ tag: 'sr-assigned' })
-      );
-      expect(pushService.sendToUser).not.toHaveBeenCalled();
-      expect(emailService.buildSRAssigned).toHaveBeenCalledWith(
-        'assignee@example.com',
-        'SR-003',
-        '할당 제목',
-        '담당자',
-        expect.stringContaining('/srs/sr-3')
-      );
+  it('관리자 조회 실패를 기록한다', async () => {
+    vi.mocked(prisma.user.findMany).mockRejectedValue(new Error('db down'));
+    domainEvents.emit('sr:created', {
+      srId: 'sr-4',
+      srNumber: 'SR-004',
+      title: '실패',
+      requesterId: 'requester-1',
+      requesterName: '요청자',
     });
+    await flush();
 
-    it('defaults assignee email to true when preference missing and uses fallback name', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        email: 'assignee@example.com',
-        notificationPreference: null,
-      });
-
-      await emitAndFlush('sr:assigned', { ...payload, assigneeName: null });
-
-      expect(emailService.buildSRAssigned).toHaveBeenCalledWith(
-        'assignee@example.com',
-        'SR-003',
-        '할당 제목',
-        '알 수 없음',
-        expect.any(String)
-      );
-    });
-
-    it('skips email when assignee has no email', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        email: null,
-        notificationPreference: { emailSRAssigned: true },
-      });
-
-      await emitAndFlush('sr:assigned', payload);
-
-      expect(pushService.sendForEvent).toHaveBeenCalledTimes(1);
-      expect(emailService.buildSRAssigned).not.toHaveBeenCalled();
-    });
-
-    it('logs an error when prisma throws', async () => {
-      mockPrisma.user.findUnique.mockRejectedValue(new Error('explode'));
-
-      await emitAndFlush('sr:assigned', payload);
-
-      expect(logger.error).toHaveBeenCalledWith(
-        'Failed to handle sr:assigned notification',
-        expect.any(Error),
-        { srId: 'sr-3' }
-      );
-    });
+    expect(logger.error).toHaveBeenCalledWith(
+      'Failed to handle sr:created notification',
+      expect.any(Error),
+      { srId: 'sr-4' }
+    );
   });
 });

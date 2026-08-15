@@ -1,6 +1,11 @@
 // src/types/sr.types.ts
 import type { SR } from '@prisma/client';
 
+type PublicSRAttachment = Pick<
+  import('@prisma/client').SRAttachment,
+  'id' | 'srId' | 'fileName' | 'fileSize' | 'fileType' | 'fileUrl' | 'uploadedBy' | 'createdAt'
+>;
+
 /**
  * SR 상세 정보 타입
  * - SR 기본 정보 + 관련 엔티티 (고객사, 요청자, 담당자, 서비스 카테고리 등)
@@ -24,7 +29,8 @@ export type SRDetails = SR & {
   activities: (import('@prisma/client').SRActivity & {
     user: { id: string; name: string; image: string | null };
   })[];
-  attachments: import('@prisma/client').SRAttachment[];
+  // 물리 저장 경로(storagePath)는 서버 내부 정보이므로 상세 응답에 포함하지 않는다.
+  attachments: PublicSRAttachment[];
   statusHistory: (import('@prisma/client').SRStatusHistory & {
     user: { id: string; name: string; image: string | null };
   })[];
@@ -51,7 +57,7 @@ export type SRCreateResult = SR & {
   activities: (import('@prisma/client').SRActivity & {
     user: { id: string; name: string; image: string | null };
   })[];
-  attachments: import('@prisma/client').SRAttachment[];
+  attachments: PublicSRAttachment[];
   _count: { comments: number; attachments: number };
 };
 

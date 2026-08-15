@@ -64,7 +64,7 @@ test.describe('ADMIN 상단 네비게이션', () => {
    */
   test('클라이언트 세션이 끊겨도 서버가 내려준 역할로 메뉴를 유지한다', async ({ page }) => {
     // 사이드바가 있는 화면이어야 한다. Sidebar 는 /dashboard 에서 null 을 반환한다.
-    await page.goto('/organization', { waitUntil: 'domcontentloaded' });
+    await page.goto('/organization', { waitUntil: 'load' });
 
     const nav = mainNav(page);
     // 사이드바는 서버 props 없이 `usePermissions()`(클라이언트 세션)만 본다.
@@ -73,6 +73,11 @@ test.describe('ADMIN 상단 네비게이션', () => {
 
     await expect(nav.getByRole('link', { name: '조직 관리' })).toBeVisible();
     await expect(sidebar.getByRole('link').first()).toBeVisible();
+    // 위 링크들은 서버 HTML에도 있어 수화 완료의 증거가 아니다. 사용자 메뉴 버튼은
+    // 클라이언트 세션이 붙어야 렌더되므로, 이 양성 조건 뒤에만 visibilitychange를 보낸다.
+    await expect(page.getByRole('button', { name: '사용자 메뉴' })).toBeVisible({
+      timeout: 30000,
+    });
 
     // 세션 엔드포인트가 "세션 없음"을 돌려주는 상황. 실제 응답도 이 형태다(200 + `null`).
     await page.route('**/api/auth/session', (route) =>

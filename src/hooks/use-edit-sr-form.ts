@@ -35,7 +35,6 @@ export function useEditSRForm({
   const [categoryId, setCategoryId] = useState('');
   const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
   const [priority, setPriority] = useState('');
-  const [status, setStatus] = useState('');
   const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<SRAttachmentView[]>([]);
@@ -140,7 +139,6 @@ export function useEditSRForm({
     setCategoryId(sr.serviceCategory?.id || sr.category?.id || '');
     setRequestedPriority(sr.requestedPriority || 'MEDIUM');
     setPriority(sr.actualPriority || 'MEDIUM');
-    setStatus(sr.status);
     setRequestedCompletionDate(
       sr.requestedCompletionDate
         ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
@@ -286,7 +284,6 @@ export function useEditSRForm({
     const formData = new FormData();
     formData.append('title', title);
     formData.append('description', description);
-    formData.append('status', status);
     if (priority && priority.trim() !== '') formData.append('priority', priority);
     formData.append('serviceCategoryId', categoryId || '');
     if (requestedPriority && requestedPriority.trim() !== '')
@@ -345,7 +342,6 @@ export function useEditSRForm({
       categoryId,
       requestedPriority,
       priority,
-      status,
       requestedCompletionDate,
       files,
       existingAttachments,
@@ -362,7 +358,6 @@ export function useEditSRForm({
       setCategoryId,
       setRequestedPriority,
       setPriority,
-      setStatus,
       setRequestedCompletionDate,
       setFiles,
       setFileToDelete,

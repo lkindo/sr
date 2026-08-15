@@ -4,6 +4,7 @@ node_modules
 
 # Next.js build output
 .next
+.next-e2e
 out
 build
 
@@ -13,6 +14,7 @@ build
 .env.production
 .env.test
 .env*.local
+.env.*
 # Docker deployment secrets: `COPY . .` in the builder stage would otherwise bake
 # these into an intermediate layer that is exported to the GHA build cache.
 .env.docker*
@@ -20,6 +22,8 @@ build
 # Private keys and certificates (never needed at build time)
 *.key
 *.pem
+*.p12
+*.pfx
 
 # Legacy attachment directory. Next serves everything under public/ from the URL
 # root, so anything left here is downloadable without passing ensureCanReadSR —

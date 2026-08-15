@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 import { validateRequestBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { SECURITY } from '@/lib/constants';
-import { NotFoundError, UnauthorizedError } from '@/lib/errors';
-import prisma from '@/lib/prisma';
+import { UnauthorizedError } from '@/lib/errors';
 import { passwordSchema } from '@/lib/schemas';
+import { UserService } from '@/services/user.service';
 
 const changePasswordSchema = z
   .object({
@@ -23,40 +21,21 @@ const changePasswordSchema = z
 // POST /api/profile/password - 비밀번호 변경 (Rate Limit: 엄격)
 export const POST = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       throw new UnauthorizedError('유효하지 않은 세션입니다. 다시 로그인해주세요.');
     }
 
     const validated = await validateRequestBody(request, changePasswordSchema);
 
-    // 현재 사용자 조회
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: {
-        id: true,
-        password: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundError('사용자');
-    }
-
-    // 현재 비밀번호 확인
-    const isPasswordValid = await bcrypt.compare(validated.currentPassword, user.password);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedError('현재 비밀번호가 올바르지 않습니다.');
-    }
-
-    // 새 비밀번호 해시화
-    const hashedPassword = await bcrypt.hash(validated.newPassword, SECURITY.BCRYPT_WORK_FACTOR);
-
-    // 비밀번호 업데이트
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: hashedPassword },
-    });
+    // 서비스 계층이 현재 비밀번호 확인, sessionVersion 증가, 감사 로그를 같은
+    // 트랜잭션에서 수행한다. 라우트에서 직접 update 하면 기존 세션 폐기와 감사가 빠진다.
+    const userService = new UserService();
+    await userService.changePassword(
+      session.user.id,
+      validated.currentPassword,
+      validated.newPassword,
+      session.user.id
+    );
 
     return NextResponse.json({
       success: true,

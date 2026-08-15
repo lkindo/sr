@@ -301,13 +301,23 @@ jobs:
 
               # 4. 마이그레이션 사고 대비 백업.
               #    앱이 뜨면서 `prisma migrate deploy` 가 도는데, 그 전에 복구 지점을 만든다.
-              #    백업 실패로 배포를 막지는 않되(운영 중단이 더 크다) 눈에 띄게 경고한다.
+              #    백업 실패 시 마이그레이션을 적용할 복구 지점이 없으므로 배포를 중단한다.
               if [ -x scripts/backup.sh ]; then
                 echo "Pre-deploy backup..."
                 if ! (set -a; . ./.env.prod; set +a; ./scripts/backup.sh); then
-                  echo "WARNING: 배포 전 백업 실패. 마이그레이션 사고 시 복구 지점이 없습니다."
+                  echo "ERROR: 배포 전 백업 실패. 현재 서비스를 유지하고 배포를 중단합니다."
+                  exit 1
                 fi
+              else
+                echo "ERROR: scripts/backup.sh 가 없어 안전한 배포를 진행할 수 없습니다."
+                exit 1
               fi
+
+              # 자동 앱 롤백은 DB 스키마가 그대로일 때만 안전하다. 새 마이그레이션이 적용된
+              # 뒤 구버전 코드를 올리면 구버전이 새 스키마를 이해하지 못할 수 있다.
+              MIGRATION_COUNT_BEFORE="$(docker exec sr-db sh -c \
+                'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL"' \
+                2>/dev/null | tr -d '[:space:]' || echo unknown)"
 
               # 5. 이미지 Pull 및 앱만 교체
               #    과거에는 `down` 으로 nginx·DB 까지 내려 매 배포가 30~90초 하드 아웃티지였고
@@ -327,7 +337,13 @@ jobs:
                 echo "ERROR: 새 이미지가 healthy 상태에 도달하지 못했습니다."
                 docker logs sr-app --tail 80 2>&1 || true
 
-                if [ -n "${PREVIOUS_IMAGE_ID:-}" ]; then
+                MIGRATION_COUNT_AFTER="$(docker exec sr-db sh -c \
+                  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL"' \
+                  2>/dev/null | tr -d '[:space:]' || echo unknown)"
+
+                if [ -n "${PREVIOUS_IMAGE_ID:-}" ] && \
+                   [ "$MIGRATION_COUNT_BEFORE" != "unknown" ] && \
+                   [ "$MIGRATION_COUNT_BEFORE" = "$MIGRATION_COUNT_AFTER" ]; then
                   # 이전 이미지 ID 에 고정 태그를 붙여 compose 가 지목할 수 있게 한다.
                   IMAGE_REPO="${PREVIOUS_IMAGE_REF%:*}"
                   [ -n "$IMAGE_REPO" ] || IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY_LC:-lkindo/sr}"
@@ -347,7 +363,8 @@ jobs:
                     echo "이전 이미지에 태그를 붙이지 못했습니다(로컬에서 이미 정리됨?)."
                   fi
                 else
-                  echo "롤백 지점이 없어 자동 복구를 시도하지 못했습니다."
+                  echo "자동 롤백을 건너뜁니다: 롤백 이미지가 없거나 DB 마이그레이션 수가 변경되었습니다."
+                  echo "구버전 코드와 새 스키마의 비호환을 피하기 위해 forward-fix 또는 백업 복구가 필요합니다."
                 fi
                 exit 1
               fi

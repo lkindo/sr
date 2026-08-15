@@ -4,6 +4,12 @@ import { ensureCanCreateSR, ensureCanUpdateSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SRService } from '@/services/sr.service';
 
+vi.mock('@/services/sr-email-outbox', () => ({
+  enqueueSRCreatedEmails: vi.fn().mockResolvedValue(0),
+  enqueueSRStatusChangedEmail: vi.fn().mockResolvedValue(0),
+  enqueueSRAssignedEmail: vi.fn().mockResolvedValue(0),
+}));
+
 // Mock dependencies
 // ensure* 만 스텁으로 대체하고 isInternalUser 는 실제 구현을 사용한다.
 // (mockUser 가 ADMIN 이므로 실제 구현상 내부 사용자로 판정되어 테넌트 가드를 통과한다.)

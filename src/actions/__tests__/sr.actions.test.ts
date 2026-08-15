@@ -1,8 +1,6 @@
 import { revalidatePath } from 'next/cache';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SRService } from '@/services/sr.service';
-
 import {
   createSRAction,
   deleteSRAction,
@@ -195,6 +193,9 @@ describe('SR Server Actions', () => {
       mockSRService.getSRDetailsById.mockResolvedValue({ id: 'sr-1', title: 'SR Details' });
       const result = await getSRDetailsAction('sr-1');
       expect(result.success).toBe(true);
+      expect(mockSRService.getSRDetailsById).toHaveBeenCalledWith('sr-1', {
+        viewer: expect.objectContaining({ id: expect.any(String) }),
+      });
     });
 
     it('returns failure when not found', async () => {

@@ -319,7 +319,9 @@ test.describe('SR 재배정 및 에스컬레이션', () => {
         timeout: 30000,
       });
 
-      const row = page.getByRole('row', { name: `SR ${sr.srNumber} 상세 보기` });
+      const row = page.getByRole('row').filter({
+        has: page.getByRole('link', { name: sr.srNumber, exact: true }),
+      });
       await expect(row, `ENGINEER 목록에 배정된 SR ${sr.srNumber} 이 보이지 않습니다.`).toBeVisible(
         { timeout: 20000 }
       );

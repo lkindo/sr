@@ -155,5 +155,66 @@ describe('API Route: /api/users (Security)', () => {
 
       expect(res.status).toBe(403);
     });
+
+    it('외부 관리자가 다른 고객사에 사용자를 생성하는 것을 거부한다', async () => {
+      const req = new NextRequest('http://localhost/api/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'new-user@example.com',
+          name: 'New User',
+          password: 'StrongPassword1!',
+          userType: 'CLIENT',
+          clientIds: ['client-b'],
+        }),
+      });
+      const context = {
+        session: {
+          user: {
+            id: 'client-admin-1',
+            roles: ['CLIENT_ADMIN'],
+            permissions: ['USER:CREATE'],
+            clientIds: ['client-a'],
+          },
+        },
+      };
+
+      const res = await POST(req, context as any);
+
+      expect(res.status).toBe(403);
+      expect(mockCreateUser).not.toHaveBeenCalled();
+    });
+
+    it('외부 관리자의 자사 사용자 생성은 PENDING 소속으로 기록한다', async () => {
+      mockCreateUser.mockResolvedValue({ id: 'new-user' });
+      const req = new NextRequest('http://localhost/api/users', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'new-user@example.com',
+          name: 'New User',
+          password: 'StrongPassword1!',
+          clientIds: ['client-a'],
+        }),
+      });
+      const context = {
+        session: {
+          user: {
+            id: 'client-admin-1',
+            roles: ['CLIENT_ADMIN'],
+            permissions: ['USER:CREATE'],
+            clientIds: ['client-a'],
+          },
+        },
+      };
+
+      const res = await POST(req, context as any);
+
+      expect(res.status).toBe(201);
+      expect(mockCreateUser).toHaveBeenCalledWith(
+        expect.objectContaining({ userType: 'CLIENT', clientIds: ['client-a'] }),
+        'client-admin-1',
+        undefined,
+        { membershipStatus: 'PENDING' }
+      );
+    });
   });
 });
