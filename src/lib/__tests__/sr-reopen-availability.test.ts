@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { canUpdateSR } from '@/lib/policies';
+import { canUpdateSR, type SRAccessFields } from '@/lib/policies';
 import {
   canViewerUpdateSR,
   getReopenAvailability,
@@ -243,28 +243,49 @@ describe('canViewerUpdateSR ↔ policies.canUpdateSR 동치', () => {
     ['sr:update'],
   ];
   const clientIdSets = [[], ['client-1'], ['client-2'], ['client-2', 'client-1']];
+  /**
+   * SR 쪽 고객사. 예전에는 'client-1' 로 고정돼 있어 `canViewerUpdateSR` 의 `!!sr.clientId`
+   * 가드가 이 대조에서 **한 번도 실행되지 않았다**.
+   *
+   * 가드가 있는 이유: 화면이 넘기는 SR 응답 타입에서는 clientId 가 비어 있을 수 있다
+   * (서버 타입 `SRAccessFields` 는 Prisma 스키마를 따라 non-null 이라 아래에서 캐스팅한다).
+   * 그때 서버(`canUpdateSR`)는 `clientIds.includes(null)` 로 **소속 없음 → 거부** 가 되는데,
+   * 사본이 `!sr.clientId || …` 같은 fail-open 으로 바뀌면 그 축에서만 조용히 갈라진다.
+   * 이 축이 그 갈라짐을 잡는다.
+   */
+  const srClientIds: Array<string | null> = ['client-1', null];
   const people = ['viewer', 'someone-else'];
 
-  it('역할·권한·소속·신청자·담당자 전 조합에서 결과가 같다', () => {
+  it('역할·권한·소속·SR 고객사·신청자·담당자 전 조합에서 결과가 같다', () => {
     let compared = 0;
     for (const roles of roleSets) {
       for (const permissions of permissionSets) {
         for (const clientIds of clientIdSets) {
-          for (const requesterId of people) {
-            for (const assigneeId of [...people, null]) {
-              const viewer: ReopenViewer = { id: 'viewer', roles, permissions, clientIds };
-              const sr = { id: 'sr-1', clientId: 'client-1', requesterId, assigneeId };
-              const user: AuthenticatedUser = {
-                ...viewer,
-                email: 'viewer@example.com',
-                name: null,
-                image: null,
-              };
-              expect(
-                canViewerUpdateSR(viewer, sr),
-                JSON.stringify({ roles, permissions, clientIds, requesterId, assigneeId })
-              ).toBe(canUpdateSR(user, sr));
-              compared++;
+          for (const srClientId of srClientIds) {
+            for (const requesterId of people) {
+              for (const assigneeId of [...people, null]) {
+                const viewer: ReopenViewer = { id: 'viewer', roles, permissions, clientIds };
+                const sr = { id: 'sr-1', clientId: srClientId, requesterId, assigneeId };
+                const user: AuthenticatedUser = {
+                  ...viewer,
+                  email: 'viewer@example.com',
+                  name: null,
+                  image: null,
+                };
+                expect(
+                  canViewerUpdateSR(viewer, sr),
+                  JSON.stringify({
+                    roles,
+                    permissions,
+                    clientIds,
+                    srClientId,
+                    requesterId,
+                    assigneeId,
+                  })
+                  // 선언 타입은 null 을 받지 않는다. 여기서 대조하는 것은 **런타임 동작** 이다.
+                ).toBe(canUpdateSR(user, sr as SRAccessFields));
+                compared++;
+              }
             }
           }
         }
@@ -272,7 +293,12 @@ describe('canViewerUpdateSR ↔ policies.canUpdateSR 동치', () => {
     }
     // 루프가 조용히 비어 "0건 대조로 통과" 하지 않았음을 못박는다.
     expect(compared).toBe(
-      roleSets.length * permissionSets.length * clientIdSets.length * people.length * 3
+      roleSets.length *
+        permissionSets.length *
+        clientIdSets.length *
+        srClientIds.length *
+        people.length *
+        3
     );
   });
 });

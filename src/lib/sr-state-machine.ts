@@ -522,7 +522,8 @@ export interface ReopenAvailability {
  * CLIENT_USER 는 역할표(TRANSITION_ROLES)만 보고 활성 재오픈 버튼을 받은 뒤 403 을 맞는다.
  *
  * ⚠️ 사본이므로 갈라질 수 있다. `src/lib/__tests__/sr-reopen-availability.test.ts` 가
- * 역할·권한·소속·신청자·담당자 조합 전체에서 policies.canUpdateSR 과 결과가 같은지 대조한다.
+ * 역할·권한·소속·SR 고객사·신청자·담당자 조합 전체에서 policies.canUpdateSR 과 결과가
+ * 같은지 대조한다(아래 `!!sr.clientId` 가드도 그 대조에 포함된다).
  * canUpdateSR 을 고치면 여기도 함께 고쳐야 그 테스트가 통과한다.
  */
 export function canViewerUpdateSR(
