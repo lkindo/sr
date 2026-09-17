@@ -701,7 +701,7 @@ jobs:
       # SARIF 업로드는 GitHub Advanced Security 가 켜져 있어야 성공한다.
       # 리포트 발행 실패로 파이프라인을 막지 않는다(의도된 비게이팅).
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
         if: always()
         continue-on-error: true
         with:
