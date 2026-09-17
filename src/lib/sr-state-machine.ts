@@ -578,11 +578,17 @@ export function getReopenAvailability(
 
   if (!canViewerUpdateSR(viewer, sr)) {
     const isInternal = (viewer.roles ?? []).some((role) => INTERNAL_ROLE_NAMES.includes(role));
+    // 신청자 본인에게 "요청자 본인 또는 고객사 관리자만 재오픈할 수 있습니다" 라고 말하면,
+    // 자기가 그 요청자인데 왜 막혔는지 알 수 없고 "요청자에게 요청해주세요" 는 자기 자신을
+    // 가리킨다. 본인에게 모자란 것은 자격이 아니라 **권한**(SR:UPDATE_SELF)이므로,
+    // 내부 사용자와 같이 권한을 말하고 다음 행동(관리자 문의)을 준다.
+    // 인가 자체는 그대로다 — 두 경우 모두 서버는 ensureCanUpdateSR 에서 403 이다.
+    const lacksPermission = isInternal || isRequester;
     return {
       visible: true,
       block: {
         code: 'NOT_PERMITTED',
-        message: isInternal
+        message: lacksPermission
           ? '이 SR을 수정할 권한이 없어 재오픈할 수 없습니다. 관리자에게 문의해주세요.'
           : '요청자 본인 또는 고객사 관리자만 재오픈할 수 있습니다. 재오픈이 필요하면 요청자나 고객사 관리자에게 요청해주세요.',
       },

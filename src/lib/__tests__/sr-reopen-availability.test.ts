@@ -367,6 +367,36 @@ describe('getReopenAvailability', () => {
   });
 
   /**
+   * 신청자 본인인데 SR:UPDATE_SELF 를 잃은 경우(권한을 좁힌 커스텀 역할 등).
+   *
+   * 위 "신청자가 아닌 CLIENT_USER" 와 같은 분기로 떨어지지만, 그때의 외부용 문구를
+   * 신청자에게 그대로 보여 주면 **본인이 요청자인데** "요청자 본인 또는 고객사 관리자만
+   * 재오픈할 수 있습니다 … 요청자에게 요청해주세요" 를 읽게 된다. 자기 자신을 가리키는
+   * 안내라 다음 행동이 없다. 모자란 것은 자격이 아니라 권한이므로 그렇게 말한다.
+   *
+   * 인가는 바뀌지 않는다 — 서버는 이 사용자에게 여전히 403 이다(아래 canViewerUpdateSR 단언).
+   */
+  it('신청자 본인이 SR 수정 권한을 잃으면 자기 자신을 가리키는 문구를 주지 않는다', () => {
+    const requester: ReopenViewer = {
+      id: 'requester',
+      roles: ['CLIENT_USER'],
+      // 시드 CLIENT_USER 에서 SR:UPDATE_SELF 만 뺐다.
+      permissions: ['SR:READ', 'SR:CONFIRM'],
+      clientIds: ['client-1'],
+    };
+    expect(requester.id).toBe(freshSR.requesterId);
+    expect(canViewerUpdateSR(requester, freshSR)).toBe(false);
+
+    const result = getReopenAvailability('COMPLETED', freshSR, requester, NOW);
+    expect(result.visible).toBe(true);
+    expect(result.block?.code).toBe('NOT_PERMITTED');
+    expect(result.block?.message).toBe(
+      '이 SR을 수정할 권한이 없어 재오픈할 수 없습니다. 관리자에게 문의해주세요.'
+    );
+    expect(result.block?.message).not.toContain('요청자');
+  });
+
+  /**
    * 신청자이고 SR 수정도 되지만 재오픈 전이 권한이 없는 경우(예: 커스텀 역할).
    * 예전에는 신청자라는 이유만으로 활성 버튼을 받고 서버 인가에서 400 을 맞았다.
    * 이유 문구는 서버 인가 단계의 문구와 글자까지 같다.
