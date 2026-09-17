@@ -44,7 +44,10 @@ const activityTypeLabels: Record<SRActivityType, string> = {
   COMMENTED: '댓글',
   ATTACHMENT_ADDED: '첨부 추가',
   ATTACHMENT_REMOVED: '첨부 삭제',
-  REOPENED: '재요청',
+  // '재요청' 이 아니다 — 이 이력은 완료/확인완료 SR 을 진행중으로 되돌린 **재오픈**이다.
+  // 버튼·다이얼로그·서버 문구가 전부 '재오픈' 인데 이력만 '재요청' 이라 다른 일로 읽혔고,
+  // REJECTED 가 재요청 불가(종착)라는 규칙과도 헷갈렸다.
+  REOPENED: '재오픈',
   COMPLETED: '완료',
   REJECTED: '거절', // statusLabels.REJECTED 와 같은 문구여야 한다(위 주석 참조).
   INTAKE_UPDATED: '접수 정보 수정',
@@ -59,7 +62,8 @@ const activityTypeColors: Record<SRActivityType, 'default' | 'secondary' | 'dest
   COMMENTED: 'secondary',
   ATTACHMENT_ADDED: 'secondary',
   ATTACHMENT_REMOVED: 'secondary',
-  REOPENED: 'destructive',
+  // 재오픈은 오류가 아니라 정상 전이다(사유 필수·7일 창 안). 거절과 같은 빨강이면 실패로 읽힌다.
+  REOPENED: 'secondary',
   COMPLETED: 'default',
   REJECTED: 'destructive',
   INTAKE_UPDATED: 'secondary',
