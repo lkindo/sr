@@ -78,7 +78,7 @@
     "nodemailer": "^9.0.5",
     "pino": "^10.3.1",
     "react": "^19.3.0",
-    "react-day-picker": "^9.13.2",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.3.0",
     "react-hook-form": "^7.87.0",
     "server-only": "^0.0.1",
