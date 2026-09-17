@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Checking DNS resolution for lkindo.kr, sr.lkindo.kr and test.lkindo.kr..."
+echo "Checking DNS resolution for lkindo.kr, sr.lkindo.kr, test.lkindo.kr and status.lkindo.kr..."
 if ! nslookup lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
   echo "Error: lkindo.kr does not resolve yet."
   exit 1
@@ -12,6 +12,10 @@ if ! nslookup sr.lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
 fi
 if ! nslookup test.lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
   echo "Error: test.lkindo.kr does not resolve yet. Please wait for DNS propagation."
+  exit 1
+fi
+if ! nslookup status.lkindo.kr 8.8.8.8 > /dev/null 2>&1; then
+  echo "Error: status.lkindo.kr does not resolve yet. Please wait for DNS propagation."
   exit 1
 fi
 
@@ -25,7 +29,7 @@ docker run --rm \
   certbot/certbot certonly --webroot \
   --webroot-path=/usr/share/nginx/html \
   --cert-name lkindo.kr \
-  -d lkindo.kr -d www.lkindo.kr -d sr.lkindo.kr -d test.lkindo.kr \
+  -d lkindo.kr -d www.lkindo.kr -d sr.lkindo.kr -d test.lkindo.kr -d status.lkindo.kr \
   --email lkind@naver.com --agree-tos --no-eff-email --keep-until-expiring \
   --expand --non-interactive
 
