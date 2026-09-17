@@ -262,12 +262,16 @@ describe('SRStatusActions Component', () => {
    * 글로 알렸다. 스테이징의 "ADMIN 이 재오픈을 못 한다" 보고가 그 글을 보지 못한 채 들어왔다.
    */
   describe('재오픈이 막힌 경우', () => {
-    const expectBlocked = (message: string | RegExp) => {
-      // 안내는 제목('재오픈할 수 없습니다') 뒤에 이유가 온다. 이유 정규식의 ^ 는 그 뒤에 건다.
+    /**
+     * @param title 안내 제목 — 막힌 이유의 요약이다(코드별로 다르다).
+     * @param message 안내 본문 — 서버 거부 문구와 같은 글자여야 한다.
+     */
+    const expectBlocked = (title: string, message: string | RegExp) => {
+      // 안내는 제목 뒤에 본문이 온다. 본문 정규식의 ^ 는 그 뒤에 건다.
       const withTitle = (separator: string) =>
         typeof message === 'string'
-          ? `재오픈할 수 없습니다${separator}${message}`
-          : new RegExp(`^재오픈할 수 없습니다${separator}${message.source.replace(/^\^/, '')}`);
+          ? `${title}${separator}${message}`
+          : new RegExp(`^${title}${separator}${message.source.replace(/^\^/, '')}`);
 
       const button = reopenButton();
       expect(button).toBeDisabled();
@@ -284,9 +288,7 @@ describe('SRStatusActions Component', () => {
       // 안내 제목은 **헤딩이 아니다**. 이 안내는 상세 페이지의 h1(SR 번호)과 h2(상세 정보)
       // 사이에 들어가므로, 헤딩으로 그리면 h1 → h5 → h2 가 되어 heading-order 를 깨뜨린다
       // (e2e/21 이 axe 로 같은 회귀를 페이지 전체에서 막는다).
-      expect(
-        screen.queryByRole('heading', { name: '재오픈할 수 없습니다' })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
 
       // 다이얼로그에도 같은 이유가 간다(열린 뒤 막히는 경우의 방어).
       const dialog = screen.getByTestId('reopen-dialog');
@@ -311,8 +313,9 @@ describe('SRStatusActions Component', () => {
         />
       );
       expectBlocked(
+        '재오픈 기한이 지났습니다',
         '완료 후 7일이 지나 재오픈할 수 없습니다. ' +
-          '(완료 2026-01-05 14:00 · 재오픈 기한 2026-01-12 14:00) ' +
+          '(완료 2026. 01. 05. 14:00 · 재오픈 기한 2026. 01. 12. 14:00) ' +
           '추가 작업이 필요하면 새 SR을 등록해주세요.'
       );
     });
@@ -327,7 +330,10 @@ describe('SRStatusActions Component', () => {
           confirmedAt={new Date(Date.now() - 8 * DAY)}
         />
       );
-      expectBlocked(/^확인 후 7일이 지나 재오픈할 수 없습니다\. \(확인 /);
+      expectBlocked(
+        '재오픈 기한이 지났습니다',
+        /^확인 후 7일이 지나 재오픈할 수 없습니다\. \(확인 /
+      );
     });
 
     /**
@@ -357,14 +363,20 @@ describe('SRStatusActions Component', () => {
       render(
         <Harness {...defaultProps} status="COMPLETED" userRoles={['ADMIN']} completedAt={null} />
       );
-      expectBlocked(/^종결 시각 기록이 없어 .*관리자에게 문의해주세요\.$/);
+      expectBlocked(
+        '재오픈 기한을 확인할 수 없습니다',
+        /^완료 시각 기록이 없어 .*관리자에게 문의해주세요\.$/
+      );
     });
 
     it('담당자가 없으면 막힌다', () => {
       render(
         <Harness {...defaultProps} status="COMPLETED" userRoles={['ADMIN']} assigneeId={null} />
       );
-      expectBlocked(/^담당자가 지정되지 않아 재오픈할 수 없습니다\./);
+      expectBlocked(
+        '담당자가 지정되지 않았습니다',
+        /^담당자가 지정되지 않아 재오픈할 수 없습니다\./
+      );
     });
 
     it('신청자가 아닌 같은 고객사 CLIENT_USER 는 403 대신 비활성 버튼과 이유를 받는다', () => {
@@ -377,6 +389,7 @@ describe('SRStatusActions Component', () => {
         />
       );
       expectBlocked(
+        '재오픈 권한이 없습니다',
         '요청자 본인 또는 고객사 관리자만 재오픈할 수 있습니다. ' +
           '재오픈이 필요하면 요청자나 고객사 관리자에게 요청해주세요.'
       );
@@ -392,7 +405,7 @@ describe('SRStatusActions Component', () => {
           isRequestor={true}
         />
       );
-      expectBlocked(/^이 상태 변경을 수행할 권한이 없습니다\./);
+      expectBlocked('재오픈 권한이 없습니다', /^이 상태 변경을 수행할 권한이 없습니다\./);
     });
 
     it('막히지 않았으면 안내를 그리지 않는다', () => {

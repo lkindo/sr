@@ -332,14 +332,13 @@ describe('SRStatusChangeDialog — 실패', () => {
     write('처리 완료');
     submit('완료 처리');
 
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '오류',
-          description: '허용되지 않는 상태 전이입니다.',
-          variant: 'destructive',
-        })
-      )
+    // 이유는 다이얼로그 안에 남고, 토스트는 실패 사실만 짧게 알린다(중복 낭독 방지).
+    expect(await screen.findByRole('alert')).toHaveTextContent('허용되지 않는 상태 전이입니다.');
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '완료 처리하지 못했습니다', variant: 'destructive' })
+    );
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ description: '허용되지 않는 상태 전이입니다.' })
     );
 
     expect(onOpenChange).not.toHaveBeenCalled();
@@ -359,7 +358,7 @@ describe('SRStatusChangeDialog — 실패', () => {
   it.each([
     [
       400,
-      '완료 후 7일이 지나 재오픈할 수 없습니다. (완료 2026-09-01 14:00 · 재오픈 기한 2026-09-08 14:00) 추가 작업이 필요하면 새 SR을 등록해주세요.',
+      '완료 후 7일이 지나 재오픈할 수 없습니다. (완료 2026. 09. 01. 14:00 · 재오픈 기한 2026. 09. 08. 14:00) 추가 작업이 필요하면 새 SR을 등록해주세요.',
     ],
     [403, 'SR 수정 권한이 없습니다.'],
   ] as const)(
@@ -377,10 +376,12 @@ describe('SRStatusChangeDialog — 실패', () => {
 
       const inline = await screen.findByRole('alert');
       expect(inline).toHaveTextContent(message);
-      // 토스트도 그대로 띄운다(기존 계약).
+      // 토스트는 짧은 제목만 맡는다 — 같은 긴 문장을 인라인과 토스트가 동시에 말하면
+      // 낭독기가 두 번 읽고 390px 에서는 토스트가 헤더를 덮는다.
       expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '오류', description: message, variant: 'destructive' })
+        expect.objectContaining({ title: '재오픈하지 못했습니다', variant: 'destructive' })
       );
+      expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ description: message }));
       expect(onOpenChange).not.toHaveBeenCalled();
     }
   );
@@ -429,14 +430,10 @@ describe('SRStatusChangeDialog — 실패', () => {
     write('중복 요청');
     submit('거절 처리');
 
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '오류',
-          description: '상태 변경에 실패했습니다.',
-          variant: 'destructive',
-        })
-      )
+    // 본문이 없으면 기본 문구가 인라인 오류로 남고, 토스트는 실패 사실만 알린다.
+    expect(await screen.findByRole('alert')).toHaveTextContent('상태 변경에 실패했습니다.');
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '거절 처리하지 못했습니다', variant: 'destructive' })
     );
   });
 });

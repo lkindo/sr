@@ -374,7 +374,7 @@ describe('validateTransition — 전이 맥락 규칙', () => {
       { changeReason: '재작업' }
     );
     expect(result.valid).toBe(false);
-    expect(result.message).toContain('종결 시각');
+    expect(result.message).toContain('완료 시각 기록이 없어');
   });
 
   // ── 담당자 요건 (재오픈 = 진행중 전이) ──────────────────────────────────
@@ -432,6 +432,6 @@ describe('validateTransition — 전이 맥락 규칙', () => {
       { changeReason: '재작업' }
     );
     expect(result.valid).toBe(false);
-    expect(result.message).toContain('종결 시각');
+    expect(result.message).toContain('완료 시각 기록이 없어');
   });
 });

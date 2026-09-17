@@ -7,7 +7,7 @@
 import type { SRStatus } from '@prisma/client';
 
 import { statusLabelOf } from '@/lib/constants/sr';
-import { formatAppZoneTime, formatISODateInAppZone } from '@/lib/timezone';
+import { formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
 export type { SRStatus };
 
 /**
@@ -47,9 +47,15 @@ function reopenAnchor(
   return { at: parsed, label: useConfirmed ? '확인' : '완료' };
 }
 
-/** 안내 문구에 싣는 시각. 사용자는 KST 로 읽으므로 앱 타임존으로 고정한다. */
+/**
+ * 안내 문구에 싣는 시각. 사용자는 KST 로 읽으므로 앱 타임존으로 고정한다.
+ *
+ * 표기는 화면의 다른 일시와 같은 `YYYY. MM. DD. HH:mm` 이다(settings/outbox 와 같은 조합).
+ * `formatISODateInAppZone` 의 `YYYY-MM-DD` 는 파일명·date input 용 표기라 같은 페이지의
+ * 접수 일시("2026. 09. 16. …")와 나란히 놓이면 다른 시스템의 값처럼 보인다.
+ */
 function formatReopenDateTime(value: Date): string {
-  return `${formatISODateInAppZone(value)} ${formatAppZoneTime(value)}`;
+  return `${formatAppZoneDate(value)} ${formatAppZoneTime(value)}`;
 }
 
 /** 재오픈이 막힌 이유의 종류. UI 분기·테스트가 문구 대신 이 코드로 판정한다. */
@@ -105,10 +111,13 @@ export function getReopenBlock(
 
   const anchor = reopenAnchor(from, sr);
   if (!anchor) {
+    // 화면에 없는 '종결 시각' 대신 사용자가 상세 화면에서 보는 이름(완료/확인)으로 말하고,
+    // 부정을 한 번만 쓴다("…없어 …없으므로 …없습니다" 는 읽고도 이유가 남지 않는다).
+    const missing = from === 'CONFIRMED' ? '확인' : '완료';
     return {
       code: 'ANCHOR_UNKNOWN',
       message:
-        `종결 시각 기록이 없어 재오픈 기한(${REOPEN_WINDOW_DAYS}일)을 판단할 수 없으므로 재오픈할 수 없습니다. ` +
+        `${missing} 시각 기록이 없어 재오픈 기한(${REOPEN_WINDOW_DAYS}일)을 확인할 수 없습니다. ` +
         '추가 작업이 필요하면 새 SR을 등록하거나 관리자에게 문의해주세요.',
     };
   }

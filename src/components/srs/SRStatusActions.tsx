@@ -17,7 +17,7 @@ import { Alert, AlertDescription, Button } from '@/components/ui';
 import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
-import type { ReopenAvailability } from '@/lib/sr-state-machine';
+import type { ReopenAvailability, ReopenBlock } from '@/lib/sr-state-machine';
 
 import { SRStatusChangeDialog } from './SRStatusChangeDialog';
 
@@ -49,6 +49,22 @@ interface SRStatusActionsProps {
 }
 
 /**
+ * 안내 제목 — 막힌 **이유의 요약**이다.
+ *
+ * 본문은 서버 거부 문구 그대로라 "…재오픈할 수 없습니다." 로 시작한다. 제목까지 같은
+ * 문장이면 한 화면에서 같은 말을 두 번 하고, 정작 사용자가 찾는 "왜" 는 본문을 읽어야
+ * 나온다. 제목이 이유를 먼저 말하고 본문이 근거(시각·기한)와 다음 행동을 잇는다.
+ *
+ * 문구가 아니라 `code` 로 고른다 — 서버 문구가 다듬어져도 여기가 따라 깨지지 않는다.
+ */
+const REOPEN_BLOCK_TITLES: Record<ReopenBlock['code'], string> = {
+  WINDOW_EXPIRED: '재오픈 기한이 지났습니다',
+  ANCHOR_UNKNOWN: '재오픈 기한을 확인할 수 없습니다',
+  ASSIGNEE_MISSING: '담당자가 지정되지 않았습니다',
+  NOT_PERMITTED: '재오픈 권한이 없습니다',
+};
+
+/**
  * 재오픈이 막힌 이유를 **화면에 보이는 글**로 알린다.
  *
  * 툴팁이나 다이얼로그 안의 한 줄로는 부족했다 — 비활성 버튼은 포인터 이벤트가 없어
@@ -67,7 +83,9 @@ export function SRReopenBlockedNotice({ reopen }: { reopen: ReopenAvailability }
           heading-order 를 깨뜨린다(axe 로 실측: 안내가 뜬 페이지에서만 위반 1건).
           같은 페이지에서 이미 한 번 고친 문제다(page.tsx 의 h2 주석). 보이는 모양은
           AlertTitle 과 같은 클래스로 유지한다. */}
-      <p className="mb-1 font-medium leading-none tracking-tight">재오픈할 수 없습니다</p>
+      <p className="mb-1 font-medium leading-none tracking-tight">
+        {REOPEN_BLOCK_TITLES[reopen.block.code]}
+      </p>
       <AlertDescription>{reopen.block.message}</AlertDescription>
     </Alert>
   );

@@ -236,9 +236,11 @@ export function SRStatusChangeDialog({
     onError: (error) => {
       const message = error instanceof Error ? error.message : '상태 변경에 실패했습니다.';
       setServerError(message);
+      // 이유는 아래 인라인 alert 가 다이얼로그 안에 **남긴다**. 토스트까지 같은 긴 문장을
+      // 반복하면 낭독기가 두 번 읽고, 390px 에서는 토스트가 헤더를 덮는다.
+      // 토스트는 "실패했다" 는 사실만 짧게 알리고 이유는 화면에 남는 쪽에 맡긴다.
       toast({
-        title: '오류',
-        description: message,
+        title: `${config.submitLabel}하지 못했습니다`,
         variant: 'destructive',
       });
     },

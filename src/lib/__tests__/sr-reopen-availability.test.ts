@@ -108,7 +108,7 @@ describe('getReopenBlock — 기산점은 출발 상태를 따른다', () => {
 });
 
 describe('getReopenBlock — 안내 문구의 날짜는 KST 다', () => {
-  it('완료 시각과 재오픈 기한을 KST "YYYY-MM-DD HH:mm" 으로 싣고 다음 행동을 안내한다', () => {
+  it('완료 시각과 재오픈 기한을 KST "YYYY. MM. DD. HH:mm" 으로 싣고 다음 행동을 안내한다', () => {
     // 2026-09-01 05:00 UTC = 2026-09-01 14:00 KST
     const block = getReopenBlock(
       'COMPLETED',
@@ -117,7 +117,7 @@ describe('getReopenBlock — 안내 문구의 날짜는 KST 다', () => {
     );
     expect(block?.message).toBe(
       '완료 후 7일이 지나 재오픈할 수 없습니다. ' +
-        '(완료 2026-09-01 14:00 · 재오픈 기한 2026-09-08 14:00) ' +
+        '(완료 2026. 09. 01. 14:00 · 재오픈 기한 2026. 09. 08. 14:00) ' +
         '추가 작업이 필요하면 새 SR을 등록해주세요.'
     );
   });
@@ -129,24 +129,34 @@ describe('getReopenBlock — 안내 문구의 날짜는 KST 다', () => {
       { assigneeId: 'eng-1', completedAt: '2026-09-01T16:30:00.000Z' },
       NOW
     );
-    expect(block?.message).toContain('(완료 2026-09-02 01:30 · 재오픈 기한 2026-09-09 01:30)');
+    expect(block?.message).toContain(
+      '(완료 2026. 09. 02. 01:30 · 재오픈 기한 2026. 09. 09. 01:30)'
+    );
   });
 });
 
 describe('getReopenBlock — fail-closed 와 담당자', () => {
   it.each([
-    ['COMPLETED, 완료 시각 NULL', 'COMPLETED', { completedAt: null }],
-    ['COMPLETED, 완료 시각 없음', 'COMPLETED', {}],
-    ['COMPLETED, 파싱 불가', 'COMPLETED', { completedAt: 'not-a-date' }],
-    ['CONFIRMED, 둘 다 NULL', 'CONFIRMED', { completedAt: null, confirmedAt: null }],
+    ['COMPLETED, 완료 시각 NULL', 'COMPLETED', { completedAt: null }, '완료'],
+    ['COMPLETED, 완료 시각 없음', 'COMPLETED', {}, '완료'],
+    ['COMPLETED, 파싱 불가', 'COMPLETED', { completedAt: 'not-a-date' }, '완료'],
+    ['CONFIRMED, 둘 다 NULL', 'CONFIRMED', { completedAt: null, confirmedAt: null }, '확인'],
     // 빈 문자열은 "값이 없다" 가 아니라 **손상된 기록**이다. completedAt 으로 폴백해
-    // 재오픈을 열어 주면 fail-closed 가 아니다(`??` 를 truthy 검사로 바꾸면 그렇게 된다).
-    ['CONFIRMED, 확인 시각이 빈 문자열', 'CONFIRMED', { completedAt: ago(DAY), confirmedAt: '' }],
-  ] as const)('%s 이면 ANCHOR_UNKNOWN 으로 거부한다', (_label, status, data) => {
+    // 재오픈을 열어 주면 fail-closed 가 아니다(?? 를 truthy 검사로 바꾸면 그렇게 된다).
+    [
+      'CONFIRMED, 확인 시각이 빈 문자열',
+      'CONFIRMED',
+      { completedAt: ago(DAY), confirmedAt: '' },
+      '확인',
+    ],
+  ] as const)('%s 이면 ANCHOR_UNKNOWN 으로 거부한다', (_label, status, data, missing) => {
     const block = getReopenBlock(status, { assigneeId: 'eng-1', ...data }, NOW);
     expect(block?.code).toBe('ANCHOR_UNKNOWN');
-    expect(block?.message).toContain('종결 시각');
-    expect(block?.message).toContain('관리자에게 문의');
+    // 화면에 없는 '종결 시각' 이 아니라 사용자가 보는 이름(완료/확인)으로 말한다.
+    expect(block?.message).toBe(
+      `${missing} 시각 기록이 없어 재오픈 기한(7일)을 확인할 수 없습니다. ` +
+        '추가 작업이 필요하면 새 SR을 등록하거나 관리자에게 문의해주세요.'
+    );
     expect(block?.anchorAt).toBeUndefined();
   });
 
