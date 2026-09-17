@@ -224,7 +224,7 @@ jobs:
       # 토큰을 받아 CODECOV_TOKEN 시크릿에 넣으면 되고, 쓰지 않기로 하면 이 스텝을
       # 통째로 지우면 된다(현재 배지·문서 어디에서도 참조하지 않는다).
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
+        uses: codecov/codecov-action@0b35c9ecc4f0529d0eb674914510c22f85b196b4 # v7
         if: success()
         with:
           files: ./coverage/coverage-final.json
