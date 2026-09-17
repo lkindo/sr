@@ -20,6 +20,7 @@ import { Textarea } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { apiPatch } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { FIELD_LIMITS } from '@/lib/schemas';
 import { formatISODateInAppZone } from '@/lib/timezone';
 
 /**
@@ -48,6 +49,12 @@ interface ActionConfig {
   helpText: string;
   /** 서버가 받는 본문 키. complete 만 resolutionDescription 이고 나머지는 reason 이다. */
   bodyKey: 'resolutionDescription' | 'reason';
+  /**
+   * 입력 최대 길이. 서버 `statusActionSchema` 의 상한과 같은 상수를 쓴다 — reason 은
+   * sr_status_history.change_reason 으로 흘러가는 255자, 해결 내용은 NOTE 상한이다.
+   * 막지 않으면 사용자는 긴 사유를 다 쓴 뒤에야 서버 400 으로 알게 된다.
+   */
+  maxLength: number;
   submitLabel: string;
   submitVariant?: 'default' | 'secondary' | 'destructive';
   /** 입력이 비었을 때의 오류 문구. */
@@ -75,6 +82,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
     placeholder: '어떻게 해결했는지 상세히 기록해주세요...',
     helpText: '신청자가 확인할 수 있는 내용입니다. (Ctrl+Enter로 저장)',
     bodyKey: 'resolutionDescription',
+    maxLength: FIELD_LIMITS.NOTE,
     submitLabel: '완료 처리',
     emptyError: '해결 내용을 입력해주세요.',
     successMessage: 'SR이 완료 처리되었습니다.',
@@ -88,6 +96,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
     placeholder: '추가 정보 대기, 고객 응답 대기, 외부 의존성 대기 등...',
     helpText: '보류 사유는 활동 기록에 저장되며 관련자가 확인할 수 있습니다. (Ctrl+Enter로 저장)',
     bodyKey: 'reason',
+    maxLength: FIELD_LIMITS.SHORT_TEXT,
     submitLabel: '보류 처리',
     submitVariant: 'secondary',
     emptyError: '보류 사유를 입력해주세요.',
@@ -108,6 +117,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
     placeholder: '거절 사유를 명확히 기입해주세요...',
     helpText: '신청자에게 거절 사유가 전달됩니다. (Ctrl+Enter로 저장)',
     bodyKey: 'reason',
+    maxLength: FIELD_LIMITS.SHORT_TEXT,
     submitLabel: '거절 처리',
     submitVariant: 'destructive',
     emptyError: '거절 사유를 입력해주세요.',
@@ -122,6 +132,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
     placeholder: '문제가 재발견되었거나 추가 작업이 필요한 이유를 기입해주세요...',
     helpText: "재오픈 시 SR 상태가 '진행중'으로 변경됩니다. (Ctrl+Enter로 저장)",
     bodyKey: 'reason',
+    maxLength: FIELD_LIMITS.SHORT_TEXT,
     submitLabel: '재오픈',
     emptyError: '재오픈 사유를 입력해주세요.',
     successMessage: 'SR이 재오픈되었습니다.',
@@ -136,7 +147,8 @@ interface SRStatusChangeDialogProps {
   srNumber: string;
   /**
    * 값이 있으면 입력과 제출을 막고 그 문구를 경고로 띄운다.
-   * 재오픈의 "완료 후 7일" 창이 이 형태로 들어온다 — 넷 중 하나만 갖는 제약을
+   * 재오픈 불가 사유(sr-state-machine 의 getReopenBlock — 7일 창·기산점·담당자·권한)가
+   * 이 형태로 들어온다 — 넷 중 하나만 갖는 제약을
    * 컴포넌트 안에 특수 분기로 넣는 대신 호출부가 판정해 넘긴다.
    */
   disabledReason?: string | null;
@@ -155,11 +167,22 @@ export function SRStatusChangeDialog({
 
   const [text, setText] = useState('');
   const [dateValue, setDateValue] = useState('');
+  /**
+   * 서버가 거부한 이유. 토스트는 몇 초 뒤 사라지는데, 재오픈 창 만료처럼 **다시 눌러도
+   * 같은 답이 나오는** 거부는 이유가 남아 있어야 사용자가 다음 행동(새 SR 등록 등)을 정한다.
+   * 다음 제출을 시작하거나 다이얼로그를 닫으면 지운다.
+   */
+  const [serverError, setServerError] = useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const blocked = Boolean(disabledReason);
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setServerError(null);
+    onOpenChange(next);
+  };
 
   /**
    * 상태 전이 요청.
@@ -211,9 +234,11 @@ export function SRStatusChangeDialog({
       router.push('/srs');
     },
     onError: (error) => {
+      const message = error instanceof Error ? error.message : '상태 변경에 실패했습니다.';
+      setServerError(message);
       toast({
         title: '오류',
-        description: error instanceof Error ? error.message : '상태 변경에 실패했습니다.',
+        description: message,
         variant: 'destructive',
       });
     },
@@ -234,11 +259,12 @@ export function SRStatusChangeDialog({
       return;
     }
 
+    setServerError(null);
     changeStatus({ trimmed, date: dateValue });
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -258,6 +284,17 @@ export function SRStatusChangeDialog({
               </div>
             )}
 
+            {/* 제출 결과로 생긴 오류라 즉시 낭독되도록 alert 로 둔다. 차단 사유와 같으면 중복이므로 생략. */}
+            {serverError && serverError !== disabledReason && (
+              <div
+                role="alert"
+                data-testid="sr-status-dialog-server-error"
+                className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {serverError}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="sr-status-reason">
                 {config.fieldLabel} <span className="text-destructive">*</span>
@@ -267,6 +304,7 @@ export function SRStatusChangeDialog({
                 placeholder={config.placeholder}
                 className="min-h-[120px]"
                 value={text}
+                maxLength={config.maxLength}
                 onChange={(e) => setText(e.target.value)}
                 disabled={loading || blocked}
                 onKeyDown={(e) => {
@@ -300,7 +338,7 @@ export function SRStatusChangeDialog({
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => handleOpenChange(false)}
               disabled={loading}
             >
               취소

@@ -72,10 +72,10 @@ const okFetch = () =>
   );
 
 /** 실패는 4xx 로 만든다 — 5xx 는 재시도 백오프 때문에 대기가 늘어진다. */
-const failFetch = (message: string) =>
+const failFetch = (message: string, status = 400) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: message }) }))
+    vi.fn(async () => ({ ok: false, status, json: async () => ({ error: message }) }))
   );
 
 /** 마지막 요청의 URL·메서드·본문. */
@@ -218,6 +218,22 @@ describe('SRStatusChangeDialog — 검증', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  /**
+   * 입력 상한은 서버 스키마(statusActionSchema)와 같은 상수다. 사유는 255자 —
+   * 막지 않으면 긴 사유를 다 쓴 뒤에야 서버 400 으로 알게 된다.
+   */
+  it.each([
+    ['hold', 255],
+    ['reject', 255],
+    ['reopen', 255],
+    ['complete', 5000],
+  ] as const)('%s 입력은 최대 %i 자로 제한한다', (action, max) => {
+    const { wrapper } = setup();
+    render(<SRStatusChangeDialog {...baseProps} action={action} />, { wrapper });
+
+    expect(field()).toHaveAttribute('maxlength', String(max));
+  });
+
   it('Ctrl+Enter 로도 제출한다', async () => {
     const { wrapper } = setup();
     render(<SRStatusChangeDialog {...baseProps} action="hold" />, { wrapper });
@@ -334,6 +350,70 @@ describe('SRStatusChangeDialog — 실패', () => {
     expect(router.push).not.toHaveBeenCalled();
     // 다시 시도할 수 있어야 한다.
     expect(screen.getByRole('button', { name: '완료 처리' })).toBeEnabled();
+  });
+
+  /**
+   * 토스트는 몇 초 뒤 사라진다. 재오픈 창 만료·권한 없음처럼 다시 눌러도 같은 답이 나오는
+   * 거부는 이유가 다이얼로그 안에 남아 있어야 사용자가 다음 행동을 정할 수 있다.
+   */
+  it.each([
+    [
+      400,
+      '완료 후 7일이 지나 재오픈할 수 없습니다. (완료 2026-09-01 14:00 · 재오픈 기한 2026-09-08 14:00) 추가 작업이 필요하면 새 SR을 등록해주세요.',
+    ],
+    [403, 'SR 수정 권한이 없습니다.'],
+  ] as const)(
+    '서버가 %i 으로 거부하면 그 이유를 다이얼로그 안에 남긴다',
+    async (status, message) => {
+      failFetch(message, status);
+      const { wrapper } = setup();
+      render(<SRStatusChangeDialog {...baseProps} action="reopen" />, { wrapper });
+
+      // 거부 전에는 오류 영역이 없다.
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+      write('같은 문제가 재발했습니다');
+      submit('재오픈');
+
+      const inline = await screen.findByRole('alert');
+      expect(inline).toHaveTextContent(message);
+      // 토스트도 그대로 띄운다(기존 계약).
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '오류', description: message, variant: 'destructive' })
+      );
+      expect(onOpenChange).not.toHaveBeenCalled();
+    }
+  );
+
+  it('다시 제출하거나 닫으면 남겨 둔 서버 오류를 지운다', async () => {
+    failFetch('다른 사용자가 먼저 이 SR을 변경했습니다.');
+    const { wrapper } = setup();
+    render(<SRStatusChangeDialog {...baseProps} action="reopen" />, { wrapper });
+
+    write('재작업 필요');
+    submit('재오픈');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // 다시 제출하면 새 판정을 기다리는 동안 지난 오류를 보이지 않는다.
+    let release!: (value: unknown) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      )
+    );
+    submit('재오픈');
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    release({ ok: false, status: 400, json: async () => ({ error: '또 실패' }) });
+    expect(await screen.findByRole('alert')).toHaveTextContent('또 실패');
+
+    // 취소로 닫으면 지운다 — 다음에 열었을 때 지난 오류가 남아 있으면 안 된다.
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   // 서버가 에러 본문을 주지 않아도(프록시 502, 빈 본문 등) 사용자에게 뭔가는 보여야 한다.
