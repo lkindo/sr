@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { qk } from '@/lib/query-keys';
+import { formatISODateInAppZone } from '@/lib/timezone';
 
 import { SRStatusChangeDialog } from '../SRStatusChangeDialog';
 
@@ -88,8 +89,13 @@ const write = (value: string) => fireEvent.change(field(), { target: { value } }
 /**
  * 보류의 예상 해제일 입력. 헌법 §2 는 보류에 사유 **와** 예상 해제일을 모두 요구하므로
  * hold 다이얼로그는 사유만으로 제출되지 않는다.
+ *
+ * 고정 날짜를 쓰면 안 된다. 입력의 `min` 이 실행 시점의 KST 오늘이라, 그 날이 지나면
+ * 값이 min 아래로 떨어져 jsdom 의 폼 검증(rangeUnderflow)이 버튼 제출을 조용히 막는다
+ * — '2026-09-01' 이 실제로 그렇게 시한폭탄이 됐다. 그래서 컴포넌트와 같은 헬퍼로
+ * 실행 시점 기준 30일 뒤를 만든다(KST 는 DST 가 없어 30×24h 가 곧 30 달력일이다).
  */
-const HOLD_RELEASE_DATE = '2026-09-01';
+const HOLD_RELEASE_DATE = formatISODateInAppZone(Date.now() + 30 * 24 * 60 * 60 * 1000);
 const writeHoldDate = (value: string = HOLD_RELEASE_DATE) =>
   fireEvent.change(screen.getByLabelText(/예상 해제일/), { target: { value } });
 const submit = (label: string | RegExp) =>
