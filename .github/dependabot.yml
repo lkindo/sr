@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: 'npm'
     directory: '/'
+    # 기본 브랜치(main)가 아니라 dev 로 연다. dev → test 배포 확인 → main 순서를 지키기 위해서다.
+    target-branch: 'dev'
     schedule:
       interval: 'weekly'
     open-pull-requests-limit: 5
@@ -13,6 +15,7 @@ updates:
 
   - package-ecosystem: 'github-actions'
     directory: '/'
+    target-branch: 'dev'
     schedule:
       interval: 'weekly'
     commit-message:
