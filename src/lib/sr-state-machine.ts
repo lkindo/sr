@@ -7,13 +7,16 @@
 import type { SRStatus } from '@prisma/client';
 
 import { statusLabelOf } from '@/lib/constants/sr';
+import { formatAppZoneTime, formatISODateInAppZone } from '@/lib/timezone';
 export type { SRStatus };
 
 /**
  * 재오픈 가능 창(일). 헌법 §2 의 "7일" 이 이 상수 하나로만 표현되도록 모은다.
  * 라우트·클라이언트가 각자 7 을 하드코딩하면 한쪽만 바뀌어 판정이 갈린다.
+ * (2026-09-18 까지 SRStatusActions 가 `REOPEN_WINDOW_MS` 사본을 들고 있었다.)
  */
 const REOPEN_WINDOW_DAYS = 7;
+const REOPEN_WINDOW_MS = REOPEN_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 /** 이 전이가 재오픈인가. 활동 이력 타입 분기 등 호출부가 같은 판정을 복제하지 않도록 export 한다. */
 export function isReopenTransition(from: SRStatus, to: SRStatus): boolean {
@@ -21,20 +24,122 @@ export function isReopenTransition(from: SRStatus, to: SRStatus): boolean {
 }
 
 /**
- * 재오픈 창의 기산점. 출발 상태에 따라 다르다 — 확인완료에서 되돌리면 확인 시각부터 센다.
+ * 재오픈 창의 기산점과 그 시각이 무엇인지(완료/확인). 출발 상태에 따라 다르다 —
+ * 확인완료에서 되돌리면 확인 시각부터 센다. 확인 시각이 없으면 완료 시각으로 폴백하며,
+ * 그때 안내 문구도 "완료" 로 말해야 사실과 맞는다.
  * 기산점을 알 수 없으면 null 을 돌려주며, 호출부는 이를 **거부** 로 처리한다(fail-closed).
  *
  * 모듈 내부 전용이다. 밖으로 내보내면 라우트가 다시 자체 창 판정을 갖게 되고,
- * 그게 정확히 2026-08-15 이전의 fail-open 버그가 생긴 경위다.
+ * 그게 정확히 2026-08-15 이전의 fail-open 버그가 생긴 경위다. 밖에서는 아래
+ * `getReopenBlock` 만 쓴다.
  */
-function reopenAnchorAt(
+function reopenAnchor(
   from: SRStatus,
   data: { completedAt?: Date | string | null; confirmedAt?: Date | string | null }
-): Date | null {
-  const raw = from === 'CONFIRMED' ? (data.confirmedAt ?? data.completedAt) : data.completedAt;
+): { at: Date; label: '완료' | '확인' } | null {
+  const useConfirmed = from === 'CONFIRMED' && !!data.confirmedAt;
+  const raw = useConfirmed ? data.confirmedAt : data.completedAt;
   if (!raw) return null;
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  if (Number.isNaN(parsed.getTime())) return null;
+  return { at: parsed, label: useConfirmed ? '확인' : '완료' };
+}
+
+/** 안내 문구에 싣는 시각. 사용자는 KST 로 읽으므로 앱 타임존으로 고정한다. */
+function formatReopenDateTime(value: Date): string {
+  return `${formatISODateInAppZone(value)} ${formatAppZoneTime(value)}`;
+}
+
+/** 재오픈이 막힌 이유의 종류. UI 분기·테스트가 문구 대신 이 코드로 판정한다. */
+type ReopenBlockCode =
+  /** 이 사용자에게는 재오픈 권한이 없다(UI 전용 — 서버는 인가 단계에서 403/400). */
+  | 'NOT_PERMITTED'
+  /** 기산점(완료/확인 시각)을 알 수 없다 — fail-closed. */
+  | 'ANCHOR_UNKNOWN'
+  /** 기산점으로부터 7일(168시간)이 지났다. */
+  | 'WINDOW_EXPIRED'
+  /** 담당자가 없다. 재오픈은 진행중 전이라 담당자가 필수인데 완료 상태에서는 지정할 수 없다. */
+  | 'ASSIGNEE_MISSING';
+
+export interface ReopenBlock {
+  code: ReopenBlockCode;
+  /** 사용자에게 그대로 보여 줄 문구. 서버 거부 메시지와 글자까지 같다. */
+  message: string;
+  /** 창의 기산점. 기산점을 알 수 없거나 권한 문제면 없다. */
+  anchorAt?: Date;
+  /** 재오픈 기한(기산점 + 7일). */
+  deadlineAt?: Date;
+}
+
+/** 재오픈 판정에 필요한 SR 필드. */
+export interface ReopenSubject {
+  completedAt?: Date | string | null;
+  confirmedAt?: Date | string | null;
+  assigneeId?: string | null;
+}
+
+/**
+ * 재오픈을 막는 **데이터 규칙**(창·기산점·담당자)의 단일 판정 지점.
+ *
+ * 서버(`validateTransition`)와 화면(`SRStatusActions`)이 모두 이 함수를 부른다.
+ * 예전에는 화면이 자체 사본(completedAt 만 보는 7일 판정)을 들고 있어서
+ *   - CONFIRMED 출발에서 서버는 confirmedAt, 화면은 completedAt 을 봐 늦게 확인한 SR 의
+ *     재오픈 버튼을 화면이 잘못 막았고 문구도 "확인 후" 가 아니라 "완료 후" 였다.
+ *   - 기산점이 NULL 이거나 담당자가 없으면 화면은 제출을 허용하고 서버가 400 을 돌려줬다.
+ * 규칙이 두 곳에 있으면 반드시 갈라진다. 여기 하나만 둔다.
+ *
+ * 판정 순서는 "고칠 수 없는 이유" 부터다: 기산점 불명 → 창 만료 → 담당자 없음.
+ * 권한은 여기서 보지 않는다(서버는 인가 단계에서 먼저 거른다) — `getReopenAvailability` 참고.
+ *
+ * @param from 현재 상태. 재오픈 출발 상태(COMPLETED/CONFIRMED)가 아니면 null.
+ * @param now 판정 시각. 테스트가 경계를 고정할 수 있게 주입받는다.
+ */
+export function getReopenBlock(
+  from: SRStatus,
+  sr: ReopenSubject,
+  now: Date | number = Date.now()
+): ReopenBlock | null {
+  if (from !== 'COMPLETED' && from !== 'CONFIRMED') return null;
+
+  const anchor = reopenAnchor(from, sr);
+  if (!anchor) {
+    return {
+      code: 'ANCHOR_UNKNOWN',
+      message:
+        `종결 시각 기록이 없어 재오픈 기한(${REOPEN_WINDOW_DAYS}일)을 판단할 수 없으므로 재오픈할 수 없습니다. ` +
+        '추가 작업이 필요하면 새 SR을 등록하거나 관리자에게 문의해주세요.',
+    };
+  }
+
+  const anchorAt = anchor.at;
+  const deadlineAt = new Date(anchorAt.getTime() + REOPEN_WINDOW_MS);
+  const nowMs = now instanceof Date ? now.getTime() : now;
+
+  // 경계: 정확히 168시간째까지는 허용한다(예전 `daysSince > 7` 과 같은 판정).
+  if (nowMs > deadlineAt.getTime()) {
+    return {
+      code: 'WINDOW_EXPIRED',
+      message:
+        `${anchor.label} 후 ${REOPEN_WINDOW_DAYS}일이 지나 재오픈할 수 없습니다. ` +
+        `(${anchor.label} ${formatReopenDateTime(anchorAt)} · 재오픈 기한 ${formatReopenDateTime(deadlineAt)}) ` +
+        '추가 작업이 필요하면 새 SR을 등록해주세요.',
+      anchorAt,
+      deadlineAt,
+    };
+  }
+
+  if (!sr.assigneeId) {
+    return {
+      code: 'ASSIGNEE_MISSING',
+      message:
+        '담당자가 지정되지 않아 재오픈할 수 없습니다. ' +
+        '완료된 SR에는 담당자를 새로 지정할 수 없으니 관리자에게 문의해주세요.',
+      anchorAt,
+      deadlineAt,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -180,11 +285,13 @@ export const getRequiredFields = (toStatus: SRStatus): string[] => {
  * 예전에는 `SRStatusActions` 가 `hasRole(['ADMIN','MANAGER'])` 로 독립 판단했고,
  * 그 결과 MANAGER 에게 재오픈 버튼이 보이는데 서버는 100% 거부하는 막다른 길이
  * 생겼다(감사 4.3). 규칙과 UI 를 한 곳에서 도출해 발산을 막는다.
+ * 지금은 화면이 아래 `getReopenAvailability` 를 부르고, 그 함수가 이것으로 노출을 판정한다
+ * (그래서 모듈 밖으로 내보내지 않는다).
  *
  * 필수 필드는 제외한다 — 버튼을 눌러 다이얼로그에서 입력하는 값이므로,
  * 그것 때문에 버튼을 숨기면 채울 방법이 없어진다.
  */
-export const canPerformTransition = (
+const canPerformTransition = (
   from: SRStatus,
   to: SRStatus,
   userRoles?: string[],
@@ -294,7 +401,11 @@ export const validateTransition = (
 
     for (const field of requiredFields) {
       // assigneeId는 특별 케이스 (assignedToId라는 별칭 사용 가능성)
-      if (field === 'assigneeId') {
+      if (field === 'assigneeId' && isReopenTransition(from, to)) {
+        // 재오픈의 담당자 요건은 아래 4번의 getReopenBlock 이 화면과 같은 문구로 판정한다.
+        // 여기서 먼저 걸면 같은 SR 에 대해 서버와 화면이 서로 다른 이유를 말하게 된다.
+        continue;
+      } else if (field === 'assigneeId') {
         if (!updateData.assigneeId && !updateData.assignedToId && !currentData.assigneeId) {
           missingFields.push('담당자(assigneeId)');
         }
@@ -330,15 +441,9 @@ export const validateTransition = (
     const isReopen = isReopenTransition(from, to);
     const requiresReason = to === 'ON_HOLD' || isReopen;
 
-    if (requiresReason && !updateData.changeReason?.trim()) {
-      return {
-        valid: false,
-        message: isReopen ? '재오픈 사유를 입력해주세요.' : '보류 사유를 입력해주세요.',
-      };
-    }
-
-    // 재오픈은 종결 후 7일까지만 허용한다. 이 규칙을 라우트가 아니라 상태 머신에 두어
-    // 일반 서비스 호출에서도 동일하게 강제한다.
+    // 재오픈은 종결 후 7일까지만, 담당자가 있을 때만 허용한다. 이 규칙을 라우트가 아니라
+    // 상태 머신에 두어 일반 서비스 호출에서도 동일하게 강제하고, 판정 자체는
+    // `getReopenBlock` 하나에 맡겨 화면이 보여 주는 이유와 서버 거부 문구가 같게 한다.
     //
     // **기산점은 출발 상태를 따른다.** 예전에는 CONFIRMED 출발에도 `completedAt` 만 봤다.
     // 완료 6일 뒤에 고객이 확인하고 그 다음 날 재오픈하면, 확인한 지 하루밖에 안 됐는데도
@@ -347,25 +452,150 @@ export const validateTransition = (
     // **fail-closed 다.** 예전에는 `if (isReopen && currentData.completedAt)` 라서
     // 기산점이 NULL 이면 검사를 통째로 건너뛰고 통과했다 — `completedAt` 기록이 도입되기
     // 전에 완료된 SR 은 몇 년이 지나도 재오픈됐다. 시각을 모르면 거부한다.
+    //
+    // 사유 검사보다 먼저 본다 — 사유를 채워도 어차피 재오픈할 수 없는 SR 에
+    // "사유를 입력해주세요" 를 먼저 말하면 사용자가 헛수고를 한다.
     if (isReopen) {
-      const anchor = reopenAnchorAt(from, currentData);
-
-      if (!anchor) {
-        return {
-          valid: false,
-          message: '종결 시각을 확인할 수 없어 재오픈할 수 없습니다. 관리자에게 문의해주세요.',
-        };
+      const block = getReopenBlock(
+        from,
+        {
+          completedAt: currentData.completedAt,
+          confirmedAt: currentData.confirmedAt,
+          // 3번의 필수 필드 검사와 같은 우선순위(요청 본문 → 별칭 → 현재 값)로 담당자를 본다.
+          assigneeId: updateData.assigneeId || updateData.assignedToId || currentData.assigneeId,
+        },
+        Date.now()
+      );
+      if (block) {
+        return { valid: false, message: block.message };
       }
+    }
 
-      const daysSinceClosure = (Date.now() - anchor.getTime()) / (1000 * 60 * 60 * 24);
-      if (daysSinceClosure > REOPEN_WINDOW_DAYS) {
-        return {
-          valid: false,
-          message: `${from === 'CONFIRMED' ? '확인' : '완료'} 후 ${REOPEN_WINDOW_DAYS}일이 지나 재오픈할 수 없습니다.`,
-        };
-      }
+    if (requiresReason && !updateData.changeReason?.trim()) {
+      return {
+        valid: false,
+        message: isReopen ? '재오픈 사유를 입력해주세요.' : '보류 사유를 입력해주세요.',
+      };
     }
   }
 
   return { valid: true };
 };
+
+// ============================================================================
+// 화면용 재오픈 가용성 (버튼 노출 · 비활성 · 이유)
+// ============================================================================
+
+/** 재오픈 버튼을 판정할 때 보는 사용자. 세션(`session.user`)에서 그대로 옮긴다. */
+export interface ReopenViewer {
+  id: string;
+  roles: string[];
+  permissions: string[];
+  clientIds: string[];
+}
+
+/** 화면이 버튼과 안내를 그리는 데 쓰는 판정 결과. */
+export interface ReopenAvailability {
+  /** 재오픈 버튼을 보여 줄지. 신청자이거나 역할/권한상 재오픈 전이가 열린 사용자에게만 보인다. */
+  visible: boolean;
+  /** 보이지만 막혀 있으면 그 이유. null 이면 누를 수 있다. */
+  block: ReopenBlock | null;
+}
+
+/**
+ * `src/lib/policies.ts` 의 `canUpdateSR` 과 **같은 판정**을 하는 클라이언트 사본.
+ *
+ * 왜 사본인가: 서버의 상태 전이는 `srService.updateSR` 에서 `ensureCanUpdateSR`(403) 를
+ * 먼저 통과해야 상태 머신에 도달한다. 그런데 policies.ts 는 errors → logger 를 끌어와
+ * 클라이언트 번들에 넣을 수 없다. 이 판정을 화면이 모르면, 같은 고객사의 **신청자가 아닌**
+ * CLIENT_USER 는 역할표(TRANSITION_ROLES)만 보고 활성 재오픈 버튼을 받은 뒤 403 을 맞는다.
+ *
+ * ⚠️ 사본이므로 갈라질 수 있다. `src/lib/__tests__/sr-reopen-availability.test.ts` 가
+ * 역할·권한·소속·신청자·담당자 조합 전체에서 policies.canUpdateSR 과 결과가 같은지 대조한다.
+ * canUpdateSR 을 고치면 여기도 함께 고쳐야 그 테스트가 통과한다.
+ */
+export function canViewerUpdateSR(
+  viewer: ReopenViewer,
+  sr: { clientId?: string | null; requesterId?: string | null; assigneeId?: string | null }
+): boolean {
+  const roles = viewer.roles ?? [];
+  const permissions = viewer.permissions ?? [];
+
+  if (roles.includes('ADMIN')) return true;
+  if (roles.includes('MANAGER') && permissions.includes('SR:UPDATE')) return true;
+  if (roles.includes('ENGINEER')) {
+    return sr.assigneeId === viewer.id && permissions.includes('SR:UPDATE');
+  }
+
+  const belongsToClient = !!sr.clientId && (viewer.clientIds ?? []).includes(sr.clientId);
+  if (permissions.includes('SR:UPDATE') && belongsToClient) return true;
+
+  return sr.requesterId === viewer.id && permissions.includes('SR:UPDATE_SELF') && belongsToClient;
+}
+
+/** policies.ts 의 INTERNAL_ROLES 와 같다(안내 문구를 고르는 데만 쓴다). */
+const INTERNAL_ROLE_NAMES = ['ADMIN', 'MANAGER', 'ENGINEER'];
+
+/**
+ * 재오픈 버튼의 노출·비활성·이유를 한 번에 판정한다.
+ *
+ * 서버가 거부하는 순서를 그대로 따른다 — 같은 SR 에 대해 화면이 말하는 이유와 서버 응답이
+ * 같아야 하기 때문이다:
+ *   1. `ensureCanUpdateSR`(403)          → canViewerUpdateSR
+ *   2. `validateTransition` 인가(400)    → 같은 함수의 인가 단계를 그대로 호출
+ *   3. `validateTransition` 재오픈 규칙  → getReopenBlock
+ *
+ * 노출 조건은 예전과 같다(신청자 OR 역할/권한상 전이 가능). 넓히지도 좁히지도 않는다 —
+ * 대신 "보이지만 누르면 반드시 실패하는 버튼" 을 비활성 + 이유로 바꾼다.
+ */
+export function getReopenAvailability(
+  status: SRStatus,
+  sr: ReopenSubject & { clientId?: string | null; requesterId?: string | null },
+  viewer: ReopenViewer,
+  now: Date | number = Date.now()
+): ReopenAvailability {
+  if (status !== 'COMPLETED' && status !== 'CONFIRMED') return { visible: false, block: null };
+
+  const isRequester = !!viewer.id && viewer.id === sr.requesterId;
+  const canTransition = canPerformTransition(
+    status,
+    'IN_PROGRESS',
+    viewer.roles,
+    viewer.permissions
+  );
+  if (!isRequester && !canTransition) return { visible: false, block: null };
+
+  if (!canViewerUpdateSR(viewer, sr)) {
+    const isInternal = (viewer.roles ?? []).some((role) => INTERNAL_ROLE_NAMES.includes(role));
+    return {
+      visible: true,
+      block: {
+        code: 'NOT_PERMITTED',
+        message: isInternal
+          ? '이 SR을 수정할 권한이 없어 재오픈할 수 없습니다. 관리자에게 문의해주세요.'
+          : '요청자 본인 또는 고객사 관리자만 재오픈할 수 있습니다. 재오픈이 필요하면 요청자나 고객사 관리자에게 요청해주세요.',
+      },
+    };
+  }
+
+  if (!canTransition) {
+    // 서버 인가 단계의 문구를 그대로 쓴다(데이터 없이 부르면 흐름·인가만 판정한다).
+    const authz = validateTransition(
+      status,
+      'IN_PROGRESS',
+      viewer.roles,
+      undefined,
+      undefined,
+      viewer.permissions
+    );
+    return {
+      visible: true,
+      block: {
+        code: 'NOT_PERMITTED',
+        message: authz.message ?? '이 상태 변경을 수행할 권한이 없습니다.',
+      },
+    };
+  }
+
+  return { visible: true, block: getReopenBlock(status, sr, now) };
+}

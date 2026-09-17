@@ -22,7 +22,7 @@ import { IntakeInfoCard } from '@/components/srs/IntakeInfoCard';
 import { SRActivities } from '@/components/srs/SRActivities';
 import { SRAttachments } from '@/components/srs/SRAttachments';
 import { SRComments } from '@/components/srs/SRComments';
-import { SRStatusActions } from '@/components/srs/SRStatusActions';
+import { SRReopenBlockedNotice, SRStatusActions } from '@/components/srs/SRStatusActions';
 import { SRStatusTimeline } from '@/components/srs/SRStatusTimeline';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
@@ -32,6 +32,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { useDeleteSR, useSRDetails } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { priorityLabels, statusLabels } from '@/lib/constants/sr';
+import { getReopenAvailability } from '@/lib/sr-state-machine';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   REQUESTED: 'secondary',
@@ -99,6 +100,28 @@ export default function SRDetailPage() {
       </div>
     );
   }
+
+  // 재오픈 버튼과 그 아래 안내가 같은 판정을 보도록 한 번만 계산한다.
+  // 서버와 같은 규칙(sr-state-machine)이므로 확인완료 SR 은 confirmedAt 을, 담당자·고객사
+  // 소속·신청자 여부까지 함께 넘겨야 화면과 서버의 답이 갈리지 않는다.
+  const reopen = session?.user
+    ? getReopenAvailability(
+        sr.status,
+        {
+          completedAt: sr.completedAt,
+          confirmedAt: sr.confirmedAt,
+          assigneeId: sr.assigneeId,
+          clientId: sr.clientId,
+          requesterId: sr.requesterId,
+        },
+        {
+          id: session.user.id,
+          roles: roles || [],
+          permissions,
+          clientIds: session.user.clientIds ?? [],
+        }
+      )
+    : null;
 
   return (
     <div className="space-y-6">
@@ -172,7 +195,7 @@ export default function SRDetailPage() {
                   <span className="hidden md:inline">접수 정보 수정</span>
                 </Button>
               )}
-            {session?.user && (
+            {session?.user && reopen && (
               <div className="flex">
                 {/* SRStatusActions returns buttons, assume it handles responsive or is just one button. 
                      If it returns multiple buttons, this might need deeper dive. 
@@ -181,10 +204,9 @@ export default function SRDetailPage() {
                   srId={srId}
                   srNumber={sr.srNumber}
                   status={sr.status as any}
-                  completedAt={sr.completedAt}
                   userRoles={roles || []}
-                  userPermissions={permissions}
                   isRequestor={session.user.id === sr.requesterId}
+                  reopen={reopen}
                 />
               </div>
             )}
@@ -223,6 +245,10 @@ export default function SRDetailPage() {
             )}
           </div>
         </div>
+
+        {/* 재오픈 버튼이 막혀 있으면 그 이유를 헤더 바로 아래 전체 폭으로 보인다.
+            모바일에서 버튼은 아이콘뿐이라 이 안내가 유일한 설명이다. */}
+        {reopen && <SRReopenBlockedNotice reopen={reopen} />}
       </div>
 
       <div className="grid gap-4 md:gap-6 md:grid-cols-3 md:items-stretch">
