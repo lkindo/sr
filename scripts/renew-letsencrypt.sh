@@ -29,8 +29,8 @@ log() { echo "[$(date -Is)] $*"; }
 
 # 현재 배포된 인증서의 지문. 갱신 여부 판단에만 쓴다.
 fingerprint() {
-  if [ -f "$1" ]; then
-    openssl x509 -in "$1" -noout -fingerprint -sha256 2>/dev/null || echo "unreadable"
+  if sudo test -f "$1"; then
+    sudo openssl x509 -in "$1" -noout -fingerprint -sha256 2>/dev/null || echo "unreadable"
   else
     echo "absent"
   fi
@@ -50,7 +50,7 @@ docker run --rm \
 
 # live/ 아래 최신 디렉터리에서 배포 위치로 복사한다.
 # (nginx 는 server.crt / server.key 만 바라보므로 live/ 심볼릭 링크를 직접 쓰지 않는다)
-if ! LATEST_DIR="$(ls -td $LIVE_GLOB 2>/dev/null | head -n 1)" || [ -z "$LATEST_DIR" ]; then
+if ! LATEST_DIR="$(sudo sh -c "ls -td $LIVE_GLOB 2>/dev/null" | head -n 1)" || [ -z "$LATEST_DIR" ]; then
   log "ERROR: live 인증서 디렉터리를 찾지 못했습니다. 최초 발급이 되어 있는지 확인하세요."
   exit 1
 fi
@@ -63,10 +63,10 @@ if [ "$before" = "$new_fingerprint" ]; then
 fi
 
 log "새 인증서 감지 — 배포 위치로 복사합니다: $LATEST_DIR"
-cp -f "$LATEST_DIR/fullchain.pem" "$TARGET_CRT"
-cp -f "$LATEST_DIR/privkey.pem" "$CERTS_DIR/server.key"
-chmod 644 "$TARGET_CRT"
-chmod 600 "$CERTS_DIR/server.key"
+sudo cp -f "$LATEST_DIR/fullchain.pem" "$TARGET_CRT"
+sudo cp -f "$LATEST_DIR/privkey.pem" "$CERTS_DIR/server.key"
+sudo chmod 644 "$TARGET_CRT"
+sudo chmod 600 "$CERTS_DIR/server.key"
 
 # restart 가 아니라 reload — 기존 연결을 끊지 않는다.
 log "nginx 설정 리로드"
