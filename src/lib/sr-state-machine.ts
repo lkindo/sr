@@ -37,7 +37,9 @@ function reopenAnchor(
   from: SRStatus,
   data: { completedAt?: Date | string | null; confirmedAt?: Date | string | null }
 ): { at: Date; label: '완료' | '확인' } | null {
-  const useConfirmed = from === 'CONFIRMED' && !!data.confirmedAt;
+  // `!= null` 이다(truthy 가 아니다). 빈 문자열까지 "확인 시각이 없다" 로 보고 completedAt
+  // 으로 폴백하면, 기록이 손상된 SR 이 fail-closed 를 빠져나가 재오픈될 수 있다.
+  const useConfirmed = from === 'CONFIRMED' && data.confirmedAt != null;
   const raw = useConfirmed ? data.confirmedAt : data.completedAt;
   if (!raw) return null;
   const parsed = new Date(raw);

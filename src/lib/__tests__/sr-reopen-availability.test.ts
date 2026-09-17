@@ -139,6 +139,9 @@ describe('getReopenBlock — fail-closed 와 담당자', () => {
     ['COMPLETED, 완료 시각 없음', 'COMPLETED', {}],
     ['COMPLETED, 파싱 불가', 'COMPLETED', { completedAt: 'not-a-date' }],
     ['CONFIRMED, 둘 다 NULL', 'CONFIRMED', { completedAt: null, confirmedAt: null }],
+    // 빈 문자열은 "값이 없다" 가 아니라 **손상된 기록**이다. completedAt 으로 폴백해
+    // 재오픈을 열어 주면 fail-closed 가 아니다(`??` 를 truthy 검사로 바꾸면 그렇게 된다).
+    ['CONFIRMED, 확인 시각이 빈 문자열', 'CONFIRMED', { completedAt: ago(DAY), confirmedAt: '' }],
   ] as const)('%s 이면 ANCHOR_UNKNOWN 으로 거부한다', (_label, status, data) => {
     const block = getReopenBlock(status, { assigneeId: 'eng-1', ...data }, NOW);
     expect(block?.code).toBe('ANCHOR_UNKNOWN');
