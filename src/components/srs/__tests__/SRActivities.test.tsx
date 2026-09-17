@@ -201,7 +201,8 @@ describe('SRActivities — 활동 유형', () => {
     COMMENTED: '댓글',
     ATTACHMENT_ADDED: '첨부 추가',
     ATTACHMENT_REMOVED: '첨부 삭제',
-    REOPENED: '재요청',
+    // '재요청' 이 아니다 — 버튼·다이얼로그·서버 문구가 모두 '재오픈' 이다(아래 잠금 테스트가 짝).
+    REOPENED: '재오픈',
     COMPLETED: '완료',
     // '반려' 가 아니다 — SR 상세 화면은 상태 타임라인과 활동 이력을 나란히 그리므로
     // 같은 enum 이 '거절'/'반려' 두 이름으로 보였다. 아래 정본 대조 테스트가 짝이다.
@@ -219,7 +220,8 @@ describe('SRActivities — 활동 유형', () => {
     COMMENTED: 'bg-secondary',
     ATTACHMENT_ADDED: 'bg-secondary',
     ATTACHMENT_REMOVED: 'bg-secondary',
-    REOPENED: 'bg-destructive',
+    // 재오픈은 정상 전이다. 거절과 같은 빨강이면 실패로 읽힌다.
+    REOPENED: 'bg-secondary',
     COMPLETED: 'bg-primary/10',
     REJECTED: 'bg-destructive',
     INTAKE_UPDATED: 'bg-secondary',
@@ -258,13 +260,29 @@ describe('SRActivities — 활동 유형', () => {
     expect(screen.queryByText('반려')).not.toBeInTheDocument();
   });
 
+  /**
+   * 같은 식의 잠금. 재오픈 이력은 '재요청' 으로 보였는데, 상세 화면의 버튼·다이얼로그·서버
+   * 거부 문구는 전부 '재오픈' 이라 사용자가 둘을 다른 일로 읽었다. 거절(빨강)과 같은 색이라
+   * 정상 전이가 실패처럼 보이기도 했다.
+   */
+  it('REOPENED 활동은 "재오픈" 으로, 거절과 다른 중립 색으로 그린다', () => {
+    listed([[activity({ id: 'a1', type: 'REOPENED' }), activity({ id: 'a2', type: 'REJECTED' })]]);
+
+    render(<SRActivities srId="sr-1" />, { wrapper });
+
+    const reopened = screen.getByText('재오픈');
+    expect(screen.queryByText('재요청')).not.toBeInTheDocument();
+    expect(reopened.className).not.toContain('bg-destructive');
+    expect(reopened.className).not.toBe(screen.getByText('거절').className);
+  });
+
   it('세 가지 배지색이 실제로 서로 다르다', () => {
     // 위 표를 그대로 베낀 단언이 아니라는 것을 못박는다.
     listed([
       [
         activity({ id: 'a1', type: 'CREATED' }),
         activity({ id: 'a2', type: 'COMMENTED' }),
-        activity({ id: 'a3', type: 'REOPENED' }),
+        activity({ id: 'a3', type: 'REJECTED' }),
       ],
     ]);
 
@@ -273,7 +291,7 @@ describe('SRActivities — 활동 유형', () => {
     const seen = new Set([
       screen.getByText('생성').className,
       screen.getByText('댓글').className,
-      screen.getByText('재요청').className,
+      screen.getByText('거절').className,
     ]);
     expect(seen.size).toBe(3);
   });

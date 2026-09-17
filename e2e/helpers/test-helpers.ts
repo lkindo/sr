@@ -578,14 +578,25 @@ const SR_ACTION_DIALOG_SUBMIT: Partial<Record<SRStatusAction, RegExp>> = {
  * @param page - Playwright Page 객체
  * @param srId - SR ID
  * @param action - 상태 변경 액션 (start, complete, hold, resume, reject, confirm, reopen)
- * @param options - 추가 옵션 (reason, resolutionDescription)
+ * @param options - 추가 옵션 (reason, resolutionDescription, expectedHoldReleaseDate)
+ *   hold 는 expectedHoldReleaseDate(YYYY-MM-DD)가 **필수**다 — 보류 다이얼로그는 예상 해제일이
+ *   비어 있으면 토스트만 띄우고 PATCH 를 보내지 않는다(SRStatusChangeDialog 의 dateField).
  */
 export async function changeSRStatus(
   page: Page,
   srId: string,
   action: SRStatusAction,
-  options?: { reason?: string; resolutionDescription?: string }
+  options?: { reason?: string; resolutionDescription?: string; expectedHoldReleaseDate?: string }
 ): Promise<void> {
+  // 날짜 없이 hold 를 부르면 PATCH 가 아예 나가지 않아 20초 뒤 응답 대기 타임아웃으로만
+  // 드러난다. 원인이 호출부에 있다는 것을 곧바로 알 수 있게 여기서 먼저 멈춘다.
+  if (action === 'hold' && !options?.expectedHoldReleaseDate) {
+    throw new Error(
+      `SR ${srId}: 'hold' 에는 options.expectedHoldReleaseDate(YYYY-MM-DD)가 필요합니다. ` +
+        `보류는 사유와 예상 해제일을 함께 받습니다(fixtures/sr.ts 의 holdReleaseDate()).`
+    );
+  }
+
   await page.goto(`/srs/${srId}`, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
   const trigger = page.getByRole('button', { name: SR_ACTION_TRIGGERS[action] });
@@ -615,6 +626,16 @@ export async function changeSRStatus(
     const reasonText = options?.resolutionDescription ?? options?.reason;
     if (reasonText) {
       await dialog.locator('textarea').first().fill(reasonText);
+    }
+
+    if (action === 'hold') {
+      // 보류 다이얼로그의 필수 '예상 해제일 *' 입력(type=date, id=sr-status-date).
+      const dateInput = dialog.getByLabel('예상 해제일');
+      await dateInput.fill(options!.expectedHoldReleaseDate!);
+      await expect(
+        dateInput,
+        `SR ${srId}: 보류 다이얼로그의 예상 해제일 입력에 값이 들어가지 않았습니다.`
+      ).toHaveValue(options!.expectedHoldReleaseDate!);
     }
 
     const submitButton = dialog.getByRole('button', { name: submitPattern });

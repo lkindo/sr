@@ -301,8 +301,13 @@ model SR {
   attachments     SRAttachment[]
   statusHistory   SRStatusHistory[]
 
-  // 모든 목록 조회가 `deleted_at IS NULL` 을 달고 나가므로 부분 인덱스로 살아 있는 행만 담는다.
-  @@index([deletedAt])
+  // 모든 목록 조회가 `deleted_at IS NULL` 을 달고 나가므로 살아 있는 행만 담는 부분 인덱스
+  // `srs_deleted_at_idx` (WHERE "deleted_at" IS NULL) 를 둔다. 이 인덱스는 마이그레이션
+  // 20260815100200_sr_soft_delete 에만 존재하며 **여기에 @@index([deletedAt]) 로 다시 적지 않는다.**
+  // Prisma(6.19 기준)는 부분 인덱스를 표현할 수 없고, 스키마 엔진이 DB 를 읽을 때 부분 인덱스를 아예
+  // 제외한다(pg_index 조회의 `indpred IS NULL` 필터). 그래서 @@index 를 적으면 CI 드리프트
+  // 검사가 "인덱스 누락" 으로 실패하고, `prisma migrate dev` 는 같은 이름의 일반 인덱스를 만드는
+  // 마이그레이션을 생성한다(이미 있는 이름이라 적용 시 실패). 반대로 적지 않아도 DROP 은 생성되지 않는다.
   @@index([clientId, status])
   @@index([requesterId, createdAt])
   @@index([assigneeId, status])

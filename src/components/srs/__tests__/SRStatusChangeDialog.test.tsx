@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { qk } from '@/lib/query-keys';
+import { formatISODateInAppZone } from '@/lib/timezone';
 
 import { SRStatusChangeDialog } from '../SRStatusChangeDialog';
 
@@ -71,10 +72,10 @@ const okFetch = () =>
   );
 
 /** 실패는 4xx 로 만든다 — 5xx 는 재시도 백오프 때문에 대기가 늘어진다. */
-const failFetch = (message: string) =>
+const failFetch = (message: string, status = 400) =>
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => ({ ok: false, status: 400, json: async () => ({ error: message }) }))
+    vi.fn(async () => ({ ok: false, status, json: async () => ({ error: message }) }))
   );
 
 /** 마지막 요청의 URL·메서드·본문. */
@@ -88,8 +89,13 @@ const write = (value: string) => fireEvent.change(field(), { target: { value } }
 /**
  * 보류의 예상 해제일 입력. 헌법 §2 는 보류에 사유 **와** 예상 해제일을 모두 요구하므로
  * hold 다이얼로그는 사유만으로 제출되지 않는다.
+ *
+ * 고정 날짜를 쓰면 안 된다. 입력의 `min` 이 실행 시점의 KST 오늘이라, 그 날이 지나면
+ * 값이 min 아래로 떨어져 jsdom 의 폼 검증(rangeUnderflow)이 버튼 제출을 조용히 막는다
+ * — '2026-09-01' 이 실제로 그렇게 시한폭탄이 됐다. 그래서 컴포넌트와 같은 헬퍼로
+ * 실행 시점 기준 30일 뒤를 만든다(KST 는 DST 가 없어 30×24h 가 곧 30 달력일이다).
  */
-const HOLD_RELEASE_DATE = '2026-09-01';
+const HOLD_RELEASE_DATE = formatISODateInAppZone(Date.now() + 30 * 24 * 60 * 60 * 1000);
 const writeHoldDate = (value: string = HOLD_RELEASE_DATE) =>
   fireEvent.change(screen.getByLabelText(/예상 해제일/), { target: { value } });
 const submit = (label: string | RegExp) =>
@@ -212,6 +218,22 @@ describe('SRStatusChangeDialog — 검증', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  /**
+   * 입력 상한은 서버 스키마(statusActionSchema)와 같은 상수다. 사유는 255자 —
+   * 막지 않으면 긴 사유를 다 쓴 뒤에야 서버 400 으로 알게 된다.
+   */
+  it.each([
+    ['hold', 255],
+    ['reject', 255],
+    ['reopen', 255],
+    ['complete', 5000],
+  ] as const)('%s 입력은 최대 %i 자로 제한한다', (action, max) => {
+    const { wrapper } = setup();
+    render(<SRStatusChangeDialog {...baseProps} action={action} />, { wrapper });
+
+    expect(field()).toHaveAttribute('maxlength', String(max));
+  });
+
   it('Ctrl+Enter 로도 제출한다', async () => {
     const { wrapper } = setup();
     render(<SRStatusChangeDialog {...baseProps} action="hold" />, { wrapper });
@@ -310,14 +332,13 @@ describe('SRStatusChangeDialog — 실패', () => {
     write('처리 완료');
     submit('완료 처리');
 
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '오류',
-          description: '허용되지 않는 상태 전이입니다.',
-          variant: 'destructive',
-        })
-      )
+    // 이유는 다이얼로그 안에 남고, 토스트는 실패 사실만 짧게 알린다(중복 낭독 방지).
+    expect(await screen.findByRole('alert')).toHaveTextContent('허용되지 않는 상태 전이입니다.');
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '완료 처리하지 못했습니다', variant: 'destructive' })
+    );
+    expect(toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ description: '허용되지 않는 상태 전이입니다.' })
     );
 
     expect(onOpenChange).not.toHaveBeenCalled();
@@ -328,6 +349,72 @@ describe('SRStatusChangeDialog — 실패', () => {
     expect(router.push).not.toHaveBeenCalled();
     // 다시 시도할 수 있어야 한다.
     expect(screen.getByRole('button', { name: '완료 처리' })).toBeEnabled();
+  });
+
+  /**
+   * 토스트는 몇 초 뒤 사라진다. 재오픈 창 만료·권한 없음처럼 다시 눌러도 같은 답이 나오는
+   * 거부는 이유가 다이얼로그 안에 남아 있어야 사용자가 다음 행동을 정할 수 있다.
+   */
+  it.each([
+    [
+      400,
+      '완료 후 7일이 지나 재오픈할 수 없습니다. (완료 2026. 09. 01. 14:00 · 재오픈 기한 2026. 09. 08. 14:00) 추가 작업이 필요하면 새 SR을 등록해주세요.',
+    ],
+    [403, 'SR 수정 권한이 없습니다.'],
+  ] as const)(
+    '서버가 %i 으로 거부하면 그 이유를 다이얼로그 안에 남긴다',
+    async (status, message) => {
+      failFetch(message, status);
+      const { wrapper } = setup();
+      render(<SRStatusChangeDialog {...baseProps} action="reopen" />, { wrapper });
+
+      // 거부 전에는 오류 영역이 없다.
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+      write('같은 문제가 재발했습니다');
+      submit('재오픈');
+
+      const inline = await screen.findByRole('alert');
+      expect(inline).toHaveTextContent(message);
+      // 토스트는 짧은 제목만 맡는다 — 같은 긴 문장을 인라인과 토스트가 동시에 말하면
+      // 낭독기가 두 번 읽고 390px 에서는 토스트가 헤더를 덮는다.
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '재오픈하지 못했습니다', variant: 'destructive' })
+      );
+      expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ description: message }));
+      expect(onOpenChange).not.toHaveBeenCalled();
+    }
+  );
+
+  it('다시 제출하거나 닫으면 남겨 둔 서버 오류를 지운다', async () => {
+    failFetch('다른 사용자가 먼저 이 SR을 변경했습니다.');
+    const { wrapper } = setup();
+    render(<SRStatusChangeDialog {...baseProps} action="reopen" />, { wrapper });
+
+    write('재작업 필요');
+    submit('재오픈');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    // 다시 제출하면 새 판정을 기다리는 동안 지난 오류를 보이지 않는다.
+    let release!: (value: unknown) => void;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      )
+    );
+    submit('재오픈');
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    release({ ok: false, status: 400, json: async () => ({ error: '또 실패' }) });
+    expect(await screen.findByRole('alert')).toHaveTextContent('또 실패');
+
+    // 취소로 닫으면 지운다 — 다음에 열었을 때 지난 오류가 남아 있으면 안 된다.
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   // 서버가 에러 본문을 주지 않아도(프록시 502, 빈 본문 등) 사용자에게 뭔가는 보여야 한다.
@@ -343,14 +430,10 @@ describe('SRStatusChangeDialog — 실패', () => {
     write('중복 요청');
     submit('거절 처리');
 
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: '오류',
-          description: '상태 변경에 실패했습니다.',
-          variant: 'destructive',
-        })
-      )
+    // 본문이 없으면 기본 문구가 인라인 오류로 남고, 토스트는 실패 사실만 알린다.
+    expect(await screen.findByRole('alert')).toHaveTextContent('상태 변경에 실패했습니다.');
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: '거절 처리하지 못했습니다', variant: 'destructive' })
     );
   });
 });

@@ -374,7 +374,53 @@ describe('validateTransition — 전이 맥락 규칙', () => {
       { changeReason: '재작업' }
     );
     expect(result.valid).toBe(false);
-    expect(result.message).toContain('종결 시각');
+    expect(result.message).toContain('완료 시각 기록이 없어');
+  });
+
+  // ── 담당자 요건 (재오픈 = 진행중 전이) ──────────────────────────────────
+  //
+  // 재오픈의 담당자 요건은 일반 필수 필드 문구가 아니라 getReopenBlock 의 문구로 거부한다.
+  // 화면이 같은 SR 에 같은 이유를 보여 줘야 하기 때문이다(sr-reopen-availability.test.ts).
+
+  it('담당자가 없는 SR 의 재오픈은 재오픈 전용 문구로 거부한다', () => {
+    const result = validateTransition(
+      'COMPLETED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      { assigneeId: null, completedAt: new Date() },
+      { changeReason: '재작업' }
+    );
+    expect(result.valid).toBe(false);
+    expect(result.message).toContain('담당자가 지정되지 않아 재오픈할 수 없습니다.');
+  });
+
+  // 판정 대상 담당자의 우선순위(요청 본문 → 별칭 → 현재 값)는 예전 필수 필드 검사와 같다.
+  // (완료 상태의 담당자 변경은 이후 srService.updateSR 가 따로 막는다.)
+  it.each([{ assigneeId: 'eng-2' }, { assignedToId: 'eng-2' }])(
+    '요청 본문의 담당자(%o)도 재오픈 담당자 요건을 채운다',
+    (assignee) => {
+      const result = validateTransition(
+        'COMPLETED',
+        'IN_PROGRESS',
+        ['ADMIN'],
+        { assigneeId: null, completedAt: new Date() },
+        { changeReason: '재작업', ...assignee }
+      );
+      expect(result.valid).toBe(true);
+    }
+  );
+
+  // 사유를 채워도 어차피 안 되는 SR 에 "사유를 입력해주세요" 를 먼저 말하지 않는다.
+  it('창이 닫힌 SR 은 사유가 없어도 창 만료를 먼저 말한다', () => {
+    const result = validateTransition(
+      'COMPLETED',
+      'IN_PROGRESS',
+      ['ADMIN'],
+      { assigneeId: 'eng-1', completedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
+      {}
+    );
+    expect(result.valid).toBe(false);
+    expect(result.message).toMatch(/^완료 후 7일이 지나 재오픈할 수 없습니다\./);
   });
 
   it('기산점이 파싱 불가능한 값이어도 거부한다', () => {
@@ -386,6 +432,6 @@ describe('validateTransition — 전이 맥락 규칙', () => {
       { changeReason: '재작업' }
     );
     expect(result.valid).toBe(false);
-    expect(result.message).toContain('종결 시각');
+    expect(result.message).toContain('완료 시각 기록이 없어');
   });
 });

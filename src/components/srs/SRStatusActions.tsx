@@ -2,41 +2,102 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, Clock, Loader2, PauseCircle, Play, RotateCcw, XCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  Clock,
+  Info,
+  Loader2,
+  PauseCircle,
+  Play,
+  RotateCcw,
+  XCircle,
+} from 'lucide-react';
 
-import { Button } from '@/components/ui';
+import { Alert, AlertDescription, Button } from '@/components/ui';
 import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
-import { canPerformTransition } from '@/lib/sr-state-machine';
+import type { ReopenAvailability, ReopenBlock } from '@/lib/sr-state-machine';
 
 import { SRStatusChangeDialog } from './SRStatusChangeDialog';
 
-/** 재오픈 허용 창. sr-state-machine 의 서버 판정과 같은 값이어야 한다. */
-const REOPEN_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
 type SRStatus =
   'REQUESTED' | 'INTAKE' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CONFIRMED' | 'REJECTED';
+
+/**
+ * 재오픈 불가 안내의 DOM id. 비활성 재오픈 버튼이 `aria-describedby` 로 이 안내를 가리킨다.
+ * 버튼과 안내가 같은 모듈에 있어야 id 가 한쪽만 바뀌지 않는다.
+ */
+const REOPEN_BLOCKED_REASON_ID = 'sr-reopen-blocked-reason';
 
 interface SRStatusActionsProps {
   srId: string;
   srNumber: string;
   status: SRStatus;
-  completedAt: Date | null;
   userRoles: string[];
-  /** 커스텀 역할도 전이할 수 있으므로 권한도 함께 넘긴다(감사 4.3). */
-  userPermissions?: string[];
   isRequestor: boolean;
+  /**
+   * 재오픈 버튼의 노출·비활성·이유. `getReopenAvailability`(sr-state-machine)로 계산해 넘긴다.
+   * 커스텀 역할도 권한으로 재오픈할 수 있으므로(감사 4.3) 그 계산에 사용자 권한이 들어간다.
+   *
+   * 예전에는 이 컴포넌트가 `completedAt` 만 받아 자체 7일 사본으로 판정했다. 그 사본은
+   * 확인완료 SR 의 기산점(confirmedAt)도, 기산점 NULL(fail-closed)도, 담당자 요건도,
+   * 신청자가 아닌 고객사 사용자의 403 도 몰라서 서버와 계속 다른 답을 냈다.
+   * 페이지가 한 번 계산해 버튼과 안내(`SRReopenBlockedNotice`)에 같은 값을 준다.
+   */
+  reopen: ReopenAvailability;
+}
+
+/**
+ * 안내 제목 — 막힌 **이유의 요약**이다.
+ *
+ * 본문은 서버 거부 문구 그대로라 "…재오픈할 수 없습니다." 로 시작한다. 제목까지 같은
+ * 문장이면 한 화면에서 같은 말을 두 번 하고, 정작 사용자가 찾는 "왜" 는 본문을 읽어야
+ * 나온다. 제목이 이유를 먼저 말하고 본문이 근거(시각·기한)와 다음 행동을 잇는다.
+ *
+ * 문구가 아니라 `code` 로 고른다 — 서버 문구가 다듬어져도 여기가 따라 깨지지 않는다.
+ */
+const REOPEN_BLOCK_TITLES: Record<ReopenBlock['code'], string> = {
+  WINDOW_EXPIRED: '재오픈 기한이 지났습니다',
+  ANCHOR_UNKNOWN: '재오픈 기한을 확인할 수 없습니다',
+  ASSIGNEE_MISSING: '담당자가 지정되지 않았습니다',
+  NOT_PERMITTED: '재오픈 권한이 없습니다',
+};
+
+/**
+ * 재오픈이 막힌 이유를 **화면에 보이는 글**로 알린다.
+ *
+ * 툴팁이나 다이얼로그 안의 한 줄로는 부족했다 — 비활성 버튼은 포인터 이벤트가 없어
+ * 툴팁이 뜨지 않고, 모바일(390px)에서는 버튼이 아이콘뿐이라 무엇이 막혔는지조차 보이지
+ * 않는다. 실제로 "재오픈이 안 된다" 는 보고가 다이얼로그 속 작은 빨간 글을 보지 못한 채
+ * 들어왔다. 헤더 바로 아래 전체 폭으로 그린다(헤더 행 안은 390px 에서 공간이 없다).
+ */
+export function SRReopenBlockedNotice({ reopen }: { reopen: ReopenAvailability }) {
+  if (!reopen.visible || !reopen.block) return null;
+  return (
+    // 페이지를 열 때부터 있는 안내이므로 role="alert"(즉시 낭독) 대신 note 로 둔다.
+    <Alert role="note" id={REOPEN_BLOCKED_REASON_ID} data-testid={REOPEN_BLOCKED_REASON_ID}>
+      <Info className="h-4 w-4" aria-hidden="true" />
+      {/* 제목이지만 **헤딩이 아니다**. `AlertTitle` 은 <h5> 로 렌더되는데, 이 안내는 상세
+          페이지의 h1(SR 번호)과 h2(상세 정보) 사이에 들어가므로 h1 → h5 → h2 가 되어
+          heading-order 를 깨뜨린다(axe 로 실측: 안내가 뜬 페이지에서만 위반 1건).
+          같은 페이지에서 이미 한 번 고친 문제다(page.tsx 의 h2 주석). 보이는 모양은
+          AlertTitle 과 같은 클래스로 유지한다. */}
+      <p className="mb-1 font-medium leading-none tracking-tight">
+        {REOPEN_BLOCK_TITLES[reopen.block.code]}
+      </p>
+      <AlertDescription>{reopen.block.message}</AlertDescription>
+    </Alert>
+  );
 }
 
 export function SRStatusActions({
   srId,
   srNumber,
   status,
-  completedAt,
   userRoles,
-  userPermissions,
   isRequestor,
+  reopen,
 }: SRStatusActionsProps) {
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [holdDialogOpen, setHoldDialogOpen] = useState(false);
@@ -54,14 +115,35 @@ export function SRStatusActions({
   const canAccept = hasRole(['ADMIN', 'MANAGER']);
 
   /**
-   * 전이 가능 여부는 상태 머신에서 도출한다.
+   * 재오픈 가능 여부는 상태 머신에서 도출한다(`reopen` prop).
    *
    * 예전에는 `isManager = hasRole(['ADMIN','MANAGER'])` 로 여기서 독립 판단했는데,
    * 재오픈 규칙에는 MANAGER 가 없어서 버튼은 보이고 서버는 항상 거부하는 막다른 길이
    * 생겼다(감사 4.3). 규칙을 바꿀 때 UI 가 따라오지 않으면 같은 발산이 반복된다.
    */
-  const can = (to: SRStatus) => canPerformTransition(status, to, userRoles, userPermissions);
-  const canReopen = can('IN_PROGRESS');
+  const reopenBlocked = Boolean(reopen.block);
+
+  // 모바일에서는 아이콘뿐이므로 이름(aria-label)은 '재오픈' 그대로 두고, 막힌 이유는
+  // 설명(aria-describedby)으로 화면의 안내 문단을 가리킨다. 이름에 이유를 섞으면
+  // e2e 헬퍼의 `/^재오픈$/` 도, 낭독기 사용자의 버튼 탐색도 함께 깨진다.
+  //
+  // `title` 에도 이유를 싣지 않는다(다른 버튼들과 같이 이름만 둔다). 비활성 버튼은
+  // `disabled:pointer-events-none` 이라 마우스 툴팁이 아예 뜨지 않고, aria-describedby 가
+  // 있으면 접근 가능한 설명도 title 이 아니라 그쪽을 쓴다 — 실제로 아무 데도 닿지 않는 문구다.
+  const renderReopenButton = () => (
+    <Button
+      variant="outline"
+      onClick={() => setReopenDialogOpen(true)}
+      disabled={!!loadingAction || reopenBlocked}
+      aria-label="재오픈"
+      aria-describedby={reopenBlocked ? REOPEN_BLOCKED_REASON_ID : undefined}
+      className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+      title="재오픈"
+    >
+      <RotateCcw className="h-4 w-4 md:mr-2" />
+      <span className="hidden md:inline">재오픈</span>
+    </Button>
+  );
 
   // 간단한 상태 변경 (다이얼로그 없음)
   const handleSimpleStatusChange = async (action: string) => {
@@ -229,38 +311,14 @@ export function SRStatusActions({
                 <span className="hidden md:inline">확인 완료</span>
               </Button>
             )}
-            {(isRequestor || canReopen) && (
-              <Button
-                variant="outline"
-                onClick={() => setReopenDialogOpen(true)}
-                disabled={!!loadingAction}
-                aria-label="재오픈"
-                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-                title="재오픈"
-              >
-                <RotateCcw className="h-4 w-4 md:mr-2" />
-                <span className="hidden md:inline">재오픈</span>
-              </Button>
-            )}
+            {reopen.visible && renderReopenButton()}
           </>
         );
 
       case 'CONFIRMED':
-        // 확인완료 상태: 재오픈 (7일 이내, 관리자/신청자)
-        if (!isRequestor && !canReopen) return null;
-        return (
-          <Button
-            variant="outline"
-            onClick={() => setReopenDialogOpen(true)}
-            disabled={!!loadingAction}
-            aria-label="재오픈"
-            className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-            title="재오픈"
-          >
-            <RotateCcw className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">재오픈</span>
-          </Button>
-        );
+        // 확인완료 상태: 재오픈 (확인 후 7일 이내, 관리자/신청자)
+        if (!reopen.visible) return null;
+        return renderReopenButton();
 
       case 'REJECTED':
         // 거절 상태: 액션 없음
@@ -270,12 +328,6 @@ export function SRStatusActions({
         return null;
     }
   };
-
-  // 재오픈 가능 창은 완료 후 7일이다. 완료일이 없으면(레거시 데이터) 서버 판정에 맡긴다.
-  const reopenBlockedReason =
-    completedAt && new Date().getTime() - new Date(completedAt).getTime() > REOPEN_WINDOW_MS
-      ? '완료 후 7일이 지나 재오픈할 수 없습니다.'
-      : null;
 
   return (
     <>
@@ -309,7 +361,9 @@ export function SRStatusActions({
         onOpenChange={setReopenDialogOpen}
         srId={srId}
         srNumber={srNumber}
-        disabledReason={reopenBlockedReason}
+        // 버튼이 막혀 있으면 다이얼로그는 열리지 않지만, 열린 뒤에 막히는 경우(판정 갱신)에도
+        // 같은 이유로 제출을 막도록 함께 넘긴다.
+        disabledReason={reopen.block?.message ?? null}
       />
     </>
   );

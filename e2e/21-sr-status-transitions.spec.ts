@@ -6,10 +6,11 @@ import {
   type Page,
   test,
 } from '@playwright/test';
+import { PrismaClient } from '@prisma/client';
 
-import { deleteSeededSRs, seedSR, type SRStage } from './fixtures/sr';
+import { deleteSeededSRs, holdReleaseDate, seedSR, type SRStage } from './fixtures/sr';
 import { PERSONA_AUTH_FILES, type PersonaKey } from './helpers/auth-helpers';
-import { changeSRStatus } from './helpers/test-helpers';
+import { changeSRStatus, checkA11y } from './helpers/test-helpers';
 
 /**
  * SR 상태 전이 (State Transition) E2E 테스트
@@ -53,6 +54,32 @@ import { changeSRStatus } from './helpers/test-helpers';
 // ============================================================================
 // 공통 유틸
 // ============================================================================
+
+/**
+ * e2e 전용 Prisma 인스턴스 — 재오픈 창 만료 검증에서 completedAt 을 과거로 되돌리는 데만 쓴다.
+ *
+ * 공개 API 에는 completedAt 을 소급 설정하는 경로가 없고(srUpdateSchema 에 필드가 없다),
+ * 판정은 서버 시계로 일어나 브라우저 시계를 돌려도 소용없다. 그래서 준비 단계만 DB 에 직접
+ * 쓴다. 앱 싱글턴(`src/lib/prisma.ts`)을 쓰지 않는 이유는 sr-permissions.spec.ts 주석과 같다
+ * (`server-only` 가 plain Node 에서 import 즉시 throw 한다).
+ *
+ * 연결은 첫 사용 때 맺는다. 이 파일의 다른 테스트만 골라 돌릴 때 DB 연결을 강요하지 않는다.
+ */
+let prismaClient: PrismaClient | undefined;
+function e2ePrisma(): PrismaClient {
+  prismaClient ??= new PrismaClient();
+  return prismaClient;
+}
+
+test.afterAll(async () => {
+  // 끊지 않으면 Playwright 워커가 커넥션을 물고 종료를 기다린다.
+  await prismaClient?.$disconnect();
+});
+
+/** 서버 문구를 그대로 정규식에 넣기 위한 이스케이프(문구에 괄호·마침표가 있다). */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
  * 상태 배지 문구. `src/lib/constants/sr.ts` 의 statusLabels 와 반드시 같아야 한다.
@@ -206,10 +233,14 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
     await expectServerStatus(browser, sr.id, 'IN_PROGRESS');
   });
 
-  test('IN_PROGRESS → ON_HOLD (보류, 사유 필수)', async ({ browser }) => {
+  test('IN_PROGRESS → ON_HOLD (보류, 사유·예상 해제일 필수)', async ({ browser }) => {
     test.setTimeout(90000);
     const sr = await seedSR(browser, { stage: 'IN_PROGRESS', title: '전이 테스트 hold' });
     seededIds.push(sr.id);
+
+    // 헌법 §2: 보류는 사유 **와** 예상 해제일을 함께 받는다. 다이얼로그가 날짜 입력을
+    // 요구하고, 라우트는 날짜가 없으면 400 을 돌려준다.
+    const expectedHoldReleaseDate = holdReleaseDate();
 
     await withPage(browser, 'engineer', async (page) => {
       await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
@@ -217,6 +248,7 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
 
       await changeSRStatus(page, sr.id, 'hold', {
         reason: '고객사 추가 정보 요청으로 인한 보류',
+        expectedHoldReleaseDate,
       });
 
       await waitForListRedirect(page);
@@ -224,6 +256,17 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
     });
 
     await expectServerStatus(browser, sr.id, 'ON_HOLD');
+
+    // 다이얼로그에서 고른 날짜가 실제로 저장되었는지도 서버 기준으로 확인한다.
+    await withApi(browser, 'admin', async (request) => {
+      const response = await request.get(`/api/srs/${sr.id}`);
+      expect(response.status(), `GET /api/srs/${sr.id} 가 200 이 아닙니다.`).toBe(200);
+      const body = (await response.json()) as { expectedHoldReleaseDate?: string | null };
+      expect(
+        body.expectedHoldReleaseDate?.slice(0, 10),
+        `SR ${sr.id}: 보류 다이얼로그에서 입력한 예상 해제일이 서버에 저장되지 않았습니다.`
+      ).toBe(expectedHoldReleaseDate);
+    });
   });
 
   test('ON_HOLD → IN_PROGRESS (진행 재개)', async ({ browser }) => {
@@ -474,7 +517,14 @@ test.describe('SR 재오픈 제약', () => {
       await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
       await expectStatusBadge(page, sr.id, 'CONFIRMED');
 
-      await page.getByRole('button', { name: '재오픈', exact: true }).click();
+      // 방금 확인된 SR 이므로 재오픈 불가 안내(SRReopenBlockedNotice)는 없고 버튼은 활성이다.
+      await expect(
+        page.getByTestId('sr-reopen-blocked-reason'),
+        `SR ${sr.id}: 7일 창 안인데 재오픈 불가 안내가 표시됩니다.`
+      ).toHaveCount(0);
+      const trigger = page.getByRole('button', { name: '재오픈', exact: true });
+      await expect(trigger, `SR ${sr.id}: 7일 창 안인데 재오픈 버튼이 비활성입니다.`).toBeEnabled();
+      await trigger.click();
 
       const dialog = page.getByRole('dialog');
       await expect(dialog, `SR ${sr.id}: 재오픈 다이얼로그가 열리지 않았습니다.`).toBeVisible();
@@ -485,11 +535,10 @@ test.describe('SR 재오픈 제약', () => {
         `SR ${sr.id}: 재오픈 안내 문구가 보이지 않습니다.`
       ).toBeVisible();
 
-      // 방금 완료된 SR 이므로 7일 차단 문구(SRStatusActions 의 reopenBlockedReason)는
-      // 나타나지 않아야 하고 제출도 가능해야 한다.
+      // 다이얼로그 안에도 차단 사유(getReopenBlock 의 문구)가 없어야 하고 제출도 가능해야 한다.
       await expect(
-        dialog.getByText('완료 후 7일이 지나 재오픈할 수 없습니다.'),
-        `SR ${sr.id}: 7일 창 안인데 차단 안내가 표시됩니다.`
+        dialog.getByText('재오픈할 수 없습니다'),
+        `SR ${sr.id}: 7일 창 안인데 다이얼로그에 차단 안내가 표시됩니다.`
       ).toHaveCount(0);
       await expect(
         dialog.getByRole('button', { name: '재오픈', exact: true }),
@@ -505,23 +554,182 @@ test.describe('SR 재오픈 제약', () => {
   });
 
   /**
-   * 완료 후 7일이 **지난** 경우의 차단은 아직 E2E 로 검증할 수 없다.
+   * 완료 20일 뒤에 확인한 SR — 상세 페이지가 기산점을 **확인 시각**으로 잡는지 보는 자리다.
    *
-   * 판정 근거는 SR.completedAt 하나뿐인데(src/app/api/srs/[id]/status/route.ts 의 reopen
-   * 분기, 그리고 SRStatusActions 의 REOPEN_WINDOW_MS), 이 값을 과거로 되돌릴 수 있는
-   * 공개 경로가 없다 — srUpdateSchema(src/lib/schemas.ts)에 completedAt 이 없어서
-   * PATCH /api/srs/{id} 로도, 상태 API 로도 소급 설정이 불가능하다.
-   * 시간을 앞당기려면 브라우저 시계가 아니라 **서버 시계**를 바꿔야 하는데
-   * (판정이 서버에서 일어난다) 프로덕션 빌드를 대상으로 하는 이 스위트에서는 손댈 수 없다.
+   * 픽스처는 상태를 API 로 밀어 올리므로 CONFIRMED SR 은 completedAt ≈ confirmedAt ≈ 지금이다.
+   * 두 시각이 붙어 있으면 어느 쪽을 봐도 답이 같아서, 상세 페이지가 `getReopenAvailability`
+   * 에 confirmedAt 을 넘기지 않아도 **어떤 E2E 도 그 누락을 보지 못한다**. 그런데 그 배선이
+   * 정확히 이 작업이 고친 버그(늦게 확인한 SR 의 재오픈 버튼을 화면이 잘못 막음)의 자리다.
+   * 그래서 **completedAt 만** 20일 전으로 되돌려 둘을 갈라놓는다:
+   *   - 확인 시각을 보면 → 창 안이므로 버튼 활성, 안내 없음 (지금의 서버·화면)
+   *   - 완료 시각만 보면 → '완료 후 7일이 지나' 로 버튼이 잘못 막힌다 (예전 화면)
    *
-   * 열려면 둘 중 하나가 필요하다:
-   *   (a) 테스트 전용 시드/픽스처가 completedAt 을 과거로 박은 SR 을 만들어 주거나,
-   *   (b) 재오픈 창 판정을 주입 가능한 시계로 분리해 단위 테스트로 옮기거나.
-   * 그 전까지 규칙 자체의 회귀는 서버 단위 테스트가 덮어야 한다.
+   * **비파괴다** — 재오픈 PATCH 를 실제로 보내지 않는다. 서버가 이 SR 을 허용한다는 것은
+   * 위 'CONFIRMED → IN_PROGRESS' 전이 테스트와 sr-reopen-availability 의 서버·화면 동치
+   * 그리드가 이미 덮고 있고, 여기서만 확인할 수 있는 것은 "페이지가 어떤 필드를 넘기는가"
+   * 뿐이다. 제출까지 하면 이 SR 이 IN_PROGRESS 로 넘어가 "아무 일도 없었다" 를 마지막에
+   * 단언할 수 없게 되고, 실패했을 때 원인이 배선인지 전이 흐름인지 흐려진다.
+   * 대신 준비가 조용히 실패해(= 그냥 갓 확인된 SR) 테스트가 거저 통과하는 일이 없도록,
+   * 두 시각이 실제로 벌어졌는지를 서버 응답으로 먼저 못박는다.
    */
-  test.fixme('완료 후 7일이 지나면 재오픈이 차단된다', async () => {
-    // completedAt 을 소급 설정할 수 있는 경로가 생기면 여기서 400 과
-    // '완료 후 7일이 지나 재오픈할 수 없습니다.' 문구를 단언한다.
+  test('완료 20일 뒤에 확인한 SR 은 확인 시각 기준으로 재오픈할 수 있다', async ({ browser }) => {
+    test.setTimeout(120000);
+    const sr = await seedSR(browser, { stage: 'CONFIRMED', title: '재오픈 기산점' });
+    seededIds.push(sr.id);
+
+    const windowMs = 7 * 24 * 60 * 60 * 1000;
+    // confirmedAt 은 건드리지 않는다 — 픽스처가 방금 찍은 값이 그대로 남아야 한다.
+    await e2ePrisma().sR.update({
+      where: { id: sr.id },
+      data: { completedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) },
+    });
+
+    // ── 전제 확인: 완료는 창 밖, 확인은 창 안 ──────────────────────────────
+    await withApi(browser, 'admin', async (request) => {
+      const response = await request.get(`/api/srs/${sr.id}`);
+      expect(response.status(), `GET /api/srs/${sr.id} 가 200 이 아닙니다.`).toBe(200);
+      const body = (await response.json()) as {
+        completedAt?: string | null;
+        confirmedAt?: string | null;
+      };
+      expect(body.completedAt, `SR ${sr.id}: 완료 시각이 비어 있습니다.`).toBeTruthy();
+      expect(body.confirmedAt, `SR ${sr.id}: 확인 시각이 비어 있습니다.`).toBeTruthy();
+      expect(
+        Date.now() - Date.parse(body.completedAt!),
+        `SR ${sr.id}: 완료 시각이 7일 창 밖으로 되돌려지지 않았습니다 — 준비가 실패했습니다.`
+      ).toBeGreaterThan(windowMs);
+      expect(
+        Date.now() - Date.parse(body.confirmedAt!),
+        `SR ${sr.id}: 확인 시각이 7일 창 밖입니다 — 이 테스트의 전제가 깨졌습니다.`
+      ).toBeLessThan(windowMs);
+    });
+
+    // ── 화면: 신청자에게 버튼이 활성이고 차단 안내가 없어야 한다 ────────────
+    await withPage(browser, 'client', async (page) => {
+      await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
+      await expectStatusBadge(page, sr.id, 'CONFIRMED');
+
+      const trigger = page.getByRole('button', { name: '재오픈', exact: true });
+      await expect(trigger, `SR ${sr.id}: 재오픈 버튼이 보이지 않습니다.`).toBeVisible();
+      await expect(
+        trigger,
+        `SR ${sr.id}: 확인 시각 기준으로는 창 안인데 재오픈 버튼이 비활성입니다. ` +
+          '상세 페이지가 getReopenAvailability 에 confirmedAt 을 넘기지 않으면 ' +
+          '20일 전 completedAt 으로 판정됩니다.'
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId('sr-reopen-blocked-reason'),
+        `SR ${sr.id}: 확인 시각 기준으로는 창 안인데 재오픈 불가 안내가 표시됩니다.`
+      ).toHaveCount(0);
+    });
+
+    // 아무것도 제출하지 않았으므로 상태는 그대로다.
+    await expectServerStatus(browser, sr.id, 'CONFIRMED');
+  });
+
+  /**
+   * 완료 후 7일이 **지난** SR — 스테이징의 "ADMIN 이 재오픈을 못 한다" 보고의 재현이다.
+   *
+   * 예전에는 이 경우 버튼이 활성이었고, 이유는 다이얼로그를 열어야 작은 빨간 한 줄로만
+   * 보였다(모바일에서는 버튼이 아이콘뿐이라 무엇이 막혔는지도 알 수 없었다). 이제는
+   *   (1) 버튼이 보이되 비활성이고,
+   *   (2) 이유가 헤더 아래에 **글로** 보이며(데스크톱·390px 모두),
+   *   (3) 그 글은 서버가 같은 요청에 돌려주는 400 문구와 글자까지 같다.
+   *
+   * completedAt 을 되돌릴 공개 경로가 없어 준비 단계만 e2e 전용 Prisma 로 DB 에 쓴다
+   * (위 e2ePrisma 주석). 판정 자체는 서버와 화면이 각자 실제로 수행한다.
+   */
+  test('완료 후 7일이 지나면 재오픈 버튼이 막히고 이유가 화면에 보인다', async ({
+    browser,
+  }, testInfo) => {
+    test.setTimeout(120000);
+    const sr = await seedSR(browser, { stage: 'COMPLETED', title: '재오픈 창 만료' });
+    seededIds.push(sr.id);
+
+    const completedAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    await e2ePrisma().sR.update({ where: { id: sr.id }, data: { completedAt } });
+
+    // ── 서버: 신청자(권한 있음)의 재오픈도 창 만료로 400 이다 ───────────────
+    let serverMessage = '';
+    await withApi(browser, 'client', async (request) => {
+      const response = await request.patch(`/api/srs/${sr.id}/status`, {
+        data: { action: 'reopen', reason: '창 만료 검증' },
+      });
+      const body = (await response.json()) as { error?: string };
+      expect(
+        response.status(),
+        `SR ${sr.id}: 완료 8일 뒤의 재오픈이 400 으로 거부되지 않았습니다. 응답: ${JSON.stringify(body)}`
+      ).toBe(400);
+      expect(body.error, `SR ${sr.id}: 창 만료 거부 문구가 다릅니다.`).toMatch(
+        /^완료 후 7일이 지나 재오픈할 수 없습니다\. \(완료 \d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2} · 재오픈 기한 \d{4}\. \d{2}\. \d{2}\. \d{2}:\d{2}\) 추가 작업이 필요하면 새 SR을 등록해주세요\.$/
+      );
+      serverMessage = body.error!;
+    });
+
+    // ── 화면: 보고자와 같은 ADMIN 세션, 데스크톱과 모바일(390px) ────────────
+    for (const { name, viewport } of [
+      { name: 'desktop', viewport: { width: 1280, height: 800 } },
+      { name: 'mobile-390', viewport: { width: 390, height: 844 } },
+    ]) {
+      const context = await browser.newContext({
+        storageState: PERSONA_AUTH_FILES.admin,
+        viewport,
+      });
+      try {
+        const page = await context.newPage();
+        await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
+        await expectStatusBadge(page, sr.id, 'COMPLETED');
+
+        // 이름은 '재오픈' 그대로다(모바일은 아이콘뿐이라 aria-label 이 유일한 이름이다).
+        const trigger = page.getByRole('button', { name: '재오픈', exact: true });
+        await expect(
+          trigger,
+          `[${name}] SR ${sr.id}: 재오픈 버튼이 보이지 않습니다.`
+        ).toBeVisible();
+        await expect(
+          trigger,
+          `[${name}] SR ${sr.id}: 창이 닫혔는데 재오픈 버튼이 활성입니다.`
+        ).toBeDisabled();
+
+        const notice = page.getByTestId('sr-reopen-blocked-reason');
+        await expect(
+          notice,
+          `[${name}] SR ${sr.id}: 재오픈 불가 이유가 화면에 보이지 않습니다.`
+        ).toBeVisible();
+        await expect(
+          notice,
+          `[${name}] SR ${sr.id}: 화면의 이유가 서버 거부 문구와 다릅니다.`
+        ).toContainText(serverMessage);
+        await expect(
+          trigger,
+          `[${name}] SR ${sr.id}: 비활성 버튼이 이유 안내를 설명으로 가리키지 않습니다.`
+        ).toHaveAccessibleDescription(new RegExp(escapeRegExp(serverMessage)));
+
+        // 안내가 뜬 상태의 접근성. 30-accessibility 의 SR 상세 검사는 목록 첫 SR 을 여는데
+        // 그 SR 은 보통 막혀 있지 않아 이 안내를 한 번도 검사하지 못한다. 실제로 안내 제목을
+        // 헤딩(AlertTitle=<h5>)으로 그렸을 때 h1 → h5 → h2 가 되어 여기서 heading-order 가
+        // 걸렸다 — 그 회귀를 막는 자리다.
+        await checkA11y(page, `SR Detail (재오픈 차단, ${name})`, '[data-testid="sr-title"]');
+
+        // 390px 에서도 안내가 화면 폭 안에 들어와야 읽을 수 있다(가로 스크롤 금지).
+        const box = await notice.boundingBox();
+        expect(box, `[${name}] SR ${sr.id}: 안내의 위치를 측정할 수 없습니다.`).not.toBeNull();
+        expect(
+          box!.x + box!.width,
+          `[${name}] SR ${sr.id}: 안내가 화면 폭(${viewport.width}px)을 넘칩니다.`
+        ).toBeLessThanOrEqual(viewport.width);
+
+        await page.screenshot({
+          path: testInfo.outputPath(`reopen-blocked-${name}.png`),
+          fullPage: false,
+        });
+      } finally {
+        await context.close();
+      }
+    }
+
+    // 버튼이 막혀 있었으므로 상태는 그대로다.
+    await expectServerStatus(browser, sr.id, 'COMPLETED');
   });
 });
 

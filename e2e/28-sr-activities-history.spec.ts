@@ -107,7 +107,8 @@ test.describe('SR 활동 이력', () => {
       COMMENTED: '댓글',
       ATTACHMENT_ADDED: '첨부 추가',
       ATTACHMENT_REMOVED: '첨부 삭제',
-      REOPENED: '재요청',
+      // 2026-09-18: '재요청' → '재오픈'. 상세 화면의 버튼·다이얼로그·서버 문구가 모두 '재오픈' 이다.
+      REOPENED: '재오픈',
       COMPLETED: '완료',
       // 2026-08-10: 상태 라벨 정본(`src/lib/constants/sr.ts` 의 statusLabels)이 '거절' 로
       // 확정됐고, SRActivities 의 사본만 '반려' 로 남아 한 화면에 두 이름이 보였다.
