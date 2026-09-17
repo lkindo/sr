@@ -10,7 +10,7 @@ import { PrismaClient } from '@prisma/client';
 
 import { deleteSeededSRs, holdReleaseDate, seedSR, type SRStage } from './fixtures/sr';
 import { PERSONA_AUTH_FILES, type PersonaKey } from './helpers/auth-helpers';
-import { changeSRStatus } from './helpers/test-helpers';
+import { changeSRStatus, checkA11y } from './helpers/test-helpers';
 
 /**
  * SR 상태 전이 (State Transition) E2E 테스트
@@ -630,6 +630,12 @@ test.describe('SR 재오픈 제약', () => {
           trigger,
           `[${name}] SR ${sr.id}: 비활성 버튼이 이유 안내를 설명으로 가리키지 않습니다.`
         ).toHaveAccessibleDescription(new RegExp(escapeRegExp(serverMessage)));
+
+        // 안내가 뜬 상태의 접근성. 30-accessibility 의 SR 상세 검사는 목록 첫 SR 을 여는데
+        // 그 SR 은 보통 막혀 있지 않아 이 안내를 한 번도 검사하지 못한다. 실제로 안내 제목을
+        // 헤딩(AlertTitle=<h5>)으로 그렸을 때 h1 → h5 → h2 가 되어 여기서 heading-order 가
+        // 걸렸다 — 그 회귀를 막는 자리다.
+        await checkA11y(page, `SR Detail (재오픈 차단, ${name})`, '[data-testid="sr-title"]');
 
         // 390px 에서도 안내가 화면 폭 안에 들어와야 읽을 수 있다(가로 스크롤 금지).
         const box = await notice.boundingBox();

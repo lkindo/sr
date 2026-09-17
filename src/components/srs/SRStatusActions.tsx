@@ -13,7 +13,7 @@ import {
   XCircle,
 } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle, Button } from '@/components/ui';
+import { Alert, AlertDescription, Button } from '@/components/ui';
 import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
@@ -62,7 +62,12 @@ export function SRReopenBlockedNotice({ reopen }: { reopen: ReopenAvailability }
     // 페이지를 열 때부터 있는 안내이므로 role="alert"(즉시 낭독) 대신 note 로 둔다.
     <Alert role="note" id={REOPEN_BLOCKED_REASON_ID} data-testid={REOPEN_BLOCKED_REASON_ID}>
       <Info className="h-4 w-4" aria-hidden="true" />
-      <AlertTitle>재오픈할 수 없습니다</AlertTitle>
+      {/* 제목이지만 **헤딩이 아니다**. `AlertTitle` 은 <h5> 로 렌더되는데, 이 안내는 상세
+          페이지의 h1(SR 번호)과 h2(상세 정보) 사이에 들어가므로 h1 → h5 → h2 가 되어
+          heading-order 를 깨뜨린다(axe 로 실측: 안내가 뜬 페이지에서만 위반 1건).
+          같은 페이지에서 이미 한 번 고친 문제다(page.tsx 의 h2 주석). 보이는 모양은
+          AlertTitle 과 같은 클래스로 유지한다. */}
+      <p className="mb-1 font-medium leading-none tracking-tight">재오픈할 수 없습니다</p>
       <AlertDescription>{reopen.block.message}</AlertDescription>
     </Alert>
   );
@@ -103,6 +108,10 @@ export function SRStatusActions({
   // 모바일에서는 아이콘뿐이므로 이름(aria-label)은 '재오픈' 그대로 두고, 막힌 이유는
   // 설명(aria-describedby)으로 화면의 안내 문단을 가리킨다. 이름에 이유를 섞으면
   // e2e 헬퍼의 `/^재오픈$/` 도, 낭독기 사용자의 버튼 탐색도 함께 깨진다.
+  //
+  // `title` 에도 이유를 싣지 않는다(다른 버튼들과 같이 이름만 둔다). 비활성 버튼은
+  // `disabled:pointer-events-none` 이라 마우스 툴팁이 아예 뜨지 않고, aria-describedby 가
+  // 있으면 접근 가능한 설명도 title 이 아니라 그쪽을 쓴다 — 실제로 아무 데도 닿지 않는 문구다.
   const renderReopenButton = () => (
     <Button
       variant="outline"
@@ -111,7 +120,7 @@ export function SRStatusActions({
       aria-label="재오픈"
       aria-describedby={reopenBlocked ? REOPEN_BLOCKED_REASON_ID : undefined}
       className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-      title={reopen.block?.message ?? '재오픈'}
+      title="재오픈"
     >
       <RotateCcw className="h-4 w-4 md:mr-2" />
       <span className="hidden md:inline">재오픈</span>

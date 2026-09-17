@@ -281,6 +281,13 @@ describe('SRStatusActions Component', () => {
       expect(text).toBeVisible();
       expect(text).toHaveTextContent(withTitle(''));
 
+      // 안내 제목은 **헤딩이 아니다**. 이 안내는 상세 페이지의 h1(SR 번호)과 h2(상세 정보)
+      // 사이에 들어가므로, 헤딩으로 그리면 h1 → h5 → h2 가 되어 heading-order 를 깨뜨린다
+      // (e2e/21 이 axe 로 같은 회귀를 페이지 전체에서 막는다).
+      expect(
+        screen.queryByRole('heading', { name: '재오픈할 수 없습니다' })
+      ).not.toBeInTheDocument();
+
       // 다이얼로그에도 같은 이유가 간다(열린 뒤 막히는 경우의 방어).
       const dialog = screen.getByTestId('reopen-dialog');
       if (typeof message === 'string') {
