@@ -7,7 +7,7 @@ import {
   test,
 } from '@playwright/test';
 
-import { deleteSeededSRs, seedSR, type SRStage } from './fixtures/sr';
+import { deleteSeededSRs, holdReleaseDate, seedSR, type SRStage } from './fixtures/sr';
 import { PERSONA_AUTH_FILES, type PersonaKey } from './helpers/auth-helpers';
 import { changeSRStatus } from './helpers/test-helpers';
 
@@ -206,10 +206,14 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
     await expectServerStatus(browser, sr.id, 'IN_PROGRESS');
   });
 
-  test('IN_PROGRESS → ON_HOLD (보류, 사유 필수)', async ({ browser }) => {
+  test('IN_PROGRESS → ON_HOLD (보류, 사유·예상 해제일 필수)', async ({ browser }) => {
     test.setTimeout(90000);
     const sr = await seedSR(browser, { stage: 'IN_PROGRESS', title: '전이 테스트 hold' });
     seededIds.push(sr.id);
+
+    // 헌법 §2: 보류는 사유 **와** 예상 해제일을 함께 받는다. 다이얼로그가 날짜 입력을
+    // 요구하고, 라우트는 날짜가 없으면 400 을 돌려준다.
+    const expectedHoldReleaseDate = holdReleaseDate();
 
     await withPage(browser, 'engineer', async (page) => {
       await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
@@ -217,6 +221,7 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
 
       await changeSRStatus(page, sr.id, 'hold', {
         reason: '고객사 추가 정보 요청으로 인한 보류',
+        expectedHoldReleaseDate,
       });
 
       await waitForListRedirect(page);
@@ -224,6 +229,17 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
     });
 
     await expectServerStatus(browser, sr.id, 'ON_HOLD');
+
+    // 다이얼로그에서 고른 날짜가 실제로 저장되었는지도 서버 기준으로 확인한다.
+    await withApi(browser, 'admin', async (request) => {
+      const response = await request.get(`/api/srs/${sr.id}`);
+      expect(response.status(), `GET /api/srs/${sr.id} 가 200 이 아닙니다.`).toBe(200);
+      const body = (await response.json()) as { expectedHoldReleaseDate?: string | null };
+      expect(
+        body.expectedHoldReleaseDate?.slice(0, 10),
+        `SR ${sr.id}: 보류 다이얼로그에서 입력한 예상 해제일이 서버에 저장되지 않았습니다.`
+      ).toBe(expectedHoldReleaseDate);
+    });
   });
 
   test('ON_HOLD → IN_PROGRESS (진행 재개)', async ({ browser }) => {

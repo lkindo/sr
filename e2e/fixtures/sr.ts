@@ -61,6 +61,23 @@ export interface SeedSROptions {
   resolutionDescription?: string;
   /** 보류/거절 사유. hold·reject 액션에 필수다. */
   reason?: string;
+  /**
+   * 보류 시 예상 해제일(YYYY-MM-DD). hold 액션에 필수다.
+   * 기본값은 실행 시점 기준 7일 뒤({@link holdReleaseDate}).
+   */
+  expectedHoldReleaseDate?: string;
+}
+
+/**
+ * 보류(hold)에 쓸 예상 해제일 — 실행 시점 기준 `daysAhead` 일 뒤의 YYYY-MM-DD.
+ *
+ * 헌법 §2 가 보류에 "사유 **와** 예상 해제일" 을 함께 요구하고, 상태 라우트는 날짜가
+ * 없으면 400('예상 해제일을 입력해주세요.')을, 보류 다이얼로그는 입력 전 제출을 막는다.
+ * 고정 날짜는 그날이 지나면 시한폭탄이 되고(다이얼로그의 min 은 오늘, KST), UTC 기준
+ * 날짜와 KST 오늘은 하루까지 어긋날 수 있으므로 여유 있게 미래로 잡는다.
+ */
+export function holdReleaseDate(daysAhead = 7): string {
+  return new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 /** 담당자 기본값. helpers/test-helpers.ts 의 ENGINEER_ASSIGNEE_EMAIL 과 반드시 같아야 한다. */
@@ -128,6 +145,7 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
     assigneeEmail = ENGINEER_EMAIL,
     resolutionDescription = '픽스처가 API 로 완료 처리했습니다.',
     reason = '픽스처가 API 로 상태를 변경했습니다.',
+    expectedHoldReleaseDate = holdReleaseDate(),
   } = options;
 
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -236,7 +254,7 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
     seeded.stage = 'IN_PROGRESS';
 
     if (stage === 'ON_HOLD') {
-      await transition('hold', engineer.request, { reason });
+      await transition('hold', engineer.request, { reason, expectedHoldReleaseDate });
       seeded.stage = 'ON_HOLD';
       return seeded;
     }

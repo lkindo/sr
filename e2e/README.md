@@ -103,7 +103,7 @@ pnpm test:e2e e2e/19-file-upload-download.spec.ts
 SR 상태 전이 규칙 및 제약 조건 검증:
 
 - INTAKE → IN_PROGRESS (start 액션)
-- IN_PROGRESS → ON_HOLD (hold 액션 - 보류 사유 필수)
+- IN_PROGRESS → ON_HOLD (hold 액션 - 보류 사유·예상 해제일 필수)
 - ON_HOLD → IN_PROGRESS (resume 액션)
 - IN_PROGRESS → COMPLETED (complete 액션 - 해결 내용 필수)
 - COMPLETED → CONFIRMED (confirm 액션 - 신청자만 가능)

@@ -275,6 +275,38 @@ test.describe('역할 상호 배타성 테스트', () => {
   });
 
   test('5. 대조군: 고객사 미할당 사용자에게 시스템 역할 부여는 성공한다', async ({ request }) => {
+    // 4번이 끝나면 사용자는 CLIENT_USER + 고객사 1곳이다. 고객사 역할 보유자는 소속을
+    // 0개로 만들 수 없다(헌법 §1.3 — 미할당 사용자는 고객사 역할을 가질 수 없다).
+    // 이 판정은 policies.ensureRoleClientExclusivity 한 곳에서 사용자 수정 경로에도 걸리며,
+    // DELETE /api/users/{id}/client 도 같은 이유로 막는다. 그래서 "역할 회수 → 고객사 해제
+    // → 시스템 역할 부여" 순서여야 한다. 먼저 그 차단이 실제로 걸리는지 확인한다.
+    const blockedUnassign = await apiRequestWithRateLimitRetry(
+      request,
+      'patch',
+      `/api/users/${testUserId}`,
+      { data: { clientIds: [] } }
+    );
+    expect(
+      blockedUnassign.status(),
+      `CLIENT_USER 보유자의 고객사 전체 해제가 차단되지 않았습니다. 응답: ${await blockedUnassign.text()}`
+    ).toBe(400);
+    expect(
+      await fetchUserClientCount(request, testUserId),
+      '차단되었는데도 고객사 소속이 실제로 해제되었습니다.'
+    ).toBe(1);
+
+    const revokeResponse = await apiRequestWithRateLimitRetry(
+      request,
+      'post',
+      `/api/users/${testUserId}/roles`,
+      { data: { roleIds: [] } }
+    );
+    expect(
+      revokeResponse.status(),
+      `테스트 준비 실패: 역할 회수(roleIds=[]) 응답: ${await revokeResponse.text()}`
+    ).toBe(200);
+    expect(await fetchUserRoleNames(request, testUserId)).toEqual([]);
+
     await setUserClients(request, testUserId, []);
 
     const engineerRole = roleMap.get('ENGINEER')!;
@@ -290,7 +322,7 @@ test.describe('역할 상호 배타성 테스트', () => {
       `정상 경로가 막혔습니다(과잉 차단). 응답: ${await response.text()}`
     ).toBe(200);
 
-    // 역할 교체는 원자적이므로 이전 CLIENT_USER 는 남아 있으면 안 된다.
+    // 역할 교체 결과는 부여한 ENGINEER 하나뿐이어야 한다(이전 CLIENT_USER 가 되살아나면 안 된다).
     expect(await fetchUserRoleNames(request, testUserId)).toEqual(['ENGINEER']);
   });
 });

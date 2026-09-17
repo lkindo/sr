@@ -119,9 +119,10 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
   test('SR 삭제 권한 확인 및 Audit Log 적재 검증 (ADMIN)', async ({ browser, page }) => {
     test.setTimeout(120_000);
 
-    // 이 테스트는 대상 SR을 파괴하므로 공용 srId 를 쓰지 않고 전용 SR을 새로 만든다.
+    // 이 테스트는 대상 SR을 삭제하므로 공용 srId 를 쓰지 않고 전용 SR을 새로 만든다.
     // (fullyParallel 환경에서 같은 워커의 다른 테스트가 삭제된 SR을 참조하는 것을 막는다.)
-    // 삭제 자체가 검증 대상이므로 별도 정리는 필요 없다 — 테스트가 끝나면 SR 은 이미 없다.
+    // 삭제 자체가 검증 대상이므로 별도 정리는 필요 없다 — 테스트가 끝나면 SR 은 이미
+    // 삭제 표시(deletedAt)되어 목록·조회에서 빠져 있다.
     const targetSrId = (
       await seedSR(browser, {
         title: `삭제 검증용 SR ${Date.now()}`,
@@ -149,9 +150,29 @@ test.describe('SR 권한 및 접수 기능 테스트', () => {
     await dialog.getByRole('button', { name: '삭제' }).click();
     await page.waitForURL((url) => url.pathname === '/srs', { timeout: 20000 });
 
-    // 서버 상태 검증: SR 행이 실제로 사라져야 한다.
+    // 서버 상태 검증: SR 삭제는 **soft delete** 다(db-rules §2, sr.service.ts 의 deleteSR).
+    // 예전에는 행을 물리 삭제해 Cascade 로 활동·댓글·첨부·상태 이력까지 복구 불가하게
+    // 사라졌고, 이 단언도 "행이 없어야 한다" 였다. 이력 보존을 위해 의도적으로 바뀐 계약이므로
+    // (1) 행은 남아 있고 deletedAt 이 기록되어야 하며 (2) API 에서는 더 이상 조회되지 않아야 한다.
     const deletedSR = await prisma.sR.findUnique({ where: { id: targetSrId } });
-    expect(deletedSR, '삭제 요청이 200 이었지만 SR 행이 그대로 남아 있습니다.').toBeNull();
+    expect(
+      deletedSR,
+      'SR 행이 물리 삭제되었습니다. 삭제는 이력 보존을 위해 deletedAt 만 기록해야 합니다.'
+    ).not.toBeNull();
+    expect(
+      deletedSR!.deletedAt,
+      '삭제가 끝나 목록으로 이동했지만 SR 에 삭제 표시(deletedAt)가 기록되지 않았습니다.'
+    ).toBeInstanceOf(Date);
+
+    const afterDeleteResponse = await apiRequestWithRateLimitRetry(
+      page.request,
+      'get',
+      `/api/srs/${targetSrId}`
+    );
+    expect(
+      afterDeleteResponse.status(),
+      `삭제된 SR 이 GET /api/srs/${targetSrId} 로 여전히 조회됩니다.`
+    ).toBe(404);
 
     // Audit Log 적재 검증 및 스키마/데이터 정합성 정밀 검증 (최대 5초 폴링 대기)
     let auditLogRecord = null;
