@@ -554,6 +554,80 @@ test.describe('SR 재오픈 제약', () => {
   });
 
   /**
+   * 완료 20일 뒤에 확인한 SR — 상세 페이지가 기산점을 **확인 시각**으로 잡는지 보는 자리다.
+   *
+   * 픽스처는 상태를 API 로 밀어 올리므로 CONFIRMED SR 은 completedAt ≈ confirmedAt ≈ 지금이다.
+   * 두 시각이 붙어 있으면 어느 쪽을 봐도 답이 같아서, 상세 페이지가 `getReopenAvailability`
+   * 에 confirmedAt 을 넘기지 않아도 **어떤 E2E 도 그 누락을 보지 못한다**. 그런데 그 배선이
+   * 정확히 이 작업이 고친 버그(늦게 확인한 SR 의 재오픈 버튼을 화면이 잘못 막음)의 자리다.
+   * 그래서 **completedAt 만** 20일 전으로 되돌려 둘을 갈라놓는다:
+   *   - 확인 시각을 보면 → 창 안이므로 버튼 활성, 안내 없음 (지금의 서버·화면)
+   *   - 완료 시각만 보면 → '완료 후 7일이 지나' 로 버튼이 잘못 막힌다 (예전 화면)
+   *
+   * **비파괴다** — 재오픈 PATCH 를 실제로 보내지 않는다. 서버가 이 SR 을 허용한다는 것은
+   * 위 'CONFIRMED → IN_PROGRESS' 전이 테스트와 sr-reopen-availability 의 서버·화면 동치
+   * 그리드가 이미 덮고 있고, 여기서만 확인할 수 있는 것은 "페이지가 어떤 필드를 넘기는가"
+   * 뿐이다. 제출까지 하면 이 SR 이 IN_PROGRESS 로 넘어가 "아무 일도 없었다" 를 마지막에
+   * 단언할 수 없게 되고, 실패했을 때 원인이 배선인지 전이 흐름인지 흐려진다.
+   * 대신 준비가 조용히 실패해(= 그냥 갓 확인된 SR) 테스트가 거저 통과하는 일이 없도록,
+   * 두 시각이 실제로 벌어졌는지를 서버 응답으로 먼저 못박는다.
+   */
+  test('완료 20일 뒤에 확인한 SR 은 확인 시각 기준으로 재오픈할 수 있다', async ({ browser }) => {
+    test.setTimeout(120000);
+    const sr = await seedSR(browser, { stage: 'CONFIRMED', title: '재오픈 기산점' });
+    seededIds.push(sr.id);
+
+    const windowMs = 7 * 24 * 60 * 60 * 1000;
+    // confirmedAt 은 건드리지 않는다 — 픽스처가 방금 찍은 값이 그대로 남아야 한다.
+    await e2ePrisma().sR.update({
+      where: { id: sr.id },
+      data: { completedAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000) },
+    });
+
+    // ── 전제 확인: 완료는 창 밖, 확인은 창 안 ──────────────────────────────
+    await withApi(browser, 'admin', async (request) => {
+      const response = await request.get(`/api/srs/${sr.id}`);
+      expect(response.status(), `GET /api/srs/${sr.id} 가 200 이 아닙니다.`).toBe(200);
+      const body = (await response.json()) as {
+        completedAt?: string | null;
+        confirmedAt?: string | null;
+      };
+      expect(body.completedAt, `SR ${sr.id}: 완료 시각이 비어 있습니다.`).toBeTruthy();
+      expect(body.confirmedAt, `SR ${sr.id}: 확인 시각이 비어 있습니다.`).toBeTruthy();
+      expect(
+        Date.now() - Date.parse(body.completedAt!),
+        `SR ${sr.id}: 완료 시각이 7일 창 밖으로 되돌려지지 않았습니다 — 준비가 실패했습니다.`
+      ).toBeGreaterThan(windowMs);
+      expect(
+        Date.now() - Date.parse(body.confirmedAt!),
+        `SR ${sr.id}: 확인 시각이 7일 창 밖입니다 — 이 테스트의 전제가 깨졌습니다.`
+      ).toBeLessThan(windowMs);
+    });
+
+    // ── 화면: 신청자에게 버튼이 활성이고 차단 안내가 없어야 한다 ────────────
+    await withPage(browser, 'client', async (page) => {
+      await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
+      await expectStatusBadge(page, sr.id, 'CONFIRMED');
+
+      const trigger = page.getByRole('button', { name: '재오픈', exact: true });
+      await expect(trigger, `SR ${sr.id}: 재오픈 버튼이 보이지 않습니다.`).toBeVisible();
+      await expect(
+        trigger,
+        `SR ${sr.id}: 확인 시각 기준으로는 창 안인데 재오픈 버튼이 비활성입니다. ` +
+          '상세 페이지가 getReopenAvailability 에 confirmedAt 을 넘기지 않으면 ' +
+          '20일 전 completedAt 으로 판정됩니다.'
+      ).toBeEnabled();
+      await expect(
+        page.getByTestId('sr-reopen-blocked-reason'),
+        `SR ${sr.id}: 확인 시각 기준으로는 창 안인데 재오픈 불가 안내가 표시됩니다.`
+      ).toHaveCount(0);
+    });
+
+    // 아무것도 제출하지 않았으므로 상태는 그대로다.
+    await expectServerStatus(browser, sr.id, 'CONFIRMED');
+  });
+
+  /**
    * 완료 후 7일이 **지난** SR — 스테이징의 "ADMIN 이 재오픈을 못 한다" 보고의 재현이다.
    *
    * 예전에는 이 경우 버튼이 활성이었고, 이유는 다이얼로그를 열어야 작은 빨간 한 줄로만
