@@ -12,20 +12,21 @@
 >
 > 이 문서의 초안(1.0/1.1)은 **Vercel + Upstash Redis + Vercel Blob + Resend +
 > React Email + Inngest + Sentry** 를 전제로 작성되었다. **그중 어느 것도 채택되지 않았다.**
-> 실제 운영 스택은 다음과 같다(2026-07-30 실측).
+> 실제 운영 스택은 다음과 같다(2026-07-30 실측, 2026-09-18 재대조). **버전 숫자의 정본은 `package.json`** 이며
+> 여기에는 메이저까지만 적는다 — 마이너까지 적었더니 dependabot 이 올릴 때마다 틀어졌다.
 >
 > | 영역        | 실제 채택                                                                   | 초안이 적었던 것(미채택) |
 > | ----------- | --------------------------------------------------------------------------- | ------------------------ |
-> | 프레임워크  | Next.js 16.1.6 (App Router), React 19.2.4                                   | Next.js 14.x             |
+> | 프레임워크  | Next.js 16 (App Router), React 19                                           | Next.js 14.x             |
 > | 런타임      | Node 22.x (`package.json` engines), pnpm 10                                 | Vercel Functions         |
 > | DB          | PostgreSQL 16 (`postgres:16-alpine` 컨테이너, named volume)                 | 외부 관리형 PostgreSQL   |
-> | 커넥션 풀러 | 없음 (Prisma 6.19 가 DB에 직접 연결)                                        | PgBouncer                |
-> | 인증        | NextAuth/Auth.js v5(5.0.0-beta.32), JWT 세션, bcryptjs                      | —                        |
+> | 커넥션 풀러 | 없음 (Prisma 6 이 DB에 직접 연결)                                           | PgBouncer                |
+> | 인증        | NextAuth/Auth.js v5(beta), JWT 세션, bcryptjs                               | —                        |
 > | 파일 저장   | 서버 디스크 `STORAGE_DIR=/app/var/uploads` (컨테이너 볼륨)                  | Vercel Blob              |
 > | 캐시        | 프로세스 내 캐시(`src/lib/cache.ts`)                                        | Upstash Redis            |
-> | 백그라운드  | `src/lib/wait-until.ts` 의 `backgroundTask` (응답 후 실행)                  | Inngest                  |
-> | 이메일      | nodemailer 7.0 (SMTP)                                                       | Resend + React Email     |
-> | 웹 푸시     | web-push 3.6 (VAPID)                                                        | —                        |
+> | 백그라운드  | 이메일: DB 아웃박스 + 앱 내부 디스패처 / 푸시: `backgroundTask` (응답 후 실행) | Inngest                  |
+> | 이메일      | nodemailer (SMTP)                                                           | Resend + React Email     |
+> | 웹 푸시     | web-push (VAPID)                                                            | —                        |
 > | 실시간      | 자체 SSE (`/api/realtime`)                                                  | —                        |
 > | 배포        | 자체 서버(Oracle Cloud VM) + Docker Compose + nginx:alpine                  | Vercel                   |
 > | 에러 추적   | **없음** (pino → stdout). Sentry 는 2026-07-30 미사용 결정, Axiom 도 미채택 | Sentry / Axiom           |
@@ -104,9 +105,10 @@
 
 ### 디렉토리 구조 상세
 
-아래 트리는 2026-07-30 저장소를 실제로 열거해 작성했다(디렉토리는 2~3단계까지만 표기).
-`src/server/`, `src/inngest/`, `src/store/`, `emails/`, `tests/` 는 **존재하지 않는다** —
-초안이 계획했으나 그 형태로 만들어지지 않았다(아래 "초안과의 차이" 참고).
+아래 트리는 2026-07-30 저장소를 실제로 열거해 작성하고 2026-09-18 다시 대조했다(디렉토리는 2~3단계까지만 표기).
+`src/server/`, `src/inngest/`, `src/store/`, `emails/` 는 **존재하지 않는다** —
+초안이 계획했으나 그 형태로 만들어지지 않았다(아래 "초안과의 차이" 참고). 루트 `tests/` 는 2026-08-01 에
+생겼다 — DB 를 실제로 쓰는 통합 테스트(`tests/integration/`)가 있다.
 
 ```
 sr/
@@ -126,7 +128,8 @@ sr/
 │   │   │   ├── users/                # 사용자
 │   │   │   ├── roles/                # 역할/권한 관리
 │   │   │   ├── organization/         # 조직
-│   │   │   ├── settings/             # 설정(알림 구독 등)
+│   │   │   ├── company/users/        # 자사 사용자 (CLIENT_ADMIN 전용)
+│   │   │   ├── settings/             # 프로필·알림 설정 / 시스템 설정·알림 발송 이력(ADMIN)
 │   │   │   ├── MainContent.tsx
 │   │   │   └── layout.tsx
 │   │   ├── api/
@@ -138,7 +141,8 @@ sr/
 │   │   │   ├── clients/ users/ roles/ permissions/ service-categories/
 │   │   │   ├── dashboard/stats/      # 대시보드 집계
 │   │   │   ├── reports/              # 보고서
-│   │   │   ├── profile/ settings/    # 프로필 / 알림 설정
+│   │   │   ├── profile/ settings/    # 프로필 / 알림 설정·시스템 설정(읽기 전용)
+│   │   │   ├── notifications/outbox/ # 알림 발송 이력 조회·실패 재발송 (ADMIN)
 │   │   │   ├── push/                 # web-push 구독·VAPID 키·테스트 발송
 │   │   │   ├── realtime/             # 자체 SSE 스트림
 │   │   │   └── health/               # 헬스체크
@@ -148,25 +152,26 @@ sr/
 │   │
 │   ├── components/
 │   │   ├── ui/                       # Shadcn/ui + Radix 기반 프리미티브
-│   │   ├── srs/ clients/ users/ roles/ dashboard/ organization/ profile/
-│   │   ├── auth/ layout/ loading/    # 인증 UI, 셸, 로딩 스켈레톤
+│   │   ├── srs/ clients/ users/ roles/ dashboard/ organization/
+│   │   ├── auth/ layout/ loading/ common/  # 인증 UI, 셸, 로딩 스켈레톤, 공용
 │   │   └── providers/                # react-query 등 클라이언트 프로바이더
 │   │
 │   ├── actions/                      # Server Actions ('use server')
 │   │   ├── sr.actions.ts  client.actions.ts  user.actions.ts
 │   │   ├── role.actions.ts  permission.actions.ts
-│   │   ├── service-category.actions.ts
-│   │   └── sr-form.utils.ts
+│   │   └── service-category.actions.ts
 │   │
 │   ├── services/                     # 비즈니스 로직 (클래스 + 싱글톤 레지스트리)
 │   │   ├── sr.service.ts  client.service.ts  user.service.ts
 │   │   ├── role.service.ts  permission.service.ts  service-category.service.ts
-│   │   ├── email.service.ts          # nodemailer(SMTP) 발송 + 인라인 HTML 템플릿
+│   │   ├── email.service.ts          # nodemailer(SMTP) 발송(실패 시 throw) + HTML 이스케이프한 템플릿 빌더
+│   │   ├── notification-outbox.ts    # 이메일 아웃박스 적재·디스패처·보존 정리
+│   │   ├── sr-email-outbox.ts        # SR 이벤트별 수신자 산정 → 아웃박스 적재(트랜잭션 안)
 │   │   ├── push.service.ts           # web-push(VAPID)
 │   │   ├── audit.service.ts          # 감사 로그
 │   │   ├── service-registry.ts       # 싱글톤 + 도메인 이벤트 리스너 등록
 │   │   └── listeners/
-│   │       └── sr-notification.listener.ts  # 도메인 이벤트 → 이메일/푸시
+│   │       └── sr-notification.listener.ts  # 도메인 이벤트 → 웹 푸시 (이메일은 아웃박스가 맡는다)
 │   │
 │   ├── lib/
 │   │   ├── prisma.ts                 # PrismaClient 싱글톤 + $transaction 이벤트 래퍼
@@ -179,8 +184,11 @@ sr/
 │   │   ├── logger.ts                 # pino → stdout 구조화 로깅
 │   │   ├── rate-limiter.ts           # 메모리 토큰 버킷 + 프리셋
 │   │   ├── api-rate-limit.ts  api-error-handler.ts  api-helpers.ts
-│   │   ├── auth-wrapper.ts  permissions.ts  permission-helpers.ts  policies.ts
-│   │   ├── sr-state-machine.ts       # SR 상태 전이 규칙
+│   │   ├── auth-wrapper.ts  action-helpers.ts  # 라우트 래퍼 / Server Action 인증·인가 헬퍼
+│   │   ├── policies.ts               # 인가 판정의 단일 지점(헌법 §1.2)
+│   │   ├── permission-helpers.ts  role-permissions.ts  # 세션 권한 플래그 / 역할→권한 확장
+│   │   ├── sr-state-machine.ts       # SR 상태 전이 규칙 + 화면용 판정 사본(동치 테스트로 고정)
+│   │   ├── sr-form.utils.ts          # SR 폼 → 서비스 입력 변환(순수 헬퍼)
 │   │   ├── schemas.ts                # Zod 스키마
 │   │   ├── env-validation.ts         # 부팅 시 환경변수 fail-fast 검증
 │   │   ├── errors.ts  result.ts  security.ts  file-validator.ts
@@ -192,7 +200,7 @@ sr/
 │   ├── config/                       # navigation 등 정적 설정
 │   ├── auth.ts  auth.config.ts       # NextAuth(Auth.js v5) 설정
 │   ├── proxy.ts                      # 미들웨어(요청 게이트, rate limit)
-│   └── instrumentation.ts            # 부팅 훅 (환경변수 검증 fail-fast)
+│   └── instrumentation.ts            # 부팅 훅 (환경변수 검증 fail-fast, 알림 디스패처 기동)
 │
 ├── e2e/                              # Playwright 스펙 (01~31 + roles/, helpers/)
 ├── nginx/                            # nginx.conf, certs (리버스 프록시)
@@ -225,13 +233,13 @@ sr/
 | `src/server/email/templates/**`, `emails/**` (React Email) | 없음. HTML 문자열이 `src/services/email.service.ts` 안에 인라인         |
 | `src/store/**` (Zustand)                                   | 없음. Zustand 는 의존성에 없다(서버 상태는 react-query, UI 상태는 로컬) |
 | `src/components/{forms,tables,charts,sr,layouts}/`         | 도메인별 디렉토리(`srs/`, `clients/`, …)로 구성                         |
-| `tests/{unit,integration,e2e}/`                            | 단위 테스트는 소스 옆 `src/**/__tests__/`, E2E 는 루트 `e2e/`           |
+| `tests/{unit,integration,e2e}/`                            | 단위 테스트는 소스 옆 `src/**/__tests__/`, 통합 테스트는 루트 `tests/integration/`, E2E 는 루트 `e2e/` |
 
 ---
 
 ## 데이터베이스 설계
 
-데이터베이스의 전체 스키마, ERD, 테이블 명세, 인덱스 전략 등은 데이터베이스 설계의 Single Source of Truth인 **[DB.md](./DB.md)** 문서를 참조하십시오.
+데이터베이스 구조의 정본은 `prisma/schema.prisma` 와 `prisma/migrations/` 다. ERD, 테이블 명세, 인덱스 전략 등 사람이 읽는 설명은 **[DB.md](./DB.md)** 를 참조하십시오.
 
 ### DB 연결 설정
 
@@ -317,8 +325,9 @@ if (prisma) {
 export default prisma ?? ({} as PrismaClient);
 ```
 
-개발 환경에서는 같은 파일이 Prisma 미들웨어로 느린 쿼리(`PRISMA_SLOW_MS`, 기본 200ms)를
-경고 로그로 남기며, 선택적으로 `PRISMA_SLOW_LOG_FILE` 에 append 한다.
+같은 파일이 **프로덕션을 포함한 전 환경에서** Prisma Client Extension(`$extends` → `$allOperations`)으로
+느린 쿼리(`PRISMA_SLOW_MS`, 기본 200ms)를 `warn` 로그로 남기며, 선택적으로 `PRISMA_SLOW_LOG_FILE` 에
+append 한다(`.gemini/rules/db-rules.md` §4). 예전의 개발 환경 전용 Prisma 미들웨어는 Prisma 6 에서 제거됐다.
 
 ---
 
@@ -331,11 +340,16 @@ export default prisma ?? ({} as PrismaClient);
 > **⚠️ 아래 예시는 초안이며 현재 구현과 구조가 다르다.**
 > 실물은 `src/actions/sr.actions.ts`(얇은 Server Action 층) + `src/services/sr.service.ts`
 > (검증·권한·트랜잭션·이벤트 발행)로 분리되어 있고, `db` 대신 `src/lib/prisma.ts` 의 기본
-> export 를, `@/lib/auth/permissions` 대신 `src/lib/permissions.ts` / `src/lib/policies.ts` /
-> `src/lib/auth-wrapper.ts` 를 사용한다. 상태 전이 규칙은 이 파일에 인라인된 형태가 아니라
-> `src/lib/sr-state-machine.ts` 에 있다.
+> export 를, `@/lib/auth/permissions` 대신 `src/lib/policies.ts`(인가 판정) / `src/lib/action-helpers.ts`
+> (Server Action 인증) / `src/lib/auth-wrapper.ts`(라우트 래퍼)를 사용한다. 상태 전이 규칙은 이 파일에
+> 인라인된 형태가 아니라 `src/lib/sr-state-machine.ts` 에 있다.
 > **알림 트리거만은 실제 구현으로 교체했다**(초안은 `inngest.send()` 를 호출했다 — Inngest 는
-> 채택되지 않았다). 나머지 흐름은 설계 의도를 보이기 위해 초안 그대로 남긴다.
+> 채택되지 않았다). 나머지는 초안 그대로 남긴 **폐기된 흐름**이다 — 특히 조회 범위 규칙은 따라 하면 안 된다.
+> 초안의 `checkPermission(…, 'sr:read')` 는 소문자 권한(카탈로그에 없다)으로 "보유하면 전체, 아니면 본인
+> 신청·배정분" 을 고르는데, 이는 헌법과 반대다. 실제 범위는 헌법 §1.1·§1.2 대로 **같은 고객사**(외부 사용자),
+> **배정분**(ENGINEER), **전체**(ADMIN·MANAGER)이며 `policies.srViewerScopeWhere(viewer)` 를 서비스가 항상
+> AND 로 건다. 초안의 알림 트리거 주석에 적힌 `sr.service.ts` 줄 번호도 이미 맞지 않는다 — `domainEvents.emit`
+> 호출을 찾아 읽는다.
 
 **초안: server/actions/sr.ts** (실물: `src/actions/sr.actions.ts` + `src/services/sr.service.ts`):
 
@@ -438,7 +452,7 @@ export async function createSR(input: z.infer<typeof createSRSchema>) {
     },
   });
 
-  // 알림 트리거 — 실제 구현(src/services/sr.service.ts:232).
+  // 알림 트리거 — 실제 구현(src/services/sr.service.ts 의 createSR 안 `sr:created` emit).
   // $transaction 안에서 emit 하면 src/lib/prisma.ts 래퍼가 커밋 후로 발행을 미룬다.
   // 페이로드는 src/lib/domain-events.ts 의 SRCreatedEvent 계약이며 이 5개 필드뿐이다.
   domainEvents.emit('sr:created', {
@@ -671,7 +685,7 @@ export async function assignSR(input: z.infer<typeof assignSRSchema>) {
     },
   });
 
-  // 알림 트리거 — 실제 구현(src/services/sr.service.ts:613).
+  // 알림 트리거 — 실제 구현(src/services/sr.service.ts 의 `sr:assigned` emit).
   // 담당 해제(assigneeId=null)도 같은 이벤트로 발행하며, 리스너가 알림을 생략한다.
   domainEvents.emit('sr:assigned', {
     srId: updatedSR.id,
@@ -734,9 +748,9 @@ export async function updateSRStatus(input: z.infer<typeof updateSRStatusSchema>
     },
   });
 
-  // 알림 트리거 — 실제 구현(src/services/sr.service.ts:601).
+  // 알림 트리거 — 실제 구현(src/services/sr.service.ts 의 `sr:status_changed` emit).
   // 상태별로 이벤트를 나누지 않는다. 단일 'sr:status_changed' 이벤트에 이전/현재 상태를 담고,
-  // 수신자 결정과 문구 생성은 리스너(src/services/listeners/sr-notification.listener.ts)가 한다.
+  // 수신자 결정은 이메일은 같은 트랜잭션의 sr-email-outbox.ts 가, 푸시는 커밋 뒤 리스너가 한다.
   domainEvents.emit('sr:status_changed', {
     srId: updatedSR.id,
     srNumber: updatedSR.srNumber,
@@ -851,10 +865,12 @@ function validateStateTransition(
 
 > **⚠️ 아래 예시는 초안이다.** 댓글은 Server Action 이 아니라 REST 라우트
 > `src/app/api/srs/[id]/comments/route.ts` 로 구현되어 있다. 실물은 댓글 생성과 활동 이력을
-> 한 `$transaction` 으로 묶고, 그 뒤에 SSE 이벤트(`emitRealtimeEvent`)를 발행하고, 이메일은
-> 도메인 이벤트를 거치지 않고 라우트 안에서 직접 `backgroundTask(...)` 로 발송한다.
-> 발송 여부는 수신자별 `notificationPreference.emailCommentAdded`(스키마 기본값 `false`)를 따르고,
-> 작성자 본인에게는 보내지 않는다. 아래 초안의 `inngest.send()` 호출은 실제 코드로 교체했다.
+> 한 `$transaction` 으로 묶는다. 이메일은 도메인 이벤트를 거치지 않고 **같은 트랜잭션 안에서**
+> 아웃박스에 적재하며(`enqueueEmails(outbox, tx)`), 커밋 뒤에 SSE 이벤트(`emitRealtimeEvent`)를
+> 발행하고 웹 푸시만 `backgroundTask(...)` 로 보낸다. 발송 여부는 수신자별
+> `notificationPreference.emailCommentAdded`/`pushCommentAdded`(스키마 기본값 `false`)를 따르고,
+> 작성자 본인에게는 보내지 않는다. 내부 노트는 신청자에게 알리지 않고 활동 로그에도 남기지 않는다
+> (헌법 §4, D7). 아래 초안의 `inngest.send()` 호출은 실제 코드로 교체했다.
 >
 > **내부 노트(2026-09-18 소유자 결정 D7).** 실물 라우트는 `isInternal` 을 내부 사용자에게만 허용하고
 > (`policies.canWriteInternalNote` — 외부 사용자가 보낸 값은 공개로 강제), 내부 노트는 신청자에게
@@ -925,7 +941,7 @@ export async function createComment(input: z.infer<typeof createCommentSchema>) 
   // 알림 트리거 (내부 댓글이 아닌 경우)
   // 실제 구현(src/app/api/srs/[id]/comments/route.ts):
   // 이메일은 같은 트랜잭션 안에서 `enqueueEmails(outbox, tx)` 로 아웃박스에 PENDING 적재하고,
-  // 디스패처가 집어 발송·재시도한다(최대 5회). 웹 푸시만 backgroundTask 로 위임하며
+  // 디스패처가 집어 발송·재시도한다(총 시도 횟수 상한은 `MAX_ATTEMPTS`). 웹 푸시만 backgroundTask 로 위임하며
   // 푸시는 재시도하지 않는다 — 프로세스가 죽으면 그 푸시는 유실된다.
   if (!validated.isInternal) {
     const sr = await db.sR.findUnique({
@@ -1049,6 +1065,11 @@ export async function deleteComment(id: string) {
 >
 > `/api/clients/public` 은 회원가입 화면이 쓰는 유일한 비인증 조회다. 인증은 없지만
 > `withErrorHandler` 는 경유해 오류 매핑과 계측을 받는다.
+>
+> 이 표가 be-rules §1·§2 가 말하는 예외 목록의 정본이다(헌법은 목록을 복제하지 않는다). 라우트가 아닌
+> 비인증 진입점은 회원가입 Server Action(`src/app/(auth)/register/actions.ts`) 하나다. **Server Action 은
+> 래퍼 시그니처(`(NextRequest, ctx)`)와 맞지 않아 이 래퍼로 감쌀 수 없다** — 인증·인가·레이트리밋은
+> `src/lib/action-helpers.ts` 가 맡고, 소요 시간 계측은 아직 없다.
 
 | 경로 | 메서드 | 래퍼 | 구현 파일 |
 | --- | --- | --- | --- |
@@ -1175,11 +1196,13 @@ export async function GET(request: NextRequest) {
 > **⚠️ 이 장의 코드 예시는 초안이다.** 파일 경로가 실제와 다르다
 > (`components/forms/sr-form.tsx`, `components/tables/sr-table.tsx` 는 없다). 실제 컴포넌트는
 > 도메인별 디렉토리 `src/components/srs/`, `src/components/clients/`, `src/components/users/`,
-> `src/components/roles/`, `src/components/dashboard/`, `src/components/organization/`,
-> `src/components/profile/` 아래에 있고, 프리미티브는 `src/components/ui/`(Shadcn/ui + Radix)다.
-> SR 폼의 상태 로직은 `src/hooks/useCreateSRForm.ts` / `src/hooks/useEditSRForm.ts` 로 분리되어
-> 있다. 아래 예시는 폼 검증(Zod + react-hook-form)과 테이블 구성 패턴의 설계 의도를 보이기 위해
-> 남겨 둔다 — 그대로 복사해 쓸 수 있는 코드가 아니다.
+> `src/components/roles/`, `src/components/dashboard/`, `src/components/organization/`
+> 아래에 있고(프로필 화면은 `src/app/(dashboard)/settings/profile/page.tsx` 안에 있다), 프리미티브는
+> `src/components/ui/`(Shadcn/ui + Radix)다. SR 폼의 상태 로직은 `src/hooks/use-create-sr-form.ts` /
+> `src/hooks/use-edit-sr-form.ts` 로, 폼 → 서비스 입력 변환은 `src/lib/sr-form.utils.ts` 로 분리되어 있다
+> (배치·명명은 `.gemini/rules/fe-rules.md` §1.1). 아래 예시는 폼 검증과 테이블 구성 패턴의 설계 의도를
+> 보이기 위해 남겨 둔다 — 그대로 복사해 쓸 수 있는 코드가 아니다. 실제 SR 폼은 react-hook-form 이 아니라
+> `useState` 로 상태를 들고, react-hook-form + zodResolver 는 접수 폼(`use-intake-form.ts`)만 쓴다.
 
 ### UI 컴포넌트 계층
 
@@ -1789,16 +1812,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
 
 ### 권한 관리 유틸리티
 
-> **⚠️ 아래 예시는 초안이다.** `src/lib/auth/permissions.ts` 는 없다. 실제로는 세 파일로 나뉜다:
+> **⚠️ 아래 예시는 초안이다.** `src/lib/auth/permissions.ts` 도 `src/lib/permissions.ts` 도 없다
+> (후자는 커밋 `4303b17` 에서 삭제됐다). 실제 구성은 다음과 같다:
 >
-> - `src/lib/permissions.ts` — DB 조회 기반 권한 확인
->   (`hasPermission`, `requirePermission`, `hasAnyPermission`, `hasAllPermissions`, `hasRole`,
->   `getUserPermissions`, `getUserRoles`)
-> - `src/lib/policies.ts` — 세션 정보만으로 판정하는 리소스 정책.
+> - `src/lib/policies.ts` — **인가 판정의 단일 지점**(헌법 §1.2). 세션 정보만으로 판정하는 리소스 정책.
 >   `can*` 는 boolean 을 반환하고 `ensureCan*` 는 위반 시 `ForbiddenError` 를 던진다
 >   (`canReadSR`/`ensureCanReadSR`, `canUpdateSR`, `canDeleteSR`, 고객사·사용자용 동종 함수).
 >   테넌트 경계(`clientIds`)와 내부/외부 사용자 구분(`isInternalUser`)이 여기 모여 있다.
 > - `src/lib/auth-wrapper.ts` — 라우트 핸들러 래퍼(`withAuthAndRateLimit`)
+> - `src/lib/action-helpers.ts` — Server Action 인증·인가(`authenticateAndAuthorize`, `requirePermission` 은
+>   `src/services/permission.service.ts` 의 DB 조회를 쓴다)
+> - `src/lib/role-permissions.ts` — 로그인 시 역할을 권한 문자열로 펼쳐 세션에 싣는다(`expandRolePermissions`).
+>   `src/lib/permission-helpers.ts` 는 그 세션 플래그를 읽는 얇은 헬퍼다(`hasPermissionFlag`)
+> - 화면의 `usePermissions()`(`src/hooks/use-permissions.ts`)는 같은 세션 플래그로 `hasPermission(resource, action)` 을 제공한다
+>
+> 권한 문자열은 `prisma/permission-catalog.ts` 의 `RESOURCE:ACTION` 대문자 표기만 쓴다(be-rules §2).
 
 **초안: lib/auth/permissions.ts**:
 
@@ -1896,8 +1924,9 @@ export async function checkClientAccess(userId: string, clientId: string): Promi
 ### SR Service Layer
 
 > **⚠️ 아래 예시는 초안이다.** 실물은 `src/services/sr.service.ts` 이며 정적 메서드 클래스가
-> 아니라 인스턴스 클래스다(`src/services/service-registry.ts` 의 `services.srService` 싱글톤으로
-> 접근한다). `@/lib/sr/sla` 모듈은 존재하지 않으며, 상태 전이 규칙은 `src/lib/sr-state-machine.ts`,
+> 아니라 인스턴스 클래스다(`src/services/sr.service.ts` 가 export 하는 `srService` 싱글톤으로 접근한다.
+> `service-registry.ts` 는 사용자·고객사·역할·권한 서비스만 들고, 생성 시 알림 리스너를 등록한다).
+> `@/lib/sr/sla` 모듈은 존재하지 않으며, 상태 전이 규칙은 `src/lib/sr-state-machine.ts`,
 > 권한은 `src/lib/policies.ts`, DB 는 `src/lib/prisma.ts` 다. 쓰기 경로는 `$transaction` 으로
 > 감싸고 그 안에서 `domainEvents.emit(...)` 을 호출해 **커밋 후에** 알림이 발행되게 한다
 > (위 "알림 파이프라인" 절 참고).
@@ -2153,108 +2182,44 @@ export class SRService {
 > 읽거나 쓰지 않는다" 고 적었으나 2026-08-02 이후로 사실이 아니다. **이메일은 아웃박스
 > 패턴으로 이 테이블을 실제로 사용한다** — 도메인 트랜잭션 안에서 `PENDING` 을 적재하고
 > (`src/services/notification-outbox.ts` 의 `enqueueEmails`), 30초 주기 디스패처가
-> `FOR UPDATE SKIP LOCKED` 로 claim 해 발송하며, 실패는 지수 백오프로 최대 5회 재시도한 뒤
+> `FOR UPDATE SKIP LOCKED` 로 claim 해 발송하며, 실패는 지수 백오프로 재시도하다 시도 횟수 상한(`MAX_ATTEMPTS`)에 이르면
 > `FAILED` 로 고정된다. 즉 **발송 상태 추적·재시도·dead-letter 는 이메일에 한해 존재한다.**
-> 여전히 없는 것은 ① 웹 푸시의 영속화·재시도 ② 미발송 알림을 조회하는 관리 화면
-> ③ Inngest 같은 외부 워커다. 실제 동작은 아래와 같다.
+> 실패 알림 조회·재발송은 ADMIN 전용 화면 `/settings/outbox`(`GET`·`POST /api/notifications/outbox`)가
+> 맡는다(2026-08-15). 여전히 없는 것은 ① 웹 푸시의 영속화·재시도 ② Inngest 같은 외부 워커다.
+> 실제 동작은 아래와 같다.
 
-**구성 요소 (읽은 파일)**
+**구성 요소 (읽은 파일, 2026-09-18 재대조)**
 
 | 역할             | 파일                                                 | 요약                                                 |
 | ---------------- | ---------------------------------------------------- | ---------------------------------------------------- |
+| 이메일 수신자 산정·적재 | `src/services/sr-email-outbox.ts`              | `enqueueSRCreatedEmails`·`enqueueSRStatusChangedEmail`·`enqueueSRAssignedEmail` — 도메인 트랜잭션 **안에서** 수신자·설정을 보고 `notifications` 에 `PENDING` 적재 |
+| 아웃박스·디스패처 | `src/services/notification-outbox.ts`              | `enqueueEmails(emails, tx)`, 30초 주기 claim·발송·백오프·`FAILED`, 1시간마다 보존 정리. `src/instrumentation.ts` 가 기동 |
+| 이메일           | `src/services/email.service.ts`                      | nodemailer SMTP. `build*` 가 제목·HTML(값은 `escapeHtml`)을 만들고 `sendMail` 은 실패·자격증명 부재 시 **예외를 던진다** |
 | 이벤트 정의·버스 | `src/lib/domain-events.ts`                           | Node `EventEmitter` 기반. 이벤트 3종, 최대 리스너 50 |
 | 커밋 후 발행     | `src/lib/prisma.ts`                                  | `$transaction` 래퍼가 커밋 성공 후에만 `emit`        |
-| 리스너           | `src/services/listeners/sr-notification.listener.ts` | 수신자 조회 → 이메일/푸시 태스크 구성                |
+| 리스너(푸시 전용) | `src/services/listeners/sr-notification.listener.ts` | 커밋 후 수신자 조회 → `pushService.sendForEvent`(유형별 푸시 설정을 존중) |
 | 리스너 등록      | `src/services/service-registry.ts`                   | 프로세스당 1회 `registerSRNotificationListeners()`   |
-| 백그라운드 실행  | `src/lib/wait-until.ts`                              | `backgroundTask(Promise.allSettled(...))`            |
-| 이메일           | `src/services/email.service.ts`                      | nodemailer SMTP 풀. 자격증명 없으면 warn 후 스킵     |
-| 웹 푸시          | `src/services/push.service.ts`                       | web-push(VAPID)                                      |
+| 백그라운드 실행  | `src/lib/wait-until.ts`                              | 푸시 묶음을 `backgroundTask(Promise.allSettled(...))` 로 |
+| 웹 푸시          | `src/services/push.service.ts`                       | web-push(VAPID). 구독 단위 실패 격리·로그, 410/404 구독 정리 |
 
-**이벤트 계약** (`src/lib/domain-events.ts` — 이 3개가 전부다):
+**이벤트 계약** (`src/lib/domain-events.ts` — 이 3개가 전부다): `sr:created`, `sr:status_changed`,
+`sr:assigned`. 트랜잭션 컨텍스트(AsyncLocalStorage) 안에서 `emit` 하면 즉시 발행하지 않고 버퍼에
+쌓았다가, `src/lib/prisma.ts` 의 `$transaction` 래퍼가 커밋 성공 후 flush 한다.
 
-```typescript
-interface DomainEventsMap {
-  'sr:created': (payload: SRCreatedEvent) => void;
-  'sr:status_changed': (payload: SRStatusChangedEvent) => void;
-  'sr:assigned': (payload: SRAssignedEvent) => void;
-}
+**채널별 흐름**
 
-class DomainEventEmitter extends EventEmitter {
-  emit<K extends keyof DomainEventsMap>(
-    eventName: K,
-    ...args: Parameters<DomainEventsMap[K]>
-  ): boolean {
-    // 트랜잭션 컨텍스트(AsyncLocalStorage) 안이면 즉시 발행하지 않고 버퍼에 쌓는다.
-    // src/lib/prisma.ts 의 $transaction 래퍼가 커밋 성공 후 이 버퍼를 flush 한다.
-    const context = transactionLocalStorage.getStore();
-    if (context) {
-      context.domainEvents.push({ eventName, args });
-      return true;
-    }
-    return super.emit(eventName, ...args);
-  }
-}
+- **이메일**: 도메인 쓰기와 **같은 트랜잭션에서** 적재한다 — SR 이벤트는 `sr-email-outbox.ts` 의 적재 함수가,
+  댓글은 댓글 라우트가 `enqueueEmails` 를 직접 부른다. 롤백되면 알림도 사라진다. 수신자는 `sr:created` →
+  활성 ADMIN·MANAGER(설정 `emailSRCreated`), `sr:assigned` → 새 담당자(`emailSRAssigned`),
+  `sr:status_changed` → 신청자(`emailSRStatusChanged`, 단 **완료·거절은 설정과 무관한 필수 알림** —
+  `MANDATORY_STATUSES`, 헌법 §4), 댓글 → 작성자를 뺀 신청자·담당자(`emailCommentAdded`, 내부 노트는
+  신청자 제외).
+- **웹 푸시**: 커밋 후 리스너가 같은 수신자에게 `sendForEvent` 로 보낸다. `sendForEvent` 는 유형별
+  푸시 설정(`pushSRCreated` 등)을 보고, 켜진 사용자의 구독에만 보낸다. 담당 해제(`assigneeId === null`)는
+  발송하지 않는다.
 
-export const domainEvents = new DomainEventEmitter();
-```
-
-**리스너** (`src/services/listeners/sr-notification.listener.ts` 발췌 — `sr:created` 분기):
-
-```typescript
-domainEvents.on('sr:created', async (payload) => {
-  try {
-    const admins = await prisma.user.findMany({
-      where: {
-        roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
-        isActive: true,
-      },
-      select: { id: true, email: true, notificationPreference: true },
-    });
-
-    const promises: Promise<unknown>[] = [];
-
-    // 웹 푸시 (VAPID). 구독이 없으면 push.service 내부에서 무시된다.
-    const adminIds = admins.map((u) => u.id);
-    if (adminIds.length > 0) {
-      promises.push(
-        pushService.sendToUsers(adminIds, {
-          title: '새로운 SR 등록',
-          body: `${payload.srNumber}: ${payload.title}`,
-          url: `/srs/${payload.srId}`,
-          tag: 'sr-created',
-        })
-      );
-    }
-
-    // 이메일 (nodemailer SMTP). 수신자별 선호 설정을 따른다.
-    admins.forEach((admin) => {
-      const shouldSend = admin.notificationPreference?.emailSRCreated ?? true;
-      if (admin.email && shouldSend) {
-        promises.push(
-          emailService.sendSRCreated(
-            admin.email,
-            payload.srNumber,
-            payload.title,
-            payload.requesterName,
-            getSRUrl(payload.srId)
-          )
-        );
-      }
-    });
-
-    backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');
-  } catch (error) {
-    logger.error(
-      'Failed to handle sr:created notification',
-      error instanceof Error ? error : undefined,
-      { srId: payload.srId }
-    );
-  }
-});
-```
-
-`sr:status_changed` 는 요청자에게, `sr:assigned` 는 새 담당자에게 같은 방식으로 발송한다
-(담당 해제 시에는 `assigneeId === null` 이므로 로그만 남기고 발송을 생략한다).
+코드 발췌는 싣지 않는다 — 예전 이 자리의 발췌는 아웃박스 도입 전 코드(리스너가 SMTP 로 직접 발송,
+설정을 무시하는 `sendToUsers`)여서 틀린 구현을 가르쳤다. 위 파일을 직접 읽는다.
 이메일 기본값은 `emailSRCreated`/`emailSRAssigned` 가 `true`, `emailSRStatusChanged` 와
 `emailCommentAdded` 가 `false` 다(`notification_preferences`).
 
@@ -2288,13 +2253,12 @@ export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
 > 아래 한계는 **웹 푸시와 그 밖의 `backgroundTask` 경로에만** 해당한다.
 > 이메일은 2026-08-02 아웃박스 도입으로 이 목록에서 벗어났다.
 
-- **재시도 없음(푸시)**: 웹 푸시 실패는 로그만 남는다. 이메일은 지수 백오프로 최대 5회
-  재시도하고 상한 도달 시 `FAILED` 로 고정된다.
+- **재시도 없음(푸시)**: 웹 푸시 실패는 로그만 남는다. 이메일은 지수 백오프로 재시도하다
+  시도 횟수 상한(`MAX_ATTEMPTS`, 총 시도 횟수)에 이르면 `FAILED` 로 고정된다.
 - **영속성 없음(푸시)**: 발송 전에 프로세스가 종료되면 그 푸시는 사라진다.
   이메일은 도메인 트랜잭션 안에서 `notifications` 에 `PENDING` 으로 커밋되므로 살아남는다.
-- **상태 추적 부분적**: 이메일은 `notifications` 의 `status`/`attempts`/`failReason` 으로
-  DB 에서 조회 가능하다. 다만 이를 보여주는 **관리 화면이 없어** 현재는 DB 직접 조회가 필요하다.
-  웹 푸시는 아예 기록되지 않는다.
+- **상태 추적 부분적**: 이메일은 `notifications` 의 `status`/`attempts`/`failReason` 으로 추적되고
+  ADMIN 전용 화면 `/settings/outbox` 에서 조회·재발송한다. 웹 푸시는 아예 기록되지 않는다.
 - **다중 인스턴스 불가(SSE·캐시)**: 이벤트 버스가 프로세스 내부에 있어 인스턴스를 늘리면
   각 인스턴스가 자기 요청에서 난 이벤트만 본다. 단 아웃박스 claim 은
   `FOR UPDATE SKIP LOCKED` 로 잠그므로 **이메일 발송은 다중 인스턴스에서도 중복되지 않는다.**
@@ -2308,17 +2272,19 @@ export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
 > 발송 실패 재시도. `src/` 에 SLA 를 주기적으로 스캔하는 코드는 없다(SLA 관련 코드는
 > 대시보드·목록의 표시 로직뿐이다). 오해를 남기지 않기 위해 코드 예시는 삭제했다.
 
-현재 저장소에 실제로 존재하는 스케줄 작업은 **GitHub Actions 크론 두 개뿐이며, 둘 다
-애플리케이션 기능이 아니라 운영 작업**이다.
+현재 저장소에 실제로 존재하는 주기 작업은 다음이 전부다(2026-09-18 재대조). SLA 를 스캔하는 작업은
+없고, SLA 능동 경고는 헌법 §3 이 규범에서 제외했다.
 
-| 워크플로                                 | 스케줄         | 하는 일                                            |
-| ---------------------------------------- | -------------- | -------------------------------------------------- |
-| `.github/workflows/backup.yml`           | 매일 UTC 18:00 | 운영 DB `pg_dump` + `uploads` 백업, 보존 관리      |
-| `.github/workflows/scheduled-checks.yml` | 매일 UTC 00:00 | 의존성 outdated/audit, 복잡도, 번들 크기, 벤치마크 |
+| 종류 | 위치 | 스케줄 | 하는 일 |
+| --- | --- | --- | --- |
+| GitHub Actions 크론 | `.github/workflows/backup.yml` | 매일 UTC 18:00 (KST 03:00) | 운영 DB `pg_dump` + `uploads` 백업, 보존 관리 |
+| GitHub Actions 크론 | `.github/workflows/restore-rehearsal.yml` | 매월 1일 UTC 19:00 (KST 2일 04:00) | 최신 백업을 일회용 컨테이너에 복구해 검증 |
+| GitHub Actions 크론 | `.github/workflows/scheduled-checks.yml` | 매일 UTC 00:00 | 의존성 outdated/audit, 복잡도, 번들 크기 (성능 벤치마크 잡은 2026-08-06 제거) |
+| 호스트 cron | `deploy.yml` 이 운영 배포마다 멱등 설치 | 매일 03:00 | `scripts/renew-letsencrypt.sh` — 인증서 갱신 |
+| 앱 내부 타이머 | `src/services/notification-outbox.ts` (`instrumentation.ts` 가 기동) | 30초 tick, 120 tick(약 1시간)마다 보존 정리 | 이메일 아웃박스 발송·재시도, `SENT`/`FAILED` 보존 기간 경과분 삭제 |
 
-앱 내부에는 스케줄러가 없다. 주기 작업이 필요해지면 (a) 호스트 cron 또는 systemd timer 가
-컨테이너의 스크립트를 실행, (b) GitHub Actions 크론이 인증된 엔드포인트를 호출,
-(c) 영속 큐/스케줄러 도입 중 하나를 선택해야 한다. **어느 것도 아직 결정되지 않았다.**
+새 주기 작업이 필요해지면 (a) 호스트 cron 또는 systemd timer 가 컨테이너의 스크립트를 실행,
+(b) GitHub Actions 크론이 인증된 엔드포인트를 호출, (c) 앱 내부 타이머(단일 인스턴스 전제) 중에서 고른다.
 
 ### 이메일 발송과 템플릿 (실제 구현)
 
@@ -2326,120 +2292,35 @@ export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
 > (`emails/sr-created.tsx`, `emails/sr-assigned.tsx`, `emails/sr-completed.tsx`)의 전체 코드를
 > 싣고 있었다.** **Resend 도 React Email 도 채택되지 않았다.** `emails/` 디렉토리와 그 파일들은
 > 존재하지 않으며, `@react-email/components` 는 의존성에도 없다. 실제 발송은 nodemailer(SMTP)
-> 이고, HTML 은 `src/services/email.service.ts` 안에 템플릿 리터럴로 인라인되어 있다.
-> 발송 전용 템플릿은 **4종뿐이다**(생성/배정/상태 변경/댓글). 완료·거절 전용 템플릿은 없고
-> 상태 변경 템플릿이 그 역할을 겸한다.
+> 이고, HTML 은 `src/services/email.service.ts` 안의 템플릿 리터럴로 만든다.
+> 템플릿은 **4종뿐이다**(생성/배정/상태 변경/댓글). 완료·거절 전용 템플릿은 없고
+> 상태 변경 템플릿이 그 역할을 겸한다(완료 내용·거절 사유를 본문에 싣는다).
 
-**트랜스포터** (`src/services/email.service.ts`):
+**구조** (`src/services/email.service.ts`, 2026-09-18 재대조 — 코드 발췌는 싣지 않는다. 예전 발췌는
+아웃박스 도입 전 코드였다)
 
-```typescript
-import nodemailer from 'nodemailer';
+- 트랜스포터: nodemailer SMTP(`EMAIL_SERVER_*`), 프로덕션에서 TLS 인증서 검증, 연결·소켓 타임아웃을 둔다.
+  타임아웃 합이 아웃박스 임대 시간 산식(`SMTP_WORST_CASE_SECONDS`)의 근거다.
+- `sendMail`: 자격증명이 없으면 **예외를 던지고**, 발송 실패도 그대로 던진다. 디스패처가 그 예외를
+  `failReason` 에 남기고 백오프 재시도한다(be-rules §4 '실패를 삼키지 않는다').
+- 템플릿 빌더(발송하지 않고 `{ subject, html }` 만 만든다 — 발송은 디스패처가 한다):
 
-import { logger } from '@/lib/logger';
-
-class EmailService {
-  private transporter: nodemailer.Transporter;
-
-  constructor() {
-    this.transporter = nodemailer.createTransport({
-      pool: true,
-      host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
-      port: Number(process.env.EMAIL_SERVER_PORT) || 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.EMAIL_SERVER_USER,
-        pass: process.env.EMAIL_SERVER_PASSWORD,
-      },
-      tls: {
-        // 프로덕션에서는 반드시 TLS 인증서를 검증한다(MITM 자격증명 탈취 방지).
-        rejectUnauthorized: process.env.NODE_ENV === 'production',
-      },
-      // 외부 SMTP 응답 지연으로 풀 연결이 묶이는 것을 방지
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
-    });
-  }
-
-  async sendMail({ to, subject, html }: EmailOptions): Promise<void> {
-    // 자격 증명이 없으면 조용히 스킵한다(로컬/스테이징에서 부팅을 막지 않기 위한 선택).
-    if (!process.env.EMAIL_SERVER_USER || !process.env.EMAIL_SERVER_PASSWORD) {
-      logger.warn('[EmailService] Email credentials not found. Skipping email sending.');
-      return;
-    }
-
-    try {
-      const info = await this.transporter.sendMail({
-        from: process.env.EMAIL_FROM || '"SR System" <no-reply@sr-system.com>',
-        to,
-        subject,
-        html,
-      });
-      logger.info(`[EmailService] Email sent: ${info.messageId}`);
-    } catch (error) {
-      // 예외를 던지지 않는다. 호출자(리스너/라우트)는 실패를 알 수 없다.
-      logger.error('[EmailService] Error sending email:', error as Error);
-    }
-  }
-}
-
-export const emailService = new EmailService();
-```
-
-**템플릿 목록** (같은 파일의 메서드. 각 메서드가 제목과 HTML 을 직접 만든다)
-
-| 메서드                | 제목                                             | 링크 대상     |
-| --------------------- | ------------------------------------------------ | ------------- |
-| `sendSRCreated`       | `[SR System] 새로운 SR이 생성되었습니다: {번호}` | SR 상세       |
-| `sendSRAssigned`      | `[SR System] SR 담당자가 배정되었습니다: {번호}` | SR 상세       |
-| `sendSRStatusChanged` | `[SR System] SR 상태가 변경되었습니다: {번호}`   | SR 상세       |
-| `sendCommentAdded`    | `[SR System] SR에 새 댓글이 달렸습니다: {번호}`  | SR 상세(댓글) |
-
-**템플릿 예시** — `sendSRStatusChanged` (상태 코드는 메서드 안의 `statusMap` 으로 한글화한다):
-
-```typescript
-async sendSRStatusChanged(
-  to: string,
-  srNumber: string,
-  title: string,
-  oldStatus: string,
-  newStatus: string,
-  link: string
-) {
-  const subject = `[SR System] SR 상태가 변경되었습니다: ${srNumber}`;
-  const statusMap = new Map<string, string>([
-    ['REQUESTED', '요청됨'],
-    ['INTAKE', '접수'],
-    ['IN_PROGRESS', '진행중'],
-    ['ON_HOLD', '보류'],
-    ['COMPLETED', '완료'],
-    ['CONFIRMED', '확인완료'],
-    ['REJECTED', '거절됨'],
-  ]);
-
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #333;">SR 상태 변경 알림</h2>
-      <p><strong>SR 번호:</strong> ${srNumber}</p>
-      <p><strong>제목:</strong> ${title}</p>
-      <p><strong>상태:</strong> ${statusMap.get(oldStatus) || oldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${statusMap.get(newStatus) || newStatus}</span></p>
-      <a href="${link}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
-    </div>
-  `;
-  await this.sendMail({ to, subject, html });
-}
-```
+| 메서드                 | 제목                                             | 링크 대상     |
+| ---------------------- | ------------------------------------------------ | ------------- |
+| `buildSRCreated`       | `[SR System] 새로운 SR이 생성되었습니다: {번호}` | SR 상세       |
+| `buildSRAssigned`      | `[SR System] SR 담당자가 배정되었습니다: {번호}` | SR 상세       |
+| `buildSRStatusChanged` | `[SR System] SR 상태가 변경되었습니다: {번호}`   | SR 상세       |
+| `buildCommentAdded`    | `[SR System] SR에 새 댓글이 달렸습니다: {번호}`  | SR 상세(댓글) |
 
 **주의할 점**
 
+- 본문에 들어가는 값은 모두 `escapeHtml` 로 이스케이프하고, 링크는 `safeEmailLink` 가 http(s) 만
+  허용한다. 상태 코드 한글화(`REJECTED` → '거절' 등)는 빌더 안의 `statusMap` 이 한다.
 - 링크 URL 은 `src/lib/app-url.ts` 의 `getSRUrl()` 이 만든다(리버스 프록시 뒤에서 내부 주소가
   새지 않도록 `NEXT_PUBLIC_APP_URL` 을 우선한다).
-- `sendMail` 은 실패해도 예외를 던지지 않으므로, 상위의 `Promise.allSettled` 와 합쳐져
-  **발송 실패가 사용자에게도 DB 에도 남지 않는다**. 로그가 유일한 흔적이다.
-- 템플릿 문자열에 값이 그대로 보간된다(`${commentContent}` 등). 이메일 본문의 HTML 이스케이프는
-  현재 적용되어 있지 않다 — 개선 대상으로 남아 있는 지점이다.
 - 자격 증명이 플레이스홀더면 `src/lib/env-validation.ts` 가 경고만 남기고 "미설정" 으로 간주한다
-  (컨테이너를 크래시 루프에 빠뜨리지 않기 위한 의도된 동작).
+  (컨테이너를 크래시 루프에 빠뜨리지 않기 위한 의도된 동작). 이때 적재된 메일은 `sendMail` 예외로
+  재시도되다 `FAILED` 가 되고, 시스템 설정 화면의 메일 서버 항목이 "자격증명 미설정" 을 보여 준다.
 
 ## 8. 알림 시스템
 
@@ -2458,15 +2339,16 @@ async sendSRStatusChanged(
 > | `SR_ASSIGNED`                                  | ✅ `sr:assigned` — 새 담당자                                                              |
 > | `SR_STATUS_CHANGED`                            | ✅ `sr:status_changed` — 요청자                                                           |
 > | `SR_COMPLETED` / `SR_REJECTED` / `SR_REOPENED` | ⚠️ 별도 이벤트 없음. `sr:status_changed` 가 겸한다                                        |
-> | `SR_COMMENT_ADDED`                             | ✅ 단, 이벤트가 아니라 댓글 라우트에서 직접 발송(즉시, 배치 아님)                         |
-> | `SLA_WARNING` / `SLA_VIOLATED`                 | ❌ 미구현. 주기 스캔 작업이 없다                                                          |
+> | `SR_COMMENT_ADDED`                             | ✅ 단, 이벤트가 아니라 댓글 라우트가 처리한다 — 이메일은 댓글 트랜잭션 안에서 아웃박스 적재, 푸시는 커밋 후 `backgroundTask` |
+> | `SLA_WARNING` / `SLA_VIOLATED`                 | ❌ **규범 제외(미도입)** — 헌법 §3 이 SLA 능동 경고를 규범에서 뺐다. 주기 스캔 작업도 없다 |
 > | `CONTRACT_EXPIRING`                            | ❌ 미구현                                                                                 |
 >
 > 채널도 다르다. 실제 채널은 **이메일(SMTP) + 웹 푸시(VAPID)** 이며, 초안의 `IN_APP` 채널
 > (앱 내 알림함)은 구현되지 않았다. `NotificationType` enum 에 `IN_APP` 값이 남아 있지만
 > 이를 쓰는 코드는 없다. 즉시성 요구는 SSE(`/api/realtime`)로 화면을 갱신해 충족한다.
 
-**필요한 명세(미구현):**
+**폐기된 초안(참고용):** 아래는 초기 요구사항 초안이다. `SLA_WARNING`·`SLA_VIOLATED` 등 헌법 §3 이 규범에서
+제외한 항목을 담고 있으므로 구현 대상 명세로 읽지 않는다.
 
 ```typescript
 // 초안. 이 파일은 저장소에 존재하지 않는다.
@@ -2748,67 +2630,16 @@ export async function sendNotification(trigger: NotificationTrigger, sr: SR) {
 > `/api/attachments/[id]/download` 로만 스트리밍된다. 초안의 `access: 'public'` 공개 URL 모델과는
 > 보안 성격이 정반대다.
 
-**src/lib/storage.ts** (실제 구현 발췌):
+**src/lib/storage.ts** (2026-09-18 재대조 — 코드 발췌는 싣지 않는다. 예전 발췌는 보안 수정 이전 코드였다)
 
-```typescript
-import fs from 'fs';
-import path from 'path';
-
-import { logger } from '@/lib/logger';
-
-// 보안(C4): 웹루트(public) 밖에 저장하여 정적 서빙으로 인한 무인증 접근을 차단한다.
-// 다운로드는 인증 라우트(/api/attachments/[id]/download)로만 제공된다.
-export const STORAGE_DIR = process.env.STORAGE_DIR
-  ? path.resolve(process.env.STORAGE_DIR)
-  : path.join(process.cwd(), 'var', 'uploads');
-
-// 레거시 저장 위치. 과거 업로드분의 다운로드 폴백 조회에만 사용한다.
-const LEGACY_PUBLIC_DIR = path.join(process.cwd(), 'public', 'uploads');
-
-if (!fs.existsSync(STORAGE_DIR)) {
-  fs.mkdirSync(STORAGE_DIR, { recursive: true });
-}
-
-export async function uploadAttachmentBlob(srId: string, file: File): Promise<UploadResult> {
-  // 파일명 정화: 경로 구분자/상위 경로 제거 후 안전 문자만 허용 (경로 탐색 방지)
-  const baseName = path.basename(file.name).replace(/\s+/g, '-');
-  const safeName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_') || 'file';
-  const safeSrId = path.basename(srId); // 방어적
-  const timestamp = Date.now();
-
-  const srDir = path.join(STORAGE_DIR, 'attachments', safeSrId);
-  const filename = `${timestamp}-${safeName}`;
-  const filepath = path.join(srDir, filename);
-
-  // 경로 탐색(Directory Traversal) 방지: 최종 경로가 STORAGE_DIR 내부인지 확인
-  const resolvedRoot = path.resolve(STORAGE_DIR);
-  if (!path.resolve(filepath).startsWith(resolvedRoot + path.sep)) {
-    logger.warn(`[storage] Attempted path traversal on upload: ${file.name}`);
-    throw new Error('잘못된 파일 경로입니다.');
-  }
-
-  await fs.promises.mkdir(srDir, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await fs.promises.writeFile(filepath, buffer);
-
-  // DB 에는 STORAGE_DIR 기준 "상대 경로"만 저장한다(절대 경로/공개 URL 이 아니다).
-  const pathname = `attachments/${safeSrId}/${filename}`;
-  return { url: pathname, pathname, downloadUrl: pathname, size: file.size, type: file.type };
-}
-
-/**
- * storagePath/fileUrl 로부터 실제 파일의 절대 경로를 안전하게 해석한다.
- * STORAGE_DIR 우선, 없으면 LEGACY_PUBLIC_DIR 폴백. 두 루트 밖이면 null(containment check).
- */
-export function resolveAttachmentFilePath(
-  storagePathOrUrl: string | null | undefined
-): string | null;
-
-export async function deleteAttachmentBlob(pathname: string); // 해석 후 unlink, 실패는 로그만
-```
-
-`listAttachmentBlobs()` 는 Vercel Blob 의 `list()` 반환 타입을 맞추기 위한 **스터브**이며
-항상 빈 배열과 경고 로그를 남긴다(재귀 탐색 미구현).
+- `STORAGE_DIR`(기본 `<cwd>/var/uploads`)이 **유일한 허용 루트**다. 예전의 웹루트 폴백
+  (`public/uploads`)은 공개 정적 서빙으로 인가를 우회할 수 있어 제거했다.
+- `uploadAttachmentBlob(srId, file)`: 파일명을 정화하고 `attachments/<srId>/<UUID>-<safeName>` 에
+  `wx` 플래그로 쓴다(같은 이름·같은 밀리초 충돌도, 기존 파일 덮어쓰기도 없다). 최종 경로가 루트 안인지
+  확인하고(경로 탐색 차단), DB 에는 `STORAGE_DIR` 기준 **상대 경로**를 `storagePath` 로 남긴다.
+- `resolveAttachmentFilePath(storagePathOrUrl)`: 루트 안에 있고 실제로 존재하는 파일만 절대 경로로
+  돌려준다(아니면 null). 구 레코드의 절대 경로도 루트 안이면 허용한다.
+- `deleteAttachmentBlob(pathname)`: 해석 후 unlink.
 
 **함수 대응표**
 
@@ -2817,7 +2648,7 @@ export async function deleteAttachmentBlob(pathname: string); // 해석 후 unli
 | `put()` / `uploadSRAttachment()` | `uploadAttachmentBlob(srId, file)`              |
 | `del()`                          | `deleteAttachmentBlob(pathname)`                |
 | `head()` / `getFileInfo()`       | 없음. 경로 해석은 `resolveAttachmentFilePath()` |
-| `list()`                         | `listAttachmentBlobs()` — 스터브(항상 빈 배열)  |
+| `list()`                         | 없음 (예전의 스터브 `listAttachmentBlobs()` 는 삭제됐다) |
 | `blob.url` (공개 CDN URL)        | `/api/attachments/{id}/download` (인증 라우트)  |
 
 ### 파일 업로드 / 다운로드 (실제 구현)
@@ -2828,7 +2659,7 @@ export async function deleteAttachmentBlob(pathname: string); // 해석 후 unli
 
 | 라우트                               | 파일                                             | 비고                                     |
 | ------------------------------------ | ------------------------------------------------ | ---------------------------------------- |
-| `POST /api/srs/[id]/attachments`     | `src/app/api/srs/[id]/attachments/route.ts`      | 다중 업로드(최대 10개), 스트리밍 저장    |
+| `POST /api/srs/[id]/attachments`     | `src/app/api/srs/[id]/attachments/route.ts`      | 다중 업로드(최대 10개). `uploadAttachmentBlob` 사용 |
 | `GET /api/srs/[id]/attachments`      | 같은 파일                                        | 목록. `storagePath` 는 응답에서 제거     |
 | `POST /api/attachments`              | `src/app/api/attachments/route.ts`               | 단건 업로드. `uploadAttachmentBlob` 사용 |
 | `GET /api/attachments/[id]/download` | `src/app/api/attachments/[id]/download/route.ts` | 인증 후 파일 스트리밍                    |
@@ -2851,11 +2682,12 @@ export async function deleteAttachmentBlob(pathname: string); // 해석 후 unli
 
 **업로드 흐름** (`POST /api/srs/[id]/attachments`)
 
-1. SR 조회 → `ensureCanReadSR(session.user, sr)` 로 테넌트/역할 경계 확인.
+1. SR 조회(`SR_ALIVE`, 상태 포함) → `ensureCanAttachToSR(session.user, sr)` — 읽기가 아니라 **첨부 권한**으로
+   판정한다(수정 가능 범위 + `ATTACHMENT:CREATE`, 종료 상태(완료·확인완료·거절) SR 은 거부). 화면은 같은 규칙의
+   사본 `sr-state-machine.canViewerAttachToSR` 로 업로드 영역을 감춘다.
 2. `formData.getAll('files')` — 0개면 400, 10개 초과면 400.
-3. 파일별 `validateFile()` → 통과분만 `createWriteStream` + `stream/promises.pipeline` 로 저장
-   (전체를 메모리에 올리지 않는다). 파일명은 `${timestamp}_${index}_${정화된 원본명}` 으로
-   병렬 업로드 시 충돌을 피한다.
+3. 파일별 `validateFile()` → 통과분만 `uploadAttachmentBlob()` 으로 저장한다. 두 업로드 라우트가 같은
+   헬퍼를 쓰므로 저장 규칙(UUID 파일명, `attachments/<srId>/`, `wx`, 경로 탐색 차단)은 한 곳에 있다.
 4. `createManyAndReturn()` 으로 DB 삽입 후, 생성된 id 로 `fileUrl` 을
    `/api/attachments/{id}/download` 로 갱신한다(공개 URL 이 존재하지 않으므로).
 5. 응답에서 `storagePath`(내부 저장 경로)는 제거하고, `fileSize`(BigInt)는
@@ -2865,15 +2697,16 @@ export async function deleteAttachmentBlob(pathname: string); // 해석 후 unli
 **다운로드 흐름** (`GET /api/attachments/[id]/download`)
 
 1. 첨부 → 소속 SR 조회 → `ensureCanReadSR()` (IDOR 방지).
-2. `resolveAttachmentFilePath()` 로 경로 해석(두 루트 밖이면 404).
+2. `resolveAttachmentFilePath()` 로 경로 해석(`STORAGE_DIR` 밖이거나 파일이 없으면 404).
 3. `Content-Disposition` 은 이미지/PDF 만 `inline`, 그 외는 `attachment` 로 강제한다.
    `image/svg+xml` 은 앱 오리진에서 스크립트가 실행될 수 있어 **명시적으로 inline 금지**다.
 
-**알려진 불일치**: `POST /api/srs/[id]/attachments` 는 `src/lib/storage.ts` 의
-`uploadAttachmentBlob()` 을 쓰지 않고 라우트 안에서 직접 경로를 만든다. 그래서 저장 경로가
-두 갈래다 — 라우트는 `attachments/{timestamp}_{index}_{name}`, 헬퍼는
-`attachments/{srId}/{timestamp}-{name}`. 다운로드는 두 형태를 모두 해석하므로 동작에는
-문제가 없지만, 저장 규칙이 한 곳에 모여 있지 않다.
+> 예전 이 자리의 "알려진 불일치"(SR 라우트가 헬퍼를 쓰지 않고 `attachments/{timestamp}_{index}_{name}` 로
+> 직접 저장해 경로가 두 갈래)는 해소됐다 — 지금은 두 라우트 모두 `uploadAttachmentBlob()` 을 쓴다.
+> 그 시절 레코드의 절대 경로는 `resolveAttachmentFilePath()` 가 루트 안에 있을 때만 해석한다.
+>
+> 첨부 삭제(`DELETE /api/attachments/[id]`)는 `ensureCanDeleteAttachment` 로 판정한다 — ADMIN·MANAGER,
+> 또는 접수 전(`REQUESTED`) SR 의 신청자 본인.
 
 ---
 
@@ -2885,50 +2718,13 @@ export async function deleteAttachmentBlob(pathname: string); // 해석 후 unli
 > Redis 자체가 배포에 없다. 현재는 Next.js 내장 `unstable_cache` 와 프로세스 내 Map 만 쓴다.
 > 단일 컨테이너 전제이므로 캐시는 인스턴스 밖으로 공유되지 않으며, 컨테이너를 재생성하면 비워진다.
 
-**src/lib/cache.ts** (현재 구현 전문 — 이 파일에 있는 것은 이 두 함수뿐이다):
+**src/lib/cache.ts** (2026-09-18 재대조 — 이 파일에 있는 것은 아래 두 함수뿐이다. 코드 전문은 싣지 않는다.
+예전 이 자리의 "현재 구현 전문" 은 이메일 누출 수정 **이전** 코드였고, 그걸 복제해 둔 탓에 틀린 채 남았다)
 
-```typescript
-import { unstable_cache as cache } from 'next/cache';
-
-import prisma from '@/lib/prisma';
-
-/**
- * Next.js unstable_cache 기반 캐시 유틸리티
- * Redis 제거 후 간소화된 버전
- */
-
-// 사용자 목록 캐싱
-export const getCachedUsers = cache(
-  async () => {
-    return prisma.user.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-      },
-    });
-  },
-  ['users'],
-  { revalidate: 300 } // 5분마다 갱신
-);
-
-// 고객사 목록 캐싱
-export const getCachedClients = cache(
-  async () => {
-    return prisma.client.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        code: true,
-        name: true,
-      },
-    });
-  },
-  ['clients'],
-  { revalidate: 300 } // 5분마다 갱신
-);
-```
+| 함수 | 반환 | 스코핑 규칙 |
+| --- | --- | --- |
+| `getCachedAssignableUsers()` | SR 을 처리할 수 있는 사용자의 `id`·`name` **만** | 이메일은 싣지 않는다 — 캐시 결과가 외부 사용자 화면(SR 목록 필터)에도 내려가므로 |
+| `getCachedClients(clientIds)` | 활성 고객사 `id`·`code`·`name` | `clientIds` 는 **필수**다. `null` = 전체(내부 사용자 전용), 배열 = 그 안으로 한정(빈 배열이면 빈 결과). 헌법 §1.2 의 스코프 필수 규칙 |
 
 ### 캐싱 전략 요약
 
@@ -2936,9 +2732,9 @@ export const getCachedClients = cache(
 | --------------- | ------------------------------------- | ---------------------------------------- |
 | **캐시 백엔드** | Next.js `unstable_cache`              | 앱 컨테이너 로컬. 인스턴스 간 공유 안 됨 |
 | **TTL**         | 5분 (300초)                           | `revalidate` 옵션                        |
-| **무효화**      | `revalidatePath()`, `revalidateTag()` | Next.js 내장                             |
+| **무효화**      | `revalidatePath('/srs')` 등 경로 무효화 | `src/actions/sr.actions.ts`. `revalidateTag` 는 쓰지 않는다 |
 | **분산 캐시**   | 없음                                  | Redis 미도입 (단일 컨테이너)             |
-| **캐시 대상**   | 활성 사용자 목록, 활성 고객사 목록    | `src/lib/cache.ts` 에 있는 것은 이 둘뿐  |
+| **캐시 대상**   | 배정 가능 사용자(id·name), 활성 고객사(스코프 인자 필수) | `src/lib/cache.ts` 에 있는 것은 이 둘뿐 |
 
 ### Rate Limiting
 
@@ -2998,7 +2794,16 @@ export class MemoryRateLimiter {
 > `.env.example` 은 `MIDDLEWARE` 를 1분당 20회로 예시하지만, 코드의 **기본값은 100회**다
 > (`RateLimitPresets.MIDDLEWARE`). 환경 변수를 설정하지 않으면 100이 적용된다.
 
-식별자는 `getClientIp()` 가 결정한다. `X-Real-IP` 를 최우선으로 쓰고, 없으면
+**버킷 키** (2026-09-18 재대조 — 예전 서술은 "IP 단일 키" 였다):
+
+- 라우트·미들웨어(`resolveRateLimitKeys`): 세션 쿠키가 있으면 **세션 해시(`s:<hash>`)가 주 버킷**이고,
+  같은 요청에 **발신 IP 천장**(`ip:<ip>`, 프리셋 × 배수)을 함께 건다 — 쿠키를 갈아 끼우는 단일 발신지를
+  막기 위해서다. 세션이 없으면 IP 가 주 버킷이다.
+- Server Action(`src/lib/action-helpers.ts`): 로그인 사용자는 `<namespace>:user:<userId>`, 아니면
+  `<namespace>:ip:<ip>` 가 주 버킷이고, 모든 액션이 공유하는 IP 천장을 따로 검사한다.
+- 로그인(`/api/auth/[...nextauth]`)은 `login:<email>:<ip>` 로 계정·발신지 조합을 센다.
+
+IP 는 `getClientIp()` 가 결정한다. `X-Real-IP` 를 최우선으로 쓰고, 없으면
 `X-Forwarded-For` 의 **마지막** 항목을 쓴다(nginx 가 실제 클라이언트를 마지막에 추가하므로
 첫 항목은 클라이언트가 위조할 수 있다). 프록시를 거치지 않으면 `'unknown'` 이다.
 
@@ -3052,7 +2857,7 @@ export class ValidationError extends ServiceError {
 }
 ```
 
-`ServiceError` 를 상속하는 클래스는 10개다. HTTP 상태와 `code` 를 클래스가 함께 들고 있다.
+`ServiceError` 를 상속하는 클래스는 아래 표가 전부다(2026-09-18 재대조 — 예전 표는 413 을 빠뜨리고 "10개" 라고 적었다). HTTP 상태와 `code` 를 클래스가 함께 들고 있다.
 
 | 클래스                      | status | code                              | 용도                        |
 | --------------------------- | ------ | --------------------------------- | --------------------------- |
@@ -3065,7 +2870,11 @@ export class ValidationError extends ServiceError {
 | `ConflictError`             | 409    | `CONFLICT`                        | 낙관적 잠금 실패(동시 수정) |
 | `DuplicateError`            | 409    | `DUPLICATE`                       | 중복 리소스                 |
 | `ReferentialIntegrityError` | 409    | `REFERENTIAL_INTEGRITY_VIOLATION` | 참조 무결성 위반            |
+| `PayloadTooLargeError`      | 413    | `PAYLOAD_TOO_LARGE`               | 업로드 크기 초과(`formData()` 전 Content-Length 검사) |
 | `TooManyRequestsError`      | 429    | `TOO_MANY_REQUESTS`               | Rate Limit 초과             |
+
+분류하지 못한 예외(`ServiceError` 가 아닌 것)는 **운영 환경에서 메시지를 가린다** — `errorToResult`·`handleApiError`
+가 `GENERIC_500_MESSAGE` 를 돌려주고 원문은 로그에만 남긴다(`exposeUnexpectedErrorMessage()`, 2026-09-18).
 
 같은 파일에 Prisma 의 알려진 오류 코드(`P2003` 등)를 위 도메인 에러로 변환하는 헬퍼가 있어,
 DB 제약 위반이 500 대신 적절한 4xx 로 내려간다.
@@ -3176,6 +2985,7 @@ import { useEffect } from 'react';
 import { AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui';
+import { logger } from '@/lib/logger';
 
 export default function Error({
   error,
@@ -3185,7 +2995,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    logger.error('처리되지 않은 페이지 오류', error);
   }, [error]);
 
   return (
@@ -3261,7 +3071,7 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 }
 ```
 
-> 초안은 옵션 이름을 `cacheTime` 으로 적었다. @tanstack/react-query 5.90 에서는 `gcTime` 이며
+> 초안은 옵션 이름을 `cacheTime` 으로 적었다. @tanstack/react-query v5 에서는 `gcTime` 이며
 > `cacheTime` 은 무시된다. 또한 실제 프로바이더는 NextAuth 세션, SSE, 유휴 타임아웃,
 > PWA 서비스 워커 등록을 함께 감싼다.
 
@@ -3270,8 +3080,11 @@ export default function ClientLayout({ children }: ClientLayoutProps) {
 > **⚠️ 아래 예시는 초안이다.** `src/hooks/use-srs.ts` 는 없다. 실제 훅은
 > `src/hooks/use-sr.ts`(`useSRDetails`, `useUpdateSR`, `useDeleteSR`, `useChangeSRStatus`)와
 > `src/hooks/use-sr-infinite.ts`(`useSRActivitiesInfinite`, `useSRCommentsInfinite`)이며,
-> Server Action 을 직접 `mutationFn` 으로 넘기지 않고 REST 라우트를 호출한다.
-> 목록 조회는 훅이 아니라 서버 컴포넌트에서 처리한다.
+> **대부분 Server Action 을 호출한다** — 상세 조회(`getSRDetailsAction`), 수정(`updateSRAction`),
+> 삭제(`deleteSRAction`), 활동·댓글 무한 스크롤(`getSRActivitiesAction`·`getSRCommentsAction`).
+> REST 라우트를 부르는 것은 상태 변경(`useChangeSRStatus` → `PATCH /api/srs/[id]/status`)뿐이다.
+> (예전 이 자리는 "REST 라우트를 호출한다" 고 적었다 — 사실과 반대였다.) 댓글 작성·첨부 업로드는
+> 훅이 아니라 컴포넌트가 REST 라우트를 직접 부른다. 목록 조회는 훅이 아니라 서버 컴포넌트에서 처리한다.
 
 **초안: hooks/use-srs.ts**:
 
@@ -3399,8 +3212,8 @@ const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
 const isDev = process.env.NODE_ENV === 'development';
 const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-inline' 'nonce-${nonce}' ${isDev ? "'unsafe-eval'" : ''};
-    style-src 'self' 'unsafe-inline';
+    script-src 'self' 'nonce-${nonce}' ${isDev ? "'unsafe-eval'" : ''};
+    style-src 'self' 'unsafe-inline'; // 스크립트와 달리 의도적으로 남긴다(React 의 style= 속성)
     img-src 'self' blob: data: https:;
     font-src 'self' data:;
     object-src 'none';
@@ -3455,29 +3268,32 @@ NextAuth.js가 자동으로 처리:
 
 ## 테스트 전략
 
-> **⚠️ 정정(2026-07-30)** — 이 절의 초안은 `tests/{unit,integration,e2e}/` 디렉토리와
-> 그 안의 예시 테스트를 기술했으나, **그런 디렉토리는 존재하지 않는다.** 실제 배치와 도구
-> 버전, 그리고 커버리지 수치를 실측값으로 교체했다.
+> **⚠️ 정정(2026-07-30, 2026-09-18 재대조)** — 이 절의 초안은 `tests/{unit,integration,e2e}/` 디렉토리와
+> 그 안의 예시 테스트를 기술했다. 그 형태로는 만들어지지 않았고, 실제 배치·도구·커버리지를 실측값으로
+> 교체했다. 루트 `tests/integration/` 은 2026-08-01 에 생겼다(아래 '파일 배치').
 
-### 도구와 버전 (2026-07-30 `package.json` 실측)
+### 도구 (버전의 정본은 `package.json` — 여기에는 적지 않는다)
 
 | 목적            | 도구                                                     | 실행 명령                                     |
 | --------------- | -------------------------------------------------------- | --------------------------------------------- |
-| 단위/컴포넌트   | **vitest 4.0** (`@vitest/coverage-v8` v8 프로바이더)     | `pnpm test`, `pnpm test:coverage`             |
-| E2E             | **Playwright 1.58**                                      | `pnpm test:e2e`                               |
-| 뮤테이션        | **Stryker 9.5.1** (`@stryker-mutator/vitest-runner`)     | `pnpm test:mutation`, `pnpm test:mutation:ci` |
+| 단위/컴포넌트   | **vitest** (`@vitest/coverage-v8` v8 프로바이더)         | `pnpm test`, `pnpm test:coverage`             |
+| 통합(실제 DB)   | **vitest** `integration` 프로젝트                        | `pnpm test:integration`                       |
+| E2E             | **Playwright**                                           | `pnpm test:e2e`                               |
+| 뮤테이션        | **Stryker** (`@stryker-mutator/vitest-runner`)           | `pnpm test:mutation`, `pnpm test:mutation:ci` |
 | 접근성          | `@axe-core/playwright`                                   | `e2e/30-accessibility.spec.ts`                |
 | API 목킹        | Vitest `vi.mock` (모듈 단위)                             | 단위 테스트                                   |
 
 ### 파일 배치
 
-- **단위 테스트**: 소스 옆 `src/**/__tests__/*.test.ts(x)` (2026-07-30 기준 136개 파일).
+- **단위 테스트**: 소스 옆 `src/**/__tests__/*.test.ts(x)`.
   `vitest.config.ts` 의 `include` 는 `src/**/*.test.ts`, `src/**/*.test.tsx` 다.
   예: `src/lib/__tests__/domain-events.test.ts`, `src/services/__tests__/`,
   `src/app/api/**/__tests__/route.test.ts`.
 - **E2E**: 루트 `e2e/` (스펙 31개 + `e2e/roles/`, `e2e/helpers/`, setup 프로젝트).
-- **통합 테스트 디렉토리는 없다.** DB 를 실제로 쓰는 검증은 CI 의 `test` 잡이 postgres
-  서비스 컨테이너를 띄운 상태에서 같은 vitest 스위트를 돌리는 방식으로 대신한다.
+- **통합 테스트**: 루트 `tests/integration/*.test.ts`(SR 채번, 테넌트 격리, 트랜잭션 원자성 등) —
+  vitest `integration` 프로젝트(`vitest.config.ts`)가 실제 Postgres 에 붙어 돌린다. CI 의 `test` 잡은
+  postgres 서비스 컨테이너를 띄우고 마이그레이션·드리프트 검사·시드 뒤 전체 스위트를 돌린다.
+  로컬에서는 개발 DB 가 아니라 일회용 테스트 DB 를 가리켜야 한다(`tests/integration/db-guard.ts` 가 막는다).
 
 ### 커버리지 기준선 (실측)
 
@@ -3485,14 +3301,16 @@ NextAuth.js가 자동으로 처리:
 프로젝트는 `unit`(node) · `unit-dom`(jsdom) · `integration` 셋이다 — Storybook 프로젝트는
 제거했고, DOM 이 필요 없는 138개 파일을 node 환경으로 분리해 스위트가 773s → 187s 가 되었다.**
 
-| 지표       | 실측    | 게이트 임계값 | 절대 개수     |
-| ---------- | ------- | ------------- | ------------- |
-| statements | 41.27 % | 40.9          | 3,026 / 7,331 |
-| branches   | 35.63 % | 35.2          | 1,785 / 5,009 |
-| functions  | 41.98 % | 41.6          | 710 / 1,691   |
-| lines      | 40.75 % | 40.4          | 2,780 / 6,821 |
+| 지표       | 실측(2026-09-18) | 게이트 임계값(`vitest.config.ts`) |
+| ---------- | ---------------- | --------------------------------- |
+| statements | 82.96 %          | 79.5                              |
+| branches   | 75.87 %          | 71.5                              |
+| functions  | 78.02 %          | 73.5                              |
+| lines      | 83.43 %          | 80.0                              |
 
-분모는 소스 232개다. `vitest.config.ts` 의 `coverage.include` 로 "테스트가 우연히 import 한
+실측은 DB 테스트를 건너뛴 로컬 실행(`SKIP_DB_TESTS=true npx vitest run --coverage`) 값이다. 임계값의 정본은
+`vitest.config.ts` 의 `coverage.thresholds` 이고, 이 표는 설명용이다(예전 표의 40.9 등은 2026-07-30 값이었다).
+`vitest.config.ts` 의 `coverage.include` 로 "테스트가 우연히 import 한
 파일"이 아니라 **소스 전체**를 분모로 고정했다. 이 고정 이전에는 같은 코드가
 statements 84.39 % 로 보였다(분모가 111개뿐이었기 때문이다). 84 % 는 코드가 좋아서 나온
 숫자가 아니었다.
@@ -3532,8 +3350,8 @@ statements 84.39 % 로 보였다(분모가 111개뿐이었기 때문이다). 84 
 ### E2E 실행 범위 (`playwright.config.ts` + `.github/workflows/ci-cd.yml`)
 
 Playwright 프로젝트는 `setup`, `multi-user-setup`, `role-persona-setup`(의존 setup),
-`chromium`, `multi-user`, `role-personas`, `permissions`, 그리고 `firefox` / `webkit` /
-`Mobile Chrome` 이다.
+`chromium`, `multi-user`, `role-personas`, `permissions` 다. 크로스 브라우저 프로젝트(`firefox` /
+`webkit` / `Mobile Chrome`)는 어디서도 실행되지 않던 채로 `playwright.config.ts` 에서 제거했다.
 
 - **push(main·dev) 와 pull request**: 모두 같은 전체 선택을 실행한다. 단 이 저장소의 `dev` 를
   head 로 하는 PR(dev→main)은 같은 커밋의 push(dev) 실행과 겹치므로 건너뛴다. 다만 PR 실행이 보던
@@ -3542,8 +3360,6 @@ Playwright 프로젝트는 `setup`, `multi-user-setup`, `role-persona-setup`(의
   main push 에서 실패하면 운영, dev push 에서 실패하면 스테이징 배포가 차단된다.
   PR 부분 실행(보안·권한 50개)은 2026-08-09 에 걷어냈고 dev push 는 2026-09-18 에 추가했다 —
   근거와 최신 실측(스펙 수·실행 시간)은 `ci-cd.yml` 의 `e2e-test` 주석이 정본이다.
-- **어디서도 실행되지 않는 것**: `firefox` / `webkit` / `Mobile Chrome`
-  (`testIgnore` 가 없어 멀티유저 스펙을 단일 인증 상태로 중복 실행한다 — 설정 결함).
 
   > 2026-08-10 갱신: 이 목록에 있던 `Dashboard Visual & Performance`(:6006 Storybook 서버
   > 의존)와 `Manual Screen Captures` 는 **playwright.config.ts 에서 이미 사라졌다.**
@@ -3556,7 +3372,7 @@ E2E 는 `next dev` 가 아니라 **프로덕션 빌드**(`pnpm build` → `pnpm 
 
 실제 스위트의 형태는 `src/**/__tests__/` 를 직접 보는 편이 정확하다. 참고로 초안이 이 자리에
 싣고 있던 `SRService.create()` / `SRService.generateSRNumber()` 예시는 존재하지 않는 API 를
-호출하고 있었다(실제 서비스는 정적 메서드가 아니라 `services.srService` 인스턴스를 통해
+호출하고 있었다(실제 서비스는 정적 메서드가 아니라 `sr.service.ts` 가 export 하는 `srService` 인스턴스를 통해
 쓰이며, `src/lib/prisma.ts` 를 목킹한다).
 
 ### 예시: E2E 테스트
@@ -3598,8 +3414,9 @@ test.describe('SR Workflow', () => {
 | ---------------------------------------- | ----------------------------------- | ------------------------------------------------------------- |
 | `.github/workflows/ci-cd.yml`            | **CI/CD Pipeline**                  | `push`/`pull_request` (main, dev). `**.md`, `docs/**` 는 제외 |
 | `.github/workflows/deploy.yml`           | Deploy to Self-Hosted Docker Server | `workflow_run` — 위 워크플로가 **성공**한 뒤                  |
-| `.github/workflows/e2e.yml`              | E2E                                 | 별도                                                          |
+| `.github/workflows/e2e.yml`              | E2E                                 | `workflow_dispatch` 전용 — 배포된 환경(`base_url`)을 대상으로 스위트 실행 |
 | `.github/workflows/backup.yml`           | Scheduled Backup                    | 매일 UTC 18:00 (KST 03:00)                                    |
+| `.github/workflows/restore-rehearsal.yml` | Monthly Restore Rehearsal          | 매월 1일 UTC 19:00 (KST 2일 04:00) + `workflow_dispatch`       |
 | `.github/workflows/scheduled-checks.yml` | Code Quality & Security             | 매일 UTC 00:00                                                |
 | `.github/workflows/prewarm.yml`          | Prewarm Cache                       | `workflow_dispatch`                                           |
 
@@ -3613,12 +3430,13 @@ Node 22 / pnpm 10 기준이다(초안은 Node 18 + `npm install -g pnpm` 이었�
 
 | 잡                 | 게이트 내용                                                                                                                                                                    |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `code-quality`     | `pnpm lint`, `pnpm type-check`                                                                                                                                                 |
+| `code-quality`     | `pnpm lint`(경고 상한), `pnpm type-check`, knip 데드 코드 검사, E2E 스펙 단언 검사(`scripts/check-e2e-assertions.ts`), Actions 커밋 SHA 고정 검사 |
 | `test`             | **실제 postgres:16-alpine 서비스 컨테이너**에서 `prisma migrate deploy` → 스키마 drift 검사(`migrate diff --exit-code`) → `pnpm db:seed` → `pnpm test:coverage`(임계값 게이트) |
 | `mutation-test`    | PR 에서만. `pnpm test:mutation:ci` (변경 파일만, `break: 45`)                                                                                                                  |
 | `build`            | `pnpm build` 후 `.next` 존재 확인                                                                                                                                              |
 | `e2e-test`         | push(main·dev)·PR 모두 전체 선택, dev→main PR 은 제외 (위 "E2E 실행 범위" 참고)                                                                                                |
-| `security`         | `pnpm audit --prod --audit-level=critical` (**게이트**) + Trivy SARIF/table(리포트 전용)                                                                                       |
+| `docker-build`     | PR 에서만. 이미지 빌드가 되는지만 본다(푸시하지 않는다) — Dependabot PR 의 도커 빌드를 머지 전에 검증 |
+| `security`         | gitleaks 커밋 시크릿 스캔 + `pnpm audit --prod --audit-level=critical` (**게이트**) + Trivy SARIF/table(리포트 전용) |
 | `deployment-ready` | main push 에서 위 잡들이 모두 성공했을 때만 성공 로그를 남긴다                                                                                                                 |
 
 `test` 잡이 진짜 DB 를 띄우는 이유는 두 가지다. (1) 마이그레이션이 빈 DB 에 실제로 적용되는지
@@ -3644,27 +3462,32 @@ concurrency:
 - `workflow_run` 은 기본 브랜치를 체크아웃하므로 CI 를 통과한 커밋
   (`github.event.workflow_run.head_sha`)을 **명시적으로** 다시 체크아웃한다.
 - 이미지: `docker/build-push-action` 으로 `ghcr.io/lkindo/sr` 에 푸시.
-  태그는 `main` → `latest`, 그 외(dev) → `dev`.
+  이동 태그(`main` → `latest`, 그 외(dev) → `dev`)와 **커밋 SHA 태그**를 함께 민다. 운영은
+  `.env.prod` 의 `APP_IMAGE_TAG=<SHA>` 로 그 SHA 이미지를 띄운다(재빌드 없는 롤백 지점).
 - 설정 파일(`docker-compose.*.yml`, `nginx/nginx.conf`, `scripts/*.sh`)을 `scp` 로
   `/home/opc/sr` 에 복사한다. **`.env.docker*` 는 저장소에 없다** — 런타임 시크릿은 SSH 단계에서
   GitHub Secrets(base64)로부터 서버에 직접 기록한다.
 - 컨테이너를 내리기 **전에** 시크릿 존재 여부와 `docker compose config -q` 보간을 검증한다.
   실패하면 아무것도 건드리지 않고 중단하므로 현재 서비스는 계속 살아 있다.
-- 재기동은 `pull` → `down --remove-orphans` → 동명 컨테이너 `docker rm -f` →
-  `up -d --force-recreate --remove-orphans` 순이다. 마지막에 컨테이너가 실제로 running 인지
-  확인하고 아니면 배포를 실패로 처리한다(과거에 "성공 보고 + 미교체" 사고가 있었다).
-- **마이그레이션은 배포 워크플로가 실행하지 않는다.** 컨테이너 시작 시
-  `docker-entrypoint.sh` 가 `prisma migrate deploy` 를 수행한다. 시딩도 파이프라인에서
-  하지 않는다(과거의 무조건 reseed 가 운영자의 비밀번호 변경을 되돌렸다).
-- main 배포는 추가로 443 방화벽 개방, 자가서명 인증서 폴백 생성,
-  `scripts/setup-letsencrypt.sh` 실행을 한다. **인증서 자동 갱신은 아직 구성되어 있지 않다.**
+- 재기동 순서는 환경마다 다르다. **운영(main)** 은 nginx 설정 검증 → 롤백 지점(현재 이미지 ID) 기록 →
+  배포 전 백업 → `pull` → `up -d --remove-orphans` → **앱만** `up -d --force-recreate --no-deps app`
+  (`down` 없음) → `healthy` 대기(240초). healthy 가 안 되면 **마이그레이션 수가 그대로일 때만** 이전
+  이미지로 자동 롤백한다. **스테이징(dev)** 은 `pull` → `down --remove-orphans` → 동명 컨테이너
+  `docker rm -f` → `up -d --force-recreate --remove-orphans` → `healthy` 대기(자동 롤백 없음).
+  배포·롤백의 정본은 `docs/SERVER_RUNBOOK_2026-08-01.md` 5절이다.
+- **마이그레이션과 기준 데이터 시딩은 배포 워크플로가 따로 실행하지 않는다.** 컨테이너가 기동할 때마다
+  `docker-entrypoint.sh` 가 `prisma migrate deploy` 와 `node prisma/seed.bundle.cjs`(권한·역할 upsert,
+  멱등)를 수행하고, 실패하면 컨테이너가 뜨지 않는다. 과거의 무조건 reseed(테스트 계정 비밀번호 초기화)는
+  없앴다 — 지금 시드는 사용자 데이터를 건드리지 않는다.
+- main 배포는 추가로 443 방화벽 개방, 자가서명 인증서 폴백 생성, `scripts/setup-letsencrypt.sh` 실행,
+  **인증서 갱신 cron 멱등 설치**(`0 3 * * * scripts/renew-letsencrypt.sh`)를 한다. 7일이 지난 이미지만 prune 한다.
 
 ### 런타임 구성 (`docker-compose.prod.yml`)
 
 | 서비스  | 이미지                     | 요점                                                                                                                                               |
 | ------- | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `nginx` | `nginx:alpine`             | 80/443 공개. `nginx.conf` 와 `certs` 를 read-only bind mount                                                                                       |
-| `app`   | `ghcr.io/lkindo/sr:latest` | `expose: 3000`(호스트 비공개). `env_file: .env.docker`, `NODE_OPTIONS=--max-old-space-size=450`, `STORAGE_DIR=/app/var/uploads`, 볼륨 `sr_uploads` |
+| `app`   | `ghcr.io/lkindo/sr:${APP_IMAGE_TAG:-latest}` | `expose: 3000`(호스트 비공개). `env_file: .env.docker`, `NODE_OPTIONS=--max-old-space-size=450`, `STORAGE_DIR=/app/var/uploads`, 볼륨 `sr_uploads`, `healthcheck`(앱 `/api/health`) |
 | `db`    | `postgres:16-alpine`       | 호스트 포트 **비공개**. `POSTGRES_*` 는 `:?` 문법으로 미설정 시 즉시 실패. 볼륨 `sr_db_data`, `pg_isready` healthcheck                             |
 
 세 서비스 모두 로깅은 `json-file` 드라이버, `max-size: 10m` × `max-file: 3` 이다.
@@ -3751,7 +3574,7 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
 - [ ] `.env.example` → `.env` 복사 후 `DATABASE_URL` / `DIRECT_URL` 채우기
 - [ ] `NEXTAUTH_SECRET` / `AUTH_SECRET` 생성 (`openssl rand -base64 32`, 32자 이상 동일 값)
 - [ ] `pnpm exec prisma migrate deploy` → `pnpm db:seed` (`SEED_DEV_FIXTURES=true`)
-- [ ] (선택) SMTP 자격증명 — 없으면 메일 발송을 건너뛴다(부팅은 정상)
+- [ ] (선택) SMTP 자격증명 — 없어도 부팅은 정상이다. 적재된 메일은 발송 실패로 재시도되다 `FAILED` 가 된다
 - [ ] (선택) VAPID 키 쌍 — 없으면 웹 푸시만 비활성화된다
 - [ ] `pnpm verify:static` (type-check + lint + format) 통과 확인
 
@@ -3761,9 +3584,9 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
       (절차: `docs/SECRET_ROTATION.md` 3절)
 - [ ] `NEXTAUTH_SECRET` 을 **운영과 다른 값**으로 발급(같으면 스테이징 세션 쿠키가 운영에서도 유효해진다)
 - [ ] dev 브랜치 push → `CI/CD Pipeline` 성공 → `deploy.yml` 자동 배포 확인
-- [ ] 기준 데이터(권한/역할) 시딩은 필요할 때 서버에서 1회 수동 실행
+- [ ] 기준 데이터(권한/역할) 시딩은 컨테이너 기동 때 자동이다(`docker-entrypoint.sh`, 실패하면 컨테이너가 뜨지 않는다)
       (이미지가 `NODE_ENV=production` 이라 테스트 계정/샘플 픽스처는 실행되지 않는다)
-- [ ] E2E 서브셋 결과 확인
+- [ ] CI 의 E2E 결과 확인(dev push 에서 전체 스위트가 돈다 — 예전의 서브셋은 2026-08-09 폐지)
 
 **Production (main 브랜치)**:
 
@@ -3771,8 +3594,9 @@ POSTGRES_USER=…  POSTGRES_PASSWORD=…  POSTGRES_DB=sr_db
 - [ ] `POSTGRES_USER` / `POSTGRES_PASSWORD` — hex 권장(base64 의 `/`, `+`, `=` 는 URL 인코딩 필요).
       기존 볼륨의 비밀번호 교체는 `ALTER USER` 로 한다(`POSTGRES_*` 는 최초 기동에만 반영된다)
 - [ ] 도메인 DNS → 서버, 방화벽 80/443 개방
-- [ ] Let's Encrypt 발급(`scripts/setup-letsencrypt.sh`).
-      **⚠️ 갱신 자동화는 아직 구성되어 있지 않다 — 만료 전 수동 갱신 필요**
+- [ ] Let's Encrypt 발급(`scripts/setup-letsencrypt.sh`). 갱신은 운영 배포가 멱등 설치하는 호스트 cron
+      (`0 3 * * * scripts/renew-letsencrypt.sh`)이 한다 — 첫 배포 뒤 `crontab -l` 로 확인
+      (`docs/SERVER_RUNBOOK_2026-08-01.md` 3절)
 - [ ] named volume `sr_db_data`, `sr_uploads` 존재 확인(재배포 시 데이터 보존의 전제)
 - [ ] `backup.yml` 스케줄 동작 확인 + **오프호스트 복제 구성**(현재 미구성)
 - [ ] uptime-kuma 감시 대상에 배포 URL 등록 (해당 컨테이너는 저장소에 정의되어 있지 않다)

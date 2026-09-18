@@ -85,49 +85,49 @@
 > 아래는 `package.json` · `docker-compose.prod.yml` · `Dockerfile` · `nginx/nginx.conf` ·
 > `.github/workflows/` 에서 실측한 값이다. 표에 없는 것은 시스템에 없다.
 >
-> **버전은 메이저·마이너까지만 적는다.** 패치 자릿수까지 박아 두면 dependabot PR 하나마다
-> 이 표가 틀려지고, 아무도 고치지 않아 결국 전부 신뢰할 수 없게 된다. 정확한 값은
-> `package.json` 과 `pnpm-lock.yaml` 이 단일 진실이다.
+> **버전은 메이저까지만 적는다(2026-09-18 개정).** 예전 규칙은 "메이저·마이너" 였는데, 마이너 자릿수도
+> dependabot PR 마다 틀어져 이 표의 React·Zod·react-query·Playwright 등이 실제와 달라져 있었다.
+> 정확한 값은 `package.json` 과 `pnpm-lock.yaml` 이 단일 진실이다.
 
-| 분류                | 기술                                                                           | 버전 (메이저·마이너만)                          |
+| 분류                | 기술                                                                           | 버전 (메이저만)                                 |
 | ------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------- |
-| **Frontend**        | Next.js (App Router)                                                           | 16.3                                            |
-|                     | React / React DOM                                                              | 19.2                                            |
-|                     | TypeScript                                                                     | 5.x                                             |
-|                     | Tailwind CSS                                                                   | 3.4                                             |
+| **Frontend**        | Next.js (App Router)                                                           | 16                                              |
+|                     | React / React DOM                                                              | 19                                              |
+|                     | TypeScript                                                                     | 5                                               |
+|                     | Tailwind CSS                                                                   | 3                                               |
 |                     | Shadcn/ui (Radix UI 프리미티브 기반, 소스 복사 방식)                           | 패키지 버전 없음 (`src/components/ui/`)         |
-|                     | Recharts (대시보드 차트)                                                       | 3.7.0                                           |
-| **Backend**         | Next.js Server Actions / Route Handlers                                        | 16.3                                            |
-|                     | Node.js 런타임                                                                 | 22.x (`package.json` engines, `node:22` 이미지) |
+|                     | 차트 라이브러리                                                                | **없음** — 대시보드 차트는 제거했다(Recharts 도 의존성에서 빠졌다) |
+| **Backend**         | Next.js Server Actions / Route Handlers                                        | 16                                              |
+|                     | Node.js 런타임                                                                 | 22 (`package.json` engines, `node:22` 이미지)   |
 |                     | pnpm (패키지 매니저)                                                           | 10                                              |
 | **Database**        | PostgreSQL — `postgres:16-alpine` 컨테이너(앱과 같은 호스트)                   | 16                                              |
-|                     | Prisma ORM (`prisma` + `@prisma/client`)                                       | 6.19                                            |
+|                     | Prisma ORM (`prisma` + `@prisma/client`)                                       | 6                                               |
 |                     | 커넥션 풀러                                                                    | **없음** (PgBouncer·관리형 Pooler 미사용)       |
 | **Storage**         | 서버 디스크 — `STORAGE_DIR=/app/var/uploads`, Docker named volume `sr_uploads` | —                                               |
 |                     | 오브젝트 스토리지 / CDN                                                        | **없음**                                        |
 | **Cache**           | Next.js `unstable_cache` (프로세스 내 메모리, `src/lib/cache.ts`)              | Next.js 내장                                    |
 |                     | 외부 캐시 서버 (Redis 등)                                                      | **없음**                                        |
-| **Background Jobs** | 이메일 아웃박스 (`src/services/notification-outbox.ts`) — DB 영속 + 재시도     | 30초 폴링 디스패처                              |
+| **Background Jobs** | 이메일 아웃박스 (`src/services/notification-outbox.ts`) — DB 영속 + 재시도 + 보존 정리 | 앱 내부 30초 타이머(`instrumentation.ts` 가 기동) |
 |                     | `backgroundTask` (`src/lib/wait-until.ts`) — 웹 푸시 등 best-effort            | 영속 큐 **없음**                                |
-|                     | 시간 기반 정기 작업(Cron)                                                      | **없음** — GitHub Actions 스케줄만              |
-| **Authentication**  | NextAuth / Auth.js — JWT 세션 전략 (`src/auth.config.ts`)                      | 5.0.0-beta.32                                   |
-|                     | bcryptjs (work factor 12, `src/lib/constants.ts:115`)                          | 3.0                                             |
-| **Validation**      | Zod                                                                            | 4.4                                             |
-|                     | react-hook-form (+ `@hookform/resolvers`)                                      | 7.84                                            |
-| **Server State**    | `@tanstack/react-query`                                                        | 5.101                                           |
-| **Email**           | nodemailer (SMTP, `src/services/email.service.ts`)                             | 9.0                                             |
-| **Web Push**        | web-push (VAPID, `src/services/push.service.ts`)                               | 3.6                                             |
+|                     | 시간 기반 정기 작업                                                            | GitHub Actions 스케줄(백업·복구 리허설·정기 점검) + 호스트 cron(인증서 갱신) + 앱 내부 아웃박스 타이머. SLA 스캔은 **없음**(헌법 §3 규범 제외) |
+| **Authentication**  | NextAuth / Auth.js — JWT 세션 전략 (`src/auth.config.ts`)                      | 5 (beta)                                        |
+|                     | bcryptjs (work factor 12, `src/lib/constants.ts` 의 `BCRYPT_WORK_FACTOR`)       | 3                                               |
+| **Validation**      | Zod                                                                            | 4                                               |
+|                     | react-hook-form (+ `@hookform/resolvers`) — 접수 폼(`use-intake-form.ts`)에만 쓴다 | 7                                          |
+| **Server State**    | `@tanstack/react-query`                                                        | 5                                               |
+| **Email**           | nodemailer (SMTP, `src/services/email.service.ts`)                             | 9                                               |
+| **Web Push**        | web-push (VAPID, `src/services/push.service.ts`)                               | 3                                               |
 | **Realtime**        | 자체 SSE 엔드포인트 `GET /api/realtime` + Node `EventEmitter`                  | —                                               |
 | **Reverse Proxy**   | nginx — `nginx:alpine` 컨테이너 (TLS 종료, 80→443 리다이렉트)                  | alpine                                          |
 | **Deployment**      | 자체 서버(Oracle Cloud VM) + Docker Compose (`/home/opc/sr`)                   | —                                               |
-|                     | 이미지 레지스트리 — GHCR `ghcr.io/lkindo/sr` (`:latest` / `:dev`)              | —                                               |
+|                     | 이미지 레지스트리 — GHCR `ghcr.io/lkindo/sr` (이동 태그 `:latest` / `:dev` + 커밋 SHA 태그) | —                                  |
 |                     | CI/CD — GitHub Actions (`CI/CD Pipeline` → `workflow_run` 배포)                | —                                               |
 |                     | TLS — Let's Encrypt (certbot). 갱신은 `scripts/renew-letsencrypt.sh` 를 호스트 cron `0 3 * * *` 로 실행하며, cron 설치는 `.github/workflows/deploy.yml` 이 배포마다 멱등 수행한다 | —                                               |
-| **Logging**         | pino → stdout → Docker `json-file` 드라이버 (3 × 10MB 로테이션)                | 10.3                                            |
+| **Logging**         | pino → stdout → Docker `json-file` 드라이버 (3 × 10MB 로테이션)                | 10                                              |
 |                     | 호스트 밖 로그 전송                                                            | **없음**                                        |
 | **Monitoring**      | uptime-kuma 컨테이너 (서버에서 구동 중, 저장소의 compose 파일에는 없음)        | 미확인                                          |
 |                     | 에러 추적 서비스                                                               | **없음** — Sentry 미사용 결정(2026-07-30)       |
-| **Testing**         | vitest (유닛) / Playwright (e2e) / Stryker (뮤테이션)                          | 4.1 / 1.62 / 9.6                                |
+| **Testing**         | vitest (유닛·통합) / Playwright (e2e) / Stryker (뮤테이션)                     | 4 / 1 / 9                                       |
 
 ---
 
@@ -185,9 +185,9 @@
 │  └──────────────────────────────────────────────────┘  │
 │  ┌──────────────────────────────────────────────────┐  │
 │  │        NextAuth Middleware (src/proxy.ts)         │  │
-│  │  - Authentication (JWT)                          │  │
-│  │  - Authorization                                 │  │
+│  │  - 인증 게이트 (JWT, 미로그인 → /login)           │  │
 │  │  - 인메모리 Rate Limit (프로세스 로컬)            │  │
+│  │  ※ 인가 판정은 하지 않는다 → policies.ts         │  │
 │  └──────────────────────────────────────────────────┘  │
 └────────────────────────┬────────────────────────────────┘
                          │
@@ -207,8 +207,9 @@
 │ 풀러 없음        │ │ (웹루트 밖)   │ │                  │
 └─────────────────┘ └──────────────┘ └──────────────────┘
 
-캐시 / 큐: 외부 컴포넌트 없음. Next.js `unstable_cache`(프로세스 메모리)와
-           `backgroundTask`(응답 후 실행)만 존재하며, 프로세스 재시작 시 모두 소실된다.
+캐시 / 큐: 외부 컴포넌트 없음. Next.js `unstable_cache`(프로세스 메모리), `backgroundTask`(응답 후 실행,
+           웹 푸시), DB 아웃박스(`notifications`, 이메일)만 존재한다. 앞의 둘은 프로세스 재시작 시 소실되고,
+           이메일 아웃박스는 DB 에 커밋되므로 재시작 뒤 디스패처가 이어서 보낸다.
 ```
 
 ### 레이어드 아키텍처
@@ -218,7 +219,8 @@
 │      Presentation Layer                 │
 │  - React Components                     │
 │  - UI Components (Shadcn/ui + Radix)    │
-│  - Forms (React Hook Form + Zod)        │
+│  - Forms (useState 기반 훅 + Zod.       │
+│    RHF 는 접수 폼만)                    │
 │  - Tables (src/components/ui/table.tsx) │
 │    ※ TanStack Table 미사용              │
 └─────────────────┬───────────────────────┘
@@ -263,9 +265,11 @@
    - 클라이언트 사이드 JavaScript 최소화
    - 초기 로딩 성능 최적화
 
-2. **Progressive Enhancement**
-   - 기본 기능은 JavaScript 없이 동작 (Server Actions)
-   - 클라이언트 컴포넌트는 상호작용이 필요한 부분만
+2. **클라이언트 상호작용은 필요한 곳에만** (2026-09-18 정정)
+   - 예전 이 항목은 "기본 기능은 JavaScript 없이 동작(Server Actions, Progressive Enhancement)" 이었으나
+     **사실이 아니다.** 폼은 모두 `onSubmit` 핸들러로 제출하고(`<form action={serverAction}>` 은 없다),
+     뮤테이션 대부분이 REST 라우트를 부르므로 **JavaScript 가 필수**다.
+   - 서버 컴포넌트 전환은 진행 중이다(`.gemini/rules/fe-rules.md` §1 의 전환 현황).
 
 3. **Layered Architecture**
    - 각 레이어는 명확한 책임 분리
@@ -288,9 +292,9 @@
 
 ### 1. Next.js (App Router)
 
-**버전**: **16.1.6** (`package.json`), React 19.2.4, Node 22.x
+**버전**: Next.js 16, React 19, Node 22 (정확한 값은 `package.json`)
 
-> **정정**: 1.3 까지 이 절은 "14.x (최신 stable)" 로 기술되어 있었다. 실제 의존성은 16.1.6 이다.
+> **정정**: 1.3 까지 이 절은 "14.x (최신 stable)" 로 기술되어 있었다. 실제 의존성은 16 이다.
 
 **선택 이유**:
 
@@ -298,14 +302,14 @@
 - **Server Actions**: API 라우트 없이 데이터 뮤테이션 가능, 타입 안정성 향상
 - **Streaming & Suspense**: 점진적 UI 렌더링으로 TTFB(Time To First Byte) 개선
 - **`output: 'standalone'`**: 빌드 산출물을 단일 `server.js` 로 묶어 Docker 이미지가 작아지고,
-  자체 서버에서 `node server.js` 로 상시 구동된다 (`next.config.ts:48`, `Dockerfile` Stage 3)
+  자체 서버에서 `node server.js` 로 상시 구동된다 (`next.config.ts` 의 `output`, `Dockerfile` Stage 3)
 - **TypeScript Native**: 타입 안정성 및 개발자 경험(DX) 향상
 
 **대안 기술 비교**:
 
 | 기술                     | 장점                                              | 단점                                | 선택 여부             |
 | ------------------------ | ------------------------------------------------- | ----------------------------------- | --------------------- |
-| **Next.js (App Router)** | RSC, Server Actions, standalone 출력 → 컨테이너화 | Learning Curve                      | ✅ 선택 (현재 16.1.6) |
+| **Next.js (App Router)** | RSC, Server Actions, standalone 출력 → 컨테이너화 | Learning Curve                      | ✅ 선택 (현재 16)     |
 | Next.js Pages Router     | 안정적, 익숙함                                    | RSC 미지원, 구식 패턴               | ❌                    |
 | Remix                    | Server-first, Form Actions                        | 생태계 작음                         | ❌                    |
 | SvelteKit                | 빠른 성능, 작은 번들                              | React 생태계 활용 불가              | ❌                    |
@@ -320,9 +324,11 @@
 
 - **Server Components**: 데이터 페칭 및 초기 렌더링
 - **Client Components**: 상호작용 (form, modal, SSE 기반 실시간 갱신)
-- **Server Actions**: 폼 제출, 데이터 뮤테이션 (`bodySizeLimit: '2mb'`, `next.config.ts:43`)
-- **Route Handlers**: REST API (`/api/*`), SSE (`/api/realtime`), 헬스체크 (`/api/health`)
-- **Middleware**: 인증·권한·인메모리 Rate Limit (`src/proxy.ts`)
+- **Server Actions**: SR 등록·수정·삭제, 목록·선택지 조회, 상세·활동·댓글 조회 등 (`bodySizeLimit: '2mb'`, `next.config.ts`)
+- **Route Handlers**: 상태 전이·댓글·첨부·접수·사용자·역할·카테고리 등 대부분의 뮤테이션 REST API (`/api/*`),
+  SSE (`/api/realtime`), 헬스체크 (`/api/health`) — 실제 분담은 아래 'API 설계 원칙' 참조
+- **Middleware**: 인증 게이트(미로그인 페이지 요청을 `/login` 으로)·인메모리 Rate Limit (`src/proxy.ts`).
+  **인가(권한) 판정은 하지 않는다** — 인가의 단일 지점은 `src/lib/policies.ts` 다(헌법 §1.2)
 
 > **구현 상세**: 구체적인 코드 예제, 설정 파일은 [LLD.md](LLD.md) 참조
 
@@ -360,8 +366,8 @@
 
 ### 3. Prisma ORM
 
-**버전**: **6.19** (`prisma` + `@prisma/client`. 런타임 컨테이너에도 마이그레이션용
-`prisma@6.19.0` 이 전역 설치되어 있다 — `Dockerfile:59`)
+**버전**: **6** (`prisma` + `@prisma/client`. 런타임 컨테이너에도 마이그레이션용
+`prisma` CLI 가 전역 설치되어 있다 — `Dockerfile` 러너 단계의 `npm install -g prisma@…`)
 
 **선택 이유**:
 
@@ -389,23 +395,27 @@
 - **두 개의 연결 문자열**: `schema.prisma` 는 `url = env("DATABASE_URL")` 과
   `directUrl = env("DIRECT_URL")` 을 모두 선언하고 `src/lib/env-validation.ts` 가 둘 다 필수로
   검증한다. 다만 풀러가 없으므로 **두 값은 같은 인스턴스를 가리킨다**
-  (CI 는 두 변수에 동일한 문자열을 넣는다 — `.github/workflows/ci-cd.yml:95-96`).
+  (CI 는 두 변수에 동일한 문자열을 넣는다 — `.github/workflows/ci-cd.yml` 의 `test` 잡 `env`).
   운영 값은 서버의 `.env.docker` 에만 있어 저장소에서 확인할 수 없다.
-- **로깅**: 개발 환경에서만 쿼리 로그 활성화 (`src/lib/prisma.ts:14`),
-  개발 환경 느린 쿼리 경고 임계값 `PRISMA_SLOW_MS`(기본 200ms)
+- **로깅**: 개발 환경에서만 쿼리 로그 활성화 (`src/lib/prisma.ts` 의 `log`).
+  느린 쿼리 경고는 **프로덕션 포함 전 환경**에서 Client Extension 이 남긴다 — 임계값 `PRISMA_SLOW_MS`(기본 200ms)
+  (`.gemini/rules/db-rules.md` §4)
 - **Singleton 패턴**: HMR로 인한 다중 인스턴스 방지 (`globalThis.prismaGlobal`)
 - **`$transaction` 래핑**: 트랜잭션 컨텍스트에 도메인/실시간 이벤트를 모아 **커밋 이후에**
-  디스패치한다 (`src/lib/prisma.ts:33-58`)
+  디스패치한다 (`src/lib/prisma.ts` 의 `$transaction` 래퍼)
 
 **마이그레이션 전략**:
 
 - **개발 환경**: `prisma migrate dev` (자동 마이그레이션 생성)
-- **Production**: 컨테이너 시작 시 `docker-entrypoint.sh` 가 `prisma migrate deploy` 를 실행한다
-  (실패 시 `0_init` 베이스라인 후 재시도). 배포 워크플로가 별도로 실행하지 않는다.
+- **Production**: 컨테이너 시작 시 `docker-entrypoint.sh` 가 `prisma migrate deploy` 를 실행한다.
+  **실패하면 부팅 실패다** — 자동으로 베이스라인하지 않는다. 출력이 P3005 이고 운영자가 백업 후 기존 스키마가
+  `0_init` 과 같음을 확인해 `ALLOW_PRISMA_BASELINE=1` 을 준 **일회성 실행**에서만 `0_init` 베이스라인 후 재시도한다
+  (정본: `docs/BOOTSTRAP.md` 3절, `docs/DB.md` '마이그레이션 상태 확인 / 롤백'). 배포 워크플로가 별도로 실행하지 않는다.
 - **CI 검증**: 모든 push/PR 에서 빈 PostgreSQL 16 컨테이너에 `migrate deploy` → `migrate diff`
-  드리프트 검사 → `db:seed` 까지 실제로 수행한다 (`.github/workflows/ci-cd.yml:122-147`)
-- **Seed 데이터**: 초기 권한·역할 생성. 개발/테스트 픽스처는 `SEED_DEV_FIXTURES=true` 일 때만
-  생성되며, 배포 파이프라인은 시딩을 수행하지 않는다(운영 계정 초기화 사고 방지).
+  드리프트 검사 → `db:seed` 까지 실제로 수행한다 (`.github/workflows/ci-cd.yml` 의 `test` 잡)
+- **Seed 데이터**: 초기 권한·역할 생성. 기준 데이터(권한·역할 upsert, 멱등)는 **컨테이너가 기동할 때마다**
+  엔트리포인트가 시딩하고 실패하면 부팅을 멈춘다. 개발/테스트 픽스처는 `SEED_DEV_FIXTURES=true` 이고
+  프로덕션이 아닐 때만 생성된다. 배포 워크플로 단계로서의 reseed(운영 계정 초기화 사고의 원인)는 없앴다.
 
 > **구현 상세**: Prisma Client 설정, 마이그레이션 스크립트, Seed 파일은 [LLD.md](LLD.md) 참조
 
@@ -420,13 +430,13 @@
 > ("PostgreSQL 15, 관리형") 를 **"✅ 선택"** 으로 표기하고 있었다. **그 외부 관리형 스택은
 > 채택되지 않았다.** 관리형 서비스가 아니며, 그 스택이 함께 제공하던
 > Storage / Auth / Realtime / Pooler / RLS 중 어느 것도 사용하지 않는다.
-> 아래 내용은 `docker-compose.prod.yml:49-81` 실측 기준이다.
+> 아래 내용은 `docker-compose.prod.yml` 의 `db` 서비스 실측 기준이다.
 
 **실제 구성**:
 
 - **이미지/버전**: `postgres:16-alpine`
 - **영속화**: named volume `sr_db_data` → `/var/lib/postgresql/data`
-  (배포 시 `down`/`up --force-recreate` 를 하더라도 데이터는 보존된다)
+  (운영 배포는 앱만 재생성하고 스테이징은 `down`/`up --force-recreate` 를 하지만, 어느 쪽이든 데이터는 보존된다)
 - **네트워크**: 호스트 포트를 **공개하지 않는다.** 관리 접근은 SSH 터널 또는 `docker exec`.
 - **자격증명**: compose 가 배포 호스트의 env 파일에서 보간하며 값이 비면 `:?` 문법으로 즉시
   실패한다. 저장소에는 자격증명이 없다 (`docs/SECRET_ROTATION.md`).
@@ -474,23 +484,26 @@
 > **정정(2026-07-30)**: 1.3 까지 이 절은 Vercel Blob 을 **"✅ 선택"** 으로 표기하고
 > `put` / `head` / `del` API 와 자동 공개 URL, 전역 CDN 을 전제로 서술하고 있었다.
 > **Vercel Blob 은 채택되지 않았다.** 오브젝트 스토리지도 CDN 도 없다.
-> `src/lib/storage.ts` 의 `listAttachmentBlobs` 등 함수명에 남은 "Blob" 은 초기 구현의
-> 잔재이며(현재는 빈 배열을 돌려주는 스텁), 실제 저장 매체는 서버 디스크다.
+> `src/lib/storage.ts` 의 `uploadAttachmentBlob` 등 함수명에 남은 "Blob" 은 초기 구현의
+> 잔재이며, 실제 저장 매체는 서버 디스크다(예전의 스텁 `listAttachmentBlobs` 는 삭제됐다).
 
 **실제 구성**:
 
 - **저장 위치**: `STORAGE_DIR` (컨테이너 기준 `/app/var/uploads`).
   Docker named volume `sr_uploads` 가 이 경로에 마운트되어 재배포 시에도 파일이 남는다.
 - **웹루트 밖 저장**: `public/` 밖에 두어 정적 서빙으로 인한 무인증 접근을 차단한다.
-- **경로 구조**: `attachments/{srId}/{timestamp}-{sanitizedName}` (DB 에는 이 상대 경로를 저장)
+- **경로 구조**: `attachments/{srId}/{UUID}-{sanitizedName}` (DB `storage_path` 에 이 상대 경로를 저장하고,
+  `file_url` 에는 인증 다운로드 경로를 둔다). `wx` 플래그로 써서 기존 파일을 덮어쓰지 않는다
 - **파일명 정화**: `path.basename` → 공백 치환 → `[^a-zA-Z0-9._-]` 제거,
   최종 경로가 `STORAGE_DIR` 내부인지 containment 검사 (경로 탐색 차단)
 - **접근 권한**: **공개 URL 없음.** 다운로드는 인증·인가를 거치는
   `GET /api/attachments/[id]/download` 로만 제공된다.
-- **레거시 폴백**: 과거 `public/uploads` 에 올라간 파일은 다운로드 조회 시에만 폴백 탐색한다.
+- **레거시 폴백 없음**: 과거의 `public/uploads` 폴백 탐색은 공개 정적 서빙으로 인가를 우회할 수 있어 제거했다.
+  `STORAGE_DIR` 이 유일한 허용 루트다.
 - **크기 상한**: MIME 타입별로 다르다 (`src/lib/file-validator.ts`) — 이미지 5~10MB,
   오피스 문서 20MB, 프레젠테이션 50MB, 압축 파일 50MB. nginx `client_max_body_size` 는 50m,
-  Server Action 본문 상한은 2MB(`next.config.ts:43`)이므로 대용량은 Route Handler 경유가 필요하다.
+  Server Action 본문 상한은 2MB(`next.config.ts` 의 `bodySizeLimit`)이므로 대용량은 Route Handler 경유가 필요하다.
+  서버의 절대 상한은 `MAX_UPLOAD_FILE_SIZE`(50MB)이고, 화면(첨부 영역·SR 폼)은 그보다 좁은 10MB 에서 먼저 막는다.
 
 **대안 기술 비교** (초기 설계안의 의사결정 기록 — 실제 채택 결과를 반영해 정정):
 
@@ -515,9 +528,10 @@
 
 **현재 캐싱 구현**:
 
-- **캐시 백엔드**: Next.js `unstable_cache` (`src/lib/cache.ts`) — 사용자 목록·고객사 목록
+- **캐시 백엔드**: Next.js `unstable_cache` (`src/lib/cache.ts`) — 배정 가능 사용자(`id`·`name` 만, 이메일 제외)와
+  활성 고객사 목록(`clientIds` 스코프 인자 **필수**, `null` = 전체·내부 사용자 전용)
 - **TTL**: 5분 (`revalidate: 300`)
-- **무효화**: `revalidatePath()`, `revalidateTag()`
+- **무효화**: 경로 무효화 `revalidatePath('/srs')` 등(`src/actions/sr.actions.ts`). `revalidateTag` 는 쓰지 않는다
 - **Rate Limiting**: `MemoryRateLimiter` (`src/lib/rate-limiter.ts`) — 프로세스 내 `Map` 기반
   토큰 버킷. 환경 변수(`RATE_LIMIT_*_WINDOW_MS`, `RATE_LIMIT_*_MAX_REQUESTS`)로 조정하고,
   랜덤 샘플링 축출 + 10,000개 상한 FIFO 방출로 메모리 누수를 막는다.
@@ -547,7 +561,7 @@
 
 ### 7. NextAuth.js v5 (Auth.js)
 
-**버전**: **5.0.0-beta.32** (`next-auth`. 정식 릴리스 전 beta 버전을 사용 중임을 명시한다)
+**버전**: **5 (beta)** (`next-auth`. 정식 릴리스 전 beta 버전을 사용 중임을 명시한다. 정확한 값은 `package.json`)
 
 **선택 이유**:
 
@@ -560,7 +574,7 @@
 **인증 전략**:
 
 - **Credentials Provider**: 이메일/비밀번호 (bcryptjs)
-- **JWT 세션**: `session.strategy: 'jwt'` (`src/auth.config.ts:6`). 서버 측 세션 레코드가 없다.
+- **JWT 세션**: `session.strategy: 'jwt'` (`src/auth.config.ts`). 서버 측 세션 레코드가 없다.
 - **세션 저장소**: 없음. Redis 블랙리스트도 구현되어 있지 않다
   (초기 설계안이 "선택적" 으로 적어 둔 Redis 세션 저장소는 채택되지 않았다).
 
@@ -575,8 +589,8 @@
 
 **보안 설정**:
 
-- **Password Hashing**: bcryptjs, **work factor 12** (`SECURITY.BCRYPT_WORK_FACTOR`,
-  `src/lib/constants.ts:115`) — 1.3 의 "saltRounds: 10" 은 실제 값과 달랐다.
+- **Password Hashing**: bcryptjs, **work factor 12** (`src/lib/constants.ts` 의 `BCRYPT_WORK_FACTOR`)
+  — 1.3 의 "saltRounds: 10" 은 실제 값과 달랐다.
 - **JWT Secret**: `NEXTAUTH_SECRET` / `AUTH_SECRET`. `src/lib/env-validation.ts` 가 32자 이상,
   플레이스홀더 패턴 아님을 검증하고 위반 시 `src/instrumentation.ts` 가 부팅을 중단시킨다.
 - **Session Token**: Auth.js 기본 쿠키 정책(HttpOnly, HTTPS 에서 Secure, SameSite=Lax)
@@ -594,7 +608,7 @@
 
 ### 8. nodemailer (SMTP) + web-push (VAPID)
 
-**버전**: nodemailer **9.0**, web-push **3.6**
+**버전**: nodemailer **9**, web-push **3** (정확한 값은 `package.json`)
 
 > **정정(2026-07-30)**: 1.3 까지 이 절은 Resend + React Email 을 **"✅ 선택"** 으로 표기하고
 > 발송 실패 재시도를 Inngest 에 위임한다고 서술했다. **Resend·React Email·Inngest 모두
@@ -609,17 +623,21 @@
   로컬 개발에서만 완화
 - **타임아웃**: connection 10s / greeting 10s / socket 15s
 - **자격증명 미설정 시**: 예외를 던진다. 조용히 성공한 척하면 환경 변수 하나가 빠졌을 때
-  알림이 통째로 안 나가는데도 애플리케이션이 정상으로 보인다(`email.service.ts:80-82`).
-- **템플릿**: 서비스 내부의 HTML 문자열 메서드(`sendSRCreated`, `sendSRStatusChanged`,
-  `sendSRAssigned` 등). JSX 기반 React Email 은 사용하지 않는다.
+  알림이 통째로 안 나가는데도 애플리케이션이 정상으로 보인다(`email.service.ts` 의 `sendMail`).
+- **템플릿**: 서비스 내부의 HTML 문자열 빌더 4종(`buildSRCreated`, `buildSRAssigned`, `buildSRStatusChanged`,
+  `buildCommentAdded`). 값은 `escapeHtml` 로 이스케이프한다. 빌더는 `{ subject, html }` 만 만들고 발송은
+  아웃박스 디스패처가 한다. JSX 기반 React Email 은 사용하지 않는다.
 - **발송 실패 처리**: **아웃박스 + 지수 백오프 재시도 + dead-letter 가 구현되어 있다**
   (2026-08-02, `src/services/notification-outbox.ts`). 상세는 아래 9절 참조.
   `sendMail` 은 실패를 삼키지 않고 던지며, 그 예외를 디스패처가 받아 `failReason` 에 기록한다.
 
 **웹 푸시 (`src/services/push.service.ts`)**:
 
-- `web-push` + VAPID 키쌍(`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`)
-- 구독 정보는 `push_subscriptions` 테이블, 사용자별 On/Off 는 `notification_preferences`
+- `web-push` + VAPID 키쌍 — 환경 변수는 **`NEXT_PUBLIC_VAPID_PUBLIC_KEY`** / `VAPID_PRIVATE_KEY`
+  (공개 키는 브라우저 구독에도 쓰이므로 `NEXT_PUBLIC_` 접두사가 붙는다. 예전 표기 `VAPID_PUBLIC_KEY` 로
+  설정하면 푸시가 꺼진다), 선택 `VAPID_SUBJECT`
+- 구독 정보는 `push_subscriptions` 테이블, 사용자별·유형별 On/Off 는 `notification_preferences`
+  (`sendForEvent` 가 유형별 설정을 보고 켜진 사용자에게만 보낸다)
 - 만료 응답(410/404) 시 구독을 자동 정리
 
 **대안 기술 비교** (초기 설계안의 의사결정 기록 — 실제 채택 결과를 반영해 정정):
@@ -633,7 +651,8 @@
 | Postmark               | 높은 전달률                                           | 비용 높음                                     | ❌                          |
 
 > **구현 상세**: 발송 코드는 `src/services/email.service.ts` / `src/services/push.service.ts`,
-> 트리거 배선은 `src/services/listeners/sr-notification.listener.ts` 참조
+> 이메일 수신자 산정·적재는 `src/services/sr-email-outbox.ts`(트랜잭션 안), 푸시 트리거는
+> `src/services/listeners/sr-notification.listener.ts`(커밋 후) 참조
 
 ---
 
@@ -648,8 +667,8 @@
 > **재정정(2026-08-15)**: 위 문단은 "재시도 기반이 시스템에 존재하지 않는다" 고 단언했으나
 > 2026-08-02 이후로 사실이 아니다. **이메일 재시도와 Dead Letter Queue 는 DB 기반 아웃박스로
 > 구현되어 있다**(`src/services/notification-outbox.ts`, 마이그레이션
-> `20260802030000_notification_outbox_retry`). 미구현으로 남은 것은 일일 리포트·만료 알림·
-> 파일 정리 Cron 3종이다.
+> `20260802030000_notification_outbox_retry`). 미구현으로 남은 것은 일일 리포트·파일 정리 Cron 이다.
+> SLA 만료(임박·초과) 알림은 미구현이 아니라 **규범 제외(미도입)** 다(헌법 §3).
 
 **실제 동작**:
 
@@ -668,23 +687,29 @@
 
 **구현**: `src/services/notification-outbox.ts`, 테이블 `notifications`
 
-- **적재**: `enqueueEmails(tx, ...)` 가 도메인 트랜잭션 **안에서** `PENDING` 행을 만든다.
+- **적재**: `enqueueEmails(emails, tx)` 가 도메인 트랜잭션 **안에서** `PENDING` 행을 만든다
+  (SR 이벤트별 수신자 산정은 `src/services/sr-email-outbox.ts`).
   트랜잭션이 롤백되면 알림도 함께 사라지므로 "없던 일에 대한 알림" 이 나가지 않는다.
 - **디스패처**: `startNotificationDispatcher()` 를 `src/instrumentation.ts` 가 부팅 시 기동한다.
   기본 30초 주기로 최대 20건을 집는다.
 - **claim**: 단일 CTE 안에서 `FOR UPDATE SKIP LOCKED` 로 행을 잠그고 `next_attempt_at` 을
   임대(lease) 시간만큼 미래로 밀어 다중 인스턴스에서도 중복 발송을 막는다.
-- **재시도**: 실패 시 지수 백오프(1·5·15·60분)로 재시도하며 상한은 5회다.
-  정본 상수는 `MAX_ATTEMPTS` / `BACKOFF_MINUTES` 이며 이 문서는 숫자를 복제하지 않는다.
+- **재시도**: 실패 시 지수 백오프로 재시도한다. 상한은 **총 시도 횟수**이며 정본 상수는
+  `MAX_ATTEMPTS` / `BACKOFF_MINUTES` 다(이 문서는 숫자를 복제하지 않는다).
 - **dead-letter**: 상한 도달 시 `FAILED` 로 고정하고 `failReason` 에 마지막 예외를 남긴다.
+  ADMIN 이 `/settings/outbox` 화면에서 조회하고 재발송한다(`FAILED` 만 `PENDING` 으로 되돌린다).
+- **보존 정리**: 발송 성공 행은 본문을 즉시 비우고, 약 1시간마다 `SENT` 90일 / `FAILED` 1년 경과분을 지운다(헌법 §4.1).
 - **범위**: 현재 `type = 'EMAIL'` 행만 처리한다. 웹 푸시는 아웃박스에 적재되지 않는다.
 
-**현재 존재하는 정기 작업**: 앱 내부에는 아웃박스 디스패처가 있고, 그 밖은 GitHub Actions 스케줄이다.
+**현재 존재하는 정기 작업**: 앱 내부에는 아웃박스 디스패처(발송·보존 정리)가 있고, 호스트에는 인증서 갱신 cron
+(운영 배포가 멱등 설치), 그 밖은 GitHub Actions 스케줄이다.
 
 | 작업                    | 위치                                     | 주기                           |
 | ----------------------- | ---------------------------------------- | ------------------------------ |
 | DB + uploads 백업       | `.github/workflows/backup.yml`           | 매일 UTC 18:00(KST 03:00)      |
-| 의존성·복잡도·성능 점검 | `.github/workflows/scheduled-checks.yml` | 매일 UTC 00:00                 |
+| 복구 리허설             | `.github/workflows/restore-rehearsal.yml` | 매월 1일 UTC 19:00(KST 2일 04:00) |
+| 의존성·복잡도·번들 점검 | `.github/workflows/scheduled-checks.yml` | 매일 UTC 00:00 (성능 벤치마크 잡은 2026-08-06 제거) |
+| 인증서 갱신             | 호스트 cron `scripts/renew-letsencrypt.sh` | 매일 03:00                    |
 | 대시보드 캐시 워밍      | `.github/workflows/prewarm.yml`          | 수동 실행(`workflow_dispatch`) |
 
 **대안 기술 비교** (초기 설계안의 의사결정 기록 — 실제 채택 결과를 반영해 정정):
@@ -699,7 +724,8 @@
 | Trigger.dev                        | 강력, 다양한 통합              | 비용 높음                                        | ❌                          |
 
 > **경과**: 위 두 후보 중 **DB 기반 outbox 테이블 + 폴링을 2026-08-02 에 채택·구현**했다
-> (이메일 한정). 남은 미해결 과제는 **스케줄링**(만료 알림, 파일 정리 같은 시간 기반 작업)이며,
+> (이메일 한정). 남은 미해결 과제는 **스케줄링**(파일 정리 같은 시간 기반 작업 — SLA 만료 알림은 헌법 §3 이
+> 규범에서 제외)이며,
 > 필요해지면 Redis 컨테이너 + BullMQ 를 검토한다.
 > 외부 SaaS 큐는 현재 인프라 방침(호스트 밖으로 데이터를 보내지 않음)과 맞지 않는다.
 
@@ -719,14 +745,18 @@
 **실제 배포 구성**:
 
 - **이미지 빌드/배포**: GitHub Actions 가 이미지를 빌드해 GHCR(`ghcr.io/lkindo/sr`)에 push 하고,
-  SSH 로 서버에서 `docker compose pull` → `down` → `up -d --force-recreate` 를 실행한다.
-- **태그 규약**: `main` → `:latest` (운영, `docker-compose.prod.yml`),
-  `dev` → `:dev` (스테이징, `docker-compose.test.yml`, compose 프로젝트 `sr-test`)
+  SSH 로 서버에서 재기동한다. 운영은 `down` 없이 **앱만** 재생성하고 healthy 를 기다리며, 실패하면 마이그레이션
+  수가 그대로일 때만 이전 이미지로 자동 롤백한다. 스테이징은 `pull` → `down` → `up -d --force-recreate` 다.
+  순서와 롤백의 정본은 `docs/SERVER_RUNBOOK_2026-08-01.md` 5절이다.
+- **태그 규약**: 이동 태그 `main` → `:latest` (운영, `docker-compose.prod.yml`),
+  `dev` → `:dev` (스테이징, `docker-compose.test.yml`, compose 프로젝트 `sr-test`)와 **커밋 SHA 태그**를 함께 민다.
+  운영은 `.env.prod` 의 `APP_IMAGE_TAG=<SHA>` 로 SHA 이미지를 띄운다(롤백 지점)
 - **환경 변수**: 저장소에 없다. 배포 시 GitHub Secrets(base64)에서 서버의 `.env.docker` 와
   compose 보간용 `.env.prod` / `.env.staging` 으로 기록되며 `chmod 600` 이 적용된다.
   시크릿이 비어 있으면 **컨테이너를 건드리지 않고** 중단한다.
 - **TLS**: 최초 기동 시 자체 서명 인증서를 생성하고, 이후 `scripts/setup-letsencrypt.sh` 로
-  Let's Encrypt 인증서를 발급한다. **갱신 자동화는 아직 없다.**
+  Let's Encrypt 인증서를 발급한다. 갱신은 운영 배포가 멱등 설치하는 호스트 cron(`0 3 * * *`
+  `scripts/renew-letsencrypt.sh`)이 한다.
 - **도메인**: 운영 `lkindo.kr` / `www.lkindo.kr` / `sr.lkindo.kr`, 스테이징 `test.lkindo.kr`
   (`nginx/nginx.conf` 의 `server_name`)
 - **메모리 제약**: 앱 컨테이너는 `NODE_OPTIONS=--max-old-space-size=450` 으로 구동된다
@@ -750,7 +780,7 @@
 
 ### 11. 관측성 — pino stdout + uptime-kuma
 
-**구성**: pino **10.3** → stdout → Docker `json-file` 드라이버 (3 × 10MB 로테이션).
+**구성**: pino **10** → stdout → Docker `json-file` 드라이버 (3 × 10MB 로테이션).
 서버에서 `uptime-kuma` 컨테이너가 구동 중이다.
 
 > **정정(2026-07-30)**: 1.3 까지 이 절은 Sentry(에러)와 Axiom(로그)을 각각 **"✅ 선택"** 으로
@@ -772,8 +802,8 @@
 - **에러 추적**: 없다. 예외는 로그로만 남는다.
 - **APM / 트레이싱 / 메트릭**: 없다 (OpenTelemetry, Prometheus 모두 미도입).
 - **헬스체크 엔드포인트**: `GET /api/health` 가 `SELECT 1` 로 DB 연결을 확인하고 실패 시 503 을
-  반환한다. Dockerfile `HEALTHCHECK` 와 compose 의 `app` 서비스 `healthcheck:` 는 없다
-  (DB 서비스에는 `pg_isready` 헬스체크가 있다).
+  반환한다. Dockerfile `HEALTHCHECK` 와 compose 의 `app` 서비스 `healthcheck:` 가 이 엔드포인트를 부르며,
+  운영 배포의 헬스 게이트·자동 롤백이 그 결과(`healthy`)를 기다린다. DB 서비스에는 `pg_isready` 헬스체크가 있다.
 
 **대안 기술 비교** (초기 설계안의 의사결정 기록 — 실제 채택 결과를 반영해 정정):
 
@@ -790,7 +820,7 @@
 > **남아 있는 공백**: 에러 추적 부재는 여전히 유효한 문제다. 다만 해법은 자체 호스팅 방향이어야
 > 한다(소유자 결정). 실무적으로 우선순위가 높은 것은 (a) `/api/health` 를 이미 구동 중인
 > uptime-kuma 감시 대상에 등록, (b) uptime-kuma 정의를 저장소 compose 로 끌어와 IaC 화,
-> (c) pino 의 SIGTERM 플러시 핸들러 추가(현재 `sync: false` 라 종료 시 버퍼가 유실될 수 있다).
+> (c) ~~pino 의 SIGTERM 플러시 핸들러 추가~~ — 구현됐다(`src/lib/logger.ts` 가 SIGTERM/SIGINT·치명 오류에서 플러시).
 > 자세한 근거는 [docs/archive/PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md) 3.30 참조.
 
 ---
@@ -810,7 +840,8 @@
 
 - **재사용 컴포넌트**: Button, Input, Select, Dialog 등
 - **복합 컴포넌트**: DataTable, Form, Card 등
-- **테마**: CSS Variables 기반, 다크모드 지원
+- **테마**: CSS Variables 기반 **다크 캔버스 단일 테마**(`docs/DESIGN.md`, `src/app/globals.css`). 라이트/다크
+  전환 기능은 없다
 
 **대안 기술 비교**:
 
@@ -880,21 +911,26 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
 
 | 비교                        | Server Actions                                    | Route Handlers                   |
 | --------------------------- | ------------------------------------------------- | -------------------------------- |
-| **용도**                    | 내부 API (폼 제출, 뮤테이션)                      | 클라이언트 REST 호출, SSE 스트림 |
+| **용도**                    | SR 등록·수정·삭제, 목록·선택지·상세·활동·댓글 조회 | 대부분의 뮤테이션(상태 전이·댓글·첨부·접수·사용자·역할·카테고리·프로필·설정·조직), SSE |
 | **타입 안전성**             | ✅ 완벽한 타입 추론                               | ❌ 수동 타입 정의 필요           |
-| **Progressive Enhancement** | ✅ JavaScript 없이 동작                           | ❌ JavaScript 필요               |
+| **Progressive Enhancement** | 이론상 가능하나 **쓰지 않는다**(모든 폼이 `onSubmit` 핸들러) | ❌ JavaScript 필요     |
 | **인증**                    | auth() 함수 사용                                  | auth() 함수 사용                 |
 | **재사용성**                | Server Component, Client Component 모두 호출 가능 | Client에서만 호출                |
 | **캐싱**                    | Next.js 자동 캐싱                                 | 수동 캐싱 필요                   |
-| **선택 기준**               | **폼 제출, 데이터 뮤테이션 (우선 사용)**          | **REST API, SSE, 헬스체크**      |
+| **실제 분담(2026-09-18)**   | SR 폼·조회 계열                                   | **뮤테이션의 기본 경로**         |
 
-**선택 이유**:
+**실제 분담과 이유** (2026-09-18 정정 — 예전 이 절은 "Server Actions 우선(뮤테이션), Route Handler 는
+조회·SSE·헬스체크" 라고 적었으나 **실제와 반대였다**):
 
-- **Server Actions 우선**: 타입 안전성, Progressive Enhancement
-- **Route Handlers**: React Query 가 호출하는 조회 API(`/api/srs` 등), SSE(`/api/realtime`),
-  푸시 구독(`/api/push`), 첨부파일 다운로드(`/api/attachments/[id]/download`),
-  헬스체크(`/api/health`)
-  — **외부 Webhook 수신 엔드포인트는 없다** (Inngest·Resend 를 채택하지 않았으므로 수신할 것이 없다)
+- **Route Handlers 가 뮤테이션의 기본 경로다**: 상태 전이(`/api/srs/[id]/status`), 댓글, 첨부 업로드·삭제,
+  접수, 사용자 CRUD·활성화, 역할 부여, 서비스 카테고리, 프로필·비밀번호, 조직 재배치 등. 공통 래퍼
+  (`withAuthAndRateLimit`)가 인증·레이트리밋·계측·오류 매핑을 한 곳에서 제공하고, 클라이언트는
+  `src/lib/api-client.ts` 로 부른다. 그 밖에 SSE(`/api/realtime`), 푸시 구독(`/api/push`), 첨부 다운로드,
+  헬스체크(`/api/health`)도 Route Handler 다.
+- **Server Actions**: SR 등록·수정·삭제와, React Query 가 `queryFn` 으로 부르는 일부 조회(SR 상세·활동·댓글,
+  선택지 목록)다(`src/actions/*.actions.ts`, 인증·인가는 `src/lib/action-helpers.ts`).
+- **외부 Webhook 수신 엔드포인트는 없다** (Inngest·Resend 를 채택하지 않았으므로 수신할 것이 없다)
+- 새 기능은 위 분담을 따른다. 어느 쪽이든 인가 판정은 `src/lib/policies.ts` 의 함수를 호출한다(헌법 §1.2).
 
 ### API 설계 원칙
 
@@ -921,22 +957,28 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    - 클라이언트와 서버 모두 검증 (중복 검증)
 
 5. **인증 및 권한**
-   - 모든 API는 기본적으로 인증 필요
+   - 모든 API는 기본적으로 인증 필요(의도적 비인증 예외는 `docs/LLD.md` 'API 엔드포인트 카탈로그' 의 표)
    - RBAC (Role-Based Access Control)
-   - Permission Check: `hasPermission(user, 'sr:read')`
+   - 인가 판정: `src/lib/policies.ts` 의 `can*`/`ensureCan*` 함수를 **호출**한다(예: `ensureCanReadSR(session.user, sr)`).
+     라우트·액션·화면이 역할 문자열을 직접 비교하지 않는다(헌법 §1.2, be-rules §2)
+   - 권한 문자열은 `prisma/permission-catalog.ts` 의 **`RESOURCE:ACTION` 대문자** 표기만 쓴다(예: `SR:READ`).
+     예전 예시의 `hasPermission(user, 'sr:read')` 는 존재하지 않는 서버 API 와 카탈로그에 없는 소문자 표기였다
 
 6. **Rate Limiting** (`src/lib/rate-limiter.ts` — **프로세스 내 메모리**, Redis 미사용)
-   - 미들웨어(`src/proxy.ts`)가 `/api/*` 및 Server Action POST 에 IP 기준으로 적용
+   - 미들웨어(`src/proxy.ts`)가 `/api/*` 및 Server Action POST 에 적용한다. **주 버킷은 세션**(세션 쿠키 해시)이고
+     같은 요청에 **발신 IP 천장**(프리셋 × 배수)을 함께 건다. 세션이 없으면 IP 가 주 버킷이다
+     (`resolveRateLimitKeys`). Server Action 은 `action-helpers` 가 사용자 ID 버킷 + 공유 IP 천장으로,
+     로그인은 `이메일+IP` 조합으로 센다
    - 신뢰 IP 해석: nginx 가 설정하는 `X-Real-IP` 우선, 없으면 `X-Forwarded-For` 의 **마지막** 항목
      (클라이언트가 위조 가능한 첫 항목은 사용하지 않는다)
    - 기본 프리셋(모두 환경 변수로 조정 가능):
      STRICT 5회/분 · STANDARD 100회/분 · RELAXED 300회/분 · FILE_UPLOAD 20회/시간 ·
      MIDDLEWARE 100회/분
-   - 사용자 기준 제한은 구현되어 있지 않다 (1.3 의 "User 기반 500 requests/minute" 은 근거 없음)
+   - 사용자(세션) 기준 제한은 위 주 버킷이 한다. 1.3 의 "User 기반 500 requests/minute" 같은 별도 수치는 없다
 
 7. **캐싱 전략**
    - Next.js Cache: `unstable_cache()` 활용 (TTL 300초)
-   - Revalidation: `revalidateTag()` / `revalidatePath()`
+   - Revalidation: 경로 무효화 `revalidatePath('/srs')` 등. `revalidateTag()` 는 쓰지 않는다
    - 외부 캐시 서버 없음
 
 > **구현 상세**: Server Actions 및 Route Handlers 구현, Validation 스키마는 [LLD.md](LLD.md) 참조
@@ -1022,7 +1064,8 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    - Production 환경 필수
    - nginx 가 TLS 를 종료하고 80 → 443 으로 강제 리다이렉트한다 (`nginx/nginx.conf`)
    - 인증서: Let's Encrypt (`scripts/setup-letsencrypt.sh`). 최초 기동 시에는 자체 서명
-     인증서로 시작한다. **자동 갱신은 아직 구성되어 있지 않다.**
+     인증서로 시작한다. 갱신은 운영 배포가 멱등 설치하는 호스트 cron(`0 3 * * *` `scripts/renew-letsencrypt.sh`)이
+     한다 — `certbot renew` 는 만기 30일 전이 아니면 아무것도 하지 않는다.
    - `ssl_protocols TLSv1.2 TLSv1.3`
 
 4. **CSRF Protection**
@@ -1030,16 +1073,18 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    - SameSite Cookie
 
 5. **XSS Prevention**
-   - React 자동 이스케이프
-   - DOMPurify (HTML 콘텐츠 sanitize)
+   - React 자동 이스케이프. 사용자 HTML 을 렌더링하는 곳이 없다(`dangerouslySetInnerHTML` 0건) — DOMPurify 는
+     쓰지 않고 의존성에도 없다
+   - 이메일 본문은 `email.service.ts` 의 `escapeHtml` 로 값을 이스케이프한다
+   - CSP: `src/proxy.ts` 가 요청별 nonce 로 `script-src 'self' 'nonce-…'` 를 건다(`'unsafe-inline'` 없음)
 
 6. **SQL Injection Prevention**
    - Prisma ORM (Parameterized Query)
 
 7. **권한 관리 (RBAC)**
    - Role-Based Access Control
-   - 각 API는 권한 체크 필수
-   - Permission: `module:action` (예: `sr:create`)
+   - 각 API는 권한 체크 필수 — 판정은 `src/lib/policies.ts` 한 곳(헌법 §1.2)
+   - Permission: `RESOURCE:ACTION` 대문자(예: `SR:CREATE`). 목록의 정본은 `prisma/permission-catalog.ts`
 
 > **구현 상세**: NextAuth 설정, Callback, Middleware 코드는 [LLD.md](LLD.md) 참조
 
@@ -1064,15 +1109,18 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
 
 | 경로 패턴 (STORAGE_DIR 기준)            | 용도          | 접근 방법                                        | 최대 크기      |
 | --------------------------------------- | ------------- | ------------------------------------------------ | -------------- |
-| `attachments/{srId}/{timestamp}-{name}` | SR 첨부파일   | `GET /api/attachments/[id]/download` (인증 필요) | MIME 별 (아래) |
-| `uploads/*` (레거시, `public/` 하위)    | 과거 업로드분 | 동일 라우트의 폴백 조회 경로                     | —              |
+| `attachments/{srId}/{UUID}-{name}`      | SR 첨부파일   | `GET /api/attachments/[id]/download` (인증 필요) | MIME 별 (아래) |
+
+예전 표의 `uploads/*`(레거시, `public/` 하위) 폴백 조회는 공개 정적 서빙으로 인가를 우회할 수 있어 제거했다.
+`STORAGE_DIR` 이 유일한 허용 루트다.
 
 프로필 이미지 전용 저장 경로(`avatars/*`)는 구현되어 있지 않다.
 
 ### 파일 업로드 전략
 
 1. **파일명 규칙**
-   - `attachments/{srId}/{timestamp}-{sanitizedName}`
+   - `attachments/{srId}/{UUID}-{sanitizedName}` — 같은 밀리초·같은 이름도 충돌하지 않도록 UUID 를 쓰고,
+     `wx` 플래그로 써서 기존 파일을 덮어쓰지 않는다. 두 업로드 라우트가 같은 헬퍼(`uploadAttachmentBlob`)를 쓴다
    - `path.basename` → 공백을 `-` 로 → `[^a-zA-Z0-9._-]` 를 `_` 로 치환
    - `srId` 도 `path.basename` 처리하고, 최종 경로가 `STORAGE_DIR` 내부인지 검사한다(경로 탐색 차단)
 
@@ -1092,18 +1140,19 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    | PPT(X)               | 50MB |
    | ZIP, RAR, 7Z         | 50MB |
 
-   경로상의 다른 상한도 함께 고려해야 한다: nginx `client_max_body_size 50m`,
-   Server Action 본문 `bodySizeLimit: '2mb'`.
+   경로상의 다른 상한도 함께 고려해야 한다: 파일당·요청당 절대 상한 `MAX_UPLOAD_FILE_SIZE`(50MB, `formData()` 전
+   Content-Length 로 413), nginx `client_max_body_size 50m`, Server Action 본문 `bodySizeLimit: '2mb'`.
+   화면(첨부 영역·SR 등록/수정 폼)은 이보다 좁은 **10MB** 에서 먼저 막는다.
 
 4. **권한**
    - 공개 URL 없음. 다운로드는 인증 라우트만 제공
    - 업로드는 서버에서만 수행 (클라이언트 직접 업로드 토큰 없음)
 
 5. **파일 관리** (`src/lib/storage.ts`)
-   - 업로드: `uploadAttachmentBlob(srId, file)` → `fs.promises.writeFile`
+   - 업로드: `uploadAttachmentBlob(srId, file)` → `fs.promises.writeFile(…, { flag: 'wx' })`
    - 삭제: `deleteAttachmentBlob(pathname)` → `fs.promises.unlink`
-   - 경로 해석: `resolveAttachmentFilePath()` (신규 경로 → 레거시 경로 폴백, containment 검사)
-   - `listAttachmentBlobs()` 는 **미구현 스텁**이다 (빈 배열 반환 + 경고 로그)
+   - 경로 해석: `resolveAttachmentFilePath()` (`STORAGE_DIR` 안에 있고 실제로 존재하는 파일만, containment 검사)
+   - 예전의 스텁 `listAttachmentBlobs()` 는 삭제됐다
 
 6. **파일 삭제**
    - SR 삭제는 논리 삭제라 첨부 레코드와 서버 파일이 남는다. 삭제된 SR 의 첨부는 다운로드·삭제 라우트가 모두 `SR_ALIVE` 로 SR 을 찾으므로 앱에서 열거나 지울 수 없다. 정리 배치는 아직 없다(`.gemini/rules/db-rules.md` §2)
@@ -1130,30 +1179,35 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
 
 | 채널            | 구현                                                  | 발송 조건                           |
 | --------------- | ----------------------------------------------------- | ----------------------------------- |
-| **이메일**      | nodemailer (SMTP)                                     | 사용자별 `notification_preferences` |
-| **웹 푸시**     | web-push (VAPID)                                      | 브라우저 구독자                     |
+| **이메일**      | nodemailer (SMTP)                                     | 사용자별 `notification_preferences`. 단 **완료·거절은 설정과 무관한 필수 알림**(헌법 §4) |
+| **웹 푸시**     | web-push (VAPID)                                      | 브라우저 구독 **그리고** 유형별 푸시 설정(`pushSRCreated` 등)이 켜진 사용자 |
 | **실시간 갱신** | 자체 SSE `GET /api/realtime` (Node `EventEmitter`)    | 접속 중인 인증 사용자               |
 | ~~인앱 알림~~   | **미구현** (알림 벨·인박스·`/api/notifications` 없음) | —                                   |
 | ~~SMS~~         | **미구현** (ENUM·코드 모두 없음)                      | —                                   |
 
 ### 알림 트리거 (실측)
 
-도메인 이벤트는 `prisma.$transaction` 래퍼가 **커밋 이후에** 디스패치하고
-(`src/lib/prisma.ts:33-58`), `src/services/listeners/sr-notification.listener.ts` 가 수신한다.
+이메일은 도메인 쓰기와 **같은 트랜잭션 안에서** `src/services/sr-email-outbox.ts` 가 수신자를 정해 아웃박스에
+적재한다. 웹 푸시는 `prisma.$transaction` 래퍼가 **커밋 이후에** 디스패치하는 도메인 이벤트를
+`src/services/listeners/sr-notification.listener.ts` 가 받아 보낸다(`src/lib/prisma.ts` 의 `$transaction` 래퍼).
 
-| 도메인 이벤트       | 알림 대상 | 채널             | 기본 이메일 발송 여부                 |
-| ------------------- | --------- | ---------------- | ------------------------------------- |
-| `sr:created`        | 관리자    | 웹 푸시 + 이메일 | 기본 ON (`emailSRCreated`)            |
-| `sr:status_changed` | 요청자    | 웹 푸시 + 이메일 | 기본 **OFF** (`emailSRStatusChanged`) |
-| `sr:assigned`       | 담당자    | 웹 푸시 + 이메일 | 기본 ON (`emailSRAssigned`)           |
+| 트리거              | 알림 대상                     | 채널             | 이메일 발송 조건                      |
+| ------------------- | ----------------------------- | ---------------- | ------------------------------------- |
+| `sr:created`        | 활성 ADMIN·MANAGER 전원       | 웹 푸시 + 이메일 | 설정 `emailSRCreated`(기본 ON)        |
+| `sr:status_changed` | 신청자                        | 웹 푸시 + 이메일 | **완료·거절: 설정과 무관하게 항상 발송(필수 알림, `MANDATORY_STATUSES`)**. 나머지(접수·진행중·보류·확인완료): 설정 `emailSRStatusChanged`(기본 OFF) |
+| `sr:assigned`       | 새 담당자                     | 웹 푸시 + 이메일 | 설정 `emailSRAssigned`(기본 ON)       |
+| 댓글 작성(라우트)   | 작성자를 뺀 신청자·담당자     | 웹 푸시 + 이메일 | 설정 `emailCommentAdded`(기본 OFF). 내부 노트는 신청자 제외 |
 
 SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted` / `sr:commented`.
 각 SSE 연결은 `canReadSR()` 로 이벤트를 **연결별 필터링**하여 타 테넌트·미배정 SR 이벤트가
 새어 나가지 않게 하고, 이벤트를 유발한 당사자에게는 에코하지 않는다.
 
-**초기 설계안에 있었으나 구현되지 않은 트리거** (제거하지 않고 미구현으로 명시):
-예상 완료일 임박(D-1/D-3), 만료 초과 알림, Critical SR 관리자 즉시 알림, 댓글 알림 이메일.
-모두 스케줄러 또는 추가 리스너가 필요하며 현재 어느 것도 존재하지 않는다.
+**초기 설계안에 있었으나 채택하지 않은 트리거**:
+
+- 예상 완료일 임박(D-1/D-3)·만료 초과 알림 — **규범 제외(미도입)**. 헌법 §3 이 SLA 임박/초과 능동 경고를
+  규범에서 뺐다(장차 구현할 일이 아니다). SLA 감시는 대시보드·목록 표시로 한다.
+- Critical SR 관리자 즉시 알림 — 미구현. 신규 SR 알림은 우선순위와 무관하게 운영 관리자 전원에게 간다.
+- 댓글 알림 이메일은 **구현되어 있다**(위 표의 댓글 행 — 예전 이 목록에 미구현으로 잘못 올라 있었다).
 
 ### 알림 발송 전략 (현재 상태)
 
@@ -1163,18 +1217,21 @@ SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted`
    푸시 구독 관리
 3. **배치 발송 / 중복 방지 창**: **미구현** (초기 설계안의 "5분 간격 배치", "5분 내 중복 방지" 는
    구현되지 않았다). 디스패처의 배치는 처리량 조절용이며 알림을 묶어 보내지 않는다.
-4. **재시도**: **이메일은 구현되어 있다.** 지수 백오프(1·5·15·60분)로 최대 5회 재시도하고
-   상한 도달 시 `FAILED` dead-letter 로 고정한다(`src/services/notification-outbox.ts`).
+4. **재시도**: **이메일은 구현되어 있다.** 지수 백오프로 재시도하다 **총 시도 횟수** 상한(`MAX_ATTEMPTS`)에
+   이르면 `FAILED` dead-letter 로 고정한다(`src/services/notification-outbox.ts`).
    **웹 푸시는 재시도하지 않는다** — best-effort 채널이며 만료 구독(410/404)만 정리한다.
 5. **발송 이력**: 이메일은 `Notification` 테이블에 `PENDING → SENT | FAILED` 로 축적된다.
    실패 사유는 `failReason`, 시도 횟수는 `attempts` 에 남는다.
    **웹 푸시는 이 테이블에 기록되지 않는다** — 푸시 발송 이력은 여전히 남지 않는다.
+   이메일 이력은 ADMIN 전용 화면 `/settings/outbox` 에서 조회하고 실패 건을 재발송한다. 보존 기간이 지나면
+   디스패처가 지운다(`SENT` 90일 / `FAILED` 1년, 발송 성공 시 본문 즉시 비움 — 헌법 §4.1).
 
 ### 이메일 템플릿
 
 - 서비스 내부의 HTML 문자열 메서드로 작성한다 (`src/services/email.service.ts`).
   **React Email(JSX 템플릿)은 채택되지 않았다.**
-- 구현된 종류: SR 생성, 상태 변경, 할당
+- 구현된 종류(4종): SR 생성, 담당자 배정, 상태 변경(완료 내용·거절 사유를 본문에 싣는다), 댓글 추가
+- 값은 `escapeHtml` 로 이스케이프한다
 - 다국어: 한국어만
 
 > **구현 상세**: `src/services/email.service.ts`, `src/services/push.service.ts`,
@@ -1203,22 +1260,24 @@ SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted`
 
 | 작업               | 트리거                         | 실행 방식                                       | 재시도                     |
 | ------------------ | ------------------------------ | ----------------------------------------------- | -------------------------- |
-| 이메일 발송        | 도메인 이벤트(`sr:created` 등) | 트랜잭션 내 아웃박스 적재 → 디스패처 폴링(30초) | **최대 5회, 1·5·15·60분**  |
+| 이메일 발송        | SR·댓글 쓰기 트랜잭션          | 트랜잭션 내 아웃박스 적재 → 디스패처 폴링(30초) | **지수 백오프, 상한은 `MAX_ATTEMPTS`(총 시도 횟수)** |
 | 웹 푸시 발송       | 동일                           | `backgroundTask` (응답 후, 같은 프로세스)       | **없음**                   |
 | 실시간 이벤트 발행 | 트랜잭션 커밋 후               | `EventEmitter` → SSE 스트림                     | 해당 없음                  |
 
-앱 내부의 유일한 주기 실행은 아웃박스 디스패처(30초 간격)이며, 시간 기반 스케줄러(Cron)는 없다.
-정기 작업은 GitHub Actions 에만 존재한다:
+앱 내부의 유일한 주기 실행은 아웃박스 디스패처(30초 간격, 약 1시간마다 보존 정리)다. 그 밖의 정기 작업은
+호스트 cron(인증서 갱신 — 운영 배포가 멱등 설치)과 GitHub Actions 에 있다:
 
-| 워크플로               | 스케줄                         | 내용                                       |
+| 워크플로·작업          | 스케줄                         | 내용                                       |
 | ---------------------- | ------------------------------ | ------------------------------------------ |
 | `backup.yml`           | `0 18 * * *` (UTC) = KST 03:00 | 서버에서 pg_dump + uploads 백업, 보존 14일 |
-| `scheduled-checks.yml` | `0 0 * * *` (UTC)              | 의존성 점검, 번들 분석, 성능 벤치마크      |
+| `restore-rehearsal.yml` | `0 19 1 * *` (UTC) = KST 2일 04:00 | 최신 백업을 일회용 컨테이너에 복구해 검증 |
+| `scheduled-checks.yml` | `0 0 * * *` (UTC)              | 의존성 점검, 복잡도, 번들 분석 (성능 벤치마크 잡은 2026-08-06 제거) |
 | `prewarm.yml`          | 수동(`workflow_dispatch`)      | 대시보드 캐시 워밍                         |
+| 호스트 cron            | `0 3 * * *`                    | `scripts/renew-letsencrypt.sh` 인증서 갱신 |
 
 ### 재시도 전략
 
-1. **자동 재시도(이메일)**: 아웃박스 디스패처가 지수 백오프(1·5·15·60분)로 최대 5회 재시도한다.
+1. **자동 재시도(이메일)**: 아웃박스 디스패처가 지수 백오프로 재시도한다(상한은 총 시도 횟수).
    상한과 간격의 정본은 `src/services/notification-outbox.ts` 의 `MAX_ATTEMPTS`·`BACKOFF_MINUTES`
    상수이며 이 문서는 숫자를 복제하지 않는다.
 2. **자동 재시도(웹 푸시·그 외 `backgroundTask`)**: 없다. 실패는 `logger.error` 로만 남는다.
@@ -1227,9 +1286,9 @@ SSE 이벤트는 별도 채널이다: `sr:updated` / `sr:created` / `sr:deleted`
 4. **Dead Letter Queue**: 이메일은 `notifications.status = 'FAILED'` + `failReason` 이 DLQ 역할을 한다.
    웹 푸시에는 없다.
 
-> **개선 방향(미구현)**: 알림 신뢰성이 필요하면 DB 기반 outbox 테이블(`Notification` 을
-> PENDING → SENT/FAILED 로 실제 전이시키는 방식) + 폴링 워커가 현재 인프라에 가장 잘 맞는다.
-> 외부 큐 SaaS 는 호스트 밖으로 데이터를 보내지 않는 현 방침과 충돌한다.
+> **경과**: 예전 이 자리의 "개선 방향(미구현) — DB 기반 outbox + 폴링 워커" 는 **2026-08-02 에 이메일에 대해
+> 구현됐다**(위 '이메일 아웃박스'). 남은 것은 웹 푸시의 아웃박스 편입이다. 외부 큐 SaaS 는 호스트 밖으로
+> 데이터를 보내지 않는 현 방침과 충돌한다.
 
 ---
 
@@ -1264,10 +1323,10 @@ Server Component (Page)
 
 | 상태 종류        | 관리 방법                                        | 용도                   |
 | ---------------- | ------------------------------------------------ | ---------------------- |
-| **Server State** | React Query (`@tanstack/react-query` 5.90)       | API 데이터, 캐싱       |
+| **Server State** | React Query (`@tanstack/react-query` v5)         | API 데이터, 캐싱       |
 | **UI State**     | 지역 `useState` + Provider 컴포넌트 / `useToast` | 모달, 사이드바, 토스트 |
-| **Form State**   | React Hook Form (+ Zod resolver)                 | 폼 입력, 검증          |
-| **URL State**    | Next.js Router (searchParams)                    | 필터, 페이지네이션     |
+| **Form State**   | 대부분 `useState` 기반 훅(`use-create-sr-form.ts` 등) + 제출 시 Zod 검증. React Hook Form(+ Zod resolver)은 접수 폼(`use-intake-form.ts`)만 | 폼 입력, 검증 |
+| **URL State**    | Next.js Router (searchParams) — SR 목록(`srs/page.tsx`·`SRsDataTable`)과 사용자 목록만. 고객사 목록 등은 아직 지역 state(`.gemini/rules/fe-rules.md` §1) | 필터, 페이지네이션 |
 
 > **정정**: 1.3 은 UI State 를 **Zustand** 로 기술했으나 **Zustand 는 설치되어 있지 않다**
 > (`package.json` 에 없고 소스에서 import 하는 곳도 없다). 전역 상태 라이브러리 없이
@@ -1278,9 +1337,9 @@ Server Component (Page)
 **선택 이유**:
 
 - **React Query**: 캐싱, 자동 재페칭, 무한 스크롤(`src/hooks/use-sr-infinite.ts`)
-- **전역 상태 라이브러리 미도입**: 서버 상태는 React Query 가, 폼 상태는 React Hook Form 이,
-  목록 필터는 URL 이 이미 담당하므로 남는 전역 UI 상태가 라이브러리를 정당화할 만큼 없었다
-- **React Hook Form**: 성능 우수, Zod 통합 (`@hookform/resolvers`)
+- **전역 상태 라이브러리 미도입**: 서버 상태는 React Query 가, 폼 상태는 화면별 훅이, 목록 필터는 URL
+  또는 화면 지역 state 가 담당하므로 남는 전역 UI 상태가 라이브러리를 정당화할 만큼 없었다
+- **React Hook Form**: Zod 통합(`@hookform/resolvers`). 현재는 접수 폼 한 곳에서만 쓴다
 
 ### 라우팅 전략
 
@@ -1292,12 +1351,16 @@ app/
 │   ├── login/
 │   └── register/
 ├── (dashboard)/               # 인증 필요 페이지
-│   ├── sr/
-│   │   ├── page.tsx          # SR 목록
-│   │   ├── [id]/page.tsx     # SR 상세
-│   │   └── new/page.tsx      # SR 생성
-│   ├── clients/
-│   └── settings/
+│   ├── dashboard/
+│   ├── srs/
+│   │   ├── page.tsx          # SR 목록 (서버 컴포넌트)
+│   │   └── [id]/
+│   │       ├── page.tsx      # SR 상세
+│   │       └── intake/       # 접수
+│   ├── my-requests/          # 내 요청 (SR 등록은 별도 페이지가 아니라 다이얼로그)
+│   ├── clients/  users/  roles/  organization/
+│   ├── company/users/        # 자사 사용자 (CLIENT_ADMIN)
+│   └── settings/             # profile, notifications, system(ADMIN), outbox(ADMIN)
 └── api/                       # Route Handlers (REST API, SSE, 헬스체크)
     ├── auth/
     ├── srs/
@@ -1312,13 +1375,7 @@ app/
 - `[id]`: SR 상세 페이지
 - `[...slug]`: Catch-all 라우팅 (선택 사항)
 
-**Parallel Routes** (선택 사항):
-
-- 모달 구현: `@modal` 폴더
-
-**Intercepting Routes** (선택 사항):
-
-- 모달 인터셉트: `(.)sr/[id]`
+**Parallel Routes / Intercepting Routes**: 쓰지 않는다(모달은 다이얼로그 컴포넌트로 구현한다).
 
 > **구현 상세**: 컴포넌트 코드, 상태 관리 코드는 [LLD.md](LLD.md) 참조
 
@@ -1353,7 +1410,7 @@ app/
    - **Router Cache**: 클라이언트 사이드 캐싱
 
 2. **애플리케이션 캐시** (Redis 아님 — 프로세스 내 메모리)
-   - `unstable_cache` 로 사용자 목록·고객사 목록 캐싱 (`src/lib/cache.ts`)
+   - `unstable_cache` 로 배정 가능 사용자(`id`·`name`)·활성 고객사(스코프 인자 필수) 캐싱 (`src/lib/cache.ts`)
    - TTL: 300초
    - 컨테이너 재시작 시 소실된다
 
@@ -1362,28 +1419,25 @@ app/
    - **CDN 은 없다.** 모든 요청이 단일 호스트의 nginx 를 거친다.
 
 4. **Cache Invalidation**
-   - Tag-based Revalidation: `revalidateTag('sr-list')`
-   - Time-based Revalidation: `revalidatePath('/sr')`
-   - On-demand Revalidation: 데이터 변경 시
+   - 경로 무효화: 데이터 변경 시 `revalidatePath('/srs')` 등(`src/actions/sr.actions.ts`)
+   - 시간 기반: `unstable_cache` 의 `revalidate: 300`
+   - 태그 기반 무효화(`revalidateTag`)는 쓰지 않는다
 
 ### 번들 최적화
 
 1. **Code Splitting**
-   - Dynamic Import: `next/dynamic`
-   - 모달, 차트 등 무거운 컴포넌트
+   - Dynamic Import: `next/dynamic`(레이아웃의 무거운 클라이언트 컴포넌트 일부 — `Header`, `ClientLayout`)
+   - 차트 라이브러리는 없다(대시보드 차트 제거)
 
 2. **Tree Shaking**
-   - ESM import/export
-   - `sideEffects: false` (package.json)
+   - ESM import/export. `package.json` 에 `sideEffects` 선언은 **없다**
+   - `components/ui` 는 배럴 import 를 쓴다(`.gemini/rules/fe-rules.md` §1.2)
 
 3. **Image Optimization**
-   - Next.js Image Component
-   - WebP 변환, lazy loading
-   - Responsive images
+   - `next/image` 를 쓰는 곳이 없다(이미지 자산이 거의 없다). 도입하면 자체 서버의 이미지 최적화 캐시를 함께 고려한다
 
 4. **Font Optimization**
-   - `next/font` 사용
-   - 폰트 서브셋팅
+   - 웹폰트를 로드하지 않는다(`next/font` 선언 없음 — 시스템 폰트). 도입은 별도 결정이다(`.gemini/rules/fe-rules.md` §3.3)
 
 ### 데이터베이스 최적화
 
@@ -1399,9 +1453,10 @@ app/
    - 없음. 단일 PostgreSQL 컨테이너다. (초기 설계안의 외부 관리형 데이터베이스 서비스 읽기 복제본은 미채택)
 
 4. **느린 쿼리 관측**
-   - 개발 환경에서만 Prisma 미들웨어가 `PRISMA_SLOW_MS`(기본 200ms) 초과 쿼리를 경고하고,
-     `PRISMA_SLOW_LOG_FILE` 지정 시 파일로 남긴다. 집계는 `pnpm report:slow-queries`.
-   - **프로덕션에는 느린 쿼리 로깅이 없다** (`log: ['error']`).
+   - **프로덕션 포함 전 환경에서** Prisma Client Extension(`$extends` → `$allOperations`)이 `PRISMA_SLOW_MS`
+     (기본 200ms) 이상 쿼리를 `warn` 로그로 남기고, `PRISMA_SLOW_LOG_FILE` 지정 시 파일로도 남긴다.
+     집계는 `pnpm report:slow-queries`. 프로덕션 로거는 `warn` 을 출력한다(`.gemini/rules/db-rules.md` §4).
+   - Prisma 의 `log` 옵션(`['error']`, 개발은 `query` 포함)은 이와 별개다.
 
 > **구현 상세**: 캐싱 코드, 최적화 설정은 [LLD.md](LLD.md) 참조
 
@@ -1413,15 +1468,18 @@ app/
 
 | 테스트 종류          | 도구                                | 범위                    | 목표 커버리지 |
 | -------------------- | ----------------------------------- | ----------------------- | ------------- |
-| **Unit Test**        | Vitest 4.0                          | 유틸 함수, 헬퍼, 서비스 | 80%           |
-| **Integration Test** | Vitest (+ 실제 PostgreSQL 컨테이너) | Server Actions, API     | 70%           |
-| **E2E Test**         | Playwright 1.58                     | 주요 사용자 흐름, RBAC  | 주요 시나리오 |
+| **Unit Test**        | Vitest                              | 유틸 함수, 헬퍼, 서비스 | 80%           |
+| **Integration Test** | Vitest `integration` 프로젝트 (+ 실제 PostgreSQL) | 채번·테넌트 격리·트랜잭션 원자성 (`tests/integration/`) | — |
+| **E2E Test**         | Playwright                          | 주요 사용자 흐름, RBAC  | 주요 시나리오 |
 | **Component Test**   | Vitest + Testing Library            | React 컴포넌트          | 60%           |
-| **Mutation Test**    | Stryker 9.5.1                       | 변경된 파일 (PR 에서만) | —             |
+| **Mutation Test**    | Stryker                             | 변경된 파일 (PR 에서만) | —             |
 
-**실측값 (2026-07-30)**: statements 커버리지 **41.27%**, 뮤테이션 점수 **49.64%**.
-위 "목표 커버리지" 는 목표치이며 현재 달성값이 아니다. 두 수치의 격차와 커버리지 게이트의
-측정 범위 문제는 [docs/archive/PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md) 3.33 참조.
+도구 버전의 정본은 `package.json` 이다.
+
+**현재 게이트와 실측(2026-09-18)**: 커버리지 게이트(`vitest.config.ts` 의 `coverage.thresholds`)는
+statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실측은 statements 82.96% 다.
+위 "목표 커버리지" 열은 초기 설계안의 목표치라 게이트와 1:1 이 아니다 — 판정은 게이트 값으로 한다.
+(2026-07-30 에는 statements 41.27%, 뮤테이션 49.64% 였다 — [docs/archive/PROJECT_AUDIT_2026-07-29.md](archive/PROJECT_AUDIT_2026-07-29.md) 3.33.)
 
 ### Vitest 선택 이유
 
@@ -1432,7 +1490,8 @@ app/
 
 ### Playwright 선택 이유
 
-- **크로스 브라우저**: Chromium, Firefox, WebKit
+- **크로스 브라우저 지원**: Chromium, Firefox, WebKit 을 지원하지만 이 저장소는 **Chromium 만 돌린다**
+  (firefox/webkit/Mobile Chrome 프로젝트는 어디서도 실행되지 않던 채로 제거했다)
 - **자동 대기**: 요소 준비 대기 자동
 - **병렬 실행**: 빠른 테스트
 - **UI 모드**: 디버깅 편리
@@ -1464,8 +1523,9 @@ app/
 
 - **트리거**: `main` / `dev` 브랜치 push 및 두 브랜치를 향한 PR.
   `paths-ignore: ['**.md', 'docs/**']` — **문서만 수정하면 CI 도 배포도 돌지 않는다.**
-- **잡 구성**: `code-quality`(ESLint + `tsc --noEmit`) / `test`(커버리지 게이트) /
-  `mutation-test`(PR 전용) / `build` / `e2e-test` / `security`(gating `pnpm audit --prod
+- **잡 구성**: `code-quality`(ESLint + `tsc --noEmit` + knip 데드 코드 + E2E 단언 검사 + Actions SHA 고정 검사) /
+  `test`(마이그레이션·드리프트·시드 + 커버리지 게이트) / `mutation-test`(PR 전용) / `build` / `e2e-test` /
+  `docker-build`(PR 전용, 푸시 없이 이미지 빌드만) / `security`(gitleaks + gating `pnpm audit --prod
 --audit-level=critical` + Trivy 리포트) / `deployment-ready`
 - **E2E 범위**: push(`main`·`dev`)와 PR 모두 같은 전체 선택을 실행한다(dev→main PR 은 같은
   커밋의 push(`dev`) 실행과 겹쳐 건너뛴다 — 병합 트리의 검증은 병합 뒤 push(`main`) E2E 로 미뤄진다). PR 보안·권한
@@ -1486,8 +1546,8 @@ app/
 > **⚠️ 이 절은 전면 정정되었다(2026-07-30).**
 > 1.3 은 Vercel 배포, PR별 Preview 환경(`sr-*.vercel.app`), Vercel Dashboard 환경 변수 관리,
 > Vercel 자동 Blue-Green 무중단 배포, Dashboard Rollback 을 규정했다.
-> **모두 사실이 아니다.** 실제는 GHCR 이미지 + SSH + `docker compose up --force-recreate` 이며,
-> **무중단 배포가 아니다**(컨테이너를 내리고 다시 올린다). 아래는
+> **모두 사실이 아니다.** 실제는 GHCR 이미지 + SSH + `docker compose` 재생성이다. 운영은 앱 컨테이너만
+> 교체하고(짧은 교체 순간만 끊긴다) 스테이징은 내리고 다시 올린다 — 어느 쪽도 무중단 배포는 아니다. 아래는
 > `.github/workflows/{ci-cd,deploy}.yml`, `Dockerfile`, `docker-compose.prod.yml`,
 > `nginx/nginx.conf` 실측 기준이다.
 
@@ -1497,7 +1557,7 @@ app/
 | --------------- | ------------ | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
 | **Development** | 로컬 개발    | `pnpm dev`                                                             | `http://localhost:3000`                                     |
 | **Staging**     | `dev` 브랜치 | `:dev` 이미지 → `docker-compose.test.yml` (compose 프로젝트 `sr-test`) | `https://test.lkindo.kr`                                    |
-| **Production**  | 운영         | `:latest` 이미지 → `docker-compose.prod.yml`                           | `https://sr.lkindo.kr` (그 외 `lkindo.kr`, `www.lkindo.kr`) |
+| **Production**  | 운영         | 커밋 SHA 태그 이미지(`APP_IMAGE_TAG`) → `docker-compose.prod.yml`      | `https://sr.lkindo.kr` (그 외 `lkindo.kr`, `www.lkindo.kr`) |
 
 **PR 단위 Preview 환경은 없다.** 운영과 스테이징이 **같은 VM·같은 Docker 데몬·같은 디렉터리
 (`/home/opc/sr`)** 를 공유하므로, `deploy.yml` 의 concurrency 그룹이 두 배포를 직렬화한다.
@@ -1512,15 +1572,18 @@ app/
        ↓
 ┌────────────────────────────────────────────┐
 │  워크플로: CI/CD Pipeline (ci-cd.yml)      │
-│   code-quality : ESLint + tsc --noEmit     │
+│   code-quality : ESLint + tsc + knip        │
+│                  + E2E 단언 + SHA 고정 검사 │
 │   test         : postgres:16-alpine 서비스  │
 │                  migrate deploy → drift    │
 │                  → seed → 커버리지 게이트   │
 │   mutation-test: Stryker (PR 에서만)        │
 │   build        : pnpm build (standalone)    │
-│   e2e-test     : Playwright                 │
-│                  (main=전체 / PR=보안 서브셋)│
-│   security     : pnpm audit(게이트) + Trivy  │
+│   e2e-test     : Playwright 전체 스위트      │
+│                  (push main·dev, PR)        │
+│   docker-build : 이미지 빌드 확인(PR 전용)   │
+│   security     : gitleaks + pnpm audit(게이트)│
+│                  + Trivy                    │
 └──────┬─────────────────────────────────────┘
        │ conclusion == success && event == push
        ↓ (workflow_run 트리거)
@@ -1528,21 +1591,29 @@ app/
 │  워크플로: Deploy (deploy.yml)              │
 │  1. CI 통과 커밋(head_sha)을 체크아웃        │
 │  2. Docker 이미지 빌드 → GHCR push          │
-│       main → :latest  /  dev → :dev         │
+│       main → :latest / dev → :dev + SHA 태그│
 │  3. scp: compose·nginx.conf·스크립트 전송   │
-│  4. ssh: GitHub Secrets → 서버 .env 기록    │
+│  4. ssh: Secrets → .env.docker·.env.prod    │
+│       (스테이징 .env.docker.test·.env.staging)│
+│       레거시 .env 는 쓰지 않는다            │
 │       (시크릿 비면 컨테이너 손대지 않고 중단)│
 │  5. ssh: compose config -q 로 보간 검증      │
-│  6. ssh: pull → down → up --force-recreate  │
-│  7. ssh: 컨테이너 running 검증 (실패 시 exit)│
-│  8. ssh: Let's Encrypt 스크립트, 이미지 prune│
+│  6. 운영: nginx -t → 롤백 지점 → 배포 전 백업│
+│       → pull → 앱만 재생성(down 없음)        │
+│     스테이징: pull → down → up --force-recreate│
+│  7. ssh: healthy 대기(240초). 운영은 실패 시 │
+│       마이그레이션 수 불변일 때만 자동 롤백  │
+│  8. 운영: Let's Encrypt·갱신 cron, 7일 prune │
 └──────┬─────────────────────────────────────┘
        │
        ↓ 컨테이너 기동
 ┌────────────────────────────────────────────┐
 │  docker-entrypoint.sh                      │
-│   prisma migrate deploy (실패 시 0_init     │
-│   베이스라인 후 재시도) → node server.js    │
+│   prisma migrate deploy (실패 = 부팅 실패.  │
+│   P3005 + ALLOW_PRISMA_BASELINE=1 일회성만  │
+│   0_init 베이스라인) → node seed.bundle.cjs │
+│   (기준 데이터, 실패 = 부팅 실패)           │
+│   → node server.js                         │
 └────────────────────────────────────────────┘
 ```
 
@@ -1550,12 +1621,15 @@ app/
 
 1. **자동 배포**: `main` push → CI 성공 → 운영 배포. `dev` push → CI 성공 → 스테이징 배포.
 2. **Preview 배포**: **없다.** PR 은 CI(E2E 전체 선택 포함, dev→main PR 은 제외 — 위 "E2E 범위")만 통과시키고 환경을 만들지 않는다.
-3. **Rollback**: 대시보드가 없다. GHCR 의 이전 이미지 태그/다이제스트로 되돌린 뒤 서버에서
-   `docker compose up -d --force-recreate` 를 수동 실행한다.
-   **DB 마이그레이션은 되돌아가지 않는다**(엔트리포인트가 전진만 한다).
-4. **무중단 배포 아님**: `down` → `up --force-recreate` 사이에 짧은 다운타임이 있다.
-   이름 충돌로 인한 "성공 보고 + 미교체" 를 막기 위해 동명 컨테이너를 강제 제거한 뒤 재생성하며,
-   `docker ps` 로 실제 running 여부를 검증해 실패 시 배포를 실패로 처리한다.
+3. **Rollback**: 운영은 새 이미지가 healthy 가 되지 못하면 **마이그레이션 수가 배포 전과 같을 때만** 이전
+   이미지(ID 로 기록한 롤백 지점)로 자동 롤백한다. 수동 롤백은 `.env.prod` 의 `APP_IMAGE_TAG` 를 이전 커밋
+   SHA 로 바꿔 앱만 재생성한다(이미지는 7일 보존). **DB 마이그레이션은 되돌아가지 않는다**(엔트리포인트가 전진만
+   한다) — 마이그레이션이 적용된 뒤라면 배포 전 백업으로 복구할지 먼저 판단한다. 절차의 정본은
+   `docs/SERVER_RUNBOOK_2026-08-01.md` 5절이다.
+4. **무중단 배포 아님**: 운영은 `down` 없이 앱 컨테이너만 재생성하므로 nginx·DB 는 계속 떠 있고 앱 교체
+   순간만 끊긴다. 스테이징은 `down` → `up --force-recreate` 라 그 사이 다운타임이 있고, 이름 충돌로 인한
+   "성공 보고 + 미교체" 를 막기 위해 동명 컨테이너를 강제 제거한 뒤 재생성한다. 두 환경 모두 running 이 아니라
+   **healthy** 를 기다려 실패 시 배포를 실패로 처리한다.
 5. **데이터 보존**: DB(`sr_db_data`)와 첨부파일(`sr_uploads`)은 named volume 이므로
    컨테이너 재생성으로 유실되지 않는다. nginx 인증서는 bind-mount 로 유지된다.
 
@@ -1579,8 +1653,9 @@ app/
   데이터 유실·운영 계정 초기화 위험 때문에 제거되었다.
 - **CI 사전 검증**: 모든 push/PR 이 빈 DB 에 마이그레이션을 적용하고 `migrate diff` 로
   `schema.prisma` 와의 드리프트를 검사한다.
-- **Rollback**: 자동화되어 있지 않다. 역방향 마이그레이션을 손으로 작성해야 한다(Prisma 한계).
-  복구 경로는 `scripts/restore.sh` + 최근 백업이다.
+- **Rollback**: DB 마이그레이션의 되돌림은 자동화되어 있지 않다. 역방향 마이그레이션을 손으로 작성해야 한다
+  (Prisma 한계). 복구 경로는 `scripts/restore.sh` + 최근 백업(운영 배포는 직전에 백업한다)이다. **앱** 이미지의
+  자동 롤백은 있지만 마이그레이션 수가 그대로일 때만 수행한다(`docs/SERVER_RUNBOOK_2026-08-01.md` 5절).
 
 > **구현 상세**: `.github/workflows/ci-cd.yml`, `.github/workflows/deploy.yml`,
 > `docker-compose.prod.yml`, `docker-entrypoint.sh`, [docs/SECRET_ROTATION.md](SECRET_ROTATION.md) 참조
@@ -1616,8 +1691,8 @@ minLength: 4096 })`.
 - **수집·보관**: Docker `json-file` 드라이버가 컨테이너별로 **3 × 10MB** 로테이션
   (`docker-compose.prod.yml`). 그 이상 오래된 로그는 사라진다.
   **호스트 밖으로 전송되지 않으며, 중앙 검색·쿼리·대시보드가 없다.**
-- **알려진 결함**: `sync: false` 인데 `pino.final` / SIGTERM 플러시 핸들러가 등록되어 있지 않다
-  → 컨테이너 종료 시 버퍼에 남은 로그가 유실될 수 있다(개선 대상).
+- **종료 시 플러시**: `sync: false` 라 버퍼링하므로 `src/lib/logger.ts` 가 SIGTERM/SIGINT 와 치명 오류에서
+  버퍼를 플러시한다(예전 이 자리의 "플러시 핸들러 없음" 결함은 해소됐다. `pino.final` 은 pino 10 에서 제거된 API 다).
 
 **로그 구조** (`LogEntry`):
 
@@ -1649,15 +1724,18 @@ minLength: 4096 })`.
   관리되므로 저장소만 읽는 정적 분석·리뷰로는 보이지 않는다.
 - **미확인**: 어떤 대상을 감시하는지, 알림 채널이 무엇인지는 저장소 기준으로 확인할 수 없다.
 - 앱 측 준비물: `GET /api/health` 가 `SELECT 1` 로 DB 연결을 확인하고 실패 시 503 을 반환한다.
-  Dockerfile `HEALTHCHECK` 와 compose `app` 서비스의 `healthcheck:` 는 없다.
+  Dockerfile `HEALTHCHECK` 와 compose `app` 서비스의 `healthcheck:` 가 이 엔드포인트를 부르고, 운영 배포의
+  헬스 게이트·자동 롤백이 그 결과를 기다린다.
 
 ### 없는 것 (명시)
 
 - APM / 분산 트레이싱 (OpenTelemetry 등)
 - 메트릭 수집·시계열 저장 (Prometheus 등)
 - RUM / Web Vitals 실사용자 수집 (Vercel Analytics 미채택)
-- 프로덕션 느린 쿼리 로깅 (개발 환경 전용)
 - 로그 중앙 집계 및 장기 보관
+
+(느린 쿼리 로깅은 **있다** — 프로덕션 포함 전 환경에서 `warn` 로그로 남긴다. 예전 이 목록에 "개발 환경 전용" 으로
+잘못 올라 있었다. `.gemini/rules/db-rules.md` §4.)
 
 ### 로깅 원칙
 
@@ -1728,9 +1806,9 @@ minLength: 4096 })`.
 ### 벤치마크 계획 (현재 실행 상태 병기)
 
 1. **정기 성능 테스트**
-   - `scheduled-checks.yml` 이 매일 번들 분석(`ANALYZE=true pnpm build`)과
-     `src/__tests__/performance/benchmark.test.ts` 를 실행한다. 단 `|| true` 로 감싸여 있어
-     **실패해도 워크플로를 막지 않는다**(게이트가 아니라 리포트).
+   - `scheduled-checks.yml` 이 매일 번들 분석(`ANALYZE=true pnpm build`)을 실행한다(리포트, 게이트 아님).
+     예전에 함께 돌던 `src/__tests__/performance/benchmark.test.ts` 성능 잡은 **2026-08-06 에 제거했다**
+     (벽시계 측정이라 러너 잡음에 좌우돼 신호가 없었다 — 워크플로 주석 참조). 정기 성능 테스트는 현재 없다.
    - Lighthouse CI: **미구성**
    - 운영 API 응답 시간 모니터링: **수단 없음** (Axiom 미채택)
 
@@ -1740,7 +1818,7 @@ minLength: 4096 })`.
 
 3. **데이터베이스 성능 테스트**
    - **미수행.** 1만 건 규모 데이터셋 생성 스크립트가 없다.
-   - 개발 환경 느린 쿼리 로그(`PRISMA_SLOW_MS`)와 `pnpm report:slow-queries` 로 개별 쿼리를
+   - 느린 쿼리 로그(`PRISMA_SLOW_MS`, 프로덕션 포함)와 `pnpm report:slow-queries` 로 개별 쿼리를
      들여다보는 수준까지만 가능하다.
 
 4. **최적화 우선순위**
@@ -1750,8 +1828,7 @@ minLength: 4096 })`.
    - **선행 과제**: 위 판단을 하려면 먼저 측정 수단이 있어야 한다. 관측성 공백 해소가
      성능 최적화보다 앞선다.
 
-> **구현 상세**: `.github/workflows/scheduled-checks.yml`,
-> `src/__tests__/performance/benchmark.test.ts`, [LLD.md](LLD.md) 참조
+> **구현 상세**: `.github/workflows/scheduled-checks.yml`, [LLD.md](LLD.md) 참조
 
 ---
 
