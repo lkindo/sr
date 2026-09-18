@@ -171,3 +171,39 @@ describe('ClientUsersSheet — 실패', () => {
     expect(screen.getByText('등록된 사용자가 없습니다.')).toBeInTheDocument();
   });
 });
+
+/**
+ * 담당 엔지니어가 사용자 배지를 누른 경우 — 서버가 명부를 빈 배열로 주고 viewerScope='assigned' 를
+ * 싣는다(헌법 §1.2). 시트가 그것을 "등록된 사용자가 없습니다" 로 말하면 사실과 다르다.
+ */
+describe('ClientUsersSheet — 명부를 받지 않는 사람', () => {
+  it('서버가 명부를 숨겼으면 "사용자 없음" 대신 숨겼다는 안내를 보인다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okResponse({ id: 'cl-1', users: [], viewerScope: 'assigned' }))
+    );
+    const { wrapper } = setup();
+
+    render(<ClientUsersSheet {...baseProps} open />, { wrapper });
+
+    expect(
+      await screen.findByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('등록된 사용자가 없습니다.')).not.toBeInTheDocument();
+  });
+
+  it('명부를 받는 사람에게 빈 명부는 여전히 "사용자 없음" 이다', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(okResponse({ id: 'cl-1', users: [], viewerScope: 'all' }))
+    );
+    const { wrapper } = setup();
+
+    render(<ClientUsersSheet {...baseProps} open />, { wrapper });
+
+    expect(await screen.findByText('등록된 사용자가 없습니다.')).toBeInTheDocument();
+    expect(
+      screen.queryByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).not.toBeInTheDocument();
+  });
+});

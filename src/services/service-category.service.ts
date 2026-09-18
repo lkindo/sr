@@ -315,10 +315,20 @@ export class ServiceCategoryService {
     }
 
     // 참조 무결성 확인
+    //
+    // 판정은 전체 SR 기준이다 — 삭제된(soft delete) SR 도 service_category_id FK 로 이 카테고리를
+    // 가리키므로(db-rules §2 예외). 삭제된 건수는 문구에만 쓴다. 고객사 화면은 삭제된 SR 을
+    // 보여 주지 않으므로, 그 사실을 밝히지 않으면 숫자가 화면과 어긋나 보인다.
     if (existing._count.srs > 0) {
+      const deletedSrs = await prisma.sR.count({
+        where: { serviceCategoryId: id, deletedAt: { not: null } },
+      });
+      // 예전 문구는 "삭제 대신 비활성화를 사용하세요" 로 끝났지만, 카테고리의 isActive 는 앱의 어떤
+      // 경로(생성·수정 스키마, 다이얼로그)로도 바꿀 수 없다. 없는 대안을 안내하지 않는다.
       throw new ReferentialIntegrityError(
-        `이 카테고리에 ${existing._count.srs}개의 SR이 연결되어 있습니다. ` +
-          `삭제 대신 비활성화를 사용하세요.`
+        `이 카테고리에 ${existing._count.srs}개의 SR이 연결되어 있어 삭제할 수 없습니다` +
+          (deletedSrs > 0 ? `(삭제된 SR ${deletedSrs}건 포함 — 감사 기록으로 보관 중)` : '') +
+          `.`
       );
     }
 

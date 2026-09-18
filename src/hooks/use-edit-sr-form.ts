@@ -10,6 +10,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
+import { canEditSRContentAt, SR_CONTENT_LOCKED_MESSAGE } from '@/lib/sr-state-machine';
 import type { ClientSummary } from '@/types/client.types';
 import type { SRAttachmentView } from '@/types/sr.types';
 
@@ -46,7 +47,7 @@ export function useEditSRForm({
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { hasAnyRole } = usePermissions();
+  const { hasAnyRole, roles, permissions } = usePermissions();
   const { mutateAsync: updateSR } = useUpdateSR(sr?.id || '');
 
   const isClientUser = hasAnyRole(['CLIENT_ADMIN', 'CLIENT_USER']);
@@ -122,11 +123,10 @@ export function useEditSRForm({
   useEffect(() => {
     if (!open || !sr) return;
 
-    const isAdmin = hasAnyRole(['ADMIN']);
-    if (sr.status !== 'REQUESTED' && !isAdmin) {
+    if (!canEditSRContentAt(sr.status, { roles, permissions })) {
       toast({
         title: '알림',
-        description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
+        description: SR_CONTENT_LOCKED_MESSAGE,
         variant: 'default',
       });
       onOpenChange(false);
@@ -253,11 +253,10 @@ export function useEditSRForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isAdmin = hasAnyRole(['ADMIN']);
-    if (sr.status !== 'REQUESTED' && !isAdmin) {
+    if (!canEditSRContentAt(sr.status, { roles, permissions })) {
       toast({
         title: '오류',
-        description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
+        description: SR_CONTENT_LOCKED_MESSAGE,
         variant: 'destructive',
       });
       return;

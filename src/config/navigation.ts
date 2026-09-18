@@ -104,6 +104,28 @@ export const NAVIGATION_CONFIG: TopNavItem[] = [
     ],
   },
   {
+    // 고객사 관리자 전용(헌법 §1.1 "자사 모든 사용자 관리", 소유자 결정 2026-09-18 D6).
+    // 내부 운영 메뉴('조직 관리')는 내부/외부 경계로 CLIENT_ADMIN 에게 닫혀 있어서, 서버는 자사 사용자
+    // 관리를 허용하는데 화면으로 갈 길이 없었다. 조회·가입 승인/거절·비활성화만 한다(생성·역할 부여 제외).
+    title: '자사 관리',
+    href: '/company/users',
+    icon: Users,
+    roles: ['CLIENT_ADMIN'],
+    sections: [
+      {
+        title: '자사 관리',
+        items: [
+          {
+            title: '자사 사용자',
+            href: '/company/users',
+            icon: Users,
+            role: 'CLIENT_ADMIN',
+          },
+        ],
+      },
+    ],
+  },
+  {
     title: '권한 관리',
     href: '/roles',
     icon: Shield,

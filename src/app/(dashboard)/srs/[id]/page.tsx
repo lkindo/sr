@@ -17,11 +17,13 @@ import {
 
 import { TableSkeleton } from '@/components/loading/TableSkeleton';
 import { DeleteSRDialog } from '@/components/srs/DeleteSRDialog';
+import { DueDateAdjustDialog } from '@/components/srs/DueDateAdjustDialog';
 import { EditSRDialog } from '@/components/srs/EditSRDialog';
 import { IntakeInfoCard } from '@/components/srs/IntakeInfoCard';
 import { SRActivities } from '@/components/srs/SRActivities';
 import { SRAttachments } from '@/components/srs/SRAttachments';
 import { SRComments } from '@/components/srs/SRComments';
+import { SRDueDateField } from '@/components/srs/SRDueDateField';
 import { SRReopenBlockedNotice, SRStatusActions } from '@/components/srs/SRStatusActions';
 import { SRStatusTimeline } from '@/components/srs/SRStatusTimeline';
 import { Badge } from '@/components/ui';
@@ -32,7 +34,12 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { useDeleteSR, useSRDetails } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { priorityLabels, statusLabels } from '@/lib/constants/sr';
-import { getReopenAvailability } from '@/lib/sr-state-machine';
+import {
+  canEditSRContentAt,
+  getReopenAvailability,
+  isSROperator,
+  SR_CONTENT_LOCKED_MESSAGE,
+} from '@/lib/sr-state-machine';
 
 const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
   REQUESTED: 'secondary',
@@ -59,6 +66,7 @@ export default function SRDetailPage() {
   const [activeTab, setActiveTab] = useState('comments');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDueDateDialogOpen, setIsDueDateDialogOpen] = useState(false);
 
   const { toast } = useToast();
   const { hasAnyRole, roles, permissions } = usePermissions();
@@ -100,6 +108,14 @@ export default function SRDetailPage() {
       </div>
     );
   }
+
+  // 접수 이후 SR 내용은 운영자만 고친다(서버: policies.ensureCanEditSRContent 와 같은 판정 함수).
+  // (ENGINEER 가 자기 배정분만 고칠 수 있다는 범위는 이 화면에 들어온 시점에 이미 걸러져 있다.)
+  const canEditContent = canEditSRContentAt(sr.status, { roles: roles || [], permissions });
+  // 마감일 수동 조정은 운영자 소유 값이다(헌법 §3 — 서버: 운영자 필드 규칙 + 사유 필수·비우기 금지).
+  const canAdjustDueDate =
+    ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) &&
+    isSROperator({ roles: roles || [], permissions });
 
   // 재오픈 버튼과 그 아래 안내가 같은 판정을 보도록 한 번만 계산한다.
   // 서버와 같은 규칙(sr-state-machine)이므로 확인완료 SR 은 confirmedAt 을, 담당자·고객사
@@ -214,17 +230,17 @@ export default function SRDetailPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                if (sr.status === 'REQUESTED' || hasAnyRole(['ADMIN'])) {
+                if (canEditContent) {
                   setIsEditDialogOpen(true);
                 } else {
                   toast({
                     title: '알림',
-                    description: "SR 수정은 '요청됨' 상태인 경우에만 가능합니다.",
+                    description: SR_CONTENT_LOCKED_MESSAGE,
                     variant: 'default',
                   });
                 }
               }}
-              disabled={sr.status !== 'REQUESTED' && !hasAnyRole(['ADMIN'])}
+              disabled={!canEditContent}
               className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
               title="수정"
             >
@@ -310,43 +326,15 @@ export default function SRDetailPage() {
                     </p>
                   </div>
                 )}
-                {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) &&
-                  sr.estimatedCompletionDate && (
-                    <div className="col-span-2 md:col-span-1">
-                      <h3 className="text-xs md:text-sm font-medium text-muted-foreground">
-                        SLA 마감일
-                      </h3>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <span className="text-sm">
-                          {new Date(sr.estimatedCompletionDate).toLocaleDateString('ko-KR')}
-                        </span>
-                        {(() => {
-                          const days = Math.ceil(
-                            (new Date(sr.estimatedCompletionDate).getTime() -
-                              new Date().getTime()) /
-                              (1000 * 60 * 60 * 24)
-                          );
-                          const variant =
-                            days < 0
-                              ? 'destructive'
-                              : days <= 1
-                                ? 'destructive'
-                                : days <= 3
-                                  ? 'secondary'
-                                  : 'default';
-                          const label = days <= 0 ? '지연' : `${days}일 남음`;
-                          return (
-                            <Badge
-                              variant={variant}
-                              className="h-4 px-1 text-[10px] md:h-5 md:px-2"
-                            >
-                              {label}
-                            </Badge>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  )}
+                {['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) && (
+                  <SRDueDateField
+                    dueDate={sr.dueDate}
+                    dueDateManual={sr.dueDateManual}
+                    status={sr.status}
+                    canAdjust={canAdjustDueDate}
+                    onAdjust={() => setIsDueDateDialogOpen(true)}
+                  />
+                )}
 
                 {/* Attachment Summary Inline for Mobile */}
                 <div>
@@ -416,6 +404,16 @@ export default function SRDetailPage() {
       </div>
 
       {/* Dialogs */}
+      {isDueDateDialogOpen && (
+        <DueDateAdjustDialog
+          srId={srId}
+          srNumber={sr.srNumber}
+          currentDueDate={sr.dueDate}
+          open={isDueDateDialogOpen}
+          onOpenChange={setIsDueDateDialogOpen}
+        />
+      )}
+
       <EditSRDialog
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}

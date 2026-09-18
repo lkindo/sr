@@ -37,6 +37,7 @@ import {
   PaginationPrevious,
 } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
+import { canViewerIntakeSR } from '@/lib/sr-state-machine';
 import type { SRListItem } from '@/types/sr.types';
 
 import { priorityLabels, statusLabels } from './constants';
@@ -108,11 +109,13 @@ export function SRsDataTable({
   const searchParams = useSearchParams();
   const { data: session } = useSession();
 
-  const { hasAnyRole } = usePermissions();
+  const { hasAnyRole, roles, permissions } = usePermissions();
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
   const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
-  const canManageSRs = !isClientUser;
+  // 목록 행의 '접수'·'접수 정보 수정' 버튼. 서버와 같은 판정(ADMIN·MANAGER 또는 SR:INTAKE) —
+  // 예전에는 내부 역할 전원이었는데 ENGINEER 는 접수하지 않는다(소유자 결정 2026-09-18).
+  const canManageSRs = canViewerIntakeSR({ roles, permissions });
 
   const [isPending, startTransition] = useTransition();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);

@@ -33,6 +33,21 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast }),
 }));
 
+// 내부 노트 토글은 내부 사용자에게만 보인다(D7). 기본은 외부 사용자이고, 내부 노트 스위트가 바꾼다.
+const viewer = vi.hoisted(() => ({ roles: ['CLIENT_USER'] as string[] }));
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    hasAnyRole: (roles: string[]) => roles.some((role) => viewer.roles.includes(role)),
+  }),
+}));
+
+/** Radix Checkbox(내부 노트 토글)가 내부에서 크기를 재는데 jsdom 에는 ResizeObserver 가 없다. */
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+
 const router = {
   push: vi.fn(),
   replace: vi.fn(),
@@ -96,6 +111,7 @@ const submit = () => fireEvent.click(screen.getByRole('button', { name: /댓글 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  viewer.roles = ['CLIENT_USER'];
   vi.mocked(useRouter).mockReturnValue(router as never);
 });
 
@@ -217,7 +233,10 @@ describe('SRComments — 작성', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0]!;
     expect(url).toBe('/api/srs/test-sr-id/comments');
     expect(init!.method).toBe('POST');
-    expect(JSON.parse(init!.body as string)).toEqual({ content: '확인했습니다' });
+    expect(JSON.parse(init!.body as string)).toEqual({
+      content: '확인했습니다',
+      isInternal: false,
+    });
 
     // 성공하면 입력이 비워져야 다음 댓글을 바로 쓸 수 있다.
     expect((screen.getByLabelText('댓글 작성') as HTMLTextAreaElement).value).toBe('');
@@ -282,5 +301,70 @@ describe('SRComments — 작성', () => {
 
     release({ ok: true, status: 201, text: async () => '{}' });
     await waitFor(() => expect(screen.getByRole('button', { name: '댓글 추가' })).toBeEnabled());
+  });
+});
+
+/**
+ * 내부 노트(D7, 소유자 결정 2026-09-18) — 고객에게 보이지 않는 댓글. 내부 사용자에게만 토글을 보이고,
+ * 서버가 외부 사용자의 값을 공개로 강제한다(comments 라우트 테스트). 목록에서는 내부 노트임을 표시한다.
+ */
+describe('SRComments — 내부 노트', () => {
+  const toggle = () => screen.queryByRole('checkbox', { name: '내부 노트(고객에게 보이지 않음)' });
+
+  it('외부 사용자에게는 토글을 보이지 않는다', () => {
+    listed([]);
+    const { wrapper } = setup();
+    render(<SRComments srId="test-sr-id" />, { wrapper });
+
+    expect(toggle()).not.toBeInTheDocument();
+  });
+
+  it('내부 사용자가 켜고 보내면 isInternal 을 실어 보내고 내부 노트로 안내한다', async () => {
+    viewer.roles = ['ENGINEER'];
+    listed([]);
+    okFetch();
+    const { wrapper } = setup();
+    render(<SRComments srId="test-sr-id" />, { wrapper });
+
+    fireEvent.click(toggle()!);
+    write('고객 환경 재현 절차 메모');
+    fireEvent.click(screen.getByRole('button', { name: '내부 노트 추가' }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({ title: '성공', description: '내부 노트가 추가되었습니다.' })
+      )
+    );
+    const [, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(JSON.parse(init!.body as string)).toEqual({
+      content: '고객 환경 재현 절차 메모',
+      isInternal: true,
+    });
+    // 보낸 뒤에는 토글을 끈다 — 다음 댓글이 모르고 내부 노트로 나가지 않게.
+    expect(toggle()).not.toBeChecked();
+  });
+
+  it('내부 노트에는 표시를 붙인다', () => {
+    viewer.roles = ['MANAGER'];
+    listed([
+      {
+        id: 'c1',
+        content: '내부 메모',
+        isInternal: true,
+        createdAt: new Date().toISOString(),
+        user: { name: 'Manager', image: null },
+      },
+      {
+        id: 'c2',
+        content: '공개 답변',
+        isInternal: false,
+        createdAt: new Date().toISOString(),
+        user: { name: 'Manager', image: null },
+      },
+    ]);
+    const { wrapper } = setup();
+    render(<SRComments srId="test-sr-id" />, { wrapper });
+
+    expect(screen.getAllByText('내부 노트')).toHaveLength(1);
   });
 });

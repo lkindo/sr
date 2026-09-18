@@ -580,9 +580,9 @@
 - **JWT Secret**: `NEXTAUTH_SECRET` / `AUTH_SECRET`. `src/lib/env-validation.ts` 가 32자 이상,
   플레이스홀더 패턴 아님을 검증하고 위반 시 `src/instrumentation.ts` 가 부팅을 중단시킨다.
 - **Session Token**: Auth.js 기본 쿠키 정책(HttpOnly, HTTPS 에서 Secure, SameSite=Lax)
-- **세션 만료**: `session.maxAge` 를 **명시적으로 설정하지 않았다** → Auth.js 기본값이 적용된다.
-  1.3 의 "만료 시간: 7일" 은 코드에 근거가 없다. 유휴 만료는 별도로
-  `IdleTimeoutProvider`(클라이언트)가 담당한다.
+- **세션 만료**: `session.maxAge` = **8시간**(`SESSION_MAX_AGE_SECONDS`, `src/auth.config.ts`).
+  1.3 의 "만료 시간: 7일" 은 코드에 근거가 없다. 유휴 만료(입력 30분 없음 → 로그아웃, 1분 전 경고)는
+  별도로 `IdleTimeoutProvider`(클라이언트)가 담당한다(`src/lib/constants/session.ts`).
 - **CSRF Protection**: NextAuth 기본 제공
 - **프록시 신뢰**: nginx 뒤에서 동작하므로 `AUTH_TRUST_HOST` / 앱 URL 설정이 필요하다
   (`src/lib/app-url.ts`)
@@ -836,7 +836,7 @@
 2. **명명 규칙**: PascalCase (Prisma 권장)
 3. **관계**: 외래키 명시, Cascade 규칙 정의
 4. **인덱스**: 자주 조회되는 컬럼에 인덱스 생성
-5. **Soft Delete**: `deletedAt` 컬럼으로 논리 삭제
+5. **Soft Delete**: SR(`srs`)만 `deletedAt` 컬럼으로 논리 삭제한다. 다른 테이블에는 `deleted_at` 이 없다 — 상세는 [DB.md](DB.md) 설계 원칙 7
 
 > **구현 상세**: 전체 Prisma 스키마, ERD, 테이블 명세는 [DB.md](DB.md) 참조
 
@@ -1015,8 +1015,8 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    - HttpOnly Cookie: XSS 방지
    - Secure Flag: HTTPS 전용
    - SameSite=Lax: CSRF 방지
-   - 만료 시간: `session.maxAge` **미설정** → Auth.js 기본값 적용 (문서에서 특정 일수를 단정하지
-     않는다). 유휴 만료는 `IdleTimeoutProvider` 가 클라이언트 측에서 처리한다.
+   - 만료 시간: `session.maxAge` = 8시간(`src/auth.config.ts`). 유휴 만료(입력 30분 없음)는
+     `IdleTimeoutProvider` 가 클라이언트 측에서 처리한다.
 
 3. **HTTPS**
    - Production 환경 필수
@@ -1106,7 +1106,7 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    - `listAttachmentBlobs()` 는 **미구현 스텁**이다 (빈 배열 반환 + 경고 로그)
 
 6. **파일 삭제**
-   - SR 삭제 시 첨부 레코드는 DB Cascade 로 정리된다
+   - SR 삭제는 논리 삭제라 첨부 레코드와 서버 파일이 남는다. 삭제된 SR 의 첨부는 다운로드·삭제 라우트가 모두 `SR_ALIVE` 로 SR 을 찾으므로 앱에서 열거나 지울 수 없다. 정리 배치는 아직 없다(`.gemini/rules/db-rules.md` §2)
    - **디스크의 고아 파일을 정리하는 정기 작업은 없다.** 초기 설계안의 "30일 후 Cron 삭제" 는
      구현되지 않았다(스케줄러 자체가 없다). 디스크 사용량은 수동 점검 대상이다.
 
@@ -1467,9 +1467,11 @@ app/
 - **잡 구성**: `code-quality`(ESLint + `tsc --noEmit`) / `test`(커버리지 게이트) /
   `mutation-test`(PR 전용) / `build` / `e2e-test` / `security`(gating `pnpm audit --prod
 --audit-level=critical` + Trivy 리포트) / `deployment-ready`
-- **E2E 범위 차등**: `main` push 는 전체 선택(2026-07-30 실측 185개)을,
-  PR 은 보안·권한 핵심 서브셋(실측 50개)을 실행한다. PR 에서 전량을 돌리면 timeout 120분에
-  육박하기 때문이다.
+- **E2E 범위**: push(`main`·`dev`)와 PR 모두 같은 전체 선택을 실행한다(dev→main PR 은 같은
+  커밋의 push(`dev`) 실행과 겹쳐 건너뛴다 — 병합 트리의 검증은 병합 뒤 push(`main`) E2E 로 미뤄진다). PR 보안·권한
+  서브셋(50개)은 스위트 정비로 전량 실행이 더 싸져 2026-08-09 에 걷어냈고, dev push 는
+  스테이징 배포가 E2E 없이 나가던 것을 막으려고 2026-09-18 에 추가했다. 근거와 최신 실측은
+  `ci-cd.yml` 의 `e2e-test` 주석이 정본이다.
 - **실패 시 배포 차단**: `deploy.yml` 이 `workflow_run` 으로 `CI/CD Pipeline` 의 결론에 매달려
   있고 `conclusion == 'success' && event == 'push'` 만 통과시킨다.
   ⚠️ 워크플로 **이름**(`CI/CD Pipeline`)이 이 결합의 유일한 연결고리다. 이름을 바꾸면 배포가
@@ -1547,7 +1549,7 @@ app/
 ### 배포 전략
 
 1. **자동 배포**: `main` push → CI 성공 → 운영 배포. `dev` push → CI 성공 → 스테이징 배포.
-2. **Preview 배포**: **없다.** PR 은 CI(보안 E2E 서브셋 포함)만 통과시키고 환경을 만들지 않는다.
+2. **Preview 배포**: **없다.** PR 은 CI(E2E 전체 선택 포함, dev→main PR 은 제외 — 위 "E2E 범위")만 통과시키고 환경을 만들지 않는다.
 3. **Rollback**: 대시보드가 없다. GHCR 의 이전 이미지 태그/다이제스트로 되돌린 뒤 서버에서
    `docker compose up -d --force-recreate` 를 수동 실행한다.
    **DB 마이그레이션은 되돌아가지 않는다**(엔트리포인트가 전진만 한다).

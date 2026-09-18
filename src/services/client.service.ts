@@ -2,8 +2,11 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 
 import { DuplicateError, NotFoundError, ReferentialIntegrityError } from '@/lib/errors';
+import { canViewClientRoster, clientSrScopeWhere } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/schemas';
+import type { AuthenticatedUser } from '@/types/session';
 
 import { auditService } from './audit.service';
 import { UserService } from './user.service';
@@ -46,7 +49,11 @@ export class ClientService {
     return prisma.client.findUnique({ where: { id } });
   }
 
-  async getClientDetailsById(id: string) {
+  /**
+   * @param viewer 필수다. SR 요약·건수에 담당자 스코프를 거는 데 쓴다(헌법 §1.2 — ENGINEER 는 배정분만).
+   */
+  async getClientDetailsById(id: string, viewer: AuthenticatedUser) {
+    const srScope = { ...SR_ALIVE, ...clientSrScopeWhere(viewer) };
     return prisma.client.findUnique({
       where: { id },
       include: {
@@ -73,7 +80,9 @@ export class ClientService {
         },
         // 테넌트 노출 최소화: 고객사 상세 응답에 전체 SR 본문(설명/처리결과/반려사유)이
         // 실려나가지 않도록 상세 화면에 필요한 최근 SR 요약만 제한적으로 조회한다.
+        // 삭제된(soft delete) SR 은 넣지 않는다 — 그 '상세보기' 링크는 404 다.
         srs: {
+          where: srScope,
           select: {
             id: true,
             srNumber: true,
@@ -85,10 +94,12 @@ export class ClientService {
           orderBy: { createdAt: 'desc' },
           take: 10,
         },
-        // 통계/삭제 가능 여부 판정을 위한 실제 전체 건수
+        // 화면에 보여 줄 전체 건수(위 `srs` 는 최근 10건뿐이다). 삭제된 SR 은 세지 않는다.
+        // 삭제 가능 여부는 이 숫자만으로 판정할 수 없다 — 삭제된 SR 도 FK 로 고객사를
+        // 가리키므로, getClientWithDetailsAndCategories 가 그 건수를 따로 싣는다.
         _count: {
           select: {
-            srs: true,
+            srs: { where: srScope },
             users: true,
           },
         },
@@ -355,19 +366,26 @@ export class ClientService {
     // DB 제약(`client_id` FK 는 ON DELETE RESTRICT)을 앱에서 미리 재현하는 가드다.
     // soft delete 된 SR 도 행은 남아 있으므로, 여기서 제외하면 앱 검사는 통과하고
     // 실제 DELETE 에서 FK 위반이 터져 500 이 된다 — 사용자에게는 원인 없는 실패로 보인다.
-    const [srsCount, usersCount, serviceCategoriesCount, clientHandlersCount] = await Promise.all([
-      prisma.sR.count({ where: { clientId: id } }),
-      prisma.userClient.count({ where: { clientId: id } }),
-      prisma.serviceCategory.count({ where: { clientId: id } }),
-      prisma.clientHandler.count({ where: { clientId: id } }),
-    ]);
+    const [srsCount, deletedSrsCount, usersCount, serviceCategoriesCount, clientHandlersCount] =
+      await Promise.all([
+        prisma.sR.count({ where: { clientId: id } }),
+        // 판정에는 쓰지 않고 문구에만 쓴다. 고객사 화면은 삭제된 SR 을 보여 주지 않으므로
+        // "3개의 SR" 이라고만 말하면 화면에 SR 이 0건인 사용자는 이유를 찾을 수 없다.
+        prisma.sR.count({ where: { clientId: id, deletedAt: { not: null } } }),
+        prisma.userClient.count({ where: { clientId: id } }),
+        prisma.serviceCategory.count({ where: { clientId: id } }),
+        prisma.clientHandler.count({ where: { clientId: id } }),
+      ]);
 
     const hasRelatedData =
       srsCount > 0 || usersCount > 0 || serviceCategoriesCount > 0 || clientHandlersCount > 0;
 
     if (hasRelatedData) {
       const errorMessages: string[] = [];
-      if (srsCount > 0) errorMessages.push(`${srsCount}개의 SR`);
+      const aliveSrsCount = srsCount - deletedSrsCount;
+      if (aliveSrsCount > 0) errorMessages.push(`${aliveSrsCount}개의 SR`);
+      if (deletedSrsCount > 0)
+        errorMessages.push(`삭제된 SR ${deletedSrsCount}건(감사 기록으로 보관 중)`);
       if (usersCount > 0) errorMessages.push(`${usersCount}개의 사용자 연결`);
       if (serviceCategoriesCount > 0)
         errorMessages.push(`${serviceCategoriesCount}개의 서비스 카테고리`);
@@ -399,8 +417,15 @@ export class ClientService {
     return result;
   }
 
-  async getClientWithDetailsAndCategories(id: string) {
-    const client = await this.getClientDetailsById(id);
+  async getClientWithDetailsAndCategories(id: string, viewer: AuthenticatedUser) {
+    // 삭제된 SR 건수는 화면에 SR 로 보여 주는 값이 아니다. 삭제 버튼을 deleteClient 의 FK 가드와
+    // 같은 기준으로 판정하고, 막혔을 때 이유를 말하는 데만 쓴다.
+    const [client, deletedSrCount] = await Promise.all([
+      this.getClientDetailsById(id, viewer),
+      prisma.sR.count({
+        where: { clientId: id, deletedAt: { not: null }, ...clientSrScopeWhere(viewer) },
+      }),
+    ]);
     if (!client) {
       return null;
     }
@@ -428,7 +453,11 @@ export class ClientService {
     // serviceCategories 는 `...client` 로 그대로 전달된다 — 이미 이 고객사로 스코프돼 있다.
     return {
       ...client,
-      users: filteredUsers,
+      // 헌법 §1.2: 담당자 스코프 사용자(ENGINEER)에게는 고객사 사용자 명부를 싣지 않는다.
+      users: canViewClientRoster(viewer) ? filteredUsers : [],
+      // 화면이 명부를 숨겼다고 안내하고 SR 숫자를 '내 배정' 으로 표기하도록 보는 사람의 범위를 싣는다.
+      viewerScope: canViewClientRoster(viewer) ? ('all' as const) : ('assigned' as const),
+      deletedSrCount,
     };
   }
 }

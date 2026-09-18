@@ -21,9 +21,17 @@ import ClientsPage from '../page';
  */
 
 vi.mock('@/components/clients/ClientTable', () => ({
-  ClientTable: ({ clients, loading, expandedRows, clientUsers, onToggleRowExpansion }: any) => (
+  ClientTable: ({
+    clients,
+    loading,
+    expandedRows,
+    clientUsers,
+    rosterHidden,
+    onToggleRowExpansion,
+  }: any) => (
     <div data-testid="client-table">
       <span data-testid="loading">{String(loading)}</span>
+      <span data-testid="roster-hidden">{String(rosterHidden)}</span>
       <span data-testid="expanded">{Array.from(expandedRows as Set<string>).join(',')}</span>
       {clients.map((client: any) => (
         <div key={client.id} data-testid={`row-${client.code}`}>
@@ -43,8 +51,10 @@ vi.mock('@/components/clients/ClientTable', () => ({
 }));
 
 vi.mock('@/components/clients/ClientMobileList', () => ({
-  ClientMobileList: ({ clients }: any) => (
-    <div data-testid="client-mobile-list">{clients.length}</div>
+  ClientMobileList: ({ clients, rosterHidden }: any) => (
+    <div data-testid="client-mobile-list" data-roster-hidden={String(rosterHidden)}>
+      {clients.length}
+    </div>
   ),
 }));
 
@@ -72,8 +82,13 @@ const toast = vi.fn();
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 /** 목록 라우트의 `{data, meta}` 봉투. 목이 이 형태를 지켜야 봉투 검사가 의미를 갖는다. */
-function listResponse(clients: Array<{ id: string; code: string }>, totalItems = clients.length) {
+function listResponse(
+  clients: Array<{ id: string; code: string }>,
+  totalItems = clients.length,
+  extra: Record<string, unknown> = {}
+) {
   return jsonResponse(200, {
+    ...extra,
     data: clients.map((client) => ({ ...client, name: client.code, isActive: true })),
     meta: {
       currentPage: 1,
@@ -267,6 +282,42 @@ describe('ClientsPage - 목록', () => {
     fireEvent.click(screen.getByTestId('client-saved'));
 
     await waitFor(() => expect(listCalls(fetchMock)).toHaveLength(2));
+  });
+});
+
+/**
+ * 보는 사람의 범위 — GET /api/clients 가 봉투에 viewerScope 를 덧붙인다. 담당 엔지니어('assigned')는
+ * 명부를 받지 않고 SR 건수가 자기 배정분이므로 표·카드가 그 사실을 표기해야 한다(헌법 §1.2).
+ */
+describe('ClientsPage - 보는 사람의 범위', () => {
+  it.each([
+    ['assigned', 'true'],
+    ['all', 'false'],
+  ])('viewerScope=%s 를 표와 카드에 넘긴다', async (viewerScope, hidden) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(listResponse([{ id: 'c1', code: 'TEST001' }], 1, { viewerScope }))
+      )
+    );
+
+    renderPage();
+    await screen.findByTestId('row-TEST001');
+
+    expect(screen.getByTestId('roster-hidden')).toHaveTextContent(hidden);
+    expect(screen.getByTestId('client-mobile-list')).toHaveAttribute('data-roster-hidden', hidden);
+  });
+
+  it('범위가 없는 응답은 명부를 받는 사람으로 본다(예전 응답과 호환)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(listResponse([{ id: 'c1', code: 'TEST001' }])))
+    );
+
+    renderPage();
+    await screen.findByTestId('row-TEST001');
+
+    expect(screen.getByTestId('roster-hidden')).toHaveTextContent('false');
   });
 });
 

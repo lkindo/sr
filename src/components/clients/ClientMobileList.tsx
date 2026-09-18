@@ -7,12 +7,15 @@ import { InlineSpinner } from '@/components/common/InlineSpinner';
 import { MobileListCard } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { CLIENT_ROSTER_HIDDEN_NOTE } from '@/lib/constants/client';
 
 interface ClientMobileListProps {
   clients: any[];
   loading: boolean;
   expandedRows: Set<string>;
   clientUsers: Record<string, any[]>;
+  /** 서버가 사용자 명부를 싣지 않았는가(viewerScope='assigned'). ClientTable 의 같은 prop 참조. */
+  rosterHidden?: boolean;
   onToggleRowExpansion: (clientId: string) => void;
   onUsersClick: (client: any, e: React.MouseEvent) => void;
   onCreateClient: () => void;
@@ -23,6 +26,7 @@ export function ClientMobileList({
   loading,
   expandedRows,
   clientUsers,
+  rosterHidden = false,
   onToggleRowExpansion,
   onUsersClick,
   onCreateClient,
@@ -103,7 +107,7 @@ export function ClientMobileList({
                       사용자 {client._count?.users || 0}
                     </Badge>
                     <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-                      SR {client._count?.srs || 0}
+                      {rosterHidden ? '내 배정 SR' : 'SR'} {client._count?.srs || 0}
                     </Badge>
                   </div>
                   <Button
@@ -125,9 +129,13 @@ export function ClientMobileList({
               {isExpanded && (
                 <div className="bg-muted/30 px-4 pb-4 pt-2 border-t">
                   <h4 className="text-xs font-semibold mb-2 text-muted-foreground">
-                    소속 사용자 ({users.length})
+                    {rosterHidden ? '소속 사용자' : `소속 사용자 (${users.length})`}
                   </h4>
-                  {users.length === 0 ? (
+                  {rosterHidden ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      {CLIENT_ROSTER_HIDDEN_NOTE}
+                    </p>
+                  ) : users.length === 0 ? (
                     <p className="text-xs text-muted-foreground text-center py-2">
                       등록된 사용자가 없습니다.
                     </p>

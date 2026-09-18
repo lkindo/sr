@@ -376,8 +376,9 @@ test.describe('SR 접수 SLA 계산 테스트', () => {
 
   /**
    * 예전 이 테스트는 "'마감일' 이라는 라벨이 화면에 있나"만 보고 로그를 찍었다.
-   * 그건 계산을 전혀 검증하지 못한다 — 실제로 화면에는 dueDate 가 나오지 않고
-   * estimatedCompletionDate 가 'SLA 마감일' 이라는 이름으로 표시된다(아래 findings).
+   * 그건 계산을 전혀 검증하지 못한다 — 당시 화면에는 dueDate 가 나오지 않고 estimatedCompletionDate 가
+   * 'SLA 마감일' 이라는 이름으로 표시됐다(2026-09-18 부터는 SR 상세가 실제 dueDate 를 보여 준다 —
+   * SRDueDateField). 화면 문구와 무관하게 계산 결과 자체를 검증하려고 API 로 읽는다.
    * 그래서 계산 결과 자체(dueDate)를 API 로 읽어 기대값과 대조한다.
    *
    * 계약(src/services/service-category.service.ts):

@@ -273,6 +273,10 @@ model SR {
   /// 보류가 풀리면(IN_PROGRESS 복귀) null 로 되돌려 "지금 유효한 약속" 만 남긴다.
   expectedHoldReleaseDate DateTime? @map("expected_hold_release_date") @db.Timestamptz
   dueDate                DateTime? @map("due_date") @db.Timestamptz
+  /// 운영자가 마감일을 직접 지정했는가(헌법 §3). true 면 우선순위·카테고리 변경과 접수 정보 수정의
+  /// 자동 재산출이 이 값을 덮어쓰지 않는다. 예전에는 "이번 요청에 dueDate 가 있었는가" 로만 판정해서
+  /// 다음 우선순위 변경 때 수동 값이 조용히 덮어써졌다.
+  dueDateManual          Boolean   @default(false) @map("due_date_manual")
   expectedCompletionDate DateTime? @map("expected_completion_date") @db.Timestamptz
   actualCompletionDate   DateTime? @map("actual_completion_date") @db.Timestamptz
 

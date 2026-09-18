@@ -25,6 +25,9 @@ vi.mock('@/lib/prisma', () => {
     auditLog: {
       create: vi.fn(),
     },
+    sR: {
+      count: vi.fn().mockResolvedValue(0),
+    },
     $transaction: vi.fn((cb: any) => cb(mockPrisma)),
   };
   return { default: mockPrisma };

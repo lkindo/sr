@@ -88,6 +88,9 @@ describe('API Route Security: /api/srs', () => {
         }),
       })
     );
+    // 목록의 댓글 수는 viewer 로 판정한다(visibleCommentsWhere). tsc 는 AuthenticatedUser 타입까지만
+    // 보장하므로, 세션 사용자 **그 자체**를 넘기는 배선을 여기서 고정한다.
+    expect(mocks.getAllSRs.mock.calls[0]![0].viewer).toBe(mockSession.user);
   });
 
   it('should allow internal users to see all SRs (no forced filter)', async () => {

@@ -124,7 +124,7 @@ DIRECT_URL="postgresql://<user>:<password>@db:5432/sr_db?schema=public"
 4. **문자열 길이:** 무제한 `TEXT` 대신 용도별 `VARCHAR(n)` 사용 (마이그레이션 `20260623055403_db_optimization`)
 5. **외래 키:** 참조 무결성 유지 (CASCADE / SET NULL / RESTRICT — [제약 조건](#제약-조건) 참조)
 6. **인덱스:** 자주 조회되는 컬럼 및 실제 쿼리 패턴에 맞춘 복합 인덱스
-7. **소프트 삭제:** 사용하지 않음. `deleted_at` 컬럼은 어떤 테이블에도 없다
+7. **소프트 삭제:** `srs` 테이블에만 적용한다(`deleted_at`, 마이그레이션 `20260815100200_sr_soft_delete`). SR 을 목록·상세·통계로 보여 주는 조회는 `SR_ALIVE`(`src/lib/prisma-selects.ts`)로 `deleted_at IS NULL` 을 붙이고, `$queryRaw` 는 같은 조건을 직접 쓴다. 삭제된 SR 의 댓글·첨부·활동·상태이력은 Cascade 되지 않고 남는다. 다른 테이블에는 `deleted_at` 이 없다. 예외는 두 종류다. (a) 삭제된 SR 도 세는 조회 — 고객사·사용자·서비스 카테고리 삭제 전 참조 무결성 가드(FK 가 삭제된 행도 가리키므로 의도적). (b) 삭제된 SR **만** 세는 조회(`deletedAt: { not: null }`) — 고객사 상세 응답의 `deletedSrCount`(삭제 버튼 판정과 그 이유 문구용), 고객사·서비스 카테고리 삭제 거부 문구의 삭제된 SR 건수. 고객사 상세·목록의 SR 요약·건수 자체는 `SR_ALIVE` 를 쓴다. 목록은 `.gemini/rules/db-rules.md` §2
 
 ---
 
@@ -278,6 +278,7 @@ erDiagram
         timestamptz completed_at
         timestamptz confirmed_at
         timestamptz due_date
+        boolean due_date_manual
         timestamptz expected_completion_date
         timestamptz actual_completion_date
         text resolution_description
@@ -286,6 +287,7 @@ erDiagram
         text additional_feedback
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
     }
 
     SRActivity {
@@ -699,6 +701,7 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 | completed_at              | TIMESTAMPTZ    | YES  | NULL        | 완료 시간                             |
 | confirmed_at              | TIMESTAMPTZ    | YES  | NULL        | 확인 완료 시간                        |
 | due_date                  | TIMESTAMPTZ    | YES  | NULL        | 완료 목표 시간 (SLA 기준)             |
+| due_date_manual           | BOOLEAN        | NO   | false       | 운영자가 마감일을 직접 지정했는가 — true 면 자동 재산출이 덮어쓰지 않는다(헌법 §3) |
 | expected_completion_date  | TIMESTAMPTZ    | YES  | NULL        | 예상 완료일                           |
 | actual_completion_date    | TIMESTAMPTZ    | YES  | NULL        | 실제 완료일                           |
 | resolution_description    | TEXT           | YES  | NULL        | 처리 결과 설명                        |
@@ -706,6 +709,7 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 | satisfaction_rating       | SMALLINT       | YES  | NULL        | 만족도 평가 (CHECK: NULL 또는 1~5)    |
 | additional_feedback       | TEXT           | YES  | NULL        | 추가 피드백                           |
 | version                   | INTEGER        | NO   | 0           | 낙관적 잠금 카운터 — 갱신 시 불일치면 409 |
+| deleted_at                | TIMESTAMPTZ    | YES  | NULL        | 논리 삭제 시각 — NULL 이면 살아 있는 SR |
 | created_at                | TIMESTAMPTZ    | NO   | now()       | 생성 시간                             |
 | updated_at                | TIMESTAMPTZ    | NO   | -           | 수정 시간                             |
 
@@ -1043,6 +1047,9 @@ pnpm db:seed
 | srs                | (status, priority, created_at)        | INDEX  | SR 목록 필터링 및 정렬        |
 | srs                | (status, due_date)                    | INDEX  | 마감일 큐 / dueToday 대시보드 |
 | srs                | (assignee_id, due_date)               | INDEX  | 담당자별 마감 임박 조회       |
+| srs                | deleted_at `WHERE deleted_at IS NULL` | PARTIAL INDEX | 살아 있는 SR 만 담는 조회용 (마이그레이션 전용) |
+| service_categories | (client_id, category_name) `WHERE client_id IS NOT NULL` | PARTIAL UNIQUE | 고객사별 카테고리 이름 중복 방지 (마이그레이션 전용) |
+| service_categories | category_name `WHERE client_id IS NULL` | PARTIAL UNIQUE | 전역 카테고리 이름 중복 방지 (마이그레이션 전용) |
 | sr_activities      | (sr_id, created_at DESC)              | INDEX  | SR별 활동 내역 최신순 조회    |
 | sr_comments        | (sr_id, created_at DESC)              | INDEX  | SR별 댓글 최신순 조회         |
 | sr_comments        | (sr_id, is_internal, created_at DESC) | INDEX  | 내부 메모 제외 댓글 조회      |
@@ -1050,7 +1057,9 @@ pnpm db:seed
 | push_subscriptions | endpoint                              | UNIQUE | 구독 중복 방지                |
 | audit_logs         | created_at                            | INDEX  | 기간별 감사 로그 조회         |
 
-인덱스는 모두 Prisma `@@index` / `@@unique` 로 선언되며 마이그레이션이 생성한다.
+인덱스는 모두 마이그레이션이 생성하며, 부분 인덱스(WHERE 절)를 뺀 나머지는 Prisma `@@index` / `@@unique` 로도 선언된다.
+위 표의 "마이그레이션 전용" 3개는 Prisma 스키마가 WHERE 절을 표현하지 못해 `prisma/migrations/` 에만 있다
+(`20260801130000_service_category_unique_name`, `20260815100200_sr_soft_delete`). 스키마에 `@@index` 로 다시 적지 않는다.
 이름은 Prisma 규칙(`<table>_<column...>_idx`, `<table>_<column...>_key`)을 따른다.
 따라서 수동 `CREATE INDEX` 를 실행할 일은 없다 —
 직접 만들면 드리프트 체크(위 2번)에서 잡힌다.
@@ -1176,12 +1185,18 @@ const permissions = [
 | 역할         | 부여 범위 (요약)                                                                                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ADMIN        | 전체 권한                                                                                                                                               |
-| MANAGER      | `SR` CONFIRM 을 제외한 전체, `CLIENT` READ/UPDATE, `USER` READ/UPDATE/UPDATE_SELF/ASSIGN_ROLE, `COMMENT`, `ATTACHMENT`, `DASHBOARD`, `NOTIFICATION`     |
-| ENGINEER     | `SR` READ/UPDATE/STATUS_CHANGE/INTAKE, `CLIENT` READ, `USER` UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION` READ, `DASHBOARD` READ                |
-| CLIENT_ADMIN | `SR` CREATE/READ/UPDATE/STATUS_CHANGE/CONFIRM, `CLIENT` READ, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION`, `DASHBOARD` READ |
+| MANAGER      | `SR` CONFIRM 을 제외한 전체, `CLIENT` READ/UPDATE, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `DASHBOARD`, `NOTIFICATION`                 |
+| ENGINEER     | `SR` READ/UPDATE/STATUS_CHANGE, `CLIENT` READ, `USER` UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION` READ, `DASHBOARD` READ                       |
+| CLIENT_ADMIN | `SR` CREATE/READ/UPDATE/DELETE/CONFIRM, `CLIENT` READ, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION`, `DASHBOARD` READ        |
 | CLIENT_USER  | `SR` CREATE/READ/UPDATE_SELF/CONFIRM, `USER` UPDATE_SELF, `COMMENT` CREATE/READ, `ATTACHMENT` CREATE/READ, `NOTIFICATION` READ, `DASHBOARD` READ        |
 
 카탈로그의 원본은 `prisma/permission-catalog.ts`, 역할별 매핑의 원본은 `prisma/seed.ts` 다.
+
+> **2026-09-18 소유자 결정 반영.** ENGINEER 의 `SR:INTAKE`(접수·배정은 운영 관리자 업무 — D1),
+> CLIENT_ADMIN 의 `SR:STATUS_CHANGE`(고객은 확인·재오픈만 — D2)를 회수했고, 코드가 검사하지 않아
+> 효과가 없던 `USER:ASSIGN_ROLE` 을 카탈로그에서 지웠다(역할 부여는 ADMIN 전용 — D5). 기존 DB 는
+> 데이터 마이그레이션 `20260918120000_role_permission_decisions` 가 같은 변경을 한다(시드는 이미 배정이
+> 있는 역할을 건너뛰고, 운영 배포는 시드를 다시 돌리지 않는다).
 
 > **해소됨(2026-08-01).** 이전 판에는 CLIENT_USER 매핑이 `SR:UPDATE_SELF` 를 조회하지만
 > 카탈로그에 그 액션 행이 없다는 불일치가 기록돼 있었다. `SR:UPDATE_SELF`,
@@ -1230,6 +1245,11 @@ SEED_DEV_FIXTURES=true SEED_ADMIN_PASSWORD=... pnpm db:seed
 | `20260809120000_client_admin_sr_delete`    | **데이터 마이그레이션** — `CLIENT_ADMIN` 역할에 `SR:DELETE` 권한 부여                                |
 | `20260814211500_user_session_version`      | `users.session_version` 추가 (비밀번호 변경 시 기존 JWT 즉시 무효화)                                 |
 | `20260814213000_sr_version`                | `srs.version` 추가 (낙관적 잠금, 불일치 시 409)                                                      |
+| `20260815100000_sr_expected_hold_release_date` | `srs.expected_hold_release_date` 추가 (보류 전이의 예상 해제일 — 헌법 §2)                      |
+| `20260815100100_backfill_sr_completed_at` | **데이터 마이그레이션** — 재오픈 기산점 `completed_at` 백필(`actual_completion_date` → `updated_at`) |
+| `20260815100200_sr_soft_delete`           | `srs.deleted_at` 추가 + 살아 있는 행 부분 인덱스 (SR 논리 삭제 — db-rules §2)                        |
+| `20260918120000_role_permission_decisions` | **데이터 마이그레이션** — ENGINEER `SR:INTAKE`·CLIENT_ADMIN `SR:STATUS_CHANGE` 회수, `USER:ASSIGN_ROLE` 삭제 |
+| `20260918121000_sr_due_date_manual`       | `srs.due_date_manual` 추가 + `SR_DUE_DATE` 감사 로그로 기존 수동 조정 백필(헌법 §3)                  |
 
 `migration_lock.toml` provider 는 `postgresql`.
 

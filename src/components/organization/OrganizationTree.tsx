@@ -20,6 +20,7 @@ import { Building2, ChevronDown, ChevronRight, GripVertical, Plus, Users } from 
 import { InlineSpinner } from '@/components/common/InlineSpinner';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { CLIENT_ROSTER_HIDDEN_NOTE } from '@/lib/constants/client';
 import { cn, escapeRegExp } from '@/lib/utils';
 
 import { ClientCardContextMenu } from './ClientCardContextMenu';
@@ -65,6 +66,11 @@ interface OrganizationTreeProps {
   onDragStart?: (event: DragStartEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
   searchQuery: string;
+  /**
+   * 서버가 사용자 명부를 싣지 않았는가(GET /api/clients/{id} 의 viewerScope='assigned').
+   * 헌법 §1.2 에 따라 담당 엔지니어에게는 고객사 사용자 정보를 주지 않는다 — 그때 빈 칸 대신 안내를 보인다.
+   */
+  rosterHidden?: boolean;
 }
 
 // 검색어 하이라이트 헬퍼 함수
@@ -302,6 +308,7 @@ export function OrganizationTree({
   onDragStart,
   onDragOver,
   searchQuery,
+  rosterHidden = false,
 }: OrganizationTreeProps) {
   // DnD Sensors
   const sensors = useSensors(
@@ -399,7 +406,11 @@ export function OrganizationTree({
               {/* 사용자 목록 */}
               {isExpanded && (
                 <div className="border-t bg-gradient-to-b from-muted/5 to-transparent">
-                  {userCount === 0 ? (
+                  {rosterHidden ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      {CLIENT_ROSTER_HIDDEN_NOTE}
+                    </p>
+                  ) : userCount === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       등록된 사용자가 없습니다.
                     </p>

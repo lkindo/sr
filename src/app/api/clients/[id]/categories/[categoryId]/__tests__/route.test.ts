@@ -167,10 +167,11 @@ describe('PATCH/DELETE /api/clients/[id]/categories/[categoryId]', () => {
   });
 
   it('SR 이 연결된 카테고리 삭제 실패 사유를 그대로 전달한다', async () => {
-    // 서비스가 참조 무결성으로 막는다. 사용자는 "비활성화하라"는 안내를 봐야 한다.
-    const err: any = new Error(
-      '이 카테고리에 3개의 SR이 연결되어 있습니다. 삭제 대신 비활성화를 사용하세요.'
-    );
+    // 서비스가 참조 무결성으로 막는다. 사용자는 무엇이 남아 막혔는지(삭제된 SR 포함)를 그대로 봐야 한다.
+    // (예전 문구의 "삭제 대신 비활성화" 는 카테고리에 비활성화 경로가 없어 걷어냈다.)
+    const message =
+      '이 카테고리에 3개의 SR이 연결되어 있어 삭제할 수 없습니다(삭제된 SR 1건 포함 — 감사 기록으로 보관 중).';
+    const err: any = new Error(message);
     err.statusCode = 409;
     mocks.remove.mockRejectedValue(err);
 
@@ -178,6 +179,6 @@ describe('PATCH/DELETE /api/clients/[id]/categories/[categoryId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body.error).toContain('비활성화');
+    expect(body.error).toBe(message);
   });
 });

@@ -755,12 +755,12 @@ export async function updateSRStatus(input: z.infer<typeof updateSRStatusSchema>
 export async function deleteSR(id: string) {
   const session = await requirePermission('sr:delete');
 
-  const sr = await db.sR.findUnique({ where: { id } });
+  const sr = await db.sR.findUnique({ where: { id, deletedAt: null } });
   if (!sr) throw new Error('SR을 찾을 수 없습니다');
 
-  // 소프트 삭제 또는 완전 삭제 (정책에 따라)
-  // 여기서는 완전 삭제 예시
-  await db.sR.delete({ where: { id } });
+  // 논리 삭제(soft delete)다. 물리 삭제하면 댓글·첨부·활동·상태이력이 Cascade 로 함께 사라진다.
+  // 실물: src/services/sr.service.ts 의 deleteSR (감사 로그와 같은 트랜잭션에서 deletedAt 기록)
+  await db.sR.updateMany({ where: { id, deletedAt: null }, data: { deletedAt: new Date() } });
 
   revalidatePath('/srs');
   revalidatePath('/dashboard');
@@ -855,6 +855,11 @@ function validateStateTransition(
 > 도메인 이벤트를 거치지 않고 라우트 안에서 직접 `backgroundTask(...)` 로 발송한다.
 > 발송 여부는 수신자별 `notificationPreference.emailCommentAdded`(스키마 기본값 `false`)를 따르고,
 > 작성자 본인에게는 보내지 않는다. 아래 초안의 `inngest.send()` 호출은 실제 코드로 교체했다.
+>
+> **내부 노트(2026-09-18 소유자 결정 D7).** 실물 라우트는 `isInternal` 을 내부 사용자에게만 허용하고
+> (`policies.canWriteInternalNote` — 외부 사용자가 보낸 값은 공개로 강제), 내부 노트는 신청자에게
+> 메일·푸시를 보내지 않으며, 고객도 보는 활동 로그(`COMMENTED`)를 남기지 않고, SSE 이벤트에
+> `internalOnly` 를 실어 내부 사용자 연결에만 흘린다(`policies.canReceiveRealtimeEvent`).
 
 **초안: server/actions/comment.ts** (실물: `src/app/api/srs/[id]/comments/route.ts`):
 
@@ -1071,7 +1076,7 @@ export async function deleteComment(id: string) {
 | `/api/roles` | GET | withAuthAndRateLimit | `src/app/api/roles/route.ts` |
 | `/api/service-categories` | GET | withAuthAndRateLimit | `src/app/api/service-categories/route.ts` |
 | `/api/settings/notifications` | GET / PUT | withAuthAndRateLimit | `src/app/api/settings/notifications/route.ts` |
-| `/api/settings/system` | GET / PUT | withAuthAndRateLimit | `src/app/api/settings/system/route.ts` |
+| `/api/settings/system` | GET | withAuthAndRateLimit | `src/app/api/settings/system/route.ts` |
 | `/api/srs` | GET / POST | withAuthAndRateLimit | `src/app/api/srs/route.ts` |
 | `/api/srs/[id]` | DELETE / GET / PATCH | withAuthAndRateLimit | `src/app/api/srs/[id]/route.ts` |
 | `/api/srs/[id]/activities` | GET | withAuthAndRateLimit | `src/app/api/srs/[id]/activities/route.ts` |
@@ -1670,8 +1675,9 @@ _문서가 너무 길어 계속 이어서 작성하겠습니다..._
 >   실제 구성이 아니다.
 > - 비밀번호 비교는 `compare` 직접 호출이 아니라 `src/lib/security.ts` 의 `verifyPassword()`
 >   (bcryptjs)를 쓴다. **사용자가 없을 때도 더미 비교를 수행해 타이밍 공격을 막는다.**
-> - `session.maxAge` 를 명시하지 않는다(NextAuth 기본값). 유휴 로그아웃은 클라이언트 측
->   `IdleTimeoutProvider` 가 담당한다.
+> - `session.maxAge` 는 **8시간**이다(`SESSION_MAX_AGE_SECONDS`, `src/auth.config.ts` — Auth.js 기본
+>   30일은 토큰 안 권한 스냅샷을 너무 오래 살려 둔다). 유휴 로그아웃(입력 30분 없음, 1분 전 경고)은
+>   클라이언트 측 `IdleTimeoutProvider` 가 담당하며 값의 정본은 `src/lib/constants/session.ts` 다.
 > - 권한 문자열은 `role.permissions[].permission` 을 거쳐 만든다(중간 테이블 `RolePermission`).
 > - `authorized` 콜백에서 미로그인 접근 차단과 로그인 상태의 `/`·`/login` 리다이렉트를 처리한다.
 > - 실패 로그는 `console.error` 가 아니라 `logger` 로 남긴다.
@@ -3529,14 +3535,15 @@ Playwright 프로젝트는 `setup`, `multi-user-setup`, `role-persona-setup`(의
 `chromium`, `multi-user`, `role-personas`, `permissions`, 그리고 `firefox` / `webkit` /
 `Mobile Chrome` 이다.
 
-- **main push**: 전체 선택 실행(2026-07-30 `--list` 실측 185개). `chromium` + `multi-user` +
+- **push(main·dev) 와 pull request**: 모두 같은 전체 선택을 실행한다. 단 이 저장소의 `dev` 를
+  head 로 하는 PR(dev→main)은 같은 커밋의 push(dev) 실행과 겹치므로 건너뛴다. 다만 PR 실행이 보던
+  병합 트리(main 에만 있는 커밋과 합친 결과)의 검증은 병합 뒤 push(main) E2E 로 미뤄진다. `chromium` + `multi-user` +
   `role-personas` + `permissions`. `deploy.yml` 이 이 워크플로의 결론에 매달려 있으므로
-  여기서 실패하면 운영 배포가 차단된다.
-- **pull request**: 보안·권한 스펙만(실측 50개). `permissions` + `role-personas`, 그리고
-  `multi-user` 중 `08-user-management` / `09-client-management` / `23-role-exclusivity`.
+  main push 에서 실패하면 운영, dev push 에서 실패하면 스테이징 배포가 차단된다.
+  PR 부분 실행(보안·권한 50개)은 2026-08-09 에 걷어냈고 dev push 는 2026-09-18 에 추가했다 —
+  근거와 최신 실측(스펙 수·실행 시간)은 `ci-cd.yml` 의 `e2e-test` 주석이 정본이다.
 - **어디서도 실행되지 않는 것**: `firefox` / `webkit` / `Mobile Chrome`
   (`testIgnore` 가 없어 멀티유저 스펙을 단일 인증 상태로 중복 실행한다 — 설정 결함).
-  PR 에서는 `chromium` 일반 기능 스펙과 `multi-user` 17~22 도 돌지 않는다.
 
   > 2026-08-10 갱신: 이 목록에 있던 `Dashboard Visual & Performance`(:6006 Storybook 서버
   > 의존)와 `Manual Screen Captures` 는 **playwright.config.ts 에서 이미 사라졌다.**
@@ -3610,7 +3617,7 @@ Node 22 / pnpm 10 기준이다(초안은 Node 18 + `npm install -g pnpm` 이었�
 | `test`             | **실제 postgres:16-alpine 서비스 컨테이너**에서 `prisma migrate deploy` → 스키마 drift 검사(`migrate diff --exit-code`) → `pnpm db:seed` → `pnpm test:coverage`(임계값 게이트) |
 | `mutation-test`    | PR 에서만. `pnpm test:mutation:ci` (변경 파일만, `break: 45`)                                                                                                                  |
 | `build`            | `pnpm build` 후 `.next` 존재 확인                                                                                                                                              |
-| `e2e-test`         | main push 는 전체 선택, PR 은 보안·권한 서브셋 (위 "테스트 전략" 참고)                                                                                                         |
+| `e2e-test`         | push(main·dev)·PR 모두 전체 선택, dev→main PR 은 제외 (위 "E2E 실행 범위" 참고)                                                                                                |
 | `security`         | `pnpm audit --prod --audit-level=critical` (**게이트**) + Trivy SARIF/table(리포트 전용)                                                                                       |
 | `deployment-ready` | main push 에서 위 잡들이 모두 성공했을 때만 성공 로그를 남긴다                                                                                                                 |
 

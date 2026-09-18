@@ -95,3 +95,35 @@ describe('Header 네비게이션 권한 필터', () => {
     expect(navLinkNames()).not.toContain('조직 관리');
   });
 });
+
+/**
+ * 고객사 관리자의 '자사 관리' 메뉴(D6, 소유자 결정 2026-09-18). 내부 운영 메뉴('조직 관리')는 내부/외부
+ * 경계로 닫혀 있어서 서버가 허용하는 자사 사용자 관리에 갈 길이 없었다.
+ */
+describe('Header — 자사 관리 메뉴', () => {
+  const clientAdmin = {
+    id: 'u3',
+    email: 'ca@example.com',
+    name: '고객사 관리자',
+    roles: ['CLIENT_ADMIN'],
+    permissions: ['USER:READ', 'USER:UPDATE', 'CLIENT:READ'],
+  } as unknown as AuthenticatedUser;
+
+  it('고객사 관리자에게는 자사 관리를 보이고 내부 운영 메뉴는 감춘다', () => {
+    mockSession.current = { data: { user: clientAdmin }, status: 'authenticated' };
+
+    render(<Header user={clientAdmin} />);
+
+    const names = navLinkNames();
+    expect(names).toContain('자사 관리');
+    expect(names).not.toContain('조직 관리');
+  });
+
+  it('내부 사용자(ADMIN 포함)에게는 자사 관리를 보이지 않는다', () => {
+    mockSession.current = { data: { user: adminUser }, status: 'authenticated' };
+
+    render(<Header user={adminUser} />);
+
+    expect(navLinkNames()).not.toContain('자사 관리');
+  });
+});

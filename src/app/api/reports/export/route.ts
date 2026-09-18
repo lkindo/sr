@@ -110,6 +110,7 @@ export const GET = withAuthAndRateLimit(
             if (take <= 0) break;
 
             const batch = await srService.getAllSRs({
+              viewer: session.user,
               where,
               orderBy: { createdAt: 'desc' },
               skip,

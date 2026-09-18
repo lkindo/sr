@@ -4,8 +4,15 @@ import { Prisma } from '@prisma/client';
 import { validateRequestBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
-import { ensureCanCreateClient, ensureCanReadClient, isInternalUser } from '@/lib/policies';
+import {
+  canViewClientRoster,
+  clientSrScopeWhere,
+  ensureCanCreateClient,
+  ensureCanReadClient,
+  isInternalUser,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { SR_ALIVE } from '@/lib/prisma-selects';
 import { clientCreateSchema, clientListQuerySchema } from '@/lib/schemas';
 import { ClientService } from '@/services/client.service';
 
@@ -60,7 +67,9 @@ export const GET = withAuthAndRateLimit(
         include: {
           _count: {
             select: {
-              srs: true,
+              // 고객사 상세와 같은 기준 — 삭제된(soft delete) SR 은 세지 않고, ENGINEER 에게는
+              // 자기 배정분만 센다(헌법 §1.2 — SR 통계는 배정 범위).
+              srs: { where: { ...SR_ALIVE, ...clientSrScopeWhere(session.user) } },
               users: true,
             },
           },
@@ -69,7 +78,12 @@ export const GET = withAuthAndRateLimit(
       prisma.client.count({ where }),
     ]);
 
-    return NextResponse.json(createResponse(clients, totalCount));
+    return NextResponse.json({
+      ...createResponse(clients, totalCount),
+      // 고객사 상세(GET /api/clients/[id])와 같은 값. 목록 화면이 SR 건수를 '내 배정' 으로 표기하고,
+      // 행을 펼쳤을 때 빈 명부를 "사용자 없음" 이 아니라 "보여 주지 않음" 으로 안내하는 데 쓴다.
+      viewerScope: canViewClientRoster(session.user) ? 'all' : 'assigned',
+    });
   },
   { preset: 'standard' }
 );

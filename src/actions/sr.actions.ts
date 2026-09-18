@@ -10,7 +10,7 @@ import {
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
-import { ensureCanReadSR } from '@/lib/policies';
+import { canRegisterSROnBehalf, ensureCanReadSR } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { srCreateSchema, srPatchSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
@@ -36,6 +36,24 @@ export async function createSRAction(formData: FormData): Promise<Result<SRCreat
 
     revalidatePath('/srs');
     return ok(serializeResponse(sr));
+  } catch (error) {
+    return errorToResult(error);
+  }
+}
+
+/**
+ * 대리 등록(D3)에서 신청자로 고를 수 있는 고객 목록 — 활성·승인된 이 고객사의 고객 사용자.
+ * 서버 검증(createSR)과 같은 조건(policies.eligibleRequesterWhere)이다. 내부 사용자만 부를 수 있다.
+ */
+export async function getSRRequesterCandidatesAction(
+  clientId: string
+): Promise<Result<Array<{ id: string; name: string; email: string }>>> {
+  try {
+    const session = await getAuthenticatedSession();
+    if (!canRegisterSROnBehalf(session.user)) {
+      return fail('대리 등록 권한이 없습니다.', 'FORBIDDEN');
+    }
+    return ok(await srService.getRequesterCandidates(clientId));
   } catch (error) {
     return errorToResult(error);
   }
@@ -146,6 +164,8 @@ export async function getSRCommentsAction(
     comments: Array<{
       id: string;
       content: string;
+      /** 내부 노트(고객에게 보이지 않음). 외부 사용자에게는 visibleCommentsWhere 가 애초에 싣지 않는다. */
+      isInternal: boolean;
       createdAt: Date;
       updatedAt: Date;
       user: { id: string; name: string; image: string | null };
@@ -163,7 +183,7 @@ export async function getSRCommentsAction(
 
     ensureCanReadSR(session.user, sr);
 
-    const result = await srService.getSRComments(srId, options);
+    const result = await srService.getSRComments(srId, session.user, options);
     return ok(result);
   } catch (error) {
     return errorToResult(error);

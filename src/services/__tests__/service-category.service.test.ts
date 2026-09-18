@@ -26,6 +26,9 @@ vi.mock('@/lib/prisma', () => {
     auditLog: {
       create: vi.fn(),
     },
+    sR: {
+      count: vi.fn().mockResolvedValue(0),
+    },
     $transaction: vi.fn((cb: any) => cb(mockPrisma)),
   };
   return { default: mockPrisma };
@@ -286,6 +289,62 @@ describe('ServiceCategoryService', () => {
       // `_count` 는 사전 조회의 산물이지 카테고리의 상태가 아니다.
       expect(data.changes.before._count).toBeUndefined();
       expect(data.changes.before.categoryName).toBe('Network Support');
+    });
+
+    // 판정은 전체 SR 기준이다(삭제된 SR 도 service_category_id FK 로 카테고리를 가리킨다).
+    // 그런데 고객사 화면은 삭제된 SR 을 보여 주지 않으므로, 숫자만 말하면 화면과 어긋나 보인다.
+    it('삭제된 SR 이 섞여 있으면 거부 문구에 그 건수를 밝힌다', async () => {
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+        ...mockCategory,
+        _count: { srs: 5 },
+      } as never);
+      vi.mocked(prisma.sR.count).mockResolvedValue(3);
+
+      await expect(service.delete('cat-1')).rejects.toThrow(
+        '이 카테고리에 5개의 SR이 연결되어 있어 삭제할 수 없습니다(삭제된 SR 3건 포함 — 감사 기록으로 보관 중).'
+      );
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { serviceCategoryId: 'cat-1', deletedAt: { not: null } },
+      });
+    });
+
+    it('참조 무결성 가드는 soft delete 필터 없이 전체 SR 을 센다', async () => {
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+        ...mockCategory,
+        _count: { srs: 5 },
+      } as never);
+
+      await expect(service.delete('cat-1')).rejects.toThrow();
+      // 여기에 SR_ALIVE 를 붙이면 삭제된 SR 만 남은 카테고리가 앱 가드를 통과하고
+      // 실제 DELETE 에서 FK 위반 500 이 난다.
+      expect(prisma.serviceCategory.findUnique).toHaveBeenCalledWith({
+        where: { id: 'cat-1' },
+        include: { _count: { select: { srs: true } } },
+      });
+    });
+
+    it('없는 대안(비활성화)을 안내하지 않는다', async () => {
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+        ...mockCategory,
+        _count: { srs: 5 },
+      } as never);
+
+      const error = await service.delete('cat-1').catch((e: Error) => e);
+      expect((error as Error).message).not.toContain('비활성화');
+    });
+
+    it('삭제된 SR 이 없으면 기존 문구 그대로다', async () => {
+      vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
+        ...mockCategory,
+        _count: { srs: 5 },
+      } as never);
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+
+      const error = await service.delete('cat-1').catch((e: Error) => e);
+      expect((error as Error).message).toBe(
+        '이 카테고리에 5개의 SR이 연결되어 있어 삭제할 수 없습니다.'
+      );
+      expect((error as Error).message).not.toContain('삭제된 SR');
     });
 
     it('SR 이 연결돼 있으면 감사 로그도 남기지 않아야 함', async () => {

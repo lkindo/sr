@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   count: vi.fn(),
   groupBy: vi.fn(),
+  // 세션 사용자. 기본은 역할 없는 신청자이며, 댓글 수 가시성 테스트만 역할을 바꾼다.
+  sessionUser: { id: 'user-1' } as { id: string; roles?: string[]; clientIds?: string[] },
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -28,7 +30,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: (handler: any) => (request: any) =>
-    handler(request, { session: { user: { id: 'user-1' } } }),
+    handler(request, { session: { user: mocks.sessionUser } }),
 }));
 
 vi.mock('@/lib/serialization', () => ({
@@ -47,6 +49,7 @@ const call = async (query = '') => {
 describe('GET /api/srs/my-requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.sessionUser = { id: 'user-1' };
     mocks.findMany.mockResolvedValue([]);
     mocks.count.mockResolvedValue(0);
     mocks.groupBy.mockResolvedValue([]);
@@ -158,6 +161,20 @@ describe('GET /api/srs/my-requests', () => {
       expect.objectContaining({ where: { deletedAt: null, requesterId: 'user-1' } })
     );
     expect(body.stats).toEqual({ total: 15, requested: 3, inProgress: 2, completed: 5 });
+  });
+
+  // 내 요청의 댓글 수도 상세·댓글 탭과 같은 가시성 판정을 따른다(visibleCommentsWhere). 신청자는
+  // 내부 사용자일 수도 있으므로(MANAGER 가 직접 등록한 SR) 역할로 판정한다 — 역할만 바꿔 확인한다.
+  it.each([
+    ['CLIENT_USER', { isInternal: false }],
+    ['MANAGER', {}],
+  ])('댓글 수는 %s 가 볼 수 있는 댓글만 센다', async (role, where) => {
+    mocks.sessionUser = { id: 'user-1', roles: [role], clientIds: ['c-1'] };
+    await call();
+
+    expect(mocks.findMany.mock.calls[0]![0].select._count).toEqual({
+      select: { comments: { where }, attachments: true },
+    });
   });
 
   it('REQUESTED 인 SR 에만 대기 시간을 계산한다', async () => {

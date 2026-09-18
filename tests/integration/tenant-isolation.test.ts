@@ -31,6 +31,18 @@ describeDb('테넌트 격리 (실제 DB)', () => {
   let externalUserId: string;
   let internalUserId: string;
 
+  // getAllSRs 는 뷰어를 필수로 받는다(목록의 댓글 수를 이 사용자 기준으로 센다). 이 스위트가 보는 것은
+  // where 의 테넌트 필터이므로 뷰어는 결과 행에 영향이 없다.
+  const listViewer = () => ({
+    id: internalUserId,
+    email: 'admin@example.com',
+    name: null,
+    image: null,
+    roles: ['ADMIN'],
+    permissions: [],
+    clientIds: [],
+  });
+
   beforeEach(async () => {
     await resetDatabase();
     await requireRole('ADMIN');
@@ -82,6 +94,7 @@ describeDb('테넌트 격리 (실제 DB)', () => {
 
   it('테넌트 필터가 타 고객사 SR 을 실제로 걸러낸다', async () => {
     const rows = await srService.getAllSRs({
+      viewer: listViewer(),
       where: { clientId: { in: [ownClientId] } },
     });
 
@@ -90,12 +103,15 @@ describeDb('테넌트 격리 (실제 DB)', () => {
   });
 
   it('필터가 없으면 두 테넌트가 모두 보인다 (필터가 실제로 일하고 있음을 보이는 대조군)', async () => {
-    const rows = await srService.getAllSRs({});
+    const rows = await srService.getAllSRs({ viewer: listViewer() });
     expect(rows).toHaveLength(2);
   });
 
   it('소속이 없는 사용자에게 빈 목록을 준다', async () => {
-    const rows = await srService.getAllSRs({ where: { clientId: { in: [] } } });
+    const rows = await srService.getAllSRs({
+      viewer: listViewer(),
+      where: { clientId: { in: [] } },
+    });
     expect(rows).toHaveLength(0);
   });
 

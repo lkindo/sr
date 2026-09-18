@@ -10,9 +10,13 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast }),
 }));
 
+// 보는 사람. 기본은 ADMIN 이고, 역할별 카드 노출은 아래 '접수 대기 카드' 스위트가 바꿔 가며 본다.
+const viewer = vi.hoisted(() => ({ roles: ['ADMIN'] as string[], permissions: [] as string[] }));
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({
-    hasAnyRole: (roles: string[]) => roles.includes('ADMIN'),
+    roles: viewer.roles,
+    permissions: viewer.permissions,
+    hasAnyRole: (roles: string[]) => roles.some((role) => viewer.roles.includes(role)),
     hasRole: () => false,
     hasPermission: () => false,
     hasAnyPermission: () => false,
@@ -71,6 +75,8 @@ function setup() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  viewer.roles = ['ADMIN'];
+  viewer.permissions = [];
 });
 
 afterEach(() => {
@@ -142,5 +148,45 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('heading', { name: '대시보드' })).toBeTruthy();
 
     resolveSecond?.(ok(STATS));
+  });
+});
+
+/**
+ * 접수 대기 카드 — 각 항목이 접수 화면(/srs/[id]/intake)으로 연결되므로 접수할 수 있는 사람에게만 보인다.
+ * 접수는 운영 관리자(ADMIN·MANAGER 또는 SR:INTAKE) 업무다(소유자 결정 2026-09-18). 예전에는 ENGINEER 에게도
+ * 보여서, 눌러 들어가면 "접수 처리 권한이 없습니다" 화면이 나왔다.
+ */
+describe('DashboardPage — 접수 대기 카드', () => {
+  const WITH_WAITING = {
+    ...STATS,
+    summary: { ...STATS.summary, requested: 2 },
+    waitingSRs: [
+      {
+        id: 'sr-1',
+        srNumber: 'SR-001',
+        title: '대기 중인 요청',
+        priority: 'MEDIUM',
+        client: { name: '가나' },
+        requester: { name: '김신청' },
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  };
+
+  it.each([
+    ['ADMIN', ['ADMIN'], [], true],
+    ['MANAGER', ['MANAGER'], [], true],
+    ['SR:INTAKE 를 받은 커스텀 역할', ['TRIAGE'], ['SR:INTAKE'], true],
+    ['ENGINEER', ['ENGINEER'], ['SR:READ', 'SR:UPDATE'], false],
+  ])('%s → 카드 노출 %s', async (_label, roles, permissions, visible) => {
+    viewer.roles = roles as string[];
+    viewer.permissions = permissions as string[];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(WITH_WAITING)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+    await waitFor(() => expect(screen.getByRole('heading', { name: '대시보드' })).toBeTruthy());
+
+    expect(screen.queryByText('접수 대기 SR') !== null).toBe(visible);
   });
 });

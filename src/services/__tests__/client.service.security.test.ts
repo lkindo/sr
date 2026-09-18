@@ -10,6 +10,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
     },
     serviceCategory: { findMany: vi.fn() },
+    sR: { count: vi.fn().mockResolvedValue(0) },
   },
 }));
 
@@ -32,7 +33,15 @@ describe('ClientService Security', () => {
       vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as any);
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([]);
 
-      await clientService.getClientWithDetailsAndCategories('c1');
+      await clientService.getClientWithDetailsAndCategories('c1', {
+        id: 'admin-1',
+        email: 'admin@example.com',
+        name: null,
+        image: null,
+        roles: ['ADMIN'],
+        permissions: [],
+        clientIds: [],
+      });
 
       // Check that findUnique was called with correct select/include arguments
       const findUniqueCalls = vi.mocked(prisma.client.findUnique).mock.calls;

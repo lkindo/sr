@@ -7,7 +7,9 @@ import {
   formatAppZoneDate,
   formatAppZoneShortDate,
   formatISODateInAppZone,
+  fromAppZoneDateTimeInput,
   getAppZoneDateParts,
+  toAppZoneDateTimeInput,
 } from '../timezone';
 
 /**
@@ -123,5 +125,27 @@ describe('diffCalendarDaysInAppZone', () => {
 describe('APP_TIME_ZONE', () => {
   it('Asia/Seoul 로 고정되어 있다', () => {
     expect(APP_TIME_ZONE).toBe('Asia/Seoul');
+  });
+});
+
+/**
+ * 마감일 입력(`<input type="datetime-local">`)의 KST 해석. 오프셋 없는 문자열을 `new Date()` 로 읽으면
+ * 브라우저 타임존으로 해석되어, KST 가 아닌 곳에서 입력한 마감일이 9시간 어긋난다.
+ */
+describe('datetime-local 값의 KST 해석', () => {
+  it('입력값을 KST 시각으로 읽는다', () => {
+    expect(fromAppZoneDateTimeInput('2026-09-20T18:00').toISOString()).toBe(
+      '2026-09-20T09:00:00.000Z'
+    );
+  });
+
+  it('어떤 순간을 KST 입력값으로 되돌린다(자정을 넘는 경우 포함)', () => {
+    expect(toAppZoneDateTimeInput('2026-09-20T09:00:00.000Z')).toBe('2026-09-20T18:00');
+    expect(toAppZoneDateTimeInput('2026-09-20T20:30:00.000Z')).toBe('2026-09-21T05:30');
+  });
+
+  it('둘은 서로의 역이다', () => {
+    const value = '2026-12-31T23:59';
+    expect(toAppZoneDateTimeInput(fromAppZoneDateTimeInput(value))).toBe(value);
   });
 });

@@ -12,7 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DeleteUserDialog } from '@/components/users/DeleteUserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, retryUnlessClientError } from '@/lib/api-client';
+import { CLIENT_ROSTER_HIDDEN_NOTE } from '@/lib/constants/client';
 import { qk } from '@/lib/query-keys';
+import type { ClientViewerScope } from '@/types/client.types';
 
 interface User {
   id: string;
@@ -31,6 +33,14 @@ interface User {
 /** `/api/clients/[id]` 의 응답 중 이 시트가 쓰는 부분만. */
 interface ClientDetail {
   users?: Array<{ user: User }>;
+  /** 'assigned' 면 서버가 명부를 싣지 않았다(담당자 스코프 사용자 — ENGINEER). */
+  viewerScope?: ClientViewerScope;
+}
+
+/** 시트가 쓰는 값. 명부를 숨겼다는 사실을 함께 들고 있어야 빈 목록을 "사용자 없음" 으로 말하지 않는다. */
+interface ClientRoster {
+  users: User[];
+  rosterHidden: boolean;
 }
 
 interface ClientUsersSheetProps {
@@ -55,8 +65,11 @@ const LOAD_ERROR_MESSAGE = '사용자 목록을 불러오는데 실패했습니�
  * 그때마다 새 배열이 나와 표 전체가 불필요하게 리렌더된다.
  * (예전에는 같은 이유로 fetchUsers 를 useCallback 으로 감쌌다.)
  */
-function selectUsers(client: ClientDetail): User[] {
-  return client.users?.map((uc) => uc.user) || [];
+function selectUsers(client: ClientDetail): ClientRoster {
+  return {
+    users: client.users?.map((uc) => uc.user) || [],
+    rosterHidden: client.viewerScope === 'assigned',
+  };
 }
 
 export function ClientUsersSheet({
@@ -70,7 +83,7 @@ export function ClientUsersSheet({
   const { toast } = useToast();
 
   const {
-    data: users = [],
+    data: roster,
     isFetching,
     error,
     refetch,
@@ -93,6 +106,8 @@ export function ClientUsersSheet({
   // 바뀌었다. 그래서 isPending 이 아니라 isFetching 이다 — 이 쿼리에는 창 포커스 재조회가
   // 없으므로(전역 refetchOnWindowFocus: false) 깜빡임을 만들 다른 재조회 경로도 없다.
   const loading = isFetching;
+  const users = roster?.users ?? [];
+  const rosterHidden = roster?.rosterHidden ?? false;
 
   // 조회 실패는 토스트로만 알린다(표는 비어 보인다). v5 의 useQuery 에는 onError 가 없어
   // effect 로 옮긴다. `error` 는 실패마다 새 객체이므로 실패 1회당 정확히 한 번 뜬다 —
@@ -128,6 +143,11 @@ export function ClientUsersSheet({
             {loading ? (
               <div className="flex items-center justify-center py-8">
                 <p className="text-muted-foreground">로딩 중...</p>
+              </div>
+            ) : rosterHidden ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Users className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                <p className="text-muted-foreground">{CLIENT_ROSTER_HIDDEN_NOTE}</p>
               </div>
             ) : users.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">

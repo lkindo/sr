@@ -111,7 +111,8 @@ describe('Sidebar - showAllSections: 역할별 상위 메뉴', () => {
     ['ADMIN', ['Dashboard', 'SR 관리', '조직 관리', '권한 관리', '설정']],
     ['MANAGER', ['Dashboard', 'SR 관리', '조직 관리', '설정']],
     ['ENGINEER', ['Dashboard', 'SR 관리', '조직 관리', '설정']],
-    ['CLIENT_ADMIN', ['Dashboard', 'SR 관리', '설정']],
+    // '자사 관리'(자사 사용자 화면)는 고객사 관리자 전용이다(소유자 결정 2026-09-18 D6).
+    ['CLIENT_ADMIN', ['Dashboard', 'SR 관리', '자사 관리', '설정']],
     ['CLIENT_USER', ['Dashboard', 'SR 관리', '설정']],
   ])('%s 의 상위 메뉴', (role, expected) => {
     signIn(role);

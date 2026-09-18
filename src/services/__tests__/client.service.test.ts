@@ -275,5 +275,49 @@ describe('ClientService', () => {
       expect(prisma.client.delete).not.toHaveBeenCalled();
       expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
+
+    // 삭제된(soft delete) SR 도 client_id FK(ON DELETE RESTRICT)로 고객사를 가리킨다. 이 가드가
+    // 그 SR 을 빼고 세면 앱 검사는 통과하고 실제 DELETE 에서 FK 위반 500 이 난다. 그러면서도
+    // 거부 문구는 고객사 화면이 보여 주는 숫자(살아 있는 SR)와 삭제된 SR 을 구분해야 한다 —
+    // 화면에 SR 이 0건인데 "3개의 SR" 이라고 말하면 사용자는 이유를 찾을 수 없다.
+    describe('삭제된 SR 이 남은 고객사', () => {
+      const countSRs = (alive: number, deleted: number) =>
+        vi
+          .mocked(prisma.sR.count)
+          .mockImplementation((async (args: { where: { deletedAt?: unknown } }) =>
+            args.where.deletedAt ? deleted : alive + deleted) as never);
+
+      beforeEach(() => {
+        vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as never);
+        vi.mocked(prisma.userClient.count).mockResolvedValue(0);
+        vi.mocked(prisma.serviceCategory.count).mockResolvedValue(0);
+        vi.mocked(prisma.clientHandler.count).mockResolvedValue(0);
+      });
+
+      it('삭제된 SR 만 남아도 영구 삭제를 거부한다', async () => {
+        countSRs(0, 3);
+
+        await expect(clientService.deleteClient('client1')).rejects.toThrow(
+          /삭제된 SR 3건\(감사 기록으로 보관 중\)/
+        );
+        expect(prisma.client.delete).not.toHaveBeenCalled();
+      });
+
+      it('FK 가드는 soft delete 필터 없이 전체 SR 을 센다', async () => {
+        countSRs(0, 3);
+
+        await expect(clientService.deleteClient('client1')).rejects.toThrow();
+        expect(prisma.sR.count).toHaveBeenCalledWith({ where: { clientId: 'client1' } });
+      });
+
+      it('살아 있는 SR 과 삭제된 SR 을 나눠 말한다', async () => {
+        countSRs(2, 3);
+
+        const error = await clientService.deleteClient('client1').catch((e: Error) => e);
+        expect((error as Error).message).toContain('2개의 SR');
+        expect((error as Error).message).toContain('삭제된 SR 3건');
+        expect((error as Error).message).not.toContain('5개의 SR');
+      });
+    });
   });
 });

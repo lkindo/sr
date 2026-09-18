@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { auth } from '@/auth';
 import { logger } from '@/lib/logger';
-import { canReadSR, SRAccessFields } from '@/lib/policies';
+import { canReceiveRealtimeEvent } from '@/lib/policies';
 import { REALTIME_EVENTS, realtimeEmitter } from '@/lib/realtime-events';
 import type { AuthenticatedUser } from '@/types/session';
 
@@ -83,20 +83,10 @@ export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
 
   /**
-   * 이 연결이 해당 이벤트를 수신할 자격이 있는지 판정한다.
-   * - 본인이 유발한 이벤트는 제외(에코 방지)
-   * - SR 접근 권한(canReadSR) 기준으로 테넌트/역할 격리
+   * 이 연결이 해당 이벤트를 수신할 자격이 있는지 판정한다 — 에코 방지, 내부 전용 이벤트(내부 노트),
+   * SR 접근 권한(canReadSR) 기준 테넌트/역할 격리. 규칙 본문은 policies.canReceiveRealtimeEvent.
    */
-  const canReceive = (payload: any): boolean => {
-    if (payload?.actorId && payload.actorId === viewer.id) return false;
-    const srFields: SRAccessFields = {
-      id: payload?.id ?? payload?.srId ?? '',
-      clientId: payload?.clientId ?? '',
-      requesterId: payload?.requesterId ?? null,
-      assigneeId: payload?.assigneeId ?? null,
-    };
-    return canReadSR(viewer, srFields);
-  };
+  const canReceive = (payload: any): boolean => canReceiveRealtimeEvent(viewer, payload);
 
   activeConnections.set(userId, userConnections + 1);
   totalConnections++;

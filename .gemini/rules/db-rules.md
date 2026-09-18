@@ -22,7 +22,14 @@
 - **SR의 보존 정책**: SR은 `deletedAt` 기반 Soft Delete를 적용하고 목록·상세·통계·CSV 내보내기 조회에 `deletedAt: null` 필터를 기본 적용한다. 물리 삭제는 데이터 보존 기간 경과 후 관리자 배치로만 수행한다. **SR을 물리 삭제하면 `SRActivity`·`SRComment`·`SRAttachment`·`SRStatusHistory`가 `onDelete: Cascade`로 함께 소멸하므로, 바로 위 "감사 및 이력 보존" 원칙이 통째로 무력화된다.**
   > ✅ **준수(2026-08-15)**: `srs.deleted_at` 을 추가하고 `deleteSR` 을 soft delete 로 전환했다. 조회 경로에는 공용 where 조각 `SR_ALIVE`(`src/lib/prisma-selects.ts`)를 펼쳐 넣고, `$queryRaw` 에는 `deleted_at IS NULL` 을 직접 썼다. 첨부 blob 은 더 이상 삭제 시점에 지우지 않는다 — 행이 살아 있어 경로를 잃지 않으므로 보존 기간 경과 후 배치가 맡는다.
   >
-  > **예외 2곳**: 고객사·사용자 영구 삭제 전의 참조 무결성 가드는 `SR_ALIVE` 를 붙이지 않는다. FK 는 soft delete 된 행도 계속 가리키므로, 여기서 제외하면 앱 검사는 통과하고 실제 DELETE 에서 FK 위반이 터진다.
+  > **예외 (a) — 삭제된 SR 도 센다(참조 무결성 가드 3곳)**: `ClientService.deleteClient` 의 `sR.count({ where: { clientId } })`, `UserService.hardDeleteUser` 의 `sR.count`(신청자·담당자·접수자), `ServiceCategoryService.delete` 의 `_count.srs`. FK 는 soft delete 된 행도 계속 가리키므로, 여기서 제외하면 앱 검사는 통과하고 실제 DELETE 에서 FK 위반이 터진다.
+  >
+  > **예외 (b) — 삭제된 SR 만 센다(`deletedAt: { not: null }`, 3곳)**: `ClientService.getClientWithDetailsAndCategories` 의 `deletedSrCount`(고객사 상세의 삭제 버튼 판정과 그 이유 문구), `deleteClient` 와 `ServiceCategoryService.delete` 의 거부 문구용 건수. 삭제 여부는 (a) 가 판정하고, 이 셋은 화면에 없는 SR 이 왜 삭제를 막는지 말하는 데 쓴다.
+  >
+  > ⚠️ **남은 항목**: 위에서 말한 "보존 기간 경과 후 관리자 배치" 는 아직 없다 — 보존 기간이 정해지지 않았고, 삭제된 SR 의 행·첨부 blob 을 정리하는 코드도 저장소에 없다. 삭제된 SR 을 되살리는 경로도 없다. 삭제된 SR 의 첨부는 다운로드·삭제 라우트가 모두 `SR_ALIVE` 로 SR 을 찾으므로 앱에서는 더 이상 열거나 지울 수 없다.
+  > 삭제된 SR 은 client_id·service_category_id FK 로 고객사·서비스 카테고리를 계속 가리키므로, 삭제된 SR 을 가진 고객사와 서비스 카테고리는 위 정리 배치가 생기기 전까지 영구 삭제할 수 없다. 고객사는 비활성화로 대신할 수 있지만(고객사 수정 권한 필요), **서비스 카테고리는 대안이 없다** — `service_categories.is_active` 컬럼은 있으나 생성·수정 스키마와 다이얼로그 어디에도 없어 앱에서 바꿀 수 없다.
+  >
+  > ✅ **준수(2026-09-18) — 고객사 화면**: 상세의 '최근 SR' 목록·SR 건수와 고객사 목록의 SR 건수는 `SR_ALIVE` 로 삭제된 SR 을 뺀다(`client.service.ts` 의 `srs` include·`_count.srs`, `api/clients` 의 `_count.srs`). 필터만 붙이면 상세의 삭제 버튼이 켜진 채 서버 FK 가드에 거부되는 막다른 길이 되므로, 상세 API 가 삭제된 SR 건수(`deletedSrCount`)를 따로 싣고 화면은 그것까지 반영해 버튼을 막으며, 보이는 것만으로 이유를 알 수 없을 때(사용자·SR 0건) 이유와 대안(비활성화, 고객사 수정 권한 필요)을 적는다. 서버가 함께 보는 서비스 카테고리·담당자 연결은 화면이 판정하지 않고 서버 거부 문구가 알려 준다(예전부터 그랬다). 고객사·서비스 카테고리 삭제 거부 문구도 삭제된 SR 을 따로 밝힌다 — 화면에 없는 SR 을 그냥 세면 숫자가 화면과 어긋나 보인다.
 
 ---
 

@@ -96,6 +96,14 @@ describe('GET — 교차 테넌트 조회 차단', () => {
     expect(res.status).toBe(200);
   });
 
+  // 응답에 무엇을 실을지(ENGINEER 는 사용자 명부 제외·SR 은 배정분만)는 서비스가 보는 사람으로
+  // 판정한다(헌법 §1.2). 라우트는 세션 사용자 **그 자체**를 넘겨야 한다.
+  it('세션 사용자를 보는 사람으로 서비스에 넘긴다', async () => {
+    await (GET as any)(new NextRequest('http://localhost/x'), ctx(internal));
+
+    expect(mocks.getClientWithDetailsAndCategories).toHaveBeenCalledWith(TARGET, internal);
+  });
+
   it('없는 고객사는 404 다', async () => {
     mocks.getClientWithDetailsAndCategories.mockResolvedValue(null);
 

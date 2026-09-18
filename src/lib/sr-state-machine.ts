@@ -218,7 +218,8 @@ export const TRANSITION_PERMISSIONS: Record<string, Record<string, string[]>> = 
  */
 export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
   REQUESTED: {
-    INTAKE: ['ADMIN', 'MANAGER', 'ENGINEER'],
+    // 접수는 운영 관리자 공용 큐 업무다 — ENGINEER 제외(소유자 결정 2026-09-18, policies.canIntakeSR).
+    INTAKE: ['ADMIN', 'MANAGER'],
     REJECTED: ['ADMIN', 'MANAGER', 'ENGINEER'],
   },
   INTAKE: {
@@ -616,4 +617,61 @@ export function getReopenAvailability(
   }
 
   return { visible: true, block: getReopenBlock(status, sr, now) };
+}
+
+/**
+ * SR 의 **운영자**인가 — 접수 이후 SR 내용과 운영자 소유 값(접수 결과·완료 내용·거절 사유)을 쓸 수 있는
+ * 사람. 내부 역할(ADMIN·MANAGER·ENGINEER) 또는 SR:ASSIGN 보유자(외부 커스텀 운영 역할 포함).
+ *
+ * 서버(policies.canWriteSROperatorFields)와 화면(SR 상세·수정 다이얼로그)이 **이 함수 하나**를 쓴다.
+ * 이 모듈은 화면도 import 하므로 여기 둔다(policies.ts 는 서버 전용이다).
+ * SR:ASSIGN 은 prisma/seed.ts 에 실제로 시딩된 권한이다 — 시딩되지 않은 이름을 쓰면 아무도 보유할 수
+ * 없어 조용히 전원이 차단된다.
+ */
+export function isSROperator(viewer: { roles?: string[]; permissions?: string[] }): boolean {
+  const isInternal = (viewer.roles ?? []).some((role) => INTERNAL_ROLE_NAMES.includes(role));
+  return isInternal || holdsPermission(viewer, 'SR:ASSIGN');
+}
+
+/** 권한 보유 여부. 전이 판정(validateTransition)과 같게 대소문자를 무시한다. */
+function holdsPermission(viewer: { permissions?: string[] }, permission: string): boolean {
+  return (viewer.permissions ?? []).some((granted) => granted.toUpperCase() === permission);
+}
+
+/** 운영 관리자 역할 — 접수(트리아지)와 담당자 배정을 맡는다(헌법 §1.1·§4). */
+const OPERATIONS_MANAGER_ROLES = ['ADMIN', 'MANAGER'];
+
+/**
+ * SR 을 접수할 수 있는가 — ADMIN·MANAGER, 또는 SR:INTAKE 를 받은 커스텀 역할.
+ * 소유자 결정(2026-09-18, D1): ENGINEER 는 접수하지 않는다. 서버(policies.canIntakeSR)와 화면(접수
+ * 페이지·목록의 접수 버튼·대시보드 접수 대기 카드)이 이 함수 하나를 쓴다.
+ */
+export function canViewerIntakeSR(viewer: { roles?: string[]; permissions?: string[] }): boolean {
+  const isManager = (viewer.roles ?? []).some((role) => OPERATIONS_MANAGER_ROLES.includes(role));
+  return isManager || holdsPermission(viewer, 'SR:INTAKE');
+}
+
+/**
+ * SR 담당자를 배정·변경할 수 있는가 — ADMIN·MANAGER, 또는 SR:ASSIGN 을 받은 커스텀 역할(D1).
+ * 서버는 policies.canAssignSR 로 이 함수를 쓴다.
+ */
+export function canViewerAssignSR(viewer: { roles?: string[]; permissions?: string[] }): boolean {
+  const isManager = (viewer.roles ?? []).some((role) => OPERATIONS_MANAGER_ROLES.includes(role));
+  return isManager || holdsPermission(viewer, 'SR:ASSIGN');
+}
+
+/** 접수 이후 운영자가 아닌 사람이 SR 내용을 고치려 할 때의 안내. 서버 거부와 화면 안내가 같은 문장을 쓴다. */
+export const SR_CONTENT_LOCKED_MESSAGE =
+  'SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다. 변경이 필요하면 댓글로 담당자에게 알려주세요.';
+
+/**
+ * 이 상태의 SR 내용을 고칠 수 있는가(소유자 결정, 2026-09-18). 접수 전(REQUESTED)에는 SR 을 수정할 수
+ * 있는 사람 누구나, 접수 이후에는 운영자만. 서버의 상세 규칙(만족도·추가 의견 예외, 전이 요청 처리)은
+ * policies.ensureCanEditSRContent 에 있고, 이 함수는 화면이 수정 버튼을 켤지 정하는 데 쓴다.
+ */
+export function canEditSRContentAt(
+  status: string,
+  viewer: { roles?: string[]; permissions?: string[] }
+): boolean {
+  return status === 'REQUESTED' || isSROperator(viewer);
 }

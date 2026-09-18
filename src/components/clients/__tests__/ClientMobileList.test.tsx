@@ -226,3 +226,21 @@ describe('ClientMobileList — 펼침', () => {
     expect(screen.getByText('소속 사용자 (0)')).toBeInTheDocument();
   });
 });
+
+/** 담당 엔지니어가 보는 목록 — ClientTable 의 같은 스위트 참조(헌법 §1.2). */
+describe('ClientMobileList — 명부를 받지 않는 사람(rosterHidden)', () => {
+  it('SR 배지를 내 배정 SR 로 표기한다', () => {
+    renderList({ rosterHidden: true });
+
+    expect(within(cardOf('가나 주식회사')).getByText('내 배정 SR 7')).toBeInTheDocument();
+  });
+
+  it('펼친 카드의 빈 명부를 "사용자 없음" 이 아니라 "보여 주지 않음" 으로 안내한다', () => {
+    renderList({ rosterHidden: true, expandedRows: new Set(['c-1']), clientUsers: { 'c-1': [] } });
+
+    expect(
+      screen.getByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('등록된 사용자가 없습니다.')).not.toBeInTheDocument();
+  });
+});

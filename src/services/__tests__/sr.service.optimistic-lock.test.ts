@@ -24,6 +24,8 @@ vi.mock('@/lib/prisma', () => ({ default: mockPrisma }));
 // Authorization is covered elsewhere; allow it here so we exercise the locking path.
 vi.mock('@/lib/policies', () => ({
   ensureCanUpdateSR: vi.fn(),
+  ensureCanEditSRContent: vi.fn(),
+  canWriteSROperatorFields: vi.fn(() => true),
 }));
 
 vi.mock('@/lib/realtime-events', () => ({

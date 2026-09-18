@@ -232,3 +232,33 @@ describe('ClientTable — 펼침', () => {
     expect(screen.getByText('소속 사용자 (0명)')).toBeInTheDocument();
   });
 });
+
+/**
+ * 담당 엔지니어가 보는 목록 — 헌법 §1.2: 고객사 사용자 정보·SR 통계는 배정 범위.
+ * 서버가 명부를 빈 배열로 주고 SR 건수는 자기 배정분만 센다(GET /api/clients 의 viewerScope='assigned').
+ * 표시가 그 사실을 말하지 않으면 "등록된 사용자가 없습니다"·"SR 3건(전체인 것처럼)" 으로 읽힌다.
+ */
+describe('ClientTable — 명부를 받지 않는 사람(rosterHidden)', () => {
+  it('SR 열을 내 배정 SR 로 표기한다', () => {
+    renderTable({ rosterHidden: true });
+
+    expect(screen.getByRole('columnheader', { name: '내 배정 SR' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'SR' })).not.toBeInTheDocument();
+  });
+
+  it('펼친 행의 빈 명부를 "사용자 없음" 이 아니라 "보여 주지 않음" 으로 안내한다', () => {
+    renderTable({ rosterHidden: true, expandedRows: new Set(['c-1']), clientUsers: { 'c-1': [] } });
+
+    expect(
+      screen.getByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('등록된 사용자가 없습니다.')).not.toBeInTheDocument();
+    expect(screen.queryByText('소속 사용자 (0명)')).not.toBeInTheDocument();
+  });
+
+  it('기본값은 명부를 받는 사람이다 — 표기가 바뀌지 않는다', () => {
+    renderTable();
+
+    expect(screen.getByRole('columnheader', { name: 'SR' })).toBeInTheDocument();
+  });
+});

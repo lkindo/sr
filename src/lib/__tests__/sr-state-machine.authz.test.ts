@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateTransition } from '../sr-state-machine';
+import {
+  canEditSRContentAt,
+  canViewerAssignSR,
+  canViewerIntakeSR,
+  isSROperator,
+  validateTransition,
+} from '../sr-state-machine';
 
 /**
  * 감사 4.3 회귀 테스트 — 상태 전이 인가.
@@ -16,6 +22,78 @@ import { validateTransition } from '../sr-state-machine';
  *    썼다. 운영자가 `SR:UPDATE` + `SR:STATUS_CHANGE` 를 준 커스텀 역할은 `canUpdateSR` 은
  *    통과하지만 전이는 하나도 못 했다 — RBAC 화면이 쓸 수 없는 역할을 만들어 냈다.
  */
+
+/**
+ * SR 운영자·내용 수정 판정 — 서버(policies.canWriteSROperatorFields / ensureCanEditSRContent)와
+ * 화면(SR 상세 수정 버튼, 수정 다이얼로그)이 같이 쓰는 함수다(소유자 결정, 2026-09-18:
+ * 접수 이후 SR 내용은 운영자만 고친다).
+ */
+describe('isSROperator / canEditSRContentAt', () => {
+  it.each([['ADMIN'], ['MANAGER'], ['ENGINEER']])('내부 역할 %s 는 운영자다', (role) => {
+    expect(isSROperator({ roles: [role], permissions: [] })).toBe(true);
+  });
+
+  it('SR:ASSIGN 을 받은 외부 커스텀 역할도 운영자다', () => {
+    expect(isSROperator({ roles: ['CLIENT_USER'], permissions: ['SR:ASSIGN'] })).toBe(true);
+  });
+
+  it.each([['CLIENT_ADMIN'], ['CLIENT_USER']])('SR:ASSIGN 없는 %s 는 운영자가 아니다', (role) => {
+    expect(isSROperator({ roles: [role], permissions: ['SR:UPDATE'] })).toBe(false);
+  });
+
+  it('역할·권한이 비어 있으면 운영자가 아니다(fail-closed)', () => {
+    expect(isSROperator({})).toBe(false);
+  });
+
+  it('접수 전(REQUESTED)은 누구나, 접수 후는 운영자만 내용을 고친다', () => {
+    const customer = { roles: ['CLIENT_ADMIN'], permissions: ['SR:UPDATE'] };
+    const manager = { roles: ['MANAGER'], permissions: [] };
+
+    expect(canEditSRContentAt('REQUESTED', customer)).toBe(true);
+    for (const status of [
+      'INTAKE',
+      'IN_PROGRESS',
+      'ON_HOLD',
+      'COMPLETED',
+      'CONFIRMED',
+      'REJECTED',
+    ]) {
+      expect(canEditSRContentAt(status, customer)).toBe(false);
+      expect(canEditSRContentAt(status, manager)).toBe(true);
+    }
+  });
+});
+
+/**
+ * 접수·담당자 배정 판정 — 운영 관리자(ADMIN·MANAGER) 또는 SR:INTAKE / SR:ASSIGN 을 받은 커스텀 역할.
+ * ENGINEER 는 하지 않는다(소유자 결정 2026-09-18). 서버(policies.canIntakeSR / canAssignSR)와 화면이 같이 쓴다.
+ */
+describe('canViewerIntakeSR / canViewerAssignSR', () => {
+  it.each([['ADMIN'], ['MANAGER']])('%s 는 접수·배정한다', (role) => {
+    expect(canViewerIntakeSR({ roles: [role] })).toBe(true);
+    expect(canViewerAssignSR({ roles: [role] })).toBe(true);
+  });
+
+  it('ENGINEER 는 역할만으로는 접수·배정하지 않는다', () => {
+    const engineer = {
+      roles: ['ENGINEER'],
+      permissions: ['SR:READ', 'SR:UPDATE', 'SR:STATUS_CHANGE'],
+    };
+    expect(canViewerIntakeSR(engineer)).toBe(false);
+    expect(canViewerAssignSR(engineer)).toBe(false);
+  });
+
+  it('권한을 명시적으로 받은 커스텀 역할은 권한 경로로 통과한다(대소문자 무시)', () => {
+    expect(canViewerIntakeSR({ roles: ['TRIAGE'], permissions: ['sr:intake'] })).toBe(true);
+    expect(canViewerAssignSR({ roles: ['TRIAGE'], permissions: ['SR:ASSIGN'] })).toBe(true);
+    expect(canViewerAssignSR({ roles: ['TRIAGE'], permissions: ['SR:INTAKE'] })).toBe(false);
+  });
+
+  it('역할·권한이 비어 있으면 거부한다(fail-closed)', () => {
+    expect(canViewerIntakeSR({})).toBe(false);
+    expect(canViewerAssignSR({})).toBe(false);
+  });
+});
 
 describe('validateTransition — fail-closed', () => {
   it('역할이 빈 배열이면 거부한다 (예전에는 통과했다)', () => {

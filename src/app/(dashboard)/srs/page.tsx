@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import type { Prisma, SRPriority, SRStatus } from '@prisma/client';
 
 import { auth } from '@/auth';
@@ -45,6 +46,9 @@ export default async function SRsPage({ searchParams }: Props) {
   // 필터 옵션(고객사·담당자) 조회가 세션 스코프에 의존하므로 가장 먼저 해석한다.
   // 예전에는 두 캐시 조회를 세션보다 먼저 시작했고, 그래서 스코프를 적용할 수 없었다.
   const session = await auth();
+  // 프록시가 비로그인 요청을 이미 /login 으로 돌리므로 정상 경로에서는 오지 않는다. 그래도 목록 조회는
+  // 뷰어(내부 댓글 수 판정)를 필수로 받으므로, 세션이 없으면 추측하지 않고 로그인으로 보낸다.
+  if (!session?.user) redirect('/login');
   const userRoles = session?.user?.roles || [];
 
   // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
@@ -183,6 +187,7 @@ export default async function SRsPage({ searchParams }: Props) {
   // Fetch all data in parallel
   const [srData, totalCount, globalCounts, clients, users] = await Promise.all([
     srService.getAllSRs({
+      viewer: session.user,
       where,
       orderBy,
       skip: (page - 1) * itemsPerPage,

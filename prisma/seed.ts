@@ -227,7 +227,9 @@ async function seedReferenceData() {
             },
           },
           { resource: 'CLIENT', action: { in: ['READ', 'UPDATE'] } },
-          { resource: 'USER', action: { in: ['READ', 'UPDATE', 'UPDATE_SELF', 'ASSIGN_ROLE'] } },
+          // 역할 부여는 ADMIN 전용이다(소유자 결정 2026-09-18). 예전 ASSIGN_ROLE 은 코드가 검사하지 않는
+          // 권한이라 켜도 효과가 없었고, 카탈로그에서 지웠다(마이그레이션 20260918120000).
+          { resource: 'USER', action: { in: ['READ', 'UPDATE', 'UPDATE_SELF'] } },
           { resource: 'COMMENT' },
           { resource: 'ATTACHMENT' },
           { resource: 'DASHBOARD' },
@@ -252,8 +254,9 @@ async function seedReferenceData() {
     const engineerPermissions = await prisma.permission.findMany({
       where: {
         OR: [
-          // INTAKE 는 TRANSITION_ROLES.REQUESTED.INTAKE 가 ENGINEER 를 포함하는 것과 맞춘다.
-          { resource: 'SR', action: { in: ['READ', 'UPDATE', 'STATUS_CHANGE', 'INTAKE'] } },
+          // INTAKE 는 주지 않는다 — 접수·배정은 운영 관리자 업무다(소유자 결정 2026-09-18,
+          // policies.canIntakeSR). 기존 DB 는 마이그레이션 20260918120000 이 회수한다.
+          { resource: 'SR', action: { in: ['READ', 'UPDATE', 'STATUS_CHANGE'] } },
           { resource: 'CLIENT', action: 'READ' },
           { resource: 'USER', action: 'UPDATE_SELF' },
           { resource: 'COMMENT' },
@@ -289,7 +292,11 @@ async function seedReferenceData() {
             // 예전에는 이 목록에 DELETE 가 없는데도 상세 화면이 CLIENT_ADMIN 에게
             // 삭제 버튼을 보여 줬다. 누르면 반드시 403 인 죽은 버튼이었다.
             // 화면 쪽이 의도를 맞게 표현하고 있었고 권한이 뒤처져 있던 쪽이다.
-            action: { in: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'STATUS_CHANGE', 'CONFIRM'] },
+            //
+            // STATUS_CHANGE 는 주지 않는다 — 고객사 관리자는 확인(CONFIRM)·재오픈만 한다(소유자 결정
+            // 2026-09-18). 거절·진행·보류·완료를 고객이 누를 수 있으면 SLA 준수율이 의미를 잃는다.
+            // 기존 DB 는 마이그레이션 20260918120000 이 회수한다.
+            action: { in: ['CREATE', 'READ', 'UPDATE', 'DELETE', 'CONFIRM'] },
           },
           { resource: 'CLIENT', action: 'READ' },
           { resource: 'USER', action: { in: ['READ', 'UPDATE', 'UPDATE_SELF'] } },

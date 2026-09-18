@@ -14,7 +14,7 @@ import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
-import { useCreateSRForm } from '@/hooks/use-create-sr-form';
+import { REQUESTER_SELF, useCreateSRForm } from '@/hooks/use-create-sr-form';
 
 interface CreateSRDialogProps {
   open: boolean;
@@ -36,6 +36,9 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
     categories,
     loading,
     canSelectClient,
+    requesterId,
+    requesters,
+    canRegisterOnBehalf,
   } = state;
   const {
     setTitle,
@@ -44,6 +47,7 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
     setCategoryId,
     setRequestedPriority,
     setRequestedCompletionDate,
+    setRequesterId,
     setFiles,
     handleSubmit,
   } = actions;
@@ -151,6 +155,31 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
                 </Select>
               </div>
             </div>
+
+            {/* 대리 등록(D3): 고객 요청을 대신 등록할 때는 실제 고객을 신청자로 지정한다. 확인완료는
+                신청자 본인만 하므로, 등록자 이름으로 남기면 그 SR 은 고객이 확인할 수 없다. */}
+            {canRegisterOnBehalf && clientId && (
+              <div className="space-y-2">
+                <Label htmlFor="requester">신청자(고객)</Label>
+                <Select value={requesterId} onValueChange={setRequesterId} disabled={loading}>
+                  <SelectTrigger id="requester">
+                    <SelectValue placeholder="신청자 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={REQUESTER_SELF}>본인(등록자) — 내부 요청</SelectItem>
+                    {requesters.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  고객의 요청을 대신 등록할 때는 그 고객을 신청자로 지정하세요. 확인완료는 신청자
+                  본인만 할 수 있습니다.
+                </p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">

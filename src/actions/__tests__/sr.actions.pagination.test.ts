@@ -139,7 +139,7 @@ describe('SR Actions - Details and Pagination', () => {
       ];
       // Mock SR existence
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      mockSRService.getSRComments.mockImplementation(async (srId, options) => {
+      mockSRService.getSRComments.mockImplementation(async (srId, _viewer, options) => {
         const limit = options?.limit || 20;
         const hasMore = mockComments.length > limit;
         const items = hasMore ? mockComments.slice(0, limit) : mockComments;

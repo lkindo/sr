@@ -268,13 +268,24 @@ describe('SRService.updateSR Branches', () => {
     it('외부 사용자가 dueDate를 바꾸면 ForbiddenError이며 갱신이 실행되지 않는다', async () => {
       await expect(
         srService.updateSR('sr-1', { dueDate: '2030-01-01' }, externalUser)
-      ).rejects.toThrow(ForbiddenError);
+      ).rejects.toThrow('접수 담당자만 변경할 수 있는 항목입니다');
+      // (문구로 단언한다. externalUser 는 이 SR 의 신청자라서, ForbiddenError 만 보면 내용 수정
+      //  규칙 — 신청자의 접수 후 수정 차단 — 이 대신 던져도 통과한다.)
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(txMock.sR.update).not.toHaveBeenCalled();
     });
 
-    it('POSITIVE: 외부 사용자는 본인 고객사 SR의 제목/설명을 계속 수정할 수 있다', async () => {
+    // 신청자의 제목·설명 수정은 접수 전(REQUESTED)에만 된다(PRD §특수 권한 규칙 "SR 소유자",
+    // policies.ensureCanEditSRContent). externalUser(u2)는 이 SR 의 신청자다.
+    // 예전 이 테스트는 접수된 SR 에서도 "계속 수정할 수 있다" 로 고정했는데, 그것이 API 로 접수·완료 뒤
+    // 요청 내용을 덮어쓸 수 있던 결함이었다. 이 테스트의 목적(운영 전용 필드가 요청에 없으면 그대로
+    // 남는다)은 접수 전 SR 에서도 똑같이 성립한다.
+    it('POSITIVE: 외부 사용자는 접수 전 본인 고객사 SR 의 제목·설명을 수정할 수 있다', async () => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+        ...intakedSR,
+        status: 'REQUESTED',
+      } as never);
       await srService.updateSR(
         'sr-1',
         { title: '수정된 제목', description: '수정된 설명입니다.' },

@@ -20,6 +20,8 @@ const {
   mockEnsureCanReadClient,
   mockEnsureCanCreateClient,
   mockIsInternalUser,
+  mockClientSrScopeWhere,
+  mockCanViewClientRoster,
   mockHandleApiError,
 } = vi.hoisted(() => ({
   mockSession: {
@@ -31,6 +33,8 @@ const {
   mockEnsureCanReadClient: vi.fn(),
   mockEnsureCanCreateClient: vi.fn(),
   mockIsInternalUser: vi.fn(),
+  mockClientSrScopeWhere: vi.fn(() => ({})),
+  mockCanViewClientRoster: vi.fn(() => true),
   mockHandleApiError: vi.fn((error: { statusCode?: number; message?: string }) =>
     NextResponse.json(
       { error: error.message ?? 'Error' },
@@ -61,6 +65,8 @@ vi.mock('@/lib/policies', () => ({
   ensureCanReadClient: mockEnsureCanReadClient,
   ensureCanCreateClient: mockEnsureCanCreateClient,
   isInternalUser: mockIsInternalUser,
+  clientSrScopeWhere: mockClientSrScopeWhere,
+  canViewClientRoster: mockCanViewClientRoster,
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -88,6 +94,8 @@ beforeEach(() => {
   // 403 을 받는다. 매번 통과 구현으로 되돌린다.
   mockEnsureCanReadClient.mockImplementation(() => {});
   mockEnsureCanCreateClient.mockImplementation(() => {});
+  mockClientSrScopeWhere.mockImplementation(() => ({}));
+  mockCanViewClientRoster.mockImplementation(() => true);
   mockSession.user = { id: 'u-1', roles: ['ADMIN'], permissions: [], clientIds: [] };
   mockFindMany.mockResolvedValue([]);
   mockCount.mockResolvedValue(0);
@@ -132,6 +140,60 @@ describe('GET /api/clients — 테넌트 격리', () => {
 
     expect(res.status).toBe(403);
     expect(mockFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/clients — SR 건수', () => {
+  // 목록의 'SR N건' 배지는 고객사 상세와 같은 기준이어야 한다 — 삭제된(soft delete) SR 은 세지 않는다.
+  it('삭제된 SR 은 건수에 넣지 않는다', async () => {
+    await GET(get(), {} as never);
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { _count: { select: { srs: { where: { deletedAt: null } }, users: true } } },
+      })
+    );
+  });
+
+  // 헌법 §1.2: ENGINEER 의 SR 통계는 배정 범위로 제한된다. 담당자 스코프는 정책 함수가 정한다.
+  it('SR 건수에 보는 사람의 담당자 스코프를 건다', async () => {
+    mockClientSrScopeWhere.mockImplementation(() => ({ assigneeId: 'eng-1' }));
+
+    await GET(get(), {} as never);
+
+    expect(mockClientSrScopeWhere).toHaveBeenCalledWith(mockSession.user);
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: {
+          _count: {
+            select: { srs: { where: { deletedAt: null, assigneeId: 'eng-1' } }, users: true },
+          },
+        },
+      })
+    );
+  });
+});
+
+/**
+ * 보는 사람의 범위. 고객사 상세와 같은 값(policies.canViewClientRoster)을 봉투에 덧붙인다 — 목록 화면이
+ * SR 건수를 '내 배정' 으로 표기하고, 펼친 행의 빈 명부를 "보여 주지 않음" 으로 안내하는 근거다.
+ */
+describe('GET /api/clients — 보는 사람의 범위', () => {
+  it.each([
+    [true, 'all'],
+    [false, 'assigned'],
+  ])('명부 열람 %s 이면 viewerScope=%s 를 싣는다', async (canView, scope) => {
+    mockCanViewClientRoster.mockImplementation(() => canView);
+    mockFindMany.mockResolvedValue([]);
+    mockCount.mockResolvedValue(0);
+
+    const body = await (await GET(get(), {} as never)).json();
+
+    expect(mockCanViewClientRoster).toHaveBeenCalledWith(mockSession.user);
+    expect(body.viewerScope).toBe(scope);
+    // 봉투는 그대로다 — apiList 가 data/meta 로 읽는다.
+    expect(body).toHaveProperty('data');
+    expect(body).toHaveProperty('meta');
   });
 });
 

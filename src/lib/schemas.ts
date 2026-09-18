@@ -209,6 +209,13 @@ export const srCreateSchema = z.object({
     .min(10, '설명은 최소 10자 이상이어야 합니다.')
     .max(FIELD_LIMITS.LONG_TEXT, `설명은 ${FIELD_LIMITS.LONG_TEXT}자를 초과할 수 없습니다.`),
   clientId: z.string().min(1, '고객사를 선택해주세요.'),
+  /**
+   * 대리 등록 — 운영자가 고객의 요청(전화·메일 등)을 대신 등록할 때 **실제 고객**을 신청자로 지정한다
+   * (소유자 결정 2026-09-18 D3). 확인완료는 신청자 본인만 하므로, 운영자 이름으로 등록하면 그 SR 은
+   * 고객이 확인할 수 없고 운영자도 확인할 수 없어 완료 상태에 머문다. 비우면 등록자 본인이 신청자다.
+   * 내부 사용자만 지정할 수 있다(policies.canRegisterSROnBehalf).
+   */
+  requesterId: z.preprocess(emptyStringToUndefined, z.string().optional()),
   serviceCategoryId: z.string().min(1, '서비스 카테고리를 선택해주세요.'),
   requestedPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
   requestedCompletionDate: z.string().optional(),
@@ -449,6 +456,12 @@ export const commentSchema = z.object({
     .string()
     .min(1, '댓글 내용을 입력해주세요.')
     .max(FIELD_LIMITS.NOTE, `댓글은 ${FIELD_LIMITS.NOTE}자를 초과할 수 없습니다.`),
+  /**
+   * 내부 노트 — 고객에게 보이지 않는 댓글(헌법 §1.1, 소유자 결정 2026-09-18 D7).
+   * 내부 사용자만 세울 수 있다. 외부 사용자가 보낸 값은 라우트가 공개(false)로 강제한다
+   * (policies.canWriteInternalNote).
+   */
+  isInternal: z.boolean().optional(),
 });
 
 /** SR 상태 전이 요청. 실제 전이 가능 여부는 sr-state-machine 이 판정한다. */

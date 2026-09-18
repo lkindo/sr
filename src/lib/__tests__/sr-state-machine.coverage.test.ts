@@ -169,7 +169,9 @@ describe('validateTransition - step 2: role gating', () => {
     expect(result.valid).toBe(false);
     // 메시지는 이제 역할과 권한 두 경로를 모두 안내한다(커스텀 역할이 무엇을 받아야
     // 하는지 알 수 있어야 하므로).
-    expect(result.message).toContain('필요 역할: ADMIN, MANAGER, ENGINEER');
+    // ENGINEER 는 접수하지 않는다(소유자 결정 2026-09-18).
+    expect(result.message).toContain('필요 역할: ADMIN, MANAGER');
+    expect(result.message).not.toContain('ENGINEER');
     expect(result.message).toContain('SR:INTAKE');
   });
 

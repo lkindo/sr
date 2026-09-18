@@ -229,7 +229,7 @@ test.describe('MANAGER: 내부 사용자 데이터 접근 (양성)', () => {
 });
 
 test.describe('MANAGER: 관리자 전용 기능 차단 (음성)', () => {
-  // prisma/seed.ts 의 MANAGER 권한 집합: SR / CLIENT(READ,UPDATE) / USER(READ,UPDATE,ASSIGN_ROLE)
+  // prisma/seed.ts 의 MANAGER 권한 집합: SR / CLIENT(READ,UPDATE) / USER(READ,UPDATE,UPDATE_SELF)
   // / COMMENT / ATTACHMENT / DASHBOARD / NOTIFICATION. ROLE 리소스 권한은 전무하다.
   const adminOnlyEndpoints: Array<{ path: string; guard: string }> = [
     {

@@ -32,6 +32,7 @@ import {
   statusLabelOf,
 } from '@/lib/constants/sr';
 import { qk } from '@/lib/query-keys';
+import { canViewerIntakeSR } from '@/lib/sr-state-machine';
 
 import { DashboardSkeleton } from './DashboardSkeleton';
 
@@ -129,11 +130,13 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { toast } = useToast();
-  const { hasAnyRole } = usePermissions();
+  const { hasAnyRole, roles, permissions } = usePermissions();
   const router = useRouter();
 
   const isAdminManagerEngineer = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const isEngineer = hasAnyRole(['ENGINEER']);
+  // 접수 대기 카드는 접수할 수 있는 사람에게만 보인다(각 항목이 접수 화면으로 연결된다).
+  const canIntake = canViewerIntakeSR({ roles, permissions });
 
   const {
     data: stats,
@@ -197,8 +200,8 @@ export default function DashboardPage() {
           <ExportButton />
         </div>
       </div>
-      {/* 접수 대기 SR 강조 카드 (ADMIN/MANAGER/ENGINEER만) */}
-      {isAdminManagerEngineer && stats.summary.requested > 0 && (
+      {/* 접수 대기 SR 강조 카드 (접수 권한자만 — ADMIN·MANAGER 또는 SR:INTAKE) */}
+      {canIntake && stats.summary.requested > 0 && (
         <Card className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-orange))] bg-gradient-to-r from-blue-500/10 to-transparent">
           <CardHeader>
             <div className="flex items-center justify-between">
