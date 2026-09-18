@@ -1039,11 +1039,15 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
 
 **Database Session 대비 — 감수하는 위험**:
 
-- 로그아웃·권한 회수·역할 변경이 **즉시 반영되지 않는다** (토큰 만료까지 유효)
+- 권한 회수·역할 변경·비활성화·비밀번호 변경은 **최대 60초** 늦게 반영된다 — `src/auth.ts` 의 jwt 콜백이
+  60초마다 DB 를 다시 읽고, 비활성·삭제 계정과 `sessionVersion` 이 바뀐 토큰을 버린다.
+- **로그아웃은 쿠키만 지운다.** 로그아웃 전에 복사해 둔 토큰은 계속 유효하고, 쓰는 동안 만료가 연장된다.
+  2026-09-18 결정 D13 으로 로그인 후 12시간 절대 수명(`SESSION_ABSOLUTE_MAX_AGE_SECONDS`)을 두어 무기한
+  연장은 막았다. 12시간 안의 재사용은 여전히 가능하다.
 - 서명키가 유출되면 임의의 사용자 ID·역할·테넌트를 담은 쿠키를 만들 수 있다
   ([docs/SECRET_ROTATION.md](SECRET_ROTATION.md) 0절)
-- **완화책 미구현**: 토큰 블랙리스트가 없다. 초기 설계안은 Redis 블랙리스트를 적었으나
-  Redis 자체가 채택되지 않았다. 블랙리스트를 도입한다면 DB 테이블 방식이 현재 인프라에 맞는다.
+- **토큰 블랙리스트는 없다.** 초기 설계안은 Redis 블랙리스트를 적었으나 Redis 자체가 채택되지 않았다.
+  블랙리스트를 도입한다면 DB 테이블 방식이 현재 인프라에 맞는다.
 
 ### 보안 설정 전략
 
@@ -1057,8 +1061,12 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
    - HttpOnly Cookie: XSS 방지
    - Secure Flag: HTTPS 전용
    - SameSite=Lax: CSRF 방지
-   - 만료 시간: `session.maxAge` = 8시간(`src/auth.config.ts`). 유휴 만료(입력 30분 없음)는
-     `IdleTimeoutProvider` 가 클라이언트 측에서 처리한다.
+   - 만료 시간: `session.maxAge` = 8시간(`src/auth.config.ts`). Auth.js 가 사용할 때마다 다시 서명하므로
+     **마지막 사용으로부터** 8시간이다(슬라이딩). 로그인 후 12시간이 지나면 사용 중이어도 토큰을 버린다
+     (`SESSION_ABSOLUTE_MAX_AGE_SECONDS`, 결정 D13 — 서버 jwt 콜백과 엣지 미들웨어가 같은 판정을 한다).
+     유휴 만료(입력 30분 없음)는 `IdleTimeoutProvider` 가 클라이언트 측에서 처리한다.
+   - 로그인 실패 잠금: 계정(이메일) 단위로 15분 안에 10번 틀리면 15분 동안 거부한다(`src/lib/login-throttle.ts`,
+     정본 수치 `LOGIN_LOCK_POLICY`). 성공·실패는 감사 로그에 `LOGIN`/`LOGIN_FAILED` 로 남긴다.
 
 3. **HTTPS**
    - Production 환경 필수

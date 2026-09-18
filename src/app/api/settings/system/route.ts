@@ -1,9 +1,9 @@
 // src/app/api/settings/system/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-import { SESSION_MAX_AGE_SECONDS } from '@/auth.config';
+import { SESSION_ABSOLUTE_MAX_AGE_SECONDS, SESSION_MAX_AGE_SECONDS } from '@/auth.config';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS } from '@/lib/constants/session';
+import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS, LOGIN_LOCK_POLICY } from '@/lib/constants/session';
 import { ensureSystemAdmin } from '@/lib/policies';
 import { PASSWORD_POLICY_DESCRIPTION } from '@/lib/schemas';
 import { smtpServer } from '@/services/email.service';
@@ -17,9 +17,9 @@ import { SystemSettings } from '@/types/settings';
  * 않으면서 "시스템 설정이 저장되었습니다" 를 돌려줬다. 저장소(설정 테이블)가 없으므로 PUT 을 걷어냈고,
  * 각 값은 그 정본(세션 상수, 비밀번호 스키마, 메일 발송 설정)에서 읽는다.
  *
- * 세션은 두 값을 함께 준다. 사용자가 실제로 겪는 것은 화면 유휴 로그아웃(30분)이고, 토큰 수명(8시간)은
- * 화면 타이머가 돌지 않을 때(탭을 닫아 둔 경우 등)의 상한이다. 토큰 수명만 보여 주면 "8시간 유지" 로
- * 읽혀 실제 동작과 어긋난다.
+ * 세션은 세 값을 함께 준다. 사용자가 실제로 겪는 것은 화면 유휴 로그아웃(30분)이다. 토큰 수명(8시간)은
+ * 화면 타이머가 돌지 않을 때(탭을 닫아 둔 경우 등) **마지막 사용으로부터** 유지되는 시간이고 사용할 때마다
+ * 연장된다. 그래서 로그인 후 절대 수명(12시간, 결정 D13)을 따로 보여 준다.
  */
 export const GET = withAuthAndRateLimit(
   async (_request: NextRequest, { session }) => {
@@ -30,7 +30,9 @@ export const GET = withAuthAndRateLimit(
         idleLogoutMinutes: IDLE_TIMEOUT_MS / 60_000,
         idleWarningMinutes: IDLE_WARNING_MS / 60_000,
         tokenMaxAgeHours: SESSION_MAX_AGE_SECONDS / 3600,
+        absoluteMaxAgeHours: SESSION_ABSOLUTE_MAX_AGE_SECONDS / 3600,
       },
+      loginLock: { ...LOGIN_LOCK_POLICY },
       passwordPolicy: PASSWORD_POLICY_DESCRIPTION,
       mailServer: smtpServer(),
     };

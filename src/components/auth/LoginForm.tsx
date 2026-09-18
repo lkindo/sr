@@ -17,7 +17,22 @@ import {
 import { Checkbox } from '@/components/ui';
 import { Input, PasswordInput } from '@/components/ui';
 import { Label } from '@/components/ui';
+import { LOGIN_LOCK_POLICY } from '@/lib/constants/session';
 import { logger } from '@/lib/logger';
+
+/**
+ * 로그인 실패 사유(`signIn` 결과의 `code`)별 안내(결정 D13). 잠금과 요청 제한은 "비밀번호가 틀렸다" 가
+ * 아니므로 다시 입력해 봐야 소용없다는 것을 알려야 한다. 잠금 문구는 존재하지 않는 이메일에도 똑같이 나온다.
+ */
+function signInErrorMessage(code: string | undefined): string {
+  if (code === 'account_locked') {
+    return `로그인 실패가 반복되어 이 계정의 로그인이 잠시 막혔습니다. ${LOGIN_LOCK_POLICY.lockMinutes}분 뒤에 다시 시도하세요.`;
+  }
+  if (code === 'rate_limited') {
+    return '로그인 시도가 너무 잦습니다. 1분 정도 기다린 뒤 다시 시도하세요.';
+  }
+  return '이메일 또는 비밀번호가 올바르지 않습니다.';
+}
 
 /**
  * "이메일 저장" 은 부가 기능이다. 스토리지가 막힌 환경(사파리 프라이빗 일부 버전,
@@ -85,7 +100,7 @@ export default function LoginForm() {
       const signInFailed = Boolean(result?.error) || result?.ok === false;
 
       if (signInFailed) {
-        setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+        setError(signInErrorMessage(result?.code));
       } else {
         // 로그인 성공 시 이메일만 저장 또는 삭제 (비밀번호는 저장하지 않음).
         // 저장 실패는 로그인 자체를 실패시켜서는 안 된다 — try/catch 없이 두면

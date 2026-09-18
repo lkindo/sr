@@ -34,7 +34,13 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 const SETTINGS = {
-  session: { idleLogoutMinutes: 30, idleWarningMinutes: 1, tokenMaxAgeHours: 8 },
+  session: {
+    idleLogoutMinutes: 30,
+    idleWarningMinutes: 1,
+    tokenMaxAgeHours: 8,
+    absoluteMaxAgeHours: 12,
+  },
+  loginLock: { maxFailures: 10, windowMinutes: 15, lockMinutes: 15 },
   passwordPolicy: '8~100자, 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함',
   mailServer: {
     host: 'mail.example.org',
@@ -78,9 +84,10 @@ describe('SystemSettingsPage', () => {
     renderPage();
 
     expect(screen.getByText('로딩 중...')).toBeInTheDocument();
-    // 사용자가 실제로 겪는 규칙(유휴 로그아웃)과 토큰 상한을 따로 보여 준다.
+    // 사용자가 실제로 겪는 규칙(유휴 로그아웃)과 토큰 수명·절대 수명을 따로 보여 준다(결정 D13).
     expect(await screen.findByText(IDLE_TEXT)).toBeInTheDocument();
-    expect(screen.getByText('최대 8시간')).toBeInTheDocument();
+    expect(screen.getByText('마지막 사용 후 8시간 · 로그인 후 최대 12시간')).toBeInTheDocument();
+    expect(screen.getByText('15분 안에 10번 틀리면 15분 동안 로그인 거부')).toBeInTheDocument();
     expect(screen.getByText(SETTINGS.passwordPolicy)).toBeInTheDocument();
     expect(screen.getByText('mail.example.org:2525')).toBeInTheDocument();
     expect(fetchMock.mock.calls[0]![0]).toBe('/api/settings/system');

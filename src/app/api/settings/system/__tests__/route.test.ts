@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { SESSION_MAX_AGE_SECONDS } from '@/auth.config';
-import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS } from '@/lib/constants/session';
+import { SESSION_ABSOLUTE_MAX_AGE_SECONDS, SESSION_MAX_AGE_SECONDS } from '@/auth.config';
+import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS, LOGIN_LOCK_POLICY } from '@/lib/constants/session';
 import { PASSWORD_POLICY_DESCRIPTION } from '@/lib/schemas';
 
 const state = vi.hoisted(() => ({ roles: ['ADMIN'] as string[] }));
@@ -54,14 +54,19 @@ describe('GET /api/settings/system', () => {
       idleLogoutMinutes: IDLE_TIMEOUT_MS / 60_000,
       idleWarningMinutes: IDLE_WARNING_MS / 60_000,
       tokenMaxAgeHours: SESSION_MAX_AGE_SECONDS / 3600,
+      absoluteMaxAgeHours: SESSION_ABSOLUTE_MAX_AGE_SECONDS / 3600,
     });
     // 정본 값 자체도 못박는다 — 사용자가 겪는 규칙은 "30분 무입력 → 로그아웃(1분 전 경고)" 이고
-    // 8시간은 토큰 상한이다. 예전 화면은 8시간만 "세션" 으로 보여 줬다.
+    // 8시간은 마지막 사용으로부터의 토큰 수명, 12시간은 로그인 후 절대 수명이다(결정 D13).
+    // 예전 화면은 8시간만 "세션" 으로 보여 줬다.
     expect(body.session).toEqual({
       idleLogoutMinutes: 30,
       idleWarningMinutes: 1,
       tokenMaxAgeHours: 8,
+      absoluteMaxAgeHours: 12,
     });
+    expect(body.loginLock).toEqual(LOGIN_LOCK_POLICY);
+    expect(body.loginLock).toEqual({ maxFailures: 10, windowMinutes: 15, lockMinutes: 15 });
     expect(body.passwordPolicy).toBe(PASSWORD_POLICY_DESCRIPTION);
   });
 

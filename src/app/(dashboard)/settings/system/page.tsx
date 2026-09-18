@@ -93,12 +93,28 @@ export default function SystemSettingsPage() {
           </div>
           <Separator />
           <div>
-            <p className="text-sm font-medium">로그인 토큰 수명</p>
+            <p className="text-sm font-medium">로그인 유지 시간</p>
             <p className="text-sm text-muted-foreground">
-              {session ? `최대 ${session.tokenMaxAgeHours}시간` : '-'}
+              {session
+                ? `마지막 사용 후 ${session.tokenMaxAgeHours}시간 · 로그인 후 최대 ${session.absoluteMaxAgeHours}시간`
+                : '-'}
             </p>
             <p className="text-xs text-muted-foreground">
-              화면을 닫아 두어 자동 로그아웃 타이머가 돌지 않을 때의 상한입니다.
+              화면을 닫아 두어 자동 로그아웃 타이머가 돌지 않을 때는 마지막 사용 후 첫 번째 시간이
+              지나면 로그아웃됩니다. 계속 사용 중이어도 로그인한 지 두 번째 시간이 지나면 다시
+              로그인해야 합니다.
+            </p>
+          </div>
+          <Separator />
+          <div>
+            <p className="text-sm font-medium">로그인 실패 잠금</p>
+            <p className="text-sm text-muted-foreground">
+              {settings?.loginLock
+                ? `${settings.loginLock.windowMinutes}분 안에 ${settings.loginLock.maxFailures}번 틀리면 ${settings.loginLock.lockMinutes}분 동안 로그인 거부`
+                : '-'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              접속 위치(IP)와 관계없이 계정(이메일) 단위로 셉니다. 시간이 지나면 자동으로 풀립니다.
             </p>
           </div>
           <Separator />

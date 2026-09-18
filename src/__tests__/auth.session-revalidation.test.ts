@@ -26,6 +26,8 @@ vi.mock('next-auth', () => ({
     capturedConfig = config;
     return { handlers: {}, signIn: vi.fn(), signOut: vi.fn(), auth: vi.fn() };
   }),
+  // src/auth.ts 가 잠금 거부(AccountLockedError)의 부모로 쓴다.
+  CredentialsSignin: class CredentialsSignin extends Error {},
 }));
 
 vi.mock('next-auth/providers/credentials', () => ({

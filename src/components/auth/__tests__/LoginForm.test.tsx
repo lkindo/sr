@@ -233,6 +233,32 @@ describe('LoginForm — 실패 처리', () => {
     expect(localStorage.getItem(EMAIL_KEY)).toBe('previous@example.com');
   });
 
+  it('계정이 잠겼으면(code=account_locked) 비밀번호가 틀렸다고 하지 않고 기다릴 시간을 알린다', async () => {
+    signIn.mockResolvedValue({ ok: false, error: 'CredentialsSignin', code: 'account_locked' });
+    render(<LoginForm />);
+    fillCredentials();
+
+    await submit();
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('잠시 막혔습니다. 15분 뒤에 다시 시도하세요.');
+    expect(alert).not.toHaveTextContent(CREDENTIAL_ERROR);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('요청 제한에 걸렸으면(code=rate_limited) 잠시 뒤 다시 시도하라고 알린다', async () => {
+    signIn.mockResolvedValue({ ok: false, error: 'CredentialsSignin', code: 'rate_limited' });
+    render(<LoginForm />);
+    fillCredentials();
+
+    await submit();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '로그인 시도가 너무 잦습니다. 1분 정도 기다린 뒤 다시 시도하세요.'
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it('ok:false 는 error 가 null 이어도 실패다 — 대시보드로 넘기지 않는다', async () => {
     // NextAuth 가 `{ ok: false, error: null }` 을 돌려주는 경우가 있다.
     // `error` 만 보던 시절에는 인증에 실패했는데도 /dashboard 로 push 했다.

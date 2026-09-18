@@ -45,8 +45,13 @@ export const POST = async (request: Request): Promise<Response> => {
     const result = await rateLimiters.strict.check(key);
 
     if (!result.allowed) {
+      // next-auth 의 signIn() 은 응답의 `url` 에서 error·code 를 읽는다. url 이 없으면 로그인 화면이
+      // "로그인 중 오류" 만 보여 이유를 알 수 없었다(결정 D13). code 로 "잠시 후 다시 시도" 를 안내한다.
+      const signInUrl = new URL('/login', request.url);
+      signInUrl.searchParams.set('error', 'CredentialsSignin');
+      signInUrl.searchParams.set('code', 'rate_limited');
       return NextResponse.json(
-        { error: 'Too Many Requests' },
+        { error: 'Too Many Requests', url: signInUrl.toString() },
         {
           status: 429,
           headers: {

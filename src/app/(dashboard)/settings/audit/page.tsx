@@ -240,7 +240,8 @@ export default function AuditLogPage() {
           <CardTitle>기록</CardTitle>
           <CardDescription>
             {meta ? `총 ${meta.totalItems}건. ` : ''}행위자가 비어 있는 기록은 영구 삭제된 사용자나
-            시스템 처리입니다.
+            시스템 처리입니다. 로그인 실패는 누가 시도했는지 알 수 없으므로 행위자를 비우고 대상에
+            계정을 남깁니다.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -276,7 +277,16 @@ export default function AuditLogPage() {
                               <div className="text-xs text-muted-foreground">{row.user.email}</div>
                             </>
                           ) : (
-                            <span className="text-muted-foreground">삭제된 사용자 또는 시스템</span>
+                            <span className="text-muted-foreground">
+                              {row.actionType === 'LOGIN_FAILED'
+                                ? '알 수 없음(로그인 실패)'
+                                : '삭제된 사용자 또는 시스템'}
+                            </span>
+                          )}
+                          {row.ipAddress && (
+                            <div className="text-xs text-muted-foreground tabular-nums">
+                              IP {row.ipAddress}
+                            </div>
                           )}
                         </td>
                         <td className="py-2 pr-4">{labelOf(ACTION_LABELS, row.actionType)}</td>

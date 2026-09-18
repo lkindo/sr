@@ -5,9 +5,16 @@ export interface SystemSettings {
     idleLogoutMinutes: number;
     /** 로그아웃 전 경고를 띄우는 시간(분). IDLE_WARNING_MS. */
     idleWarningMinutes: number;
-    /** 로그인 토큰(JWT 쿠키) 수명의 상한(시간). src/auth.config.ts 의 SESSION_MAX_AGE_SECONDS. */
+    /**
+     * 마지막 사용으로부터 로그인 토큰(JWT 쿠키)이 유지되는 시간(시간). 사용할 때마다 연장되므로 절대 상한이
+     * 아니다. src/auth.config.ts 의 SESSION_MAX_AGE_SECONDS.
+     */
     tokenMaxAgeHours: number;
+    /** 로그인한 뒤 사용 중이어도 다시 로그인해야 하는 시간(시간). SESSION_ABSOLUTE_MAX_AGE_SECONDS(결정 D13). */
+    absoluteMaxAgeHours: number;
   };
+  /** 계정 단위 로그인 실패 잠금(결정 D13). src/lib/constants/session.ts 의 LOGIN_LOCK_POLICY. */
+  loginLock: { maxFailures: number; windowMinutes: number; lockMinutes: number };
   /** 비밀번호 정책(src/lib/schemas.ts 의 passwordSchema 와 같은 상수에서 만든 문장). */
   passwordPolicy: string;
   /**

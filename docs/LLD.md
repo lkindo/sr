@@ -2804,7 +2804,10 @@ export class MemoryRateLimiter {
   막기 위해서다. 세션이 없으면 IP 가 주 버킷이다.
 - Server Action(`src/lib/action-helpers.ts`): 로그인 사용자는 `<namespace>:user:<userId>`, 아니면
   `<namespace>:ip:<ip>` 가 주 버킷이고, 모든 액션이 공유하는 IP 천장을 따로 검사한다.
-- 로그인(`/api/auth/[...nextauth]`)은 `login:<email>:<ip>` 로 계정·발신지 조합을 센다.
+- 로그인(`/api/auth/[...nextauth]`)은 `login:<email>:<ip>` 로 계정·발신지 조합을 센다. 초과하면 429 본문에
+  `url`(`/login?error=CredentialsSignin&code=rate_limited`)을 실어 로그인 화면이 사유를 보이게 한다.
+  이와 별도로 `src/lib/login-throttle.ts` 가 IP 와 무관하게 **계정 단위 실패만** 세어 15분 10회에 15분 잠근다
+  (결정 D13, 거부 코드 `account_locked`).
 
 IP 는 `getClientIp()` 가 결정한다. `X-Real-IP` 를 최우선으로 쓰고, 없으면
 `X-Forwarded-For` 의 **마지막** 항목을 쓴다(nginx 가 실제 클라이언트를 마지막에 추가하므로

@@ -14,3 +14,14 @@ export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 /** 로그아웃 직전 경고 모달을 띄워 두는 시간(밀리초). `IDLE_TIMEOUT_MS` 에 포함된다. */
 export const IDLE_WARNING_MS = 1 * 60 * 1000;
+
+/**
+ * 계정 단위 로그인 실패 잠금 — **정본**(2026-09-18 소유자 결정 D13).
+ * `src/lib/login-throttle.ts` 가 판정에, 로그인 화면과 시스템 설정 화면이 안내에 쓴다.
+ * `windowMinutes` 안에 `maxFailures` 번 틀리면 그 계정은 `lockMinutes` 동안 로그인을 거부한다.
+ */
+export const LOGIN_LOCK_POLICY = {
+  maxFailures: 10,
+  windowMinutes: 15,
+  lockMinutes: 15,
+} as const;

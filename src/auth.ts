@@ -1,14 +1,47 @@
 import 'server-only';
 
-import NextAuth from 'next-auth';
+import NextAuth, { CredentialsSignin } from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 
 import { logger } from '@/lib/logger';
+import { clearLoginFailures, loginLockRemainingMs, recordLoginFailure } from '@/lib/login-throttle';
 import prisma from '@/lib/prisma';
+import { getClientIp } from '@/lib/rate-limiter';
 import { expandRolePermissions } from '@/lib/role-permissions';
 import { verifyPassword } from '@/lib/security';
+import { auditService } from '@/services/audit.service';
 
-import { authConfig } from './auth.config';
+import { authConfig, isSessionPastAbsoluteLifetime } from './auth.config';
+
+/**
+ * 계정이 잠겨 로그인을 거부할 때(결정 D13). `code` 가 로그인 화면까지 전달돼 "잠시 후 다시 시도" 를 안내한다.
+ * 잠금은 존재하지 않는 이메일에도 똑같이 걸리므로 이 코드로 계정 존재를 알아낼 수 없다.
+ */
+class AccountLockedError extends CredentialsSignin {
+  code = 'account_locked';
+}
+
+/**
+ * 로그인 성공·실패를 감사 로그에 남긴다(결정 D13 — 조회는 D11 의 감사 로그 화면). **로그인을 막지 않는다** —
+ * 감사 로그 쓰기가 실패해도(createLog 는 실패하면 던진다) 로그인 자체는 진행된다.
+ * 실패는 존재하는 계정에 대해서만, 그리고 잠기기 전까지만 남긴다 — 행 수를 공격자가 정하지 못하게 한다.
+ */
+async function recordLoginAudit(entry: {
+  userId: string | null;
+  actionType: 'LOGIN' | 'LOGIN_FAILED';
+  targetId: string;
+  changes: Record<string, unknown>;
+  ipAddress: string | null;
+}): Promise<void> {
+  try {
+    await auditService.createLog(prisma, { ...entry, targetEntity: 'User' });
+  } catch (error) {
+    logger.warn('[Auth] 로그인 기록을 남기지 못했습니다.', {
+      custom_actionType: entry.actionType,
+      custom_error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 // Prisma 클라이언트가 초기화되었는지 확인하는 헬퍼 함수
 function ensurePrismaClient() {
@@ -90,11 +123,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) {
           logger.warn('[Auth] 이메일 또는 비밀번호 누락');
           return null;
         }
+
+        // 계정 단위 실패 제한(결정 D13) — IP 와 무관하다. 잠겨 있으면 비밀번호를 확인하지 않는다.
+        const email = credentials.email as string;
+        if (loginLockRemainingMs(email) > 0) {
+          logger.warn(`[Auth] 잠긴 계정의 로그인 시도: ${email}`);
+          throw new AccountLockedError();
+        }
+        const clientIp = request?.headers ? getClientIp(request.headers) : 'unknown';
+        const ipAddress = clientIp === 'unknown' ? null : clientIp;
 
         try {
           const db = ensurePrismaClient();
@@ -133,10 +175,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           );
 
           if (!user || !isPasswordValid) {
+            recordLoginFailure(email);
             if (!user) {
               logger.warn(`[Auth] 사용자 찾을 수 없음: ${credentials.email}`);
             } else {
               logger.warn(`[Auth] 비밀번호 불일치: ${credentials.email}`);
+              // 행위자는 알 수 없으므로 비운다. 대상 칸에 계정이 남는다.
+              await recordLoginAudit({
+                userId: null,
+                actionType: 'LOGIN_FAILED',
+                targetId: user.id,
+                changes: {
+                  reason: 'invalid_password',
+                  lockedNow: loginLockRemainingMs(email) > 0,
+                },
+                ipAddress,
+              });
             }
             return null;
           }
@@ -146,6 +200,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             logger.warn(`[Auth] 비활성 사용자: ${credentials.email}`);
             return null;
           }
+
+          clearLoginFailures(email);
+          await recordLoginAudit({
+            userId: user.id,
+            actionType: 'LOGIN',
+            targetId: user.id,
+            changes: {},
+            ipAddress,
+          });
 
           return {
             id: user.id,
@@ -173,6 +236,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.email = user.email;
         token.name = user.name;
         token.image = user.image;
+        // 절대 수명의 기준 시각(결정 D13 — auth.config.isSessionPastAbsoluteLifetime).
+        token.loginAt = Date.now();
+      }
+
+      // 로그인한 지 절대 수명이 지났으면 사용 중이어도 세션을 끝낸다. 이 변경 전에 발급된 토큰에는 기준 시각이
+      // 없으므로 지금부터 센다.
+      if (isSessionPastAbsoluteLifetime(token)) {
+        logger.info('[Auth] 세션 절대 수명이 지나 다시 로그인하게 합니다.', {
+          custom_userId: String(token.id ?? ''),
+        });
+        return null;
+      }
+      if (typeof token.loginAt !== 'number') {
+        token.loginAt = Date.now();
       }
 
       // 클레임을 다시 읽어야 하는 세 경우:

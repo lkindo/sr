@@ -78,6 +78,22 @@ describe('POST /api/auth/[...nextauth] — 자격증명 로그인', () => {
     expect((await POST(loginRequest('victim@example.com', '198.51.100.2'))).status).toBe(200);
   });
 
+  it('429 본문에 로그인 화면이 읽을 url(code=rate_limited)을 싣는다', async () => {
+    // next-auth 의 signIn() 은 응답의 url 에서 error·code 를 읽는다. url 이 없으면 new URL(undefined) 가
+    // 던져 로그인 화면이 "로그인 중 오류" 만 보였다(결정 D13).
+    for (let i = 0; i < 5; i++) await POST(loginRequest('victim@example.com'));
+
+    const blocked = await POST(loginRequest('victim@example.com'));
+    const body = await blocked.json();
+    const url = new URL(body.url);
+
+    expect(blocked.status).toBe(429);
+    expect(url.origin).toBe('http://localhost:3000');
+    expect(url.pathname).toBe('/login');
+    expect(url.searchParams.get('error')).toBe('CredentialsSignin');
+    expect(url.searchParams.get('code')).toBe('rate_limited');
+  });
+
   it('로그인이 아닌 Auth.js 엔드포인트는 strict 를 거치지 않는다', async () => {
     // session/csrf 는 정상 사용 중에도 자주 호출된다. 여기에 5회 제한을 걸면 앱이 멈춘다.
     for (let i = 0; i < 12; i++) {
