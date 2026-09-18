@@ -1064,7 +1064,9 @@ export async function deleteComment(id: string) {
 > | `/api/realtime` | SSE 스트림. 래퍼의 요청/응답 모델과 맞지 않아 핸들러가 직접 `auth()` 를 호출하고 연결 상한을 건다. |
 >
 > `/api/clients/public` 은 회원가입 화면이 쓰는 유일한 비인증 조회다. 인증은 없지만
-> `withErrorHandler` 는 경유해 오류 매핑과 계측을 받는다.
+> `withErrorHandler` 는 경유해 오류 매핑과 계측을 받고, `rateLimit(…, 'strict')` 로 IP 당 1분 5회로 묶인다.
+> 응답은 활성 고객사의 `name`·`code` 뿐이다 — 내부 id 는 교차 테넌트 IDOR 의 입력으로 쓰였으므로 주지
+> 않고, 가입 액션이 `clientCode` 를 받아 활성 고객사로 해석한다(헌법 §1.2 예외, 2026-09-18 결정 D14 A+).
 >
 > 이 표가 be-rules §1·§2 가 말하는 예외 목록의 정본이다(헌법은 목록을 복제하지 않는다). 라우트가 아닌
 > 비인증 진입점은 회원가입 Server Action(`src/app/(auth)/register/actions.ts`) 하나다. **Server Action 은
@@ -1081,7 +1083,7 @@ export async function deleteComment(id: string) {
 | `/api/clients/[id]` | DELETE / GET / PATCH | withAuthAndRateLimit | `src/app/api/clients/[id]/route.ts` |
 | `/api/clients/[id]/categories` | GET / POST | withAuthAndRateLimit | `src/app/api/clients/[id]/categories/route.ts` |
 | `/api/clients/[id]/categories/[categoryId]` | DELETE / PATCH | withAuthAndRateLimit | `src/app/api/clients/[id]/categories/[categoryId]/route.ts` |
-| `/api/clients/public` | GET | withErrorHandler (인증 없음) | `src/app/api/clients/public/route.ts` |
+| `/api/clients/public` | GET | rateLimit(strict) + withErrorHandler (인증 없음) | `src/app/api/clients/public/route.ts` |
 | `/api/dashboard/stats` | GET | withAuthAndRateLimit | `src/app/api/dashboard/stats/route.ts` |
 | `/api/health` | GET | **래퍼 없음** | `src/app/api/health/route.ts` |
 | `/api/notifications/outbox` | GET / POST | withAuthAndRateLimit | `src/app/api/notifications/outbox/route.ts` |

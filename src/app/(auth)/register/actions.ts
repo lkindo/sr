@@ -30,7 +30,9 @@ import { UserService } from '@/services/user.service';
 const registerSchema = registerFieldsSchema
   .extend({
     accountType: z.enum(['ENGINEER', 'CLIENT']),
-    clientId: z.string().optional(),
+    // 공개 목록은 내부 id 를 주지 않는다 — 고객사 코드로 받아 서버가 찾는다(D14 A+).
+    // clients.code 는 varchar(50) 이다.
+    clientCode: z.string().trim().max(50).optional(),
   })
   .refine(passwordsMatch.check, passwordsMatch.options);
 
@@ -39,7 +41,7 @@ export async function registerUser(formData: FormData) {
     // 미인증 액션이라 IP 로 키잉된다. 전용 네임스페이스를 둬서 가입 시도 폭주가
     // 같은 IP 의 정상 SR 작업을 잠그지 않게 한다.
     await requireRateLimit('strict', 'register');
-    const clientIdValue = formData.get('clientId');
+    const clientCodeValue = formData.get('clientCode');
     const data = {
       name: formData.get('name') as string,
       email: formData.get('email') as string,
@@ -47,17 +49,34 @@ export async function registerUser(formData: FormData) {
       confirmPassword: formData.get('confirmPassword') as string,
       accountType: formData.get('accountType') as 'ENGINEER' | 'CLIENT',
       // null을 undefined로 변환 (Zod optional은 undefined만 허용)
-      clientId: clientIdValue ? (clientIdValue as string) : undefined,
+      clientCode: clientCodeValue ? (clientCodeValue as string) : undefined,
     };
 
     const validated = registerSchema.parse(data);
 
     // 고객사 담당자인데 고객사 미선택 시 에러
-    if (validated.accountType === 'CLIENT' && !validated.clientId) {
+    if (validated.accountType === 'CLIENT' && !validated.clientCode) {
       return {
         success: false,
         error: '고객사 담당자는 소속 고객사를 선택해야 합니다.',
       };
+    }
+
+    // 코드를 **활성** 고객사로 해석한다. 예전에는 받은 clientId 를 조회 없이 소속으로 만들어,
+    // 목록에 없는 비활성 고객사 id 를 직접 보내면 그 고객사의 가입 신청이 생겼다.
+    let clientId: string | null = null;
+    if (validated.accountType === 'CLIENT') {
+      const client = await prisma.client.findFirst({
+        where: { code: validated.clientCode, isActive: true },
+        select: { id: true },
+      });
+      if (!client) {
+        return {
+          success: false,
+          error: '선택한 고객사를 찾을 수 없습니다. 목록에서 다시 선택하세요.',
+        };
+      }
+      clientId = client.id;
     }
 
     const userService = new UserService();
@@ -112,11 +131,11 @@ export async function registerUser(formData: FormData) {
       // 3. 고객사 할당 (CLIENT인 경우)
       // 셀프 가입으로 생성되는 소속은 PENDING 으로 두어, 고객사 관리자/운영자 승인 전까지
       // 세션 clientIds 에 포함되지 않도록 한다. (승인 전 크로스테넌트 데이터 접근 차단)
-      if (validated.accountType === 'CLIENT' && validated.clientId) {
+      if (clientId) {
         await tx.userClient.create({
           data: {
             userId: user.id,
-            clientId: validated.clientId,
+            clientId,
             status: 'PENDING',
           },
         });

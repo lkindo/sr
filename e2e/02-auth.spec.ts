@@ -83,6 +83,19 @@ async function submitLogin(page: Page, email: string, password: string) {
 }
 
 test.describe('회원가입', () => {
+  // 가입 화면의 공개 고객사 목록은 이름·코드만 준다(2026-09-18 소유자 결정 D14 A+).
+  // 내부 id 는 익명에게 주지 않는다 — 가입은 코드로 서버가 고객사를 찾는다.
+  test('로그인 없이 받는 고객사 목록은 이름·코드만 담는다', async ({ request }) => {
+    const response = await request.get('/api/clients/public');
+    expect(response.status()).toBe(200);
+
+    const clients = (await response.json()) as Array<Record<string, unknown>>;
+    expect(clients.length, '시드에는 활성 고객사가 있다').toBeGreaterThan(0);
+    for (const client of clients) {
+      expect(Object.keys(client).sort()).toEqual(['code', 'name']);
+    }
+  });
+
   test('CLIENT 가입 계정은 활성이지만 고객사 소속은 승인 대기다', async ({ page }) => {
     const email = uniqueEmail('client');
     await fillRegistrationBasics(page, 'E2E Test Client User', email);

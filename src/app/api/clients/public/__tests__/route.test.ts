@@ -7,7 +7,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * 1. **비활성 고객사는 보이지 않는다.** 계약이 끝난 고객사가 가입 화면에 남으면
  *    엉뚱한 소속으로 가입 신청이 쌓인다.
  * 2. **필드를 좁게 고른다.** 익명에게 나가는 응답이므로 select 가 넓어지는 순간
- *    내부 메모·담당자·연락처 같은 것이 그대로 공개된다.
+ *    내부 메모·담당자·연락처 같은 것이 그대로 공개된다. 내부 id 도 주지 않는다 —
+ *    익명에게 준 id 는 교차 테넌트 IDOR 의 입력으로 쓰였다(2026-09-18 소유자 결정 D14 A+).
+ * 3. **IP 당 strict(1분 5회)로 제한한다.**
  */
 
 const { mockFindMany, mockLoggerError } = vi.hoisted(() => ({
@@ -42,7 +44,7 @@ const callGet = () =>
 describe('GET /api/clients/public', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindMany.mockResolvedValue([{ id: 'c-1', name: '테스트 고객사 A', code: 'C001' }]);
+    mockFindMany.mockResolvedValue([{ name: '테스트 고객사 A', code: 'C001' }]);
   });
 
   it('활성 고객사만, 이름순으로 조회한다', async () => {
@@ -58,11 +60,25 @@ describe('GET /api/clients/public', () => {
   });
 
   // select 가 넓어지면 익명 사용자에게 내부 정보가 그대로 나간다.
-  it('id·name·code 만 내보낸다', async () => {
+  it('name·code 만 내보내고 내부 id 는 주지 않는다', async () => {
     await callGet();
 
     const select = mockFindMany.mock.calls[0]![0].select;
-    expect(Object.keys(select).sort()).toEqual(['code', 'id', 'name']);
+    expect(Object.keys(select).sort()).toEqual(['code', 'name']);
+  });
+
+  it('IP 당 strict(1분 5회)를 넘으면 429 를 돌려준다', async () => {
+    // 단위 테스트 환경은 기본적으로 레이트리밋을 끈다(api-rate-limit.ts). 이 케이스만 켠다.
+    vi.stubEnv('TEST_MODE', 'true');
+    try {
+      const statuses: number[] = [];
+      for (let i = 0; i < 6; i++) statuses.push((await callGet()).status);
+
+      expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
+      expect(statuses[5]).toBe(429);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   // 유출 방지는 `handleApiError` 의 프로덕션 분기 책임이며
