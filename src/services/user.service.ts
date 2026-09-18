@@ -296,7 +296,16 @@ export class UserService {
       throw new NotFoundError('사용자', id);
     }
 
+    // 활성 토글로 끄는 것도 비활성화다(2026-09-18 소유자 결정 D12). 예전에는 목록 토글·일괄 비활성화·조직도
+    // 토글이 이 경로(PATCH isActive:false)로 와서 진행 중 SR 검사를 건너뛰었다 — 상세 화면의 '비활성화'
+    // (deactivateUser)만 막혀서, 담당자가 비활성 계정인 채 아무도 처리하지 않는 SR 이 생겼다.
+    const deactivating = rest.isActive === false && beforeUser.isActive;
+
     const updatedUser = await this.runInTransaction(async (tx) => {
+      if (deactivating) {
+        await this.assertNoActiveAssignedSRs(tx, id);
+      }
+
       let user = await tx.user.update({
         where: { id },
         data: updateData,
@@ -345,10 +354,10 @@ export class UserService {
         include: includeConfig,
       });
 
-      // 감사 로그 남기기
+      // 감사 로그 남기기 — 비활성화는 어느 경로로 왔든 같은 행위 이름으로 남긴다(감사 로그 조회에서 찾기 쉽게).
       await auditService.createLog(tx, {
         userId: actorId,
-        actionType: 'USER_UPDATE',
+        actionType: deactivating ? 'USER_DEACTIVATE' : 'USER_UPDATE',
         targetEntity: 'User',
         targetId: id,
         changes: {
@@ -381,39 +390,45 @@ export class UserService {
     return excludePassword(user);
   }
 
+  /**
+   * 진행 중인 SR 이 배정된 사용자는 비활성화하지 않는다 — 비활성 담당자에게 묶인 SR 은 아무도 처리하지 않는다.
+   * TOCTOU 방지를 위해 검사와 비활성화를 같은 트랜잭션에서 수행한다(검사 후 비활성화 사이에 새 SR 이 배정되는
+   * 문제를 줄인다. 배정 경로의 isActive 가드와 함께 동작). 비활성화의 모든 경로(deactivateUser·updateUser)가 쓴다.
+   */
+  private async assertNoActiveAssignedSRs(tx: Prisma.TransactionClient, userId: string) {
+    const activeSRs = await tx.sR.findMany({
+      where: {
+        ...SR_ALIVE,
+        assigneeId: userId,
+        status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
+      },
+      select: {
+        id: true,
+        srNumber: true,
+        title: true,
+        status: true,
+      },
+    });
+
+    if (activeSRs.length > 0) {
+      const srList = activeSRs
+        .map((sr: { srNumber: string; status: string }) => `${sr.srNumber} (${sr.status})`)
+        .join(', ');
+      throw new ValidationError(
+        `사용자에게 ${activeSRs.length}개의 진행 중인 SR이 할당되어 있습니다. ` +
+          `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
+      );
+    }
+  }
+
   async deactivateUser(
     userId: string,
     actorId?: string | null,
     ipAddress?: string | null
   ): Promise<Omit<User, 'password'>> {
     return this.runInTransaction(async (tx) => {
-      // 1. 진행 중인 SR 확인 — TOCTOU 방지를 위해 검사와 비활성화를 같은 트랜잭션에서 수행한다.
-      //    (검사 후 비활성화 사이에 새 SR이 배정되어 비활성 담당자에게 orphan SR이
-      //     남는 문제를 줄인다. 배정 경로의 isActive 가드와 함께 동작.)
-      const activeSRs = await tx.sR.findMany({
-        where: {
-          ...SR_ALIVE,
-          assigneeId: userId,
-          status: { in: ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD'] },
-        },
-        select: {
-          id: true,
-          srNumber: true,
-          title: true,
-          status: true,
-        },
-      });
-
-      // 2. 진행 중인 SR이 있으면 비활성화 차단
-      if (activeSRs.length > 0) {
-        const srList = activeSRs
-          .map((sr: { srNumber: string; status: string }) => `${sr.srNumber} (${sr.status})`)
-          .join(', ');
-        throw new ValidationError(
-          `사용자에게 ${activeSRs.length}개의 진행 중인 SR이 할당되어 있습니다. ` +
-            `비활성화하기 전에 다음 SR을 다른 담당자에게 재할당하세요: ${srList}`
-        );
-      }
+      // 1·2. 진행 중인 SR 이 배정돼 있으면 막는다(활성 토글 경로 updateUser 와 같은 검사).
+      await this.assertNoActiveAssignedSRs(tx, userId);
 
       // 3. 진행 중인 SR이 없으면 비활성화
       return this.applyUserUpdateWithAudit(

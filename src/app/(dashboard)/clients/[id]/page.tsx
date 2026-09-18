@@ -332,13 +332,19 @@ export default function ClientDetailPage() {
 
   // 삭제 버튼의 **SR 축**은 서버의 FK 가드(clientService.deleteClient)와 같은 기준이다 — 삭제된 SR 은
   // 화면에 보여 주지 않지만 client_id FK 로 이 고객사를 계속 가리키므로 영구 삭제를 막는다.
-  // 서버가 함께 보는 서비스 카테고리·담당자 연결은 여기서 판정하지 않는다(예전부터 그랬다). 그 경우는
-  // 서버의 409 거부 문구가 무엇이 남았는지 알려 준다.
-  // 이유 문구는 삭제 버튼을 볼 수 있는 사람에게, 화면에 보이는 것(사용자·SR 0건)만으로는 막힌 이유를
-  // 알 수 없을 때만 적는다.
+  // 서비스 카테고리도 서버가 막는다. 새 고객사에는 기본 카테고리가 자동으로 생기므로, 예전에는 버튼이 켜져
+  // 있어도 첫 시도가 항상 409 였다(결정 D12). 담당자 연결은 여기서 판정하지 않는다 — 앱에 그 연결을 만드는
+  // 경로가 없고, 생기면 서버의 409 거부 문구가 무엇이 남았는지 알려 준다.
+  // 이유 문구는 삭제 버튼을 볼 수 있는 사람에게, 화면에 보이는 것만으로는 막힌 이유를 알 수 없을 때만 적는다.
   const deleteBlockedByDeletedSrs =
     canDeleteClient &&
     client.deletedSrCount > 0 &&
+    client._count.users === 0 &&
+    client._count.srs === 0;
+  const deleteBlockedByCategories =
+    canDeleteClient &&
+    !deleteBlockedByDeletedSrs &&
+    client.serviceCategories.length > 0 &&
     client._count.users === 0 &&
     client._count.srs === 0;
   const assignedOnly = client.viewerScope === 'assigned';
@@ -385,11 +391,18 @@ export default function ClientDetailPage() {
             <Button
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={
-                client._count.users > 0 || client._count.srs > 0 || client.deletedSrCount > 0
+                client._count.users > 0 ||
+                client._count.srs > 0 ||
+                client.deletedSrCount > 0 ||
+                client.serviceCategories.length > 0
               }
               variant="destructive"
               aria-label="고객사 삭제"
-              aria-describedby={deleteBlockedByDeletedSrs ? 'client-delete-blocked' : undefined}
+              aria-describedby={
+                deleteBlockedByDeletedSrs || deleteBlockedByCategories
+                  ? 'client-delete-blocked'
+                  : undefined
+              }
             >
               <Trash2 className="mr-2 h-4 w-4" />
               삭제
@@ -403,6 +416,12 @@ export default function ClientDetailPage() {
           삭제된 SR {client.deletedSrCount}건이 감사 기록으로 보관되어 있어 이 고객사는 영구 삭제할
           수 없습니다.
           {canUpdateClient && ' 더 이상 쓰지 않는 고객사는 수정 화면에서 비활성화할 수 있습니다.'}
+        </p>
+      )}
+      {deleteBlockedByCategories && (
+        <p id="client-delete-blocked" className="text-sm text-muted-foreground">
+          서비스 카테고리 {client.serviceCategories.length}개가 남아 있어 삭제할 수 없습니다. 아래
+          서비스 카테고리 탭에서 먼저 삭제하세요.
         </p>
       )}
 

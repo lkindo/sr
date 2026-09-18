@@ -17,6 +17,7 @@ import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, ApiError, apiGet, apiPatch, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { isDeletionProtectedAccount } from '@/lib/role-rules';
 import { getUserTypeBadgeVariant } from '@/lib/user-helpers';
 
 interface Permission {
@@ -370,9 +371,9 @@ export default function UserDetailPage() {
                   return;
                 }
 
-                // Check if user has system roles
-                const hasSystemRole = user.roles.some((ur) =>
-                  ['ADMIN', 'MANAGER'].includes(ur.role.name)
+                // 운영 계정(ADMIN·MANAGER)은 삭제 경로로 다루지 않는다 — 서버와 같은 판정(결정 D11).
+                const hasSystemRole = isDeletionProtectedAccount(
+                  user.roles.map((ur) => ur.role.name)
                 );
 
                 if (hasSystemRole) {
@@ -387,8 +388,8 @@ export default function UserDetailPage() {
 
                 const isHardDelete = !user.isActive;
                 const confirmMessage = isHardDelete
-                  ? `정말 사용자 ${user.name} (이메일: ${user.email}) 을 완전히 삭제하시겠습니까?\n\n주의: 이 작업은 영구적이며 모든 데이터가 삭제됩니다. SR 이력이 있는 사용자는 삭제할 수 없습니다.`
-                  : `정말 사용자 ${user.name} (이메일: ${user.email}) 을 비활성화하시겠습니까?\n\n경고: 이 작업은 되돌릴 수 없습니다.`;
+                  ? `정말 사용자 ${user.name} (이메일: ${user.email}) 을 완전히 삭제하시겠습니까?\n\n주의: 이 작업은 되돌릴 수 없습니다. SR 이력이나 관리 이력(가입 승인 등)이 있는 사용자는 삭제되지 않고 비활성 상태로 남습니다.`
+                  : `정말 사용자 ${user.name} (이메일: ${user.email}) 을 비활성화하시겠습니까?\n\n비활성화된 사용자는 로그인할 수 없습니다. 나중에 다시 활성화할 수 있습니다.`;
 
                 if (window.confirm(confirmMessage)) {
                   // 성공·실패 토스트와 이동은 deleteUser 의 onSuccess/onError 가 맡는다.

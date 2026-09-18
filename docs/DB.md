@@ -1132,12 +1132,12 @@ pnpm db:seed
 | srs                      | assignee_id         | users(id)              | SET NULL  |
 | srs                      | intake_by_id        | users(id)              | SET NULL  |
 | srs                      | service_category_id | service_categories(id) | RESTRICT  |
-| sr_activities            | sr_id               | srs(id)                | CASCADE   |
+| sr_activities            | sr_id               | srs(id)                | RESTRICT  |
 | sr_activities            | user_id             | users(id)              | RESTRICT  |
 | sr_comments              | sr_id               | srs(id)                | CASCADE   |
 | sr_comments              | user_id             | users(id)              | RESTRICT  |
 | sr_attachments           | sr_id               | srs(id)                | CASCADE   |
-| sr_status_history        | sr_id               | srs(id)                | CASCADE   |
+| sr_status_history        | sr_id               | srs(id)                | RESTRICT  |
 | sr_status_history        | changed_by          | users(id)              | RESTRICT  |
 | push_subscriptions       | user_id             | users(id)              | CASCADE   |
 | notification_preferences | user_id             | users(id)              | CASCADE   |

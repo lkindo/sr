@@ -26,6 +26,7 @@ import {
 } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 import { qk } from '@/lib/query-keys';
+import { isDeletionProtectedAccount } from '@/lib/role-rules';
 import type { ClientSummary } from '@/types/client.types';
 import type { UserListItem } from '@/types/user-view';
 
@@ -131,6 +132,8 @@ export default function UsersClient() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserListItem | null>(null);
+  // 일괄 삭제 대상(결정 D12). 단일 삭제는 userToDelete 를 쓴다.
+  const [usersToDelete, setUsersToDelete] = useState<UserListItem[] | undefined>(undefined);
 
   const {
     data: usersPage,
@@ -296,6 +299,7 @@ export default function UsersClient() {
   };
 
   const handleDeleteUser = (user: UserListItem) => {
+    setUsersToDelete(undefined);
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
   };
@@ -509,12 +513,24 @@ export default function UsersClient() {
                             : '선택한 사용자 삭제'
                         }
                         onClick={() => {
-                          const firstUserId = Array.from(selectedUserIds)[0];
-                          const user = users.find((u) => u.id === firstUserId);
-                          if (user) {
-                            setUserToDelete(user);
-                            setIsDeleteDialogOpen(true);
+                          // 선택한 전원을 넘긴다(예전에는 첫 1명만 처리했다). 운영 계정은 단일 삭제와 같은
+                          // 규칙(role-rules.isDeletionProtectedAccount — 서버와 공용)으로 먼저 걸러 알린다.
+                          const protectedUsers = selectedUsers.filter((u) =>
+                            isDeletionProtectedAccount(u.roles.map((ur) => ur.role.name))
+                          );
+                          if (protectedUsers.length > 0) {
+                            toast({
+                              title: '삭제 제한',
+                              description: `시스템 관리자 계정은 삭제할 수 없습니다: ${protectedUsers
+                                .map((u) => u.name)
+                                .join(', ')}. 선택에서 빼고 다시 시도하세요.`,
+                              variant: 'destructive',
+                            });
+                            return;
                           }
+                          setUserToDelete(null);
+                          setUsersToDelete(selectedUsers);
+                          setIsDeleteDialogOpen(true);
                         }}
                       >
                         삭제
@@ -663,6 +679,7 @@ export default function UsersClient() {
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         user={userToDelete}
+        users={usersToDelete}
         onDeleted={handleUserDeleted}
       />
     </div>

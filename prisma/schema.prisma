@@ -361,7 +361,8 @@ model SRActivity {
   metadata    Json?
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
-  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
+  // 이력은 SR 물리 삭제와 함께 사라지지 않는다(결정 D12, 마이그레이션 20260919090000).
+  sr   SR   @relation(fields: [srId], references: [id], onDelete: Restrict)
   user User @relation(fields: [userId], references: [id])
 
   @@index([srId, createdAt(sort: Desc)])
@@ -457,7 +458,8 @@ model SRStatusHistory {
   changeReason   String?   @map("change_reason")
   changedAt      DateTime  @default(now()) @map("changed_at") @db.Timestamptz
 
-  sr   SR   @relation(fields: [srId], references: [id], onDelete: Cascade)
+  // 이력은 SR 물리 삭제와 함께 사라지지 않는다(결정 D12, 마이그레이션 20260919090000).
+  sr   SR   @relation(fields: [srId], references: [id], onDelete: Restrict)
   user User @relation("StatusChangeUser", fields: [changedBy], references: [id])
 
   @@index([srId, changedAt])
