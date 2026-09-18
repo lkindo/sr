@@ -7,6 +7,7 @@ import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
 import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
 import { getEnumParams } from '@/lib/search-params';
+import { SR_SLA_OPEN_STATUSES } from '@/lib/sr-state-machine';
 import { startOfAppZoneDay } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
 
@@ -95,6 +96,10 @@ export default async function SRsPage({ searchParams }: Props) {
   const search = getSearchParam(resolvedSearchParams.search);
   const dateFrom = getSearchParam(resolvedSearchParams.dateFrom);
   const dateTo = getSearchParam(resolvedSearchParams.dateTo);
+  // '지연 중'(헌법 §3, 결정 D10) — 대시보드 카드·빠른 필터 숫자와 같은 건만 거른다.
+  const overdueOnly = getSearchParam(resolvedSearchParams.overdue) === '1';
+  // '지연' 과 '오늘 마감' 의 경계. 배지 집계와 목록 필터가 같은 시각을 쓴다.
+  const now = new Date();
 
   const where: Prisma.SRWhereInput = {};
 
@@ -143,6 +148,13 @@ export default async function SRsPage({ searchParams }: Props) {
     if (dateTo) {
       (where.createdAt as Prisma.DateTimeFilter<'SR'>).lte = new Date(dateTo);
     }
+  }
+  if (overdueOnly) {
+    // 상태 필터와 함께 쓰일 수 있으므로 AND 로 겹친다(둘 다 만족하는 건만).
+    where.AND = [
+      { dueDate: { lt: now } },
+      { status: { in: [...SR_SLA_OPEN_STATUSES] as SRStatus[] } },
+    ];
   }
   if (search) {
     where.OR = [
@@ -206,7 +218,7 @@ export default async function SRsPage({ searchParams }: Props) {
     // 같은 행 집합을 다섯 번 스캔했다.
     srService.getSRBadgeCounts({
       clientIds: badgeClientIds,
-      dueFrom: today,
+      now,
       dueTo: tomorrow,
       assigneeId: session?.user?.id || 'non-existent',
       visibilityAssigneeId,

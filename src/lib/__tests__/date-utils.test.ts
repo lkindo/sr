@@ -59,13 +59,33 @@ describe('date-utils', () => {
     it('should return on hold status for ON_HOLD', () => {
       // 마감일 배지는 상태 배지와 같은 행에 나란히 뜨므로 문구를 맞춘다
       // (statusLabels.ON_HOLD = '보류'). 예전에는 '보류중' 이라 한 행에 두 이름이었다.
-      const status = getDueDateStatus('2023-01-01', 'ON_HOLD');
+      const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      const status = getDueDateStatus(future, 'ON_HOLD');
       expect(status).toEqual({
         label: '보류',
         variant: 'secondary',
         isOverdue: false,
         isUrgent: false,
       });
+    });
+
+    // 보류 중에도 SLA 시계는 멈추지 않는다. 마감을 넘긴 보류 SR 은 '지연 중' 지표(결정 D10)에 들므로
+    // 행에도 지연으로 보여 대시보드 숫자와 목록이 맞게 한다.
+    it('마감을 넘긴 보류 SR 은 보류와 지연을 함께 보인다', () => {
+      const threeDaysAgo = new Date(Date.now() - (3 * 24 + 1) * 60 * 60 * 1000);
+      expect(getDueDateStatus(threeDaysAgo, 'ON_HOLD')).toEqual({
+        label: '보류 · 3일 지연',
+        variant: 'destructive',
+        isOverdue: true,
+        isUrgent: false,
+      });
+
+      const twoHoursAgo = new Date(Date.now() - (2 * 60 + 5) * 60 * 1000);
+      expect(getDueDateStatus(twoHoursAgo, 'ON_HOLD')?.label).toBe('보류 · 2시간 지연');
+    });
+
+    it('마감일이 없는 보류 SR 은 그냥 보류다', () => {
+      expect(getDueDateStatus(null, 'ON_HOLD')?.label).toBe('보류');
     });
 
     it('should return rejected status for REJECTED', () => {

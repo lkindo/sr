@@ -48,6 +48,12 @@ interface DashboardStats {
     urgent: number;
     myAssigned: number;
     myAssignedInProgress: number;
+    /** 마감을 넘긴 진행 중(접수·진행중·보류) SR 건수(헌법 §3 '지연 중', 결정 D10). */
+    overdue: number;
+    /** 그중 보류 건수. */
+    overdueOnHold: number;
+    /** 마감일을 직접 조정한 진행 중 SR 건수 — 조정으로 '지연 중' 에서 빠진 건을 함께 보인다. */
+    manualDueOpen: number;
   };
   byStatus: Record<string, number>;
   byPriority: Record<string, number>;
@@ -475,7 +481,47 @@ export default function DashboardPage() {
 
       {/* 성능 지표 카드 (ADMIN/MANAGER/ENGINEER만) */}
       {isAdminManagerEngineer && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/*
+            '지연 중'(헌법 §3, 결정 D10) — 준수율은 끝난 SR 만 세는 후행 지표라 적체가 쌓이는 동안에도 높게
+            유지된다. 능동 경고를 두지 않는 대신 이 숫자로 감시한다. 누르면 같은 건수의 목록(/srs?overdue=1)이 뜬다.
+          */}
+          <Link href="/srs?overdue=1" className="block" aria-label="지연 중인 SR 목록 보기">
+            <Card className="sr-card h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">지연 중</CardTitle>
+                <AlertTriangle
+                  className={
+                    stats.summary.overdue > 0
+                      ? 'h-5 w-5 text-destructive'
+                      : 'h-5 w-5 text-muted-foreground'
+                  }
+                />
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={
+                    stats.summary.overdue > 0
+                      ? 'text-2xl font-bold text-destructive'
+                      : 'text-2xl font-bold'
+                  }
+                >
+                  {stats.summary.overdue}건
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  마감을 넘긴 진행 중 SR
+                  {stats.summary.overdueOnHold > 0 &&
+                    ` (보류 ${stats.summary.overdueOnHold}건 포함)`}
+                </p>
+                {stats.summary.manualDueOpen > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    마감일 직접 조정 {stats.summary.manualDueOpen}건
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+
           <Card className="sr-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">평균 처리 시간</CardTitle>
@@ -513,8 +559,9 @@ export default function DashboardPage() {
                         : 'text-2xl font-bold text-destructive'
                 }
               >
+                {/* 헌법 §3 용어: 표본 0건은 '표본 없음', 마감일이 없어 판정할 수 없는 건은 '측정 불가'. */}
                 {stats.performance.slaComplianceRate === null
-                  ? '측정 불가'
+                  ? '표본 없음'
                   : `${stats.performance.slaComplianceRate}%`}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -524,7 +571,8 @@ export default function DashboardPage() {
               </p>
               {stats.performance.slaUnmeasurableCount > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  마감일 미산출 {stats.performance.slaUnmeasurableCount}건은 집계에서 제외됨
+                  측정 불가(마감일 없음) {stats.performance.slaUnmeasurableCount}건은 집계에서
+                  제외됨
                 </p>
               )}
               {stats.performance.slaComplianceRate !== null && (

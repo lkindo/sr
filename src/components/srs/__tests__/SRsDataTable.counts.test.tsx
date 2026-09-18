@@ -79,9 +79,37 @@ describe('SRsDataTable Counts', () => {
       inProgress: 2,
       urgent: 3,
       dueToday: 3,
+      overdue: 4,
       myAssigned: 0,
     },
   };
+
+  // '지연 중'(헌법 §3, 결정 D10) — 대시보드 카드와 같은 범위(overdue=1)로 거르고, 숫자는 서버 집계를 그대로 쓴다.
+  it('지연 빠른 필터는 건수를 보이고 누르면 overdue=1 로 거른다', () => {
+    const push = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ push, refresh: vi.fn() } as never);
+    render(<SRsDataTable {...defaultProps} />);
+
+    const button = screen.getByText('지연').closest('button')!;
+    expect(button).toHaveTextContent('4');
+    fireEvent.click(button);
+
+    const url = new URL(String(push.mock.calls[0]![0]), 'http://localhost');
+    expect(url.searchParams.get('overdue')).toBe('1');
+    expect(url.searchParams.get('page')).toBe('1');
+  });
+
+  it('overdue=1 이 걸려 있으면 지연 빠른 필터가 켜진 것으로 보고, 다시 누르면 해제한다', () => {
+    const push = vi.fn();
+    vi.mocked(useRouter).mockReturnValue({ push, refresh: vi.fn() } as never);
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams('overdue=1') as never);
+    render(<SRsDataTable {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('지연').closest('button')!);
+
+    const url = new URL(String(push.mock.calls[0]![0]), 'http://localhost');
+    expect(url.searchParams.get('overdue')).toBeNull();
+  });
 
   // 배지 '긴급' 은 CRITICAL + HIGH 를 센다(서버 getSRBadgeCounts). 눌러서 간 목록도 같은 범위여야
   // 숫자와 목록이 맞는다 — 예전에는 CRITICAL 만 걸어서 배지 3건인데 목록은 1건처럼 보였다.

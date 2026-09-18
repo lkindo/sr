@@ -207,7 +207,7 @@ describeDb('테넌트 격리 (실제 DB)', () => {
     const countsFor = (clientIds: string[] | null) =>
       srService.getSRBadgeCounts({
         clientIds,
-        dueFrom: today,
+        now: new Date(),
         dueTo: tomorrow,
         assigneeId: internalUserId,
       });

@@ -35,6 +35,9 @@ const STATS = {
     urgent: 1,
     myAssigned: 0,
     myAssignedInProgress: 0,
+    overdue: 0,
+    overdueOnHold: 0,
+    manualDueOpen: 0,
   },
   byStatus: {},
   byPriority: {},
@@ -234,5 +237,55 @@ describe('DashboardPage — 내 담당 SR 의 마감 표시', () => {
 
     const done = screen.getByText('SR-DONE').closest('a')!;
     expect(done.textContent).not.toContain('지연');
+  });
+});
+
+describe('DashboardPage — 지연 중 지표(헌법 §3, 결정 D10)', () => {
+  it('내부 사용자에게 지연 중 건수와 보류·직접 조정 건수를 보이고, 누르면 같은 범위의 목록으로 간다', async () => {
+    const body = {
+      ...STATS,
+      summary: { ...STATS.summary, overdue: 12, overdueOnHold: 3, manualDueOpen: 2 },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(body)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    const link = await screen.findByRole('link', { name: '지연 중인 SR 목록 보기' });
+    expect(link.getAttribute('href')).toBe('/srs?overdue=1');
+    expect(link.textContent).toContain('12건');
+    expect(link.textContent).toContain('보류 3건 포함');
+    expect(link.textContent).toContain('마감일 직접 조정 2건');
+  });
+
+  it('고객에게는 지연 중 카드를 보이지 않는다(내부 전용)', async () => {
+    viewer.roles = ['CLIENT_ADMIN'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(STATS)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    await screen.findByRole('heading', { name: '대시보드' });
+    expect(screen.queryByRole('link', { name: '지연 중인 SR 목록 보기' })).toBeNull();
+  });
+
+  // 헌법 §3 용어: 표본 0건은 '표본 없음', 마감일이 없어 판정할 수 없는 건은 '측정 불가'. 예전 화면은 거꾸로 불렀다.
+  it('준수율 표본이 없으면 "표본 없음", 마감일 없는 건은 "측정 불가" 로 부른다', async () => {
+    const body = {
+      ...STATS,
+      performance: {
+        ...STATS.performance,
+        slaComplianceRate: null,
+        slaSampleCount: 0,
+        slaUnmeasurableCount: 4,
+      },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(body)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    expect(await screen.findByText('표본 없음')).toBeTruthy();
+    expect(screen.getByText(/측정 불가.마감일 없음. 4건은 집계에서/)).toBeTruthy();
   });
 });

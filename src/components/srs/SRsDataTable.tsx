@@ -121,6 +121,7 @@ export function SRsDataTable({
     inProgress: number;
     urgent: number;
     dueToday: number;
+    overdue: number;
     myAssigned: number;
   };
 }) {
@@ -159,6 +160,8 @@ export function SRsDataTable({
       search: searchParams?.get('search') ?? '',
       dateFrom: searchParams?.get('dateFrom') ?? '',
       dateTo: searchParams?.get('dateTo') ?? '',
+      // '지연 중'(헌법 §3, 결정 D10) — 서버(srs/page.tsx)가 마감을 넘긴 진행 중 SR 만 거른다.
+      overdue: searchParams?.get('overdue') === '1' ? '1' : '',
     }),
     [searchParams]
   );
@@ -171,7 +174,8 @@ export function SRsDataTable({
       filters.assigneeId !== 'all' ||
       filters.search !== '' ||
       filters.dateFrom !== '' ||
-      filters.dateTo !== ''
+      filters.dateTo !== '' ||
+      filters.overdue !== ''
     );
   }, [filters]);
 
@@ -293,10 +297,12 @@ export function SRsDataTable({
     inProgress: 0,
     urgent: 0,
     dueToday: 0,
+    overdue: 0,
     myAssigned: 0,
   };
 
   const activeQuickFilter = useMemo(() => {
+    if (filters.overdue === '1') return 'overdue';
     if (filters.status === 'REQUESTED') return 'waiting';
     if (filters.assigneeId === session?.user?.id) return 'myAssigned';
     if (
@@ -308,8 +314,13 @@ export function SRsDataTable({
     return null;
   }, [filters, session]);
 
-  const handleQuickFilter = (filterType: 'waiting' | 'myAssigned' | 'urgent' | null) => {
-    if (filterType === 'waiting') {
+  const handleQuickFilter = (
+    filterType: 'waiting' | 'myAssigned' | 'urgent' | 'overdue' | null
+  ) => {
+    if (filterType === 'overdue') {
+      // 대시보드 '지연 중' 카드와 같은 범위다(결정 D10).
+      handleFilterChange('overdue', '1');
+    } else if (filterType === 'waiting') {
       handleFilterChange('status', 'REQUESTED');
     } else if (filterType === 'myAssigned') {
       if (session?.user?.id) {
@@ -436,6 +447,31 @@ export function SRsDataTable({
                       }`}
                     >
                       {counts.urgent}
+                    </span>
+                  </button>
+                  {/* '지연 중'(헌법 §3, 결정 D10) — 마감을 넘긴 진행 중 SR. 내부 사용자 전용 영역이다. */}
+                  <button
+                    onClick={() =>
+                      handleQuickFilter(activeQuickFilter === 'overdue' ? null : 'overdue')
+                    }
+                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
+                      activeQuickFilter === 'overdue'
+                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
+                    }`}
+                  >
+                    <AlertCircle className="h-2.5 w-2.5" />
+                    <span>지연</span>
+                    <span
+                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
+                        activeQuickFilter === 'overdue'
+                          ? 'bg-background text-foreground font-bold'
+                          : counts.overdue > 0
+                            ? 'bg-destructive-solid text-destructive-foreground'
+                            : 'bg-muted text-foreground'
+                      }`}
+                    >
+                      {counts.overdue}
                     </span>
                   </button>
                 </div>

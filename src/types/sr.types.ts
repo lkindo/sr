@@ -159,8 +159,10 @@ export interface SRBadgeCounts {
   inProgress: number;
   /** 긴급(CRITICAL·HIGH) */
   urgent: number;
-  /** 오늘 마감이면서 아직 닫히지 않은 것 */
+  /** 지금 이후 오늘 자정 전에 마감이 오면서 아직 닫히지 않은 것(이미 지난 것은 overdue 에서 센다) */
   dueToday: number;
+  /** '지연 중' — 마감을 넘긴 진행 중(접수·진행중·보류) SR(헌법 §3, 결정 D10) */
+  overdue: number;
   /** 내가 담당인 것 */
   myAssigned: number;
 }

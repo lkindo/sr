@@ -9,6 +9,21 @@ export function getDaysUntilDue(dueDate: string | Date | null | undefined): numb
   return diffCalendarDaysInAppZone(dueDate);
 }
 
+/**
+ * 마감을 넘겼으면 '지연' 문구, 아니면 null. 시각으로 판정한다(헌법 §3) — 24시간 미만은 시간으로 쓴다.
+ */
+function overdueLabelOf(dueDate: string | Date | null | undefined): string | null {
+  if (!dueDate) return null;
+  const dueMs = new Date(dueDate).getTime();
+  if (!Number.isFinite(dueMs)) return null;
+  const remainingMs = dueMs - Date.now();
+  if (remainingMs >= 0) return null;
+  const overdueHours = Math.floor(-remainingMs / (60 * 60 * 1000));
+  return overdueHours < 24
+    ? `${Math.max(1, overdueHours)}시간 지연`
+    : `${Math.floor(overdueHours / 24)}일 지연`;
+}
+
 export function getDueDateStatus(
   dueDate: string | Date | null | undefined,
   status?: string
@@ -34,7 +49,19 @@ export function getDueDateStatus(
   // 같은 행에 나란히 렌더되기 때문이다(SRListItem.tsx 의 인접 열). 두 배지가
   // '보류' 와 '보류중' 으로 갈리면 사용자는 다른 단계라고 읽는다.
   // 남은 '완료됨' 은 COMPLETED 와 CONFIRMED 를 합쳐 부르므로 단순 치환이 불가하다 — 별건.
+  //
+  // 보류 중에도 SLA 시계는 멈추지 않는다 — 마감을 넘겼으면 '지연 중' 지표(결정 D10)에 들고 나중에 위반으로
+  // 집계된다. 그래서 행에도 '보류 · N일 지연' 으로 보여 대시보드 숫자와 목록이 맞게 한다.
   if (status === 'ON_HOLD') {
+    const overdueLabel = overdueLabelOf(dueDate);
+    if (overdueLabel) {
+      return {
+        label: `보류 · ${overdueLabel}`,
+        variant: 'destructive',
+        isOverdue: true,
+        isUrgent: false,
+      };
+    }
     return {
       label: '보류',
       variant: 'secondary',
@@ -76,12 +103,8 @@ export function getDueDateStatus(
 
   if (remainingMs !== null && remainingMs < 0) {
     // 지연 폭도 시각 기준으로 센다. 24시간 미만이면 '일' 로 반올림하지 않고 시간으로 쓴다.
-    const overdueHours = Math.floor(-remainingMs / (60 * 60 * 1000));
     return {
-      label:
-        overdueHours < 24
-          ? `${Math.max(1, overdueHours)}시간 지연`
-          : `${Math.floor(overdueHours / 24)}일 지연`,
+      label: overdueLabelOf(dueDate) as string,
       variant: 'destructive',
       isOverdue: true,
       isUrgent: false,

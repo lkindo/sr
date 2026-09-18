@@ -1259,9 +1259,12 @@ export class SRService {
   async getSRBadgeCounts(params: {
     /** 스코프할 고객사 ID. `null` 이면 전 테넌트(내부 사용자)를 뜻한다. */
     clientIds: string[] | null;
-    /** 오늘 시작(포함) — 앱 시간대 기준으로 호출자가 계산한다. */
-    dueFrom: Date;
-    /** 내일 시작(제외). */
+    /**
+     * 판정 시각. '오늘 마감' 은 이 시각 이후(포함), '지연' 은 이 시각 이전이다. 예전에는 오늘 0시부터 세서
+     * 오늘 09:00 에 이미 마감이 지난 SR 을 '오늘 마감' 에 섞고, 어제 지난 SR 은 빼먹었다(결정 D10).
+     */
+    now: Date;
+    /** 내일 시작(제외) — 앱 시간대 기준으로 호출자가 계산한다. */
     dueTo: Date;
     /** "내 담당" 배지 기준 사용자. */
     assigneeId: string;
@@ -1284,9 +1287,12 @@ export class SRService {
         COUNT(*) FILTER (WHERE status = 'REQUESTED')::int                      AS "waiting",
         COUNT(*) FILTER (WHERE status = 'IN_PROGRESS')::int                    AS "inProgress",
         COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int          AS "urgent",
-        COUNT(*) FILTER (WHERE due_date >= ${params.dueFrom}
+        COUNT(*) FILTER (WHERE due_date >= ${params.now}
                            AND due_date <  ${params.dueTo}
                            AND status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD'))::int AS "dueToday",
+        -- '지연 중'(결정 D10). 상태 목록은 sr-state-machine.SR_SLA_OPEN_STATUSES 와 같다.
+        COUNT(*) FILTER (WHERE due_date < ${params.now}
+                           AND status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD'))::int AS "overdue",
         COUNT(*) FILTER (WHERE assignee_id = ${params.assigneeId})::int        AS "myAssigned"
       FROM srs
       -- soft delete 제외(db-rules §2). $queryRaw 는 SR_ALIVE 가 닿지 않는다.
@@ -1299,6 +1305,7 @@ export class SRService {
       inProgress: row?.inProgress ?? 0,
       urgent: row?.urgent ?? 0,
       dueToday: row?.dueToday ?? 0,
+      overdue: row?.overdue ?? 0,
       myAssigned: row?.myAssigned ?? 0,
     };
   }

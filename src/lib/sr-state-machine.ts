@@ -798,8 +798,12 @@ export function canChangeSLABasisAt(status: string): boolean {
   return !SR_CLOSED_STATUSES.includes(status);
 }
 
-/** 마감일을 직접 조정할 수 있는 상태 — 접수 전에는 SLA 시계가 돌지 않고, 종결 뒤에는 판정이 끝났다. */
-const DUE_DATE_ADJUSTABLE_STATUSES: readonly string[] = ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'];
+/**
+ * SLA 시계가 돌고 있는 상태 — 접수 전에는 시계가 돌지 않고, 종결 뒤에는 판정이 끝났다.
+ * 마감일 조정 가능 상태이자 '지연 중' 지표(헌법 §3, 결정 D10)의 대상 상태다. 서버 집계 SQL 도 같은 목록을 쓴다.
+ */
+export const SR_SLA_OPEN_STATUSES: readonly string[] = ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'];
+const DUE_DATE_ADJUSTABLE_STATUSES = SR_SLA_OPEN_STATUSES;
 
 /**
  * 이 SR 의 SLA 마감일을 직접 조정할 수 있는가(헌법 §2·§3, 2026-09-18 소유자 결정 D9).
