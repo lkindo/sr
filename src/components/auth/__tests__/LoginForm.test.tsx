@@ -440,3 +440,35 @@ describe('LoginForm — 접근성·유효성', () => {
     expect(screen.getByRole('link', { name: '회원가입' })).toHaveAttribute('href', '/register');
   });
 });
+
+/** 가입 이메일 인증 링크를 연 결과(`/login?verified=`)를 알린다(2026-09-18 소유자 결정 D13 B+). */
+describe('LoginForm — 이메일 인증 결과 안내', () => {
+  it('인증되었으면 그 사실을 알린다', () => {
+    render(<LoginForm verificationNotice="verified" />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('이메일 주소가 확인되었습니다.');
+  });
+
+  it('링크가 만료됐으면 승인은 그대로 진행될 수 있다고 알린다', () => {
+    render(<LoginForm verificationNotice="expired" />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('유효 기간이 지났습니다');
+  });
+
+  it('안내가 없으면 아무것도 보이지 않는다', () => {
+    render(<LoginForm />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('로그인 오류가 나면 인증 안내 대신 오류만 보인다', async () => {
+    signIn.mockResolvedValue({ ok: false, error: 'CredentialsSignin' });
+    render(<LoginForm verificationNotice="verified" />);
+    fillCredentials();
+
+    await submit();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(CREDENTIAL_ERROR);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});

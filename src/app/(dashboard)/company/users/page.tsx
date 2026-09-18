@@ -7,10 +7,12 @@ import { Users } from 'lucide-react';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { EmailUnverifiedBadge } from '@/components/users/EmailUnverifiedBadge';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, apiList, apiPatch, apiPost, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { showsEmailUnverified } from '@/lib/user-helpers';
 
 /** GET /api/users 응답 중 이 화면이 쓰는 부분. */
 interface CompanyUser {
@@ -18,6 +20,8 @@ interface CompanyUser {
   name: string;
   email: string;
   isActive: boolean;
+  /** 가입 확인 링크를 연 시각(결정 D13 B+). */
+  emailVerified?: string | null;
   roles: Array<{ role: { name: string } }>;
   clients: Array<{ clientId: string; status: 'PENDING' | 'APPROVED' | 'REJECTED' }>;
 }
@@ -157,7 +161,12 @@ export default function CompanyUsersPage() {
                     return (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span>{user.email}</span>
+                            {showsEmailUnverified(user) && <EmailUnverifiedBadge />}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           {user.roles
                             .map(({ role }) => ROLE_LABELS[role.name] ?? role.name)

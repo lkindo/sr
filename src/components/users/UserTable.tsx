@@ -11,7 +11,12 @@ import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/compon
 import { ClientApprovalActions } from '@/components/users/ClientApprovalActions';
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
-import { getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
+import { EmailUnverifiedBadge } from '@/components/users/EmailUnverifiedBadge';
+import {
+  getUserTypeBadgeVariant,
+  getUserTypeLabel,
+  showsEmailUnverified,
+} from '@/lib/user-helpers';
 import type { ClientSummary } from '@/types/client.types';
 import type { UserListItem } from '@/types/user-view';
 
@@ -98,7 +103,12 @@ export function UserTable({
                   {user.name}
                 </Link>
               </TableCell>
-              <TableCell>{user.email}</TableCell>
+              <TableCell>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>{user.email}</span>
+                  {showsEmailUnverified(user) && <EmailUnverifiedBadge />}
+                </div>
+              </TableCell>
               <TableCell className="text-center">
                 {(() => {
                   const typeLabel = getUserTypeLabel(user);

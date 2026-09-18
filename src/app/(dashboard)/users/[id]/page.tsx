@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiDelete, ApiError, apiGet, apiPatch, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
 import { DELETION_PROTECTED_ACCOUNT_MESSAGE, isDeletionProtectedAccount } from '@/lib/role-rules';
+import { formatAppZoneDate } from '@/lib/timezone';
 import { getUserTypeBadgeVariant } from '@/lib/user-helpers';
 
 interface Permission {
@@ -43,6 +44,8 @@ interface User {
   name: string;
   email: string;
   isActive: boolean;
+  /** 가입 확인 링크를 연 시각(결정 D13 B+). */
+  emailVerified?: string | null;
   createdAt: string;
   updatedAt: string;
   roles: Role[];
@@ -420,6 +423,13 @@ export default function UserDetailPage() {
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">이메일</h3>
                 <p className="text-sm">{user.email}</p>
+                {user.emailVerified !== undefined && (
+                  <p className="text-xs text-muted-foreground">
+                    {user.emailVerified
+                      ? `가입 확인 링크로 확인됨 · ${formatAppZoneDate(user.emailVerified)}`
+                      : '확인되지 않음(관리자가 만든 계정은 확인 메일을 받지 않습니다)'}
+                  </p>
+                )}
               </div>
             </div>
 

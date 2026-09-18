@@ -8,6 +8,7 @@ import { SECURITY } from '@/lib/constants';
 import { firstZodIssueMessage } from '@/lib/errors';
 import prisma from '@/lib/prisma';
 import { passwordsMatch, registerFieldsSchema } from '@/lib/schemas';
+import { enqueueEmailVerificationEmail } from '@/services/email-verification.service';
 import { UserService } from '@/services/user.service';
 
 /**
@@ -140,14 +141,22 @@ export async function registerUser(formData: FormData) {
           },
         });
       }
+
+      // 4. 이메일 인증 링크(결정 D13 B+) — 같은 트랜잭션의 아웃박스에 적재한다. 승인 화면이 인증 여부를 보인다.
+      await enqueueEmailVerificationEmail(tx, {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      });
     });
 
     // 계정 유형별 안내 메시지
     // CLIENT 계정도 소속 승인 전까지는 데이터에 접근할 수 없으므로 승인 안내를 노출한다.
+    const verifyNotice = ' 입력한 이메일로 보낸 확인 링크를 열어 주세요(승인 판단에 쓰입니다).';
     const message =
       validated.accountType === 'CLIENT'
-        ? '회원가입이 완료되었습니다. 고객사 관리자 승인 후 이용할 수 있습니다.'
-        : '회원가입이 완료되었습니다. 관리자 승인 후 사용 가능합니다.';
+        ? `회원가입이 완료되었습니다. 고객사 관리자 승인 후 이용할 수 있습니다.${verifyNotice}`
+        : `회원가입이 완료되었습니다. 관리자 승인 후 사용 가능합니다.${verifyNotice}`;
 
     return {
       success: true,

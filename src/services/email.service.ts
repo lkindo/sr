@@ -266,6 +266,26 @@ class EmailService {
     return { to, subject, html };
   }
 
+  /**
+   * 가입 이메일 인증 링크(결정 D13 B+). 인증은 승인을 막지 않는다 — 승인자가 "이 신청이 정말 이 메일의 주인인가"
+   * 를 판단하는 근거다. 그래서 본문도 "인증해야 쓸 수 있다" 가 아니라 "승인에 도움이 된다" 로 적는다.
+   */
+  buildEmailVerification(to: string, name: string, link: string, ttlHours: number): RenderedEmail {
+    const subject = '[SR System] 이메일 주소를 확인해 주세요';
+    const safeName = escapeHtml(name);
+    const safeLink = safeEmailLink(link);
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">이메일 주소 확인</h2>
+        <p>${safeName} 님, SR 관리 시스템 가입 신청을 받았습니다.</p>
+        <p>아래 버튼을 눌러 이 이메일 주소가 본인 것임을 확인해 주세요. 확인된 신청은 승인 담당자가 더 빨리 판단할 수 있습니다.</p>
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">이메일 확인하기</a>
+        <p style="color: #666; font-size: 12px; margin-top: 16px;">링크는 ${ttlHours}시간 동안 유효합니다. 가입을 신청한 적이 없다면 이 메일을 무시하세요.</p>
+      </div>
+    `;
+    return { to, subject, html };
+  }
+
   buildCommentAdded(
     to: string,
     srNumber: string,

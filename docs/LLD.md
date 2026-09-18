@@ -1068,6 +1068,12 @@ export async function deleteComment(id: string) {
 > 응답은 활성 고객사의 `name`·`code` 뿐이다 — 내부 id 는 교차 테넌트 IDOR 의 입력으로 쓰였으므로 주지
 > 않고, 가입 액션이 `clientCode` 를 받아 활성 고객사로 해석한다(헌법 §1.2 예외, 2026-09-18 결정 D14 A+).
 >
+> `/api/register/verify-email` 은 가입 이메일 확인 링크다(결정 D13 B+). ENGINEER 가입자는 승인 전까지 비활성이라
+> 로그인할 수 없으므로 인증 없이 연다. 서명된 토큰(`src/lib/email-verification.ts` — 사용자 id·이메일·만료 시각을
+> 인증 시크릿으로 HMAC 서명)만 받고, `users.email_verified` 를 기록한 뒤 `303 /login?verified=<결과>` 로
+> 돌려보낸다. 응답에 계정 정보는 없고, `Referrer-Policy: no-referrer` 로 토큰이 다음 화면의 Referer 로 새지 않게
+> 하며, `rateLimit(…, 'strict')` 로 IP 당 1분 5회로 묶는다.
+>
 > 이 표가 be-rules §1·§2 가 말하는 예외 목록의 정본이다(헌법은 목록을 복제하지 않는다). 라우트가 아닌
 > 비인증 진입점은 회원가입 Server Action(`src/app/(auth)/register/actions.ts`) 하나다. **Server Action 은
 > 래퍼 시그니처(`(NextRequest, ctx)`)와 맞지 않아 이 래퍼로 감쌀 수 없다** — 인증·인가·레이트리밋은
@@ -1096,6 +1102,7 @@ export async function deleteComment(id: string) {
 | `/api/push/test` | POST | withAuthAndRateLimit | `src/app/api/push/test/route.ts` |
 | `/api/push/vapid-key` | GET | **래퍼 없음** | `src/app/api/push/vapid-key/route.ts` |
 | `/api/realtime` | GET | **래퍼 없음** | `src/app/api/realtime/route.ts` |
+| `/api/register/verify-email` | GET | rateLimit(strict) + withErrorHandler (인증 없음) | `src/app/api/register/verify-email/route.ts` |
 | `/api/reports/export` | GET | withAuthAndRateLimit | `src/app/api/reports/export/route.ts` |
 | `/api/roles` | GET | withAuthAndRateLimit | `src/app/api/roles/route.ts` |
 | `/api/service-categories` | GET | withAuthAndRateLimit | `src/app/api/service-categories/route.ts` |

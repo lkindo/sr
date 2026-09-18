@@ -41,6 +41,8 @@ const USERS = [
     name: '신입',
     email: 'new@client.com',
     isActive: true,
+    // 가입 확인 링크를 열지 않은 신청자(결정 D13 B+).
+    emailVerified: null,
     roles: [{ role: { name: 'CLIENT_USER' } }],
     clients: [{ clientId: 'c1', status: 'PENDING' }],
   },
@@ -57,6 +59,7 @@ const USERS = [
     name: '퇴사자',
     email: 'off@client.com',
     isActive: false,
+    emailVerified: '2026-09-01T00:00:00.000Z',
     roles: [{ role: { name: 'CLIENT_USER' } }],
     clients: [{ clientId: 'c1', status: 'APPROVED' }],
   },
@@ -136,6 +139,15 @@ describe('자사 사용자', () => {
     // 자기 자신은 비활성화할 수 없다(스스로 잠기는 사고 방지).
     expect(screen.queryByRole('button', { name: '나관리 비활성화' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /사용자 추가|역할/ })).not.toBeInTheDocument();
+  });
+
+  it('가입 확인 링크를 열지 않은 승인 대기 신청자에게만 이메일 미인증을 보인다', async () => {
+    renderPage();
+
+    expect(await screen.findByText('신입')).toBeInTheDocument();
+    // 승인 대기 1명만 — 확인된 계정과 인증 정보가 없는 행에는 보이지 않는다.
+    expect(screen.getAllByText('이메일 미인증')).toHaveLength(1);
+    expect(screen.getByText('new@client.com').parentElement).toHaveTextContent('이메일 미인증');
   });
 
   it('승인은 가입 승인 API 를, 거절은 같은 경로의 DELETE 를 부른다', async () => {

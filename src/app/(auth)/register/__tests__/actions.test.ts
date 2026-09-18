@@ -23,6 +23,7 @@ const {
   mockUserClientCreate,
   mockTransaction,
   mockHash,
+  mockEnqueueVerification,
 } = vi.hoisted(() => ({
   mockGetUserByEmail: vi.fn(),
   mockRoleFindFirst: vi.fn(),
@@ -30,6 +31,7 @@ const {
   mockUserClientCreate: vi.fn(),
   mockTransaction: vi.fn(),
   mockHash: vi.fn(),
+  mockEnqueueVerification: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -47,6 +49,10 @@ vi.mock('@/services/user.service', () => ({
 }));
 
 vi.mock('bcryptjs', () => ({ hash: mockHash }));
+
+vi.mock('@/services/email-verification.service', () => ({
+  enqueueEmailVerificationEmail: mockEnqueueVerification,
+}));
 
 // 미인증 액션이라 IP 로 키잉된다. 레이트리밋 자체는 별도 스위트가 덮는다.
 vi.mock('@/lib/action-helpers', () => ({ requireRateLimit: vi.fn() }));
@@ -85,7 +91,9 @@ beforeEach(() => {
   mockHash.mockResolvedValue('hashed');
   mockTransaction.mockImplementation(async (cb: (tx: unknown) => unknown) =>
     cb({
-      user: { create: vi.fn().mockResolvedValue({ id: 'u-1' }) },
+      user: {
+        create: vi.fn().mockResolvedValue({ id: 'u-1', email: 'user@example.com', name: '홍길동' }),
+      },
       userRole: { create: vi.fn() },
       userClient: { create: mockUserClientCreate },
     })
@@ -214,5 +222,31 @@ describe('registerUser — 고객사 코드 해석', () => {
     expect(result.success).toBe(true);
     expect(mockClientFindFirst).not.toHaveBeenCalled();
     expect(mockUserClientCreate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 가입 이메일 인증 링크(2026-09-18 소유자 결정 D13 B+). 계정과 같은 트랜잭션에 인증 메일을 적재해
+ * "계정은 생겼는데 메일 기록은 없다" 가 생기지 않게 한다. 인증은 승인을 막지 않는다.
+ */
+describe('registerUser — 이메일 인증 링크', () => {
+  it('가입한 계정의 인증 메일을 가입 트랜잭션 안에서 적재하고, 안내 문구로 알린다', async () => {
+    const result = await registerUser(form({ accountType: 'ENGINEER' }));
+
+    expect(result.success).toBe(true);
+    expect(mockEnqueueVerification).toHaveBeenCalledTimes(1);
+    const [tx, user] = mockEnqueueVerification.mock.calls[0]!;
+    // 트랜잭션 콜백이 받은 tx 로 적재한다 — 전역 prisma 로 따로 쓰면 원자성이 깨진다.
+    expect(tx).toHaveProperty('userRole');
+    expect(user).toEqual({ id: 'u-1', email: 'user@example.com', name: '홍길동' });
+    expect(result.message).toContain('확인 링크');
+  });
+
+  it('인증 메일 적재가 실패하면 가입도 실패로 알린다(트랜잭션이 함께 롤백된다)', async () => {
+    mockEnqueueVerification.mockRejectedValueOnce(new Error('outbox down'));
+
+    const result = await registerUser(form({ accountType: 'ENGINEER' }));
+
+    expect(result).toEqual({ success: false, error: '회원가입 중 오류가 발생했습니다.' });
   });
 });

@@ -24,6 +24,28 @@ import { logger } from '@/lib/logger';
  * 로그인 실패 사유(`signIn` 결과의 `code`)별 안내(결정 D13). 잠금과 요청 제한은 "비밀번호가 틀렸다" 가
  * 아니므로 다시 입력해 봐야 소용없다는 것을 알려야 한다. 잠금 문구는 존재하지 않는 이메일에도 똑같이 나온다.
  */
+/** 이메일 인증 링크를 연 결과(`/login?verified=`). 값은 `email-verification.service` 의 결과와 같다. */
+export type EmailVerificationNotice = 'verified' | 'already' | 'expired' | 'invalid';
+
+const VERIFICATION_MESSAGES = new Map<EmailVerificationNotice, { text: string; ok: boolean }>([
+  ['verified', { text: '이메일 주소가 확인되었습니다.', ok: true }],
+  ['already', { text: '이미 확인된 이메일 주소입니다.', ok: true }],
+  [
+    'expired',
+    {
+      text: '확인 링크의 유효 기간이 지났습니다. 가입 승인은 그대로 진행될 수 있으니, 필요하면 관리자에게 문의하세요.',
+      ok: false,
+    },
+  ],
+  [
+    'invalid',
+    {
+      text: '확인 링크가 올바르지 않습니다. 메일의 링크를 그대로 열었는지 확인하세요.',
+      ok: false,
+    },
+  ],
+]);
+
 function signInErrorMessage(code: string | undefined): string {
   if (code === 'account_locked') {
     return `로그인 실패가 반복되어 이 계정의 로그인이 잠시 막혔습니다. ${LOGIN_LOCK_POLICY.lockMinutes}분 뒤에 다시 시도하세요.`;
@@ -52,7 +74,12 @@ function safeStorage<T>(operation: () => T, what: string): T | undefined {
   }
 }
 
-export default function LoginForm() {
+export default function LoginForm({
+  verificationNotice = null,
+}: {
+  verificationNotice?: EmailVerificationNotice | null;
+} = {}) {
+  const notice = verificationNotice ? VERIFICATION_MESSAGES.get(verificationNotice) : undefined;
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -134,6 +161,18 @@ export default function LoginForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {notice && !error && (
+            <div
+              className={
+                notice.ok
+                  ? 'bg-primary/10 text-foreground text-sm p-3 rounded-md'
+                  : 'bg-muted text-foreground text-sm p-3 rounded-md'
+              }
+              role="status"
+            >
+              {notice.text}
+            </div>
+          )}
           {error && (
             <div
               className="bg-destructive/15 text-destructive text-sm p-3 rounded-md"
