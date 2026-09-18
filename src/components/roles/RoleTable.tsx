@@ -4,6 +4,7 @@ import { ResponsiveTableShell } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { isCanonicalRole, isImmutableRole } from '@/lib/role-rules';
 import { RoleItem as Role } from '@/types/role';
 
 interface RoleTableProps {
@@ -42,10 +43,12 @@ export function RoleTable({ roles, onEdit, onManagePermissions, onDelete }: Role
               </TableCell>
               <TableCell className="text-center">{role._count?.users || 0}명</TableCell>
               <TableCell className="text-center space-x-2">
+                {/* ADMIN 역할은 설명·권한까지 서버가 거부한다 — 눌러도 403 인 버튼을 두지 않는다 */}
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onEdit(role)}
+                  disabled={isImmutableRole(role.name)}
                   className="sr-btn-template"
                 >
                   수정
@@ -54,6 +57,7 @@ export function RoleTable({ roles, onEdit, onManagePermissions, onDelete }: Role
                   variant="ghost"
                   size="sm"
                   onClick={() => onManagePermissions(role)}
+                  disabled={isImmutableRole(role.name)}
                   className="sr-btn-template"
                 >
                   권한 관리
@@ -62,7 +66,7 @@ export function RoleTable({ roles, onEdit, onManagePermissions, onDelete }: Role
                   variant="ghost"
                   size="sm"
                   onClick={() => onDelete(role)}
-                  disabled={role._count && role._count.users > 0}
+                  disabled={isCanonicalRole(role.name) || (role._count && role._count.users > 0)}
                   className="sr-btn-template"
                 >
                   삭제

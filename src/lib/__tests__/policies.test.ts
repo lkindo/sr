@@ -495,7 +495,7 @@ describe('Policy Functions', () => {
 
   describe('Role Policies', () => {
     const adminRole = { name: 'ADMIN' } as any;
-    const userRole = { name: 'USER' } as any;
+    const managerRole = { name: 'MANAGER' } as any;
     const customRole = { name: 'CUSTOM' } as any;
 
     it('canUpdateRole: cannot update ADMIN role', () => {
@@ -503,8 +503,8 @@ describe('Policy Functions', () => {
       expect(policies.canUpdateRole(adminUser, customRole)).toBe(true);
     });
 
-    it('canDeleteRole: cannot delete system roles', () => {
-      expect(policies.canDeleteRole(adminUser, userRole)).toBe(false);
+    it('canDeleteRole: cannot delete canonical roles', () => {
+      expect(policies.canDeleteRole(adminUser, managerRole)).toBe(false);
       expect(policies.canDeleteRole(adminUser, customRole)).toBe(true);
     });
 
@@ -520,8 +520,8 @@ describe('Policy Functions', () => {
       expect(() => policies.ensureCanUpdateRole(adminUser, adminRole)).toThrow(
         'ADMIN 역할은 수정할 수 없습니다.'
       );
-      expect(() => policies.ensureCanDeleteRole(adminUser, userRole)).toThrow(
-        '시스템 역할은 삭제할 수 없습니다.'
+      expect(() => policies.ensureCanDeleteRole(adminUser, managerRole)).toThrow(
+        '기본 역할은 삭제할 수 없습니다.'
       );
       expect(() => policies.ensureCanAssignRole(regularUser, adminRole)).toThrow(
         'ADMIN 역할 할당은 ADMIN만 가능합니다.'

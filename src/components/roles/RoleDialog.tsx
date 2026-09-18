@@ -15,6 +15,7 @@ import {
 import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { CANONICAL_ROLE_NAMES, isCanonicalRole } from '@/lib/role-rules';
 
 // 생성/수정 폼이 다루는 필드만. `RoleItem` 으로 넓히지 않는 이유는 DeleteRoleDialog 와 같다.
 interface Role {
@@ -35,6 +36,8 @@ export function RoleDialog({ open, onOpenChange, role, onSaved }: RoleDialogProp
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  // 기본 역할은 이름을 바꿀 수 없다(서버도 거부한다). 설명만 고칠 수 있다.
+  const nameLocked = role ? isCanonicalRole(role.name) : false;
 
   useEffect(() => {
     if (role) {
@@ -102,10 +105,16 @@ export function RoleDialog({ open, onOpenChange, role, onSaved }: RoleDialogProp
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="예: MANAGER"
+                placeholder="예: AUDITOR"
                 required
-                disabled={loading}
+                disabled={loading || nameLocked}
+                aria-describedby="role-name-hint"
               />
+              <p id="role-name-hint" className="text-xs text-muted-foreground">
+                {nameLocked
+                  ? '기본 역할의 이름은 바꿀 수 없습니다. 설명과 권한은 조정할 수 있습니다.'
+                  : `기본 역할 이름(${CANONICAL_ROLE_NAMES.join(', ')})은 쓸 수 없습니다.`}
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="description">설명</Label>

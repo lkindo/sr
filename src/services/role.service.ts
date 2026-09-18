@@ -8,7 +8,7 @@ import {
   ensureCanUpdateRole,
   ensureNoPrivilegeEscalation,
   ensureNotActorsOwnRole,
-  ensureRoleNameNotReserved,
+  ensureRoleNameAllowed,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { invalidateRolePermissions } from '@/lib/role-permissions';
@@ -68,6 +68,8 @@ export class RoleService {
     // 정책 검사가 없었고, `ensureCanCreateRole` 은 정의만 된 채 아무도 부르지 않았다.
     if (actor) {
       ensureCanCreateRole(actor);
+      // 기본 역할 이름 선점 차단 — 예전에는 생성 경로에 이름 검사가 아예 없었다
+      ensureRoleNameAllowed(validated.name);
     }
 
     return prisma.$transaction(async (tx) => {
@@ -103,8 +105,8 @@ export class RoleService {
       ensureCanUpdateRole(actor, existingRole);
       // 자기 역할을 스스로 손보는 경로 차단
       ensureNotActorsOwnRole(actor, existingRole);
-      // 'ADMIN' 으로의 개명 차단 — 이름만 바꿔도 전역 roles.includes('ADMIN') 이 통과한다
-      ensureRoleNameNotReserved(actor, validated.name);
+      // 기본 역할의 개명과 기본 역할 이름으로의 개명 차단 — 이름이 곧 인가의 열쇠다
+      ensureRoleNameAllowed(validated.name, existingRole);
     }
 
     return prisma.$transaction(async (tx) => {
@@ -134,7 +136,7 @@ export class RoleService {
     }
 
     if (actor) {
-      // 시스템 역할 삭제 불가 + 삭제 권한 보유 여부
+      // 기본 역할 삭제 불가 + 삭제 권한 보유 여부
       ensureCanDeleteRole(actor, role);
       ensureNotActorsOwnRole(actor, role);
     }

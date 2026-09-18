@@ -92,6 +92,22 @@ describe('RoleMobileList Component', () => {
     expect(onDelete).toHaveBeenCalledWith(mockRoles[1]);
   });
 
+  it('기본 역할은 삭제할 수 없고, ADMIN 은 수정·권한도 비활성화된다(RoleTable 과 같은 판정)', () => {
+    const canonical = [
+      { id: 'r-admin', name: 'ADMIN', permissions: [], _count: { users: 0 } },
+      { id: 'r-mgr', name: 'MANAGER', permissions: [], _count: { users: 0 } },
+    ];
+    render(<RoleMobileList {...defaultProps} roles={canonical} />);
+
+    const deleteButtons = screen.getAllByText('삭제');
+    expect(deleteButtons[0]).toBeDisabled();
+    expect(deleteButtons[1]).toBeDisabled();
+    expect(screen.getAllByText('수정')[0]).toBeDisabled();
+    expect(screen.getAllByText('권한')[0]).toBeDisabled();
+    expect(screen.getAllByText('수정')[1]).not.toBeDisabled();
+    expect(screen.getAllByText('권한')[1]).not.toBeDisabled();
+  });
+
   it('사용자가 배정된 역할(users > 0)은 삭제 버튼이 비활성화되어야 함', () => {
     render(<RoleMobileList {...defaultProps} roles={mockRoles} />);
 

@@ -184,7 +184,7 @@ describe('updateRole — 이름 보호와 자기 역할 보호', () => {
 
     await expect(
       service.updateRole('r-2', { name: 'ADMIN' }, roleManager.id, null, roleManager)
-    ).rejects.toThrow(/시스템 역할 이름/);
+    ).rejects.toThrow(/기본 역할 이름/);
   });
 
   it('대소문자를 바꿔도 막는다', async () => {
@@ -192,7 +192,7 @@ describe('updateRole — 이름 보호와 자기 역할 보호', () => {
 
     await expect(
       service.updateRole('r-2', { name: 'admin' }, roleManager.id, null, roleManager)
-    ).rejects.toThrow(/시스템 역할 이름/);
+    ).rejects.toThrow(/기본 역할 이름/);
   });
 
   it('평범한 이름 변경은 허용한다', async () => {
@@ -212,12 +212,12 @@ describe('updateRole — 이름 보호와 자기 역할 보호', () => {
   });
 });
 
-describe('deleteRole — 시스템 역할 보호', () => {
-  it('시스템 역할은 삭제할 수 없다', async () => {
+describe('deleteRole — 기본 역할 보호', () => {
+  it('기본 역할은 삭제할 수 없다', async () => {
     mocks.roleFindUnique.mockResolvedValue({ id: 'r-admin', name: 'ADMIN', description: null });
 
     await expect(service.deleteRole('r-admin', roleManager.id, null, roleManager)).rejects.toThrow(
-      /시스템 역할/
+      /기본 역할/
     );
   });
 
@@ -284,5 +284,77 @@ describe('createRole — 생성 권한과 감사 행위자', () => {
     await expect(service.createRole({ name: 'SEEDED' })).resolves.toMatchObject({
       name: 'SEEDED',
     });
+  });
+});
+
+/**
+ * 기본 역할 5개는 ADMIN 도 이름을 바꾸거나 지울 수 없다(헌법 §1.4, 2026-09-18 소유자 결정 RB-12).
+ *
+ * 세션에는 역할 이름만 실리고 정책·메뉴·알림·가입이 그 이름으로 판정한다. 예전에는 보호 목록이
+ * ADMIN·USER·GUEST 였다 — USER·GUEST 는 이 시스템에 없는 이름이라 실제로는 ADMIN 하나만 보호됐고,
+ * ADMIN 은 이름 검사를 건너뛰었다. 그래서 MANAGER 를 개명하면 운영 관리자 전원의 SR 목록이 비었고,
+ * 비워진 'MANAGER' 를 커스텀 역할이 차지하면 그 사용자가 내부 사용자로 판정됐다.
+ * 권한 구성은 ADMIN 이 조정하는 기본값이므로 막지 않는다 — 과잉 차단 대조군을 함께 둔다.
+ */
+describe('기본 역할 보호 — ADMIN 도 이름을 바꾸거나 지울 수 없다', () => {
+  const managerRole = { id: 'r-mgr', name: 'MANAGER', description: '운영 관리자' };
+
+  it('기본 역할의 이름은 ADMIN 도 바꿀 수 없다', async () => {
+    mocks.roleFindUnique.mockResolvedValue(managerRole);
+
+    await expect(
+      service.updateRole('r-mgr', { name: 'OPS_MANAGER' }, admin.id, null, admin)
+    ).rejects.toThrow('기본 역할(MANAGER)의 이름은 바꿀 수 없습니다.');
+    expect(mocks.roleUpdate).not.toHaveBeenCalled();
+  });
+
+  it('이름을 그대로 보내고 설명만 고치는 것은 허용한다 — 수정 폼은 이름을 늘 보낸다', async () => {
+    mocks.roleFindUnique.mockResolvedValue(managerRole);
+
+    await expect(
+      service.updateRole(
+        'r-mgr',
+        { name: 'MANAGER', description: 'SR 접수·배정' },
+        admin.id,
+        null,
+        admin
+      )
+    ).resolves.toMatchObject({ description: 'SR 접수·배정' });
+  });
+
+  it('ADMIN 도 커스텀 역할을 기본 역할 이름(대소문자 무시)으로 바꿀 수 없다', async () => {
+    mocks.roleFindUnique.mockResolvedValue(otherRole);
+
+    await expect(
+      service.updateRole('r-2', { name: 'Engineer' }, admin.id, null, admin)
+    ).rejects.toThrow('기본 역할 이름(Engineer)은 쓸 수 없습니다.');
+    expect(mocks.roleUpdate).not.toHaveBeenCalled();
+  });
+
+  it('ADMIN 도 기본 역할 이름으로 새 역할을 만들 수 없다', async () => {
+    await expect(
+      service.createRole({ name: ' client_admin ' }, admin.id, null, admin as never)
+    ).rejects.toThrow(/기본 역할 이름/);
+    expect(mocks.roleCreate).not.toHaveBeenCalled();
+  });
+
+  it('사용자가 0명이어도 기본 역할은 ADMIN 도 지울 수 없다', async () => {
+    mocks.roleFindUnique.mockResolvedValue({ id: 'r-cu', name: 'CLIENT_USER', description: null });
+    mocks.userRoleCount.mockResolvedValue(0);
+
+    await expect(service.deleteRole('r-cu', admin.id, null, admin)).rejects.toThrow(
+      '기본 역할은 삭제할 수 없습니다.'
+    );
+    expect(mocks.roleDelete).not.toHaveBeenCalled();
+  });
+
+  it('기본 역할의 권한 구성은 ADMIN 이 조정할 수 있다 — 역할별 권한은 기본값이다', async () => {
+    mocks.roleFindUnique.mockResolvedValue(managerRole);
+    mocks.permissionFindMany.mockResolvedValue([{ resource: 'ROLE', action: 'ASSIGN' }]);
+
+    await expect(
+      service.updateRolePermissions('r-mgr', ['p-role-assign'], admin.id, null, admin)
+    ).resolves.toBeDefined();
+    expect(mocks.rolePermissionCreateMany).toHaveBeenCalled();
   });
 });

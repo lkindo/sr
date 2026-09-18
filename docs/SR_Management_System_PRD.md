@@ -270,6 +270,11 @@ SR 관리 시스템은 여러 고객사로부터 수신된 Service Request를 �
 > **정정(2026-08-15)**: 아래 역할명은 1.3 까지 `SYSTEM_ADMIN`·`DEVELOPER` 로 적혀 있었고
 > `MANAGER` 가 누락돼 있었다. 실제 역할 5종으로 교체한다. 권한 문자열의 정본은
 > `prisma/permission-catalog.ts` 이며 `resource:action` 대문자 표기를 쓴다.
+>
+> **기본값과 보호(2026-09-18 소유자 결정 RB-12, `GEMINI.md` §1.4)**: 아래 역할별 권한과 '권한 매트릭스'는
+> 시드가 넣는 **기본값**이며 ADMIN 이 `/roles` 에서 조정할 수 있다. 확인완료 주체·ENGINEER 배정 격리·고객사 격리·
+> ADMIN 전용 기능은 권한으로 풀리지 않는다. 기본 역할 5개는 ADMIN 도 이름을 바꾸거나 삭제할 수 없고, 다른 역할이
+> 그 이름을 쓸 수 없다. ADMIN 역할은 설명·권한까지 수정할 수 없다.
 
 **시스템 관리자 (ADMIN)**
 
@@ -724,7 +729,8 @@ SR 신청 → 자동 알림 발송 → 담당자 확인 및 검토 →
 > **정정(2026-08-15)**: 이 표는 1.3 까지 `SYSTEM_ADMIN`·`DEVELOPER` 라는 **존재하지 않는 역할명**을
 > 쓰고 `MANAGER` 열이 통째로 빠져 있어 RBAC 검증의 기준으로 쓸 수 없었다.
 > 실제 역할은 `ADMIN` / `MANAGER` / `ENGINEER` / `CLIENT_ADMIN` / `CLIENT_USER` 5종이다
-> (`GEMINI.md` §1.1, `prisma/seed.ts` 의 역할·권한 시드가 정본).
+> (`GEMINI.md` §1.1, `prisma/seed.ts` 의 역할·권한 시드가 정본). 이 표는 시드 기본값이며 ADMIN 이 조정할 수 있다
+> (§3.1 머리말, `GEMINI.md` §1.4).
 
 | 기능                | ADMIN   | MANAGER      | ENGINEER       | CLIENT_ADMIN   | CLIENT_USER    |
 | ------------------- | ------- | ------------ | -------------- | -------------- | -------------- |

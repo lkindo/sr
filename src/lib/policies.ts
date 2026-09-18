@@ -8,6 +8,7 @@ import { Client, Prisma, Role, SR, SRStatus, User } from '@prisma/client';
 
 import { BusinessRuleError, ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+import { isCanonicalRole, isImmutableRole, isReservedRoleName } from '@/lib/role-rules';
 import {
   canViewerAssignSR,
   canViewerIntakeSR,
@@ -729,8 +730,6 @@ export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIde
 // Role 권한 함수
 // ============================================================================
 
-const RESERVED_ROLE_NAMES = ['ADMIN', 'USER', 'GUEST'];
-
 export function canCreateRole(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.CREATE);
 }
@@ -741,7 +740,7 @@ export function canReadRole(user: AuthenticatedUser): boolean {
 
 export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
   // ADMIN 역할은 수정 불가 (시스템 보호)
-  if (role.name === 'ADMIN') {
+  if (isImmutableRole(role.name)) {
     return false;
   }
 
@@ -749,8 +748,8 @@ export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
 }
 
 export function canDeleteRole(user: AuthenticatedUser, role: Role): boolean {
-  // 시스템 역할은 삭제 불가
-  if (RESERVED_ROLE_NAMES.includes(role.name)) {
+  // 기본 역할은 삭제 불가 — 이름이 곧 인가의 열쇠다(헌법 §1.4, role-rules.ts)
+  if (isCanonicalRole(role.name)) {
     return false;
   }
 
@@ -781,7 +780,7 @@ export function ensureCanReadRole(user: AuthenticatedUser): void {
 }
 
 export function ensureCanUpdateRole(user: AuthenticatedUser, role: Role): void {
-  if (role.name === 'ADMIN') {
+  if (isImmutableRole(role.name)) {
     throw new ForbiddenError('ADMIN 역할은 수정할 수 없습니다.');
   }
   if (!canUpdateRole(user, role)) {
@@ -790,8 +789,8 @@ export function ensureCanUpdateRole(user: AuthenticatedUser, role: Role): void {
 }
 
 export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
-  if (RESERVED_ROLE_NAMES.includes(role.name)) {
-    throw new ForbiddenError('시스템 역할은 삭제할 수 없습니다.');
+  if (isCanonicalRole(role.name)) {
+    throw new ForbiddenError('기본 역할은 삭제할 수 없습니다.');
   }
   if (!canDeleteRole(user, role)) {
     throw new ForbiddenError('역할 삭제 권한이 없습니다.');
@@ -799,19 +798,28 @@ export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
 }
 
 /**
- * 역할 이름 변경이 시스템 역할을 사칭하지 못하게 한다.
+ * 역할 이름이 기본 역할과 부딪히지 않게 한다 — 생성과 개명 모두(헌법 §1.4).
  *
- * `ensureCanUpdateRole` 은 **대상 역할이 ADMIN 인지**만 봤다. 그래서 ROLE:UPDATE 보유자가
- * 평범한 커스텀 역할의 이름을 'ADMIN' 으로 바꾸면, 코드베이스 전역의
- * `roles.includes('ADMIN')` 검사가 전부 통과한다(감사 3.11).
+ *  - 기본 역할 자신은 이름을 바꿀 수 없다. 세션·정책·메뉴·알림이 이름으로 판정하므로 개명은 표시 변경이
+ *    아니라 그 역할 사용자 전원의 인가 해제다. 부팅 시드는 이름으로 역할을 찾으므로 빈 기본 역할을 또 만든다.
+ *  - 다른 역할은 기본 역할 이름(대소문자 무시)을 가질 수 없다. 예전에는 ROLE:UPDATE 보유자가 커스텀 역할을
+ *    'ADMIN' 으로 바꾸면 전역 `roles.includes('ADMIN')` 이 통과했다(감사 3.11). 'MANAGER'·'ENGINEER' 도
+ *    같다 — 그 역할 사용자가 내부 사용자로 판정돼 전 고객사 SR 이 열린다. 그래서 ADMIN 도 예외가 아니다.
+ *
+ * 수정 폼은 이름을 고치지 않아도 늘 보내므로, 지금 이름과 같으면 검사하지 않는다(설명만 고치는 경우).
  */
-export function ensureRoleNameNotReserved(user: AuthenticatedUser, nextName?: string): void {
-  if (!nextName) return;
-  const isAdmin = user.roles?.includes('ADMIN') ?? false;
-  if (isAdmin) return;
+export function ensureRoleNameAllowed(
+  nextName: string | undefined,
+  current?: Pick<Role, 'name'>
+): void {
+  if (nextName === undefined) return;
+  if (current && nextName === current.name) return;
 
-  if (RESERVED_ROLE_NAMES.some((name) => name.toLowerCase() === nextName.trim().toLowerCase())) {
-    throw new ForbiddenError(`시스템 역할 이름(${nextName})으로 변경할 수 없습니다.`);
+  if (current && isCanonicalRole(current.name)) {
+    throw new ForbiddenError(`기본 역할(${current.name})의 이름은 바꿀 수 없습니다.`);
+  }
+  if (isReservedRoleName(nextName)) {
+    throw new ForbiddenError(`기본 역할 이름(${nextName.trim()})은 쓸 수 없습니다.`);
   }
 }
 
