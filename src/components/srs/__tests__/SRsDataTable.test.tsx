@@ -70,7 +70,11 @@ describe('SRsDataTable Search Component', () => {
 
     vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as any);
 
-    vi.mocked(usePermissions).mockReturnValue({ hasAnyRole: () => true } as any);
+    vi.mocked(usePermissions).mockReturnValue({
+      hasAnyRole: () => true,
+      hasPermission: () => true,
+      isAdmin: () => true,
+    } as any);
   });
 
   const defaultProps = {

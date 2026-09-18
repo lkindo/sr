@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation';
-import type { Prisma, SRPriority, SRStatus } from '@prisma/client';
+import { type Prisma, SRPriority, SRStatus } from '@prisma/client';
 
 import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
 import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
+import { getEnumParams } from '@/lib/search-params';
 import { startOfAppZoneDay } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
 
@@ -19,6 +20,9 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
   return Array.isArray(param) ? param[0] : param;
 };
 
+const SR_STATUSES = Object.values(SRStatus);
+const SR_PRIORITIES = Object.values(SRPriority);
+
 /**
  * 이 화면이 제공하는 정렬 필드. 관계형 3개는 아래에서 중첩 객체로 따로 처리한다.
  */
@@ -28,6 +32,9 @@ const SORTABLE_FIELDS = [
   'srNumber',
   'title',
   'status',
+  // 목록의 '우선순위' 머리글이 보내는 값(실효 우선순위 `priority`). 예전에는 여기 없어서 조용히
+  // 생성일 정렬로 떨어지면서 화면에는 우선순위 정렬 화살표가 그대로 보였다.
+  'priority',
   'actualPriority',
   'requestedPriority',
   'dueDate',
@@ -81,8 +88,8 @@ export default async function SRsPage({ searchParams }: Props) {
     ? (rawSortField as SortableField)
     : 'createdAt';
 
-  const status = getSearchParam(resolvedSearchParams.status);
-  const priority = getSearchParam(resolvedSearchParams.priority);
+  const statuses = getEnumParams(resolvedSearchParams.status, SR_STATUSES);
+  const priorities = getEnumParams(resolvedSearchParams.priority, SR_PRIORITIES);
   const clientId = getSearchParam(resolvedSearchParams.clientId);
   const assigneeId = getSearchParam(resolvedSearchParams.assigneeId);
   const search = getSearchParam(resolvedSearchParams.search);
@@ -91,8 +98,9 @@ export default async function SRsPage({ searchParams }: Props) {
 
   const where: Prisma.SRWhereInput = {};
 
-  if (status && status !== 'all') where.status = status as SRStatus;
-  if (priority && priority !== 'all') where.priority = priority as SRPriority;
+  if (statuses.length > 0) where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+  if (priorities.length > 0)
+    where.priority = priorities.length === 1 ? priorities[0] : { in: priorities };
 
   // clientId 필터 처리
   if (clientId && clientId !== 'all') {

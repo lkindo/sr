@@ -41,6 +41,26 @@ import { canViewerIntakeSR } from '@/lib/sr-state-machine';
 import type { SRListItem } from '@/types/sr.types';
 
 import { priorityLabels, statusLabels } from './constants';
+
+/** 배지 '긴급' 의 범위 — 서버 배지 집계(getSRBadgeCounts)와 같다. */
+const URGENT_PRIORITIES = ['CRITICAL', 'HIGH'] as const;
+
+/**
+ * 같은 키가 여러 번 온 필터(대시보드 카드 링크 `?status=COMPLETED&status=CONFIRMED` 등)를 하나의 선택값으로
+ * 다룬다 — 값이 여럿이면 쉼표로 묶는다. 선택 목록에는 그 묶음이 한 항목으로 따로 나타난다.
+ */
+function multiValueFilter(params: URLSearchParams | null, key: string): string {
+  const values = params?.getAll(key) ?? [];
+  return values.length === 0 ? 'all' : values.join(',');
+}
+
+function multiValueLabel(value: string, labels: Record<string, string>): string {
+  const byValue = new Map(Object.entries(labels));
+  return value
+    .split(',')
+    .map((item) => byValue.get(item) ?? item)
+    .join('·');
+}
 import { SRCardItem, SRTableRow } from './SRListItem';
 
 const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
@@ -109,7 +129,10 @@ export function SRsDataTable({
   const searchParams = useSearchParams();
   const { data: session } = useSession();
 
-  const { hasAnyRole, roles, permissions } = usePermissions();
+  const { hasAnyRole, hasPermission, isAdmin, roles, permissions } = usePermissions();
+  // 서버(policies.canCreateSR)와 같은 규칙: ADMIN 이거나 SR:CREATE. ENGINEER 는 시드상 SR:CREATE 가 없어
+  // 예전에는 등록 버튼을 누르면 반드시 403 이었다.
+  const canCreateSR = isAdmin() || hasPermission('SR', 'CREATE');
 
   // ADMIN, MANAGER, ENGINEER가 아닌 고객사 사용자인지 확인
   const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
@@ -129,8 +152,8 @@ export function SRsDataTable({
 
   const filters = useMemo(
     () => ({
-      status: searchParams?.get('status') ?? 'all',
-      priority: searchParams?.get('priority') ?? 'all',
+      status: multiValueFilter(searchParams, 'status'),
+      priority: multiValueFilter(searchParams, 'priority'),
       clientId: searchParams?.get('clientId') ?? 'all',
       assigneeId: searchParams?.get('assigneeId') ?? 'all',
       search: searchParams?.get('search') ?? '',
@@ -182,11 +205,15 @@ export function SRsDataTable({
   }, [searchParams]);
 
   const createQueryString = useCallback(
-    (params: Record<string, string | number | null>) => {
+    (params: Record<string, string | number | string[] | null>) => {
       const newSearchParams = new URLSearchParams(searchParams.toString());
       for (const [key, value] of Object.entries(params)) {
         if (value === null || value === 'all' || value === '') {
           newSearchParams.delete(key);
+        } else if (Array.isArray(value)) {
+          // 여러 값 필터는 같은 키를 반복한다(`?priority=CRITICAL&priority=HIGH`).
+          newSearchParams.delete(key);
+          value.forEach((item) => newSearchParams.append(key, item));
         } else {
           newSearchParams.set(key, String(value));
         }
@@ -196,10 +223,12 @@ export function SRsDataTable({
     [searchParams]
   );
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key: string, value: string | string[]) => {
+    // 여러 값 선택지(예: '완료·확인완료')는 쉼표로 묶여 있으므로 다시 풀어 같은 키로 반복한다.
+    const next = typeof value === 'string' && value.includes(',') ? value.split(',') : value;
     // When filtering, always go back to the first page
     startTransition(() => {
-      router.push(`${pathname}?${createQueryString({ [key]: value, page: 1 })}`);
+      router.push(`${pathname}?${createQueryString({ [key]: next, page: 1 })}`);
     });
   };
 
@@ -270,7 +299,12 @@ export function SRsDataTable({
   const activeQuickFilter = useMemo(() => {
     if (filters.status === 'REQUESTED') return 'waiting';
     if (filters.assigneeId === session?.user?.id) return 'myAssigned';
-    if (filters.priority === 'CRITICAL' || filters.priority === 'HIGH') return 'urgent';
+    if (
+      filters.priority === URGENT_PRIORITIES.join(',') ||
+      filters.priority === 'CRITICAL' ||
+      filters.priority === 'HIGH'
+    )
+      return 'urgent';
     return null;
   }, [filters, session]);
 
@@ -282,7 +316,9 @@ export function SRsDataTable({
         handleFilterChange('assigneeId', session.user.id);
       }
     } else if (filterType === 'urgent') {
-      handleFilterChange('priority', 'CRITICAL');
+      // 배지 숫자(긴급 = CRITICAL + HIGH)와 같은 범위로 거른다. 예전에는 CRITICAL 만 걸어서
+      // 배지가 5건인데 목록은 2건처럼 숫자와 목록이 달랐다.
+      handleFilterChange('priority', [...URGENT_PRIORITIES]);
     } else {
       resetFilters();
     }
@@ -294,9 +330,14 @@ export function SRsDataTable({
         <div className="px-6 py-5 border-b border-border">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-semibold text-foreground">SR 목록</h1>
-            <Button onClick={() => setIsCreateDialogOpen(true)} className="sr-btn-template-primary">
-              <Plus className="mr-2 h-4 w-4" /> 등록
-            </Button>
+            {canCreateSR && (
+              <Button
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="sr-btn-template-primary"
+              >
+                <Plus className="mr-2 h-4 w-4" /> 등록
+              </Button>
+            )}
           </div>
 
           {/* 통계 배지 - 데스크톱에서만 노출 (모바일에서는 퀵 필터 버튼에 통합) */}
@@ -366,7 +407,7 @@ export function SRsDataTable({
                       className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
                         activeQuickFilter === 'myAssigned'
                           ? 'bg-background text-foreground font-bold'
-                          : 'bg-muted-foreground text-white'
+                          : 'bg-muted text-foreground'
                       }`}
                     >
                       {counts.myAssigned}
@@ -439,6 +480,11 @@ export function SRsDataTable({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">모든 상태</SelectItem>
+                          {filters.status.includes(',') && (
+                            <SelectItem value={filters.status}>
+                              {multiValueLabel(filters.status, statusLabels)}
+                            </SelectItem>
+                          )}
                           {Object.entries(statusLabels).map(([value, label]) => (
                             <SelectItem key={value} value={value}>
                               {label}
@@ -460,6 +506,11 @@ export function SRsDataTable({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">모든 우선순위</SelectItem>
+                          {filters.priority.includes(',') && (
+                            <SelectItem value={filters.priority}>
+                              {multiValueLabel(filters.priority, priorityLabels)}
+                            </SelectItem>
+                          )}
                           {Object.entries(priorityLabels).map(([value, label]) => (
                             <SelectItem key={value} value={value}>
                               {label}
@@ -726,12 +777,14 @@ export function SRsDataTable({
                         title="SR이 없습니다"
                         description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
                         action={
-                          <Button
-                            onClick={() => setIsCreateDialogOpen(true)}
-                            className="sr-btn-template-primary"
-                          >
-                            <Plus className="mr-2 h-4 w-4" /> SR 등록
-                          </Button>
+                          canCreateSR && (
+                            <Button
+                              onClick={() => setIsCreateDialogOpen(true)}
+                              className="sr-btn-template-primary"
+                            >
+                              <Plus className="mr-2 h-4 w-4" /> SR 등록
+                            </Button>
+                          )
                         }
                       />
                     )}
@@ -762,12 +815,14 @@ export function SRsDataTable({
                 title="SR이 없습니다"
                 description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
                 action={
-                  <Button
-                    onClick={() => setIsCreateDialogOpen(true)}
-                    className="sr-btn-template-primary"
-                  >
-                    <Plus className="mr-2 h-4 w-4" /> SR 등록
-                  </Button>
+                  canCreateSR && (
+                    <Button
+                      onClick={() => setIsCreateDialogOpen(true)}
+                      className="sr-btn-template-primary"
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> SR 등록
+                    </Button>
+                  )
                 }
               />
             )}
