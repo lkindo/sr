@@ -9,7 +9,12 @@ import { Client, Prisma, Role, SR, SRStatus, User } from '@prisma/client';
 import { INTERNAL_ACTIVITY_METADATA_KEY } from '@/lib/constants/sr';
 import { BusinessRuleError, ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
-import { isCanonicalRole, isImmutableRole, isReservedRoleName } from '@/lib/role-rules';
+import {
+  isCanonicalRole,
+  isDeletionProtectedAccount,
+  isImmutableRole,
+  isReservedRoleName,
+} from '@/lib/role-rules';
 import {
   canViewerAssignSR,
   canViewerIntakeSR,
@@ -54,6 +59,14 @@ export type RoleGrantFields = {
  */
 export function isSystemAdmin(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') ?? false;
+}
+
+/**
+ * 감사 로그를 조회할 수 있는가 — ADMIN 만(헌법 §1.1, 2026-09-18 소유자 결정 D11). 감사 로그에는 전 고객사의
+ * 관리 행위와 변경 전후 값(이메일 등)이 들어 있어 테넌트 범위로 나눌 수 없다.
+ */
+export function ensureCanViewAuditLogs(user: AuthenticatedUser): void {
+  ensureSystemAdmin(user, '감사 로그는 시스템 관리자만 조회할 수 있습니다.');
 }
 
 export function ensureSystemAdmin(user: AuthenticatedUser, message: string): void {
@@ -567,6 +580,10 @@ function targetHasRole(targetUser: UserIdentity, roleName: string): boolean {
   return (targetUser.roles ?? []).some((entry) => entry.role.name === roleName);
 }
 
+function targetRoleNames(targetUser: UserIdentity): string[] {
+  return (targetUser.roles ?? []).map((entry) => entry.role.name);
+}
+
 export function canCreateUser(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
 }
@@ -627,6 +644,9 @@ export function canDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity)
   if (targetUser.id === user.id) {
     return false;
   }
+
+  // 운영 계정(ADMIN·MANAGER)은 삭제 경로로 다루지 않는다 — 역할 변경이나 활성 토글로 한다(결정 D11).
+  if (isDeletionProtectedAccount(targetRoleNames(targetUser))) return false;
 
   if (isAdmin) return true;
   if (targetHasRole(targetUser, 'ADMIN') || !hasDelete) return false;
@@ -742,9 +762,16 @@ export function ensureCanUpdateUser(user: AuthenticatedUser, targetUser: UserIde
   }
 }
 
+/** 운영 계정 삭제를 막을 때의 안내. 화면(UserActions)도 같은 문장을 쓴다. */
+export const DELETION_PROTECTED_ACCOUNT_MESSAGE =
+  '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.';
+
 export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity): void {
   if (targetUser.id === user.id) {
     throw new ForbiddenError('자기 자신을 삭제할 수 없습니다.');
+  }
+  if (isDeletionProtectedAccount(targetRoleNames(targetUser))) {
+    throw new ForbiddenError(DELETION_PROTECTED_ACCOUNT_MESSAGE);
   }
   if (!canDeleteUser(user, targetUser)) {
     throw new ForbiddenError('사용자 삭제 권한이 없습니다.');

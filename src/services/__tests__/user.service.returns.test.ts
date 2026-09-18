@@ -35,7 +35,7 @@ vi.mock('@/lib/prisma', () => ({
     sRActivity: { count: vi.fn() },
     sRComment: { count: vi.fn() },
     sRStatusHistory: { count: vi.fn() },
-    auditLog: { create: vi.fn() },
+    auditLog: { create: vi.fn(), count: vi.fn().mockResolvedValue(0) },
     $transaction: vi.fn((cb) => cb(prisma)),
   },
 }));

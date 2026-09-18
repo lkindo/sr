@@ -982,12 +982,16 @@ RETURNING "seq"
 | target_entity | VARCHAR(50) | NO   | -      | 대상 엔티티 이름         |
 | target_id     | TEXT        | YES  | NULL   | 대상 레코드 ID           |
 | changes       | JSONB       | NO   | -      | 변경 내용 (NULL 불가)    |
-| ip_address    | VARCHAR(45) | YES  | NULL   | 요청 IP (IPv6 길이 고려) |
+| ip_address    | VARCHAR(45) | YES  | NULL   | 요청 IP (IPv6 길이 고려). ⚠️ 현재 기록하지 않아 항상 NULL |
 | created_at    | TIMESTAMPTZ | NO   | now()  | 생성 시간                |
 
 **인덱스:** PK `id` / INDEX `user_id` / INDEX `action_type` / INDEX `created_at`
 
 **외래 키:** `user_id` → `users(id)` SET NULL (사용자 삭제 후에도 로그는 보존)
+
+행이 보존돼도 영구 삭제된 사용자의 행위자 칸은 비워진다. 그래서 다른 사용자·데이터에 대한 관리 이력이 있는
+계정은 앱이 영구 삭제를 거부한다(`user.service.hardDeleteUser`, 2026-09-18 결정 D11). 보존 기간은 영구다.
+조회는 ADMIN 전용 `GET /api/audit-logs`(화면 `/settings/audit`)로 한다.
 
 ---
 

@@ -37,6 +37,8 @@ vi.mock('@/lib/prisma', () => ({
     sRActivity: { count: vi.fn() },
     sRComment: { count: vi.fn() },
     sRStatusHistory: { count: vi.fn() },
+    // 관리 이력 가드(D11 — hardDeleteUser). 기본은 없음.
+    auditLog: { count: vi.fn().mockResolvedValue(0) },
     $transaction: vi.fn((cb) => cb(prisma)),
   },
 }));
@@ -128,6 +130,23 @@ describe('UserService', () => {
       const result = await userService.hardDeleteUser('u1');
       expect(result.id).toBe('u1');
       expect(prisma.user.delete).toHaveBeenCalledWith({ where: { id: 'u1' } });
+    });
+
+    // 관리 행위를 한 계정을 지우면 감사 로그의 행위자가 비워져(FK SET NULL) "누가 승인했나" 에 답할 수 없다.
+    // 가입 승인자는 감사 로그에만 남는다(2026-09-18 소유자 결정 D11).
+    it('다른 사용자·데이터에 대한 관리 이력이 있으면 영구 삭제를 거부한다', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRActivity.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRComment.count).mockResolvedValue(0);
+      vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(0);
+      vi.mocked(prisma.auditLog.count).mockResolvedValue(3);
+
+      await expect(userService.hardDeleteUser('u1')).rejects.toThrow('관리 이력');
+      expect(prisma.user.delete).not.toHaveBeenCalled();
+      // 본인에게 한 기록(비밀번호 변경·로그인)은 대상 칸에 신원이 남으므로 세지 않는다.
+      expect(prisma.auditLog.count).toHaveBeenCalledWith({
+        where: { userId: 'u1', OR: [{ targetId: null }, { targetId: { not: 'u1' } }] },
+      });
     });
   });
 

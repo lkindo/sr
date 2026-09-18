@@ -483,6 +483,21 @@ describe('Policy Functions', () => {
       );
     });
 
+    // 운영 계정(ADMIN·MANAGER)은 삭제 경로로 다루지 않는다 — 예전에는 이 규칙이 화면에만 있어 ADMIN 이 API 를 직접
+    // 부르면 다른 ADMIN·MANAGER 를 영구 삭제할 수 있었다(2026-09-18 소유자 결정 D11).
+    it('ADMIN 도 운영 계정(ADMIN·MANAGER)은 삭제 경로로 지울 수 없다', () => {
+      const manager = { id: 'mgr-9', roles: [{ role: { name: 'MANAGER' } }] } as never;
+      const otherAdmin = { id: 'adm-9', roles: [{ role: { name: 'ADMIN' } }] } as never;
+      const engineer = { id: 'eng-9', roles: [{ role: { name: 'ENGINEER' } }] } as never;
+
+      expect(policies.canDeleteUser(adminUser, manager)).toBe(false);
+      expect(() => policies.ensureCanDeleteUser(adminUser, otherAdmin)).toThrow(
+        '시스템 관리자 계정은 삭제할 수 없습니다.'
+      );
+      // 대조군: 다른 계정은 그대로 지울 수 있다.
+      expect(policies.canDeleteUser(adminUser, engineer)).toBe(true);
+    });
+
     it('ensureCanDeleteUser throws correctly', () => {
       const self = { ...adminUser, id: 'self' };
       const target = { id: 'self' } as any;

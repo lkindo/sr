@@ -1084,6 +1084,7 @@ export async function deleteComment(id: string) {
 | `/api/clients/[id]/categories` | GET / POST | withAuthAndRateLimit | `src/app/api/clients/[id]/categories/route.ts` |
 | `/api/clients/[id]/categories/[categoryId]` | DELETE / PATCH | withAuthAndRateLimit | `src/app/api/clients/[id]/categories/[categoryId]/route.ts` |
 | `/api/clients/public` | GET | rateLimit(strict) + withErrorHandler (인증 없음) | `src/app/api/clients/public/route.ts` |
+| `/api/audit-logs` | GET | withAuthAndRateLimit | `src/app/api/audit-logs/route.ts` |
 | `/api/dashboard/stats` | GET | withAuthAndRateLimit | `src/app/api/dashboard/stats/route.ts` |
 | `/api/health` | GET | **래퍼 없음** | `src/app/api/health/route.ts` |
 | `/api/notifications/outbox` | GET / POST | withAuthAndRateLimit | `src/app/api/notifications/outbox/route.ts` |

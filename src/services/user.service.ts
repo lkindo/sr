@@ -438,22 +438,30 @@ export class UserService {
     // 이 카운트에는 **의도적으로 `SR_ALIVE` 를 붙이지 않는다.** 사용자 영구 삭제를 막는
     // 참조 무결성 가드이며, soft delete 된 SR 도 `requester_id` FK 로 이 사용자를 계속
     // 가리킨다. 여기서 제외하면 앱 검사는 통과하고 실제 DELETE 에서 FK 위반이 터진다.
-    const [relatedDataCount, activityCount, commentCount, statusHistoryCount] = await Promise.all([
-      prisma.sR.count({
-        where: {
-          OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
-        },
-      }),
-      prisma.sRActivity.count({
-        where: { userId },
-      }),
-      prisma.sRComment.count({
-        where: { userId },
-      }),
-      prisma.sRStatusHistory.count({
-        where: { changedBy: userId },
-      }),
-    ]);
+    const [relatedDataCount, activityCount, commentCount, statusHistoryCount, adminActionCount] =
+      await Promise.all([
+        prisma.sR.count({
+          where: {
+            OR: [{ requesterId: userId }, { assigneeId: userId }, { intakeById: userId }],
+          },
+        }),
+        prisma.sRActivity.count({
+          where: { userId },
+        }),
+        prisma.sRComment.count({
+          where: { userId },
+        }),
+        prisma.sRStatusHistory.count({
+          where: { changedBy: userId },
+        }),
+        // 다른 사용자·데이터에 대한 관리 행위(가입 승인, 비활성화, 역할·고객사 관리 등)를 한 기록. 영구 삭제하면
+        // 감사 로그의 행위자가 비워져(FK SET NULL) "누가 승인했나" 에 답할 수 없게 된다 — 가입 승인자는 감사
+        // 로그에만 남는다(2026-09-18 소유자 결정 D11). 본인에게 한 기록(비밀번호 변경·로그인)은 대상 칸에 신원이
+        // 남으므로 세지 않는다.
+        prisma.auditLog.count({
+          where: { userId, OR: [{ targetId: null }, { targetId: { not: userId } }] },
+        }),
+      ]);
 
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
@@ -485,6 +493,12 @@ export class UserService {
     if (statusHistoryCount > 0) {
       throw new BusinessRuleError(
         '해당 사용자는 SR 상태 변경 이력이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
+      );
+    }
+
+    if (adminActionCount > 0) {
+      throw new BusinessRuleError(
+        '해당 사용자는 관리 이력(가입 승인·사용자 관리 등 감사 기록)이 있어 완전히 삭제할 수 없습니다. 비활성화 상태를 유지해주세요.'
       );
     }
 

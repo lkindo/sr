@@ -2,6 +2,7 @@ import {
   Bell,
   Building2,
   ClipboardList,
+  FileClock,
   LayoutDashboard,
   ListChecks,
   type LucideIcon,
@@ -176,6 +177,13 @@ export const NAVIGATION_CONFIG: TopNavItem[] = [
             title: '알림 발송 이력',
             href: '/settings/outbox',
             icon: Bell,
+            role: 'ADMIN',
+          },
+          {
+            // 관리 행위의 감사 기록 조회(헌법 §1.1, 결정 D11). 예전에는 서버에 SSH 로 들어가 SQL 을 쳐야 했다.
+            title: '감사 로그',
+            href: '/settings/audit',
+            icon: FileClock,
             role: 'ADMIN',
           },
         ],
