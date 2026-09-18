@@ -82,7 +82,7 @@ const callsOf = (method: string) =>
   fetchMock.mock.calls.filter((call) => (call[1]?.method ?? 'GET') === method);
 
 /** 실물 Provider 로 감싼다. retry:false / gcTime:0 이 없으면 실패 케이스가 재시도로 늘어진다. */
-function renderCard(props: { canDelete?: boolean } = {}) {
+function renderCard(props: { canDelete?: boolean; canUpload?: boolean } = {}) {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false, gcTime: 0 },
@@ -138,6 +138,15 @@ describe('SRAttachments', () => {
     // 크기 포맷은 옮기지 않은 로직이지만, 목록 행이 실제로 그려졌는지의 증거로 함께 본다.
     expect(screen.getByText(/2 KB/)).toBeInTheDocument();
     expect(callsOf('GET')[0]![0]).toBe(LIST_URL);
+  });
+
+  // 업로드할 수 없는 사람(종결 SR, 수정 권한 없음)에게는 버튼을 보이지 않는다 — 예전에는 누구에게나 보여서
+  // 누르면 반드시 403 이었다. 판정은 SR 상세가 canViewerAttachToSR 로 넘긴다.
+  it('업로드할 수 없으면 업로드 버튼을 보이지 않는다', async () => {
+    renderCard({ canUpload: false });
+
+    await waitFor(() => expect(screen.getByText('설계서.pdf')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: /파일 업로드/ })).not.toBeInTheDocument();
   });
 
   it('첨부가 없으면 빈 목록 문구를 보여 준다', async () => {

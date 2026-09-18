@@ -185,14 +185,18 @@ describe('SRStatusActions Component', () => {
       expect(screen.getByText('확인 완료')).toBeInTheDocument();
     });
 
-    it('renders "진행 시작" for INTAKE state if user can manage', () => {
+    // 접수(INTAKE) 상태에서도 거절할 수 있다 — 전이표(INTAKE → REJECTED)·status 라우트·헌법이 모두
+    // 허용하는데 화면에만 버튼이 없어서, 접수 뒤 범위 밖으로 판명된 SR 을 거절할 길이 없었다.
+    it('renders "진행 시작" and "거절" for INTAKE state if user can manage', () => {
       render(<Harness {...defaultProps} status="INTAKE" />);
       expect(screen.getByText('진행 시작')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '거절' })).toBeInTheDocument();
     });
 
     it('renders nothing for INTAKE state if user cannot manage', () => {
       render(<Harness {...defaultProps} status="INTAKE" userRoles={['USER']} />);
       expect(screen.queryByText('진행 시작')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '거절' })).not.toBeInTheDocument();
     });
 
     it('renders "진행 재개" and "거절" for ON_HOLD state', () => {

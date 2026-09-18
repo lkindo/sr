@@ -309,6 +309,35 @@ describe('EditSRDialog Component', () => {
     ).toBeInTheDocument();
     expect(mockOnOpenChange).not.toHaveBeenCalledWith(false);
   });
+  // 서비스 카테고리는 SLA 산정 근거라 운영자 소유 값이다(접수 전에도). 외부 사용자는 바꿀 수 없으므로
+  // 선택지를 잠그고 이유를 적는다 — 예전에는 열려 있어서 바꾸고 저장하면 반드시 403 이었다.
+  it('외부 사용자에게는 서비스 카테고리 변경을 잠그고 이유를 보인다', async () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasAnyRole: vi.fn().mockImplementation((roles: string[]) => roles.includes('CLIENT_USER')),
+      roles: ['CLIENT_USER'],
+      permissions: ['SR:UPDATE_SELF'],
+    } as never);
+
+    render(<EditSRDialog {...defaultProps} />);
+
+    expect(
+      await screen.findByText(
+        '서비스 카테고리 변경은 담당자에게 요청하세요.',
+        {},
+        { timeout: 5000 }
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('운영자에게는 카테고리 변경 안내를 보이지 않는다', async () => {
+    render(<EditSRDialog {...defaultProps} />);
+
+    await screen.findByDisplayValue('Existing SR Title', {}, { timeout: 5000 });
+    expect(
+      screen.queryByText('서비스 카테고리 변경은 담당자에게 요청하세요.')
+    ).not.toBeInTheDocument();
+  });
+
   it('submits form successfully', async () => {
     mockUpdateMutateAsync.mockResolvedValue({ success: true });
     render(<EditSRDialog {...defaultProps} />);

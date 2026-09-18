@@ -211,23 +211,38 @@ export function SRStatusActions({
         );
 
       case 'INTAKE':
-        // 접수됨 상태: 진행 시작, 보류(접수단계에선 보류불가?), 거절
+        // 접수됨 상태: 진행 시작, 거절. 보류는 진행 중에만 된다(상태머신 INTAKE → IN_PROGRESS·REJECTED).
+        // 거절 버튼이 없어서 접수 뒤 범위 밖으로 판명된 SR 을 화면으로는 거절할 수 없었다 — 전이표·
+        // status 라우트·헌법은 모두 허용한다.
         if (!canManage) return null;
         return (
-          <Button
-            onClick={() => handleSimpleStatusChange('start')}
-            disabled={!!loadingAction}
-            aria-label="진행 시작"
-            className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-            title="진행 시작"
-          >
-            {loadingAction === 'start' ? (
-              <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4 md:mr-2" />
-            )}
-            <span className="hidden md:inline">진행 시작</span>
-          </Button>
+          <>
+            <Button
+              onClick={() => handleSimpleStatusChange('start')}
+              disabled={!!loadingAction}
+              aria-label="진행 시작"
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="진행 시작"
+            >
+              {loadingAction === 'start' ? (
+                <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 md:mr-2" />
+              )}
+              <span className="hidden md:inline">진행 시작</span>
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setRejectDialogOpen(true)}
+              disabled={!!loadingAction}
+              aria-label="거절"
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="거절"
+            >
+              <XCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">거절</span>
+            </Button>
+          </>
         );
       case 'IN_PROGRESS':
         // 진행중 상태: 완료 처리, 보류

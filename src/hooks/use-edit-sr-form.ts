@@ -10,7 +10,11 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
-import { canEditSRContentAt, SR_CONTENT_LOCKED_MESSAGE } from '@/lib/sr-state-machine';
+import {
+  canEditSRContentAt,
+  isSROperator,
+  SR_CONTENT_LOCKED_MESSAGE,
+} from '@/lib/sr-state-machine';
 import type { ClientSummary } from '@/types/client.types';
 import type { SRAttachmentView } from '@/types/sr.types';
 
@@ -52,6 +56,9 @@ export function useEditSRForm({
 
   const isClientUser = hasAnyRole(['CLIENT_ADMIN', 'CLIENT_USER']);
   const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
+  // 서비스 카테고리는 SLA 산정 근거라 운영자 소유 값이다(서버: sr.service 의 운영자 필드 규칙 — 접수 전에도).
+  // 예전에는 외부 사용자에게도 선택지가 열려 있어, 바꾸고 저장하면 반드시 403 이었다.
+  const canChangeCategory = isSROperator({ roles, permissions });
 
   const fetchClients = useCallback(async () => {
     if (isClientUser) {
@@ -349,6 +356,7 @@ export function useEditSRForm({
       loading,
       fileToDelete,
       canSelectClient,
+      canChangeCategory,
     },
     actions: {
       setTitle,

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Progress } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, buildQuery, retryUnlessClientError } from '@/lib/api-client';
 import { statusLabelOf } from '@/lib/constants/sr';
@@ -153,6 +154,9 @@ export default function MyRequestsPage() {
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  // 서버(policies.canCreateSR)와 같은 규칙: ADMIN 이거나 SR:CREATE(시드상 ENGINEER 는 없다).
+  const { hasPermission, isAdmin } = usePermissions();
+  const canCreateSR = isAdmin() || hasPermission('SR', 'CREATE');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -254,12 +258,14 @@ export default function MyRequestsPage() {
           <h1 className="sr-list-title text-3xl">내 요청 SR</h1>
           <p className="text-muted-foreground mt-1">내가 요청한 SR의 진행 상황을 확인하세요.</p>
         </div>
-        <Button
-          onClick={() => setCreateDialogOpen(true)}
-          className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
-        >
-          새 SR 요청
-        </Button>
+        {canCreateSR && (
+          <Button
+            onClick={() => setCreateDialogOpen(true)}
+            className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
+          >
+            새 SR 요청
+          </Button>
+        )}
       </div>
 
       {/* 통계 카드 */}

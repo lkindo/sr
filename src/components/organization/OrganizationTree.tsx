@@ -55,7 +55,8 @@ interface OrganizationTreeProps {
   expandedClients: Set<string>;
   clientUsers: Record<string, User[]>;
   onToggleClient: (clientId: string) => void;
-  onAddUser: (clientId: string) => void;
+  /** 없으면 '사용자 추가' 버튼을 그리지 않는다(사용자 생성 권한이 없는 사람). */
+  onAddUser?: (clientId: string) => void;
   onToggleClientStatus?: (clientId: string) => Promise<void>;
   /**
    * 두 번째 인자는 **현재 상태**다(UserCardContextMenu 주석 참조). 트리는 값을 만들지 않고
@@ -184,7 +185,8 @@ interface DroppableClientHeaderProps {
   client: Client;
   isExpanded: boolean;
   onToggleClient: (clientId: string) => void;
-  onAddUser: (clientId: string) => void;
+  /** 없으면 '사용자 추가' 버튼을 그리지 않는다(사용자 생성 권한이 없는 사람). */
+  onAddUser?: (clientId: string) => void;
   onToggleClientStatus?: (clientId: string) => Promise<void>;
   searchQuery: string;
   userCount: number;
@@ -278,18 +280,20 @@ function DroppableClientHeader({
             <Users className="h-3 w-3" />
             {userCount}명
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddUser(client.id);
-            }}
-            className="hidden sm:flex"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            사용자 추가
-          </Button>
+          {onAddUser && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddUser(client.id);
+              }}
+              className="hidden sm:flex"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              사용자 추가
+            </Button>
+          )}
         </div>
       </div>
     </ClientCardContextMenu>

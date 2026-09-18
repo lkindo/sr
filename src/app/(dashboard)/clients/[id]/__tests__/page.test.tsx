@@ -26,10 +26,16 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 // 수정·삭제 버튼은 서버 정책(canUpdateClient / canDeleteClient)과 같은 규칙으로 보인다.
 // 기본은 ADMIN 이고, 권한별 노출은 아래 '고객사 상세 — 수정·삭제 버튼' 스위트가 바꿔 가며 본다.
-const viewer = vi.hoisted(() => ({ admin: true, permissions: [] as string[] }));
+const viewer = vi.hoisted(() => ({
+  admin: true,
+  roles: [] as string[],
+  permissions: [] as string[],
+}));
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({
     isAdmin: () => viewer.admin,
+    hasAnyRole: (roles: string[]) =>
+      roles.some((role) => (role === 'ADMIN' ? viewer.admin : viewer.roles.includes(role))),
     hasPermission: (resource: string, action: string) =>
       viewer.permissions.includes(`${resource}:${action}`),
   }),
@@ -149,6 +155,7 @@ function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   viewer.admin = true;
+  viewer.roles = [];
   viewer.permissions = [];
 });
 
@@ -533,5 +540,55 @@ describe('고객사 상세 — 사용자 제외 (읽기-수정-쓰기)', () => {
     expect(
       fetchMock.mock.calls.some((call) => (call[1] as RequestInit | undefined)?.method === 'PATCH')
     ).toBe(false);
+  });
+});
+
+/**
+ * 카테고리·사용자 조작 버튼 — 서버 판정과 같은 규칙으로만 보인다(예전에는 누구에게나 보여 누르면 403).
+ *  - 카테고리 추가·수정·삭제: 고객사 수정 권한(categories 라우트의 ensureCanUpdateClient)
+ *  - 사용자 추가: USER:CREATE(canCreateUser)
+ *  - 사용자 제외: 내부 사용자의 USER:UPDATE(PATCH /api/users/[id] 의 소속 변경 규칙)
+ */
+describe('고객사 상세 — 카테고리·사용자 조작 버튼', () => {
+  const visible = async () => {
+    await screen.findByText('장애처리');
+    return {
+      addCategory: screen.queryByRole('button', { name: /카테고리 추가/ }) !== null,
+      editCategory: screen.queryByRole('button', { name: '장애처리 수정' }) !== null,
+      addUser: screen.queryByRole('button', { name: /사용자 추가/ }) !== null,
+      removeUser: screen.queryByRole('button', { name: '김사용 고객사에서 제외' }) !== null,
+    };
+  };
+
+  it.each([
+    [
+      'ADMIN',
+      true,
+      [],
+      [],
+      { addCategory: true, editCategory: true, addUser: true, removeUser: true },
+    ],
+    [
+      'MANAGER(시드 권한)',
+      false,
+      ['MANAGER'],
+      ['CLIENT:READ', 'CLIENT:UPDATE', 'USER:READ', 'USER:UPDATE'],
+      { addCategory: true, editCategory: true, addUser: false, removeUser: true },
+    ],
+    [
+      'ENGINEER(시드 권한)',
+      false,
+      ['ENGINEER'],
+      ['CLIENT:READ', 'SR:READ'],
+      { addCategory: false, editCategory: false, addUser: false, removeUser: false },
+    ],
+  ])('%s', async (_label, admin, roles, permissions, expected) => {
+    viewer.admin = admin as boolean;
+    viewer.roles = roles as string[];
+    viewer.permissions = permissions as string[];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, CLIENT)));
+    renderPage();
+
+    expect(await visible()).toEqual(expected);
   });
 });

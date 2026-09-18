@@ -126,9 +126,16 @@ export default function ClientDetailPage() {
   // 서버(src/lib/policies.ts 의 canUpdateClient / canDeleteClient)와 같은 규칙이다: ADMIN 이거나
   // CLIENT:UPDATE / CLIENT:DELETE. 예전에는 버튼을 누구에게나 보여 주고 누르면 403 이 났다
   // (ENGINEER·MANAGER 는 CLIENT:DELETE 가 없다).
-  const { hasPermission, isAdmin } = usePermissions();
+  const { hasPermission, hasAnyRole, isAdmin } = usePermissions();
   const canUpdateClient = isAdmin() || hasPermission('CLIENT', 'UPDATE');
   const canDeleteClient = isAdmin() || hasPermission('CLIENT', 'DELETE');
+  // 서비스 카테고리 추가·수정·삭제는 서버가 고객사 수정 권한으로 판정한다(categories 라우트의
+  // ensureCanUpdateClient). 사용자 추가는 USER:CREATE(canCreateUser), 제외는 소속 변경이라 내부 사용자의
+  // USER:UPDATE 가 필요하다(PATCH /api/users/[id] 의 clientIds 규칙). 예전에는 전부 누구에게나 보였다.
+  const canManageCategories = canUpdateClient;
+  const canAddUser = isAdmin() || hasPermission('USER', 'CREATE');
+  const canRemoveUser =
+    hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']) && (isAdmin() || hasPermission('USER', 'UPDATE'));
 
   /**
    * 고객사 상세.
@@ -553,10 +560,12 @@ export default function ClientDetailPage() {
                   이 고객사에 등록된 서비스 카테고리 목록입니다.
                 </p>
               </div>
-              <Button size="sm" onClick={openCreateCategory}>
-                <Plus className="mr-2 h-4 w-4" />
-                카테고리 추가
-              </Button>
+              {canManageCategories && (
+                <Button size="sm" onClick={openCreateCategory}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  카테고리 추가
+                </Button>
+              )}
             </div>
 
             {/* 카드 내용 */}
@@ -569,9 +578,11 @@ export default function ClientDetailPage() {
                   <p className="text-sm text-muted-foreground">
                     카테고리가 없으면 이 고객사는 SR을 접수할 수 없습니다.
                   </p>
-                  <Button size="sm" onClick={openCreateCategory}>
-                    <Plus className="mr-2 h-4 w-4" />첫 카테고리 추가
-                  </Button>
+                  {canManageCategories && (
+                    <Button size="sm" onClick={openCreateCategory}>
+                      <Plus className="mr-2 h-4 w-4" />첫 카테고리 추가
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <Table>
@@ -609,24 +620,26 @@ export default function ClientDetailPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditCategory(category)}
-                              aria-label={`${category.categoryName} 수정`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCategory(category)}
-                              aria-label={`${category.categoryName} 삭제`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                          {canManageCategories && (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditCategory(category)}
+                                aria-label={`${category.categoryName} 수정`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCategory(category)}
+                                aria-label={`${category.categoryName} 삭제`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -647,14 +660,16 @@ export default function ClientDetailPage() {
                   이 고객사에 속한 사용자 목록입니다.
                 </p>
               </div>
-              <Button
-                onClick={() => setIsUserDialogOpen(true)}
-                size="sm"
-                className="sr-btn-template-primary"
-              >
-                <UserPlus className="mr-2 h-4 w-4" />
-                사용자 추가
-              </Button>
+              {canAddUser && (
+                <Button
+                  onClick={() => setIsUserDialogOpen(true)}
+                  size="sm"
+                  className="sr-btn-template-primary"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  사용자 추가
+                </Button>
+              )}
             </div>
 
             {/* 카드 내용 */}
@@ -680,14 +695,17 @@ export default function ClientDetailPage() {
                         <TableCell className="font-medium">{userClient.user.name}</TableCell>
                         <TableCell>{userClient.user.email}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveUser(userClient.user.id)}
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          >
-                            <UserMinus className="h-4 w-4" />
-                          </Button>
+                          {canRemoveUser && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveUser(userClient.user.id)}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              aria-label={`${userClient.user.name} 고객사에서 제외`}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

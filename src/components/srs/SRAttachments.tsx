@@ -24,6 +24,11 @@ import type { SRAttachmentView } from '@/types/sr.types';
 interface SRAttachmentsProps {
   srId: string;
   canDelete?: boolean;
+  /**
+   * 업로드 버튼을 보일지(서버: policies.ensureCanAttachToSR — 화면은 sr-state-machine.canViewerAttachToSR).
+   * 예전에는 누구에게나 보여서 종결 SR·수정 권한이 없는 사용자는 누르면 반드시 403 이었다.
+   */
+  canUpload?: boolean;
 }
 
 /** 업로드 상한. 서버도 같은 값을 검사하지만, 왕복 전에 걸러 준다. */
@@ -43,7 +48,7 @@ interface UploadVariables {
   input: HTMLInputElement;
 }
 
-export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
+export function SRAttachments({ srId, canDelete = false, canUpload = true }: SRAttachmentsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -230,15 +235,17 @@ export function SRAttachments({ srId, canDelete = false }: SRAttachmentsProps) {
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={uploading}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                {uploading ? '업로드 중...' : '파일 업로드'}
-              </Button>
+              {canUpload && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                  disabled={uploading}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {uploading ? '업로드 중...' : '파일 업로드'}
+                </Button>
+              )}
             </div>
           </div>
         </div>

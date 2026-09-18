@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { priorityLabels, statusLabels } from '@/lib/constants/sr';
 import {
   canEditSRContentAt,
+  canViewerAttachToSR,
   getReopenAvailability,
   isSROperator,
   SR_CONTENT_LOCKED_MESSAGE,
@@ -396,6 +397,18 @@ export default function SRDetailPage() {
                 canDelete={
                   hasAnyRole(['ADMIN', 'MANAGER']) ||
                   (session?.user?.id === sr.requesterId && sr.status === 'REQUESTED')
+                }
+                canUpload={
+                  !!session?.user &&
+                  canViewerAttachToSR(
+                    {
+                      id: session.user.id,
+                      roles: roles || [],
+                      permissions,
+                      clientIds: session.user.clientIds ?? [],
+                    },
+                    sr
+                  )
                 }
               />
             </TabsContent>

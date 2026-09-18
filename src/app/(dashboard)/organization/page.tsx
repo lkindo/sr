@@ -22,6 +22,7 @@ import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useDebounce } from '@/hooks/use-debounce';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import {
   ApiError,
@@ -101,6 +102,11 @@ export default function OrganizationPage() {
   const [showWarning, setShowWarning] = useState(false);
 
   const { toast } = useToast();
+  // 서버(policies.canCreateClient / canCreateUser)와 같은 규칙: ADMIN 이거나 CLIENT:CREATE / USER:CREATE.
+  // 예전에는 누구에게나 보여서 MANAGER·ENGINEER 가 누르면 반드시 403 이었다(시드상 둘 다 없다).
+  const { hasPermission, isAdmin } = usePermissions();
+  const canAddClient = isAdmin() || hasPermission('CLIENT', 'CREATE');
+  const canAddUser = isAdmin() || hasPermission('USER', 'CREATE');
   const queryClient = useQueryClient();
 
   /**
@@ -540,10 +546,12 @@ export default function OrganizationPage() {
           </p>
         </div>
         <div className="flex justify-start sm:justify-end shrink-0">
-          <Button onClick={handleAddClient} className="sr-btn-template-primary w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            고객사 추가
-          </Button>
+          {canAddClient && (
+            <Button onClick={handleAddClient} className="sr-btn-template-primary w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              고객사 추가
+            </Button>
+          )}
         </div>
       </div>
 
@@ -609,7 +617,7 @@ export default function OrganizationPage() {
             expandedClients={expandedClients}
             clientUsers={clientUsers}
             onToggleClient={toggleClient}
-            onAddUser={handleAddUser}
+            onAddUser={canAddUser ? handleAddUser : undefined}
             onToggleClientStatus={handleToggleClientStatus}
             onToggleUserStatus={handleToggleUserStatus}
             onDragStart={handleDragStart}
