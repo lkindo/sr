@@ -243,7 +243,9 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="email-sr-assigned">SR 배정</Label>
-              <p className="text-sm text-muted-foreground">SR이 나에게 배정되었을 때</p>
+              <p className="text-sm text-muted-foreground">
+                SR이 나에게 배정되었을 때, 담당 SR이 재오픈되었을 때
+              </p>
             </div>
             <Switch
               id="email-sr-assigned"
@@ -258,7 +260,7 @@ export default function NotificationsPage() {
             <div className="space-y-0.5">
               <Label htmlFor="email-sr-status">상태 변경</Label>
               <p className="text-sm text-muted-foreground">
-                접수·진행중·보류·확인완료로 바뀌었을 때
+                내가 신청한 SR이 접수·진행중·보류·확인완료로 바뀌었을 때
               </p>
               <p className="text-sm text-muted-foreground">
                 완료·거절 알림은 이 설정과 무관하게 항상 발송됩니다.
@@ -345,7 +347,9 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="push-sr-assigned">SR 배정</Label>
-              <p className="text-sm text-muted-foreground">SR이 나에게 배정되었을 때</p>
+              <p className="text-sm text-muted-foreground">
+                SR이 나에게 배정되었을 때, 담당 SR이 재오픈되었을 때
+              </p>
             </div>
             <Switch
               id="push-sr-assigned"
@@ -360,7 +364,7 @@ export default function NotificationsPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="push-sr-status">상태 변경</Label>
-              <p className="text-sm text-muted-foreground">SR 상태가 변경되었을 때</p>
+              <p className="text-sm text-muted-foreground">내가 신청한 SR의 상태가 변경되었을 때</p>
             </div>
             <Switch
               id="push-sr-status"

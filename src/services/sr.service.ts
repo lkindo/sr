@@ -47,6 +47,7 @@ import { serviceCategoryService } from '@/services/service-category.service';
 import {
   enqueueSRAssignedEmail,
   enqueueSRCreatedEmails,
+  enqueueSRReopenedEmails,
   enqueueSRStatusChangedEmail,
 } from '@/services/sr-email-outbox';
 import { UserService } from '@/services/user.service';
@@ -651,6 +652,18 @@ export class SRService {
           }
 
           if (statusChanged) {
+            // 재오픈이면 다시 일해야 하는 담당자에게 알린다(D15). 담당자가 비활성이면 재배정할 운영
+            // 관리자에게 간다. 받은 사람에게는 아래 상태 변경 메일을 한 통 더 보내지 않는다.
+            const reopenNotice = isReopenTransition(existingSR.status, validated.status!)
+              ? await enqueueSRReopenedEmails(tx, {
+                  srId: currentSR.id,
+                  srNumber: currentSR.srNumber,
+                  title: currentSR.title,
+                  assigneeId: currentSR.assigneeId,
+                  actorId: sessionUser.id,
+                  reason: validated.changeReason ?? null,
+                })
+              : { enqueued: 0, notifiedUserIds: [] };
             await enqueueSRStatusChangedEmail(tx, {
               srId: currentSR.id,
               srNumber: currentSR.srNumber,
@@ -662,6 +675,9 @@ export class SRService {
               // existingSR 에는 없을 수 있다.
               resolutionDescription: currentSR.resolutionDescription,
               rejectionReason: currentSR.rejectionReason,
+              actorId: sessionUser.id,
+              reason: validated.changeReason ?? null,
+              excludeUserIds: reopenNotice.notifiedUserIds,
             });
           }
           if (assigneeChanged && assigneeId) {
@@ -687,6 +703,9 @@ export class SRService {
           requesterId: updatedSR.requesterId,
           previousStatus: existingSR.status,
           currentStatus: validated.status!,
+          actorId: sessionUser.id,
+          assigneeId: updatedSR.assigneeId,
+          reason: validated.changeReason ?? null,
         });
       }
 

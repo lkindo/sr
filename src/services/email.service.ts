@@ -225,6 +225,47 @@ class EmailService {
     return { to, subject, html };
   }
 
+  /**
+   * 재오픈 알림(2026-09-18 소유자 결정 D15). 재오픈은 일이 다시 맡겨진 것이라 담당자가 알아야 한다.
+   * 담당자가 비활성이면 재배정할 운영 관리자에게 `needsReassignment` 로 보낸다.
+   */
+  buildSRReopened(
+    to: string,
+    srNumber: string,
+    title: string,
+    reason: string | null,
+    link: string,
+    needsReassignment = false
+  ): RenderedEmail {
+    const subject = needsReassignment
+      ? `[SR System] 재오픈된 SR의 담당자 재배정이 필요합니다: ${srNumber}`
+      : `[SR System] 담당 SR이 재오픈되었습니다: ${srNumber}`;
+    const safeSrNumber = escapeHtml(srNumber);
+    const safeTitle = escapeHtml(title);
+    const safeLink = safeEmailLink(link);
+    const reasonBlock =
+      reason && reason.trim()
+        ? `
+        <p style="margin-bottom: 4px;"><strong>재오픈 사유:</strong></p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #0070f3; margin: 10px 0;">
+          ${escapeHtml(reason).replaceAll('\n', '<br />')}
+        </div>`
+        : '';
+    const lead = needsReassignment
+      ? '<p>이 SR의 담당자가 비활성 계정입니다. 담당자를 다시 배정해 주세요.</p>'
+      : '<p>담당하신 SR이 다시 진행중으로 돌아왔습니다.</p>';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">SR 재오픈 알림</h2>
+        ${lead}
+        <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
+        <p><strong>제목:</strong> ${safeTitle}</p>${reasonBlock}
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
+      </div>
+    `;
+    return { to, subject, html };
+  }
+
   buildCommentAdded(
     to: string,
     srNumber: string,

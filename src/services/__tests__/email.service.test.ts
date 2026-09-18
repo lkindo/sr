@@ -86,6 +86,36 @@ describe('EmailService', () => {
   });
 
   describe('템플릿 렌더(buildX)', () => {
+    // 재오픈 알림(2026-09-18 소유자 결정 D15) — 사유를 싣고, 담당자가 비활성이면 재배정 요청으로 쓴다.
+    it('재오픈: 담당자용은 재오픈 사유를, 재배정용은 재배정 요청을 담는다', async () => {
+      vi.resetModules();
+      const { emailService } = await import('../email.service');
+
+      const forAssignee = emailService.buildSRReopened(
+        'eng@test.com',
+        'SR-009',
+        '재오픈 SR',
+        '<b>여전히</b> 오류',
+        'http://example.com/sr/9'
+      );
+      expect(forAssignee.subject).toBe('[SR System] 담당 SR이 재오픈되었습니다: SR-009');
+      expect(forAssignee.html).toContain('재오픈 사유');
+      // 사유는 사용자 입력이다 — 이스케이프해서 싣는다.
+      expect(forAssignee.html).toContain('&lt;b&gt;여전히&lt;/b&gt; 오류');
+
+      const forManager = emailService.buildSRReopened(
+        'mgr@test.com',
+        'SR-009',
+        '재오픈 SR',
+        null,
+        'http://example.com/sr/9',
+        true
+      );
+      expect(forManager.subject).toContain('담당자 재배정이 필요합니다');
+      expect(forManager.html).not.toContain('재오픈 사유');
+      expect(mockSendMail).not.toHaveBeenCalled();
+    });
+
     it('SR 생성: 수신자·제목·본문을 만들고 발송하지 않는다', async () => {
       vi.resetModules();
       const { emailService } = await import('../email.service');

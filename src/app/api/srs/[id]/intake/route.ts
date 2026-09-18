@@ -197,6 +197,7 @@ export const POST = withAuthAndRateLimit(
         requesterId: result.requesterId,
         previousStatus: 'REQUESTED',
         currentStatus: result.status,
+        actorId: session.user.id,
       });
       await enqueueSRAssignedEmail(tx, {
         srId: result.id,
@@ -220,6 +221,8 @@ export const POST = withAuthAndRateLimit(
       requesterId: updatedSR.requesterId,
       previousStatus: 'REQUESTED',
       currentStatus: updatedSR.status,
+      actorId: session.user.id,
+      assigneeId: updatedSR.assigneeId,
     });
 
     domainEvents.emit('sr:assigned', {

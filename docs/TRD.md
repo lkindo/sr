@@ -1194,7 +1194,7 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
 | 트리거              | 알림 대상                     | 채널             | 이메일 발송 조건                      |
 | ------------------- | ----------------------------- | ---------------- | ------------------------------------- |
 | `sr:created`        | 활성 ADMIN·MANAGER 전원       | 웹 푸시 + 이메일 | 설정 `emailSRCreated`(기본 ON)        |
-| `sr:status_changed` | 신청자                        | 웹 푸시 + 이메일 | **완료·거절: 설정과 무관하게 항상 발송(필수 알림, `MANDATORY_STATUSES`)**. 나머지(접수·진행중·보류·확인완료): 설정 `emailSRStatusChanged`(기본 OFF) |
+| `sr:status_changed` | 신청자(행위자 본인 제외); 재오픈이면 담당자도(비활성이면 활성 ADMIN·MANAGER) | 웹 푸시 + 이메일 | **완료·거절: 설정과 무관하게 항상 발송(필수 알림, `MANDATORY_STATUSES`)**. 나머지(접수·진행중·보류·확인완료): 설정 `emailSRStatusChanged`(기본 OFF). 재오픈 담당자 알림은 배정 알림 설정(`emailSRAssigned`·`pushSRAssigned`, 기본 ON)을 따르고 사유를 싣는다(결정 D15) |
 | `sr:assigned`       | 새 담당자                     | 웹 푸시 + 이메일 | 설정 `emailSRAssigned`(기본 ON)       |
 | 댓글 작성(라우트)   | 작성자를 뺀 신청자·담당자     | 웹 푸시 + 이메일 | 설정 `emailCommentAdded`(기본 OFF). 내부 노트는 신청자 제외 |
 
