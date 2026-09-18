@@ -18,9 +18,12 @@
 - **클라이언트 컴포넌트 최소화**: 사용자 인터랙션(이벤트 핸들러, `useState`, `useEffect` 등)이 꼭 필요한 단말 리프(Leaf) 컴포넌트에 한해서만 파일 최상단에 `"use client"`를 선언하여 Client Component로 설계한다.
 - **경계 분리**: 데이터 조회 로직이 담긴 서버 컴포넌트 내부에 클라이언트 컴포넌트를 자식(Children)이나 Props 형태로 주입하여 성능과 데이터 로딩을 효율화한다.
 
-> ⚠️ **전환 진행 중 (2026-08-15)**: `(dashboard)` 하위 route page 16개 중 서버 컴포넌트는
-> 4개다(`srs`, `roles`, `users`, `settings`). 나머지는 아직 최상단에 `'use client'` 를 달고
-> 목록 전체를 브라우저에서 가져온다 — 열 때마다 스피너가 한 번 돌고 목록 로직이 번들에 실린다.
+> ⚠️ **전환 진행 중 (2026-09-18 재실측)**: `(dashboard)` 하위 route page 17개 중 `'use client'` 가
+> 없는 것은 4개(`srs`, `roles`, `users`, `settings`)지만, 서버에서 데이터를 채워 주입하는 **실질적
+> 전환은 `srs`·`roles` 둘뿐**이다. `users/page.tsx` 는 `UsersClient` 를 `Suspense` 로 감싼 껍데기라
+> 목록은 여전히 브라우저가 `/api/users` 로 가져오고, `settings/page.tsx` 는 리디렉트만 한다.
+> 나머지는 최상단에 `'use client'` 를 달고 목록 전체를 브라우저에서 가져온다 — 열 때마다 스피너가
+> 한 번 돌고 목록 로직이 번들에 실린다.
 >
 > **참조 구현**: `src/app/(dashboard)/roles/page.tsx` + `RolesClient.tsx`.
 > 서버가 API 와 **같은 정책 함수**로 인가를 판정하고 서비스 계층을 직접 호출해
@@ -28,8 +31,10 @@
 > 이후 무효화·재조회를 그대로 이어 간다. 인가 거부는 `null` 로 구분해 "빈 목록" 과
 > 뒤섞이지 않게 한다.
 >
-> **남은 대상 (큰 것부터)**: `clients/[id]`(731줄), `organization`(658), `dashboard`(638),
-> `users/[id]`(586), `my-requests`(542), `clients`(402).
+> **남은 대상 (큰 것부터)**: `clients/[id]`, `organization`, `users`(`UsersClient`), `dashboard`,
+> `users/[id]`, `my-requests`, `srs/[id]`, `clients`, `settings/profile`, `settings/notifications`,
+> `company/users`, `settings/outbox`, `settings/system`, `srs/[id]/intake`.
+> (줄 수는 적지 않는다 — 고칠 때마다 틀어진다. `wc -l` 로 다시 잰다.)
 > `clients` 계열은 필터가 로컬 state 라 서버 렌더로 옮기려면 URL searchParams 로
 > 먼저 올려야 한다(`srs/page.tsx` 가 그 형태다) — 동작 변경이 따르므로 별도 작업이다.
 
@@ -121,16 +126,17 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 - **버튼 모양**: 모서리 반경 `rounded-[8px]`.
   <sub>`docs/DESIGN.md` 원본은 "모든 CTA 는 흰색 pill" 이라고 규정하지만 그건 분석 대상이던
   마케팅 사이트의 어휘다. 이 앱의 CTA 는 각진 8px 다 — 원본을 그대로 옮기지 않는다.</sub>
-- **인터랙티브 상태**: 활성 `hover:opacity-80`, 비활성 `opacity-40 select-none pointer-events-none`,
-  로딩 시 텍스트 전환 및 비활성 유지.
-- **그림자 고도 (Elevation)**:
-  - XS: `shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]` (플랫한 칩 및 소형 카드)
-  - SM: `shadow-[0px_4px_6px_0px_rgba(0,0,0,0.05)]`
-  - MD: `shadow-[0px_10px_15px_0px_rgba(0,0,0,0.1),_0px_4px_6px_0px_rgba(0,0,0,0.05)]` (일반 카드/다이얼로그)
-  - LG: `shadow-[0px_20px_25px_0px_rgba(0,0,0,0.05)]`
-  - XL: `shadow-[0px_25px_50px_0px_rgba(0,0,0,0.1)]` (드롭다운 메뉴 및 오버레이 팝업)
+- **인터랙티브 상태**: 활성 `hover:opacity-80`. 비활성은 버튼·SelectTrigger 가 `disabled:opacity-50 disabled:pointer-events-none`,
+  체크박스·라디오·스위치가 `disabled:opacity-40` 이고, 입력란·텍스트 영역은 불투명도를 낮추지 않는다(`disabled:opacity-100` — 읽기 전용 값이 흐려져 판독 불가가 되지 않게).
+  로딩은 `Button` 의 `isLoading` prop 이 맡는다 — 스피너(`Loader2`)를 앞에 붙이고 비활성으로 만든다. 문구 전환은 호출부가 필요할 때만 한다.
+- **그림자 고도 (Elevation)**: 값은 `tailwind.config.ts` 의 `boxShadow` 가 `shadow-xs`~`shadow-xl` 을 재정의해 갖고 있다(값을 여기 복제하지 않는다). 실제 배정은 다음과 같다.
+  - `shadow-sm`: 입력란·텍스트 영역·SelectTrigger
+  - `shadow-md`: 드롭다운·컨텍스트 메뉴·팝오버·Select 목록
+  - `shadow-lg`: 다이얼로그·AlertDialog·시트, 하위(sub) 메뉴
+  - `shadow-xl`: 현재 쓰는 곳이 없다.
 - **카드 모서리**: 기본 `rounded-[12px]`, 넓은 영역은 `rounded-[16px]`.
-- **입력란**: 높이 `40px`, 모서리 반경 `rounded-[8px]`. 텍스트 영역은 최소 높이 `120px`.
+- **입력란**: 높이 `40px`(`h-10`), 모서리 반경 `rounded-[8px]`. 텍스트 영역은 최소 높이 `120px`.
+  ⚠️ `SelectTrigger` 는 아직 shadcn 기본값(`h-9` = 36px, `rounded-md`)이라 입력란과 나란히 두면 4px 낮다.
   배경·테두리·플레이스홀더 색은 토큰(`bg-background` / `border-input` / `text-muted-foreground`)을 쓴다.
 - **태그/칩**: 완전 둥근 알약(`rounded-[9999px]`).
 - **아바타**: 20px(XS)~96px(3XL). 이미지가 없으면 `bg-primary/10` 위 이니셜.
@@ -150,15 +156,17 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 
 ## 4. Antigravity 프리미엄 WOW UI 철학
 
-SaaSify UI Kit의 견고한 구조 위에 사용자가 처음 웹 어플리케이션에 접속했을 때 시각적인 감동(WOW)을 느낄 수 있도록 아래의 프리미엄 감성 디자인 표준을 조화롭게 융합한다.
+`docs/DESIGN.md` 다크 캔버스 체계 위에 사용자가 처음 웹 어플리케이션에 접속했을 때 시각적인 감동(WOW)을 느낄 수 있도록 아래의 프리미엄 감성 디자인 표준을 조화롭게 융합한다.
+
+> **정정(2026-09-18)**: 이 절은 폐기된 `SaaSify UI Kit` 를 전제로 쓰였고, 아래 세 항목은 같은 문서 §0(인디고 팔레트 폐기)·§3.3(웹폰트 없음)·§3.4(hover 는 `hover:opacity-80`)와 `docs/DESIGN.md`(크로마틱 액센트는 파랑 하나, 그라데이션은 카드 전용)에 모순되며 코드에 반영된 적도 없다 — **폐기**한다. 충돌하면 §0·§3 과 DESIGN.md 가 이긴다.
+>
+> - ~~부드러운 그라데이션(`from-violet-600 via-indigo-600 to-cyan-500`)~~ — 그라데이션은 DESIGN.md 의 카드 계열에서만 쓴다.
+> - ~~호버 리프트·스케일(`hover:-translate-y-0.5`, `hover:scale-[1.02]`)~~ — §3.4 를 따른다.
+> - ~~고급 타이포그래피(`Pretendard Variable`·`Geist`·`Noto Sans KR` 결합)~~ — 웹폰트 도입은 §3.3 이 말한 대로 별도 결정이다.
 
 - **Harmony Color Palette**: 브라우저 기본 색상 사용을 금지하며, `docs/DESIGN.md`가 정의한 다크 캔버스 토큰 계층 안에서 색을 고른다(§3.2 — hex 리터럴 금지).
 - **글래스모피즘 (Glassmorphism)**: 대시보드 카드, 모달, 네비게이션 바 등 주요 컨테이너 레이아웃에는 반투명 배경(`bg-white/10` 또는 `bg-black/30`), 백드롭 블러(`backdrop-blur-md`), 미세한 외곽선 테두리(`border border-white/20`)를 조합하여 깊이감을 극대화한다.
-- **부드러운 그라데이션**: 텍스트 타이틀이나 핵심 버튼, 하이라이트 영역에는 세련된 메탈릭 그라데이션 또는 은은한 파스텔톤 그라데이션(`bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-500`)을 적용하여 고급스러운 품질을 유지한다.
-- **마이크로 애니메이션 & Hover 효과**:
-  - 클릭 가능한 모든 인터랙티브 요소에는 `transition-all duration-300 ease-in-out`을 기본 적용한다.
-  - 마우스 호버 시 미세한 리프트 업(`hover:-translate-y-0.5`), 스케일 조정(`hover:scale-[1.02]`), 그림자 깊이 변화(`hover:shadow-lg`) 및 글로우 효과(Glow effect)를 주어 화면이 살아 움직이는 듯한 입체감을 준다.
-- **고급 타이포그래피**: `Pretendard Variable`, `Geist`, `Noto Sans KR` 폰트를 적극 결합하여 기하학적 형태와 미학적 세련됨을 극대화한다.
+- **마이크로 애니메이션**: 클릭 가능한 인터랙티브 요소에는 부드러운 전환(`transition-colors` 또는 `transition-all`)을 둔다. hover 표현은 §3.4 를 따른다.
 
 ---
 
