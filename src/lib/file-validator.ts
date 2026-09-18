@@ -22,7 +22,12 @@ export const MAX_UPLOAD_TOTAL_SIZE = MAX_UPLOAD_FILE_SIZE;
 /** 한 요청에 담을 수 있는 파일 개수. */
 export const MAX_UPLOAD_FILE_COUNT = 10;
 
-/** CFB(OLE 복합 문서) 컨테이너로 감지된 파일 중 허용하는 구형 Office 형식 — 확장자로 구분한다. */
+/**
+ * CFB(OLE 복합 문서) 컨테이너로 감지된 파일 중 허용하는 구형 Office 형식 — 확장자로 구분한다.
+ *
+ * 매크로를 담을 수 있는 형식이고, 확장자만 바꾼 다른 CFB 파일(.msi 등)도 이 판정을 통과한다. 그 한계를 알고
+ * 업무상 필요로 허용한다(2026-09-18 소유자 결정).
+ */
 const LEGACY_OFFICE_BY_EXTENSION = new Map<string, string>([
   ['.doc', 'application/msword'],
   ['.xls', 'application/vnd.ms-excel'],
