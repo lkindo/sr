@@ -13,16 +13,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui';
-
-// 30분 유휴 (밀리초)
-const IDLE_TIMEOUT = 30 * 60 * 1000;
-// 1분간 카운트다운 모달 노출 시간
-const WARNING_TIMEOUT = 1 * 60 * 1000;
+import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS } from '@/lib/constants/session';
 
 /**
  * 유휴 세션 자동 로그아웃.
  *
- * 29분간 입력이 없으면 경고 모달을 띄우고, 이후 1분간 반응이 없으면 로그아웃한다.
+ * 29분간 입력이 없으면 경고 모달을 띄우고, 이후 1분간 반응이 없으면 로그아웃한다
+ * (값의 정본은 `@/lib/constants/session` — 시스템 설정 화면도 같은 값을 보여 준다).
  *
  * 경고 표시 여부를 state 가 아니라 ref(`showWarningRef`)로도 들고 있는 이유:
  * 타이머를 예약하는 `resetTimer` 가 `showWarning` state 에 의존하면,
@@ -79,8 +76,8 @@ export function IdleTimeoutProvider({ children }: { children: React.ReactNode })
       // Warning 시간(1분) 동안 반응이 없으면 실제 로그아웃 진행
       warningTimerRef.current = setTimeout(() => {
         void handleLogout();
-      }, WARNING_TIMEOUT);
-    }, IDLE_TIMEOUT - WARNING_TIMEOUT);
+      }, IDLE_WARNING_MS);
+    }, IDLE_TIMEOUT_MS - IDLE_WARNING_MS);
   }, [clearTimers, handleLogout, setWarning]);
 
   // 세션이 끊기면 타이머와 모달을 정리한다.

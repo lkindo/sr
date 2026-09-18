@@ -39,14 +39,36 @@ function safeEmailLink(value: string): string {
   }
 }
 
+/**
+ * 메일 발송에 실제로 쓰는 SMTP 서버. 발송 설정과 시스템 설정 화면이 같은 결정을 쓰도록 한 곳에 둔다
+ * (화면이 따로 계산하면 발송은 A 로 나가는데 화면은 B 라고 말하게 된다).
+ *
+ * `credentialsConfigured` 는 계정 환경변수가 **있는지**만 알린다 — 값은 싣지 않는다. 호스트가 맞아도
+ * 계정이 없으면 `sendMail` 이 던지므로, 화면이 호스트만 보여 주면 발송 불능을 숨기게 된다.
+ */
+export function smtpServer(): {
+  host: string;
+  port: number;
+  configured: boolean;
+  credentialsConfigured: boolean;
+} {
+  return {
+    host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_SERVER_PORT) || 587,
+    configured: !!process.env.EMAIL_SERVER_HOST,
+    credentialsConfigured: !!(process.env.EMAIL_SERVER_USER && process.env.EMAIL_SERVER_PASSWORD),
+  };
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    const { host, port } = smtpServer();
     this.transporter = nodemailer.createTransport({
       pool: true,
-      host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
-      port: Number(process.env.EMAIL_SERVER_PORT) || 587,
+      host,
+      port,
       secure: false, // true for 465, false for other ports
       auth: {
         user: process.env.EMAIL_SERVER_USER,
@@ -77,7 +99,7 @@ class EmailService {
    * 정상으로 보였다. 이제 아웃박스에 실패로 남아 조회된다.
    */
   async sendMail({ to, subject, html }: EmailOptions): Promise<void> {
-    if (!process.env.EMAIL_SERVER_USER || !process.env.EMAIL_SERVER_PASSWORD) {
+    if (!smtpServer().credentialsConfigured) {
       throw new Error('SMTP 자격증명이 설정되지 않았습니다(EMAIL_SERVER_USER/PASSWORD).');
     }
 

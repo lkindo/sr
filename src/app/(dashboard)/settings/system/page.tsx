@@ -1,26 +1,32 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Database, Lock, Mail, Settings } from 'lucide-react';
+import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Database, Lock, Mail } from 'lucide-react';
 
 import { Badge } from '@/components/ui';
-import { Button } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
-import { Input } from '@/components/ui';
-import { Label } from '@/components/ui';
 import { Separator } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
-import { apiGet, apiPut, retryUnlessClientError } from '@/lib/api-client';
+import { apiGet, retryUnlessClientError } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
 import { qk } from '@/lib/query-keys';
 import type { SystemSettings } from '@/types/settings';
 
+/**
+ * 시스템 설정 — **실제로 적용 중인 값을 보여 주는 읽기 전용 화면**.
+ *
+ * 예전 화면은 사이트 이름·설명·관리자 이메일을 입력받아 "설정 저장" 을 보냈지만 서버는 아무것도
+ * 저장하지 않고 성공을 돌려줬다. "지금 백업"·"캐시 삭제" 버튼에는 클릭 핸들러가 없었고,
+ * "마지막 백업: 2025-01-12 10:30", "세션 24시간", "최소 6자" 는 여기 박힌 값이었다. 설정을 저장할
+ * 곳(테이블)이 없으므로 조작은 걷어내고, 서버가 각 값의 정본에서 읽어 준 것만 보여 준다.
+ *
+ * 예외는 백업 카드 하나다. 백업 일정은 앱이 아니라 `.github/workflows/backup.yml`(cron) 에 있어
+ * 서버가 읽어 줄 수 없으므로 문구로 적었다 — 일정을 바꾸면 이 문구도 함께 고친다.
+ */
 export default function SystemSettingsPage() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  // 시스템 설정 가져오기.
   // `/api/settings/system` 은 `{data, meta}` 봉투 없이 객체를 그대로 주므로 apiGet 을 쓴다.
   const {
     data: settings,
@@ -32,27 +38,8 @@ export default function SystemSettingsPage() {
     retry: retryUnlessClientError,
   });
 
-  /**
-   * 사용자가 고친 값만 담는 초안.
-   *
-   * 예전에는 useEffect 안에서 응답을 그대로 setState 로 밀어 넣었지만, 이제 서버 값은
-   * 쿼리 캐시가 들고 있으므로 **바뀐 필드만** 여기에 두고 나머지는 캐시에서 읽는다.
-   * 이렇게 하면
-   *   - 로딩이 끝난 첫 프레임부터 서버 값이 그려진다(동기화 effect 가 한 박자 늦게
-   *     돌면서 입력칸이 잠깐 비어 보이는 일이 없다),
-   *   - 저장 후 무효화로 재조회가 일어나도 사용자가 입력하던 값이 되돌아가지 않는다.
-   * 빈 문자열도 "사용자가 지운 값" 이므로 `??` 로 판별한다(`||` 를 쓰면 안 된다).
-   */
-  const [draft, setDraft] = useState<
-    Pick<SystemSettings, 'siteName' | 'siteDescription' | 'adminEmail'>
-  >({});
-
-  const siteName = draft.siteName ?? settings?.siteName ?? '';
-  const siteDescription = draft.siteDescription ?? settings?.siteDescription ?? '';
-  const adminEmail = draft.adminEmail ?? settings?.adminEmail ?? '';
-
-  // 조회 실패는 화면에 노출하지 않는다 — 기존과 동일하게 로그 + 토스트로만 알리고
-  // 폼은 빈 값으로 그린다. (v5 의 useQuery 에는 onError 가 없어 effect 로 옮겼다.)
+  // 조회 실패는 화면에 노출하지 않는다 — 로그 + 토스트로만 알린다.
+  // (v5 의 useQuery 에는 onError 가 없어 effect 로 옮겼다.)
   useEffect(() => {
     if (!error) return;
     logger.error('시스템 설정 조회 오류', error instanceof Error ? error : undefined);
@@ -63,37 +50,6 @@ export default function SystemSettingsPage() {
     });
   }, [error, toast]);
 
-  const saveMutation = useMutation({
-    mutationFn: (payload: SystemSettings) =>
-      apiPut<{ message: string }>('/api/settings/system', payload, {
-        fallbackMessage: '시스템 설정 저장에 실패했습니다.',
-      }),
-    onError: (saveError) => {
-      toast({
-        title: '오류',
-        description:
-          saveError instanceof Error ? saveError.message : '시스템 설정 저장에 실패했습니다.',
-        variant: 'destructive',
-      });
-    },
-    onSuccess: () => {
-      toast({
-        title: '성공',
-        description: '시스템 설정이 저장되었습니다.',
-      });
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: qk.settings.system });
-    },
-  });
-
-  const saving = saveMutation.isPending;
-
-  const handleSave = () => {
-    saveMutation.mutate({ siteName, siteDescription, adminEmail });
-  };
-
-  // 첫 로딩만 스피너를 띄운다. `isFetching` 을 쓰면 재조회마다 폼이 사라진다.
   if (isPending) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -102,11 +58,17 @@ export default function SystemSettingsPage() {
     );
   }
 
+  const mail = settings?.mailServer;
+  const session = settings?.session;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">시스템 설정</h1>
-        <p className="text-muted-foreground">시스템 전반의 설정을 관리합니다.</p>
+        <p className="text-muted-foreground">
+          현재 적용 중인 설정입니다. 값은 코드와 서버 환경 변수로 관리하며 이 화면에서 바꿀 수
+          없습니다.
+        </p>
         <Badge variant="destructive" className="mt-2">
           ADMIN 전용
         </Badge>
@@ -115,73 +77,34 @@ export default function SystemSettingsPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            <CardTitle>일반 설정</CardTitle>
+            <Lock className="h-5 w-5" />
+            <CardTitle>보안</CardTitle>
           </div>
-          <CardDescription>사이트 기본 정보를 설정합니다.</CardDescription>
+          <CardDescription>인증과 계정 보안 정책</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="site-name">사이트 이름</Label>
-            <Input
-              id="site-name"
-              value={siteName}
-              onChange={(e) => setDraft((prev) => ({ ...prev, siteName: e.target.value }))}
-              placeholder="사이트 이름"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="site-description">사이트 설명</Label>
-            <Input
-              id="site-description"
-              value={siteDescription}
-              onChange={(e) => setDraft((prev) => ({ ...prev, siteDescription: e.target.value }))}
-              placeholder="사이트 설명"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="admin-email">관리자 이메일</Label>
-            <Input
-              id="admin-email"
-              type="email"
-              value={adminEmail}
-              onChange={(e) => setDraft((prev) => ({ ...prev, adminEmail: e.target.value }))}
-              placeholder="admin@example.com"
-            />
-            <p className="text-xs text-muted-foreground">
-              시스템 알림을 받을 관리자 이메일 주소입니다.
+          <div>
+            <p className="text-sm font-medium">자동 로그아웃</p>
+            <p className="text-sm text-muted-foreground">
+              {session
+                ? `입력이 ${session.idleLogoutMinutes}분간 없으면 로그아웃(${session.idleWarningMinutes}분 전에 경고)`
+                : '-'}
             </p>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            <CardTitle>데이터베이스</CardTitle>
-          </div>
-          <CardDescription>데이터베이스 상태 및 관리</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">데이터베이스 백업</p>
-              <p className="text-sm text-muted-foreground">마지막 백업: 2025-01-12 10:30</p>
-            </div>
-            <Button variant="outline">지금 백업</Button>
-          </div>
-
           <Separator />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">캐시 초기화</p>
-              <p className="text-sm text-muted-foreground">시스템 캐시를 초기화합니다.</p>
-            </div>
-            <Button variant="outline">캐시 삭제</Button>
+          <div>
+            <p className="text-sm font-medium">로그인 토큰 수명</p>
+            <p className="text-sm text-muted-foreground">
+              {session ? `최대 ${session.tokenMaxAgeHours}시간` : '-'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              화면을 닫아 두어 자동 로그아웃 타이머가 돌지 않을 때의 상한입니다.
+            </p>
+          </div>
+          <Separator />
+          <div>
+            <p className="text-sm font-medium">비밀번호 정책</p>
+            <p className="text-sm text-muted-foreground">{settings?.passwordPolicy ?? '-'}</p>
           </div>
         </CardContent>
       </Card>
@@ -190,70 +113,40 @@ export default function SystemSettingsPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            <CardTitle>이메일 설정</CardTitle>
+            <CardTitle>메일 발송</CardTitle>
           </div>
-          <CardDescription>SMTP 서버 설정</CardDescription>
+          <CardDescription>알림 메일을 보내는 SMTP 서버</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="smtp-host">SMTP 호스트</Label>
-            <Input id="smtp-host" placeholder="smtp.example.com" disabled />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="smtp-port">포트</Label>
-              <Input id="smtp-port" placeholder="587" disabled />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="smtp-security">보안</Label>
-              <Input id="smtp-security" value="TLS" disabled />
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">이메일 설정은 환경 변수에서 관리됩니다.</p>
+        <CardContent className="space-y-2">
+          <p className="text-sm font-medium">{mail ? `${mail.host}:${mail.port}` : '-'}</p>
+          {mail && !mail.configured && (
+            <p className="text-xs text-muted-foreground">
+              EMAIL_SERVER_HOST 가 설정되지 않아 기본값을 씁니다. 서버 환경 변수를 확인하세요.
+            </p>
+          )}
+          {mail && !mail.credentialsConfigured && (
+            <p className="text-xs text-destructive">
+              발송 계정(EMAIL_SERVER_USER/PASSWORD)이 설정되지 않아 알림 메일이 발송되지 않습니다.
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Lock className="h-5 w-5" />
-            <CardTitle>보안 설정</CardTitle>
+            <Database className="h-5 w-5" />
+            <CardTitle>데이터베이스 백업</CardTitle>
           </div>
-          <CardDescription>인증 및 보안 관련 설정</CardDescription>
+          <CardDescription>백업은 서버에서 자동으로 실행됩니다</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">세션 타임아웃</p>
-              <p className="text-sm text-muted-foreground">현재: 24시간</p>
-            </div>
-            <Button variant="outline" disabled>
-              변경
-            </Button>
-          </div>
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">비밀번호 정책</p>
-              <p className="text-sm text-muted-foreground">최소 6자, 영문/숫자 조합</p>
-            </div>
-            <Button variant="outline" disabled>
-              변경
-            </Button>
-          </div>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            매일 03:00(KST) 자동 백업. 실행 결과는 GitHub Actions 의 Scheduled Backup 워크플로에서
+            확인합니다(docs/backup-and-restore.md).
+          </p>
         </CardContent>
       </Card>
-
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? '저장 중...' : '설정 저장'}
-        </Button>
-      </div>
     </div>
   );
 }

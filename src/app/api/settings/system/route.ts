@@ -1,55 +1,43 @@
 // src/app/api/settings/system/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-import { validateRequestBody } from '@/lib/api-helpers';
+import { SESSION_MAX_AGE_SECONDS } from '@/auth.config';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS } from '@/lib/constants/session';
 import { ForbiddenError } from '@/lib/errors';
-import { logger } from '@/lib/logger';
-import { systemSettingsUpdateSchema } from '@/lib/schemas';
+import { PASSWORD_POLICY_DESCRIPTION } from '@/lib/schemas';
+import { smtpServer } from '@/services/email.service';
 import { SystemSettings } from '@/types/settings';
 
-// 시스템 설정 가져오기 (Rate Limit: 표준)
+/**
+ * 시스템 설정 — **실제로 적용 중인 값**을 읽기 전용으로 돌려준다.
+ *
+ * 예전 GET 은 앱 어디에서도 읽지 않는 환경변수(SITE_NAME·SMTP_HOST·SESSION_TIMEOUT·PASSWORD_POLICY 등)와
+ * 가짜 기본값(세션 24시간, "최소 6자", 마지막 백업 2025-01-12)을 돌려줬고, PUT 은 아무것도 저장하지
+ * 않으면서 "시스템 설정이 저장되었습니다" 를 돌려줬다. 저장소(설정 테이블)가 없으므로 PUT 을 걷어냈고,
+ * 각 값은 그 정본(세션 상수, 비밀번호 스키마, 메일 발송 설정)에서 읽는다.
+ *
+ * 세션은 두 값을 함께 준다. 사용자가 실제로 겪는 것은 화면 유휴 로그아웃(30분)이고, 토큰 수명(8시간)은
+ * 화면 타이머가 돌지 않을 때(탭을 닫아 둔 경우 등)의 상한이다. 토큰 수명만 보여 주면 "8시간 유지" 로
+ * 읽혀 실제 동작과 어긋난다.
+ */
 export const GET = withAuthAndRateLimit(
-  async (request: NextRequest, { session }) => {
-    // 관리자 권한 확인
+  async (_request: NextRequest, { session }) => {
     if (!session?.user || !session.user.roles?.includes('ADMIN')) {
       throw new ForbiddenError('관리자 권한이 필요합니다.');
     }
 
-    // 실제 설정 정보는 데이터베이스나 환경변수에서 가져와야 합니다.
-    // 현재는 더미 데이터로 표시
     const settings: SystemSettings = {
-      siteName: process.env.SITE_NAME || 'SR Management System v1.0',
-      siteDescription: process.env.SITE_DESCRIPTION || '서비스 요청 관리 시스템',
-      adminEmail: process.env.ADMIN_EMAIL || 'admin@example.com',
-      smtpHost: process.env.SMTP_HOST || 'smtp.example.com',
-      smtpPort: parseInt(process.env.SMTP_PORT || '587'),
-      smtpSecurity: process.env.SMTP_SECURITY || 'TLS',
-      sessionTimeout: parseInt(process.env.SESSION_TIMEOUT || '24'),
-      passwordPolicy: process.env.PASSWORD_POLICY || '최소 6자, 영문/숫자 조합',
-      databaseBackupTime: '2025-01-12 10:30',
-      cacheStatus: 'enabled',
+      session: {
+        idleLogoutMinutes: IDLE_TIMEOUT_MS / 60_000,
+        idleWarningMinutes: IDLE_WARNING_MS / 60_000,
+        tokenMaxAgeHours: SESSION_MAX_AGE_SECONDS / 3600,
+      },
+      passwordPolicy: PASSWORD_POLICY_DESCRIPTION,
+      mailServer: smtpServer(),
     };
 
     return NextResponse.json(settings);
   },
   { preset: 'standard' }
 ); // 1분당 100회
-
-// 시스템 설정 저장 (Rate Limit: 엄격)
-export const PUT = withAuthAndRateLimit(
-  async (request: NextRequest, { session }) => {
-    // 관리자 권한 확인
-    if (!session?.user || !session.user.roles?.includes('ADMIN')) {
-      throw new ForbiddenError('관리자 권한이 필요합니다.');
-    }
-
-    const settings = await validateRequestBody(request, systemSettingsUpdateSchema);
-
-    // 실제 설정 저장 로직은 여기에 구현해야 합니다.
-    logger.debug('Updating system settings', { custom_siteName: settings.siteName });
-
-    return NextResponse.json({ message: '시스템 설정이 저장되었습니다.' });
-  },
-  { preset: 'strict' }
-); // 1분당 5회 (민감한 작업)

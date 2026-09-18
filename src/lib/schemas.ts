@@ -52,14 +52,35 @@ export const FIELD_LIMITS = {
  * - 숫자 1개 이상 포함 (0-9)
  * - 특수문자 1개 이상 포함 (!@#$%^&*()_+-=[]{}|;:,.<>?)
  */
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 100;
+
+/**
+ * 특수문자로 인정하는 문자 — **정본**. 목록에 없는 문자(`~`, `/`, `'` 등)는 특수문자로 치지 않는다.
+ * 안내 문구가 "특수문자" 라고만 하면 `~` 를 넣은 사용자는 이유를 모른 채 거부된다.
+ */
+export const PASSWORD_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+/**
+ * `PASSWORD_SPECIAL_CHARS` 중 하나를 포함하는지. 정규식 리터럴로 두고(문자열로 조립하면
+ * `new RegExp` 가 된다) 목록과의 일치는 schemas.test.ts 가 문자 단위로 검증한다.
+ */
+export const PASSWORD_SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
+
+/** 사람이 읽는 비밀번호 정책. 아래 스키마와 같은 상수에서 만들어 둘이 갈라지지 않게 한다. */
+export const PASSWORD_POLICY_DESCRIPTION = `${PASSWORD_MIN_LENGTH}~${PASSWORD_MAX_LENGTH}자, 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함(특수문자: ${PASSWORD_SPECIAL_CHARS})`;
+
 export const passwordSchema = z
   .string()
-  .min(8, '비밀번호는 최소 8자 이상이어야 합니다.')
-  .max(100, '비밀번호는 100자를 초과할 수 없습니다.')
+  .min(PASSWORD_MIN_LENGTH, `비밀번호는 최소 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다.`)
+  .max(PASSWORD_MAX_LENGTH, `비밀번호는 ${PASSWORD_MAX_LENGTH}자를 초과할 수 없습니다.`)
   .regex(/[A-Z]/, '비밀번호는 대문자를 최소 1개 이상 포함해야 합니다.')
   .regex(/[a-z]/, '비밀번호는 소문자를 최소 1개 이상 포함해야 합니다.')
   .regex(/[0-9]/, '비밀번호는 숫자를 최소 1개 이상 포함해야 합니다.')
-  .regex(/[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/, '비밀번호는 특수문자를 최소 1개 이상 포함해야 합니다.');
+  .regex(
+    PASSWORD_SPECIAL_CHAR_PATTERN,
+    `비밀번호는 특수문자(${PASSWORD_SPECIAL_CHARS})를 최소 1개 이상 포함해야 합니다.`
+  );
 
 /**
  * 회원가입 필드 (refine 이전의 base object).
@@ -473,36 +494,6 @@ export const clientAssignSchema = z.object({
 export const roleAssignSchema = z.object({
   roleIds: z.array(z.string()),
 });
-
-/** 시스템 설정 화면이 실제로 저장하는 세 필드. 빈 관리자 메일은 알림 수신 해제를 뜻한다. */
-export const systemSettingsUpdateSchema = z
-  .object({
-    siteName: z
-      .string()
-      .trim()
-      .min(1, '사이트 이름을 입력해주세요.')
-      .max(
-        FIELD_LIMITS.DISPLAY_NAME,
-        `사이트 이름은 ${FIELD_LIMITS.DISPLAY_NAME}자를 초과할 수 없습니다.`
-      ),
-    siteDescription: z
-      .string()
-      .trim()
-      .min(1, '사이트 설명을 입력해주세요.')
-      .max(
-        FIELD_LIMITS.SHORT_TEXT,
-        `사이트 설명은 ${FIELD_LIMITS.SHORT_TEXT}자를 초과할 수 없습니다.`
-      ),
-    adminEmail: z.preprocess(
-      (value) => (typeof value === 'string' ? value.trim() : value),
-      z
-        .string()
-        .max(FIELD_LIMITS.EMAIL, `관리자 이메일은 ${FIELD_LIMITS.EMAIL}자를 초과할 수 없습니다.`)
-        .email('유효한 관리자 이메일 주소를 입력해주세요.')
-        .or(z.literal(''))
-    ),
-  })
-  .strict();
 
 const permissionSegmentSchema = z
   .string({ error: '리소스와 액션을 제공해야 합니다' })

@@ -35,6 +35,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { apiList, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { PASSWORD_SPECIAL_CHAR_PATTERN, PASSWORD_SPECIAL_CHARS } from '@/lib/schemas';
 import type { ClientSummary } from '@/types/client.types';
 
 /** `calculatePasswordStrength` 가 돌려주는 개별 규칙 충족 여부. */
@@ -59,7 +60,7 @@ function passwordRequirements(checks: PasswordChecks) {
     { key: 'uppercase', label: '대문자 포함', met: checks.uppercase },
     { key: 'lowercase', label: '소문자 포함', met: checks.lowercase },
     { key: 'number', label: '숫자 포함', met: checks.number },
-    { key: 'special', label: '특수문자 포함 (@$!%*?&#)', met: checks.special },
+    { key: 'special', label: `특수문자 포함 (${PASSWORD_SPECIAL_CHARS})`, met: checks.special },
   ];
 }
 
@@ -95,7 +96,9 @@ function calculatePasswordStrength(password: string): {
     lowercase: /[a-z]/.test(password),
     uppercase: /[A-Z]/.test(password),
     number: /\d/.test(password),
-    special: /[@$!%*?&#]/.test(password),
+    // 서버 정본과 같은 집합을 쓴다. 예전에는 `[@$!%*?&#]` 로 좁아서 `^`·`_` 만 넣은 비밀번호는
+    // 서버가 받는데도 체크리스트가 미충족으로 보였다.
+    special: PASSWORD_SPECIAL_CHAR_PATTERN.test(password),
   };
 
   const score = Object.values(checks).filter(Boolean).length;

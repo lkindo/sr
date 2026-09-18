@@ -13,7 +13,7 @@ import type { NextAuthConfig } from 'next-auth';
  * 의 jwt 콜백이 60초 TTL 로 클레임을 재조회하고, 비활성/삭제 계정은 즉시 세션을 파기한다.
  * maxAge 는 그 TTL 검사를 빠져나간 경우의 **상한**이다.
  */
-const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
+export const SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
 
 /** 인증(비보호) 페이지의 루트 경로들. 이 목록과 그 하위 경로만 비로그인 접근을 허용한다. */
 const AUTH_PAGE_ROOTS = ['/login', '/register'] as const;

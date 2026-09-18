@@ -137,7 +137,8 @@ const ANONYMOUS_READ_ENDPOINTS = [
  * 읽기만 검증하면 "인증 래퍼가 GET 에만 붙어 있다" 는 형태의 회귀를 놓친다.
  * 각 항목은 실제로 존재하는 메서드만 고른다 — 핸들러가 없는 메서드는 인증과 무관하게
  * 405 라서 401 을 단언하면 인가가 아니라 라우팅을 검사하게 된다.
- * (실측: POST /api/roles, POST /api/service-categories, PATCH /api/settings/system 은 405)
+ * (실측: POST /api/roles, POST /api/service-categories, PATCH /api/settings/system 은 405.
+ *  PUT /api/settings/system 도 2026-09-18 에 걷어냈다 — 저장하지 않으면서 성공을 돌려주던 스텁이었다.)
  */
 const ANONYMOUS_WRITE_REQUESTS: Array<{
   label: string;
@@ -171,10 +172,6 @@ const ANONYMOUS_WRITE_REQUESTS: Array<{
     label: 'POST /api/clients',
     send: (request) =>
       request.post('/api/clients', { data: { code: 'ANONFAIL', name: '익명 생성 시도' } }),
-  },
-  {
-    label: 'PUT /api/settings/system',
-    send: (request) => request.put('/api/settings/system', { data: {} }),
   },
   {
     label: 'POST /api/profile/password',

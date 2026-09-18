@@ -141,10 +141,15 @@ test.describe('설정 — 시스템 (ADMIN)', () => {
     await expect(page).toHaveURL(/\/settings\/system/);
     await expect(page.locator('main')).toBeVisible({ timeout: 15000 });
 
-    // 설정 화면인데 조작할 것이 하나도 없으면 회귀다.
-    await expect(page.locator('main input, main select, main textarea').first()).toBeVisible({
-      timeout: 15000,
-    });
+    // 이 화면은 **읽기 전용**이다(2026-09-18). 예전 입력란·"설정 저장" 은 서버가 아무것도 저장하지
+    // 않으면서 성공을 돌려주던 스텁이었다. 지금 계약은 실제 적용값을 보여 주고, 동작하지 않는
+    // 조작을 제공하지 않는 것이다.
+    await expect(page.getByText(/입력이 \d+분간 없으면 로그아웃/)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/최대 \d+시간/)).toBeVisible();
+    await expect(page.getByText('비밀번호 정책')).toBeVisible();
+    await expect(page.getByRole('button', { name: /설정 저장|지금 백업|캐시 삭제/ })).toHaveCount(
+      0
+    );
   });
 });
 
