@@ -24,6 +24,7 @@ import {
   ensureCanDeleteSR,
   ensureCanEditSRContent,
   ensureCanUpdateSR,
+  INTERNAL_ROLES,
   isInternalUser,
   srViewerScopeWhere,
   visibleCommentsWhere,
@@ -228,9 +229,9 @@ export class SRService {
 
     await this.ensureCategoryBelongsToClient(validated.serviceCategoryId, validated.clientId);
 
-    // 대리 등록(D3): 운영자가 고객 요청을 대신 등록하면 **실제 고객**이 신청자다 — 확인완료는 신청자
-    // 본인만 하므로, 운영자 이름으로 남기면 아무도 확인할 수 없다. 등록한 운영자는 활동·상태 이력의
-    // 행위자로 남는다.
+    // 대리 등록(D3): 운영자가 고객 요청을 대신 등록하면 **실제 고객**이 신청자다 — 확인완료는 고객의
+    // 인수 행위라 고객이 신청자여야 고객이 확인한다. 운영자 이름으로 남긴 SR 은 등록한 운영자 또는 그 고객사의
+    // CLIENT_ADMIN 이 확인한다(canConfirmAsAcceptor). 등록한 운영자는 활동·상태 이력의 행위자로 남는다.
     const onBehalfOf =
       validated.requesterId && validated.requesterId !== sessionUser.id
         ? validated.requesterId
@@ -399,16 +400,27 @@ export class SRService {
 
       // 상태 전환 검증
       if (validated.status && validated.status !== existingSR.status) {
+        // 확인완료의 신원 검사(canConfirmAsAcceptor)는 "운영자가 등록한 SR 인가" 를 알아야 한다.
+        // 그 전이일 때만 신청자의 역할을 읽는다.
+        const transitionSubject =
+          validated.status === 'CONFIRMED'
+            ? {
+                ...existingSR,
+                requesterIsInternal: await this.isInternalRequester(existingSR.requesterId),
+              }
+            : existingSR;
         const transitionResult = validateTransition(
           existingSR.status,
           validated.status as SRStatus,
           sessionUser.roles,
-          existingSR,
+          transitionSubject,
           validated,
           sessionUser.permissions,
           // 신청자 본인만 가능한 전이(CONFIRMED)를 판정하려면 행위자 ID 가 필요하다.
           // 이것이 없으면 상태 머신은 fail-closed 로 거부한다.
-          sessionUser.id
+          sessionUser.id,
+          // 운영자가 등록한 SR 을 그 고객사의 CLIENT_ADMIN 이 확인하는 예외의 판정 재료.
+          sessionUser.clientIds ?? []
         );
 
         if (!transitionResult.valid) {
@@ -957,14 +969,21 @@ export class SRService {
     const statusHistoryLimit = boundedLimit(options.statusHistoryLimit, 50);
     const visibleCommentWhere = visibleCommentsWhere(options.viewer);
 
-    return prisma.sR.findUnique({
+    const sr = await prisma.sR.findUnique({
       where: { id, ...SR_ALIVE },
       include: {
         client: {
           select: CLIENT_SUMMARY_SELECT,
         },
         requester: {
-          select: { id: true, name: true, email: true, image: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            // 응답에는 싣지 않는다 — 아래에서 `requesterIsInternal` 하나로 줄인다.
+            roles: { select: { role: { select: { name: true } } } },
+          },
         },
         assignee: {
           select: { id: true, name: true, email: true, image: true },
@@ -1029,7 +1048,32 @@ export class SRService {
           },
         },
       },
-    }) as Promise<SRDetails | null>;
+    });
+    if (!sr) return null;
+
+    // 화면이 '확인 완료' 버튼을 서버와 같은 규칙으로 판정하려면 "운영자가 등록한 SR 인가" 를 알아야 한다
+    // (sr-state-machine.canConfirmAsAcceptor). 신청자의 역할 이름 자체는 응답에 싣지 않는다.
+    const { roles: requesterRoles, ...requester } = sr.requester ?? { roles: [] };
+    return {
+      ...sr,
+      ...(sr.requester ? { requester } : {}),
+      requesterIsInternal: (requesterRoles ?? []).some((row) =>
+        INTERNAL_ROLES.includes(row.role.name)
+      ),
+    } as unknown as SRDetails;
+  }
+
+  /**
+   * 신청자가 운영자(내부 사용자)인가 — 확인완료 예외(`canConfirmAsAcceptor`)의 판정 재료.
+   * 세션이 아니라 **신청자**의 역할이므로 DB 의 현재 값을 읽는다. 신청자를 모르면 false(fail-closed).
+   */
+  async isInternalRequester(requesterId: string | null | undefined): Promise<boolean> {
+    if (!requesterId) return false;
+    const requester = await prisma.user.findUnique({
+      where: { id: requesterId },
+      select: { roles: { select: { role: { select: { name: true } } } } },
+    });
+    return requester?.roles?.some((row) => INTERNAL_ROLES.includes(row.role.name)) ?? false;
   }
 
   async getAllSRs(params: {

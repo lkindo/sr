@@ -467,12 +467,13 @@ test.describe('SR 상태 머신: 권한 축', () => {
   test('confirm: 진짜 MANAGER 세션도 신청자가 아니면 403 이다', async ({ browser, request }) => {
     const sr = seeded.get('COMPLETED')!;
 
-    // MANAGER 는 역할 경로에서도 제외돼 있고(TRANSITION_ROLES), prisma/seed.ts 가
-    // SR:CONFIRM 을 주지 않으므로 권한 경로로도 우회할 수 없다.
+    // 소유자 결정(2026-09-18) 이후 MANAGER 는 역할 표(TRANSITION_ROLES)에 있다 — 자기 이름으로 등록한
+    // SR 을 본인이 확인하게 하기 위해서다. 그러니 이 SR(고객이 신청)을 막는 것은 역할 표가 아니라
+    // validateTransition·상태 라우트의 **신원 검사**(canConfirmAsAcceptor)다. 아래 403 이 그 검사의 증거다.
     expect(
       TRANSITION_ROLES.COMPLETED?.CONFIRMED,
-      'MANAGER 가 CONFIRMED 역할 목록에 들어가면 "확인은 고객 인수 행위" 규칙이 깨집니다.'
-    ).not.toContain('MANAGER');
+      '역할 표가 바뀌었다면 이 테스트의 전제(신원 검사만이 막는다)도 갱신해야 합니다.'
+    ).toContain('MANAGER');
 
     const status = await withPersona(browser, 'manager', async (managerRequest) => {
       const response = await patchStatus(managerRequest, sr.id, { action: 'confirm' });
@@ -488,6 +489,100 @@ test.describe('SR 상태 머신: 권한 축', () => {
     expect(await readStatus(request, sr.id), 'MANAGER 의 confirm 이 상태를 바꿨습니다.').toBe(
       'COMPLETED'
     );
+  });
+
+  /**
+   * 소유자 결정(2026-09-18) — 운영자가 **자기 이름으로** 등록한 SR 의 확인완료.
+   *
+   * 예전에는 아무도 확인할 수 없었다: 신청자인 MANAGER 는 역할 표에 없어 거부되고, 고객 쪽 사람은
+   * 신청자가 아니라 거부됐다. 그 SR 은 영원히 '완료' 에 머물렀다. 이제 등록한 운영자 본인 또는
+   * 그 SR 고객사의 CLIENT_ADMIN 이 확인한다. 같은 고객사의 일반 CLIENT_USER 는 여전히 못 한다.
+   *
+   * CLIENT_ADMIN 경로는 **화면 버튼으로** 누른다 — 상세 응답의 `requesterIsInternal` 이 화면 판정
+   * (canViewerConfirmSR)까지 흘러가야 버튼이 뜨므로, API 만 두드리면 그 배선을 검증하지 못한다.
+   */
+  test('confirm: 운영자가 등록한 SR 은 고객사 관리자가 화면에서 확인한다 (일반 고객 사용자는 403)', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120_000);
+    const sr = await seedSR(browser, {
+      stage: 'COMPLETED',
+      requester: 'manager',
+      title: '상태머신 운영자 등록 확인(고객사 관리자)',
+    });
+    try {
+      // (1) 같은 고객사의 일반 CLIENT_USER — 신청자가 아니고 고객사 관리자도 아니다.
+      await withPersona(browser, 'client', async (clientRequest) => {
+        const response = await patchStatus(clientRequest, sr.id, { action: 'confirm' });
+        expect(
+          response.status(),
+          `신청자도 고객사 관리자도 아닌 CLIENT_USER 가 확인했습니다. 응답: ${await response.text()}`
+        ).toBe(403);
+        expect(await errorOf(response)).toBe('신청자만 확인할 수 있습니다.');
+      });
+      expect(await readStatus(request, sr.id)).toBe('COMPLETED');
+
+      // (2) 그 고객사의 CLIENT_ADMIN — 상세 화면의 '확인 완료' 버튼으로 확인한다.
+      const context = await browser.newContext({ storageState: PERSONA_AUTH_FILES.clientAdmin });
+      try {
+        const session = (await (await context.request.get('/api/auth/session')).json()) as {
+          user?: { clientIds?: string[] };
+        };
+        expect(
+          session.user?.clientIds ?? [],
+          '이 테스트는 CLIENT_ADMIN 페르소나가 SR 의 고객사 소속이라는 시드 계약을 전제로 합니다.'
+        ).toContain(sr.clientId);
+
+        const page = await context.newPage();
+        await page.goto(`/srs/${sr.id}`);
+        const confirmButton = page.getByRole('button', { name: '확인 완료' });
+        await expect(
+          confirmButton,
+          '운영자가 등록한 SR 인데 고객사 관리자에게 확인 버튼이 없습니다(requesterIsInternal 배선 확인).'
+        ).toBeVisible({ timeout: 30_000 });
+
+        const [response] = await Promise.all([
+          page.waitForResponse(
+            (res) =>
+              res.url().includes(`/api/srs/${sr.id}/status`) && res.request().method() === 'PATCH'
+          ),
+          confirmButton.click(),
+        ]);
+        expect(response.status(), `확인 요청이 거부됐습니다. 응답: ${await response.text()}`).toBe(
+          200
+        );
+      } finally {
+        await context.close();
+      }
+      expect(await readStatus(request, sr.id)).toBe('CONFIRMED');
+    } finally {
+      await deleteSeededSRs(browser, [sr.id]);
+    }
+  });
+
+  test('confirm: 운영자가 자기 이름으로 등록한 SR 은 등록한 MANAGER 본인이 확인한다', async ({
+    browser,
+    request,
+  }) => {
+    test.setTimeout(120_000);
+    const sr = await seedSR(browser, {
+      stage: 'COMPLETED',
+      requester: 'manager',
+      title: '상태머신 운영자 등록 확인(본인)',
+    });
+    try {
+      await withPersona(browser, 'manager', async (managerRequest) => {
+        const response = await patchStatus(managerRequest, sr.id, { action: 'confirm' });
+        expect(
+          response.status(),
+          `등록한 MANAGER 본인의 확인이 거부됐습니다. 응답: ${await response.text()}`
+        ).toBe(200);
+      });
+      expect(await readStatus(request, sr.id)).toBe('CONFIRMED');
+    } finally {
+      await deleteSeededSRs(browser, [sr.id]);
+    }
   });
 
   test('reopen: 담당 ENGINEER 는 재오픈할 수 없다 (SR:CONFIRM 이 필요하다)', async ({

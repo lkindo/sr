@@ -208,9 +208,9 @@ async function seedReferenceData() {
       where: {
         OR: [
           // 예전엔 `{ resource: 'SR' }` 와일드카드였다. 카탈로그에 SR:CONFIRM 이 생기면서
-          // 와일드카드가 그것까지 집어가는데, 확인(CONFIRMED)은 고객의 인수 행위라
-          // TRANSITION_ROLES 가 MANAGER 를 의도적으로 제외한다. 와일드카드를 두면 권한
-          // 경로로 그 규칙이 우회되므로 액션을 명시한다.
+          // 와일드카드가 그것까지 집어가는데, 확인(CONFIRMED)은 고객의 인수 행위라 권한을 최소로 둔다.
+          // MANAGER 가 자기 이름으로 등록한 SR 의 확인은 TRANSITION_ROLES 의 역할 경로로 열려 있고
+          // (2026-09-18 소유자 결정), 남의 SR 은 신원 검사(canConfirmAsAcceptor)가 막는다. 액션을 명시한다.
           {
             resource: 'SR',
             action: {

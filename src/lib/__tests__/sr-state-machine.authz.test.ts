@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  canConfirmAsAcceptor,
   canEditSRContentAt,
   canViewerAssignSR,
+  canViewerConfirmSR,
   canViewerIntakeSR,
   isSROperator,
   validateTransition,
@@ -511,5 +513,151 @@ describe('validateTransition — 전이 맥락 규칙', () => {
     );
     expect(result.valid).toBe(false);
     expect(result.message).toContain('완료 시각 기록이 없어');
+  });
+});
+
+/**
+ * 확인완료(고객 인수)의 신원 규칙 — 소유자 결정(2026-09-18).
+ *
+ * 원칙은 신청자 본인이다. 그런데 운영자(MANAGER 등)가 **자기 이름으로** 등록한 SR 은 고객 신청자가 없어
+ * 아무도 확인할 수 없었다: MANAGER 는 역할 표(TRANSITION_ROLES)에 없어 거부되고, 다른 사람은 신청자가 아니라
+ * 거부됐다. 그런 SR 은 등록한 운영자 본인 또는 그 SR 고객사의 CLIENT_ADMIN 이 확인한다.
+ */
+describe('확인완료 — 운영자가 등록한 SR 의 예외', () => {
+  const internalSR = { requesterId: 'mgr-1', clientId: 'c-1', requesterIsInternal: true };
+  const customerSR = { requesterId: 'cu-1', clientId: 'c-1', requesterIsInternal: false };
+
+  it('MANAGER 는 자기 이름으로 등록한 SR 을 확인할 수 있다', () => {
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['MANAGER'], internalSR, {}, [], 'mgr-1').valid
+    ).toBe(true);
+  });
+
+  it('MANAGER 는 남이 등록한 SR 을 확인할 수 없다(운영자가 고객 대신 확인하는 경로는 없다)', () => {
+    for (const sr of [internalSR, customerSR]) {
+      const r = validateTransition('COMPLETED', 'CONFIRMED', ['MANAGER'], sr, {}, [], 'mgr-2', []);
+      expect(r.valid).toBe(false);
+      expect(r.message).toBe('신청자만 확인할 수 있습니다.');
+    }
+  });
+
+  it('운영자가 등록한 SR 은 그 고객사의 CLIENT_ADMIN 이 확인할 수 있다', () => {
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_ADMIN'],
+        internalSR,
+        {},
+        ['SR:CONFIRM'],
+        'ca-1',
+        ['c-1']
+      ).valid
+    ).toBe(true);
+  });
+
+  it('다른 고객사의 CLIENT_ADMIN 은 확인할 수 없다', () => {
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_ADMIN'],
+        internalSR,
+        {},
+        ['SR:CONFIRM'],
+        'ca-2',
+        ['c-2']
+      ).valid
+    ).toBe(false);
+  });
+
+  it('고객 사용자가 신청한 SR 은 같은 고객사 CLIENT_ADMIN 이라도 대신 확인할 수 없다', () => {
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_ADMIN'],
+        customerSR,
+        {},
+        ['SR:CONFIRM'],
+        'ca-1',
+        ['c-1']
+      ).valid
+    ).toBe(false);
+  });
+
+  it('신청자가 운영자인지 모르면(값 없음) 예외를 열지 않는다 — fail-closed', () => {
+    const unknown = { requesterId: 'mgr-1', clientId: 'c-1' };
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_ADMIN'],
+        unknown,
+        {},
+        ['SR:CONFIRM'],
+        'ca-1',
+        ['c-1']
+      ).valid
+    ).toBe(false);
+    // 행위자의 소속 고객사를 넘기지 않아도(기존 7인자 호출) 예외는 열리지 않는다.
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_ADMIN'],
+        internalSR,
+        {},
+        ['SR:CONFIRM'],
+        'ca-1'
+      ).valid
+    ).toBe(false);
+  });
+
+  it('CLIENT_USER 는 운영자가 등록한 SR 이라도 신청자가 아니면 확인할 수 없다', () => {
+    expect(
+      validateTransition(
+        'COMPLETED',
+        'CONFIRMED',
+        ['CLIENT_USER'],
+        internalSR,
+        {},
+        ['SR:CONFIRM'],
+        'cu-9',
+        ['c-1']
+      ).valid
+    ).toBe(false);
+  });
+
+  it('canConfirmAsAcceptor 는 신원 없이 호출되면 거부한다', () => {
+    expect(canConfirmAsAcceptor({}, internalSR)).toBe(false);
+    expect(canConfirmAsAcceptor({ id: 'mgr-1' }, null)).toBe(false);
+    expect(canConfirmAsAcceptor({ id: 'mgr-1' }, { requesterId: null })).toBe(false);
+    expect(
+      canConfirmAsAcceptor(
+        { id: 'ca-1', roles: ['CLIENT_ADMIN'], clientIds: ['c-1'] },
+        { ...internalSR, clientId: null }
+      )
+    ).toBe(false);
+  });
+
+  it('화면 판정(canViewerConfirmSR)은 완료 상태에서만, 수정 권한이 있을 때만 버튼을 준다', () => {
+    const clientAdmin = {
+      id: 'ca-1',
+      roles: ['CLIENT_ADMIN'],
+      permissions: ['SR:UPDATE', 'SR:CONFIRM'],
+      clientIds: ['c-1'],
+    };
+    expect(canViewerConfirmSR(clientAdmin, { ...internalSR, status: 'COMPLETED' })).toBe(true);
+    expect(canViewerConfirmSR(clientAdmin, { ...internalSR, status: 'CONFIRMED' })).toBe(false);
+    // 수정 권한(SR:UPDATE)이 없으면 서버가 ensureCanUpdateSR 에서 403 이므로 버튼도 없다.
+    expect(
+      canViewerConfirmSR(
+        { ...clientAdmin, permissions: ['SR:CONFIRM'] },
+        { ...internalSR, status: 'COMPLETED' }
+      )
+    ).toBe(false);
+    const manager = { id: 'mgr-1', roles: ['MANAGER'], permissions: ['SR:UPDATE'], clientIds: [] };
+    expect(canViewerConfirmSR(manager, { ...internalSR, status: 'COMPLETED' })).toBe(true);
   });
 });

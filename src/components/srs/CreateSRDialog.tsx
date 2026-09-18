@@ -156,8 +156,8 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
               </div>
             </div>
 
-            {/* 대리 등록(D3): 고객 요청을 대신 등록할 때는 실제 고객을 신청자로 지정한다. 확인완료는
-                신청자 본인만 하므로, 등록자 이름으로 남기면 그 SR 은 고객이 확인할 수 없다. */}
+            {/* 대리 등록(D3): 고객 요청을 대신 등록할 때는 실제 고객을 신청자로 지정한다. 등록자 이름으로
+                남기면 그 SR 은 등록자 본인 또는 그 고객사의 고객사 관리자가 확인한다(canConfirmAsAcceptor). */}
             {canRegisterOnBehalf && clientId && (
               <div className="space-y-2">
                 <Label htmlFor="requester">신청자(고객)</Label>
@@ -175,8 +175,8 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  고객의 요청을 대신 등록할 때는 그 고객을 신청자로 지정하세요. 확인완료는 신청자
-                  본인만 할 수 있습니다.
+                  고객의 요청을 대신 등록할 때는 그 고객을 신청자로 지정하세요. 본인 이름으로 등록한
+                  SR은 본인 또는 그 고객사의 고객사 관리자가 확인합니다.
                 </p>
               </div>
             )}

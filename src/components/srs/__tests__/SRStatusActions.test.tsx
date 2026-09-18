@@ -4,7 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useChangeSRStatus } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
-import { getReopenAvailability, type ReopenViewer } from '@/lib/sr-state-machine';
+import {
+  canViewerConfirmSR,
+  getReopenAvailability,
+  type ReopenViewer,
+} from '@/lib/sr-state-machine';
 
 import { SRReopenBlockedNotice, SRStatusActions } from '../SRStatusActions';
 
@@ -74,6 +78,8 @@ interface Scenario {
   status: Status;
   userRoles: string[];
   isRequestor: boolean;
+  /** 신청자가 운영자(내부 사용자)인가 — 운영자가 자기 이름으로 등록한 SR. 기본값 false. */
+  requesterIsInternal?: boolean;
   /** 기본값은 역할별 시드 권한. */
   permissions?: string[];
   completedAt?: Date | string | null;
@@ -90,6 +96,7 @@ function Harness({
   status,
   userRoles,
   isRequestor,
+  requesterIsInternal = false,
   permissions,
   completedAt = new Date(Date.now() - DAY),
   confirmedAt = null,
@@ -101,17 +108,16 @@ function Harness({
     permissions: permissions ?? userRoles.flatMap((role) => SEED_PERMISSIONS[role] ?? []),
     clientIds: ['client-1'],
   };
-  const reopen = getReopenAvailability(
+  const sr = {
     status,
-    {
-      completedAt,
-      confirmedAt,
-      assigneeId,
-      clientId: 'client-1',
-      requesterId: isRequestor ? 'viewer' : 'requester',
-    },
-    viewer
-  );
+    completedAt,
+    confirmedAt,
+    assigneeId,
+    clientId: 'client-1',
+    requesterId: isRequestor ? 'viewer' : 'requester',
+    requesterIsInternal,
+  };
+  const reopen = getReopenAvailability(status, sr, viewer);
   return (
     <>
       <SRStatusActions
@@ -119,7 +125,7 @@ function Harness({
         srNumber="SR-2024-001"
         status={status}
         userRoles={userRoles}
-        isRequestor={isRequestor}
+        canConfirm={canViewerConfirmSR(viewer, sr)}
         reopen={reopen}
       />
       <SRReopenBlockedNotice reopen={reopen} />
@@ -180,9 +186,69 @@ describe('SRStatusActions Component', () => {
 
     it('renders "확인 완료" for COMPLETED state if user is Requestor', () => {
       render(
-        <Harness {...defaultProps} status="COMPLETED" isRequestor={true} userRoles={['USER']} />
+        <Harness
+          {...defaultProps}
+          status="COMPLETED"
+          isRequestor={true}
+          userRoles={['CLIENT_USER']}
+        />
       );
       expect(screen.getByText('확인 완료')).toBeInTheDocument();
+    });
+
+    // 소유자 결정(2026-09-18): 운영자가 자기 이름으로 등록한 SR 은 등록한 본인 또는 그 고객사의
+    // CLIENT_ADMIN 이 확인한다. 예전에는 MANAGER 신청자에게 버튼이 보였지만 서버가 반드시 거부했고,
+    // 다른 사람에게는 버튼이 없어 그 SR 은 영원히 '완료' 에 머물렀다.
+    it('운영자(MANAGER)가 자기 이름으로 등록한 SR 은 본인이 확인할 수 있다', () => {
+      render(
+        <Harness
+          {...defaultProps}
+          status="COMPLETED"
+          isRequestor={true}
+          requesterIsInternal={true}
+          userRoles={['MANAGER']}
+        />
+      );
+      expect(screen.getByRole('button', { name: '확인 완료' })).toBeInTheDocument();
+    });
+
+    it('운영자가 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인할 수 있다', () => {
+      render(
+        <Harness
+          {...defaultProps}
+          status="COMPLETED"
+          isRequestor={false}
+          requesterIsInternal={true}
+          userRoles={['CLIENT_ADMIN']}
+        />
+      );
+      expect(screen.getByRole('button', { name: '확인 완료' })).toBeInTheDocument();
+    });
+
+    it('고객 사용자가 신청한 SR 은 같은 고객사 CLIENT_ADMIN 이라도 대신 확인할 수 없다', () => {
+      render(
+        <Harness
+          {...defaultProps}
+          status="COMPLETED"
+          isRequestor={false}
+          requesterIsInternal={false}
+          userRoles={['CLIENT_ADMIN']}
+        />
+      );
+      expect(screen.queryByRole('button', { name: '확인 완료' })).not.toBeInTheDocument();
+    });
+
+    it('신청자가 아닌 MANAGER 는 운영자가 등록한 SR 이라도 확인할 수 없다', () => {
+      render(
+        <Harness
+          {...defaultProps}
+          status="COMPLETED"
+          isRequestor={false}
+          requesterIsInternal={true}
+          userRoles={['MANAGER']}
+        />
+      );
+      expect(screen.queryByRole('button', { name: '확인 완료' })).not.toBeInTheDocument();
     });
 
     // 접수(INTAKE) 상태에서도 거절할 수 있다 — 전이표(INTAKE → REJECTED)·status 라우트·헌법이 모두
@@ -458,7 +524,12 @@ describe('SRStatusActions Component', () => {
 
     it('calls status patch API when "확인 완료" is clicked (COMPLETED)', async () => {
       render(
-        <Harness {...defaultProps} status="COMPLETED" isRequestor={true} userRoles={['USER']} />
+        <Harness
+          {...defaultProps}
+          status="COMPLETED"
+          isRequestor={true}
+          userRoles={['CLIENT_USER']}
+        />
       );
       fireEvent.click(screen.getByText('확인 완료'));
 

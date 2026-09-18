@@ -66,6 +66,12 @@ export interface SeedSROptions {
    * 기본값은 실행 시점 기준 7일 뒤({@link holdReleaseDate}).
    */
   expectedHoldReleaseDate?: string;
+  /**
+   * 누가 등록하는가. 기본 'client'(CLIENT_USER 가 자기 이름으로 신청).
+   * 'manager' 는 **진짜 MANAGER 가 자기 이름으로** 등록한다(대리 등록 아님) — 운영자가 등록한 SR 의
+   * 확인완료 예외(등록한 운영자 본인 또는 그 고객사 CLIENT_ADMIN)를 검증할 때 쓴다.
+   */
+  requester?: 'client' | 'manager';
 }
 
 /**
@@ -83,6 +89,7 @@ export function holdReleaseDate(daysAhead = 7): string {
 /** 담당자 기본값. helpers/test-helpers.ts 의 ENGINEER_ASSIGNEE_EMAIL 과 반드시 같아야 한다. */
 export const ENGINEER_EMAIL = process.env.TEST_ENGINEER_EMAIL || 'engineeruser@example.com';
 const CLIENT_EMAIL = process.env.TEST_CLIENT_EMAIL || 'clientuser@example.com';
+const MANAGER_ROLE_EMAIL = process.env.TEST_MANAGER_ROLE_EMAIL || 'manageruser@example.com';
 
 /** 상태 전이 순서. stage 옵션이 요구하는 만큼만 앞에서부터 실행한다. */
 const LINEAR_STAGES: SRStage[] = ['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'COMPLETED', 'CONFIRMED'];
@@ -132,8 +139,9 @@ async function resolveUserId(admin: APIRequestContext, email: string): Promise<s
 /**
  * SR 을 만들고 원하는 상태까지 API 로 밀어 올린다.
  *
- * 요청자는 CLIENT_USER 고정이다. 그래야 (1) 고객사가 세션에서 자동 결정되고,
- * (2) COMPLETED → CONFIRMED 를 신청자 권한으로 진행할 수 있다.
+ * 요청자는 기본 CLIENT_USER 다. 그래야 (1) 고객사가 세션에서 자동 결정되고,
+ * (2) COMPLETED → CONFIRMED 를 신청자 권한으로 진행할 수 있다. `requester: 'manager'` 면 같은 고객사로
+ * 진짜 MANAGER 가 자기 이름으로 등록하고, CONFIRMED 단계도 그 MANAGER 가 확인한다.
  */
 export async function seedSR(browser: Browser, options: SeedSROptions = {}): Promise<SeededSR> {
   const {
@@ -146,6 +154,7 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
     resolutionDescription = '픽스처가 API 로 완료 처리했습니다.',
     reason = '픽스처가 API 로 상태를 변경했습니다.',
     expectedHoldReleaseDate = holdReleaseDate(),
+    requester = 'client',
   } = options;
 
   const stamp = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -155,6 +164,8 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
   const client = await openPersona(browser, 'client');
   const manager = await openPersona(browser, 'legacyManager');
   const engineer = await openPersona(browser, 'engineer');
+  // 등록·확인을 할 신청자 세션. 'manager' 는 레거시 별칭(ADMIN)이 아니라 진짜 MANAGER 페르소나다.
+  const registrant = requester === 'manager' ? await openPersona(browser, 'manager') : client;
 
   try {
     // ── 1) 생성 (CLIENT_USER) ────────────────────────────────────────────
@@ -180,7 +191,8 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
     ).toBeGreaterThan(0);
 
     const created = (await expectOk(
-      await client.request.post('/api/srs', {
+      // requesterId 를 보내지 않는다 — 등록자 자신이 신청자다(운영자라면 대리 등록이 아니다).
+      await registrant.request.post('/api/srs', {
         data: {
           title,
           description,
@@ -198,7 +210,7 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
       srNumber: created.srNumber,
       title,
       clientId: clientId!,
-      requesterEmail: CLIENT_EMAIL,
+      requesterEmail: requester === 'manager' ? MANAGER_ROLE_EMAIL : CLIENT_EMAIL,
       stage: 'REQUESTED',
     };
 
@@ -264,16 +276,23 @@ export async function seedSR(browser: Browser, options: SeedSROptions = {}): Pro
     seeded.stage = 'COMPLETED';
     if (stage === 'COMPLETED') return seeded;
 
-    // ── 4) 확인 완료는 신청자(CLIENT_USER)만 가능하다 ────────────────────
+    // ── 4) 확인 완료는 신청자 본인이 한다 ────────────────────────────────
     await expectOk(
-      await client.request.patch(`/api/srs/${seeded.id}/status`, { data: { action: 'confirm' } }),
+      await registrant.request.patch(`/api/srs/${seeded.id}/status`, {
+        data: { action: 'confirm' },
+      }),
       200,
       'confirm 전이'
     );
     seeded.stage = 'CONFIRMED';
     return seeded;
   } finally {
-    await Promise.all([client.close(), manager.close(), engineer.close()]);
+    await Promise.all([
+      client.close(),
+      manager.close(),
+      engineer.close(),
+      ...(registrant === client ? [] : [registrant.close()]),
+    ]);
   }
 }
 

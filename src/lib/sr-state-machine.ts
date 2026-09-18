@@ -235,8 +235,14 @@ export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
     REJECTED: ['ADMIN', 'MANAGER', 'ENGINEER'],
   },
   COMPLETED: {
-    // 확인은 고객 인수 게이트다. 운영자(MANAGER/ENGINEER)는 대신 확인할 수 없다.
-    CONFIRMED: ['ADMIN', 'CLIENT_USER', 'CLIENT_ADMIN'],
+    // 확인은 고객 인수 게이트다. **실제 제한은 이 역할 표가 아니라 아래 validateTransition 의 신원 검사
+    // (`canConfirmAsAcceptor`)다** — 역할 표는 "그 SR 의 신청자인가" 를 알지 못한다.
+    // MANAGER·ENGINEER 는 소유자 결정(2026-09-18)으로 들어왔다: 운영자가 **자기 이름으로** 등록한 SR 은
+    // 고객 신청자가 없어 아무도 확인할 수 없었으므로, 등록한 운영자 본인이 확인할 수 있게 한다. 남의 SR 은
+    // 신원 검사가 여전히 막는다(운영자가 고객 대신 확인하는 경로는 없다). ENGINEER 는 배정된 SR 만
+    // 수정할 수 있으므로(canUpdateSR) 자기가 등록한 SR 도 **배정됐을 때만** 확인한다 — 그 밖에는 그 고객사의
+    // CLIENT_ADMIN 이 확인한다. (시드 ENGINEER 는 SR:CREATE 가 없어 등록 자체를 하지 않는다.)
+    CONFIRMED: ['ADMIN', 'MANAGER', 'ENGINEER', 'CLIENT_USER', 'CLIENT_ADMIN'],
     // 재오픈에는 MANAGER 가 포함된다(소유자 결정, 2026-08-01).
     // 근거: ADMIN 은 이미 가능했고, 잘못된 완료 처리를 정정하려면 운영 관리자가
     // ADMIN 을 호출하거나 고객에게 대신 눌러 달라고 부탁해야 했다.
@@ -332,6 +338,8 @@ const canPerformTransition = (
  * @param updateData 업데이트할 SR 데이터 (Optional)
  * @param userPermissions 사용자 권한 목록 (Optional)
  * @param actorId 전이를 수행하는 사용자 ID. 신청자 본인만 가능한 전이(CONFIRMED)의 판정에 쓴다.
+ * @param actorClientIds 행위자의 소속 고객사. 운영자가 등록한 SR 을 고객사 관리자가 확인하는 예외
+ *   (`canConfirmAsAcceptor`)의 판정에 쓴다. 없으면 그 예외는 열리지 않는다(fail-closed).
  * @returns 가능 여부와 메시지
  */
 export const validateTransition = (
@@ -341,7 +349,8 @@ export const validateTransition = (
   currentData?: any,
   updateData?: any,
   userPermissions?: string[],
-  actorId?: string
+  actorId?: string,
+  actorClientIds?: string[]
 ): { valid: boolean; message?: string } => {
   // 1. 상태 흐름 유효성 검사
   if (!canTransition(from, to)) {
@@ -396,9 +405,10 @@ export const validateTransition = (
   // 공유 지점에 둔다. 두 라우트 모두 srService.updateSR 를 거치므로 함께 닫힌다.
   //
   // fail-closed 다: 신원을 확인할 수 없으면(currentData 나 actorId 가 없으면) 거부한다.
+  // 예외(운영자가 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인)는 `canConfirmAsAcceptor` 가 판정한다.
   if (to === 'CONFIRMED') {
-    const requesterId = currentData?.requesterId;
-    if (!requesterId || !actorId || requesterId !== actorId) {
+    const actor = { id: actorId, roles: userRoles, clientIds: actorClientIds };
+    if (!canConfirmAsAcceptor(actor, currentData)) {
       return {
         valid: false,
         message: '신청자만 확인할 수 있습니다.',
@@ -548,6 +558,74 @@ export function canViewerUpdateSR(
 
 /** policies.ts 의 INTERNAL_ROLES 와 같다(안내 문구를 고르는 데만 쓴다). */
 const INTERNAL_ROLE_NAMES = ['ADMIN', 'MANAGER', 'ENGINEER'];
+
+/**
+ * 확인완료(고객 인수)의 **신원** 판정 — 이 사람이 이 SR 을 확인할 자격이 있는가.
+ * 역할·권한 표(TRANSITION_ROLES/PERMISSIONS)는 validateTransition 이 이보다 먼저 본다.
+ *
+ * - 원칙: 그 SR 의 **신청자 본인**(헌법 §1.1·§2).
+ * - 예외(소유자 결정 2026-09-18): 운영자(내부 사용자)가 **자기 이름으로** 등록한 SR 은 고객 신청자가 없어
+ *   아무도 확인할 수 없었다. 그런 SR 은 등록한 운영자 본인(위 원칙으로 이미 허용) **또는 그 SR 고객사의
+ *   고객사 관리자(CLIENT_ADMIN)** 가 확인한다. 고객 사용자가 신청한 SR 에는 이 예외가 없다 — 같은 고객사의
+ *   CLIENT_ADMIN 이라도 남의 SR 을 대신 확인할 수 없다.
+ *
+ * `requesterIsInternal` 은 서버가 신청자의 역할로 계산해 넣는 값이다(`srService.isInternalRequester`,
+ * SR 상세 응답의 같은 필드). 값이 없거나 true 가 아니면 예외는 열리지 않는다(fail-closed).
+ * 서버(validateTransition·상태 라우트)와 화면(`canViewerConfirmSR`)이 이 함수 하나를 쓴다.
+ */
+export function canConfirmAsAcceptor(
+  actor: { id?: string | null; roles?: string[]; clientIds?: string[] },
+  sr:
+    | {
+        requesterId?: string | null;
+        clientId?: string | null;
+        requesterIsInternal?: boolean | null;
+      }
+    | null
+    | undefined
+): boolean {
+  const requesterId = sr?.requesterId;
+  if (!requesterId || !actor.id) return false;
+  if (requesterId === actor.id) return true;
+
+  return (
+    sr?.requesterIsInternal === true &&
+    !!sr.clientId &&
+    (actor.roles ?? []).includes('CLIENT_ADMIN') &&
+    (actor.clientIds ?? []).includes(sr.clientId)
+  );
+}
+
+/**
+ * 화면의 '확인 완료' 버튼을 보일지 — 서버가 거부하는 순서를 그대로 따른다:
+ *   1. `ensureCanUpdateSR`(403) → canViewerUpdateSR
+ *   2. `validateTransition`(역할·권한 표 + 신원 검사) → 같은 함수를 그대로 호출
+ * 예전에는 화면이 "신청자인가" 만 보고 버튼을 보여 줘서, 자기 이름으로 SR 을 등록한 MANAGER 에게는
+ * 누르면 반드시 거부되는 버튼이 떴다.
+ */
+export function canViewerConfirmSR(
+  viewer: ReopenViewer,
+  sr: {
+    status: string;
+    clientId?: string | null;
+    requesterId?: string | null;
+    assigneeId?: string | null;
+    requesterIsInternal?: boolean | null;
+  }
+): boolean {
+  if (sr.status !== 'COMPLETED') return false;
+  if (!canViewerUpdateSR(viewer, sr)) return false;
+  return validateTransition(
+    'COMPLETED',
+    'CONFIRMED',
+    viewer.roles,
+    sr,
+    {},
+    viewer.permissions,
+    viewer.id,
+    viewer.clientIds
+  ).valid;
+}
 
 /**
  * 재오픈 버튼의 노출·비활성·이유를 한 번에 판정한다.

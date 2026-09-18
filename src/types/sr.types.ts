@@ -14,6 +14,11 @@ type PublicSRAttachment = Pick<
 export type SRDetails = SR & {
   client: { id: string; code: string; name: string };
   requester: { id: string; name: string; email: string };
+  /**
+   * 신청자가 운영자(ADMIN·MANAGER·ENGINEER)인가 — 운영자가 자기 이름으로 등록한 SR 은 그 고객사의
+   * CLIENT_ADMIN 도 확인할 수 있다(sr-state-machine.canConfirmAsAcceptor). 서버가 신청자 역할로 계산한다.
+   */
+  requesterIsInternal: boolean;
   assignee: { id: string; name: string; email: string } | null;
   intakeBy: { id: string; name: string; email: string; image: string | null } | null;
   serviceCategory: {

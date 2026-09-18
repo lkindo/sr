@@ -35,7 +35,11 @@ interface SRStatusActionsProps {
   srNumber: string;
   status: SRStatus;
   userRoles: string[];
-  isRequestor: boolean;
+  /**
+   * '확인 완료' 버튼을 보일지 — 호출부가 `sr-state-machine.canViewerConfirmSR` 로 서버와 같은 규칙으로
+   * 판정해 넘긴다(신청자 본인, 또는 운영자가 등록한 SR 의 해당 고객사 CLIENT_ADMIN).
+   */
+  canConfirm: boolean;
   /**
    * 재오픈 버튼의 노출·비활성·이유. `getReopenAvailability`(sr-state-machine)로 계산해 넘긴다.
    * 커스텀 역할도 권한으로 재오픈할 수 있으므로(감사 4.3) 그 계산에 사용자 권한이 들어간다.
@@ -96,7 +100,7 @@ export function SRStatusActions({
   srNumber,
   status,
   userRoles,
-  isRequestor,
+  canConfirm,
   reopen,
 }: SRStatusActionsProps) {
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
@@ -307,10 +311,10 @@ export function SRStatusActions({
         );
 
       case 'COMPLETED':
-        // 완료 상태: 확인 완료 (신청자만), 재오픈 (관리자/신청자)
+        // 완료 상태: 확인 완료 (canConfirm — 신청자, 또는 운영자가 등록한 SR 의 고객사 관리자), 재오픈
         return (
           <>
-            {isRequestor && (
+            {canConfirm && (
               <Button
                 onClick={() => handleSimpleStatusChange('confirm')}
                 disabled={!!loadingAction}

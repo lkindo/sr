@@ -106,7 +106,8 @@ SR 상태 전이 규칙 및 제약 조건 검증:
 - IN_PROGRESS → ON_HOLD (hold 액션 - 보류 사유·예상 해제일 필수)
 - ON_HOLD → IN_PROGRESS (resume 액션)
 - IN_PROGRESS → COMPLETED (complete 액션 - 해결 내용 필수)
-- COMPLETED → CONFIRMED (confirm 액션 - 신청자만 가능)
+- COMPLETED → CONFIRMED (confirm 액션 - 신청자만 가능. 운영자가 자기 이름으로 등록한 SR 은 그 고객사
+  CLIENT_ADMIN 도 가능 — `33-sr-state-machine.spec.ts`)
 - REQUESTED → REJECTED (reject 액션 - 거절 사유 필수)
 - 잘못된 상태 전이 차단 검증
 - 상태 이력(Status History) 생성 확인

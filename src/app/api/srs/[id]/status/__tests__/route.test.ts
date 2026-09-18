@@ -17,10 +17,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   getSRById: vi.fn(),
   updateSR: vi.fn().mockResolvedValue({ id: 'sr-1', status: 'IN_PROGRESS' }),
+  isInternalRequester: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/services/sr.service', () => ({
-  srService: { getSRById: mocks.getSRById, updateSR: mocks.updateSR },
+  srService: {
+    getSRById: mocks.getSRById,
+    updateSR: mocks.updateSR,
+    isInternalRequester: mocks.isInternalRequester,
+  },
 }));
 
 vi.mock('@/lib/auth-wrapper', () => ({
@@ -36,24 +41,25 @@ function sr(overrides: Record<string, unknown> = {}) {
     id: 'sr-1',
     status: 'IN_PROGRESS',
     requesterId: REQUESTER_ID,
+    clientId: 'client-1',
     completedAt: null,
     ...overrides,
   };
 }
 
-const ctx = (userId = 'user-admin') => ({
-  session: { user: { id: userId, roles: ['ADMIN'], permissions: [], clientIds: [] } },
+const ctx = (userId = 'user-admin', roles = ['ADMIN'], clientIds: string[] = []) => ({
+  session: { user: { id: userId, roles, permissions: [], clientIds } },
   params: Promise.resolve({ id: 'sr-1' }),
 });
 
-const call = (body: unknown, userId?: string) =>
+const call = (body: unknown, userId?: string, roles?: string[], clientIds?: string[]) =>
   (PATCH as any)(
     new NextRequest('http://localhost/x', {
       method: 'PATCH',
       body: JSON.stringify(body),
       headers: { 'content-type': 'application/json' },
     }),
-    ctx(userId)
+    ctx(userId, roles, clientIds)
   );
 
 /** 며칠 전 시각. */
@@ -135,6 +141,48 @@ describe('확인(confirm)은 요청자 전용', () => {
 
     expect(res.status).toBe(403);
     expect(mocks.updateSR).not.toHaveBeenCalled();
+  });
+
+  // 소유자 결정(2026-09-18): 운영자가 자기 이름으로 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인한다.
+  describe('운영자가 등록한 SR', () => {
+    it('그 고객사의 CLIENT_ADMIN 은 확인할 수 있다', async () => {
+      mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
+      mocks.isInternalRequester.mockResolvedValueOnce(true);
+
+      const res = await call({ action: 'confirm' }, 'user-ca', ['CLIENT_ADMIN'], ['client-1']);
+
+      expect(res.status).toBe(200);
+      expect(mocks.isInternalRequester).toHaveBeenCalledWith(REQUESTER_ID);
+    });
+
+    it('다른 고객사의 CLIENT_ADMIN 은 403 이다', async () => {
+      mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
+      mocks.isInternalRequester.mockResolvedValueOnce(true);
+
+      const res = await call({ action: 'confirm' }, 'user-ca', ['CLIENT_ADMIN'], ['client-2']);
+
+      expect(res.status).toBe(403);
+      expect(mocks.updateSR).not.toHaveBeenCalled();
+    });
+
+    it('고객이 신청한 SR 이면 같은 고객사 CLIENT_ADMIN 이라도 403 이다', async () => {
+      mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
+      mocks.isInternalRequester.mockResolvedValueOnce(false);
+
+      const res = await call({ action: 'confirm' }, 'user-ca', ['CLIENT_ADMIN'], ['client-1']);
+
+      expect(res.status).toBe(403);
+      expect(mocks.updateSR).not.toHaveBeenCalled();
+    });
+
+    it('같은 고객사라도 CLIENT_USER 는 403 이다', async () => {
+      mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
+      mocks.isInternalRequester.mockResolvedValueOnce(true);
+
+      const res = await call({ action: 'confirm' }, 'user-cu', ['CLIENT_USER'], ['client-1']);
+
+      expect(res.status).toBe(403);
+    });
   });
 
   it('완료 상태가 아니면 확인할 수 없다', async () => {

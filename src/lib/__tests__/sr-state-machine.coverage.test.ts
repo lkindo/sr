@@ -175,13 +175,22 @@ describe('validateTransition - step 2: role gating', () => {
     expect(result.message).toContain('SR:INTAKE');
   });
 
-  it('enforces client-only roles on COMPLETED -> CONFIRMED', () => {
+  it('enforces the role gate on COMPLETED -> CONFIRMED', () => {
     // 역할 게이트만 보려면 신청자 조건을 만족시켜 두고 역할만 바꿔 가며 비교해야 한다.
-    // (확인 완료에는 역할 + 신청자 본인이 모두 필요하다.)
+    // (확인 완료에는 역할(또는 SR:CONFIRM) + 신청자 본인이 모두 필요하다.)
     const own = { requesterId: 'u1' };
+    // 소유자 결정(2026-09-18): 운영자가 자기 이름으로 등록한 SR 은 본인이 확인한다 — 시드 역할은 모두
+    // 역할 게이트를 통과하고, 실제 제한은 신원 검사다. 역할 게이트는 커스텀 역할에서만 의미가 있다.
     expect(
       validateTransition('COMPLETED', 'CONFIRMED', ['ENGINEER'], own, {}, [], 'u1').valid
+    ).toBe(true);
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['CUSTOM_ROLE'], own, {}, [], 'u1').valid
     ).toBe(false);
+    expect(
+      validateTransition('COMPLETED', 'CONFIRMED', ['CUSTOM_ROLE'], own, {}, ['SR:CONFIRM'], 'u1')
+        .valid
+    ).toBe(true);
     expect(
       validateTransition('COMPLETED', 'CONFIRMED', ['CLIENT_ADMIN'], own, {}, [], 'u1').valid
     ).toBe(true);

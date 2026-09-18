@@ -211,8 +211,9 @@ export const srCreateSchema = z.object({
   clientId: z.string().min(1, '고객사를 선택해주세요.'),
   /**
    * 대리 등록 — 운영자가 고객의 요청(전화·메일 등)을 대신 등록할 때 **실제 고객**을 신청자로 지정한다
-   * (소유자 결정 2026-09-18 D3). 확인완료는 신청자 본인만 하므로, 운영자 이름으로 등록하면 그 SR 은
-   * 고객이 확인할 수 없고 운영자도 확인할 수 없어 완료 상태에 머문다. 비우면 등록자 본인이 신청자다.
+   * (소유자 결정 2026-09-18 D3). 확인완료는 고객의 인수 행위라 고객이 신청자여야 고객이 확인한다. 비우면
+   * 등록자 본인이 신청자이고, 그 SR 은 등록한 운영자 또는 그 고객사의 CLIENT_ADMIN 이 확인한다
+   * (sr-state-machine.canConfirmAsAcceptor).
    * 내부 사용자만 지정할 수 있다(policies.canRegisterSROnBehalf).
    */
   requesterId: z.preprocess(emptyStringToUndefined, z.string().optional()),

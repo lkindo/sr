@@ -13,6 +13,7 @@ import {
   srViewerScopeWhere,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { validateTransition } from '@/lib/sr-state-machine';
 import { deleteAttachmentBlob } from '@/lib/storage';
 import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
 import { pushService } from '@/services/push.service';
@@ -236,7 +237,7 @@ describe('SRService', () => {
 
       const result = await srService.createSR(data, foreignUser);
 
-      expect(result).toEqual(createdSR);
+      expect(result).toEqual({ ...createdSR, requesterIsInternal: false });
       expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { id: 'client-foreign' } });
     });
 
@@ -286,13 +287,19 @@ describe('SRService', () => {
 
       // 1) 전역 카테고리
       vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ clientId: null } as any);
-      await expect(srService.createSR(data, mockUser)).resolves.toEqual(createdSR);
+      await expect(srService.createSR(data, mockUser)).resolves.toEqual({
+        ...createdSR,
+        requesterIsInternal: false,
+      });
 
       // 2) 동일 고객사 전용 카테고리
       vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
         clientId: 'client-1',
       } as any);
-      await expect(srService.createSR(data, mockUser)).resolves.toEqual(createdSR);
+      await expect(srService.createSR(data, mockUser)).resolves.toEqual({
+        ...createdSR,
+        requesterIsInternal: false,
+      });
     });
   });
 
@@ -805,7 +812,7 @@ describe('SRService', () => {
 
       const result = await srService.getSRDetailsById('sr-1', { viewer: mockUser });
 
-      expect(result).toEqual(mockDetails);
+      expect(result).toEqual({ ...mockDetails, requesterIsInternal: false });
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
       );
@@ -856,7 +863,7 @@ describe('SRService', () => {
 
       const result = await srService.createSR(data, mockUser);
 
-      expect(result).toEqual(mockCreatedSR);
+      expect(result).toEqual({ ...mockCreatedSR, requesterIsInternal: false });
     });
 
     describe('deleteSR', () => {
@@ -1234,6 +1241,68 @@ describe('SRService', () => {
 
       const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.intakeNotes).toBe('관리자 메모');
+    });
+
+    // 소유자 결정(2026-09-18): 운영자가 자기 이름으로 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인한다.
+    // 판정 자체는 sr-state-machine(canConfirmAsAcceptor)이 하고 여기서는 스텁이다 — 서비스가 그 판정에
+    // **신청자가 운영자인지**(DB 의 현재 역할)와 **행위자의 소속 고객사**를 넘기는지만 본다.
+    describe('확인완료 전이의 판정 재료', () => {
+      const completedByManager = {
+        ...existingIntakeSR,
+        status: 'COMPLETED',
+        requesterId: 'mgr-1',
+        resolutionDescription: '조치 완료',
+        completedAt: new Date(),
+      };
+
+      it('CONFIRMED 전이면 신청자의 역할을 읽어 requesterIsInternal 과 행위자 고객사를 넘긴다', async () => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue(completedByManager as never);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+          roles: [{ role: { name: 'MANAGER' } }],
+        } as never);
+        txMock.sR.update.mockResolvedValue({ ...completedByManager, status: 'CONFIRMED' });
+
+        await srService.updateSR('sr-1', { status: 'CONFIRMED' }, clientAdmin);
+
+        expect(prisma.user.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'mgr-1' } })
+        );
+        const call = vi.mocked(validateTransition).mock.calls.at(-1)!;
+        expect(call[1]).toBe('CONFIRMED');
+        expect(call[3]).toEqual(
+          expect.objectContaining({ requesterId: 'mgr-1', requesterIsInternal: true })
+        );
+        expect(call[6]).toBe('client-admin-1');
+        expect(call[7]).toEqual(['c-1']);
+      });
+
+      it('신청자가 고객 사용자면 requesterIsInternal 은 false 다', async () => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+          ...completedByManager,
+          requesterId: 'client-user-1',
+        } as never);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+          roles: [{ role: { name: 'CLIENT_USER' } }],
+        } as never);
+        txMock.sR.update.mockResolvedValue({ ...completedByManager, status: 'CONFIRMED' });
+
+        await srService.updateSR('sr-1', { status: 'CONFIRMED' }, clientAdmin);
+
+        const call = vi.mocked(validateTransition).mock.calls.at(-1)!;
+        expect(call[3]).toEqual(expect.objectContaining({ requesterIsInternal: false }));
+      });
+
+      it('확인이 아닌 전이에는 신청자 역할을 읽지 않는다', async () => {
+        vi.mocked(prisma.user.findUnique).mockClear();
+
+        await srService.updateSR('sr-1', { status: 'IN_PROGRESS' }, managerUser);
+
+        const call = vi.mocked(validateTransition).mock.calls.at(-1)!;
+        expect(call[3]).not.toHaveProperty('requesterIsInternal');
+        expect(prisma.user.findUnique).not.toHaveBeenCalledWith(
+          expect.objectContaining({ select: { roles: expect.anything() } })
+        );
+      });
     });
   });
 

@@ -1241,8 +1241,9 @@ const permissions = [
 > `TRANSITION_PERMISSIONS` 의 모든 문자열에 대응 행이 있음을 단언해 재발을 막는다.
 >
 > MANAGER 는 예전에 `{ resource: 'SR' }` 와일드카드로 부여받았으나, 확인(CONFIRM)은
-> 고객의 인수 행위이고 `TRANSITION_ROLES` 가 MANAGER 를 의도적으로 제외하므로
-> 와일드카드를 명시 목록으로 바꿔 `SR:CONFIRM` 만 제외했다.
+> 고객의 인수 행위라 권한을 최소로 두려고 와일드카드를 명시 목록으로 바꿔 `SR:CONFIRM` 만 제외했다.
+> MANAGER 가 **자기 이름으로 등록한** SR 의 확인은 `TRANSITION_ROLES` 의 역할 경로로 열려 있고
+> (2026-09-18 소유자 결정), 남의 SR 은 신원 검사(`sr-state-machine.canConfirmAsAcceptor`)가 막는다.
 
 ### 실행
 

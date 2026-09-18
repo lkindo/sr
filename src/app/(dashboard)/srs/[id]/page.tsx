@@ -37,6 +37,7 @@ import { priorityLabels, statusLabels } from '@/lib/constants/sr';
 import {
   canEditSRContentAt,
   canViewerAttachToSR,
+  canViewerConfirmSR,
   getReopenAvailability,
   isSROperator,
   SR_CONTENT_LOCKED_MESSAGE,
@@ -222,7 +223,15 @@ export default function SRDetailPage() {
                   srNumber={sr.srNumber}
                   status={sr.status as any}
                   userRoles={roles || []}
-                  isRequestor={session.user.id === sr.requesterId}
+                  canConfirm={canViewerConfirmSR(
+                    {
+                      id: session.user.id,
+                      roles: roles || [],
+                      permissions,
+                      clientIds: session.user.clientIds ?? [],
+                    },
+                    sr
+                  )}
                   reopen={reopen}
                 />
               </div>
