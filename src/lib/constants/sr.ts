@@ -63,33 +63,61 @@ export const priorityLabels: Record<string, string> = {
   LOW: '낮음',
 };
 
-// SR 상태 Badge variant 맵.
-//
-// 이 값들은 통합 전 세 벌(components/srs/constants.ts, clients/[id]/page.tsx,
-// dashboard/page.tsx)이 글자까지 동일했던 것을 그대로 옮긴 것이다. 통합의 전제가
-// "세 사본이 같다"였으므로 값을 바꾸면 통합이 아니라 리디자인이 된다 —
-// 배지 색을 조정하려면 별도 커밋에서 네 화면을 함께 보고 결정할 것.
-//
-// `my-requests/page.tsx` 의 네 번째 사본은 의도적으로 합치지 않았다. 값에 'outline'
-// 이 있고 라벨 문구도 달라서, 화면별 차이가 의도인지 표류인지 소유자 판단이 필요하다.
-export const statusBadgeVariants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  REQUESTED: 'secondary',
+/** 상태·우선순위 배지가 쓰는 Badge variant. */
+type SRBadgeVariant = 'default' | 'destructive' | 'outline';
+
+/**
+ * SR 상태 Badge variant — **모든 화면의 정본**(2026-09-18 소유자 결정 D16 1단계).
+ *
+ * 예전에는 SR 상세·상태 타임라인·내 요청·사용자 재배정 대화상자가 사본을 따로 들고 있었고, 내 요청 사본은 값이
+ * 달라 같은 '완료' 가 목록에서는 테두리 배지, 상세에서는 채움 배지로 보였다. 사본을 모두 이 맵으로 흡수했다.
+ *
+ * REQUESTED·ON_HOLD 는 예전 'secondary' 였는데 그 배경(`--secondary` #141414)이 카드(`--card` #141414)와 같아
+ * 카드·표 위에서 알약이 보이지 않고 글자만 떠 있었다. 테두리가 보이는 'outline' 으로 바꿨다.
+ * 상태별 의미색(파랑·초록·주황 등)은 2단계에서 소유자가 시안을 본 뒤 정한다.
+ */
+export const statusBadgeVariants: Record<string, SRBadgeVariant> = {
+  REQUESTED: 'outline',
   INTAKE: 'default',
   IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
+  ON_HOLD: 'outline',
   COMPLETED: 'default',
   CONFIRMED: 'default',
   REJECTED: 'destructive',
 };
 
-// SR 우선순위 Badge variant 맵. 위와 같은 근거로 통합 전 값을 보존한다.
-// 특히 HIGH 는 'destructive' 다 — CRITICAL 과 같은 강조를 주는 것이 원래 동작이다.
-export const priorityBadgeVariants: Record<string, 'default' | 'secondary' | 'destructive'> = {
+/**
+ * SR 우선순위 Badge variant — 정본(D16 1단계). 사본(SR 상세·내 요청·접수 카드 두 곳·재배정 대화상자)을 흡수했다.
+ * HIGH 는 'destructive' 다 — CRITICAL 과 같은 강조를 주는 것이 원래 동작이다.
+ * LOW 는 위 상태와 같은 이유(카드와 같은 배경)로 'secondary' 에서 'outline' 으로 바꿨다.
+ */
+export const priorityBadgeVariants: Record<string, SRBadgeVariant> = {
   CRITICAL: 'destructive',
   HIGH: 'destructive',
   MEDIUM: 'default',
-  LOW: 'secondary',
+  LOW: 'outline',
 };
+
+// 조회는 Map 으로 한다 — 객체 인덱싱은 'toString' 같은 프로토타입 키에 엉뚱한 값을 준다.
+const STATUS_BADGE_VARIANTS = new Map(Object.entries(statusBadgeVariants));
+const PRIORITY_BADGE_VARIANTS = new Map(Object.entries(priorityBadgeVariants));
+const PRIORITY_LABELS = new Map(Object.entries(priorityLabels));
+
+/** 상태 배지 variant. 모르는 값은 'outline'(알약은 보이되 강조하지 않음). */
+export function statusBadgeVariantOf(status: string | null | undefined): SRBadgeVariant {
+  return (status && STATUS_BADGE_VARIANTS.get(status)) || 'outline';
+}
+
+/** 우선순위 배지 variant. 모르는 값은 'outline'. */
+export function priorityBadgeVariantOf(priority: string | null | undefined): SRBadgeVariant {
+  return (priority && PRIORITY_BADGE_VARIANTS.get(priority)) || 'outline';
+}
+
+/** 우선순위 라벨. 모르는 값은 코드 그대로(숨기지 않는다). */
+export function priorityLabelOf(priority: string | null | undefined): string {
+  if (!priority) return '';
+  return PRIORITY_LABELS.get(priority) ?? priority;
+}
 
 /**
  * 활동 metadata 가운데 내부 사용자만 보는 키 — 마감일 조정 사유가 담긴다(2026-09-18 소유자 결정 D9).

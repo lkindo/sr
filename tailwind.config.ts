@@ -61,20 +61,8 @@ export default {
         'card-sm': '8px',
         'card-md': '12px',
         'card-lg': '16px',
-        // DESIGN.md Framer Scale
-        'framer-xs': '4px',
-        'framer-sm': '6px',
-        'framer-md': '10px',
-        'framer-lg': '15px',
-        'framer-xl': '20px',
-        'framer-xxl': '30px',
-        'framer-pill': '100px',
-      },
-      letterSpacing: {
-        'framer-xxl': '-0.05em',
-        'framer-xl': '-0.045em',
-        'framer-lg': '-0.035em',
-        'framer-md': '-0.03em',
+        // DESIGN.md 의 Framer radius·자간 스케일(framer-*)은 정의만 있고 쓰는 곳이 없어 걷어냈다(2026-09-18 결정 D16 —
+        // 치수의 정본은 fe-rules §3 과 이 파일이다).
       },
       boxShadow: {
         xs: '0px 1px 2px 0px rgba(0, 0, 0, 0.05)',

@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle, Clock, Pause, User, XCircle } from 'lucide-re
 
 import { Badge } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
-import { statusLabelOf } from '@/lib/constants/sr';
+import { statusBadgeVariantOf, statusLabelOf } from '@/lib/constants/sr';
 import { cn } from '@/lib/utils';
 
 interface StatusHistoryItem {
@@ -24,16 +24,6 @@ interface SRStatusTimelineProps {
   statusHistory: StatusHistoryItem[];
   currentStatus: string;
 }
-
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  REQUESTED: 'secondary',
-  INTAKE: 'default',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'default',
-  CONFIRMED: 'default',
-  REJECTED: 'destructive',
-};
 
 const statusIcons: Record<string, React.ElementType> = {
   REQUESTED: AlertCircle,
@@ -126,7 +116,7 @@ export function SRStatusTimeline({ statusHistory, currentStatus }: SRStatusTimel
                   <div className="flex-1 pb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge
-                        variant={statusColors[history.currentStatus]}
+                        variant={statusBadgeVariantOf(history.currentStatus)}
                         className={cn(isCurrentStatus && 'ring-2 ring-primary ring-offset-2')}
                       >
                         {statusLabelOf(history.currentStatus)}

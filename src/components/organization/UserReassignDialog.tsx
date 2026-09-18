@@ -14,6 +14,12 @@ import {
 } from '@/components/ui';
 import { Badge } from '@/components/ui';
 import { ScrollArea } from '@/components/ui';
+import {
+  priorityBadgeVariantOf,
+  priorityLabelOf,
+  statusBadgeVariantOf,
+  statusLabelOf,
+} from '@/lib/constants/sr';
 
 interface OngoingSR {
   id: string;
@@ -50,36 +56,15 @@ export function UserReassignDialog({
 }: UserReassignDialogProps) {
   const hasOngoingSRs = ongoingSRs.length > 0;
 
-  const getStatusBadge = (status: string) => {
-    const statusMap: Record<
-      string,
-      { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }
-    > = {
-      REQUESTED: { label: '요청됨', variant: 'secondary' },
-      INTAKE: { label: '접수중', variant: 'default' },
-      IN_PROGRESS: { label: '진행중', variant: 'default' },
-      ON_HOLD: { label: '보류', variant: 'outline' },
-    };
-    const statusInfo = statusMap[status] || { label: status, variant: 'secondary' as const };
-    return <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>;
-  };
+  // 라벨·색은 정본(@/lib/constants/sr)을 쓴다(2026-09-18 결정 D16 1단계). 예전 사본은 INTAKE 를 '접수중' 으로
+  // 적어 다른 화면의 '접수' 와 달랐다. 모르는 코드는 원문 그대로 보인다(숨기지 않는다).
+  const getStatusBadge = (status: string) => (
+    <Badge variant={statusBadgeVariantOf(status)}>{statusLabelOf(status)}</Badge>
+  );
 
-  const getPriorityBadge = (priority: string) => {
-    const priorityMap: Record<
-      string,
-      { label: string; variant: 'default' | 'destructive' | 'secondary' }
-    > = {
-      CRITICAL: { label: '긴급', variant: 'destructive' },
-      HIGH: { label: '높음', variant: 'destructive' },
-      MEDIUM: { label: '보통', variant: 'default' },
-      LOW: { label: '낮음', variant: 'secondary' },
-    };
-    const priorityInfo = priorityMap[priority] || {
-      label: priority,
-      variant: 'secondary' as const,
-    };
-    return <Badge variant={priorityInfo.variant}>{priorityInfo.label}</Badge>;
-  };
+  const getPriorityBadge = (priority: string) => (
+    <Badge variant={priorityBadgeVariantOf(priority)}>{priorityLabelOf(priority)}</Badge>
+  );
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>

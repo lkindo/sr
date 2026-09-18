@@ -2,9 +2,12 @@
 
 본 문서는 프론트엔드 레이어(Next.js App Router, Tailwind CSS)와 관련된 기술 헌법 및 UI 스타일 가이드이다.
 
-> **디자인 정본 선언(2026-08-15)**: 색상·타이포그래피·radius·spacing 토큰의 단일 정본은
-> **`docs/DESIGN.md`(다크 캔버스 체계)** 이며, 구현 진입점은 `src/app/globals.css`의 CSS 변수와
-> `tailwind.config.ts`다. 본 문서는 색상 값을 복제하지 않는다.
+> **디자인 정본 선언(2026-08-15, 2026-09-18 소유자 결정 D16 으로 범위를 좁힘)**: **색상 팔레트**(의미색 포함)의
+> 정본은 **`docs/DESIGN.md`(다크 캔버스 체계)** 이고, 구현 진입점은 `src/app/globals.css`의 CSS 변수와
+> `tailwind.config.ts`다. 본 문서는 색상 값을 복제하지 않는다. **치수**(radius·간격·폭)·타이포 크기·컴포넌트 규격의
+> 정본은 본 문서 §3 과 그 구현(`globals.css`·`tailwind.config.ts`·`src/components/ui/`)이다. DESIGN.md 의
+> rounded·spacing·typography 스케일과 status-badge·text-input 토큰은 마케팅 사이트 분석 원본의 값이라 참고 자료다.
+> 상태·우선순위 배지의 variant 정본은 `src/lib/constants/sr.ts` 다(화면에 사본을 두지 않는다).
 > 과거 이 문서가 규정하던 `SaaSify-UI-Kit` 라이트 인디고 팔레트는 **폐기한다** — 실측 결과
 > 코드에 인디고 계열 사용은 0건이고 캔버스는 `#090909`다. 정본이 둘이던 동안 개발자가
 > 라이트 스펙을 그대로 옮겨 적으면서 다크 화면 위 흰 글씨·흰 상자 같은 **판독 불가 UI**가
@@ -67,16 +70,20 @@ Linux Docker 빌드에서 module-not-found 로 터진다. 규칙을 하나로 �
 
 ---
 
-## 3. SaaSify UI Kit 디자인 시스템 명세
+## 3. 디자인 시스템 명세 (다크 캔버스)
 
-SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 위한 완성도 높은 디자인 시스템이며 신뢰감 있고 직관적(Clean and Trustworthy)인 인터페이스를 보장한다.
+표 중심 업무 앱의 규칙이다. 색은 §0 에 따라 DESIGN.md·`globals.css` 토큰을, 치수는 아래 규칙과 그 구현을 따른다.
 
 ### 3.1. 시각적 테마 및 분위기
 
 - 정보의 인지 오류를 줄이기 위한 명확한 타이포그래피 계층 구조 설계.
-- 컴포넌트 전반에 모서리 반경 8px를 기본값으로 사용하는 현대적인 미학 적용.
+- **모서리 반경**(실제 체계, 2026-09-18 재측정): 컨트롤(버튼·입력란·SelectTrigger) 8px, 카드 12px(`rounded-card-md`),
+  칩·배지 알약(`rounded-full`). 대화상자·탭·알림·모바일 목록 카드는 shadcn 기본 `rounded-lg`(10px)이고, 작은 내부
+  요소는 `rounded`(4px)·`rounded-sm`(6px)를 쓴다.
+  ⚠️ 목록·상세의 주 컨테이너가 쓰는 `.sr-card-template` 은 반경이 없다(0px, 각진 모서리) — 정리 대상이다.
 - 부드럽고 자연스럽게 스며드는 레이어 그림자(Elevation) 처리.
-- 시각적 일관성을 유지하는 간격 규칙(8px 배수) 적용.
+- **간격**: Tailwind 기본 4px 스케일을 쓴다. 조밀한 표·배지는 4px 단위(`gap-1`, `py-0.5` 등)가 필요하므로 8px 배수를
+  강제하지 않는다(예전 "8px 배수 엄격" 규정은 코드와 맞지 않아 2026-09-18 결정 D16 으로 폐기).
 
 ### 3.2. 색상 — 토큰만 사용한다
 
@@ -105,7 +112,8 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 
 ### 3.3. 타이포그래피 규칙 (Typography Rules)
 
-크기·행간·자간 **스케일의 정본은 `docs/DESIGN.md`** 다. 본 문서는 값을 복제하지 않는다.
+글자 크기는 Tailwind 기본 스케일(`text-xs`~`text-3xl`)을 쓴다. `docs/DESIGN.md` 의 크기·행간·자간 스케일은
+마케팅 사이트 원본의 값이라 참고 자료다(2026-09-18 결정 D16 — 적용된 적이 없다).
 
 > ⚠️ **이 앱에는 웹폰트가 하나도 로드되어 있지 않다**(2026-08-15 실측).
 > `src/app/layout.tsx` 에 `next/font` 선언이 없고 `tailwind.config.ts` 에 `fontFamily` 확장도 없다.
@@ -134,11 +142,17 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
   - `shadow-md`: 드롭다운·컨텍스트 메뉴·팝오버·Select 목록
   - `shadow-lg`: 다이얼로그·AlertDialog·시트, 하위(sub) 메뉴
   - `shadow-xl`: 현재 쓰는 곳이 없다.
-- **카드 모서리**: 기본 `rounded-[12px]`, 넓은 영역은 `rounded-[16px]`.
+- **카드 모서리**: `<Card>` 의 `rounded-card-md`(12px). `rounded-card-lg`(16px)는 정의만 있고 쓰는 곳이 없다.
 - **입력란**: 높이 `40px`(`h-10`), 모서리 반경 `rounded-[8px]`. 텍스트 영역은 최소 높이 `120px`.
-  ⚠️ `SelectTrigger` 는 아직 shadcn 기본값(`h-9` = 36px, `rounded-md`)이라 입력란과 나란히 두면 4px 낮다.
-  배경·테두리·플레이스홀더 색은 토큰(`bg-background` / `border-input` / `text-muted-foreground`)을 쓴다.
-- **태그/칩**: 완전 둥근 알약(`rounded-[9999px]`).
+  ⚠️ `SelectTrigger` 는 아직 shadcn 기본 높이(`h-9` = 36px)라 입력란과 나란히 두면 4px 낮다(반경은 `rounded-md` =
+  8px 로 같다).
+  배경은 투명(`bg-transparent` — 놓인 표면을 그대로 보인다)이고 테두리·플레이스홀더 색은 토큰(`border-input` /
+  `text-muted-foreground`)을 쓴다.
+- **태그/칩**: 완전 둥근 알약(`rounded-full`).
+- **상태·우선순위 배지**: 알약형 `Badge` 에 `src/lib/constants/sr.ts` 의 `statusBadgeVariantOf`·`priorityBadgeVariantOf`
+  가 준 variant 를 쓴다. 화면에 맵 사본을 두지 않는다 — 사본이 따로 놀아 같은 상태가 화면마다 다른 모양으로 보였다.
+  `secondary` variant 는 배경이 카드(`--card`)와 같은 색이라 카드·표 위에서 알약이 보이지 않는다 — 카드 위에 놓이는
+  배지에는 `outline` 을 쓴다. 상태별 의미색은 결정 D16 2단계(소유자 시안 확인 후)에서 정한다.
 - **아바타**: 20px(XS)~96px(3XL). 이미지가 없으면 `bg-primary/10` 위 이니셜.
 
 <sub>정정(2026-08-15): 이 절은 원래 `bg-[#4F46E5]`·`border-[#e2e8f0]`·`bg-[#f8fafc]` 같은
@@ -148,9 +162,10 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 
 ### 3.5. 레이아웃 원칙 (Layout Principles)
 
-- 그리드 간격: 모든 간격은 8px의 배수(`8px`, `16px`, `24px`, `32px`, `48px`, `64px`)를 엄격하게 적용하여 시각적 질서를 보장한다.
-- 배치 전략: 컴포넌트 간 여백은 보통 `24px` 혹은 `48px`을 적용하여 여백을 확보한다.
-- 최대 폭: 가로폭 `1440px` 단위의 데스크톱 해상도를 기준으로 레이아웃 정렬.
+- 그리드 간격: §3.1 대로 Tailwind 4px 스케일이다. 화면의 섹션 사이는 보통 `space-y-6`(24px)이다.
+- 최대 폭(실제 규칙, 2026-09-18 결정 D16): 본문은 기본적으로 폭 제한이 없다(`MainContent` 의 `w-full`) — 표가 넓은
+  화면을 쓴다. 대시보드형 화면(대시보드·내 요청)은 `.sr-content-area`(`max-w-7xl`, 1280px), 접수 화면은 `max-w-5xl`
+  이다. 예전 "1440px 기준" 규정은 코드에 반영된 적이 없어 폐기했다.
 
 ---
 
@@ -165,7 +180,7 @@ SaaSify UI 킷은 현대적이고 전문적인 IT/SaaS 제품을 구축하기 �
 > - ~~고급 타이포그래피(`Pretendard Variable`·`Geist`·`Noto Sans KR` 결합)~~ — 웹폰트 도입은 §3.3 이 말한 대로 별도 결정이다.
 
 - **Harmony Color Palette**: 브라우저 기본 색상 사용을 금지하며, `docs/DESIGN.md`가 정의한 다크 캔버스 토큰 계층 안에서 색을 고른다(§3.2 — hex 리터럴 금지).
-- **글래스모피즘 (Glassmorphism)**: 대시보드 카드, 모달, 네비게이션 바 등 주요 컨테이너 레이아웃에는 반투명 배경(`bg-white/10` 또는 `bg-black/30`), 백드롭 블러(`backdrop-blur-md`), 미세한 외곽선 테두리(`border border-white/20`)를 조합하여 깊이감을 극대화한다.
+- ~~**글래스모피즘 (Glassmorphism)**: 반투명 배경(`bg-white/10` 또는 `bg-black/30`), `backdrop-blur-md`, `border border-white/20`~~ — **폐기**(2026-09-18 결정 D16). 코드에 이 조합은 0건이고, 어두운 캔버스 위에 쓰면 기존 카드와 다른 밝은 반투명 패널이 생긴다. `.sr-card` 의 반투명·blur 도 `<Card>` 의 utility 에 밀려 그려지지 않는다 — 카드는 불투명 `bg-card` 다. `.sr-card:hover` 에 남아 있던 리프트(translateY·큰 그림자)는 같은 결정으로 걷어냈다.
 - **마이크로 애니메이션**: 클릭 가능한 인터랙티브 요소에는 부드러운 전환(`transition-colors` 또는 `transition-all`)을 둔다. hover 표현은 §3.4 를 따른다.
 
 ---

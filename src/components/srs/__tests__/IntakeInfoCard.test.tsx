@@ -143,7 +143,8 @@ describe('IntakeInfoCard — 우선순위', () => {
     CRITICAL: 'bg-destructive',
     HIGH: 'bg-destructive',
     MEDIUM: 'bg-primary/10',
-    LOW: 'bg-secondary',
+    // secondary 배경은 카드와 같은 색이라 알약이 보이지 않았다 — outline(결정 D16).
+    LOW: 'border-input',
   } as const;
 
   const priorityLabel = {

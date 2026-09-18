@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  priorityBadgeVariantOf,
+  priorityBadgeVariants,
+  priorityLabelOf,
   priorityLabels,
+  statusBadgeVariantOf,
   statusBadgeVariants,
   statusLabelOf,
   statusLabels,
@@ -81,5 +85,47 @@ describe('SR 상태 라벨 정본', () => {
       // undefined 를 렌더해 아무것도 안 뜨는 것보다 원문이 낫다.
       expect(statusLabelOf('SOMETHING_NEW')).toBe('SOMETHING_NEW');
     });
+  });
+});
+
+/**
+ * 상태·우선순위 배지 variant 정본(2026-09-18 소유자 결정 D16 1단계). 화면마다 들고 있던 사본을 흡수했으므로
+ * 모든 화면이 이 함수로 variant 를 얻는다.
+ */
+describe('배지 variant 정본', () => {
+  it('카드와 같은 배경인 secondary 를 쓰지 않는다 — 카드·표 위에서 알약이 보이지 않았다', () => {
+    expect(Object.values(statusBadgeVariants)).not.toContain('secondary');
+    expect(Object.values(priorityBadgeVariants)).not.toContain('secondary');
+  });
+
+  it('요청됨·보류는 테두리 배지, 거절은 빨강, 나머지는 채움 배지다', () => {
+    expect(statusBadgeVariantOf('REQUESTED')).toBe('outline');
+    expect(statusBadgeVariantOf('ON_HOLD')).toBe('outline');
+    expect(statusBadgeVariantOf('REJECTED')).toBe('destructive');
+    for (const status of ['INTAKE', 'IN_PROGRESS', 'COMPLETED', 'CONFIRMED']) {
+      expect(statusBadgeVariantOf(status), status).toBe('default');
+    }
+  });
+
+  it('모르는 값·빈 값은 outline 으로 보인다(알약은 보이되 강조하지 않는다)', () => {
+    expect(statusBadgeVariantOf('ESCALATED')).toBe('outline');
+    expect(statusBadgeVariantOf(undefined)).toBe('outline');
+    expect(priorityBadgeVariantOf('URGENT')).toBe('outline');
+    expect(priorityBadgeVariantOf(null)).toBe('outline');
+    // 프로토타입 키로 엉뚱한 값이 나오지 않는다.
+    expect(statusBadgeVariantOf('toString')).toBe('outline');
+  });
+
+  it('우선순위: 긴급·높음은 빨강, 보통은 채움, 낮음은 테두리다', () => {
+    expect(priorityBadgeVariantOf('CRITICAL')).toBe('destructive');
+    expect(priorityBadgeVariantOf('HIGH')).toBe('destructive');
+    expect(priorityBadgeVariantOf('MEDIUM')).toBe('default');
+    expect(priorityBadgeVariantOf('LOW')).toBe('outline');
+  });
+
+  it('우선순위 라벨은 모르는 값을 코드 그대로 보인다', () => {
+    expect(priorityLabelOf('HIGH')).toBe('높음');
+    expect(priorityLabelOf('URGENT')).toBe('URGENT');
+    expect(priorityLabelOf(undefined)).toBe('');
   });
 });

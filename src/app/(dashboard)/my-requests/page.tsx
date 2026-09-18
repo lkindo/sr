@@ -17,7 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, buildQuery, retryUnlessClientError } from '@/lib/api-client';
-import { statusLabelOf } from '@/lib/constants/sr';
+import {
+  priorityBadgeVariantOf,
+  priorityLabelOf,
+  statusBadgeVariantOf,
+  statusLabelOf,
+} from '@/lib/constants/sr';
 import type { PaginationMeta } from '@/lib/pagination';
 import { qk } from '@/lib/query-keys';
 
@@ -109,41 +114,10 @@ const STATUS_ORDER = [
 ] as const;
 
 /**
- * 상태 **라벨** 사본은 정본(@/lib/constants/sr)으로 흡수했다(2026-08-10).
- *
- * 7키 중 4키가 정본과 달랐다 — 같은 SR 이 이 화면에서는 '접수 대기'/'진행 중'/
- * '확인됨'/'거부됨' 인데 /srs 에서는 '요청됨'/'진행중'/'확인완료'/'거절' 로 보였다.
- * 목록에서 본 이름과 상세에서 본 이름이 달라 사용자가 다른 단계로 읽는다.
- * (IN_PROGRESS 는 공백 하나 차이라 눈으로는 같아 보이지만 exact 매칭에서는 다르다.)
- *
- * **색(statusColors)은 흡수하지 않는다.** 아래 맵에는 'outline' 이 있는데 정본
- * statusBadgeVariants 의 유니온에는 없다. 타입을 넓혀 억지로 합치면 통합이 아니라
- * 배지 색 리디자인이 되고, constants/sr.ts 가 소유자 판단으로 격리해 둔 항목을
- * 우회하게 된다. 색 통합은 네 화면을 함께 보고 결정할 별건이다.
+ * 상태·우선순위의 라벨과 배지 색은 정본(@/lib/constants/sr)을 쓴다. 라벨은 2026-08-10 에, 색은 2026-09-18
+ * (소유자 결정 D16 1단계)에 흡수했다 — 예전 사본은 INTAKE 를 맨 글자, 완료·확인완료를 테두리 배지로 그려 같은
+ * 상태가 SR 상세와 다른 모양으로 보였다.
  */
-const statusColors: Record<SRStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  REQUESTED: 'secondary',
-  INTAKE: 'secondary',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'outline',
-  CONFIRMED: 'outline',
-  REJECTED: 'destructive',
-};
-
-const priorityLabels: Record<string, string> = {
-  CRITICAL: '긴급',
-  HIGH: '높음',
-  MEDIUM: '보통',
-  LOW: '낮음',
-};
-
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
 
 const PAGE_SIZE = 20;
 
@@ -386,9 +360,11 @@ export default function MyRequestsPage() {
                       >
                         {sr.srNumber}
                       </Link>
-                      <Badge variant={statusColors[sr.status]}>{statusLabelOf(sr.status)}</Badge>
-                      <Badge variant={priorityColors[sr.requestedPriority]}>
-                        {priorityLabels[sr.requestedPriority]}
+                      <Badge variant={statusBadgeVariantOf(sr.status)}>
+                        {statusLabelOf(sr.status)}
+                      </Badge>
+                      <Badge variant={priorityBadgeVariantOf(sr.requestedPriority)}>
+                        {priorityLabelOf(sr.requestedPriority)}
                       </Badge>
                     </div>
                     <p className="text-lg font-medium text-foreground">{sr.title}</p>

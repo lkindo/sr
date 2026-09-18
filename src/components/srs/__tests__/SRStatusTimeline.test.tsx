@@ -85,11 +85,12 @@ describe('SRStatusTimeline — 빈 이력', () => {
 
 describe('SRStatusTimeline — 상태값 전수', () => {
   /** 배지 variant 별 대표 클래스. 실물 Badge 의 cva 정의에서 따온다. */
+  // REQUESTED·ON_HOLD 는 outline 이다 — secondary 배경은 카드와 같은 색이라 알약이 보이지 않았다(결정 D16).
   const expected = {
-    REQUESTED: 'bg-secondary',
+    REQUESTED: 'border-input',
     INTAKE: 'bg-primary/10',
     IN_PROGRESS: 'bg-primary/10',
-    ON_HOLD: 'bg-secondary',
+    ON_HOLD: 'border-input',
     COMPLETED: 'bg-primary/10',
     CONFIRMED: 'bg-primary/10',
     REJECTED: 'bg-destructive',

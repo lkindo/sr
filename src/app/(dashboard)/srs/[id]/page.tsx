@@ -33,7 +33,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useDeleteSR, useSRDetails } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
-import { priorityLabels, statusLabels } from '@/lib/constants/sr';
+import {
+  priorityBadgeVariantOf,
+  priorityLabels,
+  statusBadgeVariantOf,
+  statusLabels,
+} from '@/lib/constants/sr';
 import {
   canEditSRContentAt,
   canViewerAdjustDueDate,
@@ -43,23 +48,6 @@ import {
   isRejectBlockedAfterCompletion,
   SR_CONTENT_LOCKED_MESSAGE,
 } from '@/lib/sr-state-machine';
-
-const statusColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  REQUESTED: 'secondary',
-  INTAKE: 'default',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'default',
-  CONFIRMED: 'default',
-  REJECTED: 'destructive',
-};
-
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
 
 export default function SRDetailPage() {
   const params = useParams();
@@ -176,13 +164,13 @@ export default function SRDetailPage() {
                   */}
                   <Badge
                     data-testid="sr-status-badge"
-                    variant={statusColors[sr.status]}
+                    variant={statusBadgeVariantOf(sr.status)}
                     className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
                   >
                     {statusLabels[sr.status]}
                   </Badge>
                   <Badge
-                    variant={priorityColors[sr.requestedPriority]}
+                    variant={priorityBadgeVariantOf(sr.requestedPriority)}
                     className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
                   >
                     {priorityLabels[sr.requestedPriority]}
