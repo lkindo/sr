@@ -83,7 +83,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                     )}
                   >
                     {isActive && (
-                      <span className="absolute left-[35px] w-1.5 h-1.5 rounded-full bg-accent" />
+                      <span className="absolute left-[35px] w-1.5 h-1.5 rounded-full bg-accent-blue" />
                     )}
                     {Icon && <Icon className="h-4 w-4 mr-3 sr-menu-icon" />}
                     {item.title}
@@ -138,7 +138,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                     className={cn(
                       'flex items-center px-6 py-3 text-base font-semibold transition-colors',
                       isActiveTop
-                        ? 'text-foreground bg-muted/50 border-l-4 border-accent font-semibold'
+                        ? 'text-foreground bg-muted/50 border-l-4 border-accent-blue font-semibold'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >

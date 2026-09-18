@@ -138,7 +138,7 @@ export function IdleTimeoutProvider({ children }: { children: React.ReactNode })
           <AlertDialogFooter>
             <AlertDialogAction
               onClick={() => void handleLogout()}
-              className="bg-destructive hover:bg-destructive/90 text-white"
+              className="bg-destructive-solid hover:bg-destructive-solid/90 text-destructive-foreground"
             >
               로그아웃
             </AlertDialogAction>

@@ -35,6 +35,8 @@ export default {
         accent: {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
+          // 브랜드 액센트 블루 — 강조 표시(점·막대) 전용. hover/focus 배경에는 쓰지 않는다(대비 미달).
+          blue: 'hsl(var(--accent-blue))',
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',

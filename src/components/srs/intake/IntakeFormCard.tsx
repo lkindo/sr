@@ -58,7 +58,7 @@ export function IntakeFormCard({
       {/* 카드 헤더 */}
       <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[hsl(var(--sr-primary-dark))] text-white font-bold text-sm">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
             2
           </div>
           <div>

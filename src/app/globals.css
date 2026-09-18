@@ -74,8 +74,13 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 7.8%;
     --muted-foreground: 0 0% 60%; /* Ink Muted #999999 */
-    --accent: 204 100% 50%; /* Accent Blue #0099ff */
+    /* shadcn 프리미티브는 accent 를 "은은한 hover/focus 배경" 으로 쓴다(Select·Dropdown 항목, outline
+       버튼 hover 등). 예전에는 브랜드 액센트 #0099ff 에 흰 글씨를 매핑해서 그 모든 곳이 2.99:1 로 WCAG AA
+       (4.5:1) 에 못 미쳤고, DESIGN.md 의 "액센트 블루는 배경으로 쓰지 않는다" 와도 어긋났다.
+       hover/focus 는 Surface 2 로, 파란 강조가 꼭 필요한 곳(사이드바 활성 표시)은 --accent-blue 로 나눈다. */
+    --accent: 0 0% 11%; /* Surface 2 #1c1c1c */
     --accent-foreground: 0 0% 100%;
+    --accent-blue: 204 100% 50%; /* Accent Blue #0099ff — 점·막대 같은 강조 표시 전용 */
     --destructive: 0 84.2% 60.2%;
     /* 채움용. 흰 글씨를 얹었을 때 WCAG AA(4.5:1)를 넘도록 --destructive 보다 어둡다.
        --destructive 자체를 어둡게 하면 어두운 표면 위 텍스트 대비가 무너진다. */
@@ -118,8 +123,9 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 7.8%;
     --muted-foreground: 0 0% 60%;
-    --accent: 204 100% 50%;
+    --accent: 0 0% 11%;
     --accent-foreground: 0 0% 100%;
+    --accent-blue: 204 100% 50%;
     --destructive: 0 84.2% 60.2%;
     /* 채움용. 흰 글씨를 얹었을 때 WCAG AA(4.5:1)를 넘도록 --destructive 보다 어둡다.
        --destructive 자체를 어둡게 하면 어두운 표면 위 텍스트 대비가 무너진다. */
@@ -349,7 +355,7 @@
   }
 
   .sr-sidebar-item.active {
-    @apply text-foreground bg-muted font-semibold border-l-2 border-accent;
+    @apply text-foreground bg-muted font-semibold border-l-2 border-accent-blue;
   }
 
   .sr-sidebar-submenu {
@@ -364,7 +370,7 @@
   .sr-sidebar-submenu-item::before {
     content: '';
     @apply inline-block w-1.5 h-1.5 rounded-full;
-    @apply bg-accent mr-3;
+    @apply bg-accent-blue mr-3;
     @apply opacity-0;
   }
 

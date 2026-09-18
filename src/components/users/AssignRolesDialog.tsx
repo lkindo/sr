@@ -287,7 +287,7 @@ export function AssignRolesDialog({
                   >
                     {/* 선택 표시 아이콘 */}
                     {isSelected && (
-                      <div className="absolute top-0 right-0 bg-primary text-white p-1 rounded-bl-lg shadow-sm">
+                      <div className="absolute top-0 right-0 bg-primary text-primary-foreground p-1 rounded-bl-lg shadow-sm">
                         <Check className="w-3 h-3" />
                       </div>
                     )}

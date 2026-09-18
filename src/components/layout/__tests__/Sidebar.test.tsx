@@ -164,9 +164,14 @@ describe('Sidebar - showAllSections: 역할별 상위 메뉴', () => {
 
     render(<Sidebar showAllSections />);
 
-    expect(screen.getByRole('link', { name: 'Dashboard' }).className).toContain('border-accent');
+    // 활성 표시는 액센트 블루 막대다(--accent 는 hover 배경용 회색 — globals.css 주석).
+    expect(screen.getByRole('link', { name: 'Dashboard' }).className).toContain(
+      'border-accent-blue'
+    );
     expect(screen.getByRole('link', { name: '설정' }).className).toContain('text-muted-foreground');
-    expect(screen.getByRole('link', { name: '설정' }).className).not.toContain('border-accent');
+    expect(screen.getByRole('link', { name: '설정' }).className).not.toContain(
+      'border-accent-blue'
+    );
   });
 
   it('접힌 섹션은 열면 하위 메뉴가 나타난다', async () => {
@@ -325,7 +330,7 @@ describe('Sidebar - 활성 하위 메뉴 표시', () => {
 
     expect(activeLinkNames(container)).toEqual(['SR 전체 목록']);
     // 활성 항목에만 점 표시가 붙는다.
-    expect(container.querySelectorAll('span.bg-accent')).toHaveLength(1);
+    expect(container.querySelectorAll('span.bg-accent-blue')).toHaveLength(1);
   });
 
   it('하위 경로(/srs/{id})도 활성으로 본다', () => {
@@ -345,7 +350,7 @@ describe('Sidebar - 활성 하위 메뉴 표시', () => {
     const { container } = render(<Sidebar />);
 
     expect(activeLinkNames(container)).toEqual(['알림 설정']);
-    expect(container.querySelectorAll('span.bg-accent')).toHaveLength(1);
+    expect(container.querySelectorAll('span.bg-accent-blue')).toHaveLength(1);
   });
 
   it('활성 항목이 하나도 없을 수도 있다', () => {
@@ -356,7 +361,7 @@ describe('Sidebar - 활성 하위 메뉴 표시', () => {
     const { container } = render(<Sidebar />);
 
     expect(activeLinkNames(container)).toEqual([]);
-    expect(container.querySelectorAll('span.bg-accent')).toHaveLength(0);
+    expect(container.querySelectorAll('span.bg-accent-blue')).toHaveLength(0);
   });
 });
 
