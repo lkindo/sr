@@ -10,6 +10,7 @@ import { INTERNAL_ACTIVITY_METADATA_KEY } from '@/lib/constants/sr';
 import { BusinessRuleError, ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import {
+  DELETION_PROTECTED_ACCOUNT_MESSAGE,
   isCanonicalRole,
   isDeletionProtectedAccount,
   isImmutableRole,
@@ -761,10 +762,6 @@ export function ensureCanUpdateUser(user: AuthenticatedUser, targetUser: UserIde
     throw new ForbiddenError('사용자 수정 권한이 없습니다.');
   }
 }
-
-/** 운영 계정 삭제를 막을 때의 안내. 화면(UserActions)도 같은 문장을 쓴다. */
-export const DELETION_PROTECTED_ACCOUNT_MESSAGE =
-  '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.';
 
 export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity): void {
   if (targetUser.id === user.id) {

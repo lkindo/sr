@@ -17,7 +17,7 @@ import { UserDialog } from '@/components/users/UserDialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, ApiError, apiGet, apiPatch, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
-import { isDeletionProtectedAccount } from '@/lib/role-rules';
+import { DELETION_PROTECTED_ACCOUNT_MESSAGE, isDeletionProtectedAccount } from '@/lib/role-rules';
 import { getUserTypeBadgeVariant } from '@/lib/user-helpers';
 
 interface Permission {
@@ -379,8 +379,7 @@ export default function UserDetailPage() {
                 if (hasSystemRole) {
                   toast({
                     title: '삭제 제한',
-                    description:
-                      '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.',
+                    description: DELETION_PROTECTED_ACCOUNT_MESSAGE,
                     variant: 'destructive',
                   });
                   return;

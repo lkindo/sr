@@ -38,6 +38,10 @@ export function isDeletionProtectedAccount(roleNames: readonly string[]): boolea
   return roleNames.some((name) => DELETION_PROTECTED_ROLES.includes(name));
 }
 
+/** 운영 계정 삭제를 막을 때의 안내. 서버(policies.ensureCanDeleteUser)와 화면(UserActions·사용자 상세)이 함께 쓴다. */
+export const DELETION_PROTECTED_ACCOUNT_MESSAGE =
+  '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.';
+
 /** 설명·권한까지 아무것도 바꿀 수 없는 역할. ADMIN 은 전권이라 줄이거나 늘릴 대상이 아니다. */
 export function isImmutableRole(name: string): boolean {
   return name === 'ADMIN';
