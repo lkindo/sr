@@ -207,7 +207,19 @@ describe('Policy Functions', () => {
       expect(policies.canDeleteSR(outsider, sr)).toBe(false);
     });
 
-    it('canDeleteSR: 내부 사용자는 권한만으로 통과한다', () => {
+    it('canDeleteSR: MANAGER 는 권한만으로 통과한다', () => {
+      const manager = {
+        ...userNoPerms,
+        id: 'u-mgr',
+        roles: ['MANAGER'],
+        permissions: [PERMISSIONS.SR.DELETE],
+        clientIds: [],
+      };
+      expect(policies.canDeleteSR(manager, sr)).toBe(true);
+    });
+
+    it('canDeleteSR: SR:DELETE 를 받은 ENGINEER 도 자기에게 배정된 SR 만 지운다', () => {
+      // 역할별 권한은 ADMIN 이 조정하는 기본값이지만(헌법 §1.4) 배정 격리(§1.2)는 권한으로 풀리지 않는다.
       const engineer = {
         ...userNoPerms,
         id: 'u-eng',
@@ -215,7 +227,9 @@ describe('Policy Functions', () => {
         permissions: [PERMISSIONS.SR.DELETE],
         clientIds: [],
       };
-      expect(policies.canDeleteSR(engineer, sr)).toBe(true);
+      expect(policies.canDeleteSR(engineer, { ...sr, assigneeId: 'u-eng' })).toBe(true);
+      expect(policies.canDeleteSR(engineer, { ...sr, assigneeId: 'u-other' })).toBe(false);
+      expect(policies.canDeleteSR(engineer, { ...sr, assigneeId: null })).toBe(false);
     });
 
     it('ensureCan... throws ForbiddenError on failure', () => {

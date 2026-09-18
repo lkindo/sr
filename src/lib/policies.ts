@@ -228,9 +228,15 @@ export function canDeleteSR(user: AuthenticatedUser, sr: SRAccessFields): boolea
     return false;
   }
 
-  // 내부 사용자(MANAGER/ENGINEER)는 권한 보유만으로 통과한다.
+  // MANAGER 는 권한 보유만으로 통과한다.
+  if (user.roles?.includes('MANAGER')) return true;
+
+  // ENGINEER 는 권한을 받아도 자기에게 배정된 SR 만 — 배정 격리(헌법 §1.2)는 권한 조정으로 풀리지
+  // 않는다(§1.4). 예전에는 내부 사용자라는 이유로 통과해 보이지도 않는 남의 SR 까지 지울 수 있었다.
+  if (user.roles?.includes('ENGINEER')) return sr.assigneeId === user.id;
+
   // 외부 사용자는 자기 테넌트의 SR 로 제한한다.
-  return isInternalUser(user) || (user.clientIds?.includes(sr.clientId) ?? false);
+  return user.clientIds?.includes(sr.clientId) ?? false;
 }
 
 /**
