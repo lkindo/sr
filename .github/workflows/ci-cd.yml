@@ -364,10 +364,30 @@ jobs:
 
   # E2E 테스트
   #
-  # push(main) 와 pull_request 양쪽에서 **같은 전체 선택**을 돌린다.
-  # deploy.yml 이 이 워크플로의 최종 결론에 매달려 있으므로 여기서 실패하면 운영 배포가
-  # 차단된다. (deploy.yml 은 `workflow_run.event == 'push'` 를 요구하므로 PR 실행이
-  # 배포를 유발하지는 않는다.)
+  # push(main·dev) 와 pull_request 양쪽에서 **같은 전체 선택**을 돌린다.
+  # deploy.yml 이 이 워크플로의 최종 결론에 매달려 있으므로 여기서 실패하면 운영(main)·
+  # 스테이징(dev) 배포가 모두 차단된다. (deploy.yml 은 `workflow_run.event == 'push'` 를
+  # 요구하므로 PR 실행이 배포를 유발하지는 않는다.)
+  #
+  # ── dev push 를 넣은 이유 (2026-09-18) ────────────────────────────────────
+  # 예전 조건은 push(main) 과 PR 뿐이라 dev push 에서는 이 잡이 skip 됐다. skip 은
+  # 워크플로 결론을 실패로 만들지 않으므로 deploy.yml 이 그대로 test.lkindo.kr 에 배포했다.
+  # "dev 는 PR 로 들어오니 PR 에서 이미 돌았다" 는 가정도 성립하지 않았다 — dev 의 최근
+  # first-parent 커밋 60개 중 50개가 PR 없이 직접 push 된 것이다. 사람이 main 병합 전에
+  # 눈으로 확인하는 바로 그 환경이 E2E 없이 올라가고 있었다.
+  #
+  # ── dev→main PR 에서는 돌리지 않는다 (2026-09-18) ─────────────────────────
+  # dev→main PR 이 열려 있으면 dev push 한 번에 같은 커밋으로 push·pull_request 두 실행이
+  # 동시에 뜬다(실측: 33297fc 에 push 19:49:51Z, pull_request 19:49:52Z). concurrency 그룹이
+  # 달라 서로 취소하지 않으므로 E2E 가 두 번 돈다. 둘 중 **push(dev) 쪽을 남긴다** —
+  # deploy.yml 은 push 실행의 결론만 보므로 그쪽이 스테이징 배포의 게이트다.
+  # 잃는 것: main 에만 있는 커밋과 병합한 트리를 병합 **전에** 볼 기회. PR 실행은 병합 트리
+  # (refs/pull/N/merge)를 체크아웃하므로 push(dev) 와 완전한 중복은 아니다 — 실제로 PR #271 의
+  # 병합 트리는 dev head 와 9개 파일이 달랐다(dependabot 이 main 으로 직접 병합하던 시절의
+  # 커밋 때문. c0c419e 이후 dependabot 은 dev 로 연다). 운영은 병합 뒤
+  # push(main) E2E 가 여전히 막는다. main 에는 브랜치 보호(필수 체크)가 없어 이 PR 의
+  # skip 이 병합을 막거나 풀어 주지도 않는다.
+  # 포크의 `dev` 브랜치에서 온 PR 은 이 저장소의 push 실행이 없으므로 건너뛰지 않는다.
   #
   # ── PR 부분 실행을 걷어낸 이유 (2026-08-09) ──────────────────────────────
   # 예전에는 PR 에서 보안·권한 스펙 50개만 돌렸다. 근거는 "workers=1 · retries=2 로
@@ -390,8 +410,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'pull_request'
+      (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
+      (github.event_name == 'pull_request' &&
+        !(github.head_ref == 'dev' &&
+          github.event.pull_request.head.repo.full_name == github.repository))
     # 실측 기준 E2E 자체는 6분, 빌드·시드·브라우저 설치를 더해도 25분 안쪽이다.
     # 120분은 "언제 끝나는지 아무도 모르던" 시절의 값이라, 늘어지는 실패를 30분씩
     # 방치하는 역할만 했다.

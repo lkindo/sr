@@ -25,6 +25,13 @@ uploads_20260703_030000.tar.gz
 
 > 필요 시크릿: `SERVER_HOST`, `SERVER_USER`, `SERVER_KEY` (배포 워크플로와 동일).
 
+> **DB 사용자·DB 이름**: `backup.sh`·`restore.sh` 는 호출자가 `POSTGRES_USER` 를 넘기지 않으면
+> 저장소 루트의 `.env.prod`(배포가 매번 새로 쓰는 운영 보간 파일)에서 `POSTGRES_USER`·`POSTGRES_DB` 를
+> 읽는다. 파일이 없으면 기본값(`lkind`/`sr_db`)을 쓰고, 파일이 **있는데** 읽을 수 없거나
+> `POSTGRES_USER` 가 비어 있으면 오류로 멈춘다(엉뚱한 DB 를 백업·복구하지 않도록). 그래서 아래 cron·수동
+> 명령도 별도 설정 없이 운영 값을 따른다. 다른 파일을 쓰려면 `ENV_FILE=경로` 로 지정한다.
+> 이 동작은 main 에 병합된 뒤부터다(야간 백업은 main 의 스크립트를 서버에 복사해 실행한다).
+
 ### cron 대안 (GitHub 의존 없이)
 
 서버 crontab 에 직접 등록해도 된다:

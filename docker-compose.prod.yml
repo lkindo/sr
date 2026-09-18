@@ -90,8 +90,9 @@ services:
     container_name: sr-db
     restart: always
     environment:
-      # 자격증명은 저장소에 두지 않는다. compose 가 배포 호스트의 기본 env 파일
-      # (`/home/opc/sr/.env`) 또는 셸 환경에서 보간하며, 값이 비면 `:?` 문법으로
+      # 자격증명은 저장소에 두지 않는다. compose 는 `--env-file .env.prod`(배포가 GitHub
+      # Secret 으로 매번 새로 쓰는 파일) 또는 셸 환경에서 보간한다. 서버의 레거시 `.env` 는
+      # 쓰지 않는다(docs/SECRET_ROTATION.md 4절 2번). 값이 비면 `:?` 문법으로
       # 즉시 실패한다 — 안전하지 않은 기본값으로 조용히 뜨는 것을 막는다.
       # 주의: POSTGRES_* 는 데이터 디렉터리가 비어 있는 최초 기동에만 반영된다.
       # 기존 볼륨의 비밀번호 교체는 `ALTER USER` 로 수행한다(docs/SECRET_ROTATION.md).
