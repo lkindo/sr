@@ -25,6 +25,7 @@ import {
   ensureCanEditSRContent,
   ensureCanUpdateSR,
   isInternalUser,
+  srViewerScopeWhere,
   visibleCommentsWhere,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
@@ -1032,7 +1033,10 @@ export class SRService {
   }
 
   async getAllSRs(params: {
-    /** 필수다. 목록의 댓글 수를 이 사용자가 볼 수 있는 댓글로만 센다(`visibleCommentsWhere`). */
+    /**
+     * 필수다. 이 사용자가 볼 수 있는 SR 만 돌려주고(srViewerScopeWhere — 테넌트·담당자 스코프),
+     * 목록의 댓글 수도 이 사용자가 볼 수 있는 댓글로만 센다(`visibleCommentsWhere`).
+     */
     viewer: AuthenticatedUser;
     skip?: number;
     take?: number;
@@ -1044,7 +1048,8 @@ export class SRService {
     return prisma.sR.findMany({
       skip,
       take,
-      where: { ...SR_ALIVE, ...where },
+      // 스코프는 호출부의 where 와 키가 겹쳐도(예: clientId) 덮어써지지 않게 AND 로 묶는다.
+      where: { AND: [SR_ALIVE, srViewerScopeWhere(viewer), where ?? {}] },
       orderBy,
       select: {
         // Scalar fields (Optimized to exclude large text fields like description)
@@ -1090,8 +1095,14 @@ export class SRService {
     }) as unknown as Promise<SRListItem[]>;
   }
 
-  async countSRs(params?: { where?: Prisma.SRWhereInput }): Promise<number> {
-    return prisma.sR.count({ where: { ...SR_ALIVE, ...params?.where } });
+  /** 목록과 같은 스코프로 센다 — viewer 가 필수다(srViewerScopeWhere). */
+  async countSRs(params: {
+    viewer: AuthenticatedUser;
+    where?: Prisma.SRWhereInput;
+  }): Promise<number> {
+    return prisma.sR.count({
+      where: { AND: [SR_ALIVE, srViewerScopeWhere(params.viewer), params.where ?? {}] },
+    });
   }
 
   /**

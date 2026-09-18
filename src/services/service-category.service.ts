@@ -68,18 +68,19 @@ export class ServiceCategoryService {
    * 가 이를 인가 검사 없이 모든 인증 사용자에게 노출했다. 고객사 X 의 사용자가 고객사 Y 의
    * 서비스 카탈로그와 담당자 이메일을 그대로 읽을 수 있었다.
    *
-   * @param options.clientIds - `undefined` 면 전 고객사(내부 사용자 전용).
-   *   배열이면 그 고객사들 + 글로벌 카테고리(`clientId: null`)로 제한한다.
+   * @param options.clientIds - **필수다.** `null` 이면 전 고객사(내부 사용자 전용).
+   *   배열이면 그 고객사들 + 글로벌 카테고리(`clientId: null`)로 제한한다. 예전에는 선택 인자라 주석의
+   *   "반드시 지정" 과 시그니처가 서로 달랐다 — 빠뜨려도 컴파일되고 전 고객사가 반환됐다.
    * @param options.includeHandlerEmail - 담당자 이메일 포함 여부. 외부 사용자에게는
    *   내부 직원의 연락처를 주지 않는다.
    */
-  async getAll(options?: { clientIds?: string[]; includeHandlerEmail?: boolean }) {
-    const includeEmail = options?.includeHandlerEmail ?? true;
+  async getAll(options: { clientIds: string[] | null; includeHandlerEmail?: boolean }) {
+    const includeEmail = options.includeHandlerEmail ?? true;
     const handlerSelect = { id: true, name: true, email: includeEmail };
 
     return prisma.serviceCategory.findMany({
       where:
-        options?.clientIds === undefined
+        options.clientIds === null
           ? undefined
           : {
               isActive: true,

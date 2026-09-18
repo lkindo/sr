@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_MAX_AGE_SECONDS } from '@/auth.config';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS } from '@/lib/constants/session';
-import { ForbiddenError } from '@/lib/errors';
+import { ensureSystemAdmin } from '@/lib/policies';
 import { PASSWORD_POLICY_DESCRIPTION } from '@/lib/schemas';
 import { smtpServer } from '@/services/email.service';
 import { SystemSettings } from '@/types/settings';
@@ -23,9 +23,7 @@ import { SystemSettings } from '@/types/settings';
  */
 export const GET = withAuthAndRateLimit(
   async (_request: NextRequest, { session }) => {
-    if (!session?.user || !session.user.roles?.includes('ADMIN')) {
-      throw new ForbiddenError('관리자 권한이 필요합니다.');
-    }
+    ensureSystemAdmin(session.user, '관리자 권한이 필요합니다.');
 
     const settings: SystemSettings = {
       session: {

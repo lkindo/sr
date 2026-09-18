@@ -638,6 +638,35 @@ function holdsPermission(viewer: { permissions?: string[] }, permission: string)
   return (viewer.permissions ?? []).some((granted) => granted.toUpperCase() === permission);
 }
 
+/**
+ * 종결된 SR 상태 — 감사 추적 대상이라 첨부를 붙일 수 없다. 서버(policies.ensureCanAttachToSR)와 화면
+ * (첨부 업로드 버튼)이 이 목록 하나를 쓴다.
+ */
+export const SR_CLOSED_STATUSES: readonly string[] = ['COMPLETED', 'CONFIRMED', 'REJECTED'];
+
+/**
+ * 이 SR 에 첨부를 올릴 수 있는가 — policies.ensureCanAttachToSR 의 클라이언트 사본(canViewerUpdateSR 과
+ * 같은 이유로 사본이다). 수정 권한 + ATTACHMENT:CREATE(ADMIN 은 암묵) + 종결 상태가 아님.
+ * 예전에는 업로드 버튼을 누구에게나 보여 줘서, 종결 SR 이나 수정 권한이 없는 사용자는 누르면 반드시 403 이었다.
+ * ⚠️ 사본이므로 sr-reopen-availability.test.ts 가 서버 판정과 전 조합에서 대조한다.
+ */
+export function canViewerAttachToSR(
+  viewer: ReopenViewer,
+  sr: {
+    status: string;
+    clientId?: string | null;
+    requesterId?: string | null;
+    assigneeId?: string | null;
+  }
+): boolean {
+  if (SR_CLOSED_STATUSES.includes(sr.status)) return false;
+  if (!canViewerUpdateSR(viewer, sr)) return false;
+  return (
+    (viewer.roles ?? []).includes('ADMIN') ||
+    (viewer.permissions ?? []).includes('ATTACHMENT:CREATE')
+  );
+}
+
 /** 운영 관리자 역할 — 접수(트리아지)와 담당자 배정을 맡는다(헌법 §1.1·§4). */
 const OPERATIONS_MANAGER_ROLES = ['ADMIN', 'MANAGER'];
 

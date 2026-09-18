@@ -45,20 +45,20 @@ export const getCachedAssignableUsers = cache(
 /**
  * 고객사 필터에 넣을 목록.
  *
- * @param clientIds - `undefined` 면 전체(내부 사용자 전용).
+ * @param clientIds - **필수다**(헌법 §1.2). `null` 이면 전체(내부 사용자 전용).
  *   배열이면 그 고객사들로 제한한다. 빈 배열은 빈 결과다 — 소속 없는 외부 사용자에게
- *   전체 목록을 주지 않기 위해, `undefined` 와 `[]` 를 반드시 구분한다.
+ *   전체 목록을 주지 않기 위해, `null` 과 `[]` 를 반드시 구분한다. 예전에는 선택 인자라 빠뜨리면 전체였다.
  */
 export const getCachedClients = cache(
-  async (clientIds?: string[]) => {
-    if (clientIds !== undefined && clientIds.length === 0) {
+  async (clientIds: string[] | null) => {
+    if (clientIds !== null && clientIds.length === 0) {
       return [];
     }
 
     return prisma.client.findMany({
       where: {
         isActive: true,
-        ...(clientIds === undefined ? {} : { id: { in: clientIds } }),
+        ...(clientIds === null ? {} : { id: { in: clientIds } }),
       },
       select: {
         id: true,

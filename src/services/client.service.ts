@@ -153,13 +153,14 @@ export class ClientService {
    * 비활성화한 고객사가 SR 등록·수정 다이얼로그에 그대로 떴고, 고를 수도 있었다.
    * 그러면 고객사 비활성화가 신규 SR 에 대해 아무 의미가 없다.
    *
-   * @param clientIds 외부 사용자 스코프. 주어지면 그 안으로만 한정한다.
+   * @param clientIds 스코프 — **필수다**(헌법 §1.2). `null` 은 전체(내부 사용자 전용)이고, 배열이면 그 안으로만
+   *   한정한다(빈 배열이면 아무것도 없다). 예전에는 선택 인자라 호출부가 빠뜨리면 전 고객사가 반환됐다.
    * @param options.includeId 상태와 무관하게 반드시 포함할 고객사.
    *   수정 다이얼로그가 쓴다 — 이미 비활성이 된 고객사의 SR 을 열었을 때
    *   현재 값이 선택지에서 사라지면 셀렉트가 빈 채로 뜨고, 저장 시 무엇이
    *   들어갈지 알 수 없게 된다. 기존 값은 보이되 새로 고를 수는 없어야 한다.
    */
-  async getClientsForSelection(clientIds?: string[], options?: { includeId?: string }) {
+  async getClientsForSelection(clientIds: string[] | null, options?: { includeId?: string }) {
     const where: Prisma.ClientWhereInput = {
       OR: [{ isActive: true }, ...(options?.includeId ? [{ id: options.includeId }] : [])],
     };

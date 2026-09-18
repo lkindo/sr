@@ -13,6 +13,7 @@ import {
   canViewerIntakeSR,
   getRequiredFields,
   isSROperator,
+  SR_CLOSED_STATUSES,
   SR_CONTENT_LOCKED_MESSAGE,
 } from '@/lib/sr-state-machine';
 import { AuthenticatedUser } from '@/types/session';
@@ -44,6 +45,25 @@ export type RoleGrantFields = {
   name: string;
   permissions?: { permission: { resource: string; action: string } }[] | null;
 };
+
+/**
+ * 시스템 관리자(ADMIN)인가. ADMIN 전용 기능(시스템 설정·알림 아웃박스·사용자 완전 삭제)의 판정.
+ * 예전에는 각 라우트가 `roles.includes('ADMIN')` 을 직접 비교했다(헌법 §1.2 — 판정은 이 파일 한 곳).
+ */
+export function isSystemAdmin(user: AuthenticatedUser): boolean {
+  return user.roles?.includes('ADMIN') ?? false;
+}
+
+export function ensureSystemAdmin(user: AuthenticatedUser, message: string): void {
+  if (!isSystemAdmin(user)) {
+    throw new ForbiddenError(message);
+  }
+}
+
+/** 이 권한을 실제로 가졌는가 — ADMIN 은 모든 권한을 암묵적으로 가진다(서버 정책 전반과 같다). */
+export function hasEffectivePermission(user: AuthenticatedUser, permission: string): boolean {
+  return isSystemAdmin(user) || hasPermissionFlag(user, permission);
+}
 
 export function isInternalUser(user: AuthenticatedUser): boolean {
   return user.roles?.some((role) => INTERNAL_ROLES.includes(role)) ?? false;
@@ -215,8 +235,9 @@ export function canDeleteSR(user: AuthenticatedUser, sr: SRAccessFields): boolea
 
 /**
  * 종결된 SR. 이 상태의 레코드는 감사 추적 대상이므로 첨부를 붙일 수 없다.
+ * 목록은 화면(첨부 업로드 버튼)과 같이 쓰도록 sr-state-machine 에 있다.
  */
-const CLOSED_SR_STATUSES: ReadonlySet<string> = new Set(['COMPLETED', 'CONFIRMED', 'REJECTED']);
+const CLOSED_SR_STATUSES: ReadonlySet<string> = new Set(SR_CLOSED_STATUSES);
 
 /**
  * 첨부 업로드 권한.
@@ -876,6 +897,48 @@ export function resolveAssigneeScope(user: AuthenticatedUser): string | undefine
 }
 
 /**
+ * 사용자에게 역할을 직접 부여할 수 있는가 — ADMIN 또는 ROLE:ASSIGN(소유자 결정 2026-09-18 D5: 기본은 ADMIN
+ * 전용이고, ROLE:ASSIGN 은 ADMIN 이 커스텀 역할에 위임할 때만 쓴다). 대상·부여 범위(자기 자신·ADMIN 역할·
+ * 보유하지 않은 권한)는 ensureCanAssignRolesToUser 가 따로 판정한다.
+ */
+export function ensureCanAssignRoles(user: AuthenticatedUser): void {
+  if (!hasEffectivePermission(user, PERMISSIONS.ROLE.ASSIGN)) {
+    throw new ForbiddenError('역할을 할당할 권한이 없습니다.');
+  }
+}
+
+/** 사용자의 고객사 소속을 배정·변경·해제할 수 있는가 — 운영 관리자(ADMIN·MANAGER). */
+export function canManageUserClientAssignment(user: AuthenticatedUser): boolean {
+  return user.roles?.some((role) => role === 'ADMIN' || role === 'MANAGER') ?? false;
+}
+
+/**
+ * 고객사 소속 가입 신청을 승인·거절할 수 있는가.
+ * - 운영 관리자(ADMIN·MANAGER): 모든 고객사
+ * - 그 고객사의 CLIENT_ADMIN: 자기가 **승인된** 소속을 가진 고객사만(세션 clientIds 는 승인된 소속만 담는다)
+ */
+export function canApproveMembership(user: AuthenticatedUser, clientId: string): boolean {
+  if (canManageUserClientAssignment(user)) return true;
+  return (
+    (user.roles?.includes('CLIENT_ADMIN') ?? false) && (user.clientIds ?? []).includes(clientId)
+  );
+}
+
+export function ensureCanApproveMembership(user: AuthenticatedUser, clientId: string): void {
+  if (!canApproveMembership(user, clientId)) {
+    throw new ForbiddenError('이 고객사 소속을 승인/거절할 권한이 없습니다.');
+  }
+}
+
+/**
+ * SR 목록을 CSV 로 내보낼 수 있는가 — 내부 사용자만. 내보내는 범위는 목록·상세와 같은 담당자 스코프
+ * (resolveAssigneeScope — ENGINEER 는 자기 배정분)를 따른다.
+ */
+export function canExportSRs(user: AuthenticatedUser): boolean {
+  return isInternalUser(user);
+}
+
+/**
  * SR 을 접수(트리아지)할 수 있는가 — ADMIN·MANAGER, 또는 SR:INTAKE 를 받은 커스텀 역할.
  *
  * 소유자 결정(2026-09-18): 접수·담당자 배정은 운영 관리자의 공용 큐 업무다(헌법 §1.1·§4, PRD 배정 ❌).
@@ -883,7 +946,7 @@ export function resolveAssigneeScope(user: AuthenticatedUser): string | undefine
  * ENGINEER 가 API 로 미배정 SR 을 접수하며 담당자를 아무나(자기 포함) 지정할 수 있었다.
  * 시드 ENGINEER 의 SR:INTAKE 도 같은 결정으로 회수했다(마이그레이션 20260918120000).
  */
-function canIntakeSR(user: AuthenticatedUser): boolean {
+export function canIntakeSR(user: AuthenticatedUser): boolean {
   // 판정 본문은 화면과 같이 쓰는 sr-state-machine.canViewerIntakeSR 다.
   return canViewerIntakeSR(user);
 }
@@ -948,6 +1011,22 @@ export function ensureCanIntakeAssignedSR(
  * 고객사의 최근 SR(번호·제목·상태)과 SR 건수를 보여 줬다. 목록·상세와 같은 resolveAssigneeScope 를 쓴다.
  * 고객사 경계 자체는 canReadClient 가 판정하므로 여기서는 담당자 축만 더한다.
  */
+/**
+ * SR 목록·건수 조회의 기본 스코프 — 보는 사람이 볼 수 있는 SR 만.
+ *  - 외부 사용자: 소속(승인된) 고객사의 SR 만. 소속이 없으면 아무것도 보지 않는다(빈 IN).
+ *  - 담당자 스코프 사용자(ENGINEER): 자기 배정분만(resolveAssigneeScope).
+ *  - 그 외 내부 사용자: 제한 없음.
+ *
+ * 헌법 §1.2: 스코프는 선택 인자로 두지 않는다. 예전에는 srService.getAllSRs/countSRs 가 스코프를 호출부의
+ * `where` 에 맡겨서, 호출부가 빠뜨리면 전 테넌트가 반환됐다. 이제 두 함수가 필수 인자인 viewer 로부터 이
+ * 스코프를 직접 건다(호출부의 where 는 그 위에 AND 로 더해질 뿐이다).
+ */
+export function srViewerScopeWhere(user: AuthenticatedUser): Prisma.SRWhereInput {
+  if (!isInternalUser(user)) return { clientId: { in: user.clientIds ?? [] } };
+  const assigneeId = resolveAssigneeScope(user);
+  return assigneeId ? { assigneeId } : {};
+}
+
 export function clientSrScopeWhere(user: AuthenticatedUser): Prisma.SRWhereInput {
   const assigneeId = resolveAssigneeScope(user);
   return assigneeId ? { assigneeId } : {};

@@ -57,7 +57,7 @@ describe('UserService', () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
 
-      await userService.getAllUsers({ search: 'test' });
+      await userService.getAllUsers({ clientId: undefined, search: 'test' });
 
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -72,7 +72,7 @@ describe('UserService', () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
 
-      await userService.getAllUsers({});
+      await userService.getAllUsers({ clientId: undefined });
 
       expect(prisma.user.findMany).toHaveBeenCalled();
     });

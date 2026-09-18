@@ -305,7 +305,9 @@ describe('SRService Mutation Tests', () => {
   describe('countSRs', () => {
     it('should return count of SRs', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(5);
-      const result = await srService.countSRs();
+      const result = await srService.countSRs({
+        viewer: { ...mockUser, roles: ['ADMIN'] } as never,
+      });
       expect(result).toBe(5);
       expect(prisma.sR.count).toHaveBeenCalled();
     });

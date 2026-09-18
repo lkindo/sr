@@ -156,6 +156,9 @@ describe('SRService.updateSR Branches', () => {
     expect(vi.mocked(txMock.sR.update).mock.calls[0]![0].data.clientId).toBe('own-c');
   });
 
+  // 카테고리의 고객사 경계(ensureCategoryBelongsToClient)를 본다. 예전에는 외부 사용자로 불렀는데, 카테고리는
+  // 운영자 소유 값이라 운영자 필드 규칙이 먼저 거부해서 이 경계 검사에는 도달하지도 않은 채 통과했다.
+  // 카테고리를 바꿀 수 있는 운영자로 불러야 경계 검사 자체를 검증한다.
   it('타 고객사 전용 서비스 카테고리로 변경하면 ForbiddenError', async () => {
     vi.mocked(prisma.sR.findUnique).mockResolvedValue({
       id: 'sr-1',
@@ -169,8 +172,8 @@ describe('SRService.updateSR Branches', () => {
     vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
     await expect(
-      srService.updateSR('sr-1', { serviceCategoryId: 'cat-of-other-c' }, externalUser)
-    ).rejects.toThrow(ForbiddenError);
+      srService.updateSR('sr-1', { serviceCategoryId: 'cat-of-other-c' }, internalUser)
+    ).rejects.toThrow('다른 고객사의 서비스 카테고리는 사용할 수 없습니다.');
 
     // 경계 위반은 갱신 트랜잭션 이전에 차단되어야 한다.
     expect(prisma.$transaction).not.toHaveBeenCalled();

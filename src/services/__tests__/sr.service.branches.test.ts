@@ -293,7 +293,17 @@ describe('SRService Extended Branches', () => {
       expect(prisma.sR.findMany).toHaveBeenCalled();
 
       vi.mocked(prisma.sR.count).mockResolvedValue(0);
-      await srService.countSRs();
+      await srService.countSRs({
+        viewer: {
+          id: 'u1',
+          email: 'u1@example.com',
+          name: null,
+          image: null,
+          roles: ['ADMIN'],
+          permissions: [],
+          clientIds: [],
+        },
+      });
       expect(prisma.sR.count).toHaveBeenCalled();
 
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: '1' } as any);

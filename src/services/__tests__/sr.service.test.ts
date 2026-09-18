@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, BusinessRuleError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import {
+  ensureCanCreateSR,
+  ensureCanDeleteSR,
+  ensureCanUpdateSR,
+  srViewerScopeWhere,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { deleteAttachmentBlob } from '@/lib/storage';
 import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
@@ -616,41 +621,66 @@ describe('SRService', () => {
     });
   });
 
+  /**
+   * 건수·목록의 스코프는 필수 인자인 viewer 에서 직접 건다(policies.srViewerScopeWhere, 헌법 §1.2).
+   * 예전에는 스코프를 호출부의 where 에 맡겨서 호출부가 빠뜨리면 전 테넌트를 셌다. 호출부의 where 는 그 위에
+   * AND 로 더해질 뿐 스코프를 덮어쓰지 못한다(같은 clientId 키를 보내도).
+   */
   describe('countSRs', () => {
-    it('should return count of SRs', async () => {
-      vi.mocked(prisma.sR.count).mockResolvedValue(5);
+    const viewerOf = (roles: string[], clientIds: string[] = [], id = 'viewer-1') =>
+      ({ ...mockUser, id, roles, permissions: ['SR:READ'], clientIds }) as never;
 
-      const result = await srService.countSRs();
-
-      expect(result).toBe(5);
-    });
-
-    it('should return filtered count', async () => {
+    it('내부 운영자(ADMIN)는 호출부 필터만 걸린다', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(3);
-      const filter = { where: { status: 'IN_PROGRESS' as const } };
+      const where = { status: 'IN_PROGRESS' as const };
 
-      const result = await srService.countSRs(filter);
+      const result = await srService.countSRs({ viewer: viewerOf(['ADMIN']), where });
 
       expect(prisma.sR.count).toHaveBeenCalledWith({
-        where: { deletedAt: null, ...filter.where },
+        where: { AND: [{ deletedAt: null }, {}, where] },
       });
       expect(result).toBe(3);
     });
 
-    it('should pass complex where clauses to count', async () => {
+    it('외부 사용자는 호출부가 스코프를 빠뜨려도 소속 고객사로만 센다', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(1);
-      const params = {
-        where: {
-          AND: [{ clientId: 'c-1' }, { status: 'REQUESTED' as const }],
-        },
-      };
 
-      const result = await srService.countSRs(params);
+      await srService.countSRs({ viewer: viewerOf(['CLIENT_USER'], ['c-1']) });
 
       expect(prisma.sR.count).toHaveBeenCalledWith({
-        where: { deletedAt: null, ...params.where },
+        where: { AND: [{ deletedAt: null }, { clientId: { in: ['c-1'] } }, {}] },
       });
-      expect(result).toBe(1);
+    });
+
+    it('호출부가 다른 고객사를 지정해도 스코프를 덮어쓰지 못한다(AND)', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+      const where = { clientId: 'c-other' };
+
+      await srService.countSRs({ viewer: viewerOf(['CLIENT_ADMIN'], ['c-1']), where });
+
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { clientId: { in: ['c-1'] } }, where] },
+      });
+    });
+
+    it('ENGINEER 는 자기 배정분만 센다', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(2);
+
+      await srService.countSRs({ viewer: viewerOf(['ENGINEER'], [], 'eng-1') });
+
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { assigneeId: 'eng-1' }, {}] },
+      });
+    });
+
+    it('소속이 없는 외부 사용자는 아무것도 세지 않는다(빈 IN)', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+
+      await srService.countSRs({ viewer: viewerOf(['CLIENT_USER'], []) });
+
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { clientId: { in: [] } }, {}] },
+      });
     });
   });
 
@@ -711,8 +741,13 @@ describe('SRService', () => {
 
       const result = await srService.getAllSRs({ viewer: mockUser, ...params });
 
+      // 스코프는 viewer 에서 건다(srViewerScopeWhere) — 호출부 where 는 그 위에 AND 로 더해진다.
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ ...params, where: { deletedAt: null, ...params.where } })
+        expect.objectContaining({
+          skip: 0,
+          take: 10,
+          where: { AND: [{ deletedAt: null }, srViewerScopeWhere(mockUser), params.where] },
+        })
       );
       expect(result).toEqual(mockSRs);
     });
@@ -728,7 +763,10 @@ describe('SRService', () => {
 
       // where 를 주지 않아도 soft delete 필터는 항상 붙는다(db-rules §2).
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ ...params, where: { deletedAt: null } })
+        expect.objectContaining({
+          ...params,
+          where: { AND: [{ deletedAt: null }, srViewerScopeWhere(mockUser), {}] },
+        })
       );
     });
 
@@ -749,7 +787,9 @@ describe('SRService', () => {
       await srService.getAllSRs({ viewer: mockUser, ...params });
 
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ ...params, where: { deletedAt: null, ...params.where } })
+        expect.objectContaining({
+          where: { AND: [{ deletedAt: null }, srViewerScopeWhere(mockUser), params.where] },
+        })
       );
     });
   });

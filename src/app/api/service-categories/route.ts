@@ -19,7 +19,7 @@ export const GET = withAuthAndRateLimit(async (_request: NextRequest, { session 
 
   const categories = await serviceCategoryService.getAll(
     internal
-      ? { includeHandlerEmail: true }
+      ? { clientIds: null, includeHandlerEmail: true }
       : { clientIds: session.user.clientIds ?? [], includeHandlerEmail: false }
   );
 

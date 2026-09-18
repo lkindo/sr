@@ -3,11 +3,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { ForbiddenError } from '@/lib/errors';
-import { INTERNAL_ROLES } from '@/lib/policies';
+import { canManageUserClientAssignment, INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SR_ALIVE } from '@/lib/prisma-selects';
 import { clientAssignSchema } from '@/lib/schemas';
 import { auditService } from '@/services/audit.service';
+import type { AuthenticatedUser } from '@/types/session';
 
 /**
  * 고객사 할당/변경 요청 바디 스키마
@@ -16,15 +17,16 @@ import { auditService } from '@/services/audit.service';
 /**
  * 고객사 소속 관리 권한 판정 (ADMIN, MANAGER만 가능)
  */
-async function ensureCanManageUserClient(actorId: string): Promise<void> {
+async function ensureCanManageUserClient(actor: AuthenticatedUser): Promise<void> {
+  // 역할은 세션이 아니라 DB 에서 다시 읽는다 — 역할 회수가 세션 갱신(최대 60초)을 기다리지 않고 바로
+  // 반영되게 한 기존 동작을 유지한다. 판정 자체는 policies.canManageUserClientAssignment 다.
   const userRoles = await prisma.userRole.findMany({
-    where: { userId: actorId },
+    where: { userId: actor.id },
     include: { role: true },
   });
+  const freshActor = { ...actor, roles: userRoles.map((ur) => ur.role.name) };
 
-  const hasPermission = userRoles.some((ur) => ['ADMIN', 'MANAGER'].includes(ur.role.name));
-
-  if (!hasPermission) {
+  if (!canManageUserClientAssignment(freshActor)) {
     throw new ForbiddenError('권한이 없습니다');
   }
 }
@@ -38,7 +40,7 @@ export const DELETE = withAuthAndRateLimit(
     const { id: userId } = await params;
 
     // 권한 확인 (ADMIN, MANAGER만 가능)
-    await ensureCanManageUserClient(session.user.id);
+    await ensureCanManageUserClient(session.user);
 
     // 기존 UserClient 관계 확인 및 삭제
     const existingRelation = await prisma.userClient.findFirst({
@@ -108,7 +110,7 @@ export const PATCH = withAuthAndRateLimit(
     const { clientId, force } = await validateRequestBody(request, clientAssignSchema);
 
     // 권한 확인 (ADMIN, MANAGER만 가능)
-    await ensureCanManageUserClient(session.user.id);
+    await ensureCanManageUserClient(session.user);
 
     // 고객사 존재 확인
     const client = await prisma.client.findUnique({

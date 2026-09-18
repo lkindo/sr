@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { canUpdateSR, type SRAccessFields } from '@/lib/policies';
+import { canUpdateSR, ensureCanAttachToSR, type SRAccessFields } from '@/lib/policies';
 import {
+  canViewerAttachToSR,
   canViewerUpdateSR,
   getReopenAvailability,
   getReopenBlock,
@@ -480,5 +481,69 @@ describe('getReopenAvailability', () => {
     expect(
       getReopenAvailability('COMPLETED', { ...freshSR, requesterId: '' }, anonymous, NOW)
     ).toEqual({ visible: false, block: null });
+  });
+});
+
+// ============================================================================
+// 첨부 업로드 사본 — policies.ensureCanAttachToSR 과의 동치
+// ============================================================================
+
+describe('canViewerAttachToSR ↔ policies.ensureCanAttachToSR 동치', () => {
+  const roleSets = [[], ['ADMIN'], ['MANAGER'], ['ENGINEER'], ['CLIENT_ADMIN'], ['CLIENT_USER']];
+  const permissionSets = [
+    [],
+    ['SR:UPDATE'],
+    ['SR:UPDATE', 'ATTACHMENT:CREATE'],
+    ['SR:UPDATE_SELF', 'ATTACHMENT:CREATE'],
+    ['ATTACHMENT:CREATE'],
+  ];
+  const statuses = [
+    'REQUESTED',
+    'INTAKE',
+    'IN_PROGRESS',
+    'ON_HOLD',
+    'COMPLETED',
+    'CONFIRMED',
+    'REJECTED',
+  ];
+  const people = ['viewer', 'someone-else'];
+
+  it('역할·권한·상태·신청자·담당자 전 조합에서 결과가 같다', () => {
+    let compared = 0;
+    for (const roles of roleSets) {
+      for (const permissions of permissionSets) {
+        for (const status of statuses) {
+          for (const requesterId of people) {
+            for (const assigneeId of [...people, null]) {
+              const viewer: ReopenViewer = {
+                id: 'viewer',
+                roles,
+                permissions,
+                clientIds: ['client-1'],
+              };
+              const sr = { id: 'sr-1', clientId: 'client-1', requesterId, assigneeId, status };
+              const user: AuthenticatedUser = {
+                ...viewer,
+                email: 'viewer@example.com',
+                name: null,
+                image: null,
+              };
+              let server = true;
+              try {
+                ensureCanAttachToSR(user, sr as SRAccessFields & { status: string });
+              } catch {
+                server = false;
+              }
+              expect(
+                canViewerAttachToSR(viewer, sr),
+                JSON.stringify({ roles, permissions, status, requesterId, assigneeId })
+              ).toBe(server);
+              compared++;
+            }
+          }
+        }
+      }
+    }
+    expect(compared).toBe(roleSets.length * permissionSets.length * statuses.length * 2 * 3);
   });
 });

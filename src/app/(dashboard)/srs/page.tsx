@@ -61,7 +61,7 @@ export default async function SRsPage({ searchParams }: Props) {
 
   // Start fetching filter options early (parallel execution).
   // 외부 사용자에게는 소속 고객사만 넘긴다 — `undefined`(전체)와 `[]`(없음)는 다르다.
-  const clientsPromise = getCachedClients(isAdminManagerEngineer ? undefined : userClientIds);
+  const clientsPromise = getCachedClients(isAdminManagerEngineer ? null : userClientIds);
   const usersPromise = getCachedAssignableUsers();
 
   // 페이지네이션 파라미터는 /api/srs와 동일한 검증 규칙(lib/pagination)을 공유합니다.
@@ -193,7 +193,7 @@ export default async function SRsPage({ searchParams }: Props) {
       skip: (page - 1) * itemsPerPage,
       take: itemsPerPage,
     }),
-    srService.countSRs({ where }), // 현재 활성화된 필터/검색 적용 결과 총 개수
+    srService.countSRs({ viewer: session.user, where }), // 현재 활성화된 필터/검색 적용 결과 총 개수
     // 배지 5종을 한 번의 집계로 얻는다(이슈 #249). 예전에는 countSRs 를 다섯 번 불러
     // 같은 행 집합을 다섯 번 스캔했다.
     srService.getSRBadgeCounts({

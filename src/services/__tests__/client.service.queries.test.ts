@@ -59,7 +59,7 @@ describe('ClientService Coverage', () => {
     it('비활성 고객사를 제외한다', async () => {
       vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
 
-      await clientService.getClientsForSelection();
+      await clientService.getClientsForSelection(null);
 
       expect(prisma.client.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { OR: [{ isActive: true }] } })
@@ -69,7 +69,7 @@ describe('ClientService Coverage', () => {
     it('includeId 로 지정한 고객사는 비활성이어도 남긴다', async () => {
       vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
 
-      await clientService.getClientsForSelection(undefined, { includeId: 'c-off' });
+      await clientService.getClientsForSelection(null, { includeId: 'c-off' });
 
       expect(prisma.client.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: { OR: [{ isActive: true }, { id: 'c-off' }] } })

@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
-import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
+import { isInternalUser, resolveAssigneeScope } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { formatISODateInAppZone } from '@/lib/timezone';
@@ -16,7 +16,7 @@ export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     const userId = session.user.id;
     const userRoles = session.user.roles || [];
-    const isAdminManagerEngineer = userRoles.some((role: string) => INTERNAL_ROLES.includes(role));
+    const isAdminManagerEngineer = isInternalUser(session.user);
     const isEngineer = userRoles.includes('ENGINEER');
 
     /**

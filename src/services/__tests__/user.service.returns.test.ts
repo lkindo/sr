@@ -136,7 +136,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
 
     it('applies isActive, roleId and userType=CLIENT filters', async () => {
       await userService.getAllUsers(
-        { isActive: 'true', roleId: 'r1', userType: 'CLIENT' },
+        { clientId: undefined, isActive: 'true', roleId: 'r1', userType: 'CLIENT' },
         { skip: 0, take: 10 }
       );
 

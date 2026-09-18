@@ -827,3 +827,67 @@ describe('canReceiveRealtimeEvent', () => {
     );
   });
 });
+
+/**
+ * 라우트가 역할 문자열을 직접 비교하던 판정을 옮긴 것(헌법 §1.2 — 인가 판정은 policies.ts 한 곳).
+ * 동작은 옮기기 전과 같아야 한다.
+ */
+describe('라우트에서 옮겨 온 인가 판정', () => {
+  const user = (roles: string[], permissions: string[] = [], clientIds: string[] = []) => ({
+    id: 'u',
+    email: 'u@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions,
+    clientIds,
+  });
+
+  it('ADMIN 전용 기능은 ADMIN 만 통과한다(시스템 설정·알림 아웃박스·사용자 완전 삭제)', () => {
+    expect(policies.isSystemAdmin(user(['ADMIN']))).toBe(true);
+    for (const role of ['MANAGER', 'ENGINEER', 'CLIENT_ADMIN', 'CLIENT_USER']) {
+      expect(policies.isSystemAdmin(user([role], ['SETTINGS:UPDATE']))).toBe(false);
+    }
+    expect(() => policies.ensureSystemAdmin(user(['MANAGER']), '관리자 전용')).toThrow(
+      '관리자 전용'
+    );
+  });
+
+  it('ADMIN 은 모든 권한을 암묵적으로 가진다 — 그 외에는 권한 플래그가 있어야 한다', () => {
+    expect(policies.hasEffectivePermission(user(['ADMIN']), 'ANY:THING')).toBe(true);
+    expect(policies.hasEffectivePermission(user(['MANAGER'], ['SR:READ']), 'SR:READ')).toBe(true);
+    expect(policies.hasEffectivePermission(user(['MANAGER'], ['SR:READ']), 'SR:DELETE')).toBe(
+      false
+    );
+  });
+
+  it('역할 부여는 ADMIN 또는 ROLE:ASSIGN 만(D5 — MANAGER 는 역할만으로 통과하지 않는다)', () => {
+    expect(() => policies.ensureCanAssignRoles(user(['ADMIN']))).not.toThrow();
+    expect(() => policies.ensureCanAssignRoles(user(['CUSTOM'], ['ROLE:ASSIGN']))).not.toThrow();
+    expect(() => policies.ensureCanAssignRoles(user(['MANAGER'], ['USER:UPDATE']))).toThrow(
+      '역할을 할당할 권한이 없습니다.'
+    );
+  });
+
+  it('고객사 소속 배정·해제는 운영 관리자(ADMIN·MANAGER)만', () => {
+    expect(policies.canManageUserClientAssignment(user(['ADMIN']))).toBe(true);
+    expect(policies.canManageUserClientAssignment(user(['MANAGER']))).toBe(true);
+    expect(policies.canManageUserClientAssignment(user(['ENGINEER']))).toBe(false);
+    expect(policies.canManageUserClientAssignment(user(['CLIENT_ADMIN'], [], ['c1']))).toBe(false);
+  });
+
+  it('가입 승인은 운영 관리자는 모든 고객사, CLIENT_ADMIN 은 자기 고객사만', () => {
+    expect(policies.canApproveMembership(user(['MANAGER']), 'c9')).toBe(true);
+    expect(policies.canApproveMembership(user(['CLIENT_ADMIN'], [], ['c1']), 'c1')).toBe(true);
+    expect(policies.canApproveMembership(user(['CLIENT_ADMIN'], [], ['c1']), 'c9')).toBe(false);
+    expect(policies.canApproveMembership(user(['CLIENT_USER'], [], ['c1']), 'c1')).toBe(false);
+    expect(() => policies.ensureCanApproveMembership(user(['ENGINEER']), 'c1')).toThrow(
+      '이 고객사 소속을 승인/거절할 권한이 없습니다.'
+    );
+  });
+
+  it('CSV 내보내기는 내부 사용자만', () => {
+    expect(policies.canExportSRs(user(['ENGINEER']))).toBe(true);
+    expect(policies.canExportSRs(user(['CLIENT_ADMIN'], ['SR:READ'], ['c1']))).toBe(false);
+  });
+});

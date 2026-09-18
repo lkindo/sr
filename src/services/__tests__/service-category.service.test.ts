@@ -78,7 +78,7 @@ describe('ServiceCategoryService', () => {
       const mockCategories = [mockCategory];
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue(mockCategories as any);
 
-      const result = await service.getAll();
+      const result = await service.getAll({ clientIds: null });
 
       expect(result).toEqual(mockCategories);
       expect(prisma.serviceCategory.findMany).toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe('ServiceCategoryService', () => {
     it('빈 배열을 반환할 수 있어야 함', async () => {
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([]);
 
-      const result = await service.getAll();
+      const result = await service.getAll({ clientIds: null });
 
       expect(result).toEqual([]);
       expect(prisma.serviceCategory.findMany).toHaveBeenCalled();

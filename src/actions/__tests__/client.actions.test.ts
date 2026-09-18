@@ -285,7 +285,8 @@ describe('client.actions coverage', () => {
       expect(result.data).toEqual(clients);
       // Internal users get undefined (no client-id filter).
       // 2번째 인자는 includeId 옵션 — 수정 다이얼로그가 현재 고객사를 유지할 때만 채운다.
-      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(undefined, {
+      // 내부 사용자는 '전체' 를 명시적인 null 로 넘긴다(스코프를 선택 인자로 두지 않는다 — 헌법 §1.2).
+      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(null, {
         includeId: undefined,
       });
     });
@@ -331,7 +332,8 @@ describe('client.actions coverage', () => {
 
       await getClientsForSelection('c-inactive');
 
-      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(undefined, {
+      // 내부 사용자는 '전체' 를 명시적인 null 로 넘긴다(스코프를 선택 인자로 두지 않는다 — 헌법 §1.2).
+      expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(null, {
         includeId: 'c-inactive',
       });
     });

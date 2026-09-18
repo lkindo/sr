@@ -162,13 +162,17 @@ export class UserService {
   }
 
   async getAllUsers(
-    filters?: {
+    /**
+     * `clientId` 는 **필수 키**다(헌법 §1.2 — 스코프를 선택 인자로 두지 않는다). `undefined` 는 전체(내부 사용자),
+     * `{ in: [...] }` 는 외부 사용자 스코프다. 호출부는 policies.resolveClientIdFilter 의 결과를 그대로 넘긴다.
+     */
+    filters: {
       search?: string;
       isActive?: string;
       userType?: string;
       roleId?: string;
       role?: string;
-      clientId?: string | { in: string[] };
+      clientId: string | { in: string[] } | undefined;
     },
     params?: {
       skip?: number;

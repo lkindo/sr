@@ -88,7 +88,8 @@ describe('GET /api/service-categories — 테넌트 스코핑', () => {
     await call(internalSession);
 
     const options = mockGetAll.mock.calls[0]![0];
-    expect(options.clientIds).toBeUndefined();
+    // '전체' 는 명시적인 null 이다 — 스코프는 선택 인자가 아니다(헌법 §1.2).
+    expect(options.clientIds).toBeNull();
     expect(options.includeHandlerEmail).toBe(true);
   });
 

@@ -6,6 +6,7 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import {
+  canIntakeSR,
   ensureCanIntakeAssignedSR,
   ensureCanIntakeSR,
   ensureCanReadSR,
@@ -355,11 +356,9 @@ export const PATCH = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    // 1. 권한 확인: MANAGER 또는 ADMIN만 접수 정보 수정 가능
-    const userRoles = session.user?.roles || [];
-    const hasPermission = userRoles.some((role: string) => role === 'ADMIN' || role === 'MANAGER');
-
-    if (!hasPermission) {
+    // 1. 권한 확인: 접수 정보 수정은 접수와 같은 권한이다(policies.canIntakeSR — ADMIN·MANAGER 또는
+    //    SR:INTAKE). 예전에는 여기만 역할 문자열을 직접 비교해 접수 화면·POST 와 기준이 달랐다.
+    if (!canIntakeSR(session.user)) {
       throw new ForbiddenError(
         '접수 정보를 수정할 권한이 없습니다. MANAGER 또는 ADMIN 권한이 필요합니다.'
       );
