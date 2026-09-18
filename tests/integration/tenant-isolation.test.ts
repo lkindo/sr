@@ -203,11 +203,15 @@ describeDb('테넌트 격리 (실제 DB)', () => {
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
+    // 판정 시각을 오늘 09:00 으로 고정한다. '오늘 마감' 은 이 시각 이후, '지연' 은 이전이다(결정 D10).
+    // 실제 현재 시각을 쓰면 아래 '오늘 정오 마감' 이 정오 이후 실행에서 지연으로 바뀌어 테스트가 시각에 따라 깨진다.
+    const judgedAt = new Date(today);
+    judgedAt.setHours(9, 0, 0, 0);
 
     const countsFor = (clientIds: string[] | null) =>
       srService.getSRBadgeCounts({
         clientIds,
-        now: new Date(),
+        now: judgedAt,
         dueTo: tomorrow,
         assigneeId: internalUserId,
       });
@@ -235,6 +239,7 @@ describeDb('테넌트 격리 (실제 DB)', () => {
         inProgress: 0,
         urgent: 0,
         dueToday: 0,
+        overdue: 0,
         myAssigned: 0,
       });
     });
@@ -260,6 +265,7 @@ describeDb('테넌트 격리 (실제 DB)', () => {
         inProgress: 1,
         urgent: 1,
         dueToday: 1,
+        overdue: 0, // 정오 마감은 판정 시각(09:00) 이후다
         myAssigned: 1,
       });
     });
@@ -274,7 +280,10 @@ describeDb('테넌트 격리 (실제 DB)', () => {
         data: { status: 'IN_PROGRESS', dueDate: yesterday },
       });
 
-      expect((await countsFor([ownClientId])).dueToday).toBe(0);
+      const counts = await countsFor([ownClientId]);
+      expect(counts.dueToday).toBe(0);
+      // 어제 마감이 지난 진행 중 SR 은 '지연 중' 이다(결정 D10).
+      expect(counts.overdue).toBe(1);
     });
   });
 });
