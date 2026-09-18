@@ -340,8 +340,13 @@ export const srUpdateSchema = z.object({
  * 받으면 전용 액션의 필수 사유와 비즈니스 규칙을 우회할 수 있으므로 알 수 없는 키도
  * 조용히 버리지 않고 400/검증 실패로 돌려보낸다. 서비스 내부는 위 srUpdateSchema 를 써서
  * 전용 상태 경로의 검증된 전이를 계속 처리한다.
+ *
+ * `changeReason` 은 **받는다.** 마감일 수동 조정(헌법 §3, D8)은 사유가 필수인데, 예전에는 여기서
+ * 같이 빼 버려서 '마감일 조정' 다이얼로그의 `{dueDate, changeReason}` 이 알 수 없는 키로 400 이 됐다
+ * (사유를 빼면 서비스가 사유 필수로 거부하므로 어느 쪽으로도 조정할 수 없었다). `status` 가 없으면
+ * 이 값은 상태 이력에 쓰이지 않고 마감일 조정의 감사 사유로만 쓰인다.
  */
-export const srPatchSchema = srUpdateSchema.omit({ status: true, changeReason: true }).strict();
+export const srPatchSchema = srUpdateSchema.omit({ status: true }).strict();
 
 // User Schemas
 export const userCreateSchema = z.object({

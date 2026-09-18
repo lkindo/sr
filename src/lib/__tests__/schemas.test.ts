@@ -577,6 +577,22 @@ describe('srPatchSchema', () => {
     const result = srPatchSchema.safeParse({ status: 'COMPLETED' });
     expect(result.success).toBe(false);
   });
+
+  // 마감일 수동 조정(헌법 §3, D8)은 사유가 필수다. 예전에는 이 스키마가 changeReason 까지 빼 버려서
+  // '마감일 조정' 다이얼로그의 요청이 알 수 없는 키로 400 이 됐고, 조정할 방법이 없었다.
+  it('accepts a manual due-date adjustment with its reason', () => {
+    const result = srPatchSchema.safeParse({
+      dueDate: '2026-10-01T09:00:00.000Z',
+      changeReason: '고객 요청으로 일정 협의',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.changeReason).toBe('고객 요청으로 일정 협의');
+  });
+
+  it('still rejects a status transition even when a reason is attached', () => {
+    const result = srPatchSchema.safeParse({ status: 'CONFIRMED', changeReason: '확인' });
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('userCreateSchema', () => {
