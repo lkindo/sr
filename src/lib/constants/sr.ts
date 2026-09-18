@@ -90,3 +90,19 @@ export const priorityBadgeVariants: Record<string, 'default' | 'secondary' | 'de
   MEDIUM: 'default',
   LOW: 'secondary',
 };
+
+/**
+ * 활동 metadata 가운데 내부 사용자만 보는 키 — 마감일 조정 사유가 담긴다(2026-09-18 소유자 결정 D9).
+ * 서버는 고객에게 내려보낼 때 이 키를 지우고(policies.redactActivityForViewer), 활동 목록 화면은 값이
+ * 있을 때만 보여 준다.
+ */
+export const INTERNAL_ACTIVITY_METADATA_KEY = 'internalReason';
+
+/** 활동에 실린 내부 전용 사유. 고객에게는 서버가 지우므로 여기까지 오지 않는다. */
+export function internalReasonOf(activity: { metadata?: unknown }): string | null {
+  const metadata = activity.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  // 키 이름은 INTERNAL_ACTIVITY_METADATA_KEY 와 같다.
+  const value = (metadata as { internalReason?: unknown }).internalReason;
+  return typeof value === 'string' && value.trim() ? value : null;
+}

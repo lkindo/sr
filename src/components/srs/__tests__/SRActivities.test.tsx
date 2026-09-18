@@ -65,6 +65,7 @@ interface Activity {
   type: string;
   description: string;
   createdAt: string;
+  metadata?: unknown;
   user: { name: string; image: string | null };
 }
 
@@ -345,6 +346,26 @@ describe('SRActivities — 활동 유형', () => {
 
     expect(screen.getByText('With Image')).toBeInTheDocument();
     expect(screen.getByText('No Image')).toBeInTheDocument();
+  });
+
+  // 마감일 조정 사유는 내부 전용이다(D9). 서버가 고객에게는 지워 보내므로 화면은 값이 있을 때만 보여 준다.
+  it('내부 사유가 실려 오면 설명 아래에 보여 주고, 없으면 아무것도 덧붙이지 않는다', () => {
+    listed([
+      [
+        activity({
+          id: 'due',
+          type: 'INTAKE_UPDATED',
+          description: 'SLA 마감일 조정: A → B',
+          metadata: { internalReason: '고객 요구 범위 확대' },
+        }),
+        activity({ id: 'plain', description: '평범한 활동', metadata: { changes: [] } }),
+      ],
+    ]);
+
+    render(<SRActivities srId="sr-1" />, { wrapper });
+
+    expect(screen.getByText('사유(내부): 고객 요구 범위 확대')).toBeInTheDocument();
+    expect(screen.getAllByText(/사유\(내부\)/)).toHaveLength(1);
   });
 
   it('발생 시각을 항목마다 낸다', () => {

@@ -36,10 +36,11 @@ import { useToast } from '@/hooks/use-toast';
 import { priorityLabels, statusLabels } from '@/lib/constants/sr';
 import {
   canEditSRContentAt,
+  canViewerAdjustDueDate,
   canViewerAttachToSR,
   canViewerConfirmSR,
   getReopenAvailability,
-  isSROperator,
+  isRejectBlockedAfterCompletion,
   SR_CONTENT_LOCKED_MESSAGE,
 } from '@/lib/sr-state-machine';
 
@@ -115,9 +116,8 @@ export default function SRDetailPage() {
   // (ENGINEER 가 자기 배정분만 고칠 수 있다는 범위는 이 화면에 들어온 시점에 이미 걸러져 있다.)
   const canEditContent = canEditSRContentAt(sr.status, { roles: roles || [], permissions });
   // 마감일 수동 조정은 운영자 소유 값이다(헌법 §3 — 서버: 운영자 필드 규칙 + 사유 필수·비우기 금지).
-  const canAdjustDueDate =
-    ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'].includes(sr.status as string) &&
-    isSROperator({ roles: roles || [], permissions });
+  // 한 번 완료된 SR 은 접수 권한자(ADMIN·MANAGER)만 조정한다(D9 — 서버와 같은 판정 함수).
+  const canAdjustDueDate = canViewerAdjustDueDate({ roles: roles || [], permissions }, sr);
 
   // 재오픈 버튼과 그 아래 안내가 같은 판정을 보도록 한 번만 계산한다.
   // 서버와 같은 규칙(sr-state-machine)이므로 확인완료 SR 은 confirmedAt 을, 담당자·고객사
@@ -233,6 +233,7 @@ export default function SRDetailPage() {
                     sr
                   )}
                   reopen={reopen}
+                  rejectBlocked={isRejectBlockedAfterCompletion(sr)}
                 />
               </div>
             )}

@@ -57,6 +57,8 @@ const { mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
     },
     sRStatusHistory: {
+      // 한 번 완료된 적 있는가(D9 — sr.service.wasEverCompleted). 기본은 없음.
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
@@ -237,7 +239,7 @@ describe('SRService', () => {
 
       const result = await srService.createSR(data, foreignUser);
 
-      expect(result).toEqual({ ...createdSR, requesterIsInternal: false });
+      expect(result).toEqual({ ...createdSR, requesterIsInternal: false, wasCompleted: false });
       expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { id: 'client-foreign' } });
     });
 
@@ -290,6 +292,7 @@ describe('SRService', () => {
       await expect(srService.createSR(data, mockUser)).resolves.toEqual({
         ...createdSR,
         requesterIsInternal: false,
+        wasCompleted: false,
       });
 
       // 2) 동일 고객사 전용 카테고리
@@ -299,6 +302,7 @@ describe('SRService', () => {
       await expect(srService.createSR(data, mockUser)).resolves.toEqual({
         ...createdSR,
         requesterIsInternal: false,
+        wasCompleted: false,
       });
     });
   });
@@ -504,7 +508,13 @@ describe('SRService', () => {
               select: expect.not.objectContaining({ storagePath: true }),
             }),
             statusHistory: expect.objectContaining({ take: 50 }),
-            _count: { select: { comments: { where: { isInternal: false } }, attachments: true } },
+            _count: {
+              select: {
+                comments: { where: { isInternal: false } },
+                attachments: true,
+                statusHistory: { where: { currentStatus: 'COMPLETED' } },
+              },
+            },
           }),
         })
       );
@@ -529,7 +539,13 @@ describe('SRService', () => {
         expect.objectContaining({
           include: expect.objectContaining({
             comments: expect.objectContaining({ where: {} }),
-            _count: { select: { comments: { where: {} }, attachments: true } },
+            _count: {
+              select: {
+                comments: { where: {} },
+                attachments: true,
+                statusHistory: { where: { currentStatus: 'COMPLETED' } },
+              },
+            },
           }),
         })
       );
@@ -812,7 +828,7 @@ describe('SRService', () => {
 
       const result = await srService.getSRDetailsById('sr-1', { viewer: mockUser });
 
-      expect(result).toEqual({ ...mockDetails, requesterIsInternal: false });
+      expect(result).toEqual({ ...mockDetails, requesterIsInternal: false, wasCompleted: false });
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
       );
@@ -863,7 +879,7 @@ describe('SRService', () => {
 
       const result = await srService.createSR(data, mockUser);
 
-      expect(result).toEqual({ ...mockCreatedSR, requesterIsInternal: false });
+      expect(result).toEqual({ ...mockCreatedSR, requesterIsInternal: false, wasCompleted: false });
     });
 
     describe('deleteSR', () => {

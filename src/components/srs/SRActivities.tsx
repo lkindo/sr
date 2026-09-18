@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import { useSRActivitiesInfinite } from '@/hooks/use-sr-infinite';
+import { internalReasonOf } from '@/lib/constants/sr';
 
 interface SRActivitiesProps {
   srId: string;
@@ -175,6 +176,12 @@ export function SRActivities({ srId }: SRActivitiesProps) {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">{activity.description}</p>
+                    {/* 마감일 조정 사유 — 서버가 고객에게는 지워 보낸다(D9). */}
+                    {internalReasonOf(activity) && (
+                      <p className="text-xs text-muted-foreground">
+                        사유(내부): {internalReasonOf(activity)}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}

@@ -2,7 +2,7 @@ import { Prisma, SR, SRStatus } from '@prisma/client';
 import { z } from 'zod';
 
 import { PAGINATION } from '@/lib/constants';
-import { statusLabelOf } from '@/lib/constants/sr';
+import { INTERNAL_ACTIVITY_METADATA_KEY, statusLabelOf } from '@/lib/constants/sr';
 import { domainEvents } from '@/lib/domain-events';
 import {
   BadRequestError,
@@ -17,6 +17,7 @@ import {
 import { logger } from '@/lib/logger';
 import {
   canAssignSR,
+  canIntakeSR,
   canRegisterSROnBehalf,
   canWriteSROperatorFields,
   eligibleRequesterWhere,
@@ -26,6 +27,7 @@ import {
   ensureCanUpdateSR,
   INTERNAL_ROLES,
   isInternalUser,
+  redactActivityForViewer,
   srViewerScopeWhere,
   visibleCommentsWhere,
 } from '@/lib/policies';
@@ -33,8 +35,13 @@ import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { srCreateSchema, srUpdateSchema } from '@/lib/schemas';
-import { isReopenTransition, validateTransition } from '@/lib/sr-state-machine';
-import { appZoneDateStamp } from '@/lib/timezone';
+import {
+  canChangeSLABasisAt,
+  isReopenTransition,
+  SR_SLA_BASIS_LOCKED_MESSAGE,
+  validateTransition,
+} from '@/lib/sr-state-machine';
+import { appZoneDateStamp, formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
 import {
@@ -153,6 +160,11 @@ export async function assertAssignable(
   }
 
   return { id: candidate.id, name: candidate.name, email: candidate.email };
+}
+
+/** 활동 기록용 마감일 표기(KST). 마감일이 없던 SR 은 '없음'. */
+function formatDueForActivity(value: Date | null | undefined): string {
+  return value ? `${formatAppZoneDate(value)} ${formatAppZoneTime(value)}` : '없음';
 }
 
 /**
@@ -398,17 +410,24 @@ export class SRService {
         }
       }
 
+      // 한 번 완료된 적 있는가(D9) — 필요한 판정에서만 상태 이력을 한 번 읽는다.
+      let wasCompletedMemo: boolean | undefined;
+      const wasCompleted = async () =>
+        (wasCompletedMemo ??= await this.wasEverCompleted(existingSR));
+
       // 상태 전환 검증
       if (validated.status && validated.status !== existingSR.status) {
         // 확인완료의 신원 검사(canConfirmAsAcceptor)는 "운영자가 등록한 SR 인가" 를 알아야 한다.
-        // 그 전이일 때만 신청자의 역할을 읽는다.
+        // 그 전이일 때만 신청자의 역할을 읽는다. 거절은 "한 번 완료된 SR 인가" 를 알아야 한다(D9).
         const transitionSubject =
           validated.status === 'CONFIRMED'
             ? {
                 ...existingSR,
                 requesterIsInternal: await this.isInternalRequester(existingSR.requesterId),
               }
-            : existingSR;
+            : validated.status === 'REJECTED'
+              ? { ...existingSR, wasCompleted: await wasCompleted() }
+              : existingSR;
         const transitionResult = validateTransition(
           existingSR.status,
           validated.status as SRStatus,
@@ -478,6 +497,36 @@ export class SRService {
         }
       }
 
+      // SLA 근거 잠금과 완료 이력 규칙(2026-09-18 소유자 결정 D9 — 화면: sr-state-machine.canViewerAdjustDueDate).
+      // 판정받는 당사자가 기록 없이 기준선을 옮기면 준수율을 믿을 근거가 없어진다.
+      const dueDateChangeRequested = isDueDateChange(validated.dueDate, existingSR.dueDate);
+      const slaRecalcTriggered =
+        (validated.actualPriority !== undefined &&
+          validated.actualPriority !== existingSR.actualPriority) ||
+        (!!validated.serviceCategoryId &&
+          validated.serviceCategoryId !== existingSR.serviceCategoryId);
+      const transitioning =
+        validated.status !== undefined && validated.status !== existingSR.status;
+      //  - 종결된 SR 은 SLA 근거를 바꾸지 않는다. 판정이 끝났고, 종결 SR 상세는 마감일 칸을 보여 주지 않아
+      //    소급 변경을 아무도 알아채지 못한다. 고쳐야 하면 재오픈한 뒤 고친다.
+      if (
+        (dueDateChangeRequested || slaRecalcTriggered) &&
+        !transitioning &&
+        !canChangeSLABasisAt(existingSR.status)
+      ) {
+        throw new BusinessRuleError(SR_SLA_BASIS_LOCKED_MESSAGE);
+      }
+      //  - 한 번 완료된 SR(재오픈 포함)의 마감일은 접수 권한자만 조정한다. 재작업 당사자가 기준 마감일을
+      //    옮기면 '재작업은 서비스 실패로 계상'(헌법 §2)이 무력화된다.
+      if (dueDateChangeRequested && (await wasCompleted()) && !canIntakeSR(sessionUser)) {
+        throw new ForbiddenError(
+          '한 번 완료된 SR의 마감일은 운영 관리자(ADMIN·MANAGER)만 조정할 수 있습니다.'
+        );
+      }
+      //  - 한 번 완료된 SR 은 카테고리·우선순위가 바뀌어도 최초 마감일을 유지한다(헌법 §2 가 §3 의
+      //    자동 재산출보다 우선한다). 범위가 바뀌어 마감일을 옮겨야 하면 사유를 남기는 수동 조정으로 한다.
+      const freezeDueDate = slaRecalcTriggered && (await wasCompleted());
+
       // 담당자 배정·변경은 운영 관리자(ADMIN·MANAGER 또는 SR:ASSIGN)만 한다(소유자 결정 2026-09-18,
       // policies.canAssignSR). 외부 사용자는 위 운영자 필드 규칙이 먼저 거부하므로, 여기 걸리는 것은
       // 자기 배정분을 다른 엔지니어에게 넘기려는 ENGINEER 같은 내부 사용자다.
@@ -504,7 +553,7 @@ export class SRService {
       ensureCanEditSRContent(sessionUser, existingSR, validated);
 
       const { updateData, statusChanged, assigneeChanged, dueDateManuallySet } =
-        await this.buildSRUpdateData(validated, existingSR, sessionUser, assigneeId);
+        await this.buildSRUpdateData(validated, existingSR, sessionUser, assigneeId, freezeDueDate);
 
       // 1. 트랜잭션으로 업데이트 및 활동 로그 생성 (순수 DB 작업만 트랜잭션 내부에서 수행)
       const updatedSR = await prisma.$transaction(async (tx) => {
@@ -582,6 +631,21 @@ export class SRService {
                 before: existingSR.dueDate?.toISOString() ?? null,
                 after: currentSR.dueDate?.toISOString() ?? null,
                 reason: validated.changeReason ?? null,
+              },
+            });
+            // 조정 사실은 SR 활동에도 남긴다 — 감사 로그는 ADMIN 만 볼 수 있다. 사유는 내부 전용 키에 담아
+            // 고객에게는 지운다(policies.redactActivityForViewer).
+            await tx.sRActivity.create({
+              data: {
+                srId: id,
+                userId: sessionUser.id,
+                type: 'INTAKE_UPDATED',
+                description: `SLA 마감일 조정: ${formatDueForActivity(existingSR.dueDate)} → ${formatDueForActivity(currentSR.dueDate)}`,
+                metadata: {
+                  dueDateBefore: existingSR.dueDate?.toISOString() ?? null,
+                  dueDateAfter: currentSR.dueDate?.toISOString() ?? null,
+                  [INTERNAL_ACTIVITY_METADATA_KEY]: validated.changeReason ?? null,
+                },
               },
             });
           }
@@ -747,7 +811,9 @@ export class SRService {
     validated: z.infer<typeof srUpdateSchema>,
     existingSR: SR,
     sessionUser: AuthenticatedUser,
-    assigneeId?: string | null
+    assigneeId?: string | null,
+    /** 한 번 완료된 SR 이라 자동 재산출하지 않는다(D9 — 헌법 §2 가 §3 보다 우선). */
+    freezeDueDate = false
   ): Promise<{
     updateData: Prisma.SRUncheckedUpdateInput;
     statusChanged: boolean;
@@ -851,7 +917,8 @@ export class SRService {
       (priorityChanged || categoryChanged) &&
       nextPriority &&
       !dueDateManuallySet &&
-      !existingSR.dueDateManual
+      !existingSR.dueDateManual &&
+      !freezeDueDate
     ) {
       try {
         updateData.dueDate = await serviceCategoryService.calculateDueDate(
@@ -1045,6 +1112,8 @@ export class SRService {
           select: {
             comments: { where: visibleCommentWhere },
             attachments: true,
+            // 한 번이라도 완료된 적 있는가(D9) — 조회를 한 번 더 하지 않도록 여기서 함께 센다.
+            statusHistory: { where: { currentStatus: 'COMPLETED' } },
           },
         },
       },
@@ -1060,7 +1129,26 @@ export class SRService {
       requesterIsInternal: (requesterRoles ?? []).some((row) =>
         INTERNAL_ROLES.includes(row.role.name)
       ),
+      // 화면이 마감일 조정·거절 버튼을 서버와 같은 규칙으로 판정하는 재료(D9 — wasEverCompleted 와 같은 뜻).
+      wasCompleted: !!sr.completedAt || (sr._count?.statusHistory ?? 0) > 0,
+      activities: sr.activities?.map((activity) =>
+        redactActivityForViewer(options.viewer, activity)
+      ),
     } as unknown as SRDetails;
+  }
+
+  /**
+   * 이 SR 이 한 번이라도 완료된 적이 있는가(재오픈 포함) — D9 규칙의 판정 재료.
+   * completed_at 은 재오픈 때 지우지 않지만, 2026-08-15 백필은 그때 완료·확인완료였던 행만 채웠다. 그래서
+   * 값이 없으면 상태 이력에 완료 전이가 있는지 본다.
+   */
+  async wasEverCompleted(sr: { id: string; completedAt?: Date | null }): Promise<boolean> {
+    if (sr.completedAt) return true;
+    const completion = await prisma.sRStatusHistory.findFirst({
+      where: { srId: sr.id, currentStatus: 'COMPLETED' },
+      select: { id: true },
+    });
+    return completion !== null;
   }
 
   /**
@@ -1274,12 +1362,16 @@ export class SRService {
    */
   async getSRActivities(
     srId: string,
+    /** 필수다. 내부 전용 활동 값(마감일 조정 사유)을 이 사용자로 가린다(redactActivityForViewer). */
+    viewer: AuthenticatedUser,
     options?: { cursor?: string; limit?: number }
   ): Promise<{
     activities: Array<{
       id: string;
       type: string;
       description: string;
+      /** 내부 전용 키(마감일 조정 사유)는 고객에게 지워져 온다. */
+      metadata?: unknown;
       createdAt: Date;
       user: { id: string; name: string; image: string | null };
     }>;
@@ -1296,7 +1388,10 @@ export class SRService {
       options
     );
 
-    return { activities: items, nextCursor };
+    return {
+      activities: items.map((activity) => redactActivityForViewer(viewer, activity)),
+      nextCursor,
+    };
   }
 
   /**

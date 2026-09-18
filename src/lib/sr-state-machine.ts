@@ -416,6 +416,13 @@ export const validateTransition = (
     }
   }
 
+  // 2-2. 한 번 완료된 SR 은 거절로 끝내지 않는다(2026-09-18 소유자 결정 D9). 재오픈 → 보류 → 거절로 끝내면
+  // 그 SR 이 준수율 표본에서 영구히 빠져 '재작업은 서비스 실패로 계상'(헌법 §2)이 무력화된다.
+  // 판정 재료 `wasCompleted` 는 서버가 상태 이력으로 계산해 넘긴다(sr.service.wasEverCompleted).
+  if (to === 'REJECTED' && isRejectBlockedAfterCompletion(currentData)) {
+    return { valid: false, message: SR_REJECT_AFTER_COMPLETION_MESSAGE };
+  }
+
   // 3. 필수 필드 데이터 검증
   const requiredFields = getRequiredFields(to);
   if (requiredFields.length > 0 && currentData && updateData) {
@@ -765,6 +772,50 @@ export function canViewerIntakeSR(viewer: { roles?: string[]; permissions?: stri
 export function canViewerAssignSR(viewer: { roles?: string[]; permissions?: string[] }): boolean {
   const isManager = (viewer.roles ?? []).some((role) => OPERATIONS_MANAGER_ROLES.includes(role));
   return isManager || holdsPermission(viewer, 'SR:ASSIGN');
+}
+
+/** 한 번 완료된 SR 의 거절을 막을 때의 안내. 서버 거부와 화면이 같은 문장을 쓴다. */
+export const SR_REJECT_AFTER_COMPLETION_MESSAGE =
+  '한 번 완료된 SR은 거절로 끝낼 수 없습니다. 재작업을 마치면 다시 완료 처리하세요.';
+
+/** 한 번이라도 완료된 SR(재오픈 포함)인가 — 거절 금지(D9)의 판정. `wasCompleted` 는 서버가 채운다. */
+export function isRejectBlockedAfterCompletion(
+  sr: { wasCompleted?: boolean } | null | undefined
+): boolean {
+  return sr?.wasCompleted === true;
+}
+
+/** 종결된 SR 의 SLA 근거(마감일·서비스 카테고리·실제 우선순위)를 바꾸려 할 때의 안내. */
+export const SR_SLA_BASIS_LOCKED_MESSAGE =
+  '종결된 SR의 마감일·서비스 카테고리·실제 우선순위는 바꿀 수 없습니다. 고쳐야 하면 SR을 다시 연 뒤 수정하세요.';
+
+/**
+ * 이 상태에서 SLA 근거(마감일·서비스 카테고리·실제 우선순위)를 바꿀 수 있는가(D9).
+ * 종결(완료·확인완료·거절)된 SR 은 SLA 판정이 끝났다. 판정 뒤 근거를 바꾸면 위반을 준수로 소급해 바꿀 수 있고,
+ * 종결 SR 상세는 마감일 칸을 보여 주지 않아 아무도 알아채지 못한다.
+ */
+export function canChangeSLABasisAt(status: string): boolean {
+  return !SR_CLOSED_STATUSES.includes(status);
+}
+
+/** 마감일을 직접 조정할 수 있는 상태 — 접수 전에는 SLA 시계가 돌지 않고, 종결 뒤에는 판정이 끝났다. */
+const DUE_DATE_ADJUSTABLE_STATUSES: readonly string[] = ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'];
+
+/**
+ * 이 SR 의 SLA 마감일을 직접 조정할 수 있는가(헌법 §2·§3, 2026-09-18 소유자 결정 D9).
+ *  - 접수·진행중·보류 상태에서만 한다.
+ *  - 기본은 운영자(isSROperator)다.
+ *  - 한 번 완료된 적 있는 SR(재오픈 포함)은 접수 권한자(ADMIN·MANAGER 또는 SR:INTAKE)만 한다. 재작업 당사자가
+ *    기준 마감일을 옮기면 '재작업은 서비스 실패로 계상'이 무력화된다. `wasCompleted` 는 서버가 채운다.
+ * 서버(sr.service.updateSR)는 상태 잠금(canChangeSLABasisAt)과 완료 이력 규칙을 같은 뜻으로 판정한다.
+ */
+export function canViewerAdjustDueDate(
+  viewer: { roles?: string[]; permissions?: string[] },
+  sr: { status: string; wasCompleted?: boolean }
+): boolean {
+  if (!DUE_DATE_ADJUSTABLE_STATUSES.includes(sr.status)) return false;
+  if (sr.wasCompleted) return canViewerIntakeSR(viewer);
+  return isSROperator(viewer);
 }
 
 /** 접수 이후 운영자가 아닌 사람이 SR 내용을 고치려 할 때의 안내. 서버 거부와 화면 안내가 같은 문장을 쓴다. */

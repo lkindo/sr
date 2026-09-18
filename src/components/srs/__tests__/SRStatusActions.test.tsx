@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   canViewerConfirmSR,
   getReopenAvailability,
+  isRejectBlockedAfterCompletion,
   type ReopenViewer,
 } from '@/lib/sr-state-machine';
 
@@ -85,6 +86,8 @@ interface Scenario {
   completedAt?: Date | string | null;
   confirmedAt?: Date | string | null;
   assigneeId?: string | null;
+  /** 한 번 완료된 적 있는가(D9) — 거절 버튼을 감춘다. */
+  wasCompleted?: boolean;
 }
 
 /**
@@ -101,6 +104,7 @@ function Harness({
   completedAt = new Date(Date.now() - DAY),
   confirmedAt = null,
   assigneeId = 'eng-1',
+  wasCompleted = false,
 }: Scenario) {
   const viewer: ReopenViewer = {
     id: 'viewer',
@@ -127,6 +131,7 @@ function Harness({
         userRoles={userRoles}
         canConfirm={canViewerConfirmSR(viewer, sr)}
         reopen={reopen}
+        rejectBlocked={isRejectBlockedAfterCompletion({ wasCompleted })}
       />
       <SRReopenBlockedNotice reopen={reopen} />
     </>
@@ -269,6 +274,13 @@ describe('SRStatusActions Component', () => {
       render(<Harness {...defaultProps} status="ON_HOLD" />);
       expect(screen.getByText('진행 재개')).toBeInTheDocument();
       expect(screen.getByText('거절')).toBeInTheDocument();
+    });
+
+    // 한 번 완료된 SR 은 거절로 끝내지 않는다(D9 — 재오픈 → 보류 → 거절로 준수율에서 빠지는 경로).
+    it('재오픈되어 보류된 SR 에는 거절 버튼을 두지 않는다', () => {
+      render(<Harness {...defaultProps} status="ON_HOLD" wasCompleted />);
+      expect(screen.getByText('진행 재개')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '거절' })).not.toBeInTheDocument();
     });
 
     it('renders nothing for ON_HOLD state if user cannot manage', () => {

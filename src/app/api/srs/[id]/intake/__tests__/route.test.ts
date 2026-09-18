@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
   txUpdate: vi.fn(),
   assertAssignable: vi.fn(),
+  wasEverCompleted: vi.fn(),
 }));
 
 vi.mock('@/lib/domain-events', () => ({
@@ -57,6 +58,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/services/sr.service', () => ({
   assertAssignable: mocks.assertAssignable,
+  srService: { wasEverCompleted: mocks.wasEverCompleted },
 }));
 
 vi.mock('@/lib/auth-wrapper', () => ({
@@ -182,6 +184,8 @@ beforeEach(() => {
     return {};
   });
   mocks.rootActivityCreate.mockResolvedValue({});
+  // 기본은 한 번도 완료된 적 없는 SR 이다(D9 대조군은 개별 테스트가 바꾼다).
+  mocks.wasEverCompleted.mockResolvedValue(false);
   mocks.txUpdate.mockImplementation(async () => {
     order.push('sr.update');
     return UPDATED_SR;
@@ -863,6 +867,29 @@ describe('PATCH /api/srs/[id]/intake — SLA 재계산', () => {
 
   // 운영자가 마감일을 직접 지정한 SR(due_date_manual)은 접수 정보 수정의 우선순위 변경이 덮어쓰지
   // 않는다(헌법 §3). updateSR 경로와 같은 규칙이다 — 두 경로 중 하나만 지키면 다른 쪽으로 덮어써진다.
+  // 한 번 완료된 SR(재오픈되어 진행중)은 최초 마감일을 유지한다(헌법 §2, 2026-09-18 소유자 결정 D9).
+  // 예전에는 재오픈 SR 의 우선순위를 바꾸면 마감일이 조용히 다시 계산돼 위반을 준수로 바꿀 수 있었다.
+  it('한 번 완료된 SR 은 우선순위가 바뀌어도 마감일을 다시 계산하지 않는다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ actualPriority: 'MEDIUM' }));
+    mocks.wasEverCompleted.mockResolvedValue(true);
+
+    await patch({ actualPriority: 'LOW' });
+
+    expect(lastUpdateData().dueDate).toBeUndefined();
+    expect(lastUpdateData().actualPriority).toBe('LOW');
+  });
+
+  it('자동 재산출로 마감일이 바뀌면 활동에 전후 값을 남긴다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ actualPriority: 'MEDIUM' }));
+
+    await patch({ actualPriority: 'CRITICAL' });
+
+    const data = activityData(0);
+    expect(data.description).toContain('마감일:');
+    expect(data.metadata.newValues.dueDate).toBe('2026-08-01T12:00:00.000Z');
+    expect(data.metadata.previousValues).toHaveProperty('dueDate');
+  });
+
   it('수동 지정된 마감일은 우선순위가 바뀌어도 다시 계산하지 않는다', async () => {
     mocks.findUnique.mockResolvedValue(patchSR({ actualPriority: 'MEDIUM', dueDateManual: true }));
 
@@ -1061,6 +1088,8 @@ describe('PATCH /api/srs/[id]/intake — 변경 이력', () => {
 
     expect(body.changes).toEqual([
       '우선순위: MEDIUM → HIGH',
+      // 우선순위 변경으로 마감일이 다시 계산되면 그 전후 값도 남긴다(D9).
+      expect.stringMatching(/^마감일: .+ → .+$/),
       '예상 작업 시간: 4시간 → 12시간',
       '예상 완료일 변경',
       '접수 메모 수정',
@@ -1114,7 +1143,10 @@ describe('PATCH /api/srs/[id]/intake — 변경 이력', () => {
       type: 'INTAKE_UPDATED',
     });
     expect(activityData(0).metadata.updatedBy).toBe('매니저');
-    expect(activityData(0).metadata.newValues).toEqual({ actualPriority: 'HIGH' });
+    expect(activityData(0).metadata.newValues).toEqual({
+      actualPriority: 'HIGH',
+      dueDate: expect.any(String),
+    });
     expect(mocks.emitRealtime).toHaveBeenCalledWith(
       'sr:updated',
       expect.objectContaining({ id: 'sr-1', actorId: 'mgr-1' })

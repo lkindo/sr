@@ -11,6 +11,7 @@ import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import {
+  canChangeSLABasisAt,
   canEditSRContentAt,
   isSROperator,
   SR_CONTENT_LOCKED_MESSAGE,
@@ -58,7 +59,10 @@ export function useEditSRForm({
   const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   // 서비스 카테고리는 SLA 산정 근거라 운영자 소유 값이다(서버: sr.service 의 운영자 필드 규칙 — 접수 전에도).
   // 예전에는 외부 사용자에게도 선택지가 열려 있어, 바꾸고 저장하면 반드시 403 이었다.
-  const canChangeCategory = isSROperator({ roles, permissions });
+  // 종결된 SR 은 SLA 근거를 바꾸지 않는다(D9 — 서버: sr.service 의 SLA 근거 잠금). 이유를 달리 안내한다.
+  const isOperator = isSROperator({ roles, permissions });
+  const categoryLockedByStatus = isOperator && !!sr && !canChangeSLABasisAt(sr.status);
+  const canChangeCategory = isOperator && !categoryLockedByStatus;
 
   const fetchClients = useCallback(async () => {
     if (isClientUser) {
@@ -357,6 +361,7 @@ export function useEditSRForm({
       fileToDelete,
       canSelectClient,
       canChangeCategory,
+      categoryLockedByStatus,
     },
     actions: {
       setTitle,

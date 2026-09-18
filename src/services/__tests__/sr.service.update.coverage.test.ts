@@ -19,6 +19,8 @@ vi.mock('@/lib/prisma', () => ({
     client: { findUnique: vi.fn() },
     serviceCategory: { findUnique: vi.fn() },
     sRActivity: { create: vi.fn() },
+    // 한 번 완료된 적 있는가(D9 — sr.service.wasEverCompleted). 기본은 없음.
+    sRStatusHistory: { findFirst: vi.fn().mockResolvedValue(null) },
     // 담당자 배정 검증(assertAssignable) 및 배정 가능 사용자 목록 조회에 사용된다.
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     role: { findMany: vi.fn() },

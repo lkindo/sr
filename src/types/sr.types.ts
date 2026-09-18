@@ -19,6 +19,11 @@ export type SRDetails = SR & {
    * CLIENT_ADMIN 도 확인할 수 있다(sr-state-machine.canConfirmAsAcceptor). 서버가 신청자 역할로 계산한다.
    */
   requesterIsInternal: boolean;
+  /**
+   * 한 번이라도 완료된 적이 있는가(재오픈 포함). 마감일 조정은 접수 권한자만, 거절은 불가(D9 —
+   * sr-state-machine.canViewerAdjustDueDate·isRejectBlockedAfterCompletion). 서버가 상태 이력으로 계산한다.
+   */
+  wasCompleted: boolean;
   assignee: { id: string; name: string; email: string } | null;
   intakeBy: { id: string; name: string; email: string; image: string | null } | null;
   serviceCategory: {

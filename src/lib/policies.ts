@@ -6,6 +6,7 @@
 
 import { Client, Prisma, Role, SR, SRStatus, User } from '@prisma/client';
 
+import { INTERNAL_ACTIVITY_METADATA_KEY } from '@/lib/constants/sr';
 import { BusinessRuleError, ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
 import { isCanonicalRole, isImmutableRole, isReservedRoleName } from '@/lib/role-rules';
@@ -68,6 +69,30 @@ export function hasEffectivePermission(user: AuthenticatedUser, permission: stri
 
 export function isInternalUser(user: AuthenticatedUser): boolean {
   return user.roles?.some((role) => INTERNAL_ROLES.includes(role)) ?? false;
+}
+
+/**
+ * 활동의 내부 전용 값(키는 constants/sr 의 INTERNAL_ACTIVITY_METADATA_KEY — 마감일 조정 사유, D9)을 고객에게서 지운다.
+ * 활동 자체("SLA 마감일 조정: A → B")는 고객도 본다 — 고객도 마감일을 본다. 조정 이유는 운영 판단이라
+ * 내부에만 둔다. 활동을 내려보내는 모든 경로(상세·활동 목록·활동 API)가 이 함수를 거친다.
+ */
+export function redactActivityForViewer<T extends { metadata?: unknown }>(
+  viewer: AuthenticatedUser,
+  activity: T
+): T {
+  if (isInternalUser(viewer)) return activity;
+  const metadata = activity.metadata;
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata) ||
+    !(INTERNAL_ACTIVITY_METADATA_KEY in metadata)
+  ) {
+    return activity;
+  }
+  // 키 이름은 INTERNAL_ACTIVITY_METADATA_KEY('internalReason')와 같다 — 구조 분해로 빼낸다.
+  const { internalReason: _internalReason, ...rest } = metadata as { internalReason?: unknown };
+  return { ...activity, metadata: rest };
 }
 
 /**

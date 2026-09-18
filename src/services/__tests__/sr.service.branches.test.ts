@@ -34,6 +34,7 @@ const { mockPrisma } = vi.hoisted(() => {
       deleteMany: vi.fn().mockResolvedValue({}),
     },
     sRStatusHistory: {
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),

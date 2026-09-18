@@ -316,7 +316,7 @@ describe('SRService Mutation Tests', () => {
         const mockSR = { id: 'sr-1', title: 'Details' };
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
         const result = await srService.getSRDetailsById('sr-1', { viewer: mockUser });
-        expect(result).toEqual({ ...mockSR, requesterIsInternal: false });
+        expect(result).toEqual({ ...mockSR, requesterIsInternal: false, wasCompleted: false });
       });
     });
   });

@@ -50,6 +50,11 @@ interface SRStatusActionsProps {
    * 페이지가 한 번 계산해 버튼과 안내(`SRReopenBlockedNotice`)에 같은 값을 준다.
    */
   reopen: ReopenAvailability;
+  /**
+   * 거절 버튼을 감출지 — 한 번 완료된 SR 은 거절로 끝내지 않는다(D9). 호출부가
+   * `sr-state-machine.isRejectBlockedAfterCompletion` 으로 서버와 같은 규칙으로 판정해 넘긴다.
+   */
+  rejectBlocked?: boolean;
 }
 
 /**
@@ -102,6 +107,7 @@ export function SRStatusActions({
   userRoles,
   canConfirm,
   reopen,
+  rejectBlocked = false,
 }: SRStatusActionsProps) {
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [holdDialogOpen, setHoldDialogOpen] = useState(false);
@@ -296,17 +302,20 @@ export function SRStatusActions({
               )}
               <span className="hidden md:inline">진행 재개</span>
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setRejectDialogOpen(true)}
-              disabled={!!loadingAction}
-              aria-label="거절"
-              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-              title="거절"
-            >
-              <XCircle className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">거절</span>
-            </Button>
+            {/* 한 번 완료된 SR 은 거절로 끝내지 않는다(D9) — 재작업을 마치면 다시 완료로 종결한다. */}
+            {!rejectBlocked && (
+              <Button
+                variant="destructive"
+                onClick={() => setRejectDialogOpen(true)}
+                disabled={!!loadingAction}
+                aria-label="거절"
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+                title="거절"
+              >
+                <XCircle className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">거절</span>
+              </Button>
+            )}
           </>
         );
 

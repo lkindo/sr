@@ -17,8 +17,9 @@ import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/pris
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
+import { formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
 import { serviceCategoryService } from '@/services/service-category.service';
-import { assertAssignable } from '@/services/sr.service';
+import { assertAssignable, srService } from '@/services/sr.service';
 import { enqueueSRAssignedEmail, enqueueSRStatusChangedEmail } from '@/services/sr-email-outbox';
 
 // POST(접수)와 PATCH(접수정보 수정)의 응답 include. 두 곳에 31줄이 축자 복제돼 있었다.
@@ -404,6 +405,7 @@ export const PATCH = withAuthAndRateLimit(
 
     // 4. 변경 전 값 저장 (이력 추적용)
     const previousValues = {
+      dueDate: sr.dueDate,
       actualPriority: sr.actualPriority,
       estimatedHours: sr.estimatedHours,
       estimatedCompletionDate: sr.estimatedCompletionDate,
@@ -414,11 +416,13 @@ export const PATCH = withAuthAndRateLimit(
 
     // 5. SLA 재계산 (우선순위 변경 시). 운영자가 마감일을 직접 지정한 SR(due_date_manual)은 자동
     //    재산출이 덮어쓰지 않는다(헌법 §3) — updateSR 과 같은 규칙이다.
+    //    한 번 완료된 SR(재오픈되어 진행중)은 최초 마감일을 유지한다(헌법 §2, 2026-09-18 소유자 결정 D9).
+    //    마감일을 옮겨야 하면 사유를 남기는 수동 조정으로 한다.
     let dueDate = sr.dueDate;
+    const priorityChanging =
+      !!validated.actualPriority && validated.actualPriority !== sr.actualPriority;
     const recalculateDueDate =
-      !!validated.actualPriority &&
-      validated.actualPriority !== sr.actualPriority &&
-      !sr.dueDateManual;
+      priorityChanging && !sr.dueDateManual && !(await srService.wasEverCompleted(sr));
     if (recalculateDueDate && validated.actualPriority) {
       dueDate = serviceCategoryService.calculateDueDateFromHours(
         sr.serviceCategory.slaHours,
@@ -479,6 +483,7 @@ export const PATCH = withAuthAndRateLimit(
     //    newAssignee, validated)은 모두 이 시점에 확정돼 있고 tx 결과에 의존하지 않는다.
     const changes: string[] = [];
     const newValues: {
+      dueDate?: string;
       actualPriority?: string;
       estimatedHours?: number;
       estimatedCompletionDate?: string;
@@ -490,6 +495,14 @@ export const PATCH = withAuthAndRateLimit(
     if (validated.actualPriority && validated.actualPriority !== previousValues.actualPriority) {
       changes.push(`우선순위: ${previousValues.actualPriority} → ${validated.actualPriority}`);
       newValues.actualPriority = validated.actualPriority;
+    }
+    // 자동 재산출로 마감일이 움직였으면 전후 값을 남긴다. 예전에는 '우선순위: A → B' 만 남아 마감일이
+    // 얼마에서 얼마로 바뀌었는지 알 수 없었다(D9).
+    if (recalculateDueDate && dueDate && dueDate.getTime() !== sr.dueDate?.getTime()) {
+      changes.push(
+        `마감일: ${sr.dueDate ? `${formatAppZoneDate(sr.dueDate)} ${formatAppZoneTime(sr.dueDate)}` : '없음'} → ${formatAppZoneDate(dueDate)} ${formatAppZoneTime(dueDate)}`
+      );
+      newValues.dueDate = dueDate.toISOString();
     }
     const prevEstimatedHours =
       previousValues.estimatedHours !== null && previousValues.estimatedHours !== undefined

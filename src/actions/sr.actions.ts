@@ -133,6 +133,7 @@ export async function getSRActivitiesAction(
       id: string;
       type: string;
       description: string;
+      metadata?: unknown;
       createdAt: Date;
       user: { id: string; name: string; image: string | null };
     }>;
@@ -149,7 +150,7 @@ export async function getSRActivitiesAction(
 
     ensureCanReadSR(session.user, sr);
 
-    const result = await srService.getSRActivities(srId, options);
+    const result = await srService.getSRActivities(srId, session.user, options);
     return ok(result);
   } catch (error) {
     return errorToResult(error);

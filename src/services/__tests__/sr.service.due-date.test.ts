@@ -27,6 +27,8 @@ const { mockPrisma, calculateDueDate } = vi.hoisted(() => ({
     sR: { findUnique: vi.fn() },
     serviceCategory: { findUnique: vi.fn() },
     user: { findUnique: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    // 한 번 완료된 적 있는가(D9 — sr.service.wasEverCompleted). 기본은 없음.
+    sRStatusHistory: { findFirst: vi.fn() },
   },
   calculateDueDate: vi.fn(),
 }));
@@ -80,6 +82,7 @@ const baseSR = {
 let tx: {
   sR: { updateMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
   auditLog: { create: ReturnType<typeof vi.fn> };
+  sRActivity: { create: ReturnType<typeof vi.fn> };
 };
 
 const srService = new SRService();
@@ -92,6 +95,7 @@ const dueDateAudits = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   mockPrisma.sR.findUnique.mockResolvedValue({ ...baseSR });
+  mockPrisma.sRStatusHistory.findFirst.mockResolvedValue(null);
   calculateDueDate.mockResolvedValue(RECALCULATED);
   tx = {
     sR: {
@@ -99,6 +103,7 @@ beforeEach(() => {
       update: vi.fn().mockImplementation(async ({ data }) => ({ ...baseSR, ...data })),
     },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
+    sRActivity: { create: vi.fn().mockResolvedValue({}) },
   };
   mockPrisma.$transaction.mockImplementation(async (cb: (t: unknown) => unknown) => cb(tx));
 });
@@ -206,5 +211,116 @@ describe('수동 지정된 마감일과 자동 재산출', () => {
     expect(calculateDueDate).toHaveBeenCalledWith('cat-1', 'CRITICAL', baseSR.intakeAt);
     expect(updateData().dueDate).toBe(RECALCULATED);
     expect(updateData()).not.toHaveProperty('dueDateManual');
+  });
+});
+
+/**
+ * 한 번 완료된 SR 의 마감일(헌법 §2, 2026-09-18 소유자 결정 D9).
+ *
+ * 예전에는 완료·재오픈된 SR 의 카테고리나 우선순위만 바꿔도 마감일이 사유·기록 없이 다시 계산돼
+ * 위반을 준수로 소급해 바꿀 수 있었고, 재작업 당사자(배정 ENGINEER)가 사유 한 줄로 자기 마감일을
+ * 미룰 수 있었고, 재오픈 → 보류 → 거절로 끝내면 준수율 표본에서 빠졌다.
+ */
+describe('한 번 완료된 SR 의 마감일(D9)', () => {
+  const engineer = {
+    id: 'eng-1',
+    email: 'eng@example.com',
+    name: 'Engineer',
+    image: null,
+    roles: ['ENGINEER'],
+    permissions: ['SR:UPDATE'],
+    clientIds: [],
+  };
+  const reopened = { ...baseSR, completedAt: new Date('2026-09-18T10:00:00.000Z') };
+
+  it('종결된 SR 은 마감일·카테고리·실제 우선순위를 바꿀 수 없다', async () => {
+    mockPrisma.sR.findUnique.mockResolvedValue({ ...reopened, status: 'COMPLETED' });
+    mockPrisma.serviceCategory.findUnique.mockResolvedValue({ id: 'cat-2', clientId: null });
+
+    for (const change of [
+      { dueDate: '2026-09-25T09:00:00.000Z', changeReason: '사유' },
+      { serviceCategoryId: 'cat-2' },
+      { actualPriority: 'LOW' as const },
+    ]) {
+      await expect(srService.updateSR('sr-1', change, manager)).rejects.toThrow(
+        '종결된 SR의 마감일·서비스 카테고리·실제 우선순위는 바꿀 수 없습니다.'
+      );
+    }
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('재오픈된 SR 은 카테고리·우선순위가 바뀌어도 최초 마감일을 유지한다', async () => {
+    mockPrisma.sR.findUnique.mockResolvedValue({ ...reopened });
+
+    await srService.updateSR('sr-1', { actualPriority: 'LOW' }, manager);
+
+    expect(calculateDueDate).not.toHaveBeenCalled();
+    expect(updateData()).not.toHaveProperty('dueDate');
+    expect(updateData().actualPriority).toBe('LOW');
+  });
+
+  it('완료 시각이 비어 있는 옛 SR 도 상태 이력으로 완료 여부를 판정한다', async () => {
+    mockPrisma.sRStatusHistory.findFirst.mockResolvedValue({ id: 'h-1' });
+
+    await srService.updateSR('sr-1', { actualPriority: 'LOW' }, manager);
+
+    expect(mockPrisma.sRStatusHistory.findFirst).toHaveBeenCalledWith({
+      where: { srId: 'sr-1', currentStatus: 'COMPLETED' },
+      select: { id: true },
+    });
+    expect(calculateDueDate).not.toHaveBeenCalled();
+  });
+
+  it('재작업 당사자(배정 ENGINEER)는 재오픈된 SR 의 마감일을 조정할 수 없다', async () => {
+    mockPrisma.sR.findUnique.mockResolvedValue({ ...reopened });
+
+    await expect(
+      srService.updateSR(
+        'sr-1',
+        { dueDate: '2026-09-30T09:00:00.000Z', changeReason: '시간이 더 필요' },
+        engineer
+      )
+    ).rejects.toThrow(
+      '한 번 완료된 SR의 마감일은 운영 관리자(ADMIN·MANAGER)만 조정할 수 있습니다.'
+    );
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('대조군: 한 번도 완료되지 않은 SR 은 배정 ENGINEER 도 사유와 함께 조정할 수 있다', async () => {
+    await srService.updateSR(
+      'sr-1',
+      { dueDate: '2026-09-30T09:00:00.000Z', changeReason: '고객과 일정 협의' },
+      engineer
+    );
+
+    expect(updateData().dueDate).toEqual(new Date('2026-09-30T09:00:00.000Z'));
+  });
+
+  it('운영 관리자는 재오픈된 SR 의 마감일을 사유와 함께 조정하고, 활동에 조정 사실과 내부 사유를 남긴다', async () => {
+    mockPrisma.sR.findUnique.mockResolvedValue({ ...reopened });
+
+    await srService.updateSR(
+      'sr-1',
+      { dueDate: '2026-09-30T09:00:00.000Z', changeReason: '고객 요구 범위 확대' },
+      manager
+    );
+
+    expect(updateData().dueDate).toEqual(new Date('2026-09-30T09:00:00.000Z'));
+    const activity = tx.sRActivity.create.mock.calls[0]![0].data;
+    expect(activity).toMatchObject({ srId: 'sr-1', userId: 'mgr-1', type: 'INTAKE_UPDATED' });
+    expect(activity.description).toMatch(/^SLA 마감일 조정: .+ → .+$/);
+    expect(activity.metadata).toMatchObject({
+      dueDateAfter: '2026-09-30T09:00:00.000Z',
+      internalReason: '고객 요구 범위 확대',
+    });
+  });
+
+  it('한 번 완료된 SR 은 거절로 끝낼 수 없다(재오픈 → 보류 → 거절로 준수율에서 빠지는 경로)', async () => {
+    mockPrisma.sR.findUnique.mockResolvedValue({ ...reopened, status: 'ON_HOLD' });
+
+    await expect(
+      srService.updateSR('sr-1', { status: 'REJECTED', rejectionReason: '범위 밖' }, manager)
+    ).rejects.toThrow('한 번 완료된 SR은 거절로 끝낼 수 없습니다.');
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
   });
 });
