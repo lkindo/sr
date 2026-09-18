@@ -31,8 +31,10 @@ import {
   statusBadgeVariants as statusColors,
   statusLabelOf,
 } from '@/lib/constants/sr';
+import { getDueDateStatus } from '@/lib/date-utils';
 import { qk } from '@/lib/query-keys';
 import { canViewerIntakeSR } from '@/lib/sr-state-machine';
+import { formatAppZoneDate } from '@/lib/timezone';
 
 import { DashboardSkeleton } from './DashboardSkeleton';
 
@@ -175,16 +177,6 @@ export default function DashboardPage() {
     return `${Math.round(hours / 24)}일`;
   };
 
-  // 마감일까지 남은 시간 계산
-  const getDaysUntilDue = (dueDate: string | null): number | null => {
-    if (!dueDate) return null;
-    const now = new Date();
-    const due = new Date(dueDate);
-    const diffTime = due.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
   return (
     <div className="sr-content-area space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -290,8 +282,11 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-2 mt-4">
                 {stats.myAssignedSRs.map((sr) => {
-                  const daysUntilDue = getDaysUntilDue(sr.dueDate);
-                  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+                  // 지연 판정은 목록·SR 상세와 같은 getDueDateStatus(시각 기준, 헌법 §3)를 쓴다.
+                  // 예전에는 여기만 달력일 올림(Math.ceil)으로 셌다 — 마감을 몇 시간 넘긴 SR 이
+                  // "0일 남음" 처럼 보이고, 완료된 SR 에도 '지연' 이 붙었다.
+                  const dueStatus = getDueDateStatus(sr.dueDate, sr.status);
+                  const isOverdue = dueStatus?.isOverdue ?? false;
                   return (
                     <Link
                       key={sr.id}
@@ -322,8 +317,8 @@ export default function DashboardPage() {
                           {sr.dueDate && (
                             <span className={isOverdue ? 'text-destructive font-medium' : ''}>
                               {' '}
-                              • 마감: {new Date(sr.dueDate).toLocaleDateString('ko-KR')}
-                              {daysUntilDue !== null && !isOverdue && ` (${daysUntilDue}일 남음)`}
+                              • 마감: {formatAppZoneDate(sr.dueDate)}
+                              {dueStatus && ` (${dueStatus.label})`}
                             </span>
                           )}
                         </p>

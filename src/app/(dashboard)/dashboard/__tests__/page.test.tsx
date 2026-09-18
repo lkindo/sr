@@ -190,3 +190,49 @@ describe('DashboardPage — 접수 대기 카드', () => {
     expect(screen.queryByText('접수 대기 SR') !== null).toBe(visible);
   });
 });
+
+/**
+ * ENGINEER 의 '내 담당 SR' 카드 — 지연 판정은 목록·SR 상세와 같은 getDueDateStatus(시각 기준, 헌법 §3).
+ * 예전에는 달력일 올림으로 세서 마감을 몇 시간 넘긴 SR 이 지연으로 보이지 않았고, 완료된 SR 에도
+ * '지연' 이 붙었다.
+ */
+describe('DashboardPage — 내 담당 SR 의 마감 표시', () => {
+  const HOUR = 60 * 60 * 1000;
+  const assigned = (overrides: Record<string, unknown>) => ({
+    id: String(overrides.id),
+    srNumber: String(overrides.id),
+    title: '담당 SR',
+    status: 'IN_PROGRESS',
+    priority: 'MEDIUM',
+    client: { name: '가나' },
+    requester: { name: '김신청' },
+    ...overrides,
+  });
+
+  it('마감을 몇 시간 넘긴 진행 중 SR 은 지연으로, 완료된 SR 은 지연으로 보이지 않는다', async () => {
+    viewer.roles = ['ENGINEER'];
+    const body = {
+      ...STATS,
+      summary: { ...STATS.summary, myAssigned: 2 },
+      myAssignedSRs: [
+        assigned({ id: 'SR-LATE', dueDate: new Date(Date.now() - 3 * HOUR).toISOString() }),
+        assigned({
+          id: 'SR-DONE',
+          status: 'COMPLETED',
+          dueDate: new Date(Date.now() - 48 * HOUR).toISOString(),
+        }),
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(body)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    const late = (await screen.findByText('SR-LATE')).closest('a')!;
+    expect(late.textContent).toContain('지연');
+    expect(late.textContent).toContain('3시간 지연');
+
+    const done = screen.getByText('SR-DONE').closest('a')!;
+    expect(done.textContent).not.toContain('지연');
+  });
+});
