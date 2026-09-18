@@ -75,7 +75,7 @@ health 상태를 확인한다. 긴급 상황에서 현재 상태 백업을 의�
 `scripts/restore-rehearsal.sh` 가 **일회용 Postgres 컨테이너**에 최신 백업을 복구하고
 스키마·행 수를 단언한다. **프로덕션 DB 는 건드리지 않는다.**
 
-`.github/workflows/restore-rehearsal.yml` 이 매월 1일(KST 04:00) 자동 실행하며,
+`.github/workflows/restore-rehearsal.yml` 이 매월 2일 KST 04:00(cron `0 19 1 * *` = UTC 1일 19:00, 야간 백업 직후) 자동 실행하며,
 `workflow_dispatch` 로 수동 실행도 가능하다.
 
 ```bash
@@ -142,7 +142,10 @@ OFFSITE_CMD='rclone copy /home/opc/sr/backups sr-backups:sr/backups --max-age 25
 | -------------------------- | ---------------------------------------------- |
 | `BACKUP_ENCRYPT_RECIPIENT` | age 공개키 또는 gpg 키 ID. 미설정 시 평문 저장 |
 | `BACKUP_OFFSITE_CMD`       | 오프호스트 복제 명령. 미설정 시 복제 안 함     |
-| `BACKUP_AGE_IDENTITY_FILE` | (리허설용) 서버상의 age 개인키 파일 경로       |
+
+복구 리허설이 쓰는 개인키 경로 `BACKUP_AGE_IDENTITY_FILE` 은 **시크릿이 아니다** —
+`restore-rehearsal.yml` 이 `/home/opc/sr/var/backup-age.key` 를 직접 들고 있다(경로는 비밀이 아니고,
+시크릿으로 두면 로그에서 가려져 진단이 막힌다). 키 파일을 그 경로에 두기만 하면 된다.
 
 > **두 시크릿 모두 등록해야 3.31 이 실제로 닫힌다.** 코드 경로는 준비되어 있지만,
 > 값이 없으면 백업은 여전히 평문으로 같은 디스크에만 남는다.

@@ -2,39 +2,36 @@
 
 이 문서는 CI/CD 파이프라인에 필요한 GitHub Secrets 설정 방법을 안내합니다.
 
-## 필수 Secrets
+## 필요한 Secrets
 
-### 데이터베이스 (PostgreSQL)
+> **2026-09-18 재정리**: 워크플로가 실제로 읽는 시크릿(`grep -ho 'secrets.[A-Z_0-9]*' .github/workflows/*.yml`)
+> 기준으로 다시 썼다. 예전 목록의 `TEST_DATABASE_URL`·`TEST_DIRECT_URL` 은 어디에서도 읽지 않아 뺐다 —
+> 통합 테스트는 CI 가 띄우는 일회용 Postgres 서비스 컨테이너를 쓴다. 반대로 배포를 막는 `*_B64` 4종과
+> 서버 접속 정보, 백업 시크릿이 빠져 있었다. 값의 형식과 발급 절차는 아래 정본 문서를 따른다.
 
-1. **DATABASE_URL**
-   - 설명: Production 데이터베이스 연결 URL
-   - 형식: `postgresql://user:password@host:port/database`
-   - 확인 방법: 운영 PostgreSQL 서버의 접속 정보(호스트/포트/계정)로 연결 문자열 구성
+### 배포 (필수 — 없으면 배포가 컨테이너를 건드리기 전에 중단된다)
 
-2. **DIRECT_URL**
-   - 설명: Direct 데이터베이스 연결 URL (Prisma)
-   - 형식: `postgresql://user:password@host:port/database`
-   - 확인 방법: 커넥션 풀러를 거치지 않는 운영 PostgreSQL 직접 연결 문자열 사용
+| Secret                                               | 쓰는 곳                                                                  | 정본                          |
+| ---------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------- |
+| `SERVER_HOST` / `SERVER_USER` / `SERVER_KEY`         | `deploy.yml`·`backup.yml`·`restore-rehearsal.yml` 등 SSH 접속            | —                             |
+| `PROD_ENV_DOCKER_B64` / `PROD_COMPOSE_ENV_B64`       | `deploy.yml` (`main`) — 서버 `.env.docker`·`.env.prod` 를 매번 새로 쓴다 | `docs/SECRET_ROTATION.md` 3절 |
+| `STAGING_ENV_DOCKER_B64` / `STAGING_COMPOSE_ENV_B64` | `deploy.yml` (`dev`) — 서버 `.env.docker.test`·`.env.staging`            | `docs/SECRET_ROTATION.md` 3절 |
 
-3. **TEST_DATABASE_URL**
-   - 설명: 테스트용 데이터베이스 URL
-   - 권장: 별도의 테스트 데이터베이스 사용
-   - 또는 로컬 PostgreSQL 사용 시: `postgresql://postgres:postgres@localhost:5432/sr_test`
+### 빌드 잡
 
-4. **TEST_DIRECT_URL**
-   - 설명: 테스트용 Direct URL
-   - TEST_DATABASE_URL과 동일하게 설정 가능
+| Secret                                                             | 쓰는 곳                                                   |
+| ------------------------------------------------------------------ | --------------------------------------------------------- |
+| `DATABASE_URL` / `DIRECT_URL` / `NEXTAUTH_SECRET` / `NEXTAUTH_URL` | `ci-cd.yml` 의 `Build application`(`pnpm build` 환경변수) |
 
-### 인증 (NextAuth)
+### 선택
 
-5. **NEXTAUTH_SECRET**
-   - 설명: NextAuth JWT 암호화 키
-   - 생성 방법: `openssl rand -base64 32`
-   - 예시: `your-secret-key-here-32-characters-long`
+| Secret                     | 쓰는 곳                                          | 없으면                                                      |
+| -------------------------- | ------------------------------------------------ | ----------------------------------------------------------- |
+| `BACKUP_ENCRYPT_RECIPIENT` | `backup.yml` — 백업 암호화 수신자(age 공개키 등) | 평문으로 저장된다 (`docs/backup-and-restore.md`)            |
+| `BACKUP_OFFSITE_CMD`       | `backup.yml` — 오프호스트 복제 명령              | 복제하지 않는다                                             |
+| `CODECOV_TOKEN`            | `ci-cd.yml` 커버리지 업로드                      | 업로드만 실패하고 CI 는 계속된다(`fail_ci_if_error: false`) |
 
-6. **NEXTAUTH_URL**
-   - 설명: 애플리케이션 URL
-   - Production: 배포 도메인(예: `https://sr.example.com`)
+`BACKUP_AGE_IDENTITY_FILE` 은 시크릿이 아니다 — `restore-rehearsal.yml` 이 경로를 직접 들고 있다.
 
 > **2026-08-10 정리** — `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` 와
 > `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` 항목을 삭제했다.
@@ -60,14 +57,13 @@
 ```bash
 # GitHub CLI 설치 필요: https://cli.github.com
 
-gh secret set DATABASE_URL
+gh secret set SERVER_HOST
 # 값 입력 (Enter 후 붙여넣기, Ctrl+D로 완료)
 
-gh secret set DIRECT_URL
-gh secret set TEST_DATABASE_URL
-gh secret set TEST_DIRECT_URL
+# base64 값은 파일에서 바로 넣는다 (-w0 이 없으면 줄바꿈이 섞여 디코딩이 깨진다)
+base64 -w0 .env.docker | gh secret set PROD_ENV_DOCKER_B64
+gh secret set DATABASE_URL
 gh secret set NEXTAUTH_SECRET
-gh secret set NEXTAUTH_URL
 ```
 
 ---
@@ -140,8 +136,9 @@ Secrets가 올바르게 설정되었는지 확인하려면:
 ### 배포 실패 (자체 호스팅 Docker 서버)
 
 - `SERVER_HOST` / `SERVER_USER` / SSH 키 secret 이 설정되어 있는지 확인
-- 서버에서 `docker compose -f docker-compose.prod.yml config` 가 통과하는지 확인
-  (`POSTGRES_USER` 등은 기본값이 없어 비면 즉시 실패한다)
+- 서버에서 `docker compose --env-file .env.prod -f docker-compose.prod.yml config -q` 가 통과하는지 확인
+  (`POSTGRES_USER` 등은 기본값이 없어 비면 즉시 실패한다). `--env-file` 을 빼면 레거시 `.env` 로
+  보간되어 실제 배포와 다른 결과가 나온다(`docs/SECRET_ROTATION.md` 4절)
 - 배포는 `CI/CD Pipeline` 이 성공한 push 에만 트리거된다 — CI 가 빨간불이면 배포는 아예 돌지 않는다
 
 ---

@@ -143,7 +143,9 @@ POSTGRES_DB=sr_db
    읽는다. 운영과 스테이징이 같은 `/home/opc/sr` 를 공유하고 그 `.env` 는 레거시 파일이므로,
    **두 환경 모두** `--env-file` 로 보간 파일을 명시한다(운영 `.env.prod`, 스테이징
    `.env.staging`). `--env-file` 을 빼고 compose 를 부르면 레거시 `.env` 로 보간된다. 워크플로는 분기 시점에
-   `COMPOSE_ARGS` 를 확정하고 `pull` / `down` / `up` / `image prune` 전부에 동일하게 사용한다.
+   `COMPOSE_ARGS` 를 확정하고 그 뒤의 compose 호출(`config` / `pull` / `up`, 스테이징은 `down` 포함) 전부에
+   동일하게 사용한다. 운영은 `down` 없이 앱만 교체하고, 이미지 정리는 compose 가 아니라
+   `docker image prune` 이다(배포 순서의 정본은 `docs/SERVER_RUNBOOK_2026-08-01.md` 5절).
 
    ```bash
    COMPOSE_ARGS="--env-file .env.staging -p sr-test -f docker-compose.test.yml"   # dev
@@ -219,7 +221,14 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-rec
 # 백업 확인 후에만!
 docker compose -p sr-test --env-file .env.staging -f docker-compose.test.yml down -v
 docker compose -p sr-test --env-file .env.staging -f docker-compose.test.yml up -d
-docker compose -p sr-test exec -T app-test npx tsx prisma/seed.ts
+```
+
+기준 데이터(권한·역할) 시딩은 따로 할 필요가 없다 — 컨테이너가 기동할 때마다 `docker-entrypoint.sh` 가
+`node prisma/seed.bundle.cjs` 로 수행하고, 실패하면 컨테이너가 뜨지 않는다(`docs/BOOTSTRAP.md` 3절).
+러너 이미지에는 `tsx` 가 없으므로 `npx tsx prisma/seed.ts` 는 쓸 수 없다. 다시 돌려야 하면 다음을 쓴다.
+
+```bash
+docker compose -p sr-test --env-file .env.staging -f docker-compose.test.yml exec -T app-test node prisma/seed.bundle.cjs
 ```
 
 ---
@@ -238,7 +247,7 @@ git commit -m "chore(security): untrack .env.docker* (secrets moved to GitHub Ac
 
 ```bash
 git ls-files | grep -i env       # .env.example 만 남아야 한다
-git check-ignore -v .env.docker .env.docker.test   # .gitignore:30 규칙에 걸려야 한다
+git check-ignore -v .env.docker .env.docker.test   # .gitignore 의 .env.* / .env.docker* 규칙에 걸려야 한다
 ```
 
 > 추적 해제만으로는 **이력에 남은 값이 지워지지 않는다.** 7절의 퍼지까지 마쳐야 하며,

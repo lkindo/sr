@@ -6,14 +6,14 @@
 `roles` / `permissions` 행이 없으면 앱은 정상 부팅하지만 **아무도 로그인할 수 없고**,
 회원가입도 기본 역할(`CLIENT_USER` 또는 `ENGINEER`)을 찾지 못해
 "시스템 설정 오류: 기본 역할을 찾을 수 없습니다" 로 실패한다
-(`src/app/(auth)/register/actions.ts:71-82`).
+(`src/app/(auth)/register/actions.ts` 의 `registerUser`).
 
 ---
 
 ## 1. 시드가 하는 일
 
 시드는 단일 파일 `prisma/seed.ts` 이며 `pnpm db:seed` (= `tsx prisma/seed.ts`) 로 실행한다.
-`main()` 은 항상 아래 순서로 진행한다(`prisma/seed.ts:934-954`).
+`main()` 은 항상 아래 순서로 진행한다(`prisma/seed.ts` 의 `main`).
 
 | 순서 | 단계                                 | 실행 조건                                                                    |
 | ---- | ------------------------------------ | ---------------------------------------------------------------------------- |
@@ -26,7 +26,7 @@
 
 ### 부트스트랩 관리자의 안전장치
 
-`prisma/seed.ts:881-932` 이 보장하는 계약이다. 회귀 테스트는
+`prisma/seed.ts` 의 `bootstrapAdmin()` 이 보장하는 계약이다. 회귀 테스트는
 `src/__tests__/bootstrap-admin.test.ts` 에 있다.
 
 - 두 환경변수 중 하나라도 없으면 **아무것도 하지 않는다.**
@@ -38,7 +38,7 @@
 
 **왜 "최초 가입자 자동 승격" 이 아니라 환경변수 방식인가:** 최초 가입자를 ADMIN 으로 올리면,
 인스턴스가 인터넷에 노출된 상태에서 소유자보다 먼저 가입한 사람이 관리자가 되는 경쟁 조건이
-생긴다. 환경변수로 명시하면 그 창이 없다(`prisma/seed.ts:865-880` 의 근거 주석).
+생긴다. 환경변수로 명시하면 그 창이 없다(`prisma/seed.ts` 의 `bootstrapAdmin()` 위 근거 주석).
 
 ---
 
@@ -73,10 +73,11 @@ pnpm db:seed
 pnpm dev
 ```
 
-> **주의:** 시드는 시작할 때 `dotenv` 를 `config({ override: true })` 로 불러온다
-> (`prisma/seed.ts:7-12`). 즉 `.env` 파일에 같은 이름의 값이 있으면 **셸에서 내보낸
-> 환경변수를 덮어쓴다.** 위 PowerShell 변수가 무시된다면 `.env` 에 같은 키가
-> 들어 있는지 확인한다(`.env.example` 에서는 주석 처리되어 있다).
+> **참고:** 시드는 시작할 때 `dotenv` 를 `config({ override: false })` 로 불러온다
+> (`prisma/seed.ts` 머리). 즉 **셸에서 내보낸 환경변수가 이기고**, `.env` 는 셸에 없는 키만
+> 채운다. CI·E2E·컨테이너가 주입한 `DATABASE_URL` 과 부트스트랩 비밀을 `.env` 가 덮어써
+> 엉뚱한 DB 를 시드하는 사고를 막기 위해서다. 그러니 위 PowerShell 변수가 적용되지 않는다면
+> 같은 셸 세션에서 실행했는지부터 확인한다.
 
 ### 테스트 계정까지 필요할 때
 
@@ -90,7 +91,7 @@ pnpm db:seed
 ```
 
 `SEED_ADMIN_PASSWORD` 는 픽스처 계정 `admin@example.com` 이 **아직 없을 때만** 쓰인다.
-값을 주지 않으면 그 계정 생성만 건너뛴다(`prisma/seed.ts:344-351`).
+값을 주지 않으면 그 계정 생성만 건너뛴다(`prisma/seed.ts` 의 `seedDevFixtures()`).
 
 ---
 
@@ -103,14 +104,14 @@ pnpm db:seed
    기존 스키마가 `0_init`과 일치함을 백업 후 확인하여 `ALLOW_PRISMA_BASELINE=1`을 준
    일회성 실행에서만 `prisma migrate resolve --applied 0_init` 후 재시도한다.
 2. `node prisma/seed.bundle.cjs` — 기준 데이터 시딩과 부트스트랩 관리자 생성.
-   이 번들은 이미지 빌드 중 esbuild 가 `prisma/seed.ts` 에서 생성한다(`Dockerfile:49-52`).
+   이 번들은 이미지 빌드 중 esbuild 가 `prisma/seed.ts` 에서 생성한다(`Dockerfile` 의 `esbuild prisma/seed.ts` 단계).
    시딩 실패 또는 번들 누락은 로그인 불가능한 반쪽 부팅으로 처리하지 않고 컨테이너를
    실패시킨다.
 
 따라서 운영자가 할 일은 **환경변수를 넣어 주는 것뿐**이다.
 
 `docker-compose.yml` 의 `app` 서비스는 `env_file: .env.docker` 를 읽는다.
-이 파일은 `.gitignore:35` 로 추적에서 제외되므로 **저장소에 없고 직접 만들어야 한다.**
+이 파일은 `.gitignore` 의 `.env.docker*` 규칙으로 추적에서 제외되므로 **저장소에 없고 직접 만들어야 한다.**
 `.env.example` 을 출발점으로 삼는다.
 
 ```bash
@@ -125,7 +126,7 @@ docker compose up --build -d
 ```
 
 앱 컨테이너는 `3001:3000` 으로 매핑되므로 호스트에서는 `http://localhost:3001` 로 접속한다
-(`docker-compose.yml:9-10`).
+(`docker-compose.yml` 의 `app.ports`).
 
 ---
 
@@ -150,7 +151,8 @@ docker compose up --build -d
 | `BOOTSTRAP_ADMIN_PASSWORD 가 12자 미만이라 부트스트랩을 중단합니다.`          | 비밀번호를 12자 이상으로 늘린다                       |
 | `ADMIN 역할이 없어 부트스트랩을 건너뜁니다(기준 데이터 시딩 실패?).`          | 1단계 기준 데이터 시딩이 실패했다. DB 연결을 확인한다 |
 | `기존 사용자 ... 에게 ADMIN 역할을 부여했습니다(비밀번호는 유지).`            | 정상. 해당 계정의 기존 비밀번호로 로그인한다          |
-| (컨테이너) `WARNING: 기준 데이터 시딩 실패 — 로그인 불가 상태일 수 있습니다.` | 앱은 떴지만 시딩이 실패했다. 컨테이너 로그를 확인한다 |
+| (컨테이너) `ERROR: prisma/seed.bundle.cjs 가 없습니다. 기준 데이터 없이 앱을 시작하지 않습니다.` | 이미지 빌드에서 시드 번들이 빠졌다. 컨테이너는 종료된다. 이미지를 다시 빌드한다 |
+| (컨테이너) 시드 단계의 예외 출력 후 컨테이너 종료 | 시딩이 실패하면 앱을 띄우지 않는다(`set -e`). 예외 메시지로 원인(DB 연결 등)을 확인한다 |
 
 ---
 
