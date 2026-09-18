@@ -247,6 +247,21 @@ export function mapPrismaError(error: unknown): ServiceError | null {
  * ServiceError를 Result 타입으로 변환하는 헬퍼 함수
  */
 
+/**
+ * 분류하지 못한 예외(500)에 사용자에게 보여 주는 고정 문구.
+ *
+ * 그 메시지들은 Prisma·드라이버·서드파티 라이브러리의 원문이라 모델명·필드 목록·연결 문자열 조각·파일 경로를
+ * 담는다. 원문은 로그로만 남기고, 응답에는 운영 환경에서 이 문구를 쓴다(개발 환경은 디버깅을 위해 원문).
+ * API 라우트(handleApiError)와 서버 액션(errorToResult)이 같은 문구·같은 규칙을 쓴다 — 예전에는 서버 액션만
+ * 원문을 그대로 돌려줬다.
+ */
+export const GENERIC_500_MESSAGE = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+
+/** 분류하지 못한 예외의 원문을 응답에 실어도 되는가 — 운영 환경이 아닐 때만. */
+export function exposeUnexpectedErrorMessage(): boolean {
+  return process.env.NODE_ENV !== 'production';
+}
+
 export function errorToResult(error: unknown): { success: false; error: string; code?: string } {
   // Prisma 제약 위반은 도메인 에러로 정규화한 뒤 처리한다. (500 → 400)
   const mapped = mapPrismaError(error);
@@ -276,7 +291,7 @@ export function errorToResult(error: unknown): { success: false; error: string; 
     logger.error(`Unexpected Error: ${error.message}`, error);
     return {
       success: false,
-      error: error.message,
+      error: exposeUnexpectedErrorMessage() ? error.message : GENERIC_500_MESSAGE,
       code: 'INTERNAL_ERROR',
     };
   }
