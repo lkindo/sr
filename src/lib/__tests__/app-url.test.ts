@@ -6,6 +6,7 @@ describe('app-url', () => {
   const originalEnv = process.env;
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = { ...originalEnv };
   });
 
@@ -20,15 +21,21 @@ describe('app-url', () => {
       expect(getAppUrl()).toBe('https://custom-domain.com');
     });
 
-    it('should return production default if VERCEL_URL is set (and no NEXT_PUBLIC_APP_URL)', () => {
+    it('운영 빌드(NODE_ENV=production)의 서버에서는 NEXT_PUBLIC_APP_URL 이 없으면 운영 도메인을 쓴다', () => {
       delete process.env.NEXT_PUBLIC_APP_URL;
-      process.env.VERCEL = '1';
+      vi.stubEnv('NODE_ENV', 'production');
       expect(getAppUrl()).toBe('https://www.lkindo.kr');
+    });
+
+    it('VERCEL 환경변수는 더 이상 보지 않는다 — 운영 빌드가 아니면 로컬 기본값이다', () => {
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      vi.stubEnv('NODE_ENV', 'development');
+      vi.stubEnv('VERCEL', '1');
+      expect(getAppUrl()).toBe('http://localhost:3000');
     });
 
     it('should return local default when no env vars are set', () => {
       delete process.env.NEXT_PUBLIC_APP_URL;
-      delete process.env.VERCEL;
       vi.stubEnv('NODE_ENV', 'development');
       expect(getAppUrl()).toBe('http://localhost:3000');
     });

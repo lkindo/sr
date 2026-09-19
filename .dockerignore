@@ -84,7 +84,6 @@ eslint.config.mjs
 .prettierignore
 .prettierrc
 *.md
-vercel.json
 components.json
 # 지금은 없지만 과거에 커밋된 적이 있는 VAPID 키 파일이다(7327a52, c9b9e11).
 # 재유입 방어선이므로 "파일이 없다"는 이유로 지우지 말 것.

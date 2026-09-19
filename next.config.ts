@@ -32,15 +32,9 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // 이미지 최적화
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**.public.blob.vercel-storage.com',
-      },
-    ],
-  },
+  // 이미지 원격 호스트(images.remotePatterns)는 두지 않는다. 외부 이미지 호스트가 없고 next/image 도 쓰지 않는다.
+  // 예전에는 채택되지 않은 Vercel Blob 호스트(**.public.blob.vercel-storage.com)가 남아 있어, /_next/image 가
+  // 누구의 Vercel Blob 이미지든 대신 받아 오는 쓰이지 않는 경로였다(2026-09-19 제거).
 
   // 실험적 기능
   experimental: {
