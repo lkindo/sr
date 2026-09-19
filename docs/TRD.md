@@ -1480,7 +1480,7 @@ app/
 | **Integration Test** | Vitest `integration` 프로젝트 (+ 실제 PostgreSQL) | 채번·테넌트 격리·트랜잭션 원자성 (`tests/integration/`) | — |
 | **E2E Test**         | Playwright                          | 주요 사용자 흐름, RBAC  | 주요 시나리오 |
 | **Component Test**   | Vitest + Testing Library            | React 컴포넌트          | 60%           |
-| **Mutation Test**    | Stryker                             | 변경된 파일 (PR 에서만) | —             |
+| **Mutation Test**    | Stryker                             | 변경된 파일 (PR 에서만, 4분할 병렬 + 합산 판정) | 전체 점수 45% |
 
 도구 버전의 정본은 `package.json` 이다.
 
@@ -1532,9 +1532,15 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 - **트리거**: `main` / `dev` 브랜치 push 및 두 브랜치를 향한 PR.
   `paths-ignore: ['**.md', 'docs/**']` — **문서만 수정하면 CI 도 배포도 돌지 않는다.**
 - **잡 구성**: `code-quality`(ESLint + `tsc --noEmit` + knip 데드 코드 + E2E 단언 검사 + Actions SHA 고정 검사) /
-  `test`(마이그레이션·드리프트·시드 + 커버리지 게이트) / `mutation-test`(PR 전용) / `build` / `e2e-test` /
+  `test`(마이그레이션·드리프트·시드 + 커버리지 게이트) / `mutation-test`(PR 전용, 4분할 matrix) + `mutation-summary`
+  (분할 결과 합산·판정) / `build` / `e2e-test` /
   `docker-build`(PR 전용, 푸시 없이 이미지 빌드만) / `security`(gitleaks + gating `pnpm audit --prod
 --audit-level=critical` + Trivy 리포트) / `deployment-ready`
+- **뮤테이션 분할**(2026-09-19): PR 이 대상 브랜치 대비 바꾼 파일(테스트가 닿는 것)만 검사한다. dev 를 main 에 모아
+  반영하는 PR 은 한 작업으로 60분을 넘어(PR #279: 뮤턴트 8,535개) 대상 파일을 크기 기준으로 4개 작업에 나눠 동시에 돌린다
+  (`scripts/lib/mutation-shards.ts`). 각 분할은 점수로 실패하지 않고 배정 기록과 리포트만 올리며, `mutation-summary` 가
+  1..4 기록이 모두 왔는지·같은 목록을 빠짐·겹침 없이 나눴는지 확인한 뒤 전체 점수를 `stryker.config.mjs` 의
+  `BREAK_THRESHOLD`(45)와 비교한다(`scripts/stryker-aggregate.ts`). 분할 수는 `ci-cd.yml` 의 `matrix.shard` 목록 하나로 정한다.
 - **E2E 범위**: push(`main`·`dev`)와 PR 모두 같은 전체 선택을 실행한다(dev→main PR 은 같은
   커밋의 push(`dev`) 실행과 겹쳐 건너뛴다 — 병합 트리의 검증은 병합 뒤 push(`main`) E2E 로 미뤄진다). PR 보안·권한
   서브셋(50개)은 스위트 정비로 전량 실행이 더 싸져 2026-08-09 에 걷어냈고, dev push 는
@@ -1585,7 +1591,8 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 │   test         : postgres:16-alpine 서비스  │
 │                  migrate deploy → drift    │
 │                  → seed → 커버리지 게이트   │
-│   mutation-test: Stryker (PR 에서만)        │
+│   mutation-test: Stryker 4분할 (PR 에서만)  │
+│   mutation-summary: 분할 합산 → 45% 판정    │
 │   build        : pnpm build (standalone)    │
 │   e2e-test     : Playwright 전체 스위트      │
 │                  (push main·dev, PR)        │
