@@ -25,6 +25,7 @@ import { SRAttachments } from '@/components/srs/SRAttachments';
 import { SRComments } from '@/components/srs/SRComments';
 import { SRDueDateField } from '@/components/srs/SRDueDateField';
 import { SRReopenBlockedNotice, SRStatusActions } from '@/components/srs/SRStatusActions';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { SRStatusTimeline } from '@/components/srs/SRStatusTimeline';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
@@ -33,12 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useDeleteSR, useSRDetails } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
-import {
-  priorityBadgeVariantOf,
-  priorityLabels,
-  statusBadgeVariantOf,
-  statusLabels,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabels } from '@/lib/constants/sr';
 import {
   canEditSRContentAt,
   canViewerAdjustDueDate,
@@ -162,13 +158,11 @@ export default function SRDetailPage() {
                     같은 화면에 같은 글자로 존재하게 됐다. 텍스트로 배지를 겨냥하면
                     버튼에 먼저 걸리므로 테스트가 잡을 훅을 배지 자신에게 준다.
                   */}
-                  <Badge
+                  <SRStatusBadge
                     data-testid="sr-status-badge"
-                    variant={statusBadgeVariantOf(sr.status)}
+                    status={sr.status}
                     className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"
-                  >
-                    {statusLabels[sr.status]}
-                  </Badge>
+                  />
                   <Badge
                     variant={priorityBadgeVariantOf(sr.requestedPriority)}
                     className="h-5 px-1.5 text-[10px] md:text-xs md:h-6 md:px-2.5"

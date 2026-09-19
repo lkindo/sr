@@ -43,6 +43,17 @@ export default {
           solid: 'hsl(var(--destructive-solid))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        // SR 상태·우선순위·마감 배지의 의미색(결정 D16 2단계). 값과 대비 근거는 globals.css.
+        status: {
+          neutral: 'hsl(var(--status-neutral))',
+          'neutral-border': 'hsl(var(--status-neutral-border))',
+          info: 'hsl(var(--status-info))',
+          success: 'hsl(var(--status-success))',
+          'success-solid': 'hsl(var(--status-success-solid))',
+          warning: 'hsl(var(--status-warning))',
+          caution: 'hsl(var(--status-caution))',
+          danger: 'hsl(var(--status-danger))',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

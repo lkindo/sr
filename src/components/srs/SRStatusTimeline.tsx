@@ -2,9 +2,9 @@
 
 import { AlertCircle, CheckCircle, Clock, Pause, User, XCircle } from 'lucide-react';
 
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
-import { statusBadgeVariantOf, statusLabelOf } from '@/lib/constants/sr';
 import { cn } from '@/lib/utils';
 
 interface StatusHistoryItem {
@@ -115,12 +115,10 @@ export function SRStatusTimeline({ statusHistory, currentStatus }: SRStatusTimel
                   {/* 내용 */}
                   <div className="flex-1 pb-4">
                     <div className="flex items-center gap-2 mb-1">
-                      <Badge
-                        variant={statusBadgeVariantOf(history.currentStatus)}
+                      <SRStatusBadge
+                        status={history.currentStatus}
                         className={cn(isCurrentStatus && 'ring-2 ring-primary ring-offset-2')}
-                      >
-                        {statusLabelOf(history.currentStatus)}
-                      </Badge>
+                      />
                       {isMostRecent && (
                         <Badge variant="outline" className="text-xs">
                           최근

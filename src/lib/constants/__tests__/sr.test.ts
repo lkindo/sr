@@ -98,29 +98,35 @@ describe('배지 variant 정본', () => {
     expect(Object.values(priorityBadgeVariants)).not.toContain('secondary');
   });
 
-  it('요청됨·보류는 테두리 배지, 거절은 빨강, 나머지는 채움 배지다', () => {
-    expect(statusBadgeVariantOf('REQUESTED')).toBe('outline');
-    expect(statusBadgeVariantOf('ON_HOLD')).toBe('outline');
-    expect(statusBadgeVariantOf('REJECTED')).toBe('destructive');
-    for (const status of ['INTAKE', 'IN_PROGRESS', 'COMPLETED', 'CONFIRMED']) {
-      expect(statusBadgeVariantOf(status), status).toBe('default');
-    }
+  // 2단계(소유자가 시안 A 를 고름): 움직이는 일 파랑, 멈춘 일 노랑, 끝난 일 초록, 거절 빨강.
+  it('상태마다 의미색이 정해져 있다', () => {
+    expect(statusBadgeVariantOf('REQUESTED')).toBe('neutral');
+    expect(statusBadgeVariantOf('INTAKE')).toBe('default');
+    expect(statusBadgeVariantOf('IN_PROGRESS')).toBe('info');
+    expect(statusBadgeVariantOf('ON_HOLD')).toBe('warning');
+    expect(statusBadgeVariantOf('COMPLETED')).toBe('success');
+    expect(statusBadgeVariantOf('CONFIRMED')).toBe('successEmphasis');
+    expect(statusBadgeVariantOf('REJECTED')).toBe('danger');
   });
 
-  it('모르는 값·빈 값은 outline 으로 보인다(알약은 보이되 강조하지 않는다)', () => {
-    expect(statusBadgeVariantOf('ESCALATED')).toBe('outline');
-    expect(statusBadgeVariantOf(undefined)).toBe('outline');
-    expect(priorityBadgeVariantOf('URGENT')).toBe('outline');
-    expect(priorityBadgeVariantOf(null)).toBe('outline');
+  it('7개 상태가 서로 다른 모양이다 — 색으로 적체를 거를 수 있다', () => {
+    expect(new Set(Object.values(statusBadgeVariants)).size).toBe(7);
+  });
+
+  it('모르는 값·빈 값은 색 없는 테두리(neutral)로 보인다(알약은 보이되 강조하지 않는다)', () => {
+    expect(statusBadgeVariantOf('ESCALATED')).toBe('neutral');
+    expect(statusBadgeVariantOf(undefined)).toBe('neutral');
+    expect(priorityBadgeVariantOf('URGENT')).toBe('neutral');
+    expect(priorityBadgeVariantOf(null)).toBe('neutral');
     // 프로토타입 키로 엉뚱한 값이 나오지 않는다.
-    expect(statusBadgeVariantOf('toString')).toBe('outline');
+    expect(statusBadgeVariantOf('toString')).toBe('neutral');
   });
 
-  it('우선순위: 긴급·높음은 빨강, 보통은 채움, 낮음은 테두리다', () => {
-    expect(priorityBadgeVariantOf('CRITICAL')).toBe('destructive');
-    expect(priorityBadgeVariantOf('HIGH')).toBe('destructive');
+  it('우선순위: 빨강은 긴급에만, 높음은 주황, 보통은 채움, 낮음은 테두리다', () => {
+    expect(priorityBadgeVariantOf('CRITICAL')).toBe('danger');
+    expect(priorityBadgeVariantOf('HIGH')).toBe('caution');
     expect(priorityBadgeVariantOf('MEDIUM')).toBe('default');
-    expect(priorityBadgeVariantOf('LOW')).toBe('outline');
+    expect(priorityBadgeVariantOf('LOW')).toBe('neutral');
   });
 
   it('우선순위 라벨은 모르는 값을 코드 그대로 보인다', () => {

@@ -355,7 +355,9 @@ components:
 >   Tailwind 기본 글자 크기를 쓴다.
 > - `status-badge` · `text-input` 토큰 — 배지는 알약형 `Badge`(variant 정본 `src/lib/constants/sr.ts`), 입력란은
 >   `bg-transparent`·8px 다. 아래 status-badge 목록에는 CONFIRMED(확인완료)가 없고 INTAKE·IN_PROGRESS 가 같은
->   파랑의 명도 차뿐이라 그대로 옮길 수도 없다. 상태별 의미색은 D16 2단계에서 소유자가 시안을 본 뒤 정한다.
+>   파랑의 명도 차뿐이라 그대로 옮기지 않았다. 앱의 상태 의미색은 D16 2단계에서 소유자가 고른 시안 A 이며, 정의는
+>   fe-rules §3.4 와 `globals.css` 의 `--status-*` 토큰에 있다(요청됨 테두리·접수 회색·진행중 파랑·보류 노랑·
+>   완료 초록·확인완료 초록+체크·거절 빨강). 상태 의미색은 아래 "크로마틱 액센트는 하나" 원칙의 예외다.
 >
 > **채택하지 않은 것 (마케팅 사이트 전용 어휘)**
 > - `pricing-*`, `template-card`, `product-mockup-tile`

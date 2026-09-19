@@ -9,6 +9,7 @@ import { ko } from 'date-fns/locale';
 import { AlertCircle, Clock, FileText, Filter } from 'lucide-react';
 
 import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
@@ -17,12 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, buildQuery, retryUnlessClientError } from '@/lib/api-client';
-import {
-  priorityBadgeVariantOf,
-  priorityLabelOf,
-  statusBadgeVariantOf,
-  statusLabelOf,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf, statusLabelOf } from '@/lib/constants/sr';
 import type { PaginationMeta } from '@/lib/pagination';
 import { qk } from '@/lib/query-keys';
 
@@ -260,9 +256,7 @@ export default function MyRequestsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">요청됨</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
-              {stats.requested}
-            </div>
+            <div className="text-2xl font-bold text-status-neutral">{stats.requested}</div>
           </CardContent>
         </Card>
 
@@ -271,9 +265,7 @@ export default function MyRequestsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">진행중</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
-              {stats.inProgress}
-            </div>
+            <div className="text-2xl font-bold text-status-info">{stats.inProgress}</div>
           </CardContent>
         </Card>
 
@@ -282,7 +274,7 @@ export default function MyRequestsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+            <div className="text-2xl font-bold text-status-success">{stats.completed}</div>
           </CardContent>
         </Card>
       </div>
@@ -298,9 +290,12 @@ export default function MyRequestsPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">상태</label>
+              {/* 라벨을 트리거에 연결한다 — 예전에는 이름 없는 콤보박스였다(axe button-name). */}
+              <label htmlFor="my-requests-status" className="text-sm font-medium">
+                상태
+              </label>
               <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger>
+                <SelectTrigger id="my-requests-status">
                   <SelectValue placeholder="전체 상태" />
                 </SelectTrigger>
                 <SelectContent>
@@ -315,9 +310,11 @@ export default function MyRequestsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">정렬 기준</label>
+              <label htmlFor="my-requests-sort" className="text-sm font-medium">
+                정렬 기준
+              </label>
               <Select value={sortBy} onValueChange={handleSortByChange}>
-                <SelectTrigger>
+                <SelectTrigger id="my-requests-sort">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -336,7 +333,7 @@ export default function MyRequestsPage() {
         {srs.length === 0 ? (
           <div className="sr-empty-state">
             <FileText className="sr-empty-state-icon" />
-            <h3 className="sr-empty-state-title">요청한 SR이 없습니다</h3>
+            <h2 className="sr-empty-state-title">요청한 SR이 없습니다</h2>
             <p className="sr-empty-state-description">
               아직 요청한 SR이 없습니다. 첫 SR을 요청하여 업무를 시작하세요.
             </p>
@@ -360,9 +357,7 @@ export default function MyRequestsPage() {
                       >
                         {sr.srNumber}
                       </Link>
-                      <Badge variant={statusBadgeVariantOf(sr.status)}>
-                        {statusLabelOf(sr.status)}
-                      </Badge>
+                      <SRStatusBadge status={sr.status} />
                       <Badge variant={priorityBadgeVariantOf(sr.requestedPriority)}>
                         {priorityLabelOf(sr.requestedPriority)}
                       </Badge>

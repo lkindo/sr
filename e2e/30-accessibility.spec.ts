@@ -91,5 +91,35 @@ test.describe('Accessibility (A11y) 검증', () => {
         await checkA11y(page, 'SR Detail', '[data-testid="sr-title"]');
       });
     });
+
+    /**
+     * 상태·우선순위 배지에 의미색을 넣으면서(2026-09-18 결정 D16 2단계) 배지가 그려지는 나머지 두 화면도 검사한다.
+     * 예전에는 대시보드·SR 목록·SR 상세만 검사해 고객 화면(내 요청)과 고객사 상세의 대비 회귀를 잡지 못했다.
+     */
+    test('내 요청 페이지 접근성 확인', async ({ browser }) => {
+      await withAuthContext(browser, 'client', async (page) => {
+        // 이 화면은 0.3초 페이드인이 있어, 도중에 검사하면 반투명 글자를 대비 미달로 잡는다. 모션 축소를 켜면
+        // globals.css 가 애니메이션을 즉시 끝내므로 정지 상태를 검사한다.
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.goto('/my-requests');
+        await checkA11y(page, 'My Requests', 'h1');
+      });
+    });
+
+    test('고객사 상세 페이지 접근성 확인', async ({ browser }) => {
+      await withAuthContext(browser, 'manager', async (page) => {
+        await page.goto('/clients', { waitUntil: 'domcontentloaded' });
+
+        // 표와 모바일 목록이 함께 렌더되므로 보이는 링크만 고른다.
+        const firstClientLink = page.locator('a[href^="/clients/"]:visible').first();
+        await expect(firstClientLink, '고객사 목록에 상세 링크가 없습니다.').toBeVisible({
+          timeout: 15000,
+        });
+
+        await firstClientLink.click();
+        await page.waitForURL(/\/clients\/[a-zA-Z0-9-]+/);
+        await checkA11y(page, 'Client Detail', 'h1');
+      });
+    });
   });
 });

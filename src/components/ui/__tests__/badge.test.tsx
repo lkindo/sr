@@ -35,15 +35,16 @@ describe('Badge Component', () => {
   it('renders with success variant', () => {
     render(<Badge variant="success">Success</Badge>);
     const badge = screen.getByText('Success');
-    expect(badge).toHaveClass('bg-emerald-500/10');
-    expect(badge).toHaveClass('text-emerald-400');
+    // 팔레트 클래스가 아니라 의미색 토큰이다(결정 D16 2단계, fe-rules §3.2).
+    expect(badge).toHaveClass('bg-status-success/15');
+    expect(badge).toHaveClass('text-status-success');
   });
 
   it('renders with warning variant', () => {
     render(<Badge variant="warning">Warning</Badge>);
     const badge = screen.getByText('Warning');
-    expect(badge).toHaveClass('bg-amber-500/10');
-    expect(badge).toHaveClass('text-amber-400');
+    expect(badge).toHaveClass('bg-status-warning/15');
+    expect(badge).toHaveClass('text-status-warning');
   });
 
   it('renders with outline variant', () => {

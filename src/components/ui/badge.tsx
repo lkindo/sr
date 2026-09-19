@@ -22,10 +22,18 @@ const badgeVariants = cva(
         // 분기를 없애고 variant 하나가 최종 색을 갖게 한다.
         destructive: 'border-transparent bg-destructive/10 text-destructive',
         outline: 'border-input text-foreground bg-transparent',
-        // 다크 캔버스(#090909) 위에서 읽히는 명도를 고른다. emerald-700/amber-700 은
-        // 어두운 표면 위 어두운 글자가 되어 대비가 무너진다.
-        success: 'border-transparent bg-emerald-500/10 text-emerald-400',
-        warning: 'border-transparent bg-amber-500/10 text-amber-400',
+        // 의미색(결정 D16 2단계) — 값은 globals.css 의 --status-* 토큰이다. 같은 색을 글자와 15% 배경에 함께 써서
+        // 카드(#141414) 위 대비가 모두 4.5:1 이상이다. 예전 success·warning 은 팔레트 클래스(emerald·amber)를
+        // 직접 썼다(fe-rules §3.2 '토큰만').
+        neutral: 'border-status-neutral-border bg-transparent text-status-neutral',
+        info: 'border-transparent bg-status-info/15 text-status-info',
+        success: 'border-transparent bg-status-success/15 text-status-success',
+        // 확인완료처럼 '완료보다 한 단계 더 끝난' 상태. 같은 초록에 테두리를 더한다.
+        successEmphasis: 'border-status-success/45 bg-status-success/15 text-status-success',
+        warning: 'border-transparent bg-status-warning/15 text-status-warning',
+        caution: 'border-transparent bg-status-caution/15 text-status-caution',
+        // destructive(#ef4444/10%)는 카드 위 글자 대비가 4.46:1 로 기준에 조금 못 미친다. SR 배지는 이 변형을 쓴다.
+        danger: 'border-transparent bg-status-danger/15 text-status-danger',
       },
     },
     defaultVariants: {

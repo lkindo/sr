@@ -149,10 +149,16 @@ Linux Docker 빌드에서 module-not-found 로 터진다. 규칙을 하나로 �
   배경은 투명(`bg-transparent` — 놓인 표면을 그대로 보인다)이고 테두리·플레이스홀더 색은 토큰(`border-input` /
   `text-muted-foreground`)을 쓴다.
 - **태그/칩**: 완전 둥근 알약(`rounded-full`).
-- **상태·우선순위 배지**: 알약형 `Badge` 에 `src/lib/constants/sr.ts` 의 `statusBadgeVariantOf`·`priorityBadgeVariantOf`
-  가 준 variant 를 쓴다. 화면에 맵 사본을 두지 않는다 — 사본이 따로 놀아 같은 상태가 화면마다 다른 모양으로 보였다.
-  `secondary` variant 는 배경이 카드(`--card`)와 같은 색이라 카드·표 위에서 알약이 보이지 않는다 — 카드 위에 놓이는
-  배지에는 `outline` 을 쓴다. 상태별 의미색은 결정 D16 2단계(소유자 시안 확인 후)에서 정한다.
+- **상태·우선순위·마감 배지**: 상태는 `SRStatusBadge`, 우선순위는 알약형 `Badge` 에 `priorityBadgeVariantOf`, 마감은
+  `getDueDateStatus`(`src/lib/date-utils.ts`)가 준 variant 를 쓴다. 정본 맵은 `src/lib/constants/sr.ts` 하나다 — 화면에
+  사본을 두지 않는다(사본이 따로 놀아 같은 상태가 화면마다 다른 모양으로 보였다).
+  의미색(2026-09-18 소유자 결정 D16, 시안 A): 요청됨 = 색 없는 테두리(`neutral`), 접수 = 회색 채움(`default`),
+  진행중 = 파랑(`info`), 보류 = 노랑(`warning`), 완료 = 초록(`success`), 확인완료 = 초록 + 테두리 + 체크(`successEmphasis`),
+  거절 = 빨강(`danger`). 우선순위는 긴급 빨강·높음 주황(`caution`)·보통 채움·낮음 테두리. 마감은 지연·24시간 안·오늘·내일
+  빨강, D-2·D-3 주황, 그 뒤 테두리이고 끝난 SR 에는 마감 배지가 없다(상태를 되풀이하지 않는다). **빨강은 거절·긴급·마감
+  임박에만 쓴다.** 색 값은 `globals.css` 의 `--status-*` 토큰이고, 같은 색을 글자와 15% 배경에 함께 써서 카드 위 대비가
+  모두 4.5:1 이상이다. 라벨은 항상 있다 — 색은 보조 수단이다.
+  `secondary` variant 는 배경이 카드(`--card`)와 같은 색이라 카드·표 위에서 알약이 보이지 않는다 — 카드 위 배지에 쓰지 않는다.
 - **아바타**: 20px(XS)~96px(3XL). 이미지가 없으면 `bg-primary/10` 위 이니셜.
 
 <sub>정정(2026-08-15): 이 절은 원래 `bg-[#4F46E5]`·`border-[#e2e8f0]`·`bg-[#f8fafc]` 같은

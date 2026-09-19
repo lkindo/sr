@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { ExportButton } from '@/components/dashboard/ExportButton';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
@@ -25,12 +26,7 @@ import { Progress } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, retryUnlessClientError } from '@/lib/api-client';
-import {
-  priorityBadgeVariants as priorityColors,
-  priorityLabels,
-  statusBadgeVariants as statusColors,
-  statusLabelOf,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf } from '@/lib/constants/sr';
 import { getDueDateStatus } from '@/lib/date-utils';
 import { qk } from '@/lib/query-keys';
 import { canViewerIntakeSR } from '@/lib/sr-state-machine';
@@ -241,11 +237,8 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
-                          <Badge
-                            variant={priorityColors[sr.priority] || 'default'}
-                            className="text-xs"
-                          >
-                            {priorityLabels[sr.priority] || sr.priority}
+                          <Badge variant={priorityBadgeVariantOf(sr.priority)} className="text-xs">
+                            {priorityLabelOf(sr.priority)}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1 truncate">{sr.title}</p>
@@ -302,17 +295,12 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
-                          <Badge variant={statusColors[sr.status] || 'default'} className="text-xs">
-                            {statusLabelOf(sr.status)}
-                          </Badge>
-                          <Badge
-                            variant={priorityColors[sr.priority] || 'default'}
-                            className="text-xs"
-                          >
-                            {priorityLabels[sr.priority] || sr.priority}
+                          <SRStatusBadge status={sr.status} className="text-xs" />
+                          <Badge variant={priorityBadgeVariantOf(sr.priority)} className="text-xs">
+                            {priorityLabelOf(sr.priority)}
                           </Badge>
                           {isOverdue && (
-                            <Badge variant="destructive" className="text-xs">
+                            <Badge variant="danger" className="text-xs">
                               지연
                             </Badge>
                           )}
@@ -417,12 +405,10 @@ export default function DashboardPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">진행 중</CardTitle>
-            <Clock className="h-5 w-5 text-[hsl(var(--sr-accent-blue))]" />
+            <Clock className="h-5 w-5 text-status-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
-              {stats.summary.inProgress}
-            </div>
+            <div className="text-2xl font-bold text-status-info">{stats.summary.inProgress}</div>
             <p className="text-xs text-muted-foreground mt-1">처리 중인 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -440,10 +426,10 @@ export default function DashboardPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">완료</CardTitle>
-            <CheckCircle className="h-5 w-5 text-green-600" />
+            <CheckCircle className="h-5 w-5 text-status-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.summary.completed}</div>
+            <div className="text-2xl font-bold text-status-success">{stats.summary.completed}</div>
             <p className="text-xs text-muted-foreground mt-1">완료된 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -461,12 +447,10 @@ export default function DashboardPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">대기 중</CardTitle>
-            <AlertCircle className="h-5 w-5 text-[hsl(var(--sr-accent-orange))]" />
+            <AlertCircle className="h-5 w-5 text-status-neutral" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
-              {stats.summary.pending}
-            </div>
+            <div className="text-2xl font-bold text-status-neutral">{stats.summary.pending}</div>
             <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -645,10 +629,10 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <Badge variant={priorityColors[sr.priority]}>
-                      {priorityLabels[sr.priority]}
+                    <Badge variant={priorityBadgeVariantOf(sr.priority)}>
+                      {priorityLabelOf(sr.priority)}
                     </Badge>
-                    <Badge variant={statusColors[sr.status]}>{statusLabelOf(sr.status)}</Badge>
+                    <SRStatusBadge status={sr.status} />
                   </div>
                 </div>
               ))}

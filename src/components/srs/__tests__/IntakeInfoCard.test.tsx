@@ -140,11 +140,11 @@ describe('IntakeInfoCard — 접수자', () => {
 describe('IntakeInfoCard — 우선순위', () => {
   /** 실물 Badge 의 cva 정의에서 따온 variant 별 대표 클래스. */
   const priorityColor = {
-    CRITICAL: 'bg-destructive',
-    HIGH: 'bg-destructive',
+    // 빨강은 긴급에만, 높음은 주황, 낮음은 색 없는 테두리(결정 D16 2단계).
+    CRITICAL: 'text-status-danger',
+    HIGH: 'text-status-caution',
     MEDIUM: 'bg-primary/10',
-    // secondary 배경은 카드와 같은 색이라 알약이 보이지 않았다 — outline(결정 D16).
-    LOW: 'border-input',
+    LOW: 'text-status-neutral',
   } as const;
 
   const priorityLabel = {
@@ -165,8 +165,8 @@ describe('IntakeInfoCard — 우선순위', () => {
     }
   );
 
-  it('네 우선순위의 색이 실제로 세 갈래로 갈린다', () => {
-    // 표를 그대로 베낀 단언이 아니라는 것을 못박는다(CRITICAL·HIGH 만 같은 색).
+  it('네 우선순위의 색이 실제로 네 갈래로 갈린다', () => {
+    // 표를 그대로 베낀 단언이 아니라는 것을 못박는다. 예전에는 긴급·높음이 같은 빨강이었다(결정 D16).
     const classNames = (Object.keys(priorityLabel) as (keyof typeof priorityLabel)[]).map((p) => {
       const { unmount } = render(
         <IntakeInfoCard sr={makeSR({ requestedPriority: p, actualPriority: null })} />
@@ -176,7 +176,7 @@ describe('IntakeInfoCard — 우선순위', () => {
       return className;
     });
 
-    expect(new Set(classNames).size).toBe(3);
+    expect(new Set(classNames).size).toBe(4);
   });
 
   it('실제 우선순위가 없으면 화살표도 실제 배지도 없다', () => {

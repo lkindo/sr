@@ -19,6 +19,7 @@ import {
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import { DeleteClientDialog } from '@/components/clients/DeleteClientDialog';
 import { ServiceCategoryDialog } from '@/components/clients/ServiceCategoryDialog';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Separator } from '@/components/ui';
@@ -103,12 +104,7 @@ interface UserClients {
   clients?: Array<{ client: { id: string } }>;
 }
 
-import {
-  priorityBadgeVariants as priorityColors,
-  priorityLabels,
-  statusBadgeVariants as statusColors,
-  statusLabelOf,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf } from '@/lib/constants/sr';
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -359,14 +355,16 @@ export default function ClientDetailPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/clients">
-              <ArrowLeft className="h-4 w-4" />
+            {/* 아이콘뿐인 링크라 이름을 준다(axe link-name). */}
+            <Link href="/clients" aria-label="고객사 목록으로 돌아가기">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             </Link>
           </Button>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+            {/* 화면 제목이다 — h2 였을 때 페이지에 h1 이 없었다(axe page-has-heading-one, 결정 D16 에서 접근성 검사 대상에 넣음). */}
+            <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
               {client.name}
-            </h2>
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">고객사 코드: {client.code}</p>
           </div>
         </div>
@@ -429,7 +427,7 @@ export default function ClientDetailPage() {
         <div className="md:col-span-2 sr-card-template">
           {/* 카드 헤더 */}
           <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">기본 정보</h3>
+            <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">기본 정보</h2>
           </div>
 
           {/* 카드 내용 */}
@@ -524,7 +522,7 @@ export default function ClientDetailPage() {
         <div className="sr-card-template">
           {/* 카드 헤더 */}
           <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h3>
+            <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h2>
           </div>
 
           {/* 카드 내용 */}
@@ -572,9 +570,9 @@ export default function ClientDetailPage() {
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
               <div>
-                <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+                <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
                   서비스 카테고리
-                </h3>
+                </h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   이 고객사에 등록된 서비스 카테고리 목록입니다.
                 </p>
@@ -622,8 +620,8 @@ export default function ClientDetailPage() {
                         <TableCell>{category.description || '-'}</TableCell>
                         <TableCell>{category.slaHours}시간</TableCell>
                         <TableCell>
-                          <Badge variant={priorityColors[category.priority]}>
-                            {priorityLabels[category.priority]}
+                          <Badge variant={priorityBadgeVariantOf(category.priority)}>
+                            {priorityLabelOf(category.priority)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -674,7 +672,7 @@ export default function ClientDetailPage() {
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
               <div>
-                <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h3>
+                <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   이 고객사에 속한 사용자 목록입니다.
                 </p>
@@ -739,7 +737,7 @@ export default function ClientDetailPage() {
           <div className="sr-card-template">
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">최근 SR</h3>
+              <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">최근 SR</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {assignedOnly
                   ? '나에게 배정된 이 고객사의 최근 SR 목록입니다 (최대 10개).'
@@ -767,13 +765,11 @@ export default function ClientDetailPage() {
                       <TableRow key={sr.id}>
                         <TableCell className="font-medium">{sr.title}</TableCell>
                         <TableCell>
-                          <Badge variant={statusColors[sr.status]}>
-                            {statusLabelOf(sr.status)}
-                          </Badge>
+                          <SRStatusBadge status={sr.status} />
                         </TableCell>
                         <TableCell>
-                          <Badge variant={priorityColors[sr.priority]}>
-                            {priorityLabels[sr.priority]}
+                          <Badge variant={priorityBadgeVariantOf(sr.priority)}>
+                            {priorityLabelOf(sr.priority)}
                           </Badge>
                         </TableCell>
                         <TableCell>{new Date(sr.createdAt).toLocaleDateString('ko-KR')}</TableCell>

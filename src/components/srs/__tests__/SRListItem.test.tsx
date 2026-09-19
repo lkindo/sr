@@ -126,3 +126,45 @@ describe('SRCardItem', () => {
     expect(screen.getByRole('link', { name: 'Test SR' })).toHaveAttribute('href', '/srs/sr-1');
   });
 });
+
+/**
+ * 마감 열은 상태를 되풀이하지 않는다(2026-09-18 소유자 결정 D16 2단계). 예전에는 거절된 SR 행에 상태 열 '거절' 과
+ * 마감 열 '거절' 이 나란히 빨갛게 나왔다.
+ */
+describe('SRTableRow — 마감 열', () => {
+  it('끝난 SR 은 지난 마감이어도 마감 열에 상태나 지연을 다시 적지 않는다', () => {
+    render(
+      <table>
+        <tbody>
+          <SRTableRow
+            sr={{ ...mockSR, status: 'REJECTED', dueDate: new Date('2023-01-01') }}
+            canManageSRs={false}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(screen.getAllByText('거절')).toHaveLength(1);
+    expect(screen.queryByText(/지연/)).not.toBeInTheDocument();
+  });
+
+  it('보류 SR 은 상태 이름 없이 지연만 보인다', () => {
+    render(
+      <table>
+        <tbody>
+          <SRTableRow
+            sr={{
+              ...mockSR,
+              status: 'ON_HOLD',
+              dueDate: new Date(Date.now() - 50 * 60 * 60 * 1000),
+            }}
+            canManageSRs={false}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(screen.getAllByText('보류')).toHaveLength(1);
+    expect(screen.getByText('2일 지연')).toBeInTheDocument();
+  });
+});

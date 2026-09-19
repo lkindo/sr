@@ -2,6 +2,7 @@
 
 import { AlertTriangle, FileText } from 'lucide-react';
 
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,12 +15,7 @@ import {
 } from '@/components/ui';
 import { Badge } from '@/components/ui';
 import { ScrollArea } from '@/components/ui';
-import {
-  priorityBadgeVariantOf,
-  priorityLabelOf,
-  statusBadgeVariantOf,
-  statusLabelOf,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf } from '@/lib/constants/sr';
 
 interface OngoingSR {
   id: string;
@@ -58,9 +54,7 @@ export function UserReassignDialog({
 
   // 라벨·색은 정본(@/lib/constants/sr)을 쓴다(2026-09-18 결정 D16 1단계). 예전 사본은 INTAKE 를 '접수중' 으로
   // 적어 다른 화면의 '접수' 와 달랐다. 모르는 코드는 원문 그대로 보인다(숨기지 않는다).
-  const getStatusBadge = (status: string) => (
-    <Badge variant={statusBadgeVariantOf(status)}>{statusLabelOf(status)}</Badge>
-  );
+  const getStatusBadge = (status: string) => <SRStatusBadge status={status} />;
 
   const getPriorityBadge = (priority: string) => (
     <Badge variant={priorityBadgeVariantOf(priority)}>{priorityLabelOf(priority)}</Badge>

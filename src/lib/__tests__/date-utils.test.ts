@@ -36,34 +36,23 @@ describe('date-utils', () => {
   });
 
   describe('getDueDateStatus', () => {
-    it('should return completed status for COMPLETED', () => {
-      const status = getDueDateStatus('2023-01-01', 'COMPLETED');
-      expect(status).toEqual({
-        label: '완료됨',
-        variant: 'default',
-        isOverdue: false,
-        isUrgent: false,
-      });
-    });
+    /**
+     * 마감 열은 상태를 되풀이하지 않는다(2026-09-18 소유자 결정 D16 2단계). 예전에는 끝난 SR 에 '완료됨'·'거절',
+     * 보류에 '보류' 를 다시 적어 한 행에 빨간 '거절' 이 두 번 나왔다. 상태는 옆 상태 배지가 보인다.
+     */
+    it.each(['COMPLETED', 'CONFIRMED', 'REJECTED'])(
+      '끝난 SR(%s)은 마감 배지가 없다 — 지난 마감이어도 지연으로 보이지 않는다',
+      (status) => {
+        expect(getDueDateStatus('2023-01-01', status)).toBeNull();
+      }
+    );
 
-    it('should return completed status for CONFIRMED', () => {
-      const status = getDueDateStatus('2023-01-01', 'CONFIRMED');
-      expect(status).toEqual({
-        label: '완료됨',
-        variant: 'default',
-        isOverdue: false,
-        isUrgent: false,
-      });
-    });
-
-    it('should return on hold status for ON_HOLD', () => {
-      // 마감일 배지는 상태 배지와 같은 행에 나란히 뜨므로 문구를 맞춘다
-      // (statusLabels.ON_HOLD = '보류'). 예전에는 '보류중' 이라 한 행에 두 이름이었다.
-      const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-      const status = getDueDateStatus(future, 'ON_HOLD');
-      expect(status).toEqual({
-        label: '보류',
-        variant: 'secondary',
+    it('보류 SR 은 다른 진행 중 SR 과 같은 마감 규칙을 따른다(상태 이름을 다시 적지 않는다)', () => {
+      const d5 = new Date();
+      d5.setDate(d5.getDate() + 5);
+      expect(getDueDateStatus(d5.toISOString(), 'ON_HOLD')).toEqual({
+        label: 'D-5',
+        variant: 'neutral',
         isOverdue: false,
         isUrgent: false,
       });
@@ -71,31 +60,21 @@ describe('date-utils', () => {
 
     // 보류 중에도 SLA 시계는 멈추지 않는다. 마감을 넘긴 보류 SR 은 '지연 중' 지표(결정 D10)에 들므로
     // 행에도 지연으로 보여 대시보드 숫자와 목록이 맞게 한다.
-    it('마감을 넘긴 보류 SR 은 보류와 지연을 함께 보인다', () => {
+    it('마감을 넘긴 보류 SR 은 지연으로 보인다', () => {
       const threeDaysAgo = new Date(Date.now() - (3 * 24 + 1) * 60 * 60 * 1000);
       expect(getDueDateStatus(threeDaysAgo, 'ON_HOLD')).toEqual({
-        label: '보류 · 3일 지연',
-        variant: 'destructive',
+        label: '3일 지연',
+        variant: 'danger',
         isOverdue: true,
         isUrgent: false,
       });
 
       const twoHoursAgo = new Date(Date.now() - (2 * 60 + 5) * 60 * 1000);
-      expect(getDueDateStatus(twoHoursAgo, 'ON_HOLD')?.label).toBe('보류 · 2시간 지연');
+      expect(getDueDateStatus(twoHoursAgo, 'ON_HOLD')?.label).toBe('2시간 지연');
     });
 
-    it('마감일이 없는 보류 SR 은 그냥 보류다', () => {
-      expect(getDueDateStatus(null, 'ON_HOLD')?.label).toBe('보류');
-    });
-
-    it('should return rejected status for REJECTED', () => {
-      const status = getDueDateStatus('2023-01-01', 'REJECTED');
-      expect(status).toEqual({
-        label: '거절',
-        variant: 'destructive',
-        isOverdue: false,
-        isUrgent: false,
-      });
+    it('마감일이 없는 보류 SR 은 마감 배지가 없다', () => {
+      expect(getDueDateStatus(null, 'ON_HOLD')).toBeNull();
     });
 
     it('should return null if no due date', () => {
@@ -110,7 +89,7 @@ describe('date-utils', () => {
       const status = getDueDateStatus(pastDate.toISOString(), 'IN_PROGRESS');
       expect(status).toEqual({
         label: '5일 지연',
-        variant: 'destructive',
+        variant: 'danger',
         isOverdue: true,
         isUrgent: false,
       });
@@ -163,7 +142,7 @@ describe('date-utils', () => {
 
         expect(status).toEqual({
           label: '내일 마감',
-          variant: 'destructive',
+          variant: 'danger',
           isOverdue: false,
           isUrgent: true,
         });
@@ -172,13 +151,14 @@ describe('date-utils', () => {
       }
     });
 
+    // D-2·D-3 은 빨강이 아니라 주황이다 — 빨강은 거절·긴급·마감 임박(24시간 안·오늘·내일·지연)에만 쓴다(결정 D16).
     it('should return D-2 as urgent', () => {
       const d2 = new Date();
       d2.setDate(d2.getDate() + 2);
       const status = getDueDateStatus(d2.toISOString(), 'IN_PROGRESS');
       expect(status).toEqual({
         label: 'D-2',
-        variant: 'destructive',
+        variant: 'caution',
         isOverdue: false,
         isUrgent: true,
       });
@@ -190,31 +170,32 @@ describe('date-utils', () => {
       const status = getDueDateStatus(d3.toISOString(), 'IN_PROGRESS');
       expect(status).toEqual({
         label: 'D-3',
-        variant: 'destructive',
+        variant: 'caution',
         isOverdue: false,
         isUrgent: true,
       });
     });
 
-    it('should return D-5 as secondary (not urgent)', () => {
+    // 그 뒤는 색 없는 테두리다. 예전 secondary 는 배경이 카드와 같아 알약이 보이지 않았다.
+    it('should return D-5 as neutral (not urgent)', () => {
       const d5 = new Date();
       d5.setDate(d5.getDate() + 5);
       const status = getDueDateStatus(d5.toISOString(), 'IN_PROGRESS');
       expect(status).toEqual({
         label: 'D-5',
-        variant: 'secondary',
+        variant: 'neutral',
         isOverdue: false,
         isUrgent: false,
       });
     });
 
-    it('should return D-7 as secondary', () => {
+    it('should return D-7 as neutral', () => {
       const d7 = new Date();
       d7.setDate(d7.getDate() + 7);
       const status = getDueDateStatus(d7.toISOString(), 'IN_PROGRESS');
       expect(status).toEqual({
         label: 'D-7',
-        variant: 'secondary',
+        variant: 'neutral',
         isOverdue: false,
         isUrgent: false,
       });
@@ -227,7 +208,7 @@ describe('date-utils', () => {
       const status = getDueDateStatus(futureDate.toISOString(), 'IN_PROGRESS');
       expect(status).toEqual({
         label: 'D-10',
-        variant: 'default',
+        variant: 'neutral',
         isOverdue: false,
         isUrgent: false,
       });
