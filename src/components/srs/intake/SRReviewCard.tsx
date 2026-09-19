@@ -7,15 +7,8 @@ import { ko } from 'date-fns/locale';
 
 import { Badge } from '@/components/ui';
 import { Separator } from '@/components/ui';
-import { priorityLabels } from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabels } from '@/lib/constants/sr';
 import type { SRDetails } from '@/types/sr.types';
-
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
 
 interface SRReviewCardProps {
   sr: SRDetails;
@@ -27,7 +20,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
       {/* 카드 헤더 */}
       <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[hsl(var(--sr-primary-dark))] text-white font-bold text-sm">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
             1
           </div>
           <div>
@@ -52,7 +45,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
           <Separator orientation="vertical" className="h-12" />
           <div>
             <p className="text-sm text-muted-foreground">요청 우선순위</p>
-            <Badge variant={priorityColors[sr.requestedPriority]}>
+            <Badge variant={priorityBadgeVariantOf(sr.requestedPriority)}>
               {priorityLabels[sr.requestedPriority]}
             </Badge>
           </div>

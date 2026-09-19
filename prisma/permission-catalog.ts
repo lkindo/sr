@@ -38,7 +38,6 @@ export const PERMISSION_CATALOG = [
   { resource: 'USER', action: 'UPDATE', description: '사용자 수정' },
   { resource: 'USER', action: 'UPDATE_SELF', description: '본인 프로필 수정' },
   { resource: 'USER', action: 'DELETE', description: '사용자 삭제' },
-  { resource: 'USER', action: 'ASSIGN_ROLE', description: '역할 할당' },
 
   // 역할 관련 권한
   { resource: 'ROLE', action: 'CREATE', description: '역할 생성' },

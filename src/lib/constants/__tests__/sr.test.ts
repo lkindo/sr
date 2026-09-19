@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  priorityBadgeVariantOf,
+  priorityBadgeVariants,
+  priorityLabelOf,
   priorityLabels,
+  statusBadgeVariantOf,
   statusBadgeVariants,
   statusLabelOf,
   statusLabels,
@@ -81,5 +85,53 @@ describe('SR 상태 라벨 정본', () => {
       // undefined 를 렌더해 아무것도 안 뜨는 것보다 원문이 낫다.
       expect(statusLabelOf('SOMETHING_NEW')).toBe('SOMETHING_NEW');
     });
+  });
+});
+
+/**
+ * 상태·우선순위 배지 variant 정본(2026-09-18 소유자 결정 D16 1단계). 화면마다 들고 있던 사본을 흡수했으므로
+ * 모든 화면이 이 함수로 variant 를 얻는다.
+ */
+describe('배지 variant 정본', () => {
+  it('카드와 같은 배경인 secondary 를 쓰지 않는다 — 카드·표 위에서 알약이 보이지 않았다', () => {
+    expect(Object.values(statusBadgeVariants)).not.toContain('secondary');
+    expect(Object.values(priorityBadgeVariants)).not.toContain('secondary');
+  });
+
+  // 2단계(소유자가 시안 A 를 고름): 움직이는 일 파랑, 멈춘 일 노랑, 끝난 일 초록, 거절 빨강.
+  it('상태마다 의미색이 정해져 있다', () => {
+    expect(statusBadgeVariantOf('REQUESTED')).toBe('neutral');
+    expect(statusBadgeVariantOf('INTAKE')).toBe('default');
+    expect(statusBadgeVariantOf('IN_PROGRESS')).toBe('info');
+    expect(statusBadgeVariantOf('ON_HOLD')).toBe('warning');
+    expect(statusBadgeVariantOf('COMPLETED')).toBe('success');
+    expect(statusBadgeVariantOf('CONFIRMED')).toBe('successEmphasis');
+    expect(statusBadgeVariantOf('REJECTED')).toBe('danger');
+  });
+
+  it('7개 상태가 서로 다른 모양이다 — 색으로 적체를 거를 수 있다', () => {
+    expect(new Set(Object.values(statusBadgeVariants)).size).toBe(7);
+  });
+
+  it('모르는 값·빈 값은 색 없는 테두리(neutral)로 보인다(알약은 보이되 강조하지 않는다)', () => {
+    expect(statusBadgeVariantOf('ESCALATED')).toBe('neutral');
+    expect(statusBadgeVariantOf(undefined)).toBe('neutral');
+    expect(priorityBadgeVariantOf('URGENT')).toBe('neutral');
+    expect(priorityBadgeVariantOf(null)).toBe('neutral');
+    // 프로토타입 키로 엉뚱한 값이 나오지 않는다.
+    expect(statusBadgeVariantOf('toString')).toBe('neutral');
+  });
+
+  it('우선순위: 빨강은 긴급에만, 높음은 주황, 보통은 채움, 낮음은 테두리다', () => {
+    expect(priorityBadgeVariantOf('CRITICAL')).toBe('danger');
+    expect(priorityBadgeVariantOf('HIGH')).toBe('caution');
+    expect(priorityBadgeVariantOf('MEDIUM')).toBe('default');
+    expect(priorityBadgeVariantOf('LOW')).toBe('neutral');
+  });
+
+  it('우선순위 라벨은 모르는 값을 코드 그대로 보인다', () => {
+    expect(priorityLabelOf('HIGH')).toBe('높음');
+    expect(priorityLabelOf('URGENT')).toBe('URGENT');
+    expect(priorityLabelOf(undefined)).toBe('');
   });
 });

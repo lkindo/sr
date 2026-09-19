@@ -35,7 +35,7 @@ vi.mock('@/lib/prisma', () => ({
     sRActivity: { count: vi.fn() },
     sRComment: { count: vi.fn() },
     sRStatusHistory: { count: vi.fn() },
-    auditLog: { create: vi.fn() },
+    auditLog: { create: vi.fn(), count: vi.fn().mockResolvedValue(0) },
     $transaction: vi.fn((cb) => cb(prisma)),
   },
 }));
@@ -136,7 +136,7 @@ describe('UserService - coverage2 (uncovered methods)', () => {
 
     it('applies isActive, roleId and userType=CLIENT filters', async () => {
       await userService.getAllUsers(
-        { isActive: 'true', roleId: 'r1', userType: 'CLIENT' },
+        { clientId: undefined, isActive: 'true', roleId: 'r1', userType: 'CLIENT' },
         { skip: 0, take: 10 }
       );
 

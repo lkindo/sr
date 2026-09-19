@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
-import { ensureCanAssignRolesToUser, INTERNAL_ROLES } from '@/lib/policies';
+import { NotFoundError, ValidationError } from '@/lib/errors';
+import { ensureCanAssignRoles, ensureCanAssignRolesToUser, INTERNAL_ROLES } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { roleAssignSchema } from '@/lib/schemas';
 import { auditService } from '@/services/audit.service';
@@ -18,11 +18,7 @@ export const POST = withAuthAndRateLimit(
 
     // 권한 체크: 역할 할당 권한(ADMIN 또는 ROLE:ASSIGN)이 있어야 함
     // (인증만 하는 withAuthAndRateLimit 만으로는 인가가 보장되지 않으므로 필수)
-    const canAssignRoles =
-      session.user.roles.includes('ADMIN') || session.user.permissions.includes('ROLE:ASSIGN');
-    if (!canAssignRoles) {
-      throw new ForbiddenError('역할을 할당할 권한이 없습니다.');
-    }
+    ensureCanAssignRoles(session.user);
 
     const validated = await validateRequestBody(request, roleAssignSchema);
 

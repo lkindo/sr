@@ -13,6 +13,7 @@ import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError, apiGet, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { CANONICAL_ROLE_NAMES } from '@/lib/role-rules';
 import { RoleItem as Role } from '@/types/role';
 
 interface RolesClientProps {
@@ -179,6 +180,11 @@ export default function RolesClient({ initialRoles }: RolesClientProps) {
               등록
             </Button>
           </div>
+          {/* 비활성 버튼은 이유를 말하지 않으므로 규칙을 한 줄로 알린다(헌법 §1.4) */}
+          <p className="text-xs text-muted-foreground">
+            기본 역할({CANONICAL_ROLE_NAMES.join(', ')})은 이름을 바꾸거나 삭제할 수 없습니다. 권한
+            구성은 ADMIN 역할을 빼고 조정할 수 있습니다.
+          </p>
         </div>
 
         {/* Total Count - 테이블 바로 위 */}

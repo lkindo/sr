@@ -9,12 +9,18 @@ import { ResponsiveTableShell } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
+import { CLIENT_ROSTER_HIDDEN_NOTE } from '@/lib/constants/client';
 
 interface ClientTableProps {
   clients: any[];
   loading: boolean;
   expandedRows: Set<string>;
   clientUsers: Record<string, any[]>;
+  /**
+   * 서버가 사용자 명부를 싣지 않았는가(GET /api/clients 의 viewerScope='assigned' — ENGINEER).
+   * 그때 SR 건수는 자기 배정분이고, 펼친 행의 빈 명부는 "사용자 없음" 이 아니다.
+   */
+  rosterHidden?: boolean;
   onToggleRowExpansion: (clientId: string) => void;
   onUsersClick: (client: any, e: React.MouseEvent) => void;
   onCreateClient: () => void;
@@ -25,6 +31,7 @@ export function ClientTable({
   loading,
   expandedRows,
   clientUsers,
+  rosterHidden = false,
   onToggleRowExpansion,
   onUsersClick,
   onCreateClient,
@@ -40,7 +47,7 @@ export function ClientTable({
           <TableHead>담당자</TableHead>
           <TableHead>이메일</TableHead>
           <TableHead>사용자</TableHead>
-          <TableHead>SR</TableHead>
+          <TableHead>{rosterHidden ? '내 배정 SR' : 'SR'}</TableHead>
           <TableHead>상태</TableHead>
         </TableRow>
       </TableHeader>
@@ -121,9 +128,13 @@ export function ClientTable({
                     <TableCell colSpan={9} className="p-0">
                       <div className="p-4 pl-16">
                         <h4 className="text-sm font-semibold mb-3 text-[hsl(var(--sr-primary-dark))]">
-                          소속 사용자 ({users.length}명)
+                          {rosterHidden ? '소속 사용자' : `소속 사용자 (${users.length}명)`}
                         </h4>
-                        {users.length === 0 ? (
+                        {rosterHidden ? (
+                          <p className="text-sm text-muted-foreground py-2">
+                            {CLIENT_ROSTER_HIDDEN_NOTE}
+                          </p>
+                        ) : users.length === 0 ? (
                           <p className="text-sm text-muted-foreground py-2">
                             등록된 사용자가 없습니다.
                           </p>

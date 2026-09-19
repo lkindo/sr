@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { CopyButton } from '@/components/ui';
 import { TableCell, TableRow } from '@/components/ui';
+import { priorityBadgeVariantOf, priorityLabelOf } from '@/lib/constants/sr';
 import { getDueDateStatus } from '@/lib/date-utils';
 import { formatAppZoneDate, formatAppZoneShortDate } from '@/lib/timezone';
 import { SRListItem } from '@/types/sr.types';
 
-import { priorityColors, priorityLabels, statusColors, statusLabels } from './constants';
+import { SRStatusBadge } from './SRStatusBadge';
 
 // ⚡ Bolt: Fast date formatting for lists
 // toLocaleDateString() initializes Intl.DateTimeFormat on every call which is slow.
@@ -56,10 +57,10 @@ export const SRTableRow = memo(({ sr, canManageSRs }: SRListItemProps) => {
       <TableCell className="text-center">{sr.requester.name}</TableCell>
       <TableCell className="text-center">{sr.assignee?.name || '-'}</TableCell>
       <TableCell className="text-center">
-        <Badge variant={priorityColors[sr.priority]}>{priorityLabels[sr.priority]}</Badge>
+        <Badge variant={priorityBadgeVariantOf(sr.priority)}>{priorityLabelOf(sr.priority)}</Badge>
       </TableCell>
       <TableCell className="text-center">
-        <Badge variant={statusColors[sr.status]}>{statusLabels[sr.status]}</Badge>
+        <SRStatusBadge status={sr.status} />
       </TableCell>
       <TableCell className="text-center">
         {dueDateStatus ? <Badge variant={dueDateStatus.variant}>{dueDateStatus.label}</Badge> : '-'}
@@ -128,11 +129,12 @@ export const SRCardItem = memo(({ sr, canManageSRs }: SRListItemProps) => {
             className="h-7 w-7 text-muted-foreground"
             aria-label={`${sr.srNumber} 번호 복사`}
           />
-          <Badge variant={statusColors[sr.status]} className="text-[10px] h-5 px-1.5 shrink-0">
-            {statusLabels[sr.status]}
-          </Badge>
-          <Badge variant={priorityColors[sr.priority]} className="text-[10px] h-5 px-1.5 shrink-0">
-            {priorityLabels[sr.priority]}
+          <SRStatusBadge status={sr.status} className="text-[10px] h-5 px-1.5 shrink-0" />
+          <Badge
+            variant={priorityBadgeVariantOf(sr.priority)}
+            className="text-[10px] h-5 px-1.5 shrink-0"
+          >
+            {priorityLabelOf(sr.priority)}
           </Badge>
         </div>
         {/* Action Button */}

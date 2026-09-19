@@ -10,6 +10,7 @@ import {
   ensureCanAssignRole,
   ensureCanDeleteRole,
   ensureCanUpdateRole,
+  ensureRoleNameAllowed,
 } from '@/lib/policies';
 import { AuthenticatedUser } from '@/types/session';
 
@@ -103,14 +104,15 @@ describe('Role Policy Functions', () => {
       expect(canDeleteRole(adminUser, customRole)).toBe(true);
     });
 
-    it('should deny deleting system roles (ADMIN, USER, GUEST)', () => {
-      expect(canDeleteRole(adminUser, adminRole)).toBe(false);
+    it('기본 역할 5개는 ADMIN 도 삭제할 수 없다(헌법 §1.4)', () => {
+      for (const name of ['ADMIN', 'MANAGER', 'ENGINEER', 'CLIENT_ADMIN', 'CLIENT_USER']) {
+        expect(canDeleteRole(adminUser, { ...customRole, name }), name).toBe(false);
+      }
+    });
 
-      const userRole = { ...customRole, name: 'USER' };
-      expect(canDeleteRole(adminUser, userRole)).toBe(false);
-
-      const guestRole = { ...customRole, name: 'GUEST' };
-      expect(canDeleteRole(adminUser, guestRole)).toBe(false);
+    it('예전 보호 목록의 USER·GUEST 는 이 시스템에 없는 이름이라 보호 대상이 아니다', () => {
+      expect(canDeleteRole(adminUser, { ...customRole, name: 'USER' })).toBe(true);
+      expect(canDeleteRole(adminUser, { ...customRole, name: 'GUEST' })).toBe(true);
     });
 
     it('should deny regular users', () => {
@@ -149,9 +151,12 @@ describe('Role Policy Functions', () => {
   });
 
   describe('ensureCanDeleteRole', () => {
-    it('should throw specific error for system roles', () => {
+    it('should throw specific error for canonical roles', () => {
       expect(() => ensureCanDeleteRole(adminUser, adminRole)).toThrow(
-        '시스템 역할은 삭제할 수 없습니다'
+        '기본 역할은 삭제할 수 없습니다'
+      );
+      expect(() => ensureCanDeleteRole(adminUser, { ...customRole, name: 'MANAGER' })).toThrow(
+        '기본 역할은 삭제할 수 없습니다'
       );
     });
 
@@ -170,6 +175,32 @@ describe('Role Policy Functions', () => {
     it('should not throw for authorized assignments', () => {
       expect(() => ensureCanAssignRole(adminUser, adminRole)).not.toThrow();
       expect(() => ensureCanAssignRole(managerUser, customRole)).not.toThrow();
+    });
+  });
+  describe('ensureRoleNameAllowed — 기본 역할 이름 보호(헌법 §1.4)', () => {
+    it('이름을 보내지 않거나 지금 이름 그대로면 통과한다', () => {
+      expect(() => ensureRoleNameAllowed(undefined, { name: 'MANAGER' })).not.toThrow();
+      expect(() => ensureRoleNameAllowed('MANAGER', { name: 'MANAGER' })).not.toThrow();
+    });
+
+    it('기본 역할의 이름은 바꿀 수 없다', () => {
+      expect(() => ensureRoleNameAllowed('OPS', { name: 'CLIENT_ADMIN' })).toThrow(
+        '기본 역할(CLIENT_ADMIN)의 이름은 바꿀 수 없습니다.'
+      );
+    });
+
+    it('새 이름이 기본 역할 이름이면 대소문자·공백과 무관하게 막는다', () => {
+      expect(() => ensureRoleNameAllowed('manager')).toThrow(
+        '기본 역할 이름(manager)은 쓸 수 없습니다.'
+      );
+      expect(() => ensureRoleNameAllowed(' Client_User ', { name: 'SUPPORT' })).toThrow(
+        /기본 역할 이름/
+      );
+    });
+
+    it('평범한 이름은 통과한다', () => {
+      expect(() => ensureRoleNameAllowed('AUDITOR')).not.toThrow();
+      expect(() => ensureRoleNameAllowed('SUPPORT_LEAD', { name: 'SUPPORT' })).not.toThrow();
     });
   });
 });

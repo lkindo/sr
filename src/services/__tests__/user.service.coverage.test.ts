@@ -205,7 +205,7 @@ describe('UserService Coverage', () => {
     it('filters by isActive=true', async () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
-      await userService.getAllUsers({ isActive: 'true' });
+      await userService.getAllUsers({ clientId: undefined, isActive: 'true' });
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ isActive: true }),
@@ -216,7 +216,7 @@ describe('UserService Coverage', () => {
     it('filters by isActive=false', async () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
-      await userService.getAllUsers({ isActive: 'false' });
+      await userService.getAllUsers({ clientId: undefined, isActive: 'false' });
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ isActive: false }),
@@ -249,7 +249,7 @@ describe('UserService Coverage', () => {
     it('filters by roleId (none)', async () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
-      await userService.getAllUsers({ roleId: 'none' });
+      await userService.getAllUsers({ clientId: undefined, roleId: 'none' });
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ roles: { none: {} } }),
@@ -260,7 +260,7 @@ describe('UserService Coverage', () => {
     it('filters by role names', async () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue([]);
       vi.mocked(prisma.user.count).mockResolvedValue(0);
-      await userService.getAllUsers({ role: 'ADMIN,MANAGER' });
+      await userService.getAllUsers({ clientId: undefined, role: 'ADMIN,MANAGER' });
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
@@ -277,7 +277,7 @@ describe('UserService Coverage', () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
       vi.mocked(prisma.user.count).mockResolvedValue(1);
 
-      const result = await userService.getAllUsers({ userType: 'CLIENT' });
+      const result = await userService.getAllUsers({ clientId: undefined, userType: 'CLIENT' });
 
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -298,7 +298,7 @@ describe('UserService Coverage', () => {
       vi.mocked(prisma.user.findMany).mockResolvedValue(mockUsers as any);
       vi.mocked(prisma.user.count).mockResolvedValue(1);
 
-      const result = await userService.getAllUsers({ userType: 'ENGINEER' });
+      const result = await userService.getAllUsers({ clientId: undefined, userType: 'ENGINEER' });
 
       expect(prisma.user.findMany).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -4,9 +4,9 @@ import { z } from 'zod';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError } from '@/lib/errors';
 import { logger } from '@/lib/logger';
 import { usePagination } from '@/lib/pagination';
+import { ensureSystemAdmin } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { serializeResponse } from '@/lib/serialization';
 
@@ -37,9 +37,7 @@ const resendSchema = z.object({
 export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     // 전체 시스템의 알림 이력이므로 테넌트 개념이 없다 — ADMIN 으로 좁힌다.
-    if (!session.user.roles?.includes('ADMIN')) {
-      throw new ForbiddenError('알림 아웃박스는 시스템 관리자만 조회할 수 있습니다.');
-    }
+    ensureSystemAdmin(session.user, '알림 아웃박스는 시스템 관리자만 조회할 수 있습니다.');
 
     const { searchParams } = new URL(request.url);
     const { status } = querySchema.parse({ status: searchParams.get('status') });
@@ -102,9 +100,7 @@ export const GET = withAuthAndRateLimit(
  */
 export const POST = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
-    if (!session.user.roles?.includes('ADMIN')) {
-      throw new ForbiddenError('알림 재발송은 시스템 관리자만 수행할 수 있습니다.');
-    }
+    ensureSystemAdmin(session.user, '알림 재발송은 시스템 관리자만 수행할 수 있습니다.');
 
     const body = await parseJsonBody(request);
     const { ids } = resendSchema.parse(body);

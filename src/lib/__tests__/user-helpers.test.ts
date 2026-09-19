@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { excludePassword, getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
+import {
+  excludePassword,
+  getUserTypeBadgeVariant,
+  getUserTypeLabel,
+  showsEmailUnverified,
+} from '@/lib/user-helpers';
 
 type UserRole = { role: { id: string; name: string } };
 type UserClient = { client: { id: string; name: string; code: string } };
@@ -154,5 +159,49 @@ describe('excludePassword', () => {
     const user = { password: 'only' };
     const result = excludePassword(user);
     expect(result).toEqual({});
+  });
+});
+
+/**
+ * 승인 화면의 '이메일 미인증' 대상(2026-09-18 소유자 결정 D13 B+). 가입 승인을 기다리는 계정만 본다 —
+ * 관리자가 만든 계정은 확인 메일을 받지 않으므로 늘 미인증이라 목록 전체에 붙이면 잡음이 된다.
+ */
+describe('showsEmailUnverified', () => {
+  it('승인 대기 소속이 있고 확인하지 않았으면 보인다', () => {
+    expect(
+      showsEmailUnverified({
+        emailVerified: null,
+        isActive: true,
+        clients: [{ status: 'PENDING' }],
+      })
+    ).toBe(true);
+  });
+
+  it('비활성(기술 지원팀 가입 승인 대기)이고 확인하지 않았으면 보인다', () => {
+    expect(showsEmailUnverified({ emailVerified: null, isActive: false, clients: [] })).toBe(true);
+  });
+
+  it('확인했으면 보이지 않는다', () => {
+    expect(
+      showsEmailUnverified({
+        emailVerified: '2026-09-19T00:00:00.000Z',
+        isActive: true,
+        clients: [{ status: 'PENDING' }],
+      })
+    ).toBe(false);
+  });
+
+  it('활성이고 대기 소속이 없으면(관리자가 만든 계정 등) 보이지 않는다', () => {
+    expect(
+      showsEmailUnverified({
+        emailVerified: null,
+        isActive: true,
+        clients: [{ status: 'APPROVED' }],
+      })
+    ).toBe(false);
+  });
+
+  it('응답에 인증 필드가 없으면 판단하지 않는다', () => {
+    expect(showsEmailUnverified({ isActive: false, clients: [] })).toBe(false);
   });
 });

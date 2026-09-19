@@ -52,14 +52,35 @@ export const FIELD_LIMITS = {
  * - 숫자 1개 이상 포함 (0-9)
  * - 특수문자 1개 이상 포함 (!@#$%^&*()_+-=[]{}|;:,.<>?)
  */
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 100;
+
+/**
+ * 특수문자로 인정하는 문자 — **정본**. 목록에 없는 문자(`~`, `/`, `'` 등)는 특수문자로 치지 않는다.
+ * 안내 문구가 "특수문자" 라고만 하면 `~` 를 넣은 사용자는 이유를 모른 채 거부된다.
+ */
+export const PASSWORD_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+/**
+ * `PASSWORD_SPECIAL_CHARS` 중 하나를 포함하는지. 정규식 리터럴로 두고(문자열로 조립하면
+ * `new RegExp` 가 된다) 목록과의 일치는 schemas.test.ts 가 문자 단위로 검증한다.
+ */
+export const PASSWORD_SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
+
+/** 사람이 읽는 비밀번호 정책. 아래 스키마와 같은 상수에서 만들어 둘이 갈라지지 않게 한다. */
+export const PASSWORD_POLICY_DESCRIPTION = `${PASSWORD_MIN_LENGTH}~${PASSWORD_MAX_LENGTH}자, 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함(특수문자: ${PASSWORD_SPECIAL_CHARS})`;
+
 export const passwordSchema = z
   .string()
-  .min(8, '비밀번호는 최소 8자 이상이어야 합니다.')
-  .max(100, '비밀번호는 100자를 초과할 수 없습니다.')
+  .min(PASSWORD_MIN_LENGTH, `비밀번호는 최소 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다.`)
+  .max(PASSWORD_MAX_LENGTH, `비밀번호는 ${PASSWORD_MAX_LENGTH}자를 초과할 수 없습니다.`)
   .regex(/[A-Z]/, '비밀번호는 대문자를 최소 1개 이상 포함해야 합니다.')
   .regex(/[a-z]/, '비밀번호는 소문자를 최소 1개 이상 포함해야 합니다.')
   .regex(/[0-9]/, '비밀번호는 숫자를 최소 1개 이상 포함해야 합니다.')
-  .regex(/[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/, '비밀번호는 특수문자를 최소 1개 이상 포함해야 합니다.');
+  .regex(
+    PASSWORD_SPECIAL_CHAR_PATTERN,
+    `비밀번호는 특수문자(${PASSWORD_SPECIAL_CHARS})를 최소 1개 이상 포함해야 합니다.`
+  );
 
 /**
  * 회원가입 필드 (refine 이전의 base object).
@@ -188,6 +209,14 @@ export const srCreateSchema = z.object({
     .min(10, '설명은 최소 10자 이상이어야 합니다.')
     .max(FIELD_LIMITS.LONG_TEXT, `설명은 ${FIELD_LIMITS.LONG_TEXT}자를 초과할 수 없습니다.`),
   clientId: z.string().min(1, '고객사를 선택해주세요.'),
+  /**
+   * 대리 등록 — 운영자가 고객의 요청(전화·메일 등)을 대신 등록할 때 **실제 고객**을 신청자로 지정한다
+   * (소유자 결정 2026-09-18 D3). 확인완료는 고객의 인수 행위라 고객이 신청자여야 고객이 확인한다. 비우면
+   * 등록자 본인이 신청자이고, 그 SR 은 등록한 운영자 또는 그 고객사의 CLIENT_ADMIN 이 확인한다
+   * (sr-state-machine.canConfirmAsAcceptor).
+   * 내부 사용자만 지정할 수 있다(policies.canRegisterSROnBehalf).
+   */
+  requesterId: z.preprocess(emptyStringToUndefined, z.string().optional()),
   serviceCategoryId: z.string().min(1, '서비스 카테고리를 선택해주세요.'),
   requestedPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
   requestedCompletionDate: z.string().optional(),
@@ -312,8 +341,13 @@ export const srUpdateSchema = z.object({
  * 받으면 전용 액션의 필수 사유와 비즈니스 규칙을 우회할 수 있으므로 알 수 없는 키도
  * 조용히 버리지 않고 400/검증 실패로 돌려보낸다. 서비스 내부는 위 srUpdateSchema 를 써서
  * 전용 상태 경로의 검증된 전이를 계속 처리한다.
+ *
+ * `changeReason` 은 **받는다.** 마감일 수동 조정(헌법 §3, D8)은 사유가 필수인데, 예전에는 여기서
+ * 같이 빼 버려서 '마감일 조정' 다이얼로그의 `{dueDate, changeReason}` 이 알 수 없는 키로 400 이 됐다
+ * (사유를 빼면 서비스가 사유 필수로 거부하므로 어느 쪽으로도 조정할 수 없었다). `status` 가 없으면
+ * 이 값은 상태 이력에 쓰이지 않고 마감일 조정의 감사 사유로만 쓰인다.
  */
-export const srPatchSchema = srUpdateSchema.omit({ status: true, changeReason: true }).strict();
+export const srPatchSchema = srUpdateSchema.omit({ status: true }).strict();
 
 // User Schemas
 export const userCreateSchema = z.object({
@@ -428,6 +462,12 @@ export const commentSchema = z.object({
     .string()
     .min(1, '댓글 내용을 입력해주세요.')
     .max(FIELD_LIMITS.NOTE, `댓글은 ${FIELD_LIMITS.NOTE}자를 초과할 수 없습니다.`),
+  /**
+   * 내부 노트 — 고객에게 보이지 않는 댓글(헌법 §1.1, 소유자 결정 2026-09-18 D7).
+   * 내부 사용자만 세울 수 있다. 외부 사용자가 보낸 값은 라우트가 공개(false)로 강제한다
+   * (policies.canWriteInternalNote).
+   */
+  isInternal: z.boolean().optional(),
 });
 
 /** SR 상태 전이 요청. 실제 전이 가능 여부는 sr-state-machine 이 판정한다. */
@@ -473,36 +513,6 @@ export const clientAssignSchema = z.object({
 export const roleAssignSchema = z.object({
   roleIds: z.array(z.string()),
 });
-
-/** 시스템 설정 화면이 실제로 저장하는 세 필드. 빈 관리자 메일은 알림 수신 해제를 뜻한다. */
-export const systemSettingsUpdateSchema = z
-  .object({
-    siteName: z
-      .string()
-      .trim()
-      .min(1, '사이트 이름을 입력해주세요.')
-      .max(
-        FIELD_LIMITS.DISPLAY_NAME,
-        `사이트 이름은 ${FIELD_LIMITS.DISPLAY_NAME}자를 초과할 수 없습니다.`
-      ),
-    siteDescription: z
-      .string()
-      .trim()
-      .min(1, '사이트 설명을 입력해주세요.')
-      .max(
-        FIELD_LIMITS.SHORT_TEXT,
-        `사이트 설명은 ${FIELD_LIMITS.SHORT_TEXT}자를 초과할 수 없습니다.`
-      ),
-    adminEmail: z.preprocess(
-      (value) => (typeof value === 'string' ? value.trim() : value),
-      z
-        .string()
-        .max(FIELD_LIMITS.EMAIL, `관리자 이메일은 ${FIELD_LIMITS.EMAIL}자를 초과할 수 없습니다.`)
-        .email('유효한 관리자 이메일 주소를 입력해주세요.')
-        .or(z.literal(''))
-    ),
-  })
-  .strict();
 
 const permissionSegmentSchema = z
   .string({ error: '리소스와 액션을 제공해야 합니다' })

@@ -5,6 +5,7 @@ import {
   DuplicateError,
   errorToResult,
   ForbiddenError,
+  GENERIC_500_MESSAGE,
   NotFoundError,
   ServiceError,
   UnauthorizedError,
@@ -60,6 +61,32 @@ describe('Errors Utility', () => {
       expect(result.success).toBe(false);
       expect(result.code).toBe('INTERNAL_ERROR');
       expect(logger.error).toHaveBeenCalled();
+    });
+
+    // 분류하지 못한 예외의 원문(Prisma·드라이버 메시지)은 운영 환경에서 사용자에게 보내지 않는다 —
+    // API 라우트(handleApiError)와 같은 규칙. 예전에는 서버 액션만 원문을 그대로 돌려줬다.
+    it('운영 환경에서는 분류하지 못한 예외의 원문을 가리고 고정 문구를 준다', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      try {
+        const result = errorToResult(
+          new Error('Invalid `prisma.sR.findMany()` invocation: column "srs.secret" does not exist')
+        );
+
+        expect(result.error).toBe(GENERIC_500_MESSAGE);
+        expect(result.error).not.toContain('prisma');
+        expect(result.code).toBe('INTERNAL_ERROR');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it('도메인 에러의 문구는 운영 환경에서도 그대로 준다(사용자가 이유를 알아야 한다)', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      try {
+        expect(errorToResult(new NotFoundError('SR')).error).not.toBe(GENERIC_500_MESSAGE);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it('should handle non-Error objects', () => {

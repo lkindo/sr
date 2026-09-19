@@ -35,6 +35,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { apiList, retryUnlessClientError } from '@/lib/api-client';
 import { qk } from '@/lib/query-keys';
+import { PASSWORD_SPECIAL_CHAR_PATTERN, PASSWORD_SPECIAL_CHARS } from '@/lib/schemas';
 import type { ClientSummary } from '@/types/client.types';
 
 /** `calculatePasswordStrength` 가 돌려주는 개별 규칙 충족 여부. */
@@ -59,7 +60,7 @@ function passwordRequirements(checks: PasswordChecks) {
     { key: 'uppercase', label: '대문자 포함', met: checks.uppercase },
     { key: 'lowercase', label: '소문자 포함', met: checks.lowercase },
     { key: 'number', label: '숫자 포함', met: checks.number },
-    { key: 'special', label: '특수문자 포함 (@$!%*?&#)', met: checks.special },
+    { key: 'special', label: `특수문자 포함 (${PASSWORD_SPECIAL_CHARS})`, met: checks.special },
   ];
 }
 
@@ -95,7 +96,9 @@ function calculatePasswordStrength(password: string): {
     lowercase: /[a-z]/.test(password),
     uppercase: /[A-Z]/.test(password),
     number: /\d/.test(password),
-    special: /[@$!%*?&#]/.test(password),
+    // 서버 정본과 같은 집합을 쓴다. 예전에는 `[@$!%*?&#]` 로 좁아서 `^`·`_` 만 넣은 비밀번호는
+    // 서버가 받는데도 체크리스트가 미충족으로 보였다.
+    special: PASSWORD_SPECIAL_CHAR_PATTERN.test(password),
   };
 
   const score = Object.values(checks).filter(Boolean).length;
@@ -128,7 +131,8 @@ export default function RegisterForm() {
 
   // 새로운 상태
   const [accountType, setAccountType] = useState<'ENGINEER' | 'CLIENT'>('CLIENT');
-  const [selectedClientId, setSelectedClientId] = useState('');
+  // 공개 목록은 내부 id 를 주지 않으므로 고객사 **코드**로 고르고 보낸다(D14 A+).
+  const [selectedClientCode, setSelectedClientCode] = useState('');
 
   // 비밀번호 강도 상태
   const [password, setPassword] = useState('');
@@ -149,7 +153,8 @@ export default function RegisterForm() {
     queryKey: qk.clients.publicList,
     // 이 라우트는 bare 배열을 돌려준다. `apiList` 가 봉투/bare 양쪽을 받아 주므로
     // 예전의 `Array.isArray(result) ? result : result.data || []` 분기는 불필요하다.
-    queryFn: async () => (await apiList<ClientSummary>('/api/clients/public')).data,
+    queryFn: async () =>
+      (await apiList<Pick<ClientSummary, 'name' | 'code'>>('/api/clients/public')).data,
     staleTime: 5 * 60 * 1000,
     retry: retryUnlessClientError,
   });
@@ -160,7 +165,7 @@ export default function RegisterForm() {
   const handleAccountTypeChange = (value: 'ENGINEER' | 'CLIENT') => {
     setAccountType(value);
     if (value !== 'CLIENT') {
-      setSelectedClientId(''); // ENGINEER로 변경 시 선택 초기화
+      setSelectedClientCode(''); // ENGINEER로 변경 시 선택 초기화
     }
   };
 
@@ -176,7 +181,7 @@ export default function RegisterForm() {
     setSuccess('');
 
     // 고객사 담당자인데 고객사 미선택 시 에러
-    if (accountType === 'CLIENT' && !selectedClientId) {
+    if (accountType === 'CLIENT' && !selectedClientCode) {
       setError('소속 고객사를 선택해주세요.');
       return;
     }
@@ -188,8 +193,8 @@ export default function RegisterForm() {
 
       // 계정 유형 및 고객사 정보 추가
       formData.append('accountType', accountType);
-      if (accountType === 'CLIENT' && selectedClientId) {
-        formData.append('clientId', selectedClientId);
+      if (accountType === 'CLIENT' && selectedClientCode) {
+        formData.append('clientCode', selectedClientCode);
       }
 
       const result = await registerUser(formData);
@@ -407,8 +412,8 @@ export default function RegisterForm() {
                   </Alert>
                 ) : (
                   <Select
-                    value={selectedClientId}
-                    onValueChange={setSelectedClientId}
+                    value={selectedClientCode}
+                    onValueChange={setSelectedClientCode}
                     disabled={isLoading}
                   >
                     <SelectTrigger id="client-select">
@@ -416,7 +421,7 @@ export default function RegisterForm() {
                     </SelectTrigger>
                     <SelectContent>
                       {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
+                        <SelectItem key={client.code} value={client.code}>
                           {client.name} ({client.code})
                         </SelectItem>
                       ))}
@@ -445,7 +450,7 @@ export default function RegisterForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || (accountType === 'CLIENT' && !selectedClientId)}
+              disabled={isLoading || (accountType === 'CLIENT' && !selectedClientCode)}
             >
               {isLoading ? (
                 <>

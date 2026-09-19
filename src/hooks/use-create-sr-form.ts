@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
-import { createSRAction } from '@/actions/sr.actions';
+import { createSRAction, getSRRequesterCandidatesAction } from '@/actions/sr.actions';
 import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiPost } from '@/lib/api-client';
 import type { ClientSummary } from '@/types/client.types';
+
+/** 신청자 선택의 '본인' 값. Radix Select 는 빈 문자열을 값으로 쓸 수 없어 표식을 둔다. */
+export const REQUESTER_SELF = 'SELF';
 
 const MIN_TITLE_LENGTH = 5;
 const MIN_DESCRIPTION_LENGTH = 10;
@@ -22,12 +25,17 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
   const [files, setFiles] = useState<File[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  // 대리 등록(D3): 운영자가 고객 요청을 대신 등록할 때 실제 고객을 신청자로 고른다.
+  const [requesterId, setRequesterId] = useState(REQUESTER_SELF);
+  const [requesters, setRequesters] = useState<{ id: string; name: string; email: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { hasAnyRole } = usePermissions();
 
   const isClientUser = !hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
+  // 대리 등록은 내부 사용자만 한다(서버: policies.canRegisterSROnBehalf).
+  const canRegisterOnBehalf = canSelectClient;
 
   const fetchClients = useCallback(async () => {
     if (isClientUser) {
@@ -127,6 +135,38 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     fetchCategories(clientId);
   }, [open, clientId, fetchCategories]);
 
+  // 고객사가 바뀌면 신청자 후보를 다시 불러오고 선택을 '본인' 으로 되돌린다 — 다른 고객사 사용자가
+  // 신청자로 남은 채 제출되지 않게(서버도 거부한다).
+  useEffect(() => {
+    if (!open || !canRegisterOnBehalf) return;
+    setRequesterId(REQUESTER_SELF);
+    if (!clientId) {
+      setRequesters([]);
+      return;
+    }
+    let cancelled = false;
+    getSRRequesterCandidatesAction(clientId)
+      .then((result) => {
+        if (cancelled) return;
+        if (result.success) {
+          setRequesters(result.data);
+        } else {
+          setRequesters([]);
+          toast({
+            title: '오류',
+            description: '신청자(고객) 목록을 불러오지 못했습니다.',
+            variant: 'destructive',
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRequesters([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, clientId, canRegisterOnBehalf, toast]);
+
   /**
    * 배치 업로드 결과. `uploaded` 는 **서버에 실제로 저장된** 개수다.
    *
@@ -213,6 +253,8 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
     formData.append('requestedPriority', requestedPriority);
     if (requestedCompletionDate)
       formData.append('requestedCompletionDate', requestedCompletionDate);
+    if (canRegisterOnBehalf && requesterId !== REQUESTER_SELF)
+      formData.append('requesterId', requesterId);
 
     try {
       const result = await createSRAction(formData);
@@ -265,6 +307,9 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       categories,
       loading,
       canSelectClient,
+      requesterId,
+      requesters,
+      canRegisterOnBehalf,
     },
     actions: {
       setTitle,
@@ -273,6 +318,7 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       setCategoryId,
       setRequestedPriority,
       setRequestedCompletionDate,
+      setRequesterId,
       setFiles,
       handleSubmit,
     },

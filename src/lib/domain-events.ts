@@ -21,6 +21,12 @@ export interface SRStatusChangedEvent {
   requesterId?: string;
   previousStatus: SRStatus | null;
   currentStatus: SRStatus;
+  /** 전이를 일으킨 사용자. 본인 행동에 대한 알림은 보내지 않는다(2026-09-18 소유자 결정 D15). */
+  actorId?: string;
+  /** 담당자 — 재오픈 알림의 수신자다(D15). */
+  assigneeId?: string | null;
+  /** 전이 사유(재오픈 사유 등). 재오픈 알림 본문에 싣는다. */
+  reason?: string | null;
 }
 
 export interface SRAssignedEvent {

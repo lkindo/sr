@@ -5,19 +5,12 @@
 import { AlertTriangle, Clock, FileText, User } from 'lucide-react';
 
 import { Badge } from '@/components/ui';
-import { priorityLabels } from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabels } from '@/lib/constants/sr';
 import type { SRDetails } from '@/types/sr.types';
 
 interface IntakeInfoCardProps {
   sr: SRDetails;
 }
-
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
 
 export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
   // 접수 정보가 있는 상태만 표시
@@ -81,7 +74,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">요청:</span>
-              <Badge variant={priorityColors[sr.requestedPriority]}>
+              <Badge variant={priorityBadgeVariantOf(sr.requestedPriority)}>
                 {priorityLabels[sr.requestedPriority]}
               </Badge>
             </div>
@@ -91,7 +84,7 @@ export function IntakeInfoCard({ sr }: IntakeInfoCardProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">실제:</span>
                   <Badge
-                    variant={priorityColors[sr.actualPriority]}
+                    variant={priorityBadgeVariantOf(sr.actualPriority)}
                     className={priorityChanged ? 'ring-2 ring-orange-500 ring-offset-2' : ''}
                   >
                     {priorityLabels[sr.actualPriority]}

@@ -43,7 +43,14 @@ vi.mock('@/lib/auth-wrapper', () => ({
     },
 }));
 
-vi.mock('@/lib/policies', () => ({ ensureCanReadSR: mockEnsureCanReadSR }));
+vi.mock('@/lib/policies', async () => {
+  // 가림 규칙은 실물을 쓴다 — 고객에게 내부 전용 사유가 새지 않는지를 이 라우트에서 단언한다.
+  const actual = await vi.importActual<typeof import('@/lib/policies')>('@/lib/policies');
+  return {
+    ensureCanReadSR: mockEnsureCanReadSR,
+    redactActivityForViewer: actual.redactActivityForViewer,
+  };
+});
 
 vi.mock('@/lib/prisma', () => ({
   default: {
@@ -115,5 +122,43 @@ describe('GET /api/srs/[id]/activities', () => {
     // 빈 배열은 정상이다. 404 로 만들면 화면이 "SR 이 없다" 로 오해한다.
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual([]);
+  });
+});
+
+/**
+ * 마감일 조정 사유는 내부 전용이다(2026-09-18 소유자 결정 D9). 활동 자체("SLA 마감일 조정: A → B")는
+ * 고객도 보지만, 조정 이유는 운영 판단이라 고객에게는 지운다.
+ */
+describe('GET /api/srs/[id]/activities — 내부 전용 사유 가림', () => {
+  const ADJUSTED = {
+    id: 'a-due',
+    description: 'SLA 마감일 조정: A → B',
+    metadata: { dueDateBefore: 'x', dueDateAfter: 'y', internalReason: '고객 요구 범위 확대' },
+  };
+
+  it('고객에게는 사유를 지우고 나머지 값은 그대로 준다', async () => {
+    mockActivityFindMany.mockResolvedValue([ADJUSTED]);
+
+    const res = await GET({} as never, context);
+
+    expect(res.status).toBe(200);
+    const [activity] = await res.json();
+    expect(activity.description).toBe('SLA 마감일 조정: A → B');
+    expect(activity.metadata).toEqual({ dueDateBefore: 'x', dueDateAfter: 'y' });
+  });
+
+  it('내부 사용자에게는 사유까지 준다 — 과잉 가림 대조군', async () => {
+    const original = mockSession.user.roles;
+    mockSession.user.roles = ['MANAGER'];
+    try {
+      mockActivityFindMany.mockResolvedValue([ADJUSTED]);
+
+      const res = await GET({} as never, context);
+
+      const [activity] = await res.json();
+      expect(activity.metadata.internalReason).toBe('고객 요구 범위 확대');
+    } finally {
+      mockSession.user.roles = original;
+    }
   });
 });

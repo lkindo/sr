@@ -37,9 +37,10 @@ globalThis.ResizeObserver ??= class {
 const LOADING = '고객사 목록 로딩 중...';
 const EMPTY = '등록된 고객사가 없습니다. 관리자에게 문의하세요.';
 
+// 공개 목록은 내부 id 를 주지 않는다(D14 A+) — 이름·코드만 온다.
 const CLIENTS = [
-  { id: 'c-1', name: '테스트 고객사 A', code: 'C001' },
-  { id: 'c-2', name: '테스트 고객사 B', code: 'C002' },
+  { name: '테스트 고객사 A', code: 'C001' },
+  { name: '테스트 고객사 B', code: 'C002' },
 ];
 
 /** 공개 목록 라우트로 나간 요청만 센다. 서버 액션은 fetch 가 아니라 여기 잡히지 않는다. */

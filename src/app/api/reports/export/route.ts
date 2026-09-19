@@ -4,6 +4,7 @@ import type { Prisma } from '@prisma/client';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { priorityLabels, statusLabelOf } from '@/lib/constants/sr';
 import { logger } from '@/lib/logger';
+import { canExportSRs, resolveAssigneeScope } from '@/lib/policies';
 import { SR_ALIVE } from '@/lib/prisma-selects';
 import { formatAppZoneDate, formatISODateInAppZone } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
@@ -77,19 +78,16 @@ function toCsvLine(sr: ExportRow): string {
 // GET /api/reports/export - SR 목록 CSV 내보내기 (Rate Limit: 엄격)
 export const GET = withAuthAndRateLimit(
   async (_request: NextRequest, { session }) => {
-    const { roles } = session.user;
-    const isAdminOrManager = roles.some((role) => ['ADMIN', 'MANAGER'].includes(role));
-    const isEngineer = roles.includes('ENGINEER');
-
-    if (!isAdminOrManager && !isEngineer) {
+    if (!canExportSRs(session.user)) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    // 데이터 격리: ENGINEER 는 자신에게 배정된 SR 만 내보낼 수 있다(canReadSR 정책과 일치).
-    // ADMIN/MANAGER 는 전체 조회 가능.
-    const where: Prisma.SRWhereInput = isAdminOrManager
-      ? { ...SR_ALIVE }
-      : { ...SR_ALIVE, assigneeId: session.user.id };
+    // 데이터 격리: 목록·상세와 같은 담당자 스코프(resolveAssigneeScope)를 쓴다 — ENGINEER 는 자신에게
+    // 배정된 SR 만, ADMIN/MANAGER 는 전체.
+    const assigneeScope = resolveAssigneeScope(session.user);
+    const where: Prisma.SRWhereInput = assigneeScope
+      ? { ...SR_ALIVE, assigneeId: assigneeScope }
+      : { ...SR_ALIVE };
 
     const encoder = new TextEncoder();
     const userId = session.user.id;
@@ -110,6 +108,7 @@ export const GET = withAuthAndRateLimit(
             if (take <= 0) break;
 
             const batch = await srService.getAllSRs({
+              viewer: session.user,
               where,
               orderBy: { createdAt: 'desc' },
               skip,

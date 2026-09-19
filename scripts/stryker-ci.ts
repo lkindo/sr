@@ -1,12 +1,18 @@
 import { execSync } from 'child_process';
-import { existsSync, readFileSync, statSync } from 'fs';
-import { resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+
+import { assignShards, buildManifest, parseShardEnv } from './lib/mutation-shards';
 
 /**
  * Stryker Mutation Test Runner for CI
  *
  * Runs mutation monitoring only on files changed relative to the target branch.
  * Usage: tsx scripts/stryker-ci.ts
+ *
+ * 분할 실행: CI 는 MUTATION_SHARD_INDEX(1부터)·MUTATION_SHARD_TOTAL 을 넘겨 대상 파일을 여러 작업에 나눈다
+ * (scripts/lib/mutation-shards.ts). 이때 각 작업은 점수로 실패하지 않고(stryker.config.mjs) 리포트만 남기며,
+ * 전체 점수 판정은 scripts/stryker-aggregate.ts 가 한다. 두 값이 없으면 예전처럼 한 번에 돌리고 여기서 판정한다.
  */
 
 const TARGET_BRANCH = process.env.GITHUB_BASE_REF
@@ -91,20 +97,37 @@ function getChangedFiles(): string[] {
  * test 잡이 올려둔 coverage-final.json 을 사용한다. 파일이 없으면(로컬 실행, 아티팩트 누락)
  * 분류를 포기하고 전부 대상으로 삼는다 — 게이트를 조용히 꺼 버리는 것보다 낫다.
  */
-function splitByCoverage(files: string[]): { covered: string[]; uncovered: string[] } {
+function splitByCoverage(
+  files: string[],
+  sharded: boolean
+): { covered: string[]; uncovered: string[] } {
   const coveragePath = resolve(process.cwd(), 'coverage', 'coverage-final.json');
 
-  if (!existsSync(coveragePath)) {
-    log('coverage-final.json 이 없어 커버리지 기반 선별을 건너뜁니다(전체 파일 대상).');
+  // 분할 실행에서는 대체 동작을 쓰지 않는다. 한 분할만 맵을 못 받으면 그 분할만 다른 목록을 나눠
+  // 파일이 빠지거나 겹친다(합산 작업이 목록 불일치로 잡지만, 원인은 여기서 밝히는 편이 빠르다).
+  const fallback = (reason: string) => {
+    if (sharded) {
+      log(
+        `FATAL: ${reason} — 분할 실행은 모든 분할이 같은 커버리지 맵으로 같은 목록을 나눠야 합니다.`
+      );
+      log(
+        '  확인할 것: test 작업의 coverage-final 아티팩트 업로드·보존 기간, Download coverage map 단계.'
+      );
+      process.exit(1);
+    }
+    log(`${reason} — 커버리지 기반 선별을 건너뜁니다(전체 파일 대상).`);
     return { covered: files, uncovered: [] };
+  };
+
+  if (!existsSync(coveragePath)) {
+    return fallback('coverage-final.json 이 없습니다');
   }
 
   let coverageMap: Record<string, { s?: Record<string, number> }>;
   try {
     coverageMap = JSON.parse(readFileSync(coveragePath, 'utf8'));
   } catch (error) {
-    log(`coverage-final.json 파싱 실패 — 전체 파일을 대상으로 진행합니다: ${String(error)}`);
-    return { covered: files, uncovered: [] };
+    return fallback(`coverage-final.json 파싱 실패: ${String(error)}`);
   }
 
   // 키는 절대경로다. 구분자를 정규화해 저장소 상대경로로 맞춘다.
@@ -134,7 +157,38 @@ function splitByCoverage(files: string[]): { covered: string[]; uncovered: strin
   return { covered, uncovered };
 }
 
+const MANIFEST_PATH = 'reports/mutation/shard-manifest.json';
+
+/**
+ * 분할 실행의 배정 기록을 남긴다. 대상이 없어 일찍 끝나는 분할도 남긴다 — 합산 작업은 1..N 기록이 모두 와야
+ * 판정한다(scripts/stryker-aggregate.ts). 분할하지 않는 실행에서는 아무것도 쓰지 않는다.
+ */
+function writeManifest(
+  shard: { index: number; total: number },
+  covered: readonly string[],
+  assigned: readonly string[]
+) {
+  if (shard.total <= 1) return;
+  const abs = resolve(process.cwd(), MANIFEST_PATH);
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(
+    abs,
+    JSON.stringify(buildManifest(shard.index, shard.total, covered, assigned), null, 2)
+  );
+  log(`배정 기록: ${MANIFEST_PATH} (대상 ${covered.length}개 중 ${assigned.length}개)`);
+}
+
+function readShard(): { index: number; total: number } {
+  try {
+    return parseShardEnv(process.env.MUTATION_SHARD_INDEX, process.env.MUTATION_SHARD_TOTAL);
+  } catch (error) {
+    log(`FATAL: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
 function run() {
+  const shard = readShard();
   const changedFiles = getChangedFiles();
 
   // Filter for Typescript files in src, excluding tests and ignored patterns
@@ -153,10 +207,11 @@ function run() {
 
   if (filesToMutate.length === 0) {
     log('No applicable file changes detected. Skipping mutation testing.');
+    writeManifest(shard, [], []);
     process.exit(0);
   }
 
-  const { covered, uncovered } = splitByCoverage(filesToMutate);
+  const { covered, uncovered } = splitByCoverage(filesToMutate, shard.total > 1);
 
   // 테스트가 전혀 없는 파일은 뮤테이션 대상에서 제외한다.
   //  - 그런 파일의 뮤턴트는 전부 NoCoverage 로 mutationScore 를 끌어내려,
@@ -173,12 +228,32 @@ function run() {
   if (covered.length === 0) {
     log('변경된 파일 중 테스트가 있는 파일이 없어 뮤테이션 점수를 낼 수 없습니다.');
     log('  테스트 부재 자체는 커버리지 게이트가 판정하므로 여기서는 통과 처리합니다.');
+    writeManifest(shard, [], []);
     process.exit(0);
   }
 
   log(`Found ${covered.length} file(s) to mutate:`);
   covered.forEach((f) => console.log(` - ${f}`));
   filesToMutate = covered;
+
+  if (shard.total > 1) {
+    // 모든 분할 작업이 같은 목록으로 같은 배분을 계산한다(무거운 파일부터, 동률은 경로 순).
+    const shards = assignShards(
+      covered.map((path) => ({ path, weight: statSync(resolve(process.cwd(), path)).size })),
+      shard.total
+    );
+    const mine = shards[shard.index - 1] ?? [];
+    log(
+      `분할 ${shard.index}/${shard.total}: 이 작업은 ${mine.length}개 파일을 맡습니다(전체 ${covered.length}개). 점수 판정은 합산 작업이 합니다.`
+    );
+    shards.forEach((files, i) => log(`  분할 ${i + 1}: ${files.length}개`));
+    if (mine.length === 0) {
+      log('이 분할에 배정된 파일이 없어 건너뜁니다.');
+      writeManifest(shard, covered, []);
+      process.exit(0);
+    }
+    filesToMutate = mine;
+  }
 
   // 아래 이스케이프/조합으로 안전하게 표현할 수 없는 문자들.
   //  ,  → join(',') 이 한 파일을 둘로 쪼갠다.
@@ -213,6 +288,18 @@ function run() {
     log('Starting Stryker...');
     log(`  ${strykerCmd}`);
     execSync(strykerCmd, { stdio: 'inherit' });
+    if (shard.total > 1) {
+      // 분할 실행은 점수로 실패하지 않으므로, 리포트가 이번 실행에서 생겼는지 여기서 확인한다
+      // (json 리포터가 빠지거나 경로가 바뀌면 합산 작업에 결과가 가지 않는다).
+      if (!reportWrittenSince(startedAt, ['reports/mutation/mutation.json'])) {
+        log(
+          'FATAL: Stryker 는 끝났지만 reports/mutation/mutation.json 이 이번 실행에서 만들어지지 않았습니다.'
+        );
+        log('  확인할 것: stryker.config.mjs 의 reporters 에 json 이 있는지.');
+        process.exit(1);
+      }
+      writeManifest(shard, covered, filesToMutate);
+    }
     log('Mutation testing completed successfully.');
   } catch {
     // Stryker 는 thresholds.break 미달 시에도 non-zero 로 끝난다. 여기서 삼키면 게이트가 사라진다.
@@ -220,7 +307,7 @@ function run() {
     // 대응도 다르다(전자는 테스트를 더 써야 하고, 후자는 설정/툴체인을 고쳐야 한다).
     // 예전에는 두 경우가 같은 한 줄로 뭉개져서, 로그를 보고도 어느 쪽인지 알 수 없었다.
     // 실제로 2026-07-30 에 mutation-test 잡이 dry run 크래시로 죽었는데 "임계값 미달"로 읽혔다.
-    reportFailure(startedAt);
+    reportFailure(startedAt, shard.total > 1);
     process.exit(1);
   }
 }
@@ -232,7 +319,17 @@ function run() {
  * 중복처럼 보일 수 있다. 그러나 CI 로그는 수천 줄이고 실패 요약만 보는 경우가 많으므로,
  * 마지막 줄에 판정을 남기는 것이 실제 디버깅 시간을 좌우한다.
  */
-function reportFailure(startedAt: number) {
+/** 이번 실행이 만든 리포트인가(예전 실행의 리포트를 오진하지 않게 mtime 을 본다). */
+function reportWrittenSince(startedAt: number, paths: readonly string[]): boolean {
+  return paths.some((p) => {
+    const abs = resolve(process.cwd(), p);
+    if (!existsSync(abs)) return false;
+    // 파일시스템 mtime 해상도(FAT/일부 네트워크 FS 는 최대 2초)를 감안해 여유를 둔다.
+    return statSync(abs).mtimeMs >= startedAt - 2000;
+  });
+}
+
+function reportFailure(startedAt: number, sharded: boolean) {
   // 판정 근거: Stryker 는 dry run 단계에서 죽으면 리포트를 아예 만들지 않는다
   // (실측 2026-07-30: dry run 크래시 후 reports/ 디렉터리 자체가 없었다).
   // 반대로 thresholds.break 미달은 뮤턴트를 다 돌린 뒤의 판정이므로 리포트가 남는다.
@@ -241,17 +338,25 @@ function reportFailure(startedAt: number) {
   // mtime 을 함께 보는 이유: 로컬에서 `pnpm test:mutation` 을 먼저 돌려 둔 상태라면
   // 예전 리포트가 남아 있어 "크래시"를 "점수 미달"로 오진할 수 있다. CI 는 워크스페이스가
   // 깨끗하지만 로컬 재현 시 정확히 이 함수가 헷갈리게 만들면 존재 이유가 없어진다.
-  const reportWrittenByThisRun = [
+  const reportWrittenByThisRun = reportWrittenSince(startedAt, [
     'reports/mutation/mutation.html',
     'reports/mutation/mutation.json',
-  ].some((p) => {
-    const abs = resolve(process.cwd(), p);
-    if (!existsSync(abs)) return false;
-    // 파일시스템 mtime 해상도(FAT/일부 네트워크 FS 는 최대 2초)를 감안해 여유를 둔다.
-    return statSync(abs).mtimeMs >= startedAt - 2000;
-  });
+  ]);
 
-  if (reportWrittenByThisRun) {
+  // 분할 실행은 점수로 실패하지 않는다(thresholds.break = null). 리포트가 있어도 실패 코드면 실행 문제다.
+  if (sharded) {
+    log(
+      'FAILED: Stryker 가 실패 코드로 끝났습니다(분할 실행은 점수로 실패하지 않으므로 실행 문제입니다).'
+    );
+    log(
+      reportWrittenByThisRun
+        ? '  리포트는 만들어졌습니다 — 리포트 작성 뒤 단계(리포터·종료 처리)의 오류를 위 로그에서 확인하세요.'
+        : '  리포트가 만들어지지 않았습니다 — 아래 순서로 확인하세요.'
+    );
+    if (reportWrittenByThisRun) return;
+  }
+
+  if (reportWrittenByThisRun && !sharded) {
     log('FAILED: 뮤테이션 점수가 thresholds.break 미달입니다.');
     log(
       '  대응: 위 clear-text 리포터 출력의 Survived / NoCoverage 뮤턴트에 대응하는 테스트를 추가하세요.'

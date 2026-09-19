@@ -242,15 +242,27 @@ jobs:
           name: coverage-final
           path: coverage/coverage-final.json
           if-no-files-found: error
-          retention-days: 1
+          # 뮤테이션 분할 작업을 나중에 다시 돌려도(Re-run) 같은 맵을 받도록 분할 리포트와 같은 기간 보존한다.
+          retention-days: 7
 
-  # 뮤테이션 테스트 (변경된 파일만 검사)
+  # 뮤테이션 테스트 (변경된 파일만 검사) — 분할 실행
+  #
+  # 대상 파일을 matrix 작업 여러 개에 나눠 동시에 돌린다(scripts/lib/mutation-shards.ts — 파일 크기 기준 배분).
+  # dev 를 main 에 모아 반영하는 PR 은 변경량이 커서 한 작업으로는 60분 제한을 넘었다
+  # (2026-09-19 PR #279: 뮤턴트 8,535개, 추정 78분 — 71% 에서 중단). 분할 수는 아래 matrix.shard 목록 하나로
+  # 정한다(MUTATION_SHARD_TOTAL 은 strategy.job-total 로 따라간다).
+  # 각 분할은 점수로 실패하지 않고 리포트만 올린다. 판정은 mutation-summary 가 전체 점수로 한다.
   mutation-test:
-    name: Mutation Testing
+    name: Mutation Testing (${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
     needs: [test]
     if: github.event_name == 'pull_request' # PR에서만 실행 (변경분 분석 용이)
     timeout-minutes: 60
+    strategy:
+      # 한 분할이 실패해도 나머지는 끝까지 돌린다 — 어느 파일에서 무엇이 실패했는지 한 번에 보인다.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
 
     # 뮤테이션 테스트는 단위 테스트를 그대로 재실행한다.
     # test 잡에만 DB가 있으면 "test 는 통과하는데 stryker 만 실패"하는 어긋남이 생기므로
@@ -275,6 +287,8 @@ jobs:
       DIRECT_URL: 'postgresql://sr_ci:sr_ci@127.0.0.1:5432/sr_ci?schema=public'
       NEXTAUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
       AUTH_SECRET: 'ci-throwaway-secret-for-ephemeral-runner-db-0123456789'
+      MUTATION_SHARD_INDEX: ${{ matrix.shard }}
+      MUTATION_SHARD_TOTAL: ${{ strategy.job-total }}
 
     steps:
       - name: Checkout code
@@ -320,6 +334,61 @@ jobs:
       - name: Run Mutation Tests (Changed Files Only)
         run: pnpm test:mutation:ci
 
+      # 합산 판정용. 배정 기록(shard-manifest.json)은 대상이 없던 분할도 늘 남기므로 파일이 하나도 없으면 오류다.
+      # 합산 작업은 1..N 기록이 모두 와야 판정한다 — 결과가 빠졌는데 통과하는 일을 막는다.
+      - name: Upload shard mutation report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: success()
+        with:
+          name: mutation-report-${{ matrix.shard }}
+          path: |
+            reports/mutation/shard-manifest.json
+            reports/mutation/mutation.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # 분할 결과 합산 — 전체 뮤테이션 점수를 stryker.config.mjs 의 BREAK_THRESHOLD 와 비교한다.
+  # 분할이 하나라도 실패·시간 초과하면 합산하지 않고 실패한다(점수를 모르는 채 통과시키지 않는다).
+  # !cancelled(): 새 커밋이 올라와 실행 전체가 취소된 경우에는 돌지 않는다(취소된 실행에 오해를 부르는
+  # 빨간 결과를 남기지 않는다). 분할 하나의 시간 초과는 실행 취소가 아니므로 여기서 실패로 잡힌다.
+  mutation-summary:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    needs: [mutation-test]
+    if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.mutation-test.result != 'skipped' }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Require every shard to succeed
+        if: needs.mutation-test.result != 'success'
+        run: |
+          echo "뮤테이션 분할 작업 결과: ${{ needs.mutation-test.result }} — 실패한 분할의 로그를 확인하세요."
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download shard mutation reports
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: mutation-report-*
+          path: mutation-reports
+
+      - name: Aggregate mutation score
+        run: pnpm exec tsx scripts/stryker-aggregate.ts mutation-reports
+
   # 빌드 검증
   build:
     name: Build Verification
@@ -364,10 +433,30 @@ jobs:
 
   # E2E 테스트
   #
-  # push(main) 와 pull_request 양쪽에서 **같은 전체 선택**을 돌린다.
-  # deploy.yml 이 이 워크플로의 최종 결론에 매달려 있으므로 여기서 실패하면 운영 배포가
-  # 차단된다. (deploy.yml 은 `workflow_run.event == 'push'` 를 요구하므로 PR 실행이
-  # 배포를 유발하지는 않는다.)
+  # push(main·dev) 와 pull_request 양쪽에서 **같은 전체 선택**을 돌린다.
+  # deploy.yml 이 이 워크플로의 최종 결론에 매달려 있으므로 여기서 실패하면 운영(main)·
+  # 스테이징(dev) 배포가 모두 차단된다. (deploy.yml 은 `workflow_run.event == 'push'` 를
+  # 요구하므로 PR 실행이 배포를 유발하지는 않는다.)
+  #
+  # ── dev push 를 넣은 이유 (2026-09-18) ────────────────────────────────────
+  # 예전 조건은 push(main) 과 PR 뿐이라 dev push 에서는 이 잡이 skip 됐다. skip 은
+  # 워크플로 결론을 실패로 만들지 않으므로 deploy.yml 이 그대로 test.lkindo.kr 에 배포했다.
+  # "dev 는 PR 로 들어오니 PR 에서 이미 돌았다" 는 가정도 성립하지 않았다 — dev 의 최근
+  # first-parent 커밋 60개 중 50개가 PR 없이 직접 push 된 것이다. 사람이 main 병합 전에
+  # 눈으로 확인하는 바로 그 환경이 E2E 없이 올라가고 있었다.
+  #
+  # ── dev→main PR 에서는 돌리지 않는다 (2026-09-18) ─────────────────────────
+  # dev→main PR 이 열려 있으면 dev push 한 번에 같은 커밋으로 push·pull_request 두 실행이
+  # 동시에 뜬다(실측: 33297fc 에 push 19:49:51Z, pull_request 19:49:52Z). concurrency 그룹이
+  # 달라 서로 취소하지 않으므로 E2E 가 두 번 돈다. 둘 중 **push(dev) 쪽을 남긴다** —
+  # deploy.yml 은 push 실행의 결론만 보므로 그쪽이 스테이징 배포의 게이트다.
+  # 잃는 것: main 에만 있는 커밋과 병합한 트리를 병합 **전에** 볼 기회. PR 실행은 병합 트리
+  # (refs/pull/N/merge)를 체크아웃하므로 push(dev) 와 완전한 중복은 아니다 — 실제로 PR #271 의
+  # 병합 트리는 dev head 와 9개 파일이 달랐다(dependabot 이 main 으로 직접 병합하던 시절의
+  # 커밋 때문. c0c419e 이후 dependabot 은 dev 로 연다). 운영은 병합 뒤
+  # push(main) E2E 가 여전히 막는다. main 에는 브랜치 보호(필수 체크)가 없어 이 PR 의
+  # skip 이 병합을 막거나 풀어 주지도 않는다.
+  # 포크의 `dev` 브랜치에서 온 PR 은 이 저장소의 push 실행이 없으므로 건너뛰지 않는다.
   #
   # ── PR 부분 실행을 걷어낸 이유 (2026-08-09) ──────────────────────────────
   # 예전에는 PR 에서 보안·권한 스펙 50개만 돌렸다. 근거는 "workers=1 · retries=2 로
@@ -390,8 +479,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build]
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      github.event_name == 'pull_request'
+      (github.event_name == 'push' &&
+        (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')) ||
+      (github.event_name == 'pull_request' &&
+        !(github.head_ref == 'dev' &&
+          github.event.pull_request.head.repo.full_name == github.repository))
     # 실측 기준 E2E 자체는 6분, 빌드·시드·브라우저 설치를 더해도 25분 안쪽이다.
     # 120분은 "언제 끝나는지 아무도 모르던" 시절의 값이라, 늘어지는 실패를 30분씩
     # 방치하는 역할만 했다.

@@ -6,6 +6,7 @@ import { Shield, UserCheck, UserX } from 'lucide-react';
 import { PermissionGuard } from '@/components/auth/PermissionGuard';
 import { Button } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
+import { DELETION_PROTECTED_ACCOUNT_MESSAGE, isDeletionProtectedAccount } from '@/lib/role-rules';
 
 interface UserActionsProps {
   user: any; // Using any for now to match page.tsx usage until types are unified
@@ -80,13 +81,15 @@ export function UserActions({
       return;
     }
 
-    // Check if user has system roles
-    const hasSystemRole = user.roles.some((ur: any) => ['ADMIN', 'MANAGER'].includes(ur.role.name));
+    // 운영 계정(ADMIN·MANAGER)은 삭제 경로로 다루지 않는다 — 서버(policies.ensureCanDeleteUser)와 같은 판정.
+    const hasSystemRole = isDeletionProtectedAccount(
+      user.roles.map((ur: { role: { name: string } }) => ur.role.name)
+    );
 
     if (hasSystemRole) {
       toast({
         title: '삭제 제한',
-        description: '시스템 관리자 계정은 삭제할 수 없습니다. 역할을 변경하거나 비활성화하세요.',
+        description: DELETION_PROTECTED_ACCOUNT_MESSAGE,
         variant: 'destructive',
       });
       return;

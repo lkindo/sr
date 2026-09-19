@@ -24,6 +24,23 @@ import ClientDetailPage from '../page';
 const toast = vi.fn();
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
+// 수정·삭제 버튼은 서버 정책(canUpdateClient / canDeleteClient)과 같은 규칙으로 보인다.
+// 기본은 ADMIN 이고, 권한별 노출은 아래 '고객사 상세 — 수정·삭제 버튼' 스위트가 바꿔 가며 본다.
+const viewer = vi.hoisted(() => ({
+  admin: true,
+  roles: [] as string[],
+  permissions: [] as string[],
+}));
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    isAdmin: () => viewer.admin,
+    hasAnyRole: (roles: string[]) =>
+      roles.some((role) => (role === 'ADMIN' ? viewer.admin : viewer.roles.includes(role))),
+    hasPermission: (resource: string, action: string) =>
+      viewer.permissions.includes(`${resource}:${action}`),
+  }),
+}));
+
 const push = vi.fn();
 // vitest.config 의 alias 가 next/navigation 을 공용 목으로 바꾸지만 그 목에는 useParams 가
 // 없다. 이 화면은 라우트 파라미터로 조회 대상을 정하므로 여기서 직접 준다.
@@ -56,8 +73,19 @@ vi.mock('@/components/users/UserDialog', () => ({ UserDialog: () => null }));
 vi.mock('@/components/ui', () => {
   const passthrough = ({ children }: any) => <div>{children}</div>;
   return {
-    Button: ({ children, onClick, disabled, ['aria-label']: ariaLabel }: any) => (
-      <button onClick={onClick} disabled={disabled} aria-label={ariaLabel}>
+    Button: ({
+      children,
+      onClick,
+      disabled,
+      ['aria-label']: ariaLabel,
+      ['aria-describedby']: describedBy,
+    }: any) => (
+      <button
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        aria-describedby={describedBy}
+      >
         {children}
       </button>
     ),
@@ -86,6 +114,9 @@ const CLIENT = {
   serviceCategories: [{ id: 'cat-1', categoryName: '장애처리', slaHours: 4, priority: 'HIGH' }],
   users: [{ user: { id: 'u-1', name: '김사용', email: 'kim@example.com' } }],
   srs: [],
+  _count: { srs: 0, users: 1 },
+  deletedSrCount: 0,
+  viewerScope: 'all' as const,
 };
 
 /** 이 사용자는 두 고객사에 속해 있다 — 필터가 한쪽만 지우는지 보려면 두 개가 필요하다. */
@@ -123,6 +154,9 @@ function renderPage() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  viewer.admin = true;
+  viewer.roles = [];
+  viewer.permissions = [];
 });
 
 afterEach(() => {
@@ -178,6 +212,179 @@ describe('고객사 상세 — 조회', () => {
     expect(toast).toHaveBeenCalledTimes(1);
     expect(push).not.toHaveBeenCalled();
     expect(screen.getByText('고객사를 찾을 수 없습니다.')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 삭제된(soft delete) SR 은 고객사 화면에 나오지 않는다. 서버가 목록·건수에서 이미 빼고 내려 주므로,
+ * 화면이 지킬 것은 둘이다:
+ *   1. SR 건수는 `_count.srs`(전체) 로 보여 준다. `srs` 는 최근 10건뿐이라 그 길이를 쓰면 10 에서 멈춘다.
+ *   2. 삭제 버튼은 서버의 FK 가드와 같은 기준으로 막는다 — 삭제된 SR 도 고객사를 가리키므로
+ *      영구 삭제할 수 없다. 화면에 보이는 것(사용자·SR 0건)만으로 이유를 알 수 없을 때는 이유를 적는다.
+ */
+describe('고객사 상세 — 삭제된 SR', () => {
+  const stubClient = (overrides: Record<string, unknown>) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(200, { ...CLIENT, ...overrides }))
+    );
+
+  // 서버가 "삭제 가능" 으로 보는 상태만 만들 수 있게, 서비스 카테고리도 비운다(서버 가드는 카테고리도 본다).
+  const EMPTY = {
+    users: [],
+    serviceCategories: [],
+    _count: { srs: 0, users: 0 },
+    deletedSrCount: 0,
+  };
+  const ONE_USER = [{ user: { id: 'u-1', name: '김사용', email: 'kim@example.com' } }];
+
+  it('SR 건수는 최근 목록 길이가 아니라 전체 건수를 보여 준다', async () => {
+    stubClient({ _count: { srs: 37, users: 1 } });
+    renderPage();
+
+    expect(await screen.findByText('37')).toBeInTheDocument();
+  });
+
+  it('삭제된 SR 만 남아 있으면 삭제를 막고, 버튼에 이유와 대안을 연결한다', async () => {
+    stubClient({ ...EMPTY, deletedSrCount: 2 });
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: '고객사 삭제' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription(
+      /삭제된 SR 2건이 감사 기록으로 보관되어 있어 이 고객사는 영구 삭제할 수 없습니다/
+    );
+    // 대안(비활성화)은 그것을 할 수 있는 사람(고객사 수정 권한)에게만 안내한다 — ADMIN 은 둘 다 된다.
+    expect(button).toHaveAccessibleDescription(/수정 화면에서 비활성화할 수 있습니다/);
+  });
+
+  it('삭제 권한만 있고 수정 권한이 없으면 비활성화 대안은 안내하지 않는다', async () => {
+    viewer.admin = false;
+    viewer.permissions = ['CLIENT:DELETE'];
+    stubClient({ ...EMPTY, deletedSrCount: 2 });
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: '고객사 삭제' });
+    expect(button).toHaveAccessibleDescription(/영구 삭제할 수 없습니다/);
+    expect(button).not.toHaveAccessibleDescription(/비활성화/);
+  });
+
+  // 명부는 ADMIN 연결을 빼고 내려온다(client.service 의 filteredUsers). 삭제 판정은 서버 FK 가드와
+  // 같게 전체 연결 수(_count.users)로 한다 — 명부 길이로 판정하면 눌러도 409 가 나는 버튼이 켜진다.
+  it('명부에 보이지 않는 사용자 연결만 있어도 삭제를 막는다', async () => {
+    stubClient({ ...EMPTY, _count: { srs: 0, users: 1 } });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: '고객사 삭제' })).toBeDisabled();
+  });
+
+  it('명부를 받는 사람에게 사용자 수는 나열되는 명부와 같은 수다', async () => {
+    stubClient({ users: ONE_USER, _count: { srs: 0, users: 2 } });
+    renderPage();
+
+    expect(await screen.findByText('사용자 (1)')).toBeInTheDocument();
+    expect(screen.queryByText('사용자 (2)')).not.toBeInTheDocument();
+  });
+
+  it('살아 있는 SR 이 있으면 삭제를 막는다', async () => {
+    stubClient({ ...EMPTY, _count: { srs: 1, users: 0 } });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: '고객사 삭제' })).toBeDisabled();
+  });
+
+  it('사용자·SR·삭제된 SR·카테고리가 모두 없으면 삭제할 수 있다', async () => {
+    stubClient(EMPTY);
+    renderPage();
+
+    const button = await screen.findByRole('button', { name: '고객사 삭제' });
+    expect(button).toBeEnabled();
+    expect(button).not.toHaveAttribute('aria-describedby');
+    expect(screen.queryByText(/영구 삭제할 수 없습니다/)).not.toBeInTheDocument();
+  });
+
+  // 보이는 사용자나 SR 이 있으면 화면이 이미 막힌 이유를 보여 준다 — 삭제된 SR 이유를 덧붙이지 않는다.
+  it.each([
+    ['살아 있는 SR', { _count: { srs: 1, users: 0 } }],
+    ['사용자', { users: ONE_USER, _count: { srs: 0, users: 1 } }],
+  ])('보이는 %s 이 있으면 이유를 따로 적지 않는다', async (_label, visible) => {
+    stubClient({ ...EMPTY, ...visible, deletedSrCount: 2 });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: '고객사 삭제' })).toBeDisabled();
+    expect(screen.queryByText(/영구 삭제할 수 없습니다/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 담당 엔지니어가 보는 고객사 상세 — 헌법 §1.2: 고객사 사용자 정보·SR 통계는 배정 범위로 제한.
+ * 서버가 사용자 명부를 빼고(users: []) SR 은 배정분만 준다. 화면은 그것을 "사용자 0명"·"등록된
+ * 사용자가 없습니다"·"SR 3건(전체인 것처럼)" 같은 거짓 숫자로 보이지 않게 표기해야 한다.
+ */
+describe('고객사 상세 — 담당 엔지니어 시점', () => {
+  const ASSIGNED = {
+    ...CLIENT,
+    users: [],
+    _count: { srs: 2, users: 5 },
+    viewerScope: 'assigned' as const,
+  };
+
+  it('사용자 명부 대신 숨겼다는 안내를 보이고, 건수는 서버 건수를 쓴다', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, ASSIGNED)));
+    renderPage();
+
+    expect(
+      await screen.findByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('등록된 사용자가 없습니다.')).not.toBeInTheDocument();
+    expect(screen.getByText('사용자 (5)')).toBeInTheDocument();
+  });
+
+  it('SR 숫자가 내 배정분임을 표기한다', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, ASSIGNED)));
+    renderPage();
+
+    expect(await screen.findByText('내 배정 SR')).toBeInTheDocument();
+    expect(screen.getByText(/최근 SR · 내 배정/)).toBeInTheDocument();
+  });
+
+  it('고객사 쓰기 권한이 없는 담당 엔지니어에게는 수정·삭제 버튼을 보이지 않는다', async () => {
+    viewer.admin = false;
+    viewer.permissions = ['CLIENT:READ', 'SR:READ'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, ASSIGNED)));
+    renderPage();
+
+    await screen.findByText('내 배정 SR');
+    expect(screen.queryByRole('button', { name: '고객사 정보 수정' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '고객사 삭제' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 수정·삭제 버튼 노출 — 서버(policies.canUpdateClient / canDeleteClient)와 같은 규칙: ADMIN 이거나
+ * CLIENT:UPDATE / CLIENT:DELETE. 예전에는 누구에게나 보이고 누르면 403 이 났다.
+ */
+describe('고객사 상세 — 수정·삭제 버튼', () => {
+  const visibleButtons = async () => {
+    await screen.findByText('장애처리');
+    return {
+      edit: screen.queryByRole('button', { name: '고객사 정보 수정' }) !== null,
+      remove: screen.queryByRole('button', { name: '고객사 삭제' }) !== null,
+    };
+  };
+
+  it.each([
+    ['ADMIN', true, [], { edit: true, remove: true }],
+    ['CLIENT:UPDATE 만', false, ['CLIENT:UPDATE'], { edit: true, remove: false }],
+    ['CLIENT:DELETE 만', false, ['CLIENT:DELETE'], { edit: false, remove: true }],
+    ['고객사 쓰기 권한 없음', false, ['CLIENT:READ'], { edit: false, remove: false }],
+  ])('%s', async (_label, admin, permissions, expected) => {
+    viewer.admin = admin as boolean;
+    viewer.permissions = permissions as string[];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, CLIENT)));
+    renderPage();
+
+    expect(await visibleButtons()).toEqual(expected);
   });
 });
 
@@ -333,5 +540,55 @@ describe('고객사 상세 — 사용자 제외 (읽기-수정-쓰기)', () => {
     expect(
       fetchMock.mock.calls.some((call) => (call[1] as RequestInit | undefined)?.method === 'PATCH')
     ).toBe(false);
+  });
+});
+
+/**
+ * 카테고리·사용자 조작 버튼 — 서버 판정과 같은 규칙으로만 보인다(예전에는 누구에게나 보여 누르면 403).
+ *  - 카테고리 추가·수정·삭제: 고객사 수정 권한(categories 라우트의 ensureCanUpdateClient)
+ *  - 사용자 추가: USER:CREATE(canCreateUser)
+ *  - 사용자 제외: 내부 사용자의 USER:UPDATE(PATCH /api/users/[id] 의 소속 변경 규칙)
+ */
+describe('고객사 상세 — 카테고리·사용자 조작 버튼', () => {
+  const visible = async () => {
+    await screen.findByText('장애처리');
+    return {
+      addCategory: screen.queryByRole('button', { name: /카테고리 추가/ }) !== null,
+      editCategory: screen.queryByRole('button', { name: '장애처리 수정' }) !== null,
+      addUser: screen.queryByRole('button', { name: /사용자 추가/ }) !== null,
+      removeUser: screen.queryByRole('button', { name: '김사용 고객사에서 제외' }) !== null,
+    };
+  };
+
+  it.each([
+    [
+      'ADMIN',
+      true,
+      [],
+      [],
+      { addCategory: true, editCategory: true, addUser: true, removeUser: true },
+    ],
+    [
+      'MANAGER(시드 권한)',
+      false,
+      ['MANAGER'],
+      ['CLIENT:READ', 'CLIENT:UPDATE', 'USER:READ', 'USER:UPDATE'],
+      { addCategory: true, editCategory: true, addUser: false, removeUser: true },
+    ],
+    [
+      'ENGINEER(시드 권한)',
+      false,
+      ['ENGINEER'],
+      ['CLIENT:READ', 'SR:READ'],
+      { addCategory: false, editCategory: false, addUser: false, removeUser: false },
+    ],
+  ])('%s', async (_label, admin, roles, permissions, expected) => {
+    viewer.admin = admin as boolean;
+    viewer.roles = roles as string[];
+    viewer.permissions = permissions as string[];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, CLIENT)));
+    renderPage();
+
+    expect(await visible()).toEqual(expected);
   });
 });

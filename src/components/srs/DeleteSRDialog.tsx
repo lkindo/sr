@@ -54,7 +54,9 @@ export function DeleteSRDialog({ open, onOpenChange, sr, onDelete }: DeleteSRDia
           <DialogTitle>SR 삭제</DialogTitle>
           <DialogDescription>
             정말로 <strong>{sr?.srNumber}</strong> - {sr?.title} SR을 삭제하시겠습니까?
-            <br />이 작업은 되돌릴 수 없으며, 모든 댓글과 첨부파일도 함께 삭제됩니다.
+            <br />
+            삭제한 SR은 SR 목록·검색·대시보드에서 사라지며, 이 작업은 되돌릴 수 없습니다.
+            댓글·첨부파일·처리 이력은 감사 기록으로 보관됩니다.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

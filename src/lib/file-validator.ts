@@ -23,6 +23,18 @@ export const MAX_UPLOAD_TOTAL_SIZE = MAX_UPLOAD_FILE_SIZE;
 export const MAX_UPLOAD_FILE_COUNT = 10;
 
 /**
+ * CFB(OLE 복합 문서) 컨테이너로 감지된 파일 중 허용하는 구형 Office 형식 — 확장자로 구분한다.
+ *
+ * 매크로를 담을 수 있는 형식이고, 확장자만 바꾼 다른 CFB 파일(.msi 등)도 이 판정을 통과한다. 그 한계를 알고
+ * 업무상 필요로 허용한다(2026-09-18 소유자 결정).
+ */
+const LEGACY_OFFICE_BY_EXTENSION = new Map<string, string>([
+  ['.doc', 'application/msword'],
+  ['.xls', 'application/vnd.ms-excel'],
+  ['.ppt', 'application/vnd.ms-powerpoint'],
+]);
+
+/**
  * 허용된 파일 MIME 타입 목록
  */
 const ALLOWED_FILE_TYPES = {
@@ -145,6 +157,23 @@ async function validateFileContent(buffer: ArrayBuffer, fileName: string): Promi
 
   // file-type 라이브러리로 실제 파일 타입 감지
   const detectedType = await fileTypeFromBuffer(uint8Array);
+
+  // 구형 Office(.doc/.xls/.ppt)는 OLE 복합 문서(CFB) 컨테이너다. file-type 은 앞부분만 보고는 그 안이
+  // 워드인지 엑셀인지 구분하지 못해 `application/x-cfb` 로 감지한다. 예전에는 이 값이 허용 목록에 없어
+  // 문서상 허용인 구형 Office 파일이 **항상** 거부됐다(허용 목록에 msword 등이 있는데도).
+  // 컨테이너 서명이 CFB 로 확인됐으므로 구체 형식은 확장자로 정한다. 다른 확장자의 CFB(예: .msi)는
+  // 여전히 거부한다.
+  if (detectedType?.mime === 'application/x-cfb') {
+    const ext = fileName.toLowerCase().substring(fileName.lastIndexOf('.'));
+    const legacyOfficeMime = LEGACY_OFFICE_BY_EXTENSION.get(ext);
+    if (!legacyOfficeMime) {
+      throw new FileValidationError(
+        `허용되지 않은 파일 형식입니다. (감지된 형식: ${detectedType.mime})`,
+        'INVALID_TYPE'
+      );
+    }
+    return legacyOfficeMime;
+  }
 
   // 파일 타입을 감지하지 못한 경우 (텍스트 파일 등)
   if (!detectedType) {

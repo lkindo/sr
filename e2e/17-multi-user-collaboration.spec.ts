@@ -220,7 +220,7 @@ test.describe('다중 사용자 협업 — 크로스 페르소나 가시성', ()
         'ENGINEER 의 완료 처리가 CLIENT 화면에 반영되지 않았다'
       ).toBeVisible({ timeout: 20000 });
 
-      // '확인 완료' 는 SRStatusActions.tsx 에서 isRequestor 일 때만 렌더된다.
+      // '확인 완료' 는 SRStatusActions.tsx 에서 canConfirm(sr-state-machine.canViewerConfirmSR)일 때만 렌더된다.
       await expect(page.getByRole('button', { name: '확인 완료' })).toBeVisible();
 
       await changeSRStatus(page, sr.id, 'confirm');

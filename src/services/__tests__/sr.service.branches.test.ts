@@ -34,6 +34,7 @@ const { mockPrisma } = vi.hoisted(() => {
       deleteMany: vi.fn().mockResolvedValue({}),
     },
     sRStatusHistory: {
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
@@ -223,11 +224,13 @@ describe('SRService Extended Branches', () => {
           expectedCompletionDate: null,
           intakeNotes: '',
         },
-        { id: 'u1' } as any
+        { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as any
       );
 
       updateData = vi.mocked(txMock.sR.update).mock.calls[1]![0].data;
-      // (두 번째 호출은 운영 소유 필드를 바꾸지 않으므로 역할 제약과 무관하다)
+      // (두 번째 호출도 첫 호출과 같은 내부 사용자다. 역할 없는 사용자는 외부 사용자로 판정되어
+      //  접수 후(IN_PROGRESS) SR 내용을 고칠 수 없다 — policies.ensureCanEditSRContent. 이 테스트는
+      //  null 변환만 본다.)
       expect(updateData.expectedCompletionDate).toBeNull();
       expect(updateData.intakeNotes).toBeNull();
     });
@@ -276,11 +279,32 @@ describe('SRService Extended Branches', () => {
   describe('Direct Prisma Proxy Methods', () => {
     it('proxies correctly', async () => {
       vi.mocked(prisma.sR.findMany).mockResolvedValue([]);
-      await srService.getAllSRs({ take: 1 });
+      await srService.getAllSRs({
+        viewer: {
+          id: 'u1',
+          email: 'u1@example.com',
+          name: null,
+          image: null,
+          roles: ['ADMIN'],
+          permissions: [],
+          clientIds: [],
+        },
+        take: 1,
+      });
       expect(prisma.sR.findMany).toHaveBeenCalled();
 
       vi.mocked(prisma.sR.count).mockResolvedValue(0);
-      await srService.countSRs();
+      await srService.countSRs({
+        viewer: {
+          id: 'u1',
+          email: 'u1@example.com',
+          name: null,
+          image: null,
+          roles: ['ADMIN'],
+          permissions: [],
+          clientIds: [],
+        },
+      });
       expect(prisma.sR.count).toHaveBeenCalled();
 
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: '1' } as any);

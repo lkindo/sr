@@ -75,7 +75,7 @@ interface ActionConfig {
 const ACTIONS: Record<SRDialogAction, ActionConfig> = {
   complete: {
     icon: CheckCircle,
-    iconClassName: 'h-5 w-5 text-green-600',
+    iconClassName: 'h-5 w-5 text-status-success',
     title: 'SR 완료 처리',
     description: 'SR을 완료 처리합니다. 해결 내용을 입력해주세요.',
     fieldLabel: '해결 내용',
@@ -89,7 +89,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
   },
   hold: {
     icon: PauseCircle,
-    iconClassName: 'h-5 w-5 text-yellow-600',
+    iconClassName: 'h-5 w-5 text-status-warning',
     title: 'SR 보류 처리',
     description: 'SR을 일시 보류합니다. 보류 사유를 입력해주세요.',
     fieldLabel: '보류 사유',
@@ -110,7 +110,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
   },
   reject: {
     icon: XCircle,
-    iconClassName: 'h-5 w-5 text-destructive',
+    iconClassName: 'h-5 w-5 text-status-danger',
     title: 'SR 거절 처리',
     description: 'SR을 거절합니다. 거절 사유를 입력해주세요.',
     fieldLabel: '거절 사유',
@@ -125,7 +125,7 @@ const ACTIONS: Record<SRDialogAction, ActionConfig> = {
   },
   reopen: {
     icon: RotateCcw,
-    iconClassName: 'h-5 w-5 text-blue-600',
+    iconClassName: 'h-5 w-5 text-status-info',
     title: 'SR 재오픈',
     description: '완료된 SR을 다시 진행합니다. 재오픈 사유를 입력해주세요.',
     fieldLabel: '재오픈 사유',

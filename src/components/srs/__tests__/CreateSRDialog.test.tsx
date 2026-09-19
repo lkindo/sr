@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getClientsForSelection } from '@/actions/client.actions';
 import { getServiceCategoriesForSelection } from '@/actions/service-category.actions';
-import { createSRAction } from '@/actions/sr.actions';
+import { createSRAction, getSRRequesterCandidatesAction } from '@/actions/sr.actions';
 import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,7 @@ vi.mock('@/hooks/use-permissions', () => ({
 
 vi.mock('@/actions/sr.actions', () => ({
   createSRAction: vi.fn(),
+  getSRRequesterCandidatesAction: vi.fn(),
 }));
 
 vi.mock('@/actions/client.actions', () => ({
@@ -67,6 +68,8 @@ vi.mock('@/components/ui/select', () => ({
         <option value="client-1">Client 1</option>
         <option value="cat-1">Category 1</option>
         <option value="MEDIUM">MEDIUM</option>
+        <option value="SELF">SELF</option>
+        <option value="cust-1">cust-1</option>
       </select>
       {children}
     </div>
@@ -93,6 +96,11 @@ describe('CreateSRDialog Component', () => {
     (getClientsForSelection as any).mockResolvedValue({
       success: true,
       data: [{ id: 'client-1', code: 'C1', name: 'Client 1' }],
+    });
+
+    vi.mocked(getSRRequesterCandidatesAction).mockResolvedValue({
+      success: true,
+      data: [{ id: 'cust-1', name: '김고객', email: 'kim@client.com' }],
     });
 
     (getServiceCategoriesForSelection as any).mockResolvedValue({
@@ -215,6 +223,83 @@ describe('CreateSRDialog Component', () => {
         })
       );
       expect(mockOnCreated).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * 대리 등록(D3, 소유자 결정 2026-09-18). 확인완료는 신청자 본인만 하므로, 운영자가 고객 요청을 대신
+   * 등록할 때는 실제 고객을 신청자로 지정한다. 내부 사용자에게만 보이고, 고객사를 고른 뒤에 뜬다.
+   */
+  describe('대리 등록 — 신청자(고객) 지정', () => {
+    const fillRequired = async () => {
+      fireEvent.change(await screen.findByLabelText(/제목 \*/), {
+        target: { value: 'Valid Title Here' },
+      });
+      fireEvent.change(await screen.findByLabelText(/설명 \*/), {
+        target: { value: 'This is a long enough description for testing.' },
+      });
+    };
+
+    it('내부 사용자가 고객사를 고르면 그 고객사의 신청자 후보를 불러와 선택지를 보인다', async () => {
+      render(<CreateSRDialog {...defaultProps} />);
+      expect(screen.queryByTestId('trigger-requester')).not.toBeInTheDocument();
+
+      const selects = await screen.findAllByTestId('mock-select');
+      fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
+
+      await waitFor(() => expect(getSRRequesterCandidatesAction).toHaveBeenCalledWith('client-1'));
+      expect(await screen.findByTestId('trigger-requester')).toBeInTheDocument();
+      expect(await screen.findByTestId('item-cust-1')).toHaveTextContent('김고객');
+    });
+
+    it('고객을 고르면 requesterId 를 실어 보낸다', async () => {
+      vi.mocked(createSRAction).mockResolvedValue({
+        success: true,
+        data: { id: 'new-sr' },
+      } as never);
+      render(<CreateSRDialog {...defaultProps} />);
+      await fillRequired();
+
+      const selects = await screen.findAllByTestId('mock-select');
+      fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
+      fireEvent.change(selects[1]!, { target: { value: 'cat-1' } });
+      await screen.findByTestId('trigger-requester');
+      fireEvent.change(screen.getAllByTestId('mock-select')[2]!, { target: { value: 'cust-1' } });
+
+      fireEvent.submit(screen.getByTestId('sr-form'));
+
+      await waitFor(() => expect(createSRAction).toHaveBeenCalled());
+      const formData = vi.mocked(createSRAction).mock.calls[0]![0];
+      expect(formData.get('requesterId')).toBe('cust-1');
+    });
+
+    it('본인(기본값)이면 requesterId 를 보내지 않는다', async () => {
+      vi.mocked(createSRAction).mockResolvedValue({
+        success: true,
+        data: { id: 'new-sr' },
+      } as never);
+      render(<CreateSRDialog {...defaultProps} />);
+      await fillRequired();
+
+      const selects = await screen.findAllByTestId('mock-select');
+      fireEvent.change(selects[0]!, { target: { value: 'client-1' } });
+      fireEvent.change(selects[1]!, { target: { value: 'cat-1' } });
+      fireEvent.submit(screen.getByTestId('sr-form'));
+
+      await waitFor(() => expect(createSRAction).toHaveBeenCalled());
+      const formData = vi.mocked(createSRAction).mock.calls[0]![0];
+      expect(formData.has('requesterId')).toBe(false);
+    });
+
+    it('외부 사용자에게는 보이지 않고 후보도 조회하지 않는다', async () => {
+      vi.mocked(usePermissions).mockReturnValue({
+        hasAnyRole: vi.fn().mockReturnValue(false),
+      } as never);
+      render(<CreateSRDialog {...defaultProps} />);
+
+      await waitFor(() => expect(getProfileAction).toHaveBeenCalled());
+      expect(screen.queryByTestId('trigger-requester')).not.toBeInTheDocument();
+      expect(getSRRequesterCandidatesAction).not.toHaveBeenCalled();
     });
   });
 

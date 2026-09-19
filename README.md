@@ -14,10 +14,10 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
   - **운영팀**: ADMIN (전체 권한), MANAGER (관리), ENGINEER (실무)
   - **고객사**: CLIENT_ADMIN (고객사 관리), CLIENT_USER (승인된 고객사 범위의 요청·조회)
 - **모바일 최적화 (Mobile-First)**:
-  - **통합 디자인 시스템**: 모든 모바일 카드에 일관된 디자인 토큰(2열 그리드 정보 배치, p-3.5 패딩) 적용
+  - **통합 디자인 시스템**: 모바일 목록 카드는 공용 셸(`MobileListCard`)로 같은 배치(2열 정보 그리드)를 쓴다
   - **콤팩트 필터**: 모바일 화면 활용도를 높이기 위한 탭/칩 스타일 필터 시스템
 - **PWA & 성능**:
-  - **오프라인 지원**: 서비스 워커를 통한 리소스 캐싱 및 오프라인 모드 지원
+  - **오프라인 대비(모바일)**: 모바일 기기에서만 앱 설치·서비스 워커를 켠다(PC 는 웹 푸시를 구독할 때만 등록된다). 네트워크가 끊기면 마지막으로 연 화면과 정적 자원을 캐시에서 보여 주지만, API 응답은 캐시하지 않으므로 오프라인에서 SR 을 조회·작성할 수는 없다.
   - **속도 최적화**: `navigationPreload` 활성화 및 미들웨어 리다이렉트 서버화로 렌더링 지연 최소화
 - **보안**: 역할 기반 권한 제어(RBAC), 환경 변수 기반 Rate Limiting
 
@@ -155,7 +155,7 @@ docker-compose up --build
 
 ### 시스템 운영팀 고객사 할당 정리
 
-운영팀(Admin/Manager) 계정이 실수로 특정 고객사에 매핑된 경우 이를 정리합니다.
+운영팀(ADMIN·MANAGER·ENGINEER) 계정이 실수로 특정 고객사에 매핑된 경우 이를 정리합니다. 시스템 역할 보유자는 고객사에 소속될 수 없습니다(`GEMINI.md` §1.3).
 
 ```bash
 # 1. 대상 확인 (Dry Run)
@@ -195,12 +195,18 @@ pnpm test:mutation
 
 ## 📖 문서
 
+### 문서 위계 — 서로 다를 때 무엇이 이기는가
+
+1. **헌법** — [GEMINI.md](./GEMINI.md)(비즈니스 정책)와 [.gemini/rules/](./.gemini/rules/)(백엔드·프런트엔드·DB 기술 규칙). 최상위다.
+2. **코드의 정본 파일** — 인가 판정 `src/lib/policies.ts`, 상태 전이 `src/lib/sr-state-machine.ts`, 권한 카탈로그 `prisma/permission-catalog.ts`·역할 매핑 `prisma/seed.ts`, 스키마 `prisma/schema.prisma`·`prisma/migrations/`, 디자인 토큰 구현 `src/app/globals.css`·`tailwind.config.ts`, 상태·우선순위 라벨과 배지 `src/lib/constants/sr.ts`.
+3. **설계서** — PRD·TRD·LLD·DB.md·DESIGN.md. 헌법이나 정본 파일과 다르면 설계서가 틀린 것이다(고칠 대상).
+
 ### 제품 · 설계
 
 - [SR_Management_System_PRD.md](./docs/SR_Management_System_PRD.md): 제품 요구사항 정의서(v1.4). 초기판이 기술했던 미채택 스택(Vercel/Upstash/Resend/Inngest 등)을 실제 구현 기준으로 정정했습니다.
-- [TRD.md](./docs/TRD.md): 기술 요구사항 문서(v1.5). 현재 스택의 단일 기준 문서로, 자체 서버(Oracle Cloud VM) + Docker Compose + nginx + PostgreSQL 16 구성을 실측 기반으로 기술합니다.
+- [TRD.md](./docs/TRD.md): 기술 요구사항 문서(v1.5). 자체 서버(Oracle Cloud VM) + Docker Compose + nginx + PostgreSQL 16 구성을 실측 기반으로 기술합니다. 기술 규칙이 `.gemini/rules/` 와 다르면 규칙이 이깁니다.
 - [LLD.md](./docs/LLD.md): 상세 설계 문서(v1.3). Next.js 16 + PostgreSQL 16 컨테이너 + 자체 서버 기준이며, 초안이 전제했던 Vercel/Upstash/Blob 스택 미채택을 정정 배너로 명시합니다.
-- [DESIGN.md](./docs/DESIGN.md): 프런트엔드 디자인 토큰 명세. 다크 캔버스 기반 색상·타이포 팔레트를 정의한 디자인 시스템 자료입니다.
+- [DESIGN.md](./docs/DESIGN.md): 색상 팔레트의 정본(다크 캔버스). 치수(반경·간격·폭)의 정본은 `.gemini/rules/fe-rules.md` §3 입니다.
 
 ### 데이터베이스
 

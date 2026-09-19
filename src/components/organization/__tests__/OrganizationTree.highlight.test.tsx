@@ -109,3 +109,28 @@ describe('OrganizationTree 사용자 상태 토글 배선', () => {
     await waitFor(() => expect(onToggleUserStatus).toHaveBeenCalledWith('user-1', false));
   });
 });
+
+/**
+ * 담당 엔지니어가 보는 조직도 — 헌법 §1.2 에 따라 서버가 고객사 사용자 명부를 싣지 않는다
+ * (GET /api/clients/{id} 의 viewerScope='assigned', users=[]). 사용자 수는 있는데 목록이 비면
+ * 트리는 아무것도 없는 칸을 그렸다. 숨겼다는 사실을 말해야 한다.
+ */
+describe('OrganizationTree 사용자 명부를 숨긴 시점', () => {
+  it('사용자 목록 대신 숨겼다는 안내를 보인다', () => {
+    renderTree('', { clientUsers: { 'client-1': [] }, rosterHidden: true });
+
+    expect(
+      screen.getByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('등록된 사용자가 없습니다.')).not.toBeInTheDocument();
+  });
+
+  it('숨기지 않았으면 기존처럼 사용자를 그린다', () => {
+    renderTree('', { rosterHidden: false });
+
+    expect(screen.getByText('홍길동')).toBeInTheDocument();
+    expect(
+      screen.queryByText('담당 엔지니어에게는 고객사 사용자 목록을 보여 주지 않습니다.')
+    ).not.toBeInTheDocument();
+  });
+});

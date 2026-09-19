@@ -1,20 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import SystemSettingsPage from '../page';
 
 /**
- * 시스템 설정 화면이 React Query 로 옮겨진 뒤에도 **화면에 보이는 계약**이 같은지 본다.
+ * 시스템 설정 화면 — **실제로 적용 중인 값을 보여 주는 읽기 전용 화면**.
  *
- * 이 화면의 회귀는 조용하다:
- *  - 조회 실패는 **토스트로만** 알린다. 폼은 빈 값으로 계속 그려져야 한다 —
- *    useQuery 의 `error` 를 화면에 노출하면 그게 회귀다(기존 코드는 노출하지 않았다).
- *  - 첫 로딩만 '로딩 중...' 이다. `isPending` 이 아니라 `isFetching` 을 물리면
- *    저장 뒤 재조회마다 폼 전체가 사라졌다 나타난다.
- *  - 저장 뒤에는 `qk.settings.system` 무효화로 재조회가 뒤따라야 한다.
- *  - 저장 뒤에도 사용자가 입력하던 값이 서버 값으로 되돌아가면 안 된다.
- *    (PUT 이 아직 스텁이라 GET 은 예전 값을 그대로 돌려준다.)
+ * 예전 화면은 사이트 이름·설명·관리자 이메일을 입력받아 "설정 저장" 으로 PUT 을 보냈지만 서버는
+ * 아무것도 저장하지 않고 성공을 돌려줬다. "지금 백업"·"캐시 삭제" 버튼은 클릭 핸들러가 없었고,
+ * "마지막 백업: 2025-01-12 10:30", "세션 24시간", "최소 6자" 는 JSX 에 박힌 값이었다.
+ * 지켜야 하는 것:
+ *  - 서버가 준 실제 값(세션·비밀번호 정책·메일 서버)을 보여 준다.
+ *  - 저장·백업·캐시 삭제처럼 **동작하지 않는 조작을 제공하지 않는다**.
+ *  - 조회 실패는 토스트로만 알린다(기존 동작).
  */
 
 const toast = vi.fn();
@@ -35,13 +34,23 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 const SETTINGS = {
-  siteName: 'SR Management System v1.0',
-  siteDescription: '서비스 요청 관리 시스템',
-  adminEmail: 'admin@example.com',
-  smtpHost: 'smtp.example.com',
-  smtpPort: 587,
-  smtpSecurity: 'TLS',
+  session: {
+    idleLogoutMinutes: 30,
+    idleWarningMinutes: 1,
+    tokenMaxAgeHours: 8,
+    absoluteMaxAgeHours: 12,
+  },
+  loginLock: { maxFailures: 10, windowMinutes: 15, lockMinutes: 15 },
+  passwordPolicy: '8~100자, 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함',
+  mailServer: {
+    host: 'mail.example.org',
+    port: 2525,
+    configured: true,
+    credentialsConfigured: true,
+  },
 };
+
+const IDLE_TEXT = '입력이 30분간 없으면 로그아웃(1분 전에 경고)';
 
 const jsonResponse = (body: unknown, status = 200) => ({
   ok: status >= 200 && status < 300,
@@ -55,10 +64,7 @@ const fetchMock = vi.fn();
 /** 실물 Provider 로 감싼다. retry:false / gcTime:0 이 없으면 실패 케이스가 재시도로 늘어진다. */
 function renderPage() {
   const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: 0 },
-      mutations: { retry: false },
-    },
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -67,13 +73,6 @@ function renderPage() {
   );
 }
 
-const input = (id: string) => document.getElementById(id) as HTMLInputElement;
-
-const fill = (id: string, value: string) => fireEvent.change(input(id), { target: { value } });
-
-const callsWithMethod = (method: string) =>
-  fetchMock.mock.calls.filter((call) => (call[1]?.method ?? 'GET') === method);
-
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('fetch', fetchMock);
@@ -81,17 +80,74 @@ beforeEach(() => {
 });
 
 describe('SystemSettingsPage', () => {
-  it('첫 로딩 동안 로딩 문구를 보이고, 받은 설정으로 폼을 채운다', async () => {
+  it('첫 로딩 동안 로딩 문구를 보이고, 서버가 준 실제 값을 보여 준다', async () => {
     renderPage();
 
     expect(screen.getByText('로딩 중...')).toBeInTheDocument();
-
-    await waitFor(() => expect(screen.getByText('시스템 설정')).toBeInTheDocument());
-
-    expect(input('site-name')).toHaveValue('SR Management System v1.0');
-    expect(input('site-description')).toHaveValue('서비스 요청 관리 시스템');
-    expect(input('admin-email')).toHaveValue('admin@example.com');
+    // 사용자가 실제로 겪는 규칙(유휴 로그아웃)과 토큰 수명·절대 수명을 따로 보여 준다(결정 D13).
+    expect(await screen.findByText(IDLE_TEXT)).toBeInTheDocument();
+    expect(screen.getByText('마지막 사용 후 8시간 · 로그인 후 최대 12시간')).toBeInTheDocument();
+    expect(screen.getByText('15분 안에 10번 틀리면 15분 동안 로그인 거부')).toBeInTheDocument();
+    expect(screen.getByText(SETTINGS.passwordPolicy)).toBeInTheDocument();
+    expect(screen.getByText('mail.example.org:2525')).toBeInTheDocument();
     expect(fetchMock.mock.calls[0]![0]).toBe('/api/settings/system');
+  });
+
+  it('메일 서버 환경변수가 없으면 기본값을 쓰고 있다고 알린다', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...SETTINGS,
+        mailServer: {
+          host: 'smtp.gmail.com',
+          port: 587,
+          configured: false,
+          credentialsConfigured: true,
+        },
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText('smtp.gmail.com:587')).toBeInTheDocument();
+    expect(
+      screen.getByText(/EMAIL_SERVER_HOST 가 설정되지 않아 기본값을 씁니다/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/알림 메일이 발송되지 않습니다/)).not.toBeInTheDocument();
+  });
+
+  it('발송 계정이 없으면 호스트가 맞아도 메일이 나가지 않는다고 알린다', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...SETTINGS,
+        mailServer: { ...SETTINGS.mailServer, credentialsConfigured: false },
+      })
+    );
+    renderPage();
+
+    expect(await screen.findByText('mail.example.org:2525')).toBeInTheDocument();
+    expect(screen.getByText(/알림 메일이 발송되지 않습니다/)).toBeInTheDocument();
+  });
+
+  it('정상 설정이면 메일 경고를 띄우지 않는다', async () => {
+    renderPage();
+
+    await screen.findByText('mail.example.org:2525');
+    expect(screen.queryByText(/기본값을 씁니다/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/알림 메일이 발송되지 않습니다/)).not.toBeInTheDocument();
+  });
+
+  it('동작하지 않는 조작(저장·지금 백업·캐시 삭제)과 가짜 값을 보여 주지 않는다', async () => {
+    renderPage();
+    await screen.findByText(IDLE_TEXT);
+
+    for (const name of ['설정 저장', '지금 백업', '캐시 삭제', '변경']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/2025-01-12/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/24시간/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/최소 6자/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    // 조회 외의 요청을 보내지 않는다.
+    expect(fetchMock.mock.calls.every((call) => (call[1]?.method ?? 'GET') === 'GET')).toBe(true);
   });
 
   it('조회가 실패해도 화면에는 에러를 노출하지 않고 토스트만 띄운다', async () => {
@@ -108,55 +164,7 @@ describe('SystemSettingsPage', () => {
         variant: 'destructive',
       })
     );
-
-    // 폼은 계속 그려지고 값만 비어 있다 — 기존 동작과 같다.
     expect(screen.getByText('시스템 설정')).toBeInTheDocument();
-    expect(input('site-name')).toHaveValue('');
     expect(screen.queryByText('관리자 권한이 필요합니다.')).not.toBeInTheDocument();
-  });
-
-  it('저장하면 PUT 을 보내고 성공 토스트 뒤 설정을 다시 읽는다', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText('시스템 설정')).toBeInTheDocument());
-
-    fill('site-name', '새 사이트 이름');
-    fireEvent.click(screen.getByRole('button', { name: '설정 저장' }));
-
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith({
-        title: '성공',
-        description: '시스템 설정이 저장되었습니다.',
-      })
-    );
-
-    const put = callsWithMethod('PUT')[0]!;
-    expect(put[0]).toBe('/api/settings/system');
-    expect(JSON.parse((put[1] as { body: string }).body)).toEqual({
-      siteName: '새 사이트 이름',
-      siteDescription: '서비스 요청 관리 시스템',
-      adminEmail: 'admin@example.com',
-    });
-
-    // onSettled 의 invalidateQueries 가 재조회를 일으킨다.
-    await waitFor(() => expect(callsWithMethod('GET')).toHaveLength(2));
-
-    // 재조회 결과(예전 값)가 사용자가 입력한 값을 덮어쓰면 안 된다.
-    expect(input('site-name')).toHaveValue('새 사이트 이름');
-  });
-
-  it('저장이 실패하면 서버 메시지를 오류 토스트로 보여 준다', async () => {
-    renderPage();
-    await waitFor(() => expect(screen.getByText('시스템 설정')).toBeInTheDocument());
-
-    fetchMock.mockResolvedValueOnce(jsonResponse({ error: '저장 권한이 없습니다.' }, 403));
-    fireEvent.click(screen.getByRole('button', { name: '설정 저장' }));
-
-    await waitFor(() =>
-      expect(toast).toHaveBeenCalledWith({
-        title: '오류',
-        description: '저장 권한이 없습니다.',
-        variant: 'destructive',
-      })
-    );
   });
 });

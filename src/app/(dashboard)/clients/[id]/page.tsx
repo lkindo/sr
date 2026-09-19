@@ -19,14 +19,17 @@ import {
 import { ClientDialog } from '@/components/clients/ClientDialog';
 import { DeleteClientDialog } from '@/components/clients/DeleteClientDialog';
 import { ServiceCategoryDialog } from '@/components/clients/ServiceCategoryDialog';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Separator } from '@/components/ui';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { UserDialog } from '@/components/users/UserDialog';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, ApiError, apiGet, apiPatch, retryUnlessClientError } from '@/lib/api-client';
+import { CLIENT_ROSTER_HIDDEN_NOTE } from '@/lib/constants/client';
 import { qk } from '@/lib/query-keys';
 
 interface ServiceCategory {
@@ -78,7 +81,17 @@ interface ClientDetail {
   isActive: boolean;
   serviceCategories: ServiceCategory[];
   users: UserClient[];
+  /** 최근 SR 10건. 삭제된(soft delete) SR 은 서버가 빼고 내려 준다. */
   srs: SR[];
+  /** 전체 건수. `srs` 는 최근 10건뿐이므로 SR 수는 여기서 읽는다. 삭제된 SR 은 세지 않는다. */
+  _count: { srs: number; users: number };
+  /** 삭제된 SR 건수. 화면에 SR 로 보여 주지 않고, 삭제 버튼 판정과 그 이유에만 쓴다. */
+  deletedSrCount: number;
+  /**
+   * 보는 사람의 범위. 'assigned' 면 담당 엔지니어다 — 헌법 §1.2 에 따라 서버가 사용자 명부를 싣지
+   * 않고(users 는 빈 배열) SR 요약·건수는 내 배정분만 준다. 화면은 이를 거짓 숫자로 보이지 않게 표기한다.
+   */
+  viewerScope: 'assigned' | 'all';
 }
 
 /**
@@ -91,12 +104,7 @@ interface UserClients {
   clients?: Array<{ client: { id: string } }>;
 }
 
-import {
-  priorityBadgeVariants as priorityColors,
-  priorityLabels,
-  statusBadgeVariants as statusColors,
-  statusLabelOf,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf } from '@/lib/constants/sr';
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -111,6 +119,19 @@ export default function ClientDetailPage() {
   // null = 생성 모드
   const [editingCategory, setEditingCategory] = useState<ServiceCategory | null>(null);
   const { toast } = useToast();
+  // 서버(src/lib/policies.ts 의 canUpdateClient / canDeleteClient)와 같은 규칙이다: ADMIN 이거나
+  // CLIENT:UPDATE / CLIENT:DELETE. 예전에는 버튼을 누구에게나 보여 주고 누르면 403 이 났다
+  // (ENGINEER·MANAGER 는 CLIENT:DELETE 가 없다).
+  const { hasPermission, hasAnyRole, isAdmin } = usePermissions();
+  const canUpdateClient = isAdmin() || hasPermission('CLIENT', 'UPDATE');
+  const canDeleteClient = isAdmin() || hasPermission('CLIENT', 'DELETE');
+  // 서비스 카테고리 추가·수정·삭제는 서버가 고객사 수정 권한으로 판정한다(categories 라우트의
+  // ensureCanUpdateClient). 사용자 추가는 USER:CREATE(canCreateUser), 제외는 소속 변경이라 내부 사용자의
+  // USER:UPDATE 가 필요하다(PATCH /api/users/[id] 의 clientIds 규칙). 예전에는 전부 누구에게나 보였다.
+  const canManageCategories = canUpdateClient;
+  const canAddUser = isAdmin() || hasPermission('USER', 'CREATE');
+  const canRemoveUser =
+    hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']) && (isAdmin() || hasPermission('USER', 'UPDATE'));
 
   /**
    * 고객사 상세.
@@ -305,20 +326,45 @@ export default function ClientDetailPage() {
     );
   }
 
+  // 삭제 버튼의 **SR 축**은 서버의 FK 가드(clientService.deleteClient)와 같은 기준이다 — 삭제된 SR 은
+  // 화면에 보여 주지 않지만 client_id FK 로 이 고객사를 계속 가리키므로 영구 삭제를 막는다.
+  // 서비스 카테고리도 서버가 막는다. 새 고객사에는 기본 카테고리가 자동으로 생기므로, 예전에는 버튼이 켜져
+  // 있어도 첫 시도가 항상 409 였다(결정 D12). 담당자 연결은 여기서 판정하지 않는다 — 앱에 그 연결을 만드는
+  // 경로가 없고, 생기면 서버의 409 거부 문구가 무엇이 남았는지 알려 준다.
+  // 이유 문구는 삭제 버튼을 볼 수 있는 사람에게, 화면에 보이는 것만으로는 막힌 이유를 알 수 없을 때만 적는다.
+  const deleteBlockedByDeletedSrs =
+    canDeleteClient &&
+    client.deletedSrCount > 0 &&
+    client._count.users === 0 &&
+    client._count.srs === 0;
+  const deleteBlockedByCategories =
+    canDeleteClient &&
+    !deleteBlockedByDeletedSrs &&
+    client.serviceCategories.length > 0 &&
+    client._count.users === 0 &&
+    client._count.srs === 0;
+  const assignedOnly = client.viewerScope === 'assigned';
+  // 명부를 받는 사람에게는 아래 사용자 탭에 나열되는 수(서버가 ADMIN 연결을 뺀 명부)와 같은 숫자를
+  // 보여 준다 — _count.users 는 ADMIN 연결까지 세어 "사용자 (3)" 아래 2명이 보이는 식으로 어긋난다.
+  // 명부를 받지 않는 담당 엔지니어에게는 서버가 센 연결 수만 있다(헌법 §1.2 의 범위 — 정책 확인 필요).
+  const userCount = assignedOnly ? client._count.users : client.users.length;
+
   return (
     <div className="space-y-6">
       {/* 페이지 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/clients">
-              <ArrowLeft className="h-4 w-4" />
+            {/* 아이콘뿐인 링크라 이름을 준다(axe link-name). */}
+            <Link href="/clients" aria-label="고객사 목록으로 돌아가기">
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             </Link>
           </Button>
           <div>
-            <h2 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
+            {/* 화면 제목이다 — h2 였을 때 페이지에 h1 이 없었다(axe page-has-heading-one, 결정 D16 에서 접근성 검사 대상에 넣음). */}
+            <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
               {client.name}
-            </h2>
+            </h1>
             <p className="text-sm text-muted-foreground mt-1">고객사 코드: {client.code}</p>
           </div>
         </div>
@@ -329,31 +375,59 @@ export default function ClientDetailPage() {
           이 8개에 걸려 실패했다. 고객사 자체를 대상으로 한다는 것을 이름에 명시한다.
         */}
         <div className="flex gap-2">
-          <Button
-            onClick={() => setIsEditDialogOpen(true)}
-            className="sr-btn-template"
-            aria-label="고객사 정보 수정"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            수정
-          </Button>
-          <Button
-            onClick={() => setIsDeleteDialogOpen(true)}
-            disabled={client.users.length > 0 || client.srs.length > 0}
-            variant="destructive"
-            aria-label="고객사 삭제"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            삭제
-          </Button>
+          {canUpdateClient && (
+            <Button
+              onClick={() => setIsEditDialogOpen(true)}
+              className="sr-btn-template"
+              aria-label="고객사 정보 수정"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              수정
+            </Button>
+          )}
+          {canDeleteClient && (
+            <Button
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={
+                client._count.users > 0 ||
+                client._count.srs > 0 ||
+                client.deletedSrCount > 0 ||
+                client.serviceCategories.length > 0
+              }
+              variant="destructive"
+              aria-label="고객사 삭제"
+              aria-describedby={
+                deleteBlockedByDeletedSrs || deleteBlockedByCategories
+                  ? 'client-delete-blocked'
+                  : undefined
+              }
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              삭제
+            </Button>
+          )}
         </div>
       </div>
+
+      {deleteBlockedByDeletedSrs && (
+        <p id="client-delete-blocked" className="text-sm text-muted-foreground">
+          삭제된 SR {client.deletedSrCount}건이 감사 기록으로 보관되어 있어 이 고객사는 영구 삭제할
+          수 없습니다.
+          {canUpdateClient && ' 더 이상 쓰지 않는 고객사는 수정 화면에서 비활성화할 수 있습니다.'}
+        </p>
+      )}
+      {deleteBlockedByCategories && (
+        <p id="client-delete-blocked" className="text-sm text-muted-foreground">
+          서비스 카테고리 {client.serviceCategories.length}개가 남아 있어 삭제할 수 없습니다. 아래
+          서비스 카테고리 탭에서 먼저 삭제하세요.
+        </p>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-2 sr-card-template">
           {/* 카드 헤더 */}
           <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">기본 정보</h3>
+            <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">기본 정보</h2>
           </div>
 
           {/* 카드 내용 */}
@@ -448,7 +522,7 @@ export default function ClientDetailPage() {
         <div className="sr-card-template">
           {/* 카드 헤더 */}
           <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-            <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h3>
+            <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">통계</h2>
           </div>
 
           {/* 카드 내용 */}
@@ -458,15 +532,15 @@ export default function ClientDetailPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">사용자</span>
               </div>
-              <span className="text-2xl font-bold">{client.users.length}</span>
+              <span className="text-2xl font-bold">{userCount}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">SR</span>
+                <span className="text-sm">{assignedOnly ? '내 배정 SR' : 'SR'}</span>
               </div>
-              <span className="text-2xl font-bold">{client.srs.length}</span>
+              <span className="text-2xl font-bold">{client._count.srs}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -485,8 +559,10 @@ export default function ClientDetailPage() {
           <TabsTrigger value="categories">
             서비스 카테고리 ({client.serviceCategories.length})
           </TabsTrigger>
-          <TabsTrigger value="users">사용자 ({client.users.length})</TabsTrigger>
-          <TabsTrigger value="srs">최근 SR ({client.srs.length})</TabsTrigger>
+          <TabsTrigger value="users">사용자 ({userCount})</TabsTrigger>
+          <TabsTrigger value="srs">
+            {assignedOnly ? '최근 SR · 내 배정' : '최근 SR'} ({client.srs.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="categories" className="mt-6">
@@ -494,17 +570,19 @@ export default function ClientDetailPage() {
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
               <div>
-                <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
+                <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
                   서비스 카테고리
-                </h3>
+                </h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   이 고객사에 등록된 서비스 카테고리 목록입니다.
                 </p>
               </div>
-              <Button size="sm" onClick={openCreateCategory}>
-                <Plus className="mr-2 h-4 w-4" />
-                카테고리 추가
-              </Button>
+              {canManageCategories && (
+                <Button size="sm" onClick={openCreateCategory}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  카테고리 추가
+                </Button>
+              )}
             </div>
 
             {/* 카드 내용 */}
@@ -517,9 +595,11 @@ export default function ClientDetailPage() {
                   <p className="text-sm text-muted-foreground">
                     카테고리가 없으면 이 고객사는 SR을 접수할 수 없습니다.
                   </p>
-                  <Button size="sm" onClick={openCreateCategory}>
-                    <Plus className="mr-2 h-4 w-4" />첫 카테고리 추가
-                  </Button>
+                  {canManageCategories && (
+                    <Button size="sm" onClick={openCreateCategory}>
+                      <Plus className="mr-2 h-4 w-4" />첫 카테고리 추가
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <Table>
@@ -540,8 +620,8 @@ export default function ClientDetailPage() {
                         <TableCell>{category.description || '-'}</TableCell>
                         <TableCell>{category.slaHours}시간</TableCell>
                         <TableCell>
-                          <Badge variant={priorityColors[category.priority]}>
-                            {priorityLabels[category.priority]}
+                          <Badge variant={priorityBadgeVariantOf(category.priority)}>
+                            {priorityLabelOf(category.priority)}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -557,24 +637,26 @@ export default function ClientDetailPage() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openEditCategory(category)}
-                              aria-label={`${category.categoryName} 수정`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteCategory(category)}
-                              aria-label={`${category.categoryName} 삭제`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                          {canManageCategories && (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditCategory(category)}
+                                aria-label={`${category.categoryName} 수정`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteCategory(category)}
+                                aria-label={`${category.categoryName} 삭제`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -590,24 +672,30 @@ export default function ClientDetailPage() {
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))] flex justify-between items-center">
               <div>
-                <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h3>
+                <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">사용자</h2>
                 <p className="text-sm text-muted-foreground mt-0.5">
                   이 고객사에 속한 사용자 목록입니다.
                 </p>
               </div>
-              <Button
-                onClick={() => setIsUserDialogOpen(true)}
-                size="sm"
-                className="sr-btn-template-primary"
-              >
-                <UserPlus className="mr-2 h-4 w-4" />
-                사용자 추가
-              </Button>
+              {canAddUser && (
+                <Button
+                  onClick={() => setIsUserDialogOpen(true)}
+                  size="sm"
+                  className="sr-btn-template-primary"
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  사용자 추가
+                </Button>
+              )}
             </div>
 
             {/* 카드 내용 */}
             <div className="px-6 py-5">
-              {client.users.length === 0 ? (
+              {assignedOnly ? (
+                <p className="text-center py-8 text-muted-foreground">
+                  {CLIENT_ROSTER_HIDDEN_NOTE}
+                </p>
+              ) : client.users.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">등록된 사용자가 없습니다.</p>
               ) : (
                 <Table>
@@ -624,14 +712,17 @@ export default function ClientDetailPage() {
                         <TableCell className="font-medium">{userClient.user.name}</TableCell>
                         <TableCell>{userClient.user.email}</TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveUser(userClient.user.id)}
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          >
-                            <UserMinus className="h-4 w-4" />
-                          </Button>
+                          {canRemoveUser && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveUser(userClient.user.id)}
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              aria-label={`${userClient.user.name} 고객사에서 제외`}
+                            >
+                              <UserMinus className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -646,9 +737,11 @@ export default function ClientDetailPage() {
           <div className="sr-card-template">
             {/* 카드 헤더 */}
             <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
-              <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">최근 SR</h3>
+              <h2 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">최근 SR</h2>
               <p className="text-sm text-muted-foreground mt-0.5">
-                이 고객사의 최근 SR 목록입니다 (최대 10개).
+                {assignedOnly
+                  ? '나에게 배정된 이 고객사의 최근 SR 목록입니다 (최대 10개).'
+                  : '이 고객사의 최근 SR 목록입니다 (최대 10개).'}
               </p>
             </div>
 
@@ -672,13 +765,11 @@ export default function ClientDetailPage() {
                       <TableRow key={sr.id}>
                         <TableCell className="font-medium">{sr.title}</TableCell>
                         <TableCell>
-                          <Badge variant={statusColors[sr.status]}>
-                            {statusLabelOf(sr.status)}
-                          </Badge>
+                          <SRStatusBadge status={sr.status} />
                         </TableCell>
                         <TableCell>
-                          <Badge variant={priorityColors[sr.priority]}>
-                            {priorityLabels[sr.priority]}
+                          <Badge variant={priorityBadgeVariantOf(sr.priority)}>
+                            {priorityLabelOf(sr.priority)}
                           </Badge>
                         </TableCell>
                         <TableCell>{new Date(sr.createdAt).toLocaleDateString('ko-KR')}</TableCell>

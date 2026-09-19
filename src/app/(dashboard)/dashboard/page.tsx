@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 import { ExportButton } from '@/components/dashboard/ExportButton';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
@@ -25,13 +26,11 @@ import { Progress } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, retryUnlessClientError } from '@/lib/api-client';
-import {
-  priorityBadgeVariants as priorityColors,
-  priorityLabels,
-  statusBadgeVariants as statusColors,
-  statusLabelOf,
-} from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf } from '@/lib/constants/sr';
+import { getDueDateStatus } from '@/lib/date-utils';
 import { qk } from '@/lib/query-keys';
+import { canViewerIntakeSR } from '@/lib/sr-state-machine';
+import { formatAppZoneDate } from '@/lib/timezone';
 
 import { DashboardSkeleton } from './DashboardSkeleton';
 
@@ -45,6 +44,12 @@ interface DashboardStats {
     urgent: number;
     myAssigned: number;
     myAssignedInProgress: number;
+    /** 마감을 넘긴 진행 중(접수·진행중·보류) SR 건수(헌법 §3 '지연 중', 결정 D10). */
+    overdue: number;
+    /** 그중 보류 건수. */
+    overdueOnHold: number;
+    /** 마감일을 직접 조정한 진행 중 SR 건수 — 조정으로 '지연 중' 에서 빠진 건을 함께 보인다. */
+    manualDueOpen: number;
   };
   byStatus: Record<string, number>;
   byPriority: Record<string, number>;
@@ -129,11 +134,13 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { toast } = useToast();
-  const { hasAnyRole } = usePermissions();
+  const { hasAnyRole, roles, permissions } = usePermissions();
   const router = useRouter();
 
   const isAdminManagerEngineer = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const isEngineer = hasAnyRole(['ENGINEER']);
+  // 접수 대기 카드는 접수할 수 있는 사람에게만 보인다(각 항목이 접수 화면으로 연결된다).
+  const canIntake = canViewerIntakeSR({ roles, permissions });
 
   const {
     data: stats,
@@ -172,16 +179,6 @@ export default function DashboardPage() {
     return `${Math.round(hours / 24)}일`;
   };
 
-  // 마감일까지 남은 시간 계산
-  const getDaysUntilDue = (dueDate: string | null): number | null => {
-    if (!dueDate) return null;
-    const now = new Date();
-    const due = new Date(dueDate);
-    const diffTime = due.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
   return (
     <div className="sr-content-area space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -197,8 +194,8 @@ export default function DashboardPage() {
           <ExportButton />
         </div>
       </div>
-      {/* 접수 대기 SR 강조 카드 (ADMIN/MANAGER/ENGINEER만) */}
-      {isAdminManagerEngineer && stats.summary.requested > 0 && (
+      {/* 접수 대기 SR 강조 카드 (접수 권한자만 — ADMIN·MANAGER 또는 SR:INTAKE) */}
+      {canIntake && stats.summary.requested > 0 && (
         <Card className="sr-card border-l-4 border-l-[hsl(var(--sr-accent-orange))] bg-gradient-to-r from-blue-500/10 to-transparent">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -240,11 +237,8 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
-                          <Badge
-                            variant={priorityColors[sr.priority] || 'default'}
-                            className="text-xs"
-                          >
-                            {priorityLabels[sr.priority] || sr.priority}
+                          <Badge variant={priorityBadgeVariantOf(sr.priority)} className="text-xs">
+                            {priorityLabelOf(sr.priority)}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-1 truncate">{sr.title}</p>
@@ -287,8 +281,11 @@ export default function DashboardPage() {
             <CardContent>
               <div className="space-y-2 mt-4">
                 {stats.myAssignedSRs.map((sr) => {
-                  const daysUntilDue = getDaysUntilDue(sr.dueDate);
-                  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+                  // 지연 판정은 목록·SR 상세와 같은 getDueDateStatus(시각 기준, 헌법 §3)를 쓴다.
+                  // 예전에는 여기만 달력일 올림(Math.ceil)으로 셌다 — 마감을 몇 시간 넘긴 SR 이
+                  // "0일 남음" 처럼 보이고, 완료된 SR 에도 '지연' 이 붙었다.
+                  const dueStatus = getDueDateStatus(sr.dueDate, sr.status);
+                  const isOverdue = dueStatus?.isOverdue ?? false;
                   return (
                     <Link
                       key={sr.id}
@@ -298,17 +295,12 @@ export default function DashboardPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{sr.srNumber}</span>
-                          <Badge variant={statusColors[sr.status] || 'default'} className="text-xs">
-                            {statusLabelOf(sr.status)}
-                          </Badge>
-                          <Badge
-                            variant={priorityColors[sr.priority] || 'default'}
-                            className="text-xs"
-                          >
-                            {priorityLabels[sr.priority] || sr.priority}
+                          <SRStatusBadge status={sr.status} className="text-xs" />
+                          <Badge variant={priorityBadgeVariantOf(sr.priority)} className="text-xs">
+                            {priorityLabelOf(sr.priority)}
                           </Badge>
                           {isOverdue && (
-                            <Badge variant="destructive" className="text-xs">
+                            <Badge variant="danger" className="text-xs">
                               지연
                             </Badge>
                           )}
@@ -319,8 +311,8 @@ export default function DashboardPage() {
                           {sr.dueDate && (
                             <span className={isOverdue ? 'text-destructive font-medium' : ''}>
                               {' '}
-                              • 마감: {new Date(sr.dueDate).toLocaleDateString('ko-KR')}
-                              {daysUntilDue !== null && !isOverdue && ` (${daysUntilDue}일 남음)`}
+                              • 마감: {formatAppZoneDate(sr.dueDate)}
+                              {dueStatus && ` (${dueStatus.label})`}
                             </span>
                           )}
                         </p>
@@ -413,12 +405,10 @@ export default function DashboardPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">진행 중</CardTitle>
-            <Clock className="h-5 w-5 text-[hsl(var(--sr-accent-blue))]" />
+            <Clock className="h-5 w-5 text-status-info" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
-              {stats.summary.inProgress}
-            </div>
+            <div className="text-2xl font-bold text-status-info">{stats.summary.inProgress}</div>
             <p className="text-xs text-muted-foreground mt-1">처리 중인 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -436,10 +426,10 @@ export default function DashboardPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">완료</CardTitle>
-            <CheckCircle className="h-5 w-5 text-green-600" />
+            <CheckCircle className="h-5 w-5 text-status-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.summary.completed}</div>
+            <div className="text-2xl font-bold text-status-success">{stats.summary.completed}</div>
             <p className="text-xs text-muted-foreground mt-1">완료된 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -457,12 +447,10 @@ export default function DashboardPage() {
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">대기 중</CardTitle>
-            <AlertCircle className="h-5 w-5 text-[hsl(var(--sr-accent-orange))]" />
+            <AlertCircle className="h-5 w-5 text-status-neutral" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
-              {stats.summary.pending}
-            </div>
+            <div className="text-2xl font-bold text-status-neutral">{stats.summary.pending}</div>
             <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
             {stats.summary.total > 0 && (
               <Progress
@@ -477,7 +465,47 @@ export default function DashboardPage() {
 
       {/* 성능 지표 카드 (ADMIN/MANAGER/ENGINEER만) */}
       {isAdminManagerEngineer && (
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {/*
+            '지연 중'(헌법 §3, 결정 D10) — 준수율은 끝난 SR 만 세는 후행 지표라 적체가 쌓이는 동안에도 높게
+            유지된다. 능동 경고를 두지 않는 대신 이 숫자로 감시한다. 누르면 같은 건수의 목록(/srs?overdue=1)이 뜬다.
+          */}
+          <Link href="/srs?overdue=1" className="block" aria-label="지연 중인 SR 목록 보기">
+            <Card className="sr-card h-full">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">지연 중</CardTitle>
+                <AlertTriangle
+                  className={
+                    stats.summary.overdue > 0
+                      ? 'h-5 w-5 text-destructive'
+                      : 'h-5 w-5 text-muted-foreground'
+                  }
+                />
+              </CardHeader>
+              <CardContent>
+                <div
+                  className={
+                    stats.summary.overdue > 0
+                      ? 'text-2xl font-bold text-destructive'
+                      : 'text-2xl font-bold'
+                  }
+                >
+                  {stats.summary.overdue}건
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  마감을 넘긴 진행 중 SR
+                  {stats.summary.overdueOnHold > 0 &&
+                    ` (보류 ${stats.summary.overdueOnHold}건 포함)`}
+                </p>
+                {stats.summary.manualDueOpen > 0 && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    마감일 직접 조정 {stats.summary.manualDueOpen}건
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+
           <Card className="sr-card">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">평균 처리 시간</CardTitle>
@@ -515,8 +543,9 @@ export default function DashboardPage() {
                         : 'text-2xl font-bold text-destructive'
                 }
               >
+                {/* 헌법 §3 용어: 표본 0건은 '표본 없음', 마감일이 없어 판정할 수 없는 건은 '측정 불가'. */}
                 {stats.performance.slaComplianceRate === null
-                  ? '측정 불가'
+                  ? '표본 없음'
                   : `${stats.performance.slaComplianceRate}%`}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
@@ -526,7 +555,8 @@ export default function DashboardPage() {
               </p>
               {stats.performance.slaUnmeasurableCount > 0 && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  마감일 미산출 {stats.performance.slaUnmeasurableCount}건은 집계에서 제외됨
+                  측정 불가(마감일 없음) {stats.performance.slaUnmeasurableCount}건은 집계에서
+                  제외됨
                 </p>
               )}
               {stats.performance.slaComplianceRate !== null && (
@@ -599,10 +629,10 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <Badge variant={priorityColors[sr.priority]}>
-                      {priorityLabels[sr.priority]}
+                    <Badge variant={priorityBadgeVariantOf(sr.priority)}>
+                      {priorityLabelOf(sr.priority)}
                     </Badge>
-                    <Badge variant={statusColors[sr.status]}>{statusLabelOf(sr.status)}</Badge>
+                    <SRStatusBadge status={sr.status} />
                   </div>
                 </div>
               ))}

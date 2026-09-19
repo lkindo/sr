@@ -99,6 +99,28 @@ describe('RoleTable Component', () => {
     expect(deleteButtons[1]).not.toBeDisabled(); // 일반사용자 (users: 0) -> enabled
   });
 
+  it('기본 역할은 사용자가 0명이어도 삭제 버튼이 비활성화되고, ADMIN 은 수정·권한 관리도 비활성화된다', () => {
+    const canonical = [
+      { id: 'r-admin', name: 'ADMIN', permissions: [], _count: { users: 0 } },
+      { id: 'r-cu', name: 'CLIENT_USER', permissions: [], _count: { users: 0 } },
+      { id: 'r-x', name: 'SUPPORT', permissions: [], _count: { users: 0 } },
+    ];
+    render(<RoleTable {...defaultProps} roles={canonical} />);
+
+    const deleteButtons = screen.getAllByText('삭제');
+    expect(deleteButtons[0]).toBeDisabled();
+    expect(deleteButtons[1]).toBeDisabled();
+    expect(deleteButtons[2]).not.toBeDisabled();
+
+    const editButtons = screen.getAllByText('수정');
+    const permissionButtons = screen.getAllByText('권한 관리');
+    expect(editButtons[0]).toBeDisabled();
+    expect(permissionButtons[0]).toBeDisabled();
+    // 다른 기본 역할은 설명·권한을 조정할 수 있다 — 역할별 권한은 ADMIN 이 조정하는 기본값이다.
+    expect(editButtons[1]).not.toBeDisabled();
+    expect(permissionButtons[1]).not.toBeDisabled();
+  });
+
   it('삭제 활성화된 버튼 클릭 시 onDelete 콜백 함수를 호출해야 함', () => {
     const onDelete = vi.fn();
     render(<RoleTable {...defaultProps} roles={mockRoles} onDelete={onDelete} />);

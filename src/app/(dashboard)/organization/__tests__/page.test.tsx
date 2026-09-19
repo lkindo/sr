@@ -28,8 +28,10 @@ vi.mock('@/components/organization/OrganizationTree', () => ({
     onToggleClient,
     onToggleUserStatus,
     onDragEnd,
+    onAddUser,
   }: any) => (
     <div>
+      <span data-testid="can-add-user">{String(Boolean(onAddUser))}</span>
       <span data-testid="client-count">{clients.length}</span>
       {clients.map((client: any) => (
         <div key={client.id}>
@@ -89,6 +91,17 @@ vi.mock('@/components/ui', () => ({
 }));
 
 const toast = vi.fn();
+// 고객사·사용자 추가 버튼은 서버와 같은 권한 규칙으로 보인다(CLIENT:CREATE / USER:CREATE). 이 스위트는
+// 조회·변이 흐름을 보므로 ADMIN 으로 둔다.
+const viewer = vi.hoisted(() => ({ admin: true, permissions: [] as string[] }));
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({
+    isAdmin: () => viewer.admin,
+    hasPermission: (resource: string, action: string) =>
+      viewer.permissions.includes(`${resource}:${action}`),
+  }),
+}));
+
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast }),
 }));
@@ -353,5 +366,36 @@ describe('OrganizationPage', () => {
       })
     );
     expect(screen.getByTestId('client-count')).toHaveTextContent('0');
+  });
+});
+
+/**
+ * 추가 버튼 — 서버(policies.canCreateClient / canCreateUser)와 같은 규칙: ADMIN 이거나 CLIENT:CREATE /
+ * USER:CREATE. 예전에는 누구에게나 보여 MANAGER·ENGINEER 가 누르면 반드시 403 이었다(시드상 둘 다 없다).
+ */
+describe('OrganizationPage — 추가 버튼', () => {
+  afterEach(() => {
+    viewer.admin = true;
+    viewer.permissions = [];
+  });
+
+  it('시드 MANAGER(생성 권한 없음)에게는 고객사·사용자 추가를 보이지 않는다', async () => {
+    stubFetch();
+    viewer.admin = false;
+    viewer.permissions = ['CLIENT:READ', 'CLIENT:UPDATE', 'USER:READ', 'USER:UPDATE'];
+    renderPage();
+
+    await screen.findByTestId('client-count');
+    expect(screen.queryByRole('button', { name: /고객사 추가/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId('can-add-user')).toHaveTextContent('false');
+  });
+
+  it('ADMIN 에게는 둘 다 보인다', async () => {
+    stubFetch();
+    renderPage();
+
+    await screen.findByTestId('client-count');
+    expect(screen.getByRole('button', { name: /고객사 추가/ })).toBeInTheDocument();
+    expect(screen.getByTestId('can-add-user')).toHaveTextContent('true');
   });
 });

@@ -112,4 +112,9 @@ export const qk = {
   outbox: {
     list: (status: string) => ['outbox', status] as const,
   },
+
+  /** 감사 로그(ADMIN 전용, 결정 D11). 필터·페이지가 키에 들어가야 조건을 바꿀 때 캐시를 갈라 쓴다. */
+  auditLogs: {
+    list: (query: string) => ['audit-logs', query] as const,
+  },
 } as const;

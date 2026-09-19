@@ -12,6 +12,28 @@
 #       자동화에서는 FORCE=1 로 확인을 생략할 수 있다.
 set -euo pipefail
 
+# 운영 DB 사용자·DB 이름의 정본은 배포가 매번 새로 쓰는 `.env.prod` 다(docs/SECRET_ROTATION.md 4절).
+# 호출자가 POSTGRES_USER 를 넘기지 않았고 그 파일이 있으면 거기서 두 값만 읽는다(서브셸에서 읽어
+# 다른 변수는 이 셸로 새지 않는다). 이 파일을 읽지 않던 판에서는 런북대로 DB 사용자 이름을 바꾸면
+# 기본값(lkind)으로 접속해 백업이 실패하게 된다.
+# 배포 전 백업처럼 값을 이미 넘기는 호출은 영향이 없다. 다른 파일을 쓰려면 ENV_FILE 로 지정한다.
+#
+# 파일이 **있는데** 읽을 수 없거나 POSTGRES_USER 가 비어 있으면 멈춘다(fail-closed). 조용히 기본값으로
+# 떨어지면 엉뚱한 사용자·DB 로 백업하거나, restore 에서는 엉뚱한 DB 를 덮어쓸 수 있다.
+ENV_FILE="${ENV_FILE:-$(cd "$(dirname "$0")/.." && pwd)/.env.prod}"
+if [ -z "${POSTGRES_USER:-}" ] && [ -f "$ENV_FILE" ]; then
+  if [ ! -r "$ENV_FILE" ]; then
+    echo "ERROR: $ENV_FILE 를 읽을 수 없습니다(권한). POSTGRES_USER 를 직접 넘기거나 권한을 확인하세요." >&2
+    exit 1
+  fi
+  POSTGRES_USER="$(set -a; . "$ENV_FILE"; printf '%s' "${POSTGRES_USER:-}")"
+  POSTGRES_DB="${POSTGRES_DB:-$(set -a; . "$ENV_FILE"; printf '%s' "${POSTGRES_DB:-}")}"
+  if [ -z "$POSTGRES_USER" ]; then
+    echo "ERROR: $ENV_FILE 에 POSTGRES_USER 가 없습니다. 파일을 확인하거나 POSTGRES_USER 를 직접 넘기세요." >&2
+    exit 1
+  fi
+fi
+
 DB_CONTAINER="${DB_CONTAINER:-sr-db}"
 APP_CONTAINER="${APP_CONTAINER:-sr-app}"
 DB_USER="${POSTGRES_USER:-lkind}"

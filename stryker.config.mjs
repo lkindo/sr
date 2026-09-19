@@ -1,8 +1,25 @@
 // @ts-check
+// 설정 파일은 ESLint 의 Node 전역 대상이 아니라 process 를 명시적으로 가져온다(no-undef).
+import process from 'node:process';
+
+/**
+ * 뮤테이션 점수의 실패 기준(%). 분할 실행에서는 각 분할이 판정하지 않고 scripts/stryker-aggregate.ts 가
+ * 전체 점수로 이 값과 비교한다 — 그래서 이름을 붙여 내보낸다(값의 근거는 아래 thresholds 주석).
+ */
+export const BREAK_THRESHOLD = 45;
+
+/**
+ * CI 가 뮤테이션을 여러 작업으로 나눠 돌릴 때(MUTATION_SHARD_TOTAL > 1, .github/workflows/ci-cd.yml) 각 작업은
+ * 점수 판정을 끈다. 묶음별로 판정하면 테스트가 약한 파일이 한 묶음에 몰렸을 때 전체로는 통과할 PR 이
+ * 실패한다. 판정은 합산 작업이 한다(scripts/stryker-aggregate.ts).
+ */
+const sharded = Number(process.env.MUTATION_SHARD_TOTAL ?? '1') > 1;
+
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
   packageManager: 'pnpm',
-  reporters: ['html', 'clear-text', 'progress'],
+  // json: 분할 결과를 합산하려면 뮤턴트별 상태가 필요하다(reports/mutation/mutation.json).
+  reporters: ['html', 'json', 'clear-text', 'progress'],
   testRunner: 'vitest',
   plugins: ['@stryker-mutator/vitest-runner'],
   vitest: {
@@ -91,7 +108,7 @@ const config = {
   thresholds: {
     high: 90,
     low: 70,
-    break: 45,
+    break: sharded ? null : BREAK_THRESHOLD,
   },
 };
 export default config;

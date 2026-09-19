@@ -20,7 +20,8 @@ const buttonVariants = cva(
           'border border-primary bg-transparent text-primary shadow-sm hover:bg-primary/10',
         ghost: 'bg-transparent text-primary hover:bg-primary/10',
         link: 'text-primary underline-offset-4 hover:underline',
-        success: 'bg-emerald-600 text-white shadow-sm hover:opacity-80',
+        // 흰 글씨 대비 5.48:1 인 채움용 토큰(예전 emerald-600 은 3.77:1 — 결정 D16 2단계).
+        success: 'bg-status-success-solid text-white shadow-sm hover:opacity-80',
       },
       size: {
         default: 'h-10 px-[16px] py-[10px] text-sm',

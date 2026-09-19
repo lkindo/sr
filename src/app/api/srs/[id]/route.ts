@@ -53,7 +53,9 @@ export const GET = withAuthAndRateLimit(
 ); // 1분당 100회
 
 // PATCH /api/srs/[id] - SR 수정 (Rate Limit: 엄격)
-// 권한 체크는 서비스 레이어에서 처리 (REQUESTED 상태: 요청자 또는 ADMIN, 기타: ADMIN만)
+// 권한 체크는 서비스 레이어에서 처리한다. 접수 이후 SR 내용은 운영자만 고친다 — 외부 사용자는 접수
+// 전(REQUESTED)에만 고칠 수 있고(접수 후에는 만족도·추가 의견만), 완료 내용·거절 사유는 쓸 수 없다
+// (policies.ensureCanEditSRContent).
 export const PATCH = withAuthAndRateLimit(
   async (
     request: NextRequest,

@@ -34,8 +34,9 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 >   `20260730000000_drop_mattermost` 에서 제거됨)
 >
 > 본 버전은 `prisma/schema.prisma` 와 `prisma/migrations/` 전체를 직접 읽어 대조한 결과로 갱신했다.
-> (2026-08-15 기준 19개 모델, 17개 마이그레이션. **줄 수·개수를 본문에 박아 두는 관행은
-> 폐지한다** — 코드가 움직일 때마다 조용히 틀려지고, 아무도 고치지 않는다.)
+> (모델·마이그레이션 개수는 적지 않는다. **줄 수·개수를 본문에 박아 두는 관행은
+> 폐지한다** — 코드가 움직일 때마다 조용히 틀려지고, 아무도 고치지 않는다. 이 자리에 있던
+> "17개 마이그레이션" 도 적힌 날 이미 틀려 있었다.)
 
 ---
 
@@ -97,8 +98,9 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 | ORM               | Prisma 6.19 (`@prisma/client` + `prisma`)                                       |
 
 정의는 `docker-compose.prod.yml` 의 `db` 서비스에 있다. `POSTGRES_USER` /
-`POSTGRES_PASSWORD` 는 저장소에 두지 않고 배포 호스트의 `.env` 에서 compose 가 보간하며,
-값이 비면 `:?` 문법으로 즉시 실패한다.
+`POSTGRES_PASSWORD` 는 저장소에 두지 않고 compose 가 `--env-file` 로 지정한 보간 파일(운영
+`.env.prod`, 스테이징 `.env.staging`)에서 보간하며, 값이 비면 `:?` 문법으로 즉시 실패한다. 서버의
+레거시 `.env` 는 쓰지 않는다 — 파일 구성과 이유의 정본은 `docs/SECRET_ROTATION.md` 4절이다.
 
 ### 연결 정보
 
@@ -120,11 +122,15 @@ DIRECT_URL="postgresql://<user>:<password>@db:5432/sr_db?schema=public"
 
 1. **정규화:** 제3정규형(3NF) 준수
 2. **명명 규칙:** snake_case (PostgreSQL 표준). Prisma 모델은 camelCase, `@map`/`@@map` 으로 매핑
-3. **타임스탬프:** 모든 주요 테이블에 `created_at` 포함, 변경 가능한 테이블에 `updated_at`
+3. **타임스탬프:** 모든 주요 테이블에 `created_at` 포함, 사용자가 편집하는 엔티티에 `updated_at`.
+   예외 — 시스템이 상태만 갱신하는 `user_clients`(승인 시 `status`·`approved_at`),
+   `notifications`(디스패처가 `status`·`attempts`·`sent_at` 등), 생성 직후 `file_url` 을 채우는
+   `sr_attachments` 에는 `updated_at` 이 없다. 변경 시각이 필요하면 각 상태 컬럼(`approved_at`,
+   `sent_at`)이나 감사·활동 로그를 본다.
 4. **문자열 길이:** 무제한 `TEXT` 대신 용도별 `VARCHAR(n)` 사용 (마이그레이션 `20260623055403_db_optimization`)
 5. **외래 키:** 참조 무결성 유지 (CASCADE / SET NULL / RESTRICT — [제약 조건](#제약-조건) 참조)
 6. **인덱스:** 자주 조회되는 컬럼 및 실제 쿼리 패턴에 맞춘 복합 인덱스
-7. **소프트 삭제:** 사용하지 않음. `deleted_at` 컬럼은 어떤 테이블에도 없다
+7. **소프트 삭제:** `srs` 테이블에만 적용한다(`deleted_at`, 마이그레이션 `20260815100200_sr_soft_delete`). SR 을 목록·상세·통계로 보여 주는 조회는 `SR_ALIVE`(`src/lib/prisma-selects.ts`)로 `deleted_at IS NULL` 을 붙이고, `$queryRaw` 는 같은 조건을 직접 쓴다. 삭제된 SR 의 댓글·첨부·활동·상태이력은 Cascade 되지 않고 남는다. 다른 테이블에는 `deleted_at` 이 없다. 예외는 두 종류다. (a) 삭제된 SR 도 세는 조회 — 고객사·사용자·서비스 카테고리 삭제 전 참조 무결성 가드(FK 가 삭제된 행도 가리키므로 의도적). (b) 삭제된 SR **만** 세는 조회(`deletedAt: { not: null }`) — 고객사 상세 응답의 `deletedSrCount`(삭제 버튼 판정과 그 이유 문구용), 고객사·서비스 카테고리 삭제 거부 문구의 삭제된 SR 건수. 고객사 상세·목록의 SR 요약·건수 자체는 `SR_ALIVE` 를 쓴다. 목록은 `.gemini/rules/db-rules.md` §2
 
 ---
 
@@ -172,6 +178,7 @@ erDiagram
         timestamptz email_verified
         varchar image
         boolean is_active
+        int session_version
         timestamptz created_at
         timestamptz updated_at
     }
@@ -257,6 +264,7 @@ erDiagram
 
     SR {
         varchar id PK
+        int version
         varchar sr_number UK
         varchar title
         text description
@@ -277,7 +285,9 @@ erDiagram
         timestamptz intake_at
         timestamptz completed_at
         timestamptz confirmed_at
+        timestamptz expected_hold_release_date
         timestamptz due_date
+        boolean due_date_manual
         timestamptz expected_completion_date
         timestamptz actual_completion_date
         text resolution_description
@@ -286,6 +296,7 @@ erDiagram
         text additional_feedback
         timestamptz created_at
         timestamptz updated_at
+        timestamptz deleted_at
     }
 
     SRActivity {
@@ -341,6 +352,8 @@ erDiagram
         timestamptz sent_at
         varchar fail_reason
         timestamptz created_at
+        int attempts
+        timestamptz next_attempt_at
     }
 
     PushSubscription {
@@ -497,7 +510,8 @@ erDiagram
 | created_at     | TIMESTAMPTZ   | NO   | now()  | 생성 시간                      |
 | updated_at     | TIMESTAMPTZ   | NO   | -      | 수정 시간 (`@updatedAt`)       |
 
-**인덱스:** PK `id` / UNIQUE `email` / INDEX `email` / INDEX `is_active`
+**인덱스:** PK `id` / UNIQUE `email` / INDEX `is_active` / GIN `name gin_trgm_ops`(`users_name_trgm_idx`, 이름 부분 검색)
+(예전 INDEX `email` 은 UNIQUE 와 중복이라 `20260802010000_drop_redundant_indexes` 에서 지웠다.)
 
 **제약 조건:** 이메일 형식은 애플리케이션(Zod)에서만 검증한다. DB CHECK 제약은 없다.
 
@@ -595,9 +609,10 @@ erDiagram
 | created_at          | TIMESTAMPTZ  | NO   | now()  | 생성 시간                    |
 | updated_at          | TIMESTAMPTZ  | NO   | -      | 수정 시간                    |
 
-**인덱스:** PK `id` / UNIQUE `code` / INDEX `name` / INDEX `code` / INDEX `is_active`
+**인덱스:** PK `id` / UNIQUE `code` / INDEX `name` / INDEX `is_active` / GIN `name gin_trgm_ops`(`clients_name_trgm_idx`)
+(예전 INDEX `code` 는 UNIQUE 와 중복이라 `20260802010000_drop_redundant_indexes` 에서 지웠다.)
 
-> `code` 에 대한 schema.prisma 주석은 "SR 번호 생성에 사용되는 고유 코드"라고 적혀 있으나,
+> 초기 설계는 `code` 를 "SR 번호 생성에 사용되는 고유 코드"로 두었으나,
 > **현재 SR 번호 생성 로직(`src/services/sr.service.ts`)은 `code` 를 사용하지 않는다.**
 > 번호는 고객사와 무관한 일자별 전역 시퀀스다. 아래 `sr_sequences` 참조.
 
@@ -643,7 +658,10 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 | created_at        | TIMESTAMPTZ  | NO   | now()    | 생성 시간                            |
 | updated_at        | TIMESTAMPTZ  | NO   | -        | 수정 시간                            |
 
-**인덱스:** PK `id` / INDEX `client_id` / INDEX `handler_id`
+**인덱스:** PK `id` / INDEX `client_id` / INDEX `handler_id` /
+부분 UNIQUE `(client_id, category_name) WHERE client_id IS NOT NULL`(`service_categories_client_id_category_name_key`) /
+부분 UNIQUE `(category_name) WHERE client_id IS NULL`(`service_categories_global_category_name_key`)
+— 같은 고객사(또는 공용) 안에서 이름 중복 금지(`20260801130000_service_category_unique_name`, 마이그레이션 전용이라 `schema.prisma` 에는 없다).
 
 **외래 키:** `client_id` → `clients(id)` SET NULL, `handler_id` → `users(id)` SET NULL,
 `backup_handler_id` → `users(id)` SET NULL
@@ -698,7 +716,9 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 | intake_at                 | TIMESTAMPTZ    | YES  | NULL        | 접수 시간                             |
 | completed_at              | TIMESTAMPTZ    | YES  | NULL        | 완료 시간                             |
 | confirmed_at              | TIMESTAMPTZ    | YES  | NULL        | 확인 완료 시간                        |
+| expected_hold_release_date | TIMESTAMPTZ   | YES  | NULL        | 보류 예상 해제일 — `ON_HOLD` 전이 필수, 보류 해제 시 NULL (헌법 §2) |
 | due_date                  | TIMESTAMPTZ    | YES  | NULL        | 완료 목표 시간 (SLA 기준)             |
+| due_date_manual           | BOOLEAN        | NO   | false       | 운영자가 마감일을 직접 지정했는가 — true 면 자동 재산출이 덮어쓰지 않는다(헌법 §3) |
 | expected_completion_date  | TIMESTAMPTZ    | YES  | NULL        | 예상 완료일                           |
 | actual_completion_date    | TIMESTAMPTZ    | YES  | NULL        | 실제 완료일                           |
 | resolution_description    | TEXT           | YES  | NULL        | 처리 결과 설명                        |
@@ -706,6 +726,7 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 | satisfaction_rating       | SMALLINT       | YES  | NULL        | 만족도 평가 (CHECK: NULL 또는 1~5)    |
 | additional_feedback       | TEXT           | YES  | NULL        | 추가 피드백                           |
 | version                   | INTEGER        | NO   | 0           | 낙관적 잠금 카운터 — 갱신 시 불일치면 409 |
+| deleted_at                | TIMESTAMPTZ    | YES  | NULL        | 논리 삭제 시각 — NULL 이면 살아 있는 SR |
 | created_at                | TIMESTAMPTZ    | NO   | now()       | 생성 시간                             |
 | updated_at                | TIMESTAMPTZ    | NO   | -           | 수정 시간                             |
 
@@ -724,6 +745,10 @@ SR 분류와 SLA 시간, 기본 담당자를 정의한다.
 - INDEX `(intake_by_id)`
 - INDEX `(status, due_date)` — 마감일 큐/대시보드 (`20260630000000_add_sr_due_date_indexes`)
 - INDEX `(assignee_id, due_date)` — 담당자별 마감 임박 (동일 마이그레이션)
+- INDEX `created_at DESC`, `(client_id, created_at DESC)`, `(assignee_id, created_at DESC)` — 목록 최신순 정렬
+- GIN `title gin_trgm_ops`(`srs_title_trgm_idx`), `sr_number gin_trgm_ops`(`srs_sr_number_trgm_idx`) — 부분 검색
+- 부분 INDEX `deleted_at WHERE deleted_at IS NULL`(`srs_deleted_at_idx`) — 살아 있는 SR 조회용
+  (`20260815100200_sr_soft_delete` 전용. `schema.prisma` 에 적으면 CI 드리프트 검사가 깨진다 — 스키마 주석 참조)
 
 **외래 키:**
 
@@ -792,8 +817,8 @@ SR의 첨부파일 메타데이터. **파일 실체는 서버 디스크에 저�
 | file_name    | VARCHAR(255)  | NO   | -      | 원본 파일명                             |
 | file_size    | BIGINT        | NO   | -      | 파일 크기 (bytes)                       |
 | file_type    | VARCHAR(100)  | NO   | -      | MIME 타입                               |
-| file_url     | VARCHAR(1024) | NO   | -      | `STORAGE_DIR` 기준 상대 경로            |
-| storage_path | VARCHAR(1024) | YES  | NULL   | 저장 경로 (다운로드 라우트가 우선 사용) |
+| file_url     | VARCHAR(1024) | NO   | -      | 인증 다운로드 경로 `/api/attachments/<id>/download` (생성 직후 같은 트랜잭션에서 채운다) |
+| storage_path | VARCHAR(1024) | YES  | NULL   | `STORAGE_DIR` 기준 상대 경로 `attachments/<srId>/<uuid>-<safeName>` (다운로드 라우트가 파일을 찾는 근거) |
 | uploaded_by  | TEXT          | NO   | -      | 업로드한 사용자 ID (**FK 제약 없음**)   |
 | created_at   | TIMESTAMPTZ   | NO   | now()  | 생성 시간                               |
 
@@ -809,10 +834,12 @@ volume `sr_uploads`), 파일 경로는 `attachments/<srId>/<uuid>-<safeName>` �
 서빙으로 인가를 우회할 수 있어 제거되었다.
 
 > **Vercel Blob 은 사용하지 않는다.** 오브젝트 스토리지·CDN 자체가 없다.
-> `file_url` 은 공개 URL이 아니라 로컬 상대 경로다.
+> `file_url` 은 공개 URL이 아니라 인가를 거치는 다운로드 라우트 경로다.
 
-**파일 크기 제한:** 10MB. 애플리케이션 레벨(`src/app/api/attachments/route.ts` 의
-`MAX_FILE_SIZE`)에서만 검증하며 **DB CHECK 제약은 없다.**
+**파일 크기 제한:** 애플리케이션 규칙이며 **DB CHECK 제약은 없다.** 서버는 파일당·요청당 절대
+상한 `MAX_UPLOAD_FILE_SIZE`(50MB)와 MIME 별 한도(`src/lib/file-validator.ts`)로 검증하고, 화면
+(`SRAttachments`, SR 등록·수정 폼)은 그보다 좁은 10MB 에서 먼저 막는다. 값의 정본은 코드이며
+기술 규칙은 `docs/TRD.md` 가 설명한다.
 
 ---
 
@@ -820,8 +847,15 @@ volume `sr_uploads`), 파일 경로는 `attachments/<srId>/<uuid>-<safeName>` �
 
 SR 생성·상태 변경·담당자 배정과 댓글 추가 이메일은 도메인 변경과 같은 트랜잭션에서
 `PENDING` 행으로 적재된다. 앱 instrumentation이 시작하는 디스패처가 30초마다 최대 20건을
-claim해 SMTP로 발송한다. claim은 단일 CTE의 `FOR UPDATE SKIP LOCKED`와 5분 임대를 사용해
-여러 워커가 같은 행을 동시에 보내지 않으며, 워커가 죽으면 임대 만료 후 다시 처리된다.
+claim해 SMTP로 발송한다. claim은 단일 CTE의 `FOR UPDATE SKIP LOCKED`와 임대(`next_attempt_at`)를
+사용해 여러 워커가 같은 행을 동시에 보내지 않으며, 워커가 죽으면 임대 만료 후 다시 처리된다. 임대
+시간은 한 배치의 최악 소요(배치 크기 × SMTP 타임아웃)에서 도출한 `CLAIM_LEASE_MINUTES`
+(`src/services/notification-outbox.ts`)가 정본이다 — 예전 5분 고정값은 배치보다 짧아 중복 발송을
+일으킬 수 있었다(`GEMINI.md` §4.1).
+
+**보존 정리.** 발송에 성공한 행은 즉시 `content` 를 비운다(본문을 오래 들고 있지 않는다). 디스패처가
+약 1시간에 한 번 `SENT` 90일 / `FAILED` 1년이 지난 행을 지운다(환경변수 `OUTBOX_SENT_RETENTION_DAYS` /
+`OUTBOX_FAILED_RETENTION_DAYS` 로 조정 가능, 기본값이 헌법 §4.1 값이다).
 
 실패는 1·5·15·60분 백오프로 최대 5회 시도하고, 상한에 도달하면 `FAILED` dead-letter로
 남긴다. 웹 푸시는 `push_subscriptions`, 실시간 화면 갱신은 SSE(`/api/realtime`)를 사용한다.
@@ -948,12 +982,16 @@ RETURNING "seq"
 | target_entity | VARCHAR(50) | NO   | -      | 대상 엔티티 이름         |
 | target_id     | TEXT        | YES  | NULL   | 대상 레코드 ID           |
 | changes       | JSONB       | NO   | -      | 변경 내용 (NULL 불가)    |
-| ip_address    | VARCHAR(45) | YES  | NULL   | 요청 IP (IPv6 길이 고려) |
+| ip_address    | VARCHAR(45) | YES  | NULL   | 요청 IP (IPv6 길이 고려). ⚠️ 현재 기록하지 않아 항상 NULL |
 | created_at    | TIMESTAMPTZ | NO   | now()  | 생성 시간                |
 
 **인덱스:** PK `id` / INDEX `user_id` / INDEX `action_type` / INDEX `created_at`
 
 **외래 키:** `user_id` → `users(id)` SET NULL (사용자 삭제 후에도 로그는 보존)
+
+행이 보존돼도 영구 삭제된 사용자의 행위자 칸은 비워진다. 그래서 다른 사용자·데이터에 대한 관리 이력이 있는
+계정은 앱이 영구 삭제를 거부한다(`user.service.hardDeleteUser`, 2026-09-18 결정 D11). 보존 기간은 영구다.
+조회는 ADMIN 전용 `GET /api/audit-logs`(화면 `/settings/audit`)로 한다.
 
 ---
 
@@ -1043,6 +1081,9 @@ pnpm db:seed
 | srs                | (status, priority, created_at)        | INDEX  | SR 목록 필터링 및 정렬        |
 | srs                | (status, due_date)                    | INDEX  | 마감일 큐 / dueToday 대시보드 |
 | srs                | (assignee_id, due_date)               | INDEX  | 담당자별 마감 임박 조회       |
+| srs                | deleted_at `WHERE deleted_at IS NULL` | PARTIAL INDEX | 살아 있는 SR 만 담는 조회용 (마이그레이션 전용) |
+| service_categories | (client_id, category_name) `WHERE client_id IS NOT NULL` | PARTIAL UNIQUE | 고객사별 카테고리 이름 중복 방지 (마이그레이션 전용) |
+| service_categories | category_name `WHERE client_id IS NULL` | PARTIAL UNIQUE | 전역 카테고리 이름 중복 방지 (마이그레이션 전용) |
 | sr_activities      | (sr_id, created_at DESC)              | INDEX  | SR별 활동 내역 최신순 조회    |
 | sr_comments        | (sr_id, created_at DESC)              | INDEX  | SR별 댓글 최신순 조회         |
 | sr_comments        | (sr_id, is_internal, created_at DESC) | INDEX  | 내부 메모 제외 댓글 조회      |
@@ -1050,7 +1091,9 @@ pnpm db:seed
 | push_subscriptions | endpoint                              | UNIQUE | 구독 중복 방지                |
 | audit_logs         | created_at                            | INDEX  | 기간별 감사 로그 조회         |
 
-인덱스는 모두 Prisma `@@index` / `@@unique` 로 선언되며 마이그레이션이 생성한다.
+인덱스는 모두 마이그레이션이 생성하며, 부분 인덱스(WHERE 절)를 뺀 나머지는 Prisma `@@index` / `@@unique` 로도 선언된다.
+위 표의 "마이그레이션 전용" 3개는 Prisma 스키마가 WHERE 절을 표현하지 못해 `prisma/migrations/` 에만 있다
+(`20260801130000_service_category_unique_name`, `20260815100200_sr_soft_delete`). 스키마에 `@@index` 로 다시 적지 않는다.
 이름은 Prisma 규칙(`<table>_<column...>_idx`, `<table>_<column...>_key`)을 따른다.
 따라서 수동 `CREATE INDEX` 를 실행할 일은 없다 —
 직접 만들면 드리프트 체크(위 2번)에서 잡힌다.
@@ -1089,12 +1132,12 @@ pnpm db:seed
 | srs                      | assignee_id         | users(id)              | SET NULL  |
 | srs                      | intake_by_id        | users(id)              | SET NULL  |
 | srs                      | service_category_id | service_categories(id) | RESTRICT  |
-| sr_activities            | sr_id               | srs(id)                | CASCADE   |
+| sr_activities            | sr_id               | srs(id)                | RESTRICT  |
 | sr_activities            | user_id             | users(id)              | RESTRICT  |
 | sr_comments              | sr_id               | srs(id)                | CASCADE   |
 | sr_comments              | user_id             | users(id)              | RESTRICT  |
 | sr_attachments           | sr_id               | srs(id)                | CASCADE   |
-| sr_status_history        | sr_id               | srs(id)                | CASCADE   |
+| sr_status_history        | sr_id               | srs(id)                | RESTRICT  |
 | sr_status_history        | changed_by          | users(id)              | RESTRICT  |
 | push_subscriptions       | user_id             | users(id)              | CASCADE   |
 | notification_preferences | user_id             | users(id)              | CASCADE   |
@@ -1124,7 +1167,7 @@ ALTER TABLE "srs"
 | 규칙                    | 실제 강제 위치                                     |
 | ----------------------- | -------------------------------------------------- |
 | 이메일 형식             | Zod 스키마 (DB CHECK 없음)                         |
-| 첨부파일 크기 ≤ 10MB    | `src/app/api/attachments/route.ts` `MAX_FILE_SIZE` |
+| 첨부파일 크기            | 서버 `src/lib/file-validator.ts`(절대 상한 50MB + MIME 별 한도), 화면 10MB |
 | 첨부파일 MIME 허용 목록 | 업로드 라우트                                      |
 | SR 상태 전이 규칙       | 서비스 레이어 (`src/services/sr.service.ts`)       |
 
@@ -1137,12 +1180,16 @@ ALTER TABLE "srs"
 
 ### 시드 구조
 
-시드는 두 부분으로 나뉘며, 두 번째는 명시적 opt-in 이다.
+시드(`prisma/seed.ts` 의 `main`)는 세 단계로 진행하며, 마지막은 명시적 opt-in 이다. 절차와 진단의
+정본은 `docs/BOOTSTRAP.md` 다.
 
 | 구분                              | 내용                                            | 실행 조건                                                            |
 | --------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------- |
 | 기준 데이터 (`seedReferenceData`) | `permissions`, `roles`, `role_permissions` 매핑 | 항상. 멱등(upsert)이며 사용자 데이터를 건드리지 않아 운영에서도 안전 |
-| 개발용 픽스처                     | 테스트 계정 / 고객사 / 샘플 SR                  | `NODE_ENV !== 'production'` **그리고** `SEED_DEV_FIXTURES=true`      |
+| 부트스트랩 관리자 (`bootstrapAdmin`) | 최초 ADMIN 1명                               | `BOOTSTRAP_ADMIN_EMAIL`·`BOOTSTRAP_ADMIN_PASSWORD` 가 둘 다 있고 ADMIN 이 없을 때 |
+| 개발용 픽스처 (`seedDevFixtures`) | 테스트 계정 / 고객사 / 샘플 SR                  | `NODE_ENV !== 'production'` **그리고** `SEED_DEV_FIXTURES=true`      |
+
+컨테이너는 기동할 때마다 이 시드의 번들(`prisma/seed.bundle.cjs`)을 실행하며, 실패하면 앱을 띄우지 않는다.
 
 즉 프로덕션에서는 개발용 테스트 계정이 어떤 경우에도 생성되지 않는다.
 
@@ -1176,12 +1223,18 @@ const permissions = [
 | 역할         | 부여 범위 (요약)                                                                                                                                        |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ADMIN        | 전체 권한                                                                                                                                               |
-| MANAGER      | `SR` CONFIRM 을 제외한 전체, `CLIENT` READ/UPDATE, `USER` READ/UPDATE/UPDATE_SELF/ASSIGN_ROLE, `COMMENT`, `ATTACHMENT`, `DASHBOARD`, `NOTIFICATION`     |
-| ENGINEER     | `SR` READ/UPDATE/STATUS_CHANGE/INTAKE, `CLIENT` READ, `USER` UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION` READ, `DASHBOARD` READ                |
-| CLIENT_ADMIN | `SR` CREATE/READ/UPDATE/STATUS_CHANGE/CONFIRM, `CLIENT` READ, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION`, `DASHBOARD` READ |
+| MANAGER      | `SR` CONFIRM 을 제외한 전체, `CLIENT` READ/UPDATE, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `DASHBOARD`, `NOTIFICATION`                 |
+| ENGINEER     | `SR` READ/UPDATE/STATUS_CHANGE, `CLIENT` READ, `USER` UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION` READ, `DASHBOARD` READ                       |
+| CLIENT_ADMIN | `SR` CREATE/READ/UPDATE/DELETE/CONFIRM, `CLIENT` READ, `USER` READ/UPDATE/UPDATE_SELF, `COMMENT`, `ATTACHMENT`, `NOTIFICATION`, `DASHBOARD` READ        |
 | CLIENT_USER  | `SR` CREATE/READ/UPDATE_SELF/CONFIRM, `USER` UPDATE_SELF, `COMMENT` CREATE/READ, `ATTACHMENT` CREATE/READ, `NOTIFICATION` READ, `DASHBOARD` READ        |
 
 카탈로그의 원본은 `prisma/permission-catalog.ts`, 역할별 매핑의 원본은 `prisma/seed.ts` 다.
+
+> **2026-09-18 소유자 결정 반영.** ENGINEER 의 `SR:INTAKE`(접수·배정은 운영 관리자 업무 — D1),
+> CLIENT_ADMIN 의 `SR:STATUS_CHANGE`(고객은 확인·재오픈만 — D2)를 회수했고, 코드가 검사하지 않아
+> 효과가 없던 `USER:ASSIGN_ROLE` 을 카탈로그에서 지웠다(역할 부여는 ADMIN 전용 — D5). 기존 DB 는
+> 데이터 마이그레이션 `20260918120000_role_permission_decisions` 가 같은 변경을 한다(시드는 이미 배정이
+> 있는 역할을 건너뛰고, 운영 배포는 시드를 다시 돌리지 않는다).
 
 > **해소됨(2026-08-01).** 이전 판에는 CLIENT_USER 매핑이 `SR:UPDATE_SELF` 를 조회하지만
 > 카탈로그에 그 액션 행이 없다는 불일치가 기록돼 있었다. `SR:UPDATE_SELF`,
@@ -1192,8 +1245,9 @@ const permissions = [
 > `TRANSITION_PERMISSIONS` 의 모든 문자열에 대응 행이 있음을 단언해 재발을 막는다.
 >
 > MANAGER 는 예전에 `{ resource: 'SR' }` 와일드카드로 부여받았으나, 확인(CONFIRM)은
-> 고객의 인수 행위이고 `TRANSITION_ROLES` 가 MANAGER 를 의도적으로 제외하므로
-> 와일드카드를 명시 목록으로 바꿔 `SR:CONFIRM` 만 제외했다.
+> 고객의 인수 행위라 권한을 최소로 두려고 와일드카드를 명시 목록으로 바꿔 `SR:CONFIRM` 만 제외했다.
+> MANAGER 가 **자기 이름으로 등록한** SR 의 확인은 `TRANSITION_ROLES` 의 역할 경로로 열려 있고
+> (2026-09-18 소유자 결정), 남의 SR 은 신원 검사(`sr-state-machine.canConfirmAsAcceptor`)가 막는다.
 
 ### 실행
 
@@ -1230,6 +1284,11 @@ SEED_DEV_FIXTURES=true SEED_ADMIN_PASSWORD=... pnpm db:seed
 | `20260809120000_client_admin_sr_delete`    | **데이터 마이그레이션** — `CLIENT_ADMIN` 역할에 `SR:DELETE` 권한 부여                                |
 | `20260814211500_user_session_version`      | `users.session_version` 추가 (비밀번호 변경 시 기존 JWT 즉시 무효화)                                 |
 | `20260814213000_sr_version`                | `srs.version` 추가 (낙관적 잠금, 불일치 시 409)                                                      |
+| `20260815100000_sr_expected_hold_release_date` | `srs.expected_hold_release_date` 추가 (보류 전이의 예상 해제일 — 헌법 §2)                      |
+| `20260815100100_backfill_sr_completed_at` | **데이터 마이그레이션** — 재오픈 기산점 `completed_at` 백필(`actual_completion_date` → `updated_at`) |
+| `20260815100200_sr_soft_delete`           | `srs.deleted_at` 추가 + 살아 있는 행 부분 인덱스 (SR 논리 삭제 — db-rules §2)                        |
+| `20260918120000_role_permission_decisions` | **데이터 마이그레이션** — ENGINEER `SR:INTAKE`·CLIENT_ADMIN `SR:STATUS_CHANGE` 회수, `USER:ASSIGN_ROLE` 삭제 |
+| `20260918121000_sr_due_date_manual`       | `srs.due_date_manual` 추가 + `SR_DUE_DATE` 감사 로그로 기존 수동 조정 백필(헌법 §3)                  |
 
 `migration_lock.toml` provider 는 `postgresql`.
 
@@ -1319,9 +1378,14 @@ docker exec sr-app prisma migrate resolve --rolled-back <migration_name>
 
 ### 백업
 
-> **미확인 항목.** 정기 백업(`pg_dump` 스케줄, 볼륨 스냅샷, 보존 기간, 복구 리허설)에
-> 대한 설정을 저장소에서 확인하지 못했다. 데이터는 named volume `sr_db_data` 에만
-> 존재하며, 호스트 밖으로 복제된다는 근거를 찾지 못했다. 확인 후 이 절을 채워야 한다.
+정기 백업·보존 기간·복구 리허설은 저장소에 있다. 정본은 `docs/backup-and-restore.md` 다.
+
+- 매일 03:00 KST `.github/workflows/backup.yml` 이 서버에서 `scripts/backup.sh` 실행(`pg_dump -Fc` + 첨부 tar, 보존 기본 14일).
+- 운영 배포 직전에도 같은 스크립트로 백업하고, 실패하면 배포를 중단한다(`docs/SERVER_RUNBOOK_2026-08-01.md` 5절).
+- 매월 `.github/workflows/restore-rehearsal.yml` 이 일회용 컨테이너에 최신 백업을 복구해 검증한다.
+
+> ⚠️ **남은 불확실성**: 호스트 밖 복제는 `BACKUP_OFFSITE_CMD` 시크릿이 있을 때만 일어나며, 등록 여부는
+> 저장소에서 확인할 수 없다. 등록되지 않았다면 백업은 같은 디스크에만 있다.
 
 ---
 

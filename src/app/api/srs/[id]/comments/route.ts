@@ -5,7 +5,12 @@ import { getSRUrl } from '@/lib/app-url';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION } from '@/lib/constants';
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanCommentOnSR, ensureCanReadSR, isInternalUser } from '@/lib/policies';
+import {
+  canWriteInternalNote,
+  ensureCanCommentOnSR,
+  ensureCanReadSR,
+  visibleCommentsWhere,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SR_ACCESS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { commentSchema } from '@/lib/schemas';
@@ -45,7 +50,7 @@ export const GET = withAuthAndRateLimit(
     const comments = await prisma.sRComment.findMany({
       where: {
         srId: id,
-        ...(isInternalUser(session.user) ? {} : { isInternal: false }),
+        ...visibleCommentsWhere(session.user),
       },
       include: {
         user: {
@@ -114,6 +119,14 @@ export const POST = withAuthAndRateLimit(
     // `ensureCanCommentOnSR` 이 읽기 가능 여부 + `COMMENT:CREATE` 를 함께 본다(감사 4.1).
     ensureCanCommentOnSR(session.user, sr);
 
+    // 내부 노트(D7). 내부 사용자만 세울 수 있고, 외부 사용자가 보낸 값은 공개로 강제한다
+    // (고객 화면에는 토글이 없으므로 조작된 요청뿐이다).
+    // 내부 노트는 고객에게 **존재 자체도** 드러나지 않아야 한다 — 그래서 아래에서
+    //  - 신청자에게 메일·푸시를 보내지 않고(담당자는 내부 사용자다),
+    //  - 고객도 보는 활동 로그에 "댓글이 추가되었습니다" 를 남기지 않으며,
+    //  - 실시간 이벤트를 내부 사용자에게만 흘린다(internalOnly — realtime 라우트의 canReceive).
+    const isInternal = validated.isInternal === true && canWriteInternalNote(session.user);
+
     // 댓글 + 활동로그를 하나의 트랜잭션으로 커밋 (중간 실패 시 감사 이력 불일치 방지)
     const comment = await prisma.$transaction(async (tx) => {
       const created = await tx.sRComment.create({
@@ -121,6 +134,7 @@ export const POST = withAuthAndRateLimit(
           srId: id,
           userId: session.user.id,
           content: validated.content,
+          isInternal,
         },
         include: {
           user: {
@@ -133,20 +147,29 @@ export const POST = withAuthAndRateLimit(
         },
       });
 
-      await tx.sRActivity.create({
-        data: {
-          srId: id,
-          userId: session.user.id,
-          type: 'COMMENTED',
-          description: '댓글이 추가되었습니다.',
-        },
-      });
+      // 활동 로그는 고객도 본다(활동 라우트는 필터가 없다). 내부 노트는 여기에 남기지 않는다 —
+      // 노트 자체가 작성자·시각과 함께 댓글 목록(내부 사용자만)에 남는다.
+      if (!isInternal) {
+        await tx.sRActivity.create({
+          data: {
+            srId: id,
+            userId: session.user.id,
+            type: 'COMMENTED',
+            description: '댓글이 추가되었습니다.',
+          },
+        });
+      }
 
       // 이메일 아웃박스도 댓글/활동과 같은 트랜잭션에 적재한다. 커밋 직후 프로세스가
       // 종료돼도 "댓글은 있는데 보내야 할 알림 행은 없음" 상태가 생기지 않는다.
       const outbox: OutboxEmail[] = [];
       const shouldSendRequester = sr.requester.notificationPreference?.emailCommentAdded ?? false;
-      if (sr.requester.id !== session.user.id && sr.requester.email && shouldSendRequester) {
+      if (
+        !isInternal &&
+        sr.requester.id !== session.user.id &&
+        sr.requester.email &&
+        shouldSendRequester
+      ) {
         outbox.push({
           ...emailService.buildCommentAdded(
             sr.requester.email,
@@ -194,6 +217,8 @@ export const POST = withAuthAndRateLimit(
       requesterId: sr.requesterId,
       assigneeId: sr.assigneeId,
       actorId: session.user.id,
+      // 내부 노트는 내부 사용자 연결에만 흘린다(realtime 라우트의 canReceive).
+      internalOnly: isInternal,
     });
 
     /**
@@ -206,7 +231,8 @@ export const POST = withAuthAndRateLimit(
      * 수신자는 이메일과 동일한 규칙으로 고른다 — 요청자와 담당자 중 작성자 본인 제외.
      * 설정 확인은 `sendForEvent` 가 담당하므로 여기서는 대상만 추린다.
      */
-    const pushTargets = [sr.requester.id, sr.assignee?.id].filter(
+    // 내부 노트는 신청자에게 알리지 않는다(존재 자체가 고객에게 드러나지 않아야 한다).
+    const pushTargets = [isInternal ? null : sr.requester.id, sr.assignee?.id].filter(
       (userId): userId is string => Boolean(userId) && userId !== session.user.id
     );
 

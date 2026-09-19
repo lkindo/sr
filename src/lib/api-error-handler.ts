@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 
-import { mapPrismaError, ServiceError } from './errors';
+import {
+  exposeUnexpectedErrorMessage,
+  GENERIC_500_MESSAGE,
+  mapPrismaError,
+  ServiceError,
+} from './errors';
 import { logger } from './logger';
 
 /**
@@ -15,11 +20,7 @@ import { logger } from './logger';
  * 원문은 `logger.error` 로 스택·userId·path·method 와 함께 남으므로 디버깅 능력은
  * 잃지 않는다. 개발 환경에서만 응답에도 실어 로컬 디버깅 편의를 유지한다.
  */
-const GENERIC_500_MESSAGE = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
-
-function isProduction(): boolean {
-  return process.env.NODE_ENV === 'production';
-}
+// 고정 문구와 노출 규칙은 서버 액션(errorToResult)과 같이 쓰도록 errors.ts 에 있다.
 
 /**
  * API Routes에서 에러를 처리하고 적절한 HTTP 응답을 반환하는 헬퍼 함수
@@ -71,7 +72,7 @@ export function handleApiError(
     logger.error('Unexpected error', error, context);
     return NextResponse.json(
       {
-        error: isProduction() ? GENERIC_500_MESSAGE : error.message,
+        error: exposeUnexpectedErrorMessage() ? error.message : GENERIC_500_MESSAGE,
         code: 'INTERNAL_ERROR',
       },
       { status: 500 }

@@ -8,6 +8,7 @@ import {
   ensureCanDeleteUser,
   ensureCanReadUser,
   ensureCanUpdateUser,
+  ensureSystemAdmin,
   isInternalUser,
 } from '@/lib/policies';
 import { userUpdateSchema } from '@/lib/schemas';
@@ -123,9 +124,7 @@ export const DELETE = withAuthAndRateLimit(
     ensureCanDeleteUser(session.user, targetUser);
 
     if (isHardDelete) {
-      if (!session.user.roles.includes('ADMIN')) {
-        throw new ForbiddenError('사용자 완전 삭제는 ADMIN만 수행할 수 있습니다.');
-      }
+      ensureSystemAdmin(session.user, '사용자 완전 삭제는 ADMIN만 수행할 수 있습니다.');
       await userService.hardDeleteUser(id, session.user.id);
       return NextResponse.json({ message: '사용자가 완전히 삭제되었습니다.' });
     } else {

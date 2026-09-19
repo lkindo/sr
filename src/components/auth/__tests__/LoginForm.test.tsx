@@ -233,6 +233,32 @@ describe('LoginForm — 실패 처리', () => {
     expect(localStorage.getItem(EMAIL_KEY)).toBe('previous@example.com');
   });
 
+  it('계정이 잠겼으면(code=account_locked) 비밀번호가 틀렸다고 하지 않고 기다릴 시간을 알린다', async () => {
+    signIn.mockResolvedValue({ ok: false, error: 'CredentialsSignin', code: 'account_locked' });
+    render(<LoginForm />);
+    fillCredentials();
+
+    await submit();
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('잠시 막혔습니다. 15분 뒤에 다시 시도하세요.');
+    expect(alert).not.toHaveTextContent(CREDENTIAL_ERROR);
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('요청 제한에 걸렸으면(code=rate_limited) 잠시 뒤 다시 시도하라고 알린다', async () => {
+    signIn.mockResolvedValue({ ok: false, error: 'CredentialsSignin', code: 'rate_limited' });
+    render(<LoginForm />);
+    fillCredentials();
+
+    await submit();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '로그인 시도가 너무 잦습니다. 1분 정도 기다린 뒤 다시 시도하세요.'
+    );
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it('ok:false 는 error 가 null 이어도 실패다 — 대시보드로 넘기지 않는다', async () => {
     // NextAuth 가 `{ ok: false, error: null }` 을 돌려주는 경우가 있다.
     // `error` 만 보던 시절에는 인증에 실패했는데도 /dashboard 로 push 했다.
@@ -412,5 +438,37 @@ describe('LoginForm — 접근성·유효성', () => {
     expect(screen.getByRole('heading', { level: 1, name: '로그인' })).toBeInTheDocument();
     expect(screen.getByText(/시스템 관리자에게 재설정을 요청하세요/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '회원가입' })).toHaveAttribute('href', '/register');
+  });
+});
+
+/** 가입 이메일 인증 링크를 연 결과(`/login?verified=`)를 알린다(2026-09-18 소유자 결정 D13 B+). */
+describe('LoginForm — 이메일 인증 결과 안내', () => {
+  it('인증되었으면 그 사실을 알린다', () => {
+    render(<LoginForm verificationNotice="verified" />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('이메일 주소가 확인되었습니다.');
+  });
+
+  it('링크가 만료됐으면 승인은 그대로 진행될 수 있다고 알린다', () => {
+    render(<LoginForm verificationNotice="expired" />);
+
+    expect(screen.getByRole('status')).toHaveTextContent('유효 기간이 지났습니다');
+  });
+
+  it('안내가 없으면 아무것도 보이지 않는다', () => {
+    render(<LoginForm />);
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('로그인 오류가 나면 인증 안내 대신 오류만 보인다', async () => {
+    signIn.mockResolvedValue({ ok: false, error: 'CredentialsSignin' });
+    render(<LoginForm verificationNotice="verified" />);
+    fillCredentials();
+
+    await submit();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(CREDENTIAL_ERROR);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });

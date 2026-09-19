@@ -178,7 +178,8 @@ describe('UserReassignDialog — 상태·우선순위 배지', () => {
   // 'ON_HOLD' 같은 원문 코드가 그대로 노출된다.
   it.each([
     ['REQUESTED', '요청됨'],
-    ['INTAKE', '접수중'],
+    // 정본 라벨이다 — 예전 사본은 '접수중' 이라 다른 화면의 '접수' 와 달랐다(결정 D16).
+    ['INTAKE', '접수'],
     ['IN_PROGRESS', '진행중'],
     ['ON_HOLD', '보류'],
   ])('상태 %s 는 "%s" 로 보여 준다', (status, label) => {

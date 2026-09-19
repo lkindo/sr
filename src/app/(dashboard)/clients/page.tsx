@@ -13,7 +13,9 @@ import { Input } from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiList, buildQuery, retryUnlessClientError } from '@/lib/api-client';
+import type { PaginatedResponse } from '@/lib/pagination';
 import { qk } from '@/lib/query-keys';
+import type { ClientViewerScope } from '@/types/client.types';
 
 interface Client {
   id: string;
@@ -37,6 +39,9 @@ interface Client {
 interface ClientDetail {
   users?: Array<{ user: { id: string; name: string; email: string } }>;
 }
+
+/** 목록 응답. 페이지 봉투에 보는 사람의 범위(`viewerScope`)가 덧붙는다(GET /api/clients). */
+type ClientListPage = PaginatedResponse<Client> & { viewerScope?: ClientViewerScope };
 
 /** `client.users[]` 한 칸. 표는 `uc.user` 를 읽으므로 이 형태 그대로 넘긴다. */
 type ClientUserLink = NonNullable<ClientDetail['users']>[number];
@@ -114,7 +119,11 @@ export default function ClientsPage() {
   } = useQuery({
     queryKey: qk.clients.list(listParams),
     queryFn: async ({ signal }) => {
-      const result = await apiList<Client>(`/api/clients${buildQuery(listParams)}`, { signal });
+      // apiList 는 봉투를 그대로 돌려주므로 덧붙은 viewerScope 도 남아 있다.
+      const result: ClientListPage = await apiList<Client>(
+        `/api/clients${buildQuery(listParams)}`,
+        { signal }
+      );
       // 예전 fetch 경로의 방어를 그대로 남긴다. 봉투가 깨진 응답을 성공으로 받으면 표가
       // 조용히 빈 채로 남아 원인을 찾을 단서가 없다.
       if (!result?.data || !result.meta) throw new Error('Invalid response format');
@@ -138,6 +147,9 @@ export default function ClientsPage() {
   const clients = clientPage?.data ?? [];
   const totalItems = clientPage?.meta.totalItems ?? 0;
   const totalPages = clientPage?.meta.totalPages ?? 0;
+  // 담당자 스코프 사용자(ENGINEER)는 명부를 받지 않고 SR 숫자가 자기 배정분이다(헌법 §1.2).
+  // 이 값이 없으면 행을 펼쳤을 때 "등록된 사용자가 없습니다" 로 보여 사실과 다르게 읽힌다.
+  const rosterHidden = clientPage?.viewerScope === 'assigned';
 
   /**
    * 조회 실패 토스트. v5 의 useQuery 에는 `onError` 가 없어 effect 로 옮겼다.
@@ -340,6 +352,7 @@ export default function ClientsPage() {
           loading={loading}
           expandedRows={expandedRows}
           clientUsers={clientUsers}
+          rosterHidden={rosterHidden}
           onToggleRowExpansion={toggleRowExpansion}
           onUsersClick={handleUsersClick}
           onCreateClient={handleCreateClient}
@@ -351,6 +364,7 @@ export default function ClientsPage() {
           loading={loading}
           expandedRows={expandedRows}
           clientUsers={clientUsers}
+          rosterHidden={rosterHidden}
           onToggleRowExpansion={toggleRowExpansion}
           onUsersClick={handleUsersClick}
           onCreateClient={handleCreateClient}

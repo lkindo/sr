@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { hasPermissionFlag } from '@/lib/permission-helpers';
+import { hasEffectivePermission } from '@/lib/policies';
 import { permissionCheckSchema } from '@/lib/schemas';
 
 export const runtime = 'nodejs'; // Ensure Prisma works
@@ -26,9 +26,7 @@ export const POST = withAuthAndRateLimit(
 
     // Optimize: Check permissions in-memory using session data
     // ADMIN has all permissions implicitly
-    const hasPermission =
-      session.user.roles.includes('ADMIN') ||
-      hasPermissionFlag(session.user, `${resource}:${action}`);
+    const hasPermission = hasEffectivePermission(session.user, `${resource}:${action}`);
 
     return NextResponse.json({ hasPermission });
   },

@@ -1,10 +1,13 @@
-import type { Prisma, SRPriority, SRStatus } from '@prisma/client';
+import { redirect } from 'next/navigation';
+import { type Prisma, SRPriority, SRStatus } from '@prisma/client';
 
 import { auth } from '@/auth';
 import { SRsDataTable } from '@/components/srs/SRsDataTable';
 import { getCachedAssignableUsers, getCachedClients } from '@/lib/cache';
 import { paginationSchema } from '@/lib/pagination';
 import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
+import { getEnumParams } from '@/lib/search-params';
+import { SR_SLA_OPEN_STATUSES } from '@/lib/sr-state-machine';
 import { startOfAppZoneDay } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
 
@@ -18,6 +21,9 @@ const getSearchParam = (param: string | string[] | undefined): string | undefine
   return Array.isArray(param) ? param[0] : param;
 };
 
+const SR_STATUSES = Object.values(SRStatus);
+const SR_PRIORITIES = Object.values(SRPriority);
+
 /**
  * 이 화면이 제공하는 정렬 필드. 관계형 3개는 아래에서 중첩 객체로 따로 처리한다.
  */
@@ -27,6 +33,9 @@ const SORTABLE_FIELDS = [
   'srNumber',
   'title',
   'status',
+  // 목록의 '우선순위' 머리글이 보내는 값(실효 우선순위 `priority`). 예전에는 여기 없어서 조용히
+  // 생성일 정렬로 떨어지면서 화면에는 우선순위 정렬 화살표가 그대로 보였다.
+  'priority',
   'actualPriority',
   'requestedPriority',
   'dueDate',
@@ -45,6 +54,9 @@ export default async function SRsPage({ searchParams }: Props) {
   // 필터 옵션(고객사·담당자) 조회가 세션 스코프에 의존하므로 가장 먼저 해석한다.
   // 예전에는 두 캐시 조회를 세션보다 먼저 시작했고, 그래서 스코프를 적용할 수 없었다.
   const session = await auth();
+  // 프록시가 비로그인 요청을 이미 /login 으로 돌리므로 정상 경로에서는 오지 않는다. 그래도 목록 조회는
+  // 뷰어(내부 댓글 수 판정)를 필수로 받으므로, 세션이 없으면 추측하지 않고 로그인으로 보낸다.
+  if (!session?.user) redirect('/login');
   const userRoles = session?.user?.roles || [];
 
   // ADMIN, MANAGER, ENGINEER가 아닌 경우 고객사 필터링
@@ -57,7 +69,7 @@ export default async function SRsPage({ searchParams }: Props) {
 
   // Start fetching filter options early (parallel execution).
   // 외부 사용자에게는 소속 고객사만 넘긴다 — `undefined`(전체)와 `[]`(없음)는 다르다.
-  const clientsPromise = getCachedClients(isAdminManagerEngineer ? undefined : userClientIds);
+  const clientsPromise = getCachedClients(isAdminManagerEngineer ? null : userClientIds);
   const usersPromise = getCachedAssignableUsers();
 
   // 페이지네이션 파라미터는 /api/srs와 동일한 검증 규칙(lib/pagination)을 공유합니다.
@@ -77,18 +89,23 @@ export default async function SRsPage({ searchParams }: Props) {
     ? (rawSortField as SortableField)
     : 'createdAt';
 
-  const status = getSearchParam(resolvedSearchParams.status);
-  const priority = getSearchParam(resolvedSearchParams.priority);
+  const statuses = getEnumParams(resolvedSearchParams.status, SR_STATUSES);
+  const priorities = getEnumParams(resolvedSearchParams.priority, SR_PRIORITIES);
   const clientId = getSearchParam(resolvedSearchParams.clientId);
   const assigneeId = getSearchParam(resolvedSearchParams.assigneeId);
   const search = getSearchParam(resolvedSearchParams.search);
   const dateFrom = getSearchParam(resolvedSearchParams.dateFrom);
   const dateTo = getSearchParam(resolvedSearchParams.dateTo);
+  // '지연 중'(헌법 §3, 결정 D10) — 대시보드 카드·빠른 필터 숫자와 같은 건만 거른다.
+  const overdueOnly = getSearchParam(resolvedSearchParams.overdue) === '1';
+  // '지연' 과 '오늘 마감' 의 경계. 배지 집계와 목록 필터가 같은 시각을 쓴다.
+  const now = new Date();
 
   const where: Prisma.SRWhereInput = {};
 
-  if (status && status !== 'all') where.status = status as SRStatus;
-  if (priority && priority !== 'all') where.priority = priority as SRPriority;
+  if (statuses.length > 0) where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
+  if (priorities.length > 0)
+    where.priority = priorities.length === 1 ? priorities[0] : { in: priorities };
 
   // clientId 필터 처리
   if (clientId && clientId !== 'all') {
@@ -131,6 +148,13 @@ export default async function SRsPage({ searchParams }: Props) {
     if (dateTo) {
       (where.createdAt as Prisma.DateTimeFilter<'SR'>).lte = new Date(dateTo);
     }
+  }
+  if (overdueOnly) {
+    // 상태 필터와 함께 쓰일 수 있으므로 AND 로 겹친다(둘 다 만족하는 건만).
+    where.AND = [
+      { dueDate: { lt: now } },
+      { status: { in: [...SR_SLA_OPEN_STATUSES] as SRStatus[] } },
+    ];
   }
   if (search) {
     where.OR = [
@@ -183,17 +207,18 @@ export default async function SRsPage({ searchParams }: Props) {
   // Fetch all data in parallel
   const [srData, totalCount, globalCounts, clients, users] = await Promise.all([
     srService.getAllSRs({
+      viewer: session.user,
       where,
       orderBy,
       skip: (page - 1) * itemsPerPage,
       take: itemsPerPage,
     }),
-    srService.countSRs({ where }), // 현재 활성화된 필터/검색 적용 결과 총 개수
+    srService.countSRs({ viewer: session.user, where }), // 현재 활성화된 필터/검색 적용 결과 총 개수
     // 배지 5종을 한 번의 집계로 얻는다(이슈 #249). 예전에는 countSRs 를 다섯 번 불러
     // 같은 행 집합을 다섯 번 스캔했다.
     srService.getSRBadgeCounts({
       clientIds: badgeClientIds,
-      dueFrom: today,
+      now,
       dueTo: tomorrow,
       assigneeId: session?.user?.id || 'non-existent',
       visibilityAssigneeId,

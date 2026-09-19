@@ -59,7 +59,7 @@ describe('Cache Utility', () => {
       const { default: prisma } = await import('@/lib/prisma');
       vi.mocked(prisma.client.findMany).mockResolvedValue([{ id: 'c1', name: 'Client' }] as never);
 
-      const result = await getCachedClients();
+      const result = await getCachedClients(null);
 
       expect(result).toHaveLength(1);
       const where = vi.mocked(prisma.client.findMany).mock.calls[0]![0]!.where!;

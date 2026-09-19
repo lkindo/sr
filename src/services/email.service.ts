@@ -39,14 +39,36 @@ function safeEmailLink(value: string): string {
   }
 }
 
+/**
+ * 메일 발송에 실제로 쓰는 SMTP 서버. 발송 설정과 시스템 설정 화면이 같은 결정을 쓰도록 한 곳에 둔다
+ * (화면이 따로 계산하면 발송은 A 로 나가는데 화면은 B 라고 말하게 된다).
+ *
+ * `credentialsConfigured` 는 계정 환경변수가 **있는지**만 알린다 — 값은 싣지 않는다. 호스트가 맞아도
+ * 계정이 없으면 `sendMail` 이 던지므로, 화면이 호스트만 보여 주면 발송 불능을 숨기게 된다.
+ */
+export function smtpServer(): {
+  host: string;
+  port: number;
+  configured: boolean;
+  credentialsConfigured: boolean;
+} {
+  return {
+    host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
+    port: Number(process.env.EMAIL_SERVER_PORT) || 587,
+    configured: !!process.env.EMAIL_SERVER_HOST,
+    credentialsConfigured: !!(process.env.EMAIL_SERVER_USER && process.env.EMAIL_SERVER_PASSWORD),
+  };
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    const { host, port } = smtpServer();
     this.transporter = nodemailer.createTransport({
       pool: true,
-      host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
-      port: Number(process.env.EMAIL_SERVER_PORT) || 587,
+      host,
+      port,
       secure: false, // true for 465, false for other ports
       auth: {
         user: process.env.EMAIL_SERVER_USER,
@@ -77,7 +99,7 @@ class EmailService {
    * 정상으로 보였다. 이제 아웃박스에 실패로 남아 조회된다.
    */
   async sendMail({ to, subject, html }: EmailOptions): Promise<void> {
-    if (!process.env.EMAIL_SERVER_USER || !process.env.EMAIL_SERVER_PASSWORD) {
+    if (!smtpServer().credentialsConfigured) {
       throw new Error('SMTP 자격증명이 설정되지 않았습니다(EMAIL_SERVER_USER/PASSWORD).');
     }
 
@@ -198,6 +220,67 @@ class EmailService {
         <p><strong>제목:</strong> ${safeTitle}</p>
         <p><strong>상태:</strong> ${safeOldStatus} ➡️ <span style="color: #0070f3; font-weight: bold;">${safeNewStatus}</span></p>${detailBlock}
         <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
+      </div>
+    `;
+    return { to, subject, html };
+  }
+
+  /**
+   * 재오픈 알림(2026-09-18 소유자 결정 D15). 재오픈은 일이 다시 맡겨진 것이라 담당자가 알아야 한다.
+   * 담당자가 비활성이면 재배정할 운영 관리자에게 `needsReassignment` 로 보낸다.
+   */
+  buildSRReopened(
+    to: string,
+    srNumber: string,
+    title: string,
+    reason: string | null,
+    link: string,
+    needsReassignment = false
+  ): RenderedEmail {
+    const subject = needsReassignment
+      ? `[SR System] 재오픈된 SR의 담당자 재배정이 필요합니다: ${srNumber}`
+      : `[SR System] 담당 SR이 재오픈되었습니다: ${srNumber}`;
+    const safeSrNumber = escapeHtml(srNumber);
+    const safeTitle = escapeHtml(title);
+    const safeLink = safeEmailLink(link);
+    const reasonBlock =
+      reason && reason.trim()
+        ? `
+        <p style="margin-bottom: 4px;"><strong>재오픈 사유:</strong></p>
+        <div style="background-color: #f9f9f9; padding: 15px; border-left: 4px solid #0070f3; margin: 10px 0;">
+          ${escapeHtml(reason).replaceAll('\n', '<br />')}
+        </div>`
+        : '';
+    const lead = needsReassignment
+      ? '<p>이 SR의 담당자가 비활성 계정입니다. 담당자를 다시 배정해 주세요.</p>'
+      : '<p>담당하신 SR이 다시 진행중으로 돌아왔습니다.</p>';
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">SR 재오픈 알림</h2>
+        ${lead}
+        <p><strong>SR 번호:</strong> ${safeSrNumber}</p>
+        <p><strong>제목:</strong> ${safeTitle}</p>${reasonBlock}
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">SR 확인하기</a>
+      </div>
+    `;
+    return { to, subject, html };
+  }
+
+  /**
+   * 가입 이메일 인증 링크(결정 D13 B+). 인증은 승인을 막지 않는다 — 승인자가 "이 신청이 정말 이 메일의 주인인가"
+   * 를 판단하는 근거다. 그래서 본문도 "인증해야 쓸 수 있다" 가 아니라 "승인에 도움이 된다" 로 적는다.
+   */
+  buildEmailVerification(to: string, name: string, link: string, ttlHours: number): RenderedEmail {
+    const subject = '[SR System] 이메일 주소를 확인해 주세요';
+    const safeName = escapeHtml(name);
+    const safeLink = safeEmailLink(link);
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">이메일 주소 확인</h2>
+        <p>${safeName} 님, SR 관리 시스템 가입 신청을 받았습니다.</p>
+        <p>아래 버튼을 눌러 이 이메일 주소가 본인 것임을 확인해 주세요. 확인된 신청은 승인 담당자가 더 빨리 판단할 수 있습니다.</p>
+        <a href="${safeLink}" style="display: inline-block; background-color: #0070f3; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">이메일 확인하기</a>
+        <p style="color: #666; font-size: 12px; margin-top: 16px;">링크는 ${ttlHours}시간 동안 유효합니다. 가입을 신청한 적이 없다면 이 메일을 무시하세요.</p>
       </div>
     `;
     return { to, subject, html };

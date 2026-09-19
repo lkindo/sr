@@ -69,7 +69,11 @@ describe('SRsDataTable Accessibility', () => {
     vi.mocked(usePathname).mockReturnValue('/srs');
     vi.mocked(useSearchParams).mockReturnValue(mockSearchParams as any);
     vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as any);
-    vi.mocked(usePermissions).mockReturnValue({ hasAnyRole: () => true } as any);
+    vi.mocked(usePermissions).mockReturnValue({
+      hasAnyRole: () => true,
+      hasPermission: () => true,
+      isAdmin: () => true,
+    } as any);
   });
 
   const defaultProps = {

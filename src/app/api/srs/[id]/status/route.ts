@@ -5,6 +5,7 @@ import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { statusLabelOf } from '@/lib/constants/sr';
 import { statusActionSchema } from '@/lib/schemas';
+import { canConfirmAsAcceptor } from '@/lib/sr-state-machine';
 import { srService } from '@/services/sr.service';
 
 // PATCH /api/srs/[id]/status - SR 상태 전이 (Rate Limit: 표준)
@@ -119,14 +120,21 @@ export const PATCH = withAuthAndRateLimit(
         break;
 
       case 'confirm':
-        // COMPLETED → CONFIRMED (신청자만 가능)
+        // COMPLETED → CONFIRMED (신청자 본인. 운영자가 자기 이름으로 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도)
         if (currentStatus !== 'COMPLETED') {
           return NextResponse.json(
             { error: '완료 상태에서만 확인할 수 있습니다.' },
             { status: 400 }
           );
         }
-        if (currentSR.requesterId !== session.user.id) {
+        // 신원 판정은 상태 머신과 같은 함수를 쓴다(updateSR 의 validateTransition 이 한 번 더 본다).
+        // 여기서 먼저 보는 이유는 신원 거부를 403 으로 돌려주기 위해서다.
+        if (
+          !canConfirmAsAcceptor(session.user, {
+            ...currentSR,
+            requesterIsInternal: await srService.isInternalRequester(currentSR.requesterId),
+          })
+        ) {
           return NextResponse.json({ error: '신청자만 확인할 수 있습니다.' }, { status: 403 });
         }
         newStatus = 'CONFIRMED';

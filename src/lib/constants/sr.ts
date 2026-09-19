@@ -63,30 +63,73 @@ export const priorityLabels: Record<string, string> = {
   LOW: '낮음',
 };
 
-// SR 상태 Badge variant 맵.
-//
-// 이 값들은 통합 전 세 벌(components/srs/constants.ts, clients/[id]/page.tsx,
-// dashboard/page.tsx)이 글자까지 동일했던 것을 그대로 옮긴 것이다. 통합의 전제가
-// "세 사본이 같다"였으므로 값을 바꾸면 통합이 아니라 리디자인이 된다 —
-// 배지 색을 조정하려면 별도 커밋에서 네 화면을 함께 보고 결정할 것.
-//
-// `my-requests/page.tsx` 의 네 번째 사본은 의도적으로 합치지 않았다. 값에 'outline'
-// 이 있고 라벨 문구도 달라서, 화면별 차이가 의도인지 표류인지 소유자 판단이 필요하다.
-export const statusBadgeVariants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  REQUESTED: 'secondary',
+/** 상태·우선순위·마감 배지가 쓰는 Badge variant(의미색 — src/components/ui/badge.tsx). */
+export type SRBadgeVariant =
+  'default' | 'neutral' | 'info' | 'success' | 'successEmphasis' | 'warning' | 'caution' | 'danger';
+
+/**
+ * SR 상태 Badge variant — **모든 화면의 정본**. 화면은 이 맵을 직접 읽지 않고 `SRStatusBadge` 를 쓴다.
+ *
+ * 1단계(2026-09-18 소유자 결정 D16): 화면마다 따로 있던 사본을 이 맵으로 흡수했다.
+ * 2단계(같은 결정, 소유자가 시안 A 를 고름): 7개 상태가 채움·테두리·빨강 세 모양뿐이라 적체를 색으로 거를 수
+ * 없었다. 움직이는 일(진행중)만 파랑, 멈춘 일(보류)은 노랑, 끝난 일(완료·확인완료)은 초록, 거절은 빨강이다.
+ * 요청됨은 색 없는 테두리, 접수는 회색 채움으로 '아직 손대기 전' 과 '받아 둠' 을 가른다. 확인완료는 완료와 같은
+ * 초록에 테두리와 체크 아이콘(SRStatusBadge)을 더한다. 설계 근거는 LLD '상태별 색' 초안이다.
+ */
+export const statusBadgeVariants: Record<string, SRBadgeVariant> = {
+  REQUESTED: 'neutral',
   INTAKE: 'default',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'default',
-  CONFIRMED: 'default',
-  REJECTED: 'destructive',
+  IN_PROGRESS: 'info',
+  ON_HOLD: 'warning',
+  COMPLETED: 'success',
+  CONFIRMED: 'successEmphasis',
+  REJECTED: 'danger',
 };
 
-// SR 우선순위 Badge variant 맵. 위와 같은 근거로 통합 전 값을 보존한다.
-// 특히 HIGH 는 'destructive' 다 — CRITICAL 과 같은 강조를 주는 것이 원래 동작이다.
-export const priorityBadgeVariants: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
+/**
+ * SR 우선순위 Badge variant — 정본(D16). 빨강은 긴급에만 쓰고 높음은 주황으로 뗀다 — 예전에는 빨강이 거절·긴급·
+ * 높음·마감 임박에 모두 쓰여 빨강만으로는 무엇이 급한지 알 수 없었다. 낮음은 색 없는 테두리다.
+ */
+export const priorityBadgeVariants: Record<string, SRBadgeVariant> = {
+  CRITICAL: 'danger',
+  HIGH: 'caution',
   MEDIUM: 'default',
-  LOW: 'secondary',
+  LOW: 'neutral',
 };
+
+// 조회는 Map 으로 한다 — 객체 인덱싱은 'toString' 같은 프로토타입 키에 엉뚱한 값을 준다.
+const STATUS_BADGE_VARIANTS = new Map(Object.entries(statusBadgeVariants));
+const PRIORITY_BADGE_VARIANTS = new Map(Object.entries(priorityBadgeVariants));
+const PRIORITY_LABELS = new Map(Object.entries(priorityLabels));
+
+/** 상태 배지 variant. 모르는 값은 'neutral'(알약은 보이되 강조하지 않음). */
+export function statusBadgeVariantOf(status: string | null | undefined): SRBadgeVariant {
+  return (status && STATUS_BADGE_VARIANTS.get(status)) || 'neutral';
+}
+
+/** 우선순위 배지 variant. 모르는 값은 'neutral'. */
+export function priorityBadgeVariantOf(priority: string | null | undefined): SRBadgeVariant {
+  return (priority && PRIORITY_BADGE_VARIANTS.get(priority)) || 'neutral';
+}
+
+/** 우선순위 라벨. 모르는 값은 코드 그대로(숨기지 않는다). */
+export function priorityLabelOf(priority: string | null | undefined): string {
+  if (!priority) return '';
+  return PRIORITY_LABELS.get(priority) ?? priority;
+}
+
+/**
+ * 활동 metadata 가운데 내부 사용자만 보는 키 — 마감일 조정 사유가 담긴다(2026-09-18 소유자 결정 D9).
+ * 서버는 고객에게 내려보낼 때 이 키를 지우고(policies.redactActivityForViewer), 활동 목록 화면은 값이
+ * 있을 때만 보여 준다.
+ */
+export const INTERNAL_ACTIVITY_METADATA_KEY = 'internalReason';
+
+/** 활동에 실린 내부 전용 사유. 고객에게는 서버가 지우므로 여기까지 오지 않는다. */
+export function internalReasonOf(activity: { metadata?: unknown }): string | null {
+  const metadata = activity.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null;
+  // 키 이름은 INTERNAL_ACTIVITY_METADATA_KEY 와 같다.
+  const value = (metadata as { internalReason?: unknown }).internalReason;
+  return typeof value === 'string' && value.trim() ? value : null;
+}

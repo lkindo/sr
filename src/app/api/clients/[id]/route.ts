@@ -26,7 +26,10 @@ export const GET = withAuthAndRateLimit(
 
     // Service 레이어를 통해 고객사 조회
     const clientService = new ClientService();
-    const clientWithCategories = await clientService.getClientWithDetailsAndCategories(id);
+    const clientWithCategories = await clientService.getClientWithDetailsAndCategories(
+      id,
+      session.user
+    );
 
     if (!clientWithCategories) {
       throw new NotFoundError('고객사');
@@ -59,7 +62,10 @@ export const PATCH = withAuthAndRateLimit(
     await clientService.updateClient(id, validated, session.user.id, null);
 
     // 수정된 고객사 정보와 서비스 카테고리 조회
-    const clientWithCategories = await clientService.getClientWithDetailsAndCategories(id);
+    const clientWithCategories = await clientService.getClientWithDetailsAndCategories(
+      id,
+      session.user
+    );
 
     return NextResponse.json(clientWithCategories);
   },

@@ -41,5 +41,10 @@ declare module 'next-auth/jwt' {
      * 이것이 없으면 클레임이 세션 수명 내내 발급 시점 스냅샷으로 고정된다.
      */
     checkedAt?: number;
+    /**
+     * 로그인한 시각(epoch ms). 세션 절대 수명(결정 D13)의 기준이다 — 슬라이딩 갱신과 무관하게
+     * 이 시각으로부터 `SESSION_ABSOLUTE_MAX_AGE_SECONDS` 가 지나면 토큰을 버린다(src/auth.config.ts).
+     */
+    loginAt?: number;
   }
 }

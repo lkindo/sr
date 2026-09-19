@@ -35,11 +35,24 @@ export default {
         accent: {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
+          // 브랜드 액센트 블루 — 강조 표시(점·막대) 전용. hover/focus 배경에는 쓰지 않는다(대비 미달).
+          blue: 'hsl(var(--accent-blue))',
         },
         destructive: {
           DEFAULT: 'hsl(var(--destructive))',
           solid: 'hsl(var(--destructive-solid))',
           foreground: 'hsl(var(--destructive-foreground))',
+        },
+        // SR 상태·우선순위·마감 배지의 의미색(결정 D16 2단계). 값과 대비 근거는 globals.css.
+        status: {
+          neutral: 'hsl(var(--status-neutral))',
+          'neutral-border': 'hsl(var(--status-neutral-border))',
+          info: 'hsl(var(--status-info))',
+          success: 'hsl(var(--status-success))',
+          'success-solid': 'hsl(var(--status-success-solid))',
+          warning: 'hsl(var(--status-warning))',
+          caution: 'hsl(var(--status-caution))',
+          danger: 'hsl(var(--status-danger))',
         },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
@@ -59,20 +72,8 @@ export default {
         'card-sm': '8px',
         'card-md': '12px',
         'card-lg': '16px',
-        // DESIGN.md Framer Scale
-        'framer-xs': '4px',
-        'framer-sm': '6px',
-        'framer-md': '10px',
-        'framer-lg': '15px',
-        'framer-xl': '20px',
-        'framer-xxl': '30px',
-        'framer-pill': '100px',
-      },
-      letterSpacing: {
-        'framer-xxl': '-0.05em',
-        'framer-xl': '-0.045em',
-        'framer-lg': '-0.035em',
-        'framer-md': '-0.03em',
+        // DESIGN.md 의 Framer radius·자간 스케일(framer-*)은 정의만 있고 쓰는 곳이 없어 걷어냈다(2026-09-18 결정 D16 —
+        // 치수의 정본은 fe-rules §3 과 이 파일이다).
       },
       boxShadow: {
         xs: '0px 1px 2px 0px rgba(0, 0, 0, 0.05)',

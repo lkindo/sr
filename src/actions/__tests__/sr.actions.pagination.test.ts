@@ -102,7 +102,8 @@ describe('SR Actions - Details and Pagination', () => {
       ];
       // Mock SR existence
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      mockSRService.getSRActivities.mockImplementation(async (srId, options) => {
+      // 두 번째 인자는 내부 전용 값을 가릴 viewer 다(D9). 액션은 세션 사용자를 넘긴다.
+      mockSRService.getSRActivities.mockImplementation(async (srId, _viewer, options) => {
         const limit = options?.limit || 20;
         const hasMore = mockActivities.length > limit;
         const items = hasMore ? mockActivities.slice(0, limit) : mockActivities;
@@ -139,7 +140,7 @@ describe('SR Actions - Details and Pagination', () => {
       ];
       // Mock SR existence
       mockSRService.getSRById.mockResolvedValue({ id: 'sr-1' });
-      mockSRService.getSRComments.mockImplementation(async (srId, options) => {
+      mockSRService.getSRComments.mockImplementation(async (srId, _viewer, options) => {
         const limit = options?.limit || 20;
         const hasMore = mockComments.length > limit;
         const items = hasMore ? mockComments.slice(0, limit) : mockComments;

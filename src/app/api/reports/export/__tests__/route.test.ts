@@ -84,6 +84,8 @@ describe('GET /api/reports/export', () => {
     expect(mocks.getAllSRs).toHaveBeenCalledTimes(3);
     for (const [args] of mocks.getAllSRs.mock.calls) {
       expect(args.take).toBeLessThanOrEqual(1000);
+      // 목록 조회는 viewer 를 필수로 받는다 — 세션 사용자 그 자체를 넘긴다.
+      expect(args.viewer).toBe(SESSION_USER);
     }
     // 헤더 1줄 + 데이터 2500줄
     expect(body.trim().split('\n')).toHaveLength(2501);

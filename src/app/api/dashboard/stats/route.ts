@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION, STATS } from '@/lib/constants';
-import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
+import { isInternalUser, resolveAssigneeScope } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 import { formatISODateInAppZone } from '@/lib/timezone';
@@ -16,7 +16,7 @@ export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
     const userId = session.user.id;
     const userRoles = session.user.roles || [];
-    const isAdminManagerEngineer = userRoles.some((role: string) => INTERNAL_ROLES.includes(role));
+    const isAdminManagerEngineer = isInternalUser(session.user);
     const isEngineer = userRoles.includes('ENGINEER');
 
     /**
@@ -62,6 +62,9 @@ export const GET = withAuthAndRateLimit(
         ? Prisma.sql`AND assignee_id = ${assigneeScope}`
         : Prisma.empty;
 
+      // '지연 중' 판정 시각(헌법 §3, 결정 D10). 집계와 목록 필터가 같은 기준을 쓴다.
+      const overdueCutoff = new Date();
+
       // Get SR trend (last 30 days)
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - STATS.TREND_DAYS);
@@ -105,6 +108,9 @@ export const GET = withAuthAndRateLimit(
             urgentSRs: bigint;
             myAssignedSRs: bigint;
             myAssignedInProgress: bigint;
+            overdueSRs: bigint;
+            overdueOnHoldSRs: bigint;
+            manualDueOpenSRs: bigint;
           }>
         >`
           SELECT
@@ -114,6 +120,13 @@ export const GET = withAuthAndRateLimit(
             COUNT(*) FILTER (WHERE status IN ('REQUESTED', 'INTAKE'))::int as "pendingSRs",
             COUNT(*) FILTER (WHERE status = 'REQUESTED')::int as "requestedSRs",
             COUNT(*) FILTER (WHERE priority IN ('CRITICAL', 'HIGH'))::int as "urgentSRs",
+            -- '지연 중': SLA 시계가 도는 상태(sr-state-machine.SR_SLA_OPEN_STATUSES)이면서 마감을 넘긴 SR.
+            -- 준수율(완료 건만 보는 후행 지표)과 짝을 이루는 선행 지표다(헌법 §3, 결정 D10). 보류도 넣는다 —
+            -- 보류 중에도 SLA 시계는 멈추지 않아 결국 위반으로 집계된다.
+            COUNT(*) FILTER (WHERE status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD') AND due_date < ${overdueCutoff})::int as "overdueSRs",
+            COUNT(*) FILTER (WHERE status = 'ON_HOLD' AND due_date < ${overdueCutoff})::int as "overdueOnHoldSRs",
+            -- 마감일을 직접 조정한 진행 중 SR. 조정으로 '지연 중' 에서 빠진 건을 함께 보이기 위한 수치다.
+            COUNT(*) FILTER (WHERE status IN ('INTAKE', 'IN_PROGRESS', 'ON_HOLD') AND due_date_manual = true)::int as "manualDueOpenSRs",
             ${
               isEngineer
                 ? Prisma.sql`COUNT(*) FILTER (WHERE assignee_id = ${userId})::int as "myAssignedSRs",`
@@ -203,7 +216,13 @@ export const GET = withAuthAndRateLimit(
         // 7. 내 담당 SR 목록 (ENGINEER용, 최대 5개)
         isEngineer
           ? prisma.sR.findMany({
-              where: { ...baseWhere, assigneeId: userId },
+              // 끝나지 않은 SR 만 — 상태 조건이 없으면 마감이 이른 옛 완료 SR 이 5칸을 차지해 지금
+              // 지연 중인 SR 이 밀려났다(결정 D10).
+              where: {
+                ...baseWhere,
+                assigneeId: userId,
+                status: { notIn: ['COMPLETED', 'CONFIRMED', 'REJECTED'] },
+              },
               take: PAGINATION.DASHBOARD_MY_ASSIGNED,
               orderBy: { dueDate: 'asc' }, // 마감일이 가까운 것부터
               include: {
@@ -322,6 +341,9 @@ export const GET = withAuthAndRateLimit(
         urgentSRs: 0,
         myAssignedSRs: 0,
         myAssignedInProgress: 0,
+        overdueSRs: 0,
+        overdueOnHoldSRs: 0,
+        manualDueOpenSRs: 0,
       };
 
       const totalSRs = toNum(counts.totalSRs);
@@ -332,6 +354,9 @@ export const GET = withAuthAndRateLimit(
       const urgentSRs = toNum(counts.urgentSRs);
       const myAssignedSRs = toNum(counts.myAssignedSRs);
       const myAssignedInProgress = toNum(counts.myAssignedInProgress);
+      const overdueSRs = toNum(counts.overdueSRs);
+      const overdueOnHoldSRs = toNum(counts.overdueOnHoldSRs);
+      const manualDueOpenSRs = toNum(counts.manualDueOpenSRs);
 
       // Get client details (Requires srByClient)
       const clientIds = srByClient.map((item) => item.clientId);
@@ -423,6 +448,9 @@ export const GET = withAuthAndRateLimit(
           urgent: urgentSRs,
           myAssigned: myAssignedSRs,
           myAssignedInProgress: myAssignedInProgress,
+          overdue: overdueSRs,
+          overdueOnHold: overdueOnHoldSRs,
+          manualDueOpen: manualDueOpenSRs,
         },
         byStatus: statusCounts,
         byPriority: priorityCounts,

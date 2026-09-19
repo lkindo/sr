@@ -11,3 +11,10 @@ export interface ClientSummary {
   name: string;
   code: string;
 }
+
+/**
+ * 고객사 화면을 보는 사람의 범위 — GET /api/clients 와 /api/clients/[id] 의 `viewerScope`.
+ * 'assigned' 는 담당자 스코프 사용자(ENGINEER)다. 사용자 명부를 받지 않고, SR 숫자는 자기 배정분이다
+ * (헌법 §1.2, policies.canViewClientRoster).
+ */
+export type ClientViewerScope = 'all' | 'assigned';

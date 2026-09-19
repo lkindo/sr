@@ -9,14 +9,16 @@ import { ko } from 'date-fns/locale';
 import { AlertCircle, Clock, FileText, Filter } from 'lucide-react';
 
 import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
+import { SRStatusBadge } from '@/components/srs/SRStatusBadge';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { Progress } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, buildQuery, retryUnlessClientError } from '@/lib/api-client';
-import { statusLabelOf } from '@/lib/constants/sr';
+import { priorityBadgeVariantOf, priorityLabelOf, statusLabelOf } from '@/lib/constants/sr';
 import type { PaginationMeta } from '@/lib/pagination';
 import { qk } from '@/lib/query-keys';
 
@@ -108,41 +110,10 @@ const STATUS_ORDER = [
 ] as const;
 
 /**
- * 상태 **라벨** 사본은 정본(@/lib/constants/sr)으로 흡수했다(2026-08-10).
- *
- * 7키 중 4키가 정본과 달랐다 — 같은 SR 이 이 화면에서는 '접수 대기'/'진행 중'/
- * '확인됨'/'거부됨' 인데 /srs 에서는 '요청됨'/'진행중'/'확인완료'/'거절' 로 보였다.
- * 목록에서 본 이름과 상세에서 본 이름이 달라 사용자가 다른 단계로 읽는다.
- * (IN_PROGRESS 는 공백 하나 차이라 눈으로는 같아 보이지만 exact 매칭에서는 다르다.)
- *
- * **색(statusColors)은 흡수하지 않는다.** 아래 맵에는 'outline' 이 있는데 정본
- * statusBadgeVariants 의 유니온에는 없다. 타입을 넓혀 억지로 합치면 통합이 아니라
- * 배지 색 리디자인이 되고, constants/sr.ts 가 소유자 판단으로 격리해 둔 항목을
- * 우회하게 된다. 색 통합은 네 화면을 함께 보고 결정할 별건이다.
+ * 상태·우선순위의 라벨과 배지 색은 정본(@/lib/constants/sr)을 쓴다. 라벨은 2026-08-10 에, 색은 2026-09-18
+ * (소유자 결정 D16 1단계)에 흡수했다 — 예전 사본은 INTAKE 를 맨 글자, 완료·확인완료를 테두리 배지로 그려 같은
+ * 상태가 SR 상세와 다른 모양으로 보였다.
  */
-const statusColors: Record<SRStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  REQUESTED: 'secondary',
-  INTAKE: 'secondary',
-  IN_PROGRESS: 'default',
-  ON_HOLD: 'secondary',
-  COMPLETED: 'outline',
-  CONFIRMED: 'outline',
-  REJECTED: 'destructive',
-};
-
-const priorityLabels: Record<string, string> = {
-  CRITICAL: '긴급',
-  HIGH: '높음',
-  MEDIUM: '보통',
-  LOW: '낮음',
-};
-
-const priorityColors: Record<string, 'default' | 'secondary' | 'destructive'> = {
-  CRITICAL: 'destructive',
-  HIGH: 'destructive',
-  MEDIUM: 'default',
-  LOW: 'secondary',
-};
 
 const PAGE_SIZE = 20;
 
@@ -153,6 +124,9 @@ export default function MyRequestsPage() {
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [page, setPage] = useState(1);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  // 서버(policies.canCreateSR)와 같은 규칙: ADMIN 이거나 SR:CREATE(시드상 ENGINEER 는 없다).
+  const { hasPermission, isAdmin } = usePermissions();
+  const canCreateSR = isAdmin() || hasPermission('SR', 'CREATE');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -254,12 +228,14 @@ export default function MyRequestsPage() {
           <h1 className="sr-list-title text-3xl">내 요청 SR</h1>
           <p className="text-muted-foreground mt-1">내가 요청한 SR의 진행 상황을 확인하세요.</p>
         </div>
-        <Button
-          onClick={() => setCreateDialogOpen(true)}
-          className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
-        >
-          새 SR 요청
-        </Button>
+        {canCreateSR && (
+          <Button
+            onClick={() => setCreateDialogOpen(true)}
+            className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
+          >
+            새 SR 요청
+          </Button>
+        )}
       </div>
 
       {/* 통계 카드 */}
@@ -280,9 +256,7 @@ export default function MyRequestsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">요청됨</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-orange))]">
-              {stats.requested}
-            </div>
+            <div className="text-2xl font-bold text-status-neutral">{stats.requested}</div>
           </CardContent>
         </Card>
 
@@ -291,9 +265,7 @@ export default function MyRequestsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">진행중</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-accent-blue))]">
-              {stats.inProgress}
-            </div>
+            <div className="text-2xl font-bold text-status-info">{stats.inProgress}</div>
           </CardContent>
         </Card>
 
@@ -302,7 +274,7 @@ export default function MyRequestsPage() {
             <CardTitle className="text-sm font-medium text-muted-foreground">완료</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+            <div className="text-2xl font-bold text-status-success">{stats.completed}</div>
           </CardContent>
         </Card>
       </div>
@@ -318,9 +290,12 @@ export default function MyRequestsPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">상태</label>
+              {/* 라벨을 트리거에 연결한다 — 예전에는 이름 없는 콤보박스였다(axe button-name). */}
+              <label htmlFor="my-requests-status" className="text-sm font-medium">
+                상태
+              </label>
               <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger>
+                <SelectTrigger id="my-requests-status">
                   <SelectValue placeholder="전체 상태" />
                 </SelectTrigger>
                 <SelectContent>
@@ -335,9 +310,11 @@ export default function MyRequestsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">정렬 기준</label>
+              <label htmlFor="my-requests-sort" className="text-sm font-medium">
+                정렬 기준
+              </label>
               <Select value={sortBy} onValueChange={handleSortByChange}>
-                <SelectTrigger>
+                <SelectTrigger id="my-requests-sort">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -356,7 +333,7 @@ export default function MyRequestsPage() {
         {srs.length === 0 ? (
           <div className="sr-empty-state">
             <FileText className="sr-empty-state-icon" />
-            <h3 className="sr-empty-state-title">요청한 SR이 없습니다</h3>
+            <h2 className="sr-empty-state-title">요청한 SR이 없습니다</h2>
             <p className="sr-empty-state-description">
               아직 요청한 SR이 없습니다. 첫 SR을 요청하여 업무를 시작하세요.
             </p>
@@ -380,9 +357,9 @@ export default function MyRequestsPage() {
                       >
                         {sr.srNumber}
                       </Link>
-                      <Badge variant={statusColors[sr.status]}>{statusLabelOf(sr.status)}</Badge>
-                      <Badge variant={priorityColors[sr.requestedPriority]}>
-                        {priorityLabels[sr.requestedPriority]}
+                      <SRStatusBadge status={sr.status} />
+                      <Badge variant={priorityBadgeVariantOf(sr.requestedPriority)}>
+                        {priorityLabelOf(sr.requestedPriority)}
                       </Badge>
                     </div>
                     <p className="text-lg font-medium text-foreground">{sr.title}</p>

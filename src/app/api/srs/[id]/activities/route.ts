@@ -4,7 +4,7 @@ import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { PAGINATION } from '@/lib/constants';
 import { NotFoundError } from '@/lib/errors';
-import { ensureCanReadSR } from '@/lib/policies';
+import { ensureCanReadSR, redactActivityForViewer } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SR_ACCESS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
 
@@ -53,7 +53,10 @@ export const GET = withAuthAndRateLimit(
       throw new NotFoundError('활동 이력');
     }
 
-    return NextResponse.json(activities);
+    // 마감일 조정 사유 같은 내부 전용 값은 고객에게 가린다(D9).
+    return NextResponse.json(
+      activities.map((activity) => redactActivityForViewer(session.user, activity))
+    );
   },
   { preset: 'standard' }
 ); // 1분당 100회

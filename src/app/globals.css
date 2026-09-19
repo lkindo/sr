@@ -74,13 +74,30 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 7.8%;
     --muted-foreground: 0 0% 60%; /* Ink Muted #999999 */
-    --accent: 204 100% 50%; /* Accent Blue #0099ff */
+    /* shadcn 프리미티브는 accent 를 "은은한 hover/focus 배경" 으로 쓴다(Select·Dropdown 항목, outline
+       버튼 hover 등). 예전에는 브랜드 액센트 #0099ff 에 흰 글씨를 매핑해서 그 모든 곳이 2.99:1 로 WCAG AA
+       (4.5:1) 에 못 미쳤고, DESIGN.md 의 "액센트 블루는 배경으로 쓰지 않는다" 와도 어긋났다.
+       hover/focus 는 Surface 2 로, 파란 강조가 꼭 필요한 곳(사이드바 활성 표시)은 --accent-blue 로 나눈다. */
+    --accent: 0 0% 11%; /* Surface 2 #1c1c1c */
     --accent-foreground: 0 0% 100%;
+    --accent-blue: 204 100% 50%; /* Accent Blue #0099ff — 점·막대 같은 강조 표시 전용 */
     --destructive: 0 84.2% 60.2%;
     /* 채움용. 흰 글씨를 얹었을 때 WCAG AA(4.5:1)를 넘도록 --destructive 보다 어둡다.
        --destructive 자체를 어둡게 하면 어두운 표면 위 텍스트 대비가 무너진다. */
     --destructive-solid: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
+    /* SR 상태·우선순위·마감 배지의 의미색(2026-09-18 소유자 결정 D16 2단계). 배지는 같은 색을 글자와 15% 배경에
+       함께 쓴다 — 카드(#141414) 위에서 글자 대비가 모두 WCAG AA(4.5:1) 이상이다(최저 info 5.06:1).
+       파랑(info)은 앱의 유일한 강조색과 같은 값이고 "움직이는 일(진행중)" 에만 쓴다. */
+    --status-neutral: 0 0% 83.1%; /* #d4d4d4 — 요청됨·낮음 테두리 배지의 글자 */
+    --status-neutral-border: 0 0% 23.9%; /* #3d3d3d */
+    --status-info: 204 100% 50%; /* #0099ff — 진행중 */
+    --status-success: 158.1 64.4% 51.6%; /* #34d399 — 완료·확인완료 */
+    /* 채움용. 흰 글씨 대비 5.48:1(예전 버튼 success 의 emerald-600 은 3.77:1 이었다). */
+    --status-success-solid: 162.9 93.5% 24.3%; /* #047857 */
+    --status-warning: 43.3 96.4% 56.3%; /* #fbbf24 — 보류 */
+    --status-caution: 27 96% 61%; /* #fb923c — 우선순위 높음, 마감 D-2·D-3 */
+    --status-danger: 0 90.6% 70.8%; /* #f87171 — 거절·긴급·마감 임박/지연 */
     --border: 0 0% 14.9%; /* Hairline #262626 */
     --input: 0 0% 14.9%;
     --ring: 204 100% 50%; /* Accent Blue #0099ff */
@@ -118,13 +135,26 @@
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 7.8%;
     --muted-foreground: 0 0% 60%;
-    --accent: 204 100% 50%;
+    --accent: 0 0% 11%;
     --accent-foreground: 0 0% 100%;
+    --accent-blue: 204 100% 50%;
     --destructive: 0 84.2% 60.2%;
     /* 채움용. 흰 글씨를 얹었을 때 WCAG AA(4.5:1)를 넘도록 --destructive 보다 어둡다.
        --destructive 자체를 어둡게 하면 어두운 표면 위 텍스트 대비가 무너진다. */
     --destructive-solid: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
+    /* SR 상태·우선순위·마감 배지의 의미색(2026-09-18 소유자 결정 D16 2단계). 배지는 같은 색을 글자와 15% 배경에
+       함께 쓴다 — 카드(#141414) 위에서 글자 대비가 모두 WCAG AA(4.5:1) 이상이다(최저 info 5.06:1).
+       파랑(info)은 앱의 유일한 강조색과 같은 값이고 "움직이는 일(진행중)" 에만 쓴다. */
+    --status-neutral: 0 0% 83.1%; /* #d4d4d4 — 요청됨·낮음 테두리 배지의 글자 */
+    --status-neutral-border: 0 0% 23.9%; /* #3d3d3d */
+    --status-info: 204 100% 50%; /* #0099ff — 진행중 */
+    --status-success: 158.1 64.4% 51.6%; /* #34d399 — 완료·확인완료 */
+    /* 채움용. 흰 글씨 대비 5.48:1(예전 버튼 success 의 emerald-600 은 3.77:1 이었다). */
+    --status-success-solid: 162.9 93.5% 24.3%; /* #047857 */
+    --status-warning: 43.3 96.4% 56.3%; /* #fbbf24 — 보류 */
+    --status-caution: 27 96% 61%; /* #fb923c — 우선순위 높음, 마감 D-2·D-3 */
+    --status-danger: 0 90.6% 70.8%; /* #f87171 — 거절·긴급·마감 임박/지연 */
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 204 100% 50%;
@@ -163,21 +193,23 @@
     @apply px-4 py-6;
   }
 
-  /* Card Styles (Premium Glassmorphism & Lift) */
+  /* Card Styles
+   * 모든 사용처가 <Card> 와 함께 쓴다. <Card> 의 utility(bg-card·rounded-card-md·shadow-md)가 이 components
+   * 레이어 값을 이기므로 반투명 배경·blur·20px 반경은 실제로 그려지지 않는다(불투명 #141414·12px). 남는 것은
+   * 테두리와 아래 hover 의 배경·테두리 변화다.
+   * hover 리프트(translateY·큰 그림자)는 fe-rules §4 가 폐기했으므로 걷어냈다(2026-09-18 결정 D16). */
   .sr-card {
     background: rgba(20, 20, 20, 0.75); /* Surface 1 with opacity */
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.05); /* Hairline Soft */
-    border-radius: 20px; /* rounded-framer-xl */
-    @apply shadow-sm transition-all duration-300;
+    border-radius: 20px;
+    @apply shadow-sm transition-colors duration-300;
   }
 
   .sr-card:hover {
     border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(28, 28, 28, 0.85); /* Lifted to Surface 2 */
-    transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    background: rgba(28, 28, 28, 0.85); /* Surface 2 */
   }
 
   /* Table Styles (Premium Data Table Paradigm) */
@@ -349,7 +381,7 @@
   }
 
   .sr-sidebar-item.active {
-    @apply text-foreground bg-muted font-semibold border-l-2 border-accent;
+    @apply text-foreground bg-muted font-semibold border-l-2 border-accent-blue;
   }
 
   .sr-sidebar-submenu {
@@ -364,7 +396,7 @@
   .sr-sidebar-submenu-item::before {
     content: '';
     @apply inline-block w-1.5 h-1.5 rounded-full;
-    @apply bg-accent mr-3;
+    @apply bg-accent-blue mr-3;
     @apply opacity-0;
   }
 

@@ -312,7 +312,7 @@ test.describe('SR 상태 전이 — 정상 경로', () => {
     seededIds.push(sr.id);
 
     // 담당 엔지니어는 신청자가 아니므로 확인 완료 버튼이 아예 없어야 한다.
-    // (SRStatusActions 의 COMPLETED 분기: isRequestor 일 때만 렌더한다.)
+    // (SRStatusActions 의 COMPLETED 분기: canConfirm — 신청자 본인 등 — 일 때만 렌더한다.)
     await withPage(browser, 'engineer', async (page) => {
       await page.goto(`/srs/${sr.id}`, { waitUntil: 'domcontentloaded' });
       await expectStatusBadge(page, sr.id, 'COMPLETED');

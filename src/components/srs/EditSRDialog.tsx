@@ -84,6 +84,8 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
     loading,
     fileToDelete,
     canSelectClient,
+    canChangeCategory,
+    categoryLockedByStatus,
   } = state;
   const {
     setTitle,
@@ -173,7 +175,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
                 <Select
                   value={categoryId}
                   onValueChange={setCategoryId}
-                  disabled={loading || categories.length === 0}
+                  disabled={loading || categories.length === 0 || !canChangeCategory}
                 >
                   <SelectTrigger id="category">
                     <SelectValue
@@ -195,6 +197,13 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
                     ))}
                   </SelectContent>
                 </Select>
+                {!canChangeCategory && (
+                  <p className="text-xs text-muted-foreground">
+                    {categoryLockedByStatus
+                      ? '종결된 SR의 서비스 카테고리는 바꿀 수 없습니다. 고쳐야 하면 SR을 다시 연 뒤 수정하세요.'
+                      : '서비스 카테고리 변경은 담당자에게 요청하세요.'}
+                  </p>
+                )}
               </div>
             </div>
 

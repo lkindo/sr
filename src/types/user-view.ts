@@ -30,6 +30,8 @@ export interface UserListItem {
   email: string;
   name: string;
   isActive: boolean;
+  /** 가입 확인 링크를 연 시각. 열지 않았으면 null(결정 D13 B+ — 승인 화면의 '이메일 미인증'). */
+  emailVerified?: string | Date | null;
   userType: 'ENGINEER' | 'CLIENT';
   roles: UserRoleView[];
   clients: UserClientView[];

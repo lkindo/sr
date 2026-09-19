@@ -4,10 +4,26 @@
  * 클래스 기반 Policy를 함수로 간소화하여 단순하고 명확한 권한 검증 제공
  */
 
-import { Client, Role, SR, User } from '@prisma/client';
+import { Client, Prisma, Role, SR, SRStatus, User } from '@prisma/client';
 
+import { INTERNAL_ACTIVITY_METADATA_KEY } from '@/lib/constants/sr';
 import { BusinessRuleError, ForbiddenError } from '@/lib/errors';
 import { hasPermissionFlag, PERMISSIONS } from '@/lib/permission-helpers';
+import {
+  DELETION_PROTECTED_ACCOUNT_MESSAGE,
+  isCanonicalRole,
+  isDeletionProtectedAccount,
+  isImmutableRole,
+  isReservedRoleName,
+} from '@/lib/role-rules';
+import {
+  canViewerAssignSR,
+  canViewerIntakeSR,
+  getRequiredFields,
+  isSROperator,
+  SR_CLOSED_STATUSES,
+  SR_CONTENT_LOCKED_MESSAGE,
+} from '@/lib/sr-state-machine';
 import { AuthenticatedUser } from '@/types/session';
 
 export const INTERNAL_ROLES = ['ADMIN', 'MANAGER', 'ENGINEER'];
@@ -38,8 +54,129 @@ export type RoleGrantFields = {
   permissions?: { permission: { resource: string; action: string } }[] | null;
 };
 
+/**
+ * 시스템 관리자(ADMIN)인가. ADMIN 전용 기능(시스템 설정·알림 아웃박스·사용자 완전 삭제)의 판정.
+ * 예전에는 각 라우트가 `roles.includes('ADMIN')` 을 직접 비교했다(헌법 §1.2 — 판정은 이 파일 한 곳).
+ */
+export function isSystemAdmin(user: AuthenticatedUser): boolean {
+  return user.roles?.includes('ADMIN') ?? false;
+}
+
+/**
+ * 감사 로그를 조회할 수 있는가 — ADMIN 만(헌법 §1.1, 2026-09-18 소유자 결정 D11). 감사 로그에는 전 고객사의
+ * 관리 행위와 변경 전후 값(이메일 등)이 들어 있어 테넌트 범위로 나눌 수 없다.
+ */
+export function ensureCanViewAuditLogs(user: AuthenticatedUser): void {
+  ensureSystemAdmin(user, '감사 로그는 시스템 관리자만 조회할 수 있습니다.');
+}
+
+export function ensureSystemAdmin(user: AuthenticatedUser, message: string): void {
+  if (!isSystemAdmin(user)) {
+    throw new ForbiddenError(message);
+  }
+}
+
+/** 이 권한을 실제로 가졌는가 — ADMIN 은 모든 권한을 암묵적으로 가진다(서버 정책 전반과 같다). */
+export function hasEffectivePermission(user: AuthenticatedUser, permission: string): boolean {
+  return isSystemAdmin(user) || hasPermissionFlag(user, permission);
+}
+
 export function isInternalUser(user: AuthenticatedUser): boolean {
   return user.roles?.some((role) => INTERNAL_ROLES.includes(role)) ?? false;
+}
+
+/**
+ * 활동의 내부 전용 값(키는 constants/sr 의 INTERNAL_ACTIVITY_METADATA_KEY — 마감일 조정 사유, D9)을 고객에게서 지운다.
+ * 활동 자체("SLA 마감일 조정: A → B")는 고객도 본다 — 고객도 마감일을 본다. 조정 이유는 운영 판단이라
+ * 내부에만 둔다. 활동을 내려보내는 모든 경로(상세·활동 목록·활동 API)가 이 함수를 거친다.
+ */
+export function redactActivityForViewer<T extends { metadata?: unknown }>(
+  viewer: AuthenticatedUser,
+  activity: T
+): T {
+  if (isInternalUser(viewer)) return activity;
+  const metadata = activity.metadata;
+  if (
+    !metadata ||
+    typeof metadata !== 'object' ||
+    Array.isArray(metadata) ||
+    !(INTERNAL_ACTIVITY_METADATA_KEY in metadata)
+  ) {
+    return activity;
+  }
+  // 키 이름은 INTERNAL_ACTIVITY_METADATA_KEY('internalReason')와 같다 — 구조 분해로 빼낸다.
+  const { internalReason: _internalReason, ...rest } = metadata as { internalReason?: unknown };
+  return { ...activity, metadata: rest };
+}
+
+/**
+ * 이 SSE 연결(viewer)이 실시간 이벤트를 받을 자격이 있는가.
+ *  - 본인이 유발한 이벤트는 받지 않는다(에코 방지).
+ *  - 내부 전용 이벤트(내부 노트 등 — `internalOnly`)는 내부 사용자만 받는다. 이벤트가 왔다는 사실만으로도
+ *    고객에게 보이지 않는 댓글이 있음이 드러난다.
+ *  - 나머지는 SR 조회 권한(canReadSR)으로 테넌트·담당자 범위를 격리한다.
+ */
+export function canReceiveRealtimeEvent(
+  viewer: AuthenticatedUser,
+  payload: {
+    id?: string;
+    srId?: string;
+    clientId?: string;
+    requesterId?: string | null;
+    assigneeId?: string | null;
+    actorId?: string;
+    internalOnly?: boolean;
+  } | null
+): boolean {
+  if (payload?.actorId && payload.actorId === viewer.id) return false;
+  if (payload?.internalOnly && !isInternalUser(viewer)) return false;
+  return canReadSR(viewer, {
+    id: payload?.id ?? payload?.srId ?? '',
+    clientId: payload?.clientId ?? '',
+    // 신청자가 실리지 않은 이벤트는 신청자 경로로 열리지 않게 빈 값으로 둔다(어떤 사용자 id 와도 같지 않다).
+    requesterId: payload?.requesterId ?? '',
+    assigneeId: payload?.assigneeId ?? null,
+  });
+}
+
+/**
+ * 고객을 대신해 SR 을 등록할 수 있는가(대리 등록 — 소유자 결정 2026-09-18 D3). 내부 사용자만.
+ * 고객사 관리자가 동료 이름으로 SR 을 만드는 것은 결정 범위 밖이라 열지 않는다.
+ */
+export function canRegisterSROnBehalf(user: AuthenticatedUser): boolean {
+  return isInternalUser(user);
+}
+
+/**
+ * 이 고객사의 SR 신청자가 될 수 있는 사용자 — 활성이고, 그 고객사 소속이 **승인**됐고, 내부 역할이 없다.
+ * 대리 등록 대상 목록(화면)과 서버 검증이 같은 조건을 쓰도록 한 곳에 둔다.
+ */
+export function eligibleRequesterWhere(clientId: string): Prisma.UserWhereInput {
+  return {
+    isActive: true,
+    clients: { some: { clientId, status: 'APPROVED' } },
+    roles: { none: { role: { name: { in: INTERNAL_ROLES } } } },
+  };
+}
+
+/**
+ * 내부 노트(고객에게 보이지 않는 댓글)를 쓸 수 있는가 — 내부 사용자(ADMIN·MANAGER·ENGINEER)만.
+ * 헌법 §1.1 "ENGINEER·MANAGER·ADMIN만 작성 및 조회" 와 읽기 쪽 visibleCommentsWhere 와 같은 경계다.
+ */
+export function canWriteInternalNote(user: AuthenticatedUser): boolean {
+  return isInternalUser(user);
+}
+
+/**
+ * 이 사용자에게 보여도 되는 댓글만 고르는 where 조각. 내부 댓글(`isInternal`)은 내부 사용자에게만 보인다.
+ *
+ * 댓글을 읽거나 세는 경로는 전부 이것을 쓴다 — SR 상세(`getSRDetailsById`), 댓글 탭(`getSRComments`),
+ * REST `GET /api/srs/[id]/comments`, SR 목록의 댓글 수(`getAllSRs`), 내 요청의 댓글 수. 예전에는
+ * 앞의 세 곳이 같은 삼항식을 각자 복제했고, 뒤의 두 곳은 필터가 아예 없어 내부 댓글이 생기면
+ * 고객사 사용자의 목록에만 그 개수가 섞일 상태였다. 규칙이 여러 곳에 있으면 반드시 갈라진다.
+ */
+export function visibleCommentsWhere(user: AuthenticatedUser): Prisma.SRCommentWhereInput {
+  return isInternalUser(user) ? {} : { isInternal: false };
 }
 
 // ============================================================================
@@ -131,15 +268,22 @@ export function canDeleteSR(user: AuthenticatedUser, sr: SRAccessFields): boolea
     return false;
   }
 
-  // 내부 사용자(MANAGER/ENGINEER)는 권한 보유만으로 통과한다.
+  // MANAGER 는 권한 보유만으로 통과한다.
+  if (user.roles?.includes('MANAGER')) return true;
+
+  // ENGINEER 는 권한을 받아도 자기에게 배정된 SR 만 — 배정 격리(헌법 §1.2)는 권한 조정으로 풀리지
+  // 않는다(§1.4). 예전에는 내부 사용자라는 이유로 통과해 보이지도 않는 남의 SR 까지 지울 수 있었다.
+  if (user.roles?.includes('ENGINEER')) return sr.assigneeId === user.id;
+
   // 외부 사용자는 자기 테넌트의 SR 로 제한한다.
-  return isInternalUser(user) || (user.clientIds?.includes(sr.clientId) ?? false);
+  return user.clientIds?.includes(sr.clientId) ?? false;
 }
 
 /**
  * 종결된 SR. 이 상태의 레코드는 감사 추적 대상이므로 첨부를 붙일 수 없다.
+ * 목록은 화면(첨부 업로드 버튼)과 같이 쓰도록 sr-state-machine 에 있다.
  */
-const CLOSED_SR_STATUSES: ReadonlySet<string> = new Set(['COMPLETED', 'CONFIRMED', 'REJECTED']);
+const CLOSED_SR_STATUSES: ReadonlySet<string> = new Set(SR_CLOSED_STATUSES);
 
 /**
  * 첨부 업로드 권한.
@@ -205,6 +349,84 @@ export function ensureCanUpdateSR(user: AuthenticatedUser, sr: SRAccessFields): 
     throw new ForbiddenError('SR 수정 권한이 없습니다.');
   }
 }
+
+/**
+ * SR 의 **운영자 소유 값**(접수 결과·완료 내용·거절 사유 등)을 쓸 수 있는 사용자인가.
+ * 내부 사용자(ADMIN/MANAGER/ENGINEER) 또는 SR:ASSIGN 보유자(외부 커스텀 운영 역할 포함).
+ *
+ * 필드 단위 인가(sr.service 의 collectOperatorFieldChanges)와 내용 수정 규칙(ensureCanEditSRContent)이
+ * 같은 판정을 써야 한다. 예전에는 앞쪽만 SR:ASSIGN 을 운영자로 인정해서, SR:ASSIGN 을 받은 외부 역할은
+ * 우선순위는 고칠 수 있는데 완료 내용은 쓸 수 없는 식으로 두 규칙이 서로 다른 사람을 운영자로 봤다.
+ * 판정 본문은 화면과 같이 쓰는 sr-state-machine.isSROperator 다.
+ */
+export function canWriteSROperatorFields(user: AuthenticatedUser): boolean {
+  return isSROperator(user);
+}
+
+/**
+ * 상태 전이 요청에 함께 실려 오는 **전이 전용 값**. 이 값들은 상태머신이 판정한다
+ * (전이 권한 — validateTransition, 필수 값 — REQUIRED_FIELDS). 목록은 status 라우트가 전이마다 싣는
+ * 값과 같다: 완료 → 완료 내용, 거절 → 거절 사유, 보류 → 예상 해제일, 재개 → 예상 해제일 비우기,
+ * 진행 → 담당자(assigneeId, 별칭 assignedToId — 담당자 변경은 운영자 필드 규칙이 따로 막는다).
+ */
+function transitionOwnedKeys(from: string, to: string): Set<string> {
+  const keys = new Set<string>(['status', 'changeReason', ...getRequiredFields(to as SRStatus)]);
+  if (keys.has('assigneeId')) keys.add('assignedToId');
+  if (from === 'ON_HOLD') keys.add('expectedHoldReleaseDate');
+  return keys;
+}
+
+/**
+ * 운영자가 아닌 사용자가 SR **내용**을 직접 고칠 수 있는가.
+ *
+ * 규칙(소유자 결정, 2026-09-18 — 헌법 §1.1, PRD §특수 권한 규칙):
+ *  1. **접수 이후 SR 내용은 운영자만 고친다**(ADMIN·MANAGER·배정 ENGINEER, SR:ASSIGN 보유 역할).
+ *     외부 사용자는 신청자든 고객사 관리자든 접수 전(REQUESTED)에만 고칠 수 있고, 그 뒤 변경은 댓글로
+ *     담당자에게 요청한다. SLA 는 접수 시점의 요구를 근거로 산정되므로 그 뒤 요구 범위가 조용히 바뀌면
+ *     근거가 흔들린다. 만족도·추가 의견은 고객이 결과를 받은 뒤 남기는 값이라 예외다.
+ *     (ENGINEER 가 **자기 배정분만** 고칠 수 있다는 범위는 ensureCanUpdateSR 이 이미 판정한다.)
+ *  2. 완료 내용·거절 사유는 운영자만 쓴다 — REQUESTED 에서도. 미리 채워 두면 운영자가 완료·거절할 때
+ *     필수 입력 검사를 비어 있는 채로 통과한다. 단, 그 값을 요구하는 전이 자체에 실려 온 경우는
+ *     상태머신이 전이 권한으로 판정한다.
+ *
+ * 예전에는 이 규칙이 화면(수정 버튼·다이얼로그)에만 있어서 API(PATCH /api/srs/[id], updateSRAction)로는
+ * 접수·완료 뒤에도 제목·본문과 완료 내용·거절 사유를 덮어쓰거나 지울 수 있었다.
+ *
+ * 상태 전이 요청도 이 검사를 지난다. 전이 전용 값(transitionOwnedKeys)만 빼고 나머지를 본다 —
+ * 전이 요청이라는 이유로 통째로 건너뛰면 `{status:'CONFIRMED', title:'…'}` 처럼 전이에 내용 수정을
+ * 끼워 넣어 규칙을 우회할 수 있다.
+ */
+export function ensureCanEditSRContent(
+  user: AuthenticatedUser,
+  sr: { status: string },
+  changes: { status?: unknown; [key: string]: unknown }
+): void {
+  if (canWriteSROperatorFields(user)) return;
+
+  const isTransition = typeof changes.status === 'string' && changes.status !== sr.status;
+  const exempt = isTransition
+    ? transitionOwnedKeys(sr.status, changes.status as string)
+    : new Set(['status', 'changeReason']);
+  const content = Object.entries(changes)
+    .filter(([key, value]) => value !== undefined && !exempt.has(key))
+    .map(([key]) => key);
+
+  if (content.some((key) => OPERATOR_WRITTEN_FIELDS.has(key))) {
+    throw new ForbiddenError('완료 내용과 거절 사유는 운영 담당자만 작성할 수 있습니다.');
+  }
+  if (sr.status === 'REQUESTED') return;
+
+  // 만족도·추가 의견은 고객이 처리 결과를 받은 뒤 남기는 **고객 소유** 값이라 접수 후에도 허용한다.
+  if (content.some((key) => !CUSTOMER_FEEDBACK_FIELDS.has(key))) {
+    throw new ForbiddenError(SR_CONTENT_LOCKED_MESSAGE);
+  }
+}
+
+/** 운영자가 완료·거절하며 쓰는 값. 외부 사용자는 전이 요청에 실린 경우가 아니면 쓸 수 없다. */
+const OPERATOR_WRITTEN_FIELDS = new Set(['resolutionDescription', 'rejectionReason']);
+
+/** 접수 후에도 외부 사용자가 쓸 수 있는 고객 피드백 필드. */
+const CUSTOMER_FEEDBACK_FIELDS = new Set(['satisfactionRating', 'additionalFeedback']);
 
 /**
  * 첨부파일을 지울 수 있는가.
@@ -359,6 +581,10 @@ function targetHasRole(targetUser: UserIdentity, roleName: string): boolean {
   return (targetUser.roles ?? []).some((entry) => entry.role.name === roleName);
 }
 
+function targetRoleNames(targetUser: UserIdentity): string[] {
+  return (targetUser.roles ?? []).map((entry) => entry.role.name);
+}
+
 export function canCreateUser(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.USER.CREATE);
 }
@@ -419,6 +645,9 @@ export function canDeleteUser(user: AuthenticatedUser, targetUser: UserIdentity)
   if (targetUser.id === user.id) {
     return false;
   }
+
+  // 운영 계정(ADMIN·MANAGER)은 삭제 경로로 다루지 않는다 — 역할 변경이나 활성 토글로 한다(결정 D11).
+  if (isDeletionProtectedAccount(targetRoleNames(targetUser))) return false;
 
   if (isAdmin) return true;
   if (targetHasRole(targetUser, 'ADMIN') || !hasDelete) return false;
@@ -538,6 +767,9 @@ export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIde
   if (targetUser.id === user.id) {
     throw new ForbiddenError('자기 자신을 삭제할 수 없습니다.');
   }
+  if (isDeletionProtectedAccount(targetRoleNames(targetUser))) {
+    throw new ForbiddenError(DELETION_PROTECTED_ACCOUNT_MESSAGE);
+  }
   if (!canDeleteUser(user, targetUser)) {
     throw new ForbiddenError('사용자 삭제 권한이 없습니다.');
   }
@@ -546,8 +778,6 @@ export function ensureCanDeleteUser(user: AuthenticatedUser, targetUser: UserIde
 // ============================================================================
 // Role 권한 함수
 // ============================================================================
-
-const RESERVED_ROLE_NAMES = ['ADMIN', 'USER', 'GUEST'];
 
 export function canCreateRole(user: AuthenticatedUser): boolean {
   return user.roles?.includes('ADMIN') || hasPermissionFlag(user, PERMISSIONS.ROLE.CREATE);
@@ -559,7 +789,7 @@ export function canReadRole(user: AuthenticatedUser): boolean {
 
 export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
   // ADMIN 역할은 수정 불가 (시스템 보호)
-  if (role.name === 'ADMIN') {
+  if (isImmutableRole(role.name)) {
     return false;
   }
 
@@ -567,8 +797,8 @@ export function canUpdateRole(user: AuthenticatedUser, role: Role): boolean {
 }
 
 export function canDeleteRole(user: AuthenticatedUser, role: Role): boolean {
-  // 시스템 역할은 삭제 불가
-  if (RESERVED_ROLE_NAMES.includes(role.name)) {
+  // 기본 역할은 삭제 불가 — 이름이 곧 인가의 열쇠다(헌법 §1.4, role-rules.ts)
+  if (isCanonicalRole(role.name)) {
     return false;
   }
 
@@ -599,7 +829,7 @@ export function ensureCanReadRole(user: AuthenticatedUser): void {
 }
 
 export function ensureCanUpdateRole(user: AuthenticatedUser, role: Role): void {
-  if (role.name === 'ADMIN') {
+  if (isImmutableRole(role.name)) {
     throw new ForbiddenError('ADMIN 역할은 수정할 수 없습니다.');
   }
   if (!canUpdateRole(user, role)) {
@@ -608,8 +838,8 @@ export function ensureCanUpdateRole(user: AuthenticatedUser, role: Role): void {
 }
 
 export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
-  if (RESERVED_ROLE_NAMES.includes(role.name)) {
-    throw new ForbiddenError('시스템 역할은 삭제할 수 없습니다.');
+  if (isCanonicalRole(role.name)) {
+    throw new ForbiddenError('기본 역할은 삭제할 수 없습니다.');
   }
   if (!canDeleteRole(user, role)) {
     throw new ForbiddenError('역할 삭제 권한이 없습니다.');
@@ -617,19 +847,28 @@ export function ensureCanDeleteRole(user: AuthenticatedUser, role: Role): void {
 }
 
 /**
- * 역할 이름 변경이 시스템 역할을 사칭하지 못하게 한다.
+ * 역할 이름이 기본 역할과 부딪히지 않게 한다 — 생성과 개명 모두(헌법 §1.4).
  *
- * `ensureCanUpdateRole` 은 **대상 역할이 ADMIN 인지**만 봤다. 그래서 ROLE:UPDATE 보유자가
- * 평범한 커스텀 역할의 이름을 'ADMIN' 으로 바꾸면, 코드베이스 전역의
- * `roles.includes('ADMIN')` 검사가 전부 통과한다(감사 3.11).
+ *  - 기본 역할 자신은 이름을 바꿀 수 없다. 세션·정책·메뉴·알림이 이름으로 판정하므로 개명은 표시 변경이
+ *    아니라 그 역할 사용자 전원의 인가 해제다. 부팅 시드는 이름으로 역할을 찾으므로 빈 기본 역할을 또 만든다.
+ *  - 다른 역할은 기본 역할 이름(대소문자 무시)을 가질 수 없다. 예전에는 ROLE:UPDATE 보유자가 커스텀 역할을
+ *    'ADMIN' 으로 바꾸면 전역 `roles.includes('ADMIN')` 이 통과했다(감사 3.11). 'MANAGER'·'ENGINEER' 도
+ *    같다 — 그 역할 사용자가 내부 사용자로 판정돼 전 고객사 SR 이 열린다. 그래서 ADMIN 도 예외가 아니다.
+ *
+ * 수정 폼은 이름을 고치지 않아도 늘 보내므로, 지금 이름과 같으면 검사하지 않는다(설명만 고치는 경우).
  */
-export function ensureRoleNameNotReserved(user: AuthenticatedUser, nextName?: string): void {
-  if (!nextName) return;
-  const isAdmin = user.roles?.includes('ADMIN') ?? false;
-  if (isAdmin) return;
+export function ensureRoleNameAllowed(
+  nextName: string | undefined,
+  current?: Pick<Role, 'name'>
+): void {
+  if (nextName === undefined) return;
+  if (current && nextName === current.name) return;
 
-  if (RESERVED_ROLE_NAMES.some((name) => name.toLowerCase() === nextName.trim().toLowerCase())) {
-    throw new ForbiddenError(`시스템 역할 이름(${nextName})으로 변경할 수 없습니다.`);
+  if (current && isCanonicalRole(current.name)) {
+    throw new ForbiddenError(`기본 역할(${current.name})의 이름은 바꿀 수 없습니다.`);
+  }
+  if (isReservedRoleName(nextName)) {
+    throw new ForbiddenError(`기본 역할 이름(${nextName.trim()})은 쓸 수 없습니다.`);
   }
 }
 
@@ -718,6 +957,156 @@ export function resolveAssigneeScope(user: AuthenticatedUser): string | undefine
   if (user.roles?.includes('ENGINEER')) return user.id;
 
   return undefined;
+}
+
+/**
+ * 사용자에게 역할을 직접 부여할 수 있는가 — ADMIN 또는 ROLE:ASSIGN(소유자 결정 2026-09-18 D5: 기본은 ADMIN
+ * 전용이고, ROLE:ASSIGN 은 ADMIN 이 커스텀 역할에 위임할 때만 쓴다). 대상·부여 범위(자기 자신·ADMIN 역할·
+ * 보유하지 않은 권한)는 ensureCanAssignRolesToUser 가 따로 판정한다.
+ */
+export function ensureCanAssignRoles(user: AuthenticatedUser): void {
+  if (!hasEffectivePermission(user, PERMISSIONS.ROLE.ASSIGN)) {
+    throw new ForbiddenError('역할을 할당할 권한이 없습니다.');
+  }
+}
+
+/** 사용자의 고객사 소속을 배정·변경·해제할 수 있는가 — 운영 관리자(ADMIN·MANAGER). */
+export function canManageUserClientAssignment(user: AuthenticatedUser): boolean {
+  return user.roles?.some((role) => role === 'ADMIN' || role === 'MANAGER') ?? false;
+}
+
+/**
+ * 고객사 소속 가입 신청을 승인·거절할 수 있는가.
+ * - 운영 관리자(ADMIN·MANAGER): 모든 고객사
+ * - 그 고객사의 CLIENT_ADMIN: 자기가 **승인된** 소속을 가진 고객사만(세션 clientIds 는 승인된 소속만 담는다)
+ */
+export function canApproveMembership(user: AuthenticatedUser, clientId: string): boolean {
+  if (canManageUserClientAssignment(user)) return true;
+  return (
+    (user.roles?.includes('CLIENT_ADMIN') ?? false) && (user.clientIds ?? []).includes(clientId)
+  );
+}
+
+export function ensureCanApproveMembership(user: AuthenticatedUser, clientId: string): void {
+  if (!canApproveMembership(user, clientId)) {
+    throw new ForbiddenError('이 고객사 소속을 승인/거절할 권한이 없습니다.');
+  }
+}
+
+/**
+ * SR 목록을 CSV 로 내보낼 수 있는가 — 내부 사용자만. 내보내는 범위는 목록·상세와 같은 담당자 스코프
+ * (resolveAssigneeScope — ENGINEER 는 자기 배정분)를 따른다.
+ */
+export function canExportSRs(user: AuthenticatedUser): boolean {
+  return isInternalUser(user);
+}
+
+/**
+ * SR 을 접수(트리아지)할 수 있는가 — ADMIN·MANAGER, 또는 SR:INTAKE 를 받은 커스텀 역할.
+ *
+ * 소유자 결정(2026-09-18): 접수·담당자 배정은 운영 관리자의 공용 큐 업무다(헌법 §1.1·§4, PRD 배정 ❌).
+ * 예전에는 접수 API 가 내부 역할 전원(ENGINEER 포함)에게 열려 있어서, 화면에는 접수 버튼이 없는
+ * ENGINEER 가 API 로 미배정 SR 을 접수하며 담당자를 아무나(자기 포함) 지정할 수 있었다.
+ * 시드 ENGINEER 의 SR:INTAKE 도 같은 결정으로 회수했다(마이그레이션 20260918120000).
+ */
+export function canIntakeSR(user: AuthenticatedUser): boolean {
+  // 판정 본문은 화면과 같이 쓰는 sr-state-machine.canViewerIntakeSR 다.
+  return canViewerIntakeSR(user);
+}
+
+export function ensureCanIntakeSR(user: AuthenticatedUser): void {
+  if (!canIntakeSR(user)) {
+    throw new ForbiddenError(
+      'SR 접수 권한이 없습니다. 접수는 운영 관리자(ADMIN·MANAGER)가 합니다.'
+    );
+  }
+}
+
+/**
+ * SR 의 담당자를 배정·변경할 수 있는가 — ADMIN·MANAGER, 또는 SR:ASSIGN 을 받은 커스텀 역할.
+ *
+ * 소유자 결정(2026-09-18, D1). 예전에는 일반 수정 경로(updateSR)에서 배정된 ENGINEER 도 담당자를
+ * 바꿀 수 있었다 — 자기 배정분을 다른 엔지니어에게 넘기는 것이 운영 관리자 모르게 가능했다.
+ */
+export function canAssignSR(user: AuthenticatedUser): boolean {
+  return canViewerAssignSR(user);
+}
+
+/**
+ * 이미 다른 사람에게 배정된 SR 을 접수(담당자 재지정)로 가져갈 수 있는가.
+ *
+ * 헌법 §1.1: ENGINEER 는 "타 엔지니어에게 할당된 SR은 임의로 변경할 수 없다". 접수 POST 는 담당자를
+ * 새로 지정하므로(assigneeId 필수), 이 검사가 없으면 담당자 스코프 사용자가 남에게 배정된 SR 을
+ * 가로채고 그 본문까지 읽게 된다. 판정은 목록·상세와 같은 담당자 스코프(resolveAssigneeScope)를
+ * 쓴다 — 담당자 스코프가 걸린 사용자는 자기 배정분만, 스코프가 없는 사용자는 재배정할 수 있다.
+ *
+ * "스코프가 없는 사용자" 는 ADMIN·MANAGER 만이 아니다. resolveAssigneeScope 는 ENGINEER 에게만
+ * 스코프를 건다. 그래서 다음도 여기서는 통과한다:
+ *  - ENGINEER 와 ADMIN, 또는 ENGINEER 와 MANAGER(+SR:READ) 를 함께 가진 사용자(상위 역할이 이긴다).
+ *  - SR:READ 가 없는 MANAGER.
+ *  - SR:INTAKE 를 받은 외부 커스텀 역할 — 테넌트 검사(자기 고객사 SR 만)는 라우트가 따로 한다.
+ * 이 사용자들이 남의 배정분을 재배정해도 되는지, 미배정 SR 을 누가 접수할 수 있는지는 여기서
+ * 정하지 않는다(정책 미결 — 역할·권한 게이트가 판정한다).
+ */
+export function canIntakeAssignedSR(
+  user: AuthenticatedUser,
+  sr: { assigneeId: string | null }
+): boolean {
+  if (!sr.assigneeId) return true;
+  const scope = resolveAssigneeScope(user);
+  return scope === undefined || scope === sr.assigneeId;
+}
+
+export function ensureCanIntakeAssignedSR(
+  user: AuthenticatedUser,
+  sr: { assigneeId: string | null }
+): void {
+  if (!canIntakeAssignedSR(user, sr)) {
+    throw new ForbiddenError('다른 담당자에게 배정된 SR은 접수할 수 없습니다.');
+  }
+}
+
+/**
+ * 고객사 화면(상세의 최근 SR·SR 건수, 목록의 SR 건수)에 거는 **담당자 스코프**.
+ *
+ * 헌법 §1.2: ENGINEER 는 고객사 명부·서비스 카테고리는 전체를 보지만 "SR 본문·고객사 사용자
+ * 정보·SR 통계는 자신에게 배정된 범위로 제한" 된다. 예전에는 고객사 상세·목록이 ENGINEER 에게 전
+ * 고객사의 최근 SR(번호·제목·상태)과 SR 건수를 보여 줬다. 목록·상세와 같은 resolveAssigneeScope 를 쓴다.
+ * 고객사 경계 자체는 canReadClient 가 판정하므로 여기서는 담당자 축만 더한다.
+ */
+/**
+ * SR 목록·건수 조회의 기본 스코프 — 보는 사람이 볼 수 있는 SR 만.
+ *  - 외부 사용자: 소속(승인된) 고객사의 SR 만. 소속이 없으면 아무것도 보지 않는다(빈 IN).
+ *  - 담당자 스코프 사용자(ENGINEER): 자기 배정분만(resolveAssigneeScope).
+ *  - 그 외 내부 사용자: 제한 없음.
+ *
+ * 헌법 §1.2: 스코프는 선택 인자로 두지 않는다. 예전에는 srService.getAllSRs/countSRs 가 스코프를 호출부의
+ * `where` 에 맡겨서, 호출부가 빠뜨리면 전 테넌트가 반환됐다. 이제 두 함수가 필수 인자인 viewer 로부터 이
+ * 스코프를 직접 건다(호출부의 where 는 그 위에 AND 로 더해질 뿐이다).
+ */
+export function srViewerScopeWhere(user: AuthenticatedUser): Prisma.SRWhereInput {
+  if (!isInternalUser(user)) return { clientId: { in: user.clientIds ?? [] } };
+  const assigneeId = resolveAssigneeScope(user);
+  return assigneeId ? { assigneeId } : {};
+}
+
+export function clientSrScopeWhere(user: AuthenticatedUser): Prisma.SRWhereInput {
+  const assigneeId = resolveAssigneeScope(user);
+  return assigneeId ? { assigneeId } : {};
+}
+
+/**
+ * 고객사 상세에 소속 사용자 명부(이름·이메일·역할)를 실을 수 있는가.
+ *
+ * 헌법 §1.2 의 "고객사 사용자 정보는 배정 범위로 제한" 에 따라 담당자 스코프 사용자(ENGINEER)에게는
+ * 싣지 않는다. 사용자 목록 메뉴를 ENGINEER 에게 숨긴 것(USER:READ 없음)과 같은 취지인데, 고객사
+ * 상세·조직도 경로로는 같은 명부가 그대로 나가고 있었다.
+ *
+ * ⚠️ 외부 사용자(CLIENT_ADMIN·CLIENT_USER)는 지금 자사 명부를 받는다(스코프 없음 → true). PRD 권한표는
+ * CLIENT_USER 에게 고객사 조회 ❌·사용자 조회는 본인만으로 적고 있어 이 부분은 정책 미결이다.
+ */
+export function canViewClientRoster(user: AuthenticatedUser): boolean {
+  return resolveAssigneeScope(user) === undefined;
 }
 
 /**

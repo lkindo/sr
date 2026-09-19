@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, MessageSquare, Send } from 'lucide-react';
+import { Loader2, Lock, MessageSquare, Send } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
+import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { Checkbox } from '@/components/ui';
+import { Label } from '@/components/ui';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui';
 import { Textarea } from '@/components/ui';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useSRCommentsInfinite } from '@/hooks/use-sr-infinite';
 import { useToast } from '@/hooks/use-toast';
 import { apiPost } from '@/lib/api-client';
@@ -20,7 +24,12 @@ interface SRCommentsProps {
 
 export function SRComments({ srId }: SRCommentsProps) {
   const [newComment, setNewComment] = useState('');
+  const [isInternal, setIsInternal] = useState(false);
   const { toast } = useToast();
+  // 내부 노트는 내부 사용자만 쓴다(서버: policies.canWriteInternalNote). 외부 사용자에게는 토글을 보이지
+  // 않고, 서버도 외부 사용자가 보낸 값을 공개로 강제한다.
+  const { hasAnyRole } = usePermissions();
+  const canWriteInternalNote = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   const queryClient = useQueryClient();
   const router = useRouter();
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -59,19 +68,20 @@ export function SRComments({ srId }: SRCommentsProps) {
    *    입력창과 버튼이 계속 잠긴다 — 사용자가 보던 것보다 느려진다.
    */
   const { mutate: addComment, isPending: submitting } = useMutation({
-    mutationFn: (content: string) =>
+    mutationFn: ({ content, internal }: { content: string; internal: boolean }) =>
       apiPost(
         `/api/srs/${srId}/comments`,
-        { content },
+        { content, isInternal: internal },
         // 서버가 메시지를 주지 않을 때의 문구. 기존 `error.error || ...` 와 같은 값이다.
         { fallbackMessage: 'Failed to create comment' }
       ),
-    onSuccess: () => {
+    onSuccess: (_data, { internal }) => {
       setNewComment('');
+      setIsInternal(false);
 
       toast({
         title: '성공',
-        description: '댓글이 추가되었습니다.',
+        description: internal ? '내부 노트가 추가되었습니다.' : '댓글이 추가되었습니다.',
       });
 
       // React Query 캐시 무효화 및 서버 컴포넌트 갱신 (비동기로 실행)
@@ -103,7 +113,7 @@ export function SRComments({ srId }: SRCommentsProps) {
     }
 
     // 서버로는 trim 하지 않은 원문을 보낸다(기존 동작). 비었는지 판정에만 trim 을 쓴다.
-    addComment(newComment);
+    addComment({ content: newComment, internal: canWriteInternalNote && isInternal });
   };
 
   const getInitials = (name: string) => {
@@ -158,14 +168,27 @@ export function SRComments({ srId }: SRCommentsProps) {
               disabled={submitting}
               className="resize-none w-full"
             />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-4">
+              {canWriteInternalNote && (
+                <div className="flex items-center gap-2 mr-auto">
+                  <Checkbox
+                    id="sr-comment-internal"
+                    checked={isInternal}
+                    onCheckedChange={(checked) => setIsInternal(checked === true)}
+                    disabled={submitting}
+                  />
+                  <Label htmlFor="sr-comment-internal" className="text-sm font-normal">
+                    내부 노트(고객에게 보이지 않음)
+                  </Label>
+                </div>
+              )}
               <Button type="submit" disabled={submitting} size="sm">
                 {submitting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
                 )}
-                {submitting ? '추가 중...' : '댓글 추가'}
+                {submitting ? '추가 중...' : isInternal ? '내부 노트 추가' : '댓글 추가'}
               </Button>
             </div>
           </form>
@@ -201,6 +224,12 @@ export function SRComments({ srId }: SRCommentsProps) {
                         <span className="text-xs text-muted-foreground">
                           {new Date(comment.createdAt).toLocaleString('ko-KR')}
                         </span>
+                        {comment.isInternal && (
+                          <Badge variant="secondary" className="h-5 gap-1 px-1.5 text-[10px]">
+                            <Lock className="h-3 w-3" aria-hidden="true" />
+                            내부 노트
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
                     </div>

@@ -344,13 +344,20 @@ components:
 
 > **이 문서는 Framer 마케팅 사이트를 분석한 원본이다.** SR 관리 앱의 화면 명세가 아니다.
 >
-> 그럼에도 **디자인 토큰의 정본은 이 문서다**(fe-rules §3). 앱이 실제로 채택한 것은
+> 그럼에도 **색상 팔레트의 정본은 이 문서다**(fe-rules §0). 앱이 실제로 채택한 것은
 > 아래 범위이며, 구현 진입점은 `src/app/globals.css` 의 CSS 변수와 `tailwind.config.ts` 다.
 >
 > **채택한 것**
-> - `colors` 팔레트 — 특히 canvas `#090909`, ink `#ffffff` (다크 캔버스 체계)
-> - `rounded` · `spacing` · `typography` 스케일
-> - `status-badge` · `text-input` 계열 토큰
+> - `colors` 팔레트 — 특히 canvas `#090909`, ink `#ffffff` (다크 캔버스 체계)와 semantic 상태색
+>
+> **참고로만 두는 것**(2026-09-18 소유자 결정 D16 — 적용된 적이 없고, 치수의 정본은 fe-rules §3 과 그 구현이다)
+> - `rounded` · `spacing` · `typography` 스케일 — 앱은 8px(컨트롤)/12px(카드)/알약 반경, Tailwind 4px 간격,
+>   Tailwind 기본 글자 크기를 쓴다.
+> - `status-badge` · `text-input` 토큰 — 배지는 알약형 `Badge`(variant 정본 `src/lib/constants/sr.ts`), 입력란은
+>   `bg-transparent`·8px 다. 아래 status-badge 목록에는 CONFIRMED(확인완료)가 없고 INTAKE·IN_PROGRESS 가 같은
+>   파랑의 명도 차뿐이라 그대로 옮기지 않았다. 앱의 상태 의미색은 D16 2단계에서 소유자가 고른 시안 A 이며, 정의는
+>   fe-rules §3.4 와 `globals.css` 의 `--status-*` 토큰에 있다(요청됨 테두리·접수 회색·진행중 파랑·보류 노랑·
+>   완료 초록·확인완료 초록+체크·거절 빨강). 상태 의미색은 아래 "크로마틱 액센트는 하나" 원칙의 예외다.
 >
 > **채택하지 않은 것 (마케팅 사이트 전용 어휘)**
 > - `pricing-*`, `template-card`, `product-mockup-tile`

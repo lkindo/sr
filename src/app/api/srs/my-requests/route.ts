@@ -3,6 +3,7 @@ import { Prisma, SRStatus } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { usePagination } from '@/lib/pagination';
+import { visibleCommentsWhere } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
@@ -105,7 +106,8 @@ export const GET = withAuthAndRateLimit(
           },
           _count: {
             select: {
-              comments: true,
+              // 요청자가 내부 사용자일 수도 있다(MANAGER 가 직접 등록한 SR) — 역할로 판정한다.
+              comments: { where: visibleCommentsWhere(session.user) },
               attachments: true,
             },
           },

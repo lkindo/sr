@@ -2,28 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
-import { ForbiddenError, NotFoundError } from '@/lib/errors';
+import { NotFoundError } from '@/lib/errors';
+import { ensureCanApproveMembership } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { auditService } from '@/services/audit.service';
 
-/**
- * 승인 권한 판정.
- * - 시스템 운영자(ADMIN/MANAGER): 모든 고객사 소속 승인/거절 가능
- * - 해당 고객사의 CLIENT_ADMIN: 본인이 "승인된" 소속을 가진 고객사에 한해 승인/거절 가능
- *   (actor.clientIds 는 auth.ts 에서 이미 APPROVED 소속만 담고 있으므로 그대로 신뢰 가능)
- */
-function ensureCanApproveMembership(
-  actor: { roles: string[]; clientIds: string[] },
-  clientId: string
-): void {
-  const isSystemApprover = actor.roles.includes('ADMIN') || actor.roles.includes('MANAGER');
-  const isClientAdminOfSameClient =
-    actor.roles.includes('CLIENT_ADMIN') && actor.clientIds.includes(clientId);
-
-  if (!isSystemApprover && !isClientAdminOfSameClient) {
-    throw new ForbiddenError('이 고객사 소속을 승인/거절할 권한이 없습니다.');
-  }
-}
+// 승인 권한 판정은 policies.ensureCanApproveMembership — 운영 관리자는 모든 고객사, CLIENT_ADMIN 은
+// 자기가 승인된 소속을 가진 고객사만(세션 clientIds 는 auth.ts 가 APPROVED 소속만 담는다).
 
 // POST /api/users/[id]/client/approve - 셀프 회원가입으로 생성된 PENDING 소속 승인
 export const POST = withAuthAndRateLimit(

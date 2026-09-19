@@ -42,6 +42,23 @@ export const getUserTypeBadgeVariant = (typeLabel: string) => {
   }
 };
 
+/**
+ * 승인 화면에서 '이메일 미인증' 을 보일 계정인가(2026-09-18 소유자 결정 D13 B+).
+ * 가입 승인을 기다리는 계정(비활성이거나 승인 대기 소속이 있음) 가운데 가입 확인 링크를 열지 않은 계정이다.
+ * 관리자가 만든 계정은 확인 메일을 받지 않으므로, 활성이고 대기 소속이 없으면 보이지 않는다.
+ * 응답에 인증 필드가 없으면(`undefined`) 판단하지 않는다.
+ */
+export function showsEmailUnverified(user: {
+  emailVerified?: string | Date | null;
+  isActive: boolean;
+  clients?: ReadonlyArray<{ status?: string }>;
+}): boolean {
+  if (user.emailVerified !== null) return false;
+  const awaitingApproval =
+    !user.isActive || (user.clients ?? []).some((link) => link.status === 'PENDING');
+  return awaitingApproval;
+}
+
 // 비밀번호 제외 헬퍼 함수
 export function excludePassword<T extends { password: string }>(user: T): Omit<T, 'password'> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

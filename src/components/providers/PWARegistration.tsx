@@ -133,7 +133,9 @@ export function PWARegistration() {
 
   return (
     <div className="fixed bottom-4 right-4 z-[100] w-auto max-w-xs">
-      <div className="bg-[hsl(var(--sr-primary-dark))] p-3 rounded-lg shadow-2xl border border-[#3f4564] text-white animate-in slide-in-from-bottom-5 duration-500">
+      {/* 배경·전경 짝을 토큰으로 맞춘다. 예전에는 흰색인 --sr-primary-dark(이름과 달리 Ink) 배경에 흰 글씨라
+          제목 '앱으로 설치' 가 보이지 않았다. */}
+      <div className="bg-card p-3 rounded-lg shadow-2xl border border-border text-card-foreground animate-in slide-in-from-bottom-5 duration-500">
         <div className="flex items-center gap-3">
           <div className="bg-[hsl(var(--sr-accent-orange))] p-2 rounded-md shrink-0">
             <Download className="h-4 w-4" />
@@ -142,11 +144,7 @@ export function PWARegistration() {
             <p className="text-sm font-bold">앱으로 설치</p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              size="sm"
-              className="bg-card text-[hsl(var(--sr-primary-dark))] hover:bg-muted h-7 px-2 text-xs"
-              onClick={handleInstallClick}
-            >
+            <Button size="sm" className="h-7 px-2 text-xs" onClick={handleInstallClick}>
               설치
             </Button>
             <button

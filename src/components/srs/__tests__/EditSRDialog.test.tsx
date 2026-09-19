@@ -11,6 +11,7 @@ import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
+import { SR_CONTENT_LOCKED_MESSAGE } from '@/lib/sr-state-machine';
 
 import { EditSRDialog } from '../EditSRDialog';
 
@@ -165,6 +166,8 @@ describe('EditSRDialog Component', () => {
     (useSession as any).mockReturnValue({ data: { user: { id: 'user-1', roles: ['ADMIN'] } } });
     (usePermissions as any).mockReturnValue({
       hasAnyRole: vi.fn().mockReturnValue(true),
+      roles: ['ADMIN'],
+      permissions: [],
     });
     (useRouter as any).mockReturnValue({ push: mockPush, refresh: mockRefresh });
     (useQueryClient as any).mockReturnValue({ invalidateQueries: mockInvalidateQueries });
@@ -268,9 +271,13 @@ describe('EditSRDialog Component', () => {
     }
   });
 
-  it('restricts edit for non-admin users if status is not REQUESTED', async () => {
+  // 접수 이후 SR 내용은 운영자만 고친다(소유자 결정, 2026-09-18 — policies.ensureCanEditSRContent 와
+  // 같은 판정 함수 sr-state-machine.canEditSRContentAt). 외부 사용자는 댓글로 요청한다.
+  it('접수 이후에는 외부 사용자의 수정을 막고 서버와 같은 문구로 안내한다', async () => {
     (usePermissions as any).mockReturnValue({
-      hasAnyRole: vi.fn().mockImplementation((roles) => (roles.includes('ADMIN') ? false : true)),
+      hasAnyRole: vi.fn().mockImplementation((roles) => roles.includes('CLIENT_USER')),
+      roles: ['CLIENT_USER'],
+      permissions: ['SR:UPDATE_SELF'],
     });
 
     const inProgressSR = { ...mockSR, status: 'IN_PROGRESS' };
@@ -278,12 +285,59 @@ describe('EditSRDialog Component', () => {
 
     await waitFor(
       () => {
-        expect(mockToast).toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({ description: SR_CONTENT_LOCKED_MESSAGE })
+        );
         expect(mockOnOpenChange).toHaveBeenCalledWith(false);
       },
       { timeout: 5000 }
     );
   });
+
+  it('접수 이후에도 운영자(MANAGER)는 수정 다이얼로그를 쓸 수 있다', async () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasAnyRole: vi.fn().mockImplementation((roles: string[]) => roles.includes('MANAGER')),
+      roles: ['MANAGER'],
+      permissions: ['SR:UPDATE', 'SR:ASSIGN'],
+    } as never);
+
+    const inProgressSR = { ...mockSR, status: 'IN_PROGRESS' };
+    render(<EditSRDialog {...defaultProps} sr={inProgressSR as never} />);
+
+    expect(
+      await screen.findByDisplayValue('Existing SR Title', {}, { timeout: 5000 })
+    ).toBeInTheDocument();
+    expect(mockOnOpenChange).not.toHaveBeenCalledWith(false);
+  });
+  // 서비스 카테고리는 SLA 산정 근거라 운영자 소유 값이다(접수 전에도). 외부 사용자는 바꿀 수 없으므로
+  // 선택지를 잠그고 이유를 적는다 — 예전에는 열려 있어서 바꾸고 저장하면 반드시 403 이었다.
+  it('외부 사용자에게는 서비스 카테고리 변경을 잠그고 이유를 보인다', async () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasAnyRole: vi.fn().mockImplementation((roles: string[]) => roles.includes('CLIENT_USER')),
+      roles: ['CLIENT_USER'],
+      permissions: ['SR:UPDATE_SELF'],
+    } as never);
+
+    render(<EditSRDialog {...defaultProps} />);
+
+    expect(
+      await screen.findByText(
+        '서비스 카테고리 변경은 담당자에게 요청하세요.',
+        {},
+        { timeout: 5000 }
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('운영자에게는 카테고리 변경 안내를 보이지 않는다', async () => {
+    render(<EditSRDialog {...defaultProps} />);
+
+    await screen.findByDisplayValue('Existing SR Title', {}, { timeout: 5000 });
+    expect(
+      screen.queryByText('서비스 카테고리 변경은 담당자에게 요청하세요.')
+    ).not.toBeInTheDocument();
+  });
+
   it('submits form successfully', async () => {
     mockUpdateMutateAsync.mockResolvedValue({ success: true });
     render(<EditSRDialog {...defaultProps} />);

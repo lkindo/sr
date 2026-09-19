@@ -22,6 +22,7 @@ import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { UserDialog } from '@/components/users/UserDialog';
 import { useDebounce } from '@/hooks/use-debounce';
+import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import {
   ApiError,
@@ -35,10 +36,12 @@ import { qk } from '@/lib/query-keys';
 
 /**
  * `/api/clients/[id]` 응답. 목록 봉투를 쓰지 않는 예외 라우트라 bare object 다.
- * 이 화면은 그중 `users` 만 쓴다.
+ * 이 화면은 그중 `users` 와 `viewerScope` 만 쓴다.
  */
 interface ClientDetail {
   users?: User[];
+  /** 'assigned' 면 담당 엔지니어라 서버가 명부를 싣지 않았다(헌법 §1.2). */
+  viewerScope?: 'assigned' | 'all';
 }
 
 /** `/api/users/[id]/client` 응답 본문. 성공 본문과 409 에러 본문이 같은 모양이다. */
@@ -99,6 +102,11 @@ export default function OrganizationPage() {
   const [showWarning, setShowWarning] = useState(false);
 
   const { toast } = useToast();
+  // 서버(policies.canCreateClient / canCreateUser)와 같은 규칙: ADMIN 이거나 CLIENT:CREATE / USER:CREATE.
+  // 예전에는 누구에게나 보여서 MANAGER·ENGINEER 가 누르면 반드시 403 이었다(시드상 둘 다 없다).
+  const { hasPermission, isAdmin } = usePermissions();
+  const canAddClient = isAdmin() || hasPermission('CLIENT', 'CREATE');
+  const canAddUser = isAdmin() || hasPermission('USER', 'CREATE');
   const queryClient = useQueryClient();
 
   /**
@@ -162,7 +170,7 @@ export default function OrganizationPage() {
    * 실패는 토스트로 알린다(예전 catch 의 계약). `retry: false` 인 이유는 예전에도 요청이
    * 정확히 한 번이었기 때문이다.
    */
-  const { clientUsers, failedClientIds } = useQueries({
+  const { clientUsers, failedClientIds, rosterHidden } = useQueries({
     queries: clientIds.map((clientId) => ({
       queryKey: qk.clients.users(clientId),
       // ⚠️ 이 라우트는 bare object 를 준다. 봉투를 벗기는 apiList 가 아니라 apiGet 이다.
@@ -175,13 +183,15 @@ export default function OrganizationPage() {
     combine: (results) => {
       const dict: Record<string, User[]> = {};
       const failed: string[] = [];
+      let hidden = false;
       results.forEach((result, index) => {
         const clientId = clientIds[index]!;
         // 아직 안 왔거나 실패한 행은 키를 만들지 않는다 — 트리가 그걸 '로딩 중' 으로 읽는다.
         if (result.data) dict[clientId] = result.data.users ?? [];
         if (result.isError) failed.push(clientId);
+        if (result.data?.viewerScope === 'assigned') hidden = true;
       });
-      return { clientUsers: dict, failedClientIds: failed };
+      return { clientUsers: dict, failedClientIds: failed, rosterHidden: hidden };
     },
   });
 
@@ -536,10 +546,12 @@ export default function OrganizationPage() {
           </p>
         </div>
         <div className="flex justify-start sm:justify-end shrink-0">
-          <Button onClick={handleAddClient} className="sr-btn-template-primary w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            고객사 추가
-          </Button>
+          {canAddClient && (
+            <Button onClick={handleAddClient} className="sr-btn-template-primary w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              고객사 추가
+            </Button>
+          )}
         </div>
       </div>
 
@@ -605,13 +617,14 @@ export default function OrganizationPage() {
             expandedClients={expandedClients}
             clientUsers={clientUsers}
             onToggleClient={toggleClient}
-            onAddUser={handleAddUser}
+            onAddUser={canAddUser ? handleAddUser : undefined}
             onToggleClientStatus={handleToggleClientStatus}
             onToggleUserStatus={handleToggleUserStatus}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             searchQuery={debouncedSearchQuery}
+            rosterHidden={rosterHidden}
           />
         </div>
       </div>

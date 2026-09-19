@@ -135,11 +135,12 @@ grep 'public key' /home/opc/sr/var/backup-age.key
 # 위 2-2 에서 출력된 age1... 공개키를 그대로 넣는다
 gh secret set BACKUP_ENCRYPT_RECIPIENT --repo lkindo/sr --body 'age1...'
 
-# 복구 리허설이 복호화할 수 있도록 개인키 "경로" 를 알려준다(키 자체가 아니라 경로다)
-gh secret set BACKUP_AGE_IDENTITY_FILE --repo lkindo/sr --body '/home/opc/sr/var/backup-age.key'
-
 gh secret list --repo lkindo/sr | grep BACKUP
 ```
+
+복구 리허설이 쓰는 개인키 **경로**(`BACKUP_AGE_IDENTITY_FILE=/home/opc/sr/var/backup-age.key`)는
+시크릿으로 등록하지 않는다. 키가 아니라 경로라 비밀이 아니고, `restore-rehearsal.yml` 이 값을
+직접 들고 있다(시크릿으로 두면 로그에서 가려져 진단만 어려워진다). 키 파일을 위 경로에 두기만 하면 된다.
 
 ### 2-4. 확인 — 실제로 암호화되는지
 
@@ -213,13 +214,65 @@ docker exec sr-app date
 
 ---
 
+## 5. 배포와 롤백 (정본)
+
+> 배포·롤백 동작의 **정본은 이 절**이다(실제 동작은 `.github/workflows/deploy.yml`). TRD·LLD·PRD 는
+> 요약과 이 절 링크만 둔다 — 네 문서가 각자 복제하다가 서로 어긋난 적이 있다(2026-09-18 정리).
+
+**이미지 태그.** 빌드는 이동 태그(`main` → `latest`, `dev` → `dev`)와 **커밋 SHA 태그**를 함께
+GHCR 에 민다. 운영 배포는 `.env.prod` 에 `APP_IMAGE_TAG=<SHA>` 를 덧붙여 SHA 이미지로 뜬다
+(`docker-compose.prod.yml` 의 `${APP_IMAGE_TAG:-latest}`).
+
+**공통 전처리.** GitHub Secrets 에서 서버 파일을 매번 새로 쓴다 — 운영 `.env.docker`+`.env.prod`,
+스테이징 `.env.docker.test`+`.env.staging`. 레거시 `.env` 는 쓰지 않는다(`docs/SECRET_ROTATION.md` 4절).
+시크릿이 비었거나 `docker compose ... config -q` 보간이 실패하면 **컨테이너를 건드리기 전에** 중단한다.
+
+**운영(`main`) 순서**
+
+1. nginx 설정을 일회용 컨테이너에서 `nginx -t` 로 검증한다. 실패하면 중단(현재 서비스 유지).
+2. 롤백 지점 기록: 지금 떠 있는 `sr-app` 의 **이미지 ID**(태그가 아니다)를 `.previous-image` 에 남긴다.
+3. 배포 전 백업(`scripts/backup.sh`). 실패하면 중단한다.
+4. 적용된 마이그레이션 수를 센다(`_prisma_migrations`).
+5. `pull` → `up -d --remove-orphans`(nginx·db 는 설정이 바뀐 경우에만 재생성) →
+   `up -d --force-recreate --no-deps app`. **`down` 은 하지 않는다** — 앱 컨테이너만 교체한다.
+   마이그레이션과 기준 데이터 시딩은 컨테이너 기동 시 `docker-entrypoint.sh` 가 한다(`docs/BOOTSTRAP.md` 3절).
+6. 헬스 게이트: `sr-app` 이 240초 안에 `healthy` 가 되기를 기다린다.
+7. Let's Encrypt 발급 스크립트 실행, 갱신 cron 멱등 설치(3절), 7일(`until=168h`)이 지난 이미지와 빌드 캐시 정리.
+
+**자동 롤백 (운영만).** 6에서 healthy 가 되지 않으면:
+
+- 이전 이미지 ID 가 있고 **마이그레이션 수가 배포 전과 같을 때만** 그 이미지에 `:rollback` 태그를
+  붙이고 `APP_IMAGE_TAG=rollback` 으로 앱을 다시 띄운다.
+- 마이그레이션 수가 바뀌었으면 자동 롤백하지 않는다 — 구버전 코드가 새 스키마를 이해하지 못할 수 있다.
+  forward-fix 하거나 3번 백업으로 복구한다(`docs/backup-and-restore.md`).
+- 어느 경우든 배포 잡은 실패로 끝난다. 다음 배포가 다시 새 이미지로 덮어쓰므로 원인을 먼저 고친다.
+
+**수동 롤백.** 이전 커밋 SHA 이미지로 되돌린다(GHCR 에 있거나 서버에 7일 안쪽으로 남아 있어야 한다).
+
+```bash
+cd /home/opc/sr
+sed -i '/^APP_IMAGE_TAG=/d' .env.prod && printf '\nAPP_IMAGE_TAG=%s\n' '<이전 커밋 SHA>' >> .env.prod
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate --no-deps app
+docker inspect -f '{{.State.Health.Status}}' sr-app   # healthy 확인
+```
+
+마이그레이션이 이미 적용된 뒤라면 위 명령만으로는 안전하지 않다(자동 롤백이 건너뛴 이유와 같다).
+배포 전 백업으로 DB 까지 되돌릴지 먼저 판단한다. 다음 배포는 Secrets 로 `.env.prod` 를 다시 쓰므로
+이 수동 변경은 그때 사라진다.
+
+**스테이징(`dev`) 순서.** `pull` → `down --remove-orphans` → 동명 컨테이너 `docker rm -f` →
+`up -d --force-recreate` → `sr-app-test` 헬스 게이트(240초, 실패 시 잡 실패). **자동 롤백은 없다.**
+스테이징은 `down` 을 하므로 배포 중 짧은 중단이 있다.
+
+---
+
 ## 완료 체크리스트
 
 - [ ] uptime-kuma 에 `sr.lkindo.kr/api/health` 모니터 등록 + 알림 채널 연결
 - [ ] uptime-kuma 에 `test.lkindo.kr/api/health` 모니터 등록
 - [ ] 서버에 age 설치
 - [ ] age 키 생성 + **개인키를 비밀번호 관리자에 백업**
-- [ ] `BACKUP_ENCRYPT_RECIPIENT` / `BACKUP_AGE_IDENTITY_FILE` 시크릿 등록
+- [ ] `BACKUP_ENCRYPT_RECIPIENT` 시크릿 등록 (`BACKUP_AGE_IDENTITY_FILE` 은 시크릿이 아니다 — 2-3)
 - [ ] 암호화 백업 1회 실행 확인 (`.age` 생성 + 평문 없음)
 - [ ] 복구 리허설 통과 확인
 - [ ] (배포 후) certbot cron 설치 확인

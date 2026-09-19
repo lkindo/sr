@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   updateMany: vi.fn(),
   txUpdate: vi.fn(),
   assertAssignable: vi.fn(),
+  wasEverCompleted: vi.fn(),
 }));
 
 vi.mock('@/lib/domain-events', () => ({
@@ -57,6 +58,7 @@ vi.mock('@/lib/prisma', () => ({
 
 vi.mock('@/services/sr.service', () => ({
   assertAssignable: mocks.assertAssignable,
+  srService: { wasEverCompleted: mocks.wasEverCompleted },
 }));
 
 vi.mock('@/lib/auth-wrapper', () => ({
@@ -182,6 +184,8 @@ beforeEach(() => {
     return {};
   });
   mocks.rootActivityCreate.mockResolvedValue({});
+  // 기본은 한 번도 완료된 적 없는 SR 이다(D9 대조군은 개별 테스트가 바꾼다).
+  mocks.wasEverCompleted.mockResolvedValue(false);
   mocks.txUpdate.mockImplementation(async () => {
     order.push('sr.update');
     return UPDATED_SR;
@@ -211,13 +215,15 @@ afterEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('POST /api/srs/[id]/intake — 권한 게이트', () => {
-  // hasIntakePermission × hasIntakeRole 네 조합. 라우트는 OR 게이트이므로
-  // 둘 다 없을 때만 403 이어야 한다.
+  // SR:INTAKE 권한 × 운영 관리자 역할(ADMIN·MANAGER) 조합. 라우트는 OR 게이트이므로 둘 다 없을 때만
+  // 403 이어야 한다(policies.canIntakeSR). ENGINEER 는 운영 관리자 역할이 아니다 — 접수·배정은 운영
+  // 관리자 업무다(소유자 결정 2026-09-18). 예전에는 ENGINEER 도 역할만으로 통과했다.
   it.each([
     ['권한 O · 역할 O', ['SR:INTAKE'], ['MANAGER'], 200],
     ['권한 O · 역할 X', ['SR:INTAKE'], ['CLIENT_USER'], 200],
-    ['권한 X · 역할 O', ['SR:READ'], ['ENGINEER'], 200],
+    ['권한 X · 역할 O', ['SR:READ'], ['MANAGER'], 200],
     ['권한 X · 역할 X', ['SR:READ'], ['CLIENT_USER'], 403],
+    ['권한 X · ENGINEER', ['SR:READ', 'SR:UPDATE'], ['ENGINEER'], 403],
   ])('%s → %d', async (_label, permissions, roles, expected) => {
     const response = await post(
       POST_BODY,
@@ -270,6 +276,67 @@ describe('POST /api/srs/[id]/intake — 권한 게이트', () => {
     expect(response.status).toBe(403);
     expect(body.error).toContain('SR 접수 권한이 없습니다');
     expect(mocks.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 이미 다른 사람에게 배정된 SR 을 접수로 가져가기.
+ *
+ * 접수는 담당자를 새로 지정한다(assigneeId 필수). 예전에는 SR 단위 검사가 없어서 담당자
+ * 스코프 사용자(ENGINEER)가 남에게 배정된 SR 을 접수하며 자기를 담당자로 지정하면, 그 SR 을
+ * 가로채고 본문까지 읽게 됐다 — 헌법 §1.1 "타 엔지니어에게 할당된 SR은 임의로 변경할 수 없다".
+ * 미배정 SR 을 ENGINEER 가 접수할 수 있는지는 정책 미결이라 이 테스트는 그 동작을 바꾸지 않는다.
+ */
+describe('POST /api/srs/[id]/intake — 이미 배정된 SR', () => {
+  const ENGINEER = session({
+    id: 'eng-self',
+    roles: ['ENGINEER'],
+    permissions: ['SR:READ', 'SR:UPDATE', 'SR:INTAKE'],
+    clientIds: [],
+  });
+
+  it('담당자 스코프 사용자는 남에게 배정된 SR 을 가져갈 수 없다', async () => {
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, assigneeId: 'eng-other' });
+
+    const response = await post(POST_BODY, ENGINEER);
+
+    expect(response.status).toBe(403);
+    expect(mocks.txUpdate).not.toHaveBeenCalled();
+  });
+
+  it('자기에게 배정된 SR 은 접수할 수 있다', async () => {
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, assigneeId: 'eng-self' });
+
+    expect((await post(POST_BODY, ENGINEER)).status).toBe(200);
+  });
+
+  it('운영 관리자는 남에게 배정된 SR 도 접수하며 재배정할 수 있다', async () => {
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, assigneeId: 'eng-other' });
+
+    expect((await post(POST_BODY, MANAGER)).status).toBe(200);
+  });
+
+  it('미배정 SR 의 접수 범위는 바꾸지 않는다(정책 미결)', async () => {
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, assigneeId: null });
+
+    expect((await post(POST_BODY, ENGINEER)).status).toBe(200);
+  });
+
+  // 배정 검사가 담당자 검증보다 앞서면, 없는 담당자 id 로 보낸 요청이 "남에게 배정됨(403)" 과
+  // "담당자 없음(404)" 으로 갈려 SR 의 배정 여부가 새어 나간다. 담당자 검증이 먼저라 둘 다 404 다.
+  it('없는 담당자 id 로는 SR 의 배정 여부를 떠볼 수 없다', async () => {
+    const { NotFoundError } = await import('@/lib/errors');
+    mocks.assertAssignable.mockRejectedValue(new NotFoundError('담당자'));
+
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, assigneeId: 'eng-other' });
+    const assignedElsewhere = await post(POST_BODY, ENGINEER);
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, assigneeId: null });
+    const unassigned = await post(POST_BODY, ENGINEER);
+
+    expect(assignedElsewhere.status).toBe(404);
+    expect(unassigned.status).toBe(404);
+    expect(await assignedElsewhere.json()).toEqual(await unassigned.json());
+    expect(mocks.txUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -422,6 +489,17 @@ describe('POST /api/srs/[id]/intake — 저장 데이터', () => {
     expect(dueDate).toBeInstanceOf(Date);
     expect(dueDate.getTime()).toBeGreaterThanOrEqual(before + offset);
     expect(dueDate.getTime()).toBeLessThanOrEqual(after + offset);
+  });
+
+  // 접수 전에 운영자가 마감일을 직접 지정해 두었다면(due_date_manual) 접수가 그 값을 SLA 산출로
+  // 덮어쓰지 않는다(헌법 §3, 소유자 결정 2026-09-18 D8).
+  it('수동 지정된 마감일은 접수가 덮어쓰지 않는다', async () => {
+    const manualDue = new Date('2026-09-30T09:00:00.000Z');
+    mocks.findUnique.mockResolvedValue({ ...BASE_SR, dueDate: manualDue, dueDateManual: true });
+
+    await post({ ...POST_BODY, actualPriority: 'CRITICAL' });
+
+    expect(lastUpdateData().dueDate).toEqual(manualDue);
   });
 
   it('상태 변경·담당자 배정 Activity 를 각각 남긴다', async () => {
@@ -787,6 +865,40 @@ describe('PATCH /api/srs/[id]/intake — SLA 재계산', () => {
     expect(lastUpdateData().actualPriority).toBeUndefined();
   });
 
+  // 운영자가 마감일을 직접 지정한 SR(due_date_manual)은 접수 정보 수정의 우선순위 변경이 덮어쓰지
+  // 않는다(헌법 §3). updateSR 경로와 같은 규칙이다 — 두 경로 중 하나만 지키면 다른 쪽으로 덮어써진다.
+  // 한 번 완료된 SR(재오픈되어 진행중)은 최초 마감일을 유지한다(헌법 §2, 2026-09-18 소유자 결정 D9).
+  // 예전에는 재오픈 SR 의 우선순위를 바꾸면 마감일이 조용히 다시 계산돼 위반을 준수로 바꿀 수 있었다.
+  it('한 번 완료된 SR 은 우선순위가 바뀌어도 마감일을 다시 계산하지 않는다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ actualPriority: 'MEDIUM' }));
+    mocks.wasEverCompleted.mockResolvedValue(true);
+
+    await patch({ actualPriority: 'LOW' });
+
+    expect(lastUpdateData().dueDate).toBeUndefined();
+    expect(lastUpdateData().actualPriority).toBe('LOW');
+  });
+
+  it('자동 재산출로 마감일이 바뀌면 활동에 전후 값을 남긴다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ actualPriority: 'MEDIUM' }));
+
+    await patch({ actualPriority: 'CRITICAL' });
+
+    const data = activityData(0);
+    expect(data.description).toContain('마감일:');
+    expect(data.metadata.newValues.dueDate).toBe('2026-08-01T12:00:00.000Z');
+    expect(data.metadata.previousValues).toHaveProperty('dueDate');
+  });
+
+  it('수동 지정된 마감일은 우선순위가 바뀌어도 다시 계산하지 않는다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ actualPriority: 'MEDIUM', dueDateManual: true }));
+
+    await patch({ actualPriority: 'CRITICAL' });
+
+    expect(lastUpdateData().dueDate).toBeUndefined();
+    expect(lastUpdateData().actualPriority).toBe('CRITICAL');
+  });
+
   it('intakeAt 이 없으면 현재 시각을 기준으로 계산한다', async () => {
     mocks.findUnique.mockResolvedValue(patchSR({ intakeAt: null, actualPriority: 'MEDIUM' }));
 
@@ -976,6 +1088,8 @@ describe('PATCH /api/srs/[id]/intake — 변경 이력', () => {
 
     expect(body.changes).toEqual([
       '우선순위: MEDIUM → HIGH',
+      // 우선순위 변경으로 마감일이 다시 계산되면 그 전후 값도 남긴다(D9).
+      expect.stringMatching(/^마감일: .+ → .+$/),
       '예상 작업 시간: 4시간 → 12시간',
       '예상 완료일 변경',
       '접수 메모 수정',
@@ -1029,7 +1143,10 @@ describe('PATCH /api/srs/[id]/intake — 변경 이력', () => {
       type: 'INTAKE_UPDATED',
     });
     expect(activityData(0).metadata.updatedBy).toBe('매니저');
-    expect(activityData(0).metadata.newValues).toEqual({ actualPriority: 'HIGH' });
+    expect(activityData(0).metadata.newValues).toEqual({
+      actualPriority: 'HIGH',
+      dueDate: expect.any(String),
+    });
     expect(mocks.emitRealtime).toHaveBeenCalledWith(
       'sr:updated',
       expect.objectContaining({ id: 'sr-1', actorId: 'mgr-1' })

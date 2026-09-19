@@ -10,9 +10,13 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast }),
 }));
 
+// 보는 사람. 기본은 ADMIN 이고, 역할별 카드 노출은 아래 '접수 대기 카드' 스위트가 바꿔 가며 본다.
+const viewer = vi.hoisted(() => ({ roles: ['ADMIN'] as string[], permissions: [] as string[] }));
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({
-    hasAnyRole: (roles: string[]) => roles.includes('ADMIN'),
+    roles: viewer.roles,
+    permissions: viewer.permissions,
+    hasAnyRole: (roles: string[]) => roles.some((role) => viewer.roles.includes(role)),
     hasRole: () => false,
     hasPermission: () => false,
     hasAnyPermission: () => false,
@@ -31,6 +35,9 @@ const STATS = {
     urgent: 1,
     myAssigned: 0,
     myAssignedInProgress: 0,
+    overdue: 0,
+    overdueOnHold: 0,
+    manualDueOpen: 0,
   },
   byStatus: {},
   byPriority: {},
@@ -71,6 +78,8 @@ function setup() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  viewer.roles = ['ADMIN'];
+  viewer.permissions = [];
 });
 
 afterEach(() => {
@@ -142,5 +151,141 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('heading', { name: '대시보드' })).toBeTruthy();
 
     resolveSecond?.(ok(STATS));
+  });
+});
+
+/**
+ * 접수 대기 카드 — 각 항목이 접수 화면(/srs/[id]/intake)으로 연결되므로 접수할 수 있는 사람에게만 보인다.
+ * 접수는 운영 관리자(ADMIN·MANAGER 또는 SR:INTAKE) 업무다(소유자 결정 2026-09-18). 예전에는 ENGINEER 에게도
+ * 보여서, 눌러 들어가면 "접수 처리 권한이 없습니다" 화면이 나왔다.
+ */
+describe('DashboardPage — 접수 대기 카드', () => {
+  const WITH_WAITING = {
+    ...STATS,
+    summary: { ...STATS.summary, requested: 2 },
+    waitingSRs: [
+      {
+        id: 'sr-1',
+        srNumber: 'SR-001',
+        title: '대기 중인 요청',
+        priority: 'MEDIUM',
+        client: { name: '가나' },
+        requester: { name: '김신청' },
+        createdAt: new Date().toISOString(),
+      },
+    ],
+  };
+
+  it.each([
+    ['ADMIN', ['ADMIN'], [], true],
+    ['MANAGER', ['MANAGER'], [], true],
+    ['SR:INTAKE 를 받은 커스텀 역할', ['TRIAGE'], ['SR:INTAKE'], true],
+    ['ENGINEER', ['ENGINEER'], ['SR:READ', 'SR:UPDATE'], false],
+  ])('%s → 카드 노출 %s', async (_label, roles, permissions, visible) => {
+    viewer.roles = roles as string[];
+    viewer.permissions = permissions as string[];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(WITH_WAITING)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+    await waitFor(() => expect(screen.getByRole('heading', { name: '대시보드' })).toBeTruthy());
+
+    expect(screen.queryByText('접수 대기 SR') !== null).toBe(visible);
+  });
+});
+
+/**
+ * ENGINEER 의 '내 담당 SR' 카드 — 지연 판정은 목록·SR 상세와 같은 getDueDateStatus(시각 기준, 헌법 §3).
+ * 예전에는 달력일 올림으로 세서 마감을 몇 시간 넘긴 SR 이 지연으로 보이지 않았고, 완료된 SR 에도
+ * '지연' 이 붙었다.
+ */
+describe('DashboardPage — 내 담당 SR 의 마감 표시', () => {
+  const HOUR = 60 * 60 * 1000;
+  const assigned = (overrides: Record<string, unknown>) => ({
+    id: String(overrides.id),
+    srNumber: String(overrides.id),
+    title: '담당 SR',
+    status: 'IN_PROGRESS',
+    priority: 'MEDIUM',
+    client: { name: '가나' },
+    requester: { name: '김신청' },
+    ...overrides,
+  });
+
+  it('마감을 몇 시간 넘긴 진행 중 SR 은 지연으로, 완료된 SR 은 지연으로 보이지 않는다', async () => {
+    viewer.roles = ['ENGINEER'];
+    const body = {
+      ...STATS,
+      summary: { ...STATS.summary, myAssigned: 2 },
+      myAssignedSRs: [
+        assigned({ id: 'SR-LATE', dueDate: new Date(Date.now() - 3 * HOUR).toISOString() }),
+        assigned({
+          id: 'SR-DONE',
+          status: 'COMPLETED',
+          dueDate: new Date(Date.now() - 48 * HOUR).toISOString(),
+        }),
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(body)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    const late = (await screen.findByText('SR-LATE')).closest('a')!;
+    expect(late.textContent).toContain('지연');
+    expect(late.textContent).toContain('3시간 지연');
+
+    const done = screen.getByText('SR-DONE').closest('a')!;
+    expect(done.textContent).not.toContain('지연');
+  });
+});
+
+describe('DashboardPage — 지연 중 지표(헌법 §3, 결정 D10)', () => {
+  it('내부 사용자에게 지연 중 건수와 보류·직접 조정 건수를 보이고, 누르면 같은 범위의 목록으로 간다', async () => {
+    const body = {
+      ...STATS,
+      summary: { ...STATS.summary, overdue: 12, overdueOnHold: 3, manualDueOpen: 2 },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(body)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    const link = await screen.findByRole('link', { name: '지연 중인 SR 목록 보기' });
+    expect(link.getAttribute('href')).toBe('/srs?overdue=1');
+    expect(link.textContent).toContain('12건');
+    expect(link.textContent).toContain('보류 3건 포함');
+    expect(link.textContent).toContain('마감일 직접 조정 2건');
+  });
+
+  it('고객에게는 지연 중 카드를 보이지 않는다(내부 전용)', async () => {
+    viewer.roles = ['CLIENT_ADMIN'];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(STATS)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    await screen.findByRole('heading', { name: '대시보드' });
+    expect(screen.queryByRole('link', { name: '지연 중인 SR 목록 보기' })).toBeNull();
+  });
+
+  // 헌법 §3 용어: 표본 0건은 '표본 없음', 마감일이 없어 판정할 수 없는 건은 '측정 불가'. 예전 화면은 거꾸로 불렀다.
+  it('준수율 표본이 없으면 "표본 없음", 마감일 없는 건은 "측정 불가" 로 부른다', async () => {
+    const body = {
+      ...STATS,
+      performance: {
+        ...STATS.performance,
+        slaComplianceRate: null,
+        slaSampleCount: 0,
+        slaUnmeasurableCount: 4,
+      },
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(body)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    expect(await screen.findByText('표본 없음')).toBeTruthy();
+    expect(screen.getByText(/측정 불가.마감일 없음. 4건은 집계에서/)).toBeTruthy();
   });
 });

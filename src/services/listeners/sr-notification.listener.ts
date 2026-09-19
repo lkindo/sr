@@ -1,6 +1,8 @@
+import { statusLabelOf } from '@/lib/constants/sr';
 import { domainEvents } from '@/lib/domain-events';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
+import { isReopenTransition } from '@/lib/sr-state-machine';
 import { backgroundTask } from '@/lib/wait-until';
 import { pushService } from '@/services/push.service';
 
@@ -61,22 +63,77 @@ export function registerSRNotificationListeners() {
 
   // 2. SR 상태 변경 이벤트 리스너
   domainEvents.on('sr:status_changed', async (payload) => {
-    if (!payload.requesterId) return;
-
     try {
       const promises: Promise<unknown>[] = [];
+      const isReopen =
+        payload.previousStatus !== null &&
+        isReopenTransition(payload.previousStatus, payload.currentStatus);
 
-      // 푸시 알림 — 사용자 설정을 존중한다(감사 4.3).
-      // `pushSRStatusChanged` 는 스키마 기본값이 false 다. 예전 코드는 이 설정을
-      // 아예 읽지 않아, 기본값이 꺼져 있는데도 전원에게 발송됐다.
-      promises.push(
-        pushService.sendForEvent('SR_STATUS_CHANGED', [payload.requesterId], {
-          title: 'SR 상태 변경',
-          body: `${payload.srNumber} 상태가 ${payload.currentStatus}로 변경되었습니다.`,
-          url: `/srs/${payload.srId}`,
-          tag: 'sr-status-changed',
-        })
-      );
+      // 재오픈 — 다시 일해야 하는 담당자에게 알린다(2026-09-18 소유자 결정 D15). 설정은 '배정 알림'
+      // (pushSRAssigned, 기본 켜짐)을 따르고, 행위자 본인은 제외한다. 담당자가 비활성이면 재배정할 활성
+      // ADMIN·MANAGER 에게 보낸다(설정은 '새 SR 알림'). 메일은 전이 트랜잭션에서 이미 적재됐다.
+      const reopenNotified = new Set<string>();
+      if (isReopen) {
+        const assignee = payload.assigneeId
+          ? await prisma.user.findUnique({
+              where: { id: payload.assigneeId },
+              select: { id: true, isActive: true },
+            })
+          : null;
+        const reason = payload.reason?.trim() ? ` — ${payload.reason.trim()}` : '';
+        if (assignee?.isActive) {
+          if (assignee.id !== payload.actorId) {
+            reopenNotified.add(assignee.id);
+            promises.push(
+              pushService.sendForEvent('SR_ASSIGNED', [assignee.id], {
+                title: '담당 SR 재오픈',
+                body: `${payload.srNumber} 이(가) 재오픈되었습니다${reason}`,
+                url: `/srs/${payload.srId}`,
+                tag: 'sr-reopened',
+              })
+            );
+          }
+        } else {
+          const managers = await prisma.user.findMany({
+            where: {
+              roles: { some: { role: { name: { in: ['ADMIN', 'MANAGER'] } } } },
+              isActive: true,
+              ...(payload.actorId ? { NOT: { id: payload.actorId } } : {}),
+            },
+            select: { id: true },
+          });
+          const managerIds = managers.map((manager) => manager.id);
+          managerIds.forEach((id) => reopenNotified.add(id));
+          if (managerIds.length > 0) {
+            promises.push(
+              pushService.sendForEvent('SR_CREATED', managerIds, {
+                title: '재오픈 SR 재배정 필요',
+                body: `${payload.srNumber} 이(가) 재오픈됐지만 담당자가 비활성입니다${reason}`,
+                url: `/srs/${payload.srId}`,
+                tag: 'sr-reopened',
+              })
+            );
+          }
+        }
+      }
+
+      // 신청자 — 사용자 설정을 존중한다(감사 4.3). `pushSRStatusChanged` 는 스키마 기본값이 false 다.
+      // 행위자 본인과, 방금 재오픈 알림을 받은 사람은 제외한다(D15).
+      if (
+        payload.requesterId &&
+        payload.requesterId !== payload.actorId &&
+        !reopenNotified.has(payload.requesterId)
+      ) {
+        promises.push(
+          pushService.sendForEvent('SR_STATUS_CHANGED', [payload.requesterId], {
+            title: 'SR 상태 변경',
+            // 상태는 화면과 같은 한국어 이름으로 보낸다. 예전에는 'IN_PROGRESS로 변경' 처럼 코드가 그대로 나갔다.
+            body: `${payload.srNumber} 상태가 ${statusLabelOf(payload.currentStatus)}(으)로 변경되었습니다.`,
+            url: `/srs/${payload.srId}`,
+            tag: 'sr-status-changed',
+          })
+        );
+      }
 
       // 이메일은 상태 변경 트랜잭션 안에서 이미 아웃박스에 적재된다.
       backgroundTask(Promise.allSettled(promises), 'sr-notification-dispatch');

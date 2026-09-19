@@ -10,8 +10,13 @@ import { Button } from '@/components/ui';
 import { ClientApprovalActions } from '@/components/users/ClientApprovalActions';
 import { ClientAssignDropdown } from '@/components/users/ClientAssignDropdown';
 import { ClientBadgeWithActions } from '@/components/users/ClientBadgeWithActions';
+import { EmailUnverifiedBadge } from '@/components/users/EmailUnverifiedBadge';
 import { UserActions } from '@/components/users/UserActions';
-import { getUserTypeBadgeVariant, getUserTypeLabel } from '@/lib/user-helpers';
+import {
+  getUserTypeBadgeVariant,
+  getUserTypeLabel,
+  showsEmailUnverified,
+} from '@/lib/user-helpers';
 import { cn } from '@/lib/utils';
 import type { ClientSummary } from '@/types/client.types';
 import type { UserListItem } from '@/types/user-view';
@@ -90,6 +95,7 @@ export function UserMobileList({
                         {user.name}
                       </Link>
                       <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                      {showsEmailUnverified(user) && <EmailUnverifiedBadge />}
                     </div>
                     <Badge
                       variant={user.isActive ? 'default' : 'secondary'}

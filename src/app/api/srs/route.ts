@@ -71,6 +71,7 @@ export const GET = withAuthAndRateLimit(
 
     const [srs, totalCount] = await Promise.all([
       srService.getAllSRs({
+        viewer: session.user,
         where: filters,
         skip,
         take,

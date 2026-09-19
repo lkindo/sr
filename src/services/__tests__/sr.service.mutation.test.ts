@@ -94,9 +94,11 @@ vi.mock('@/lib/storage', () => ({
   deleteAttachmentBlob: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('@/lib/sr-state-machine', () => ({
+// 전이 판정만 스텁한다. 나머지(getRequiredFields·isSROperator 등)는 policies 가 실제로 쓰는
+// 판정 함수라 실물을 둔다 — 통째로 대체하면 운영자·내용 수정 규칙이 사라진 채로 테스트가 돈다.
+vi.mock('@/lib/sr-state-machine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sr-state-machine')>()),
   validateTransition: vi.fn().mockReturnValue({ valid: true }),
-  getRequiredFields: vi.fn().mockReturnValue([]),
   isReopenTransition: vi.fn().mockReturnValue(false),
 }));
 
@@ -108,6 +110,7 @@ describe('SRService Mutation Tests', () => {
     id: 'user-1',
     email: 'test@example.com',
     name: 'Test',
+    image: null,
     roles: ['USER'],
     permissions: [],
     clientIds: ['c-1'],
@@ -291,7 +294,7 @@ describe('SRService Mutation Tests', () => {
         { id: 'sr-2', title: 'SR 2' },
       ];
       vi.mocked(prisma.sR.findMany).mockResolvedValue(mockSRs as any);
-      const result = await srService.getAllSRs({ skip: 0, take: 10 });
+      const result = await srService.getAllSRs({ viewer: mockUser, skip: 0, take: 10 });
       expect(result).toEqual(mockSRs);
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ skip: 0, take: 10 })
@@ -302,7 +305,9 @@ describe('SRService Mutation Tests', () => {
   describe('countSRs', () => {
     it('should return count of SRs', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(5);
-      const result = await srService.countSRs();
+      const result = await srService.countSRs({
+        viewer: { ...mockUser, roles: ['ADMIN'] } as never,
+      });
       expect(result).toBe(5);
       expect(prisma.sR.count).toHaveBeenCalled();
     });
@@ -310,8 +315,8 @@ describe('SRService Mutation Tests', () => {
       it('should return SR details', async () => {
         const mockSR = { id: 'sr-1', title: 'Details' };
         vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
-        const result = await srService.getSRDetailsById('sr-1');
-        expect(result).toEqual(mockSR);
+        const result = await srService.getSRDetailsById('sr-1', { viewer: mockUser });
+        expect(result).toEqual({ ...mockSR, requesterIsInternal: false, wasCompleted: false });
       });
     });
   });

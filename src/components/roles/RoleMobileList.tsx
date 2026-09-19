@@ -5,6 +5,7 @@
 import { MobileListCard } from '@/components/common/ResponsiveTableShell';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { isCanonicalRole, isImmutableRole } from '@/lib/role-rules';
 import { RoleItem as Role } from '@/types/role';
 
 interface RoleMobileListProps {
@@ -53,11 +54,13 @@ export function RoleMobileList({
 
               {/* Actions */}
               <div className="grid grid-cols-3 gap-1.5 pt-1.5 border-t border-border/50">
+                {/* 판정은 RoleTable 과 같다(role-rules.ts) */}
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs"
                   onClick={() => onEdit(role)}
+                  disabled={isImmutableRole(role.name)}
                 >
                   수정
                 </Button>
@@ -66,6 +69,7 @@ export function RoleMobileList({
                   size="sm"
                   className="h-8 text-xs"
                   onClick={() => onManagePermissions(role)}
+                  disabled={isImmutableRole(role.name)}
                 >
                   권한
                 </Button>
@@ -74,7 +78,7 @@ export function RoleMobileList({
                   size="sm"
                   className="h-8 text-xs hover:text-destructive hover:bg-destructive/10"
                   onClick={() => onDelete(role)}
-                  disabled={role._count && role._count.users > 0}
+                  disabled={isCanonicalRole(role.name) || (role._count && role._count.users > 0)}
                 >
                   삭제
                 </Button>

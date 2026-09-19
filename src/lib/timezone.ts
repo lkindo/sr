@@ -127,3 +127,18 @@ export function formatAppZoneTime(value: string | Date | number): string {
 export function appZoneDateStamp(value: string | Date | number = new Date()): string {
   return formatISODateInAppZone(value).replace(/-/g, '');
 }
+
+/**
+ * `<input type="datetime-local">` 의 값(`YYYY-MM-DDTHH:mm`)을 KST 로 읽어 그 순간을 돌려준다.
+ *
+ * `new Date(value)` 는 오프셋이 없는 문자열을 **앰비언트 로컬 타임존**으로 읽는다. 브라우저가 KST 가
+ * 아니면 9시간이 어긋난 마감일이 저장된다. 오프셋(+09:00)을 명시해 어디서 입력해도 같은 순간이 된다.
+ */
+export function fromAppZoneDateTimeInput(value: string): Date {
+  return new Date(`${value}:00+09:00`);
+}
+
+/** 어떤 순간을 KST 기준 `YYYY-MM-DDTHH:mm` 로 — `<input type="datetime-local">` 의 초기값용. */
+export function toAppZoneDateTimeInput(value: string | Date | number): string {
+  return `${formatISODateInAppZone(value)}T${formatAppZoneTime(value)}`;
+}

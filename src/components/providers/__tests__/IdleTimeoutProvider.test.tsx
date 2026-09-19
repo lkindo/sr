@@ -1,6 +1,8 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS } from '@/lib/constants/session';
+
 const signOut = vi.fn(async () => undefined);
 const useSession = vi.fn(() => ({ status: 'authenticated' }) as { status: string });
 const routerPush = vi.fn();
@@ -36,8 +38,9 @@ vi.mock('@/components/ui', () => ({
 
 const { IdleTimeoutProvider } = await import('../IdleTimeoutProvider');
 
-const IDLE_TIMEOUT = 30 * 60 * 1000;
-const WARNING_TIMEOUT = 60 * 1000;
+// 사본을 두지 않고 Provider 와 같은 정본을 쓴다. 값 자체(30분/1분)는 설정 라우트 테스트가 못박는다.
+const IDLE_TIMEOUT = IDLE_TIMEOUT_MS;
+const WARNING_TIMEOUT = IDLE_WARNING_MS;
 
 describe('IdleTimeoutProvider', () => {
   beforeEach(() => {

@@ -218,7 +218,8 @@ export const TRANSITION_PERMISSIONS: Record<string, Record<string, string[]>> = 
  */
 export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
   REQUESTED: {
-    INTAKE: ['ADMIN', 'MANAGER', 'ENGINEER'],
+    // 접수는 운영 관리자 공용 큐 업무다 — ENGINEER 제외(소유자 결정 2026-09-18, policies.canIntakeSR).
+    INTAKE: ['ADMIN', 'MANAGER'],
     REJECTED: ['ADMIN', 'MANAGER', 'ENGINEER'],
   },
   INTAKE: {
@@ -234,8 +235,14 @@ export const TRANSITION_ROLES: Record<string, Record<string, string[]>> = {
     REJECTED: ['ADMIN', 'MANAGER', 'ENGINEER'],
   },
   COMPLETED: {
-    // 확인은 고객 인수 게이트다. 운영자(MANAGER/ENGINEER)는 대신 확인할 수 없다.
-    CONFIRMED: ['ADMIN', 'CLIENT_USER', 'CLIENT_ADMIN'],
+    // 확인은 고객 인수 게이트다. **실제 제한은 이 역할 표가 아니라 아래 validateTransition 의 신원 검사
+    // (`canConfirmAsAcceptor`)다** — 역할 표는 "그 SR 의 신청자인가" 를 알지 못한다.
+    // MANAGER·ENGINEER 는 소유자 결정(2026-09-18)으로 들어왔다: 운영자가 **자기 이름으로** 등록한 SR 은
+    // 고객 신청자가 없어 아무도 확인할 수 없었으므로, 등록한 운영자 본인이 확인할 수 있게 한다. 남의 SR 은
+    // 신원 검사가 여전히 막는다(운영자가 고객 대신 확인하는 경로는 없다). ENGINEER 는 배정된 SR 만
+    // 수정할 수 있으므로(canUpdateSR) 자기가 등록한 SR 도 **배정됐을 때만** 확인한다 — 그 밖에는 그 고객사의
+    // CLIENT_ADMIN 이 확인한다. (시드 ENGINEER 는 SR:CREATE 가 없어 등록 자체를 하지 않는다.)
+    CONFIRMED: ['ADMIN', 'MANAGER', 'ENGINEER', 'CLIENT_USER', 'CLIENT_ADMIN'],
     // 재오픈에는 MANAGER 가 포함된다(소유자 결정, 2026-08-01).
     // 근거: ADMIN 은 이미 가능했고, 잘못된 완료 처리를 정정하려면 운영 관리자가
     // ADMIN 을 호출하거나 고객에게 대신 눌러 달라고 부탁해야 했다.
@@ -331,6 +338,8 @@ const canPerformTransition = (
  * @param updateData 업데이트할 SR 데이터 (Optional)
  * @param userPermissions 사용자 권한 목록 (Optional)
  * @param actorId 전이를 수행하는 사용자 ID. 신청자 본인만 가능한 전이(CONFIRMED)의 판정에 쓴다.
+ * @param actorClientIds 행위자의 소속 고객사. 운영자가 등록한 SR 을 고객사 관리자가 확인하는 예외
+ *   (`canConfirmAsAcceptor`)의 판정에 쓴다. 없으면 그 예외는 열리지 않는다(fail-closed).
  * @returns 가능 여부와 메시지
  */
 export const validateTransition = (
@@ -340,7 +349,8 @@ export const validateTransition = (
   currentData?: any,
   updateData?: any,
   userPermissions?: string[],
-  actorId?: string
+  actorId?: string,
+  actorClientIds?: string[]
 ): { valid: boolean; message?: string } => {
   // 1. 상태 흐름 유효성 검사
   if (!canTransition(from, to)) {
@@ -395,14 +405,22 @@ export const validateTransition = (
   // 공유 지점에 둔다. 두 라우트 모두 srService.updateSR 를 거치므로 함께 닫힌다.
   //
   // fail-closed 다: 신원을 확인할 수 없으면(currentData 나 actorId 가 없으면) 거부한다.
+  // 예외(운영자가 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인)는 `canConfirmAsAcceptor` 가 판정한다.
   if (to === 'CONFIRMED') {
-    const requesterId = currentData?.requesterId;
-    if (!requesterId || !actorId || requesterId !== actorId) {
+    const actor = { id: actorId, roles: userRoles, clientIds: actorClientIds };
+    if (!canConfirmAsAcceptor(actor, currentData)) {
       return {
         valid: false,
         message: '신청자만 확인할 수 있습니다.',
       };
     }
+  }
+
+  // 2-2. 한 번 완료된 SR 은 거절로 끝내지 않는다(2026-09-18 소유자 결정 D9). 재오픈 → 보류 → 거절로 끝내면
+  // 그 SR 이 준수율 표본에서 영구히 빠져 '재작업은 서비스 실패로 계상'(헌법 §2)이 무력화된다.
+  // 판정 재료 `wasCompleted` 는 서버가 상태 이력으로 계산해 넘긴다(sr.service.wasEverCompleted).
+  if (to === 'REJECTED' && isRejectBlockedAfterCompletion(currentData)) {
+    return { valid: false, message: SR_REJECT_AFTER_COMPLETION_MESSAGE };
   }
 
   // 3. 필수 필드 데이터 검증
@@ -549,6 +567,74 @@ export function canViewerUpdateSR(
 const INTERNAL_ROLE_NAMES = ['ADMIN', 'MANAGER', 'ENGINEER'];
 
 /**
+ * 확인완료(고객 인수)의 **신원** 판정 — 이 사람이 이 SR 을 확인할 자격이 있는가.
+ * 역할·권한 표(TRANSITION_ROLES/PERMISSIONS)는 validateTransition 이 이보다 먼저 본다.
+ *
+ * - 원칙: 그 SR 의 **신청자 본인**(헌법 §1.1·§2).
+ * - 예외(소유자 결정 2026-09-18): 운영자(내부 사용자)가 **자기 이름으로** 등록한 SR 은 고객 신청자가 없어
+ *   아무도 확인할 수 없었다. 그런 SR 은 등록한 운영자 본인(위 원칙으로 이미 허용) **또는 그 SR 고객사의
+ *   고객사 관리자(CLIENT_ADMIN)** 가 확인한다. 고객 사용자가 신청한 SR 에는 이 예외가 없다 — 같은 고객사의
+ *   CLIENT_ADMIN 이라도 남의 SR 을 대신 확인할 수 없다.
+ *
+ * `requesterIsInternal` 은 서버가 신청자의 역할로 계산해 넣는 값이다(`srService.isInternalRequester`,
+ * SR 상세 응답의 같은 필드). 값이 없거나 true 가 아니면 예외는 열리지 않는다(fail-closed).
+ * 서버(validateTransition·상태 라우트)와 화면(`canViewerConfirmSR`)이 이 함수 하나를 쓴다.
+ */
+export function canConfirmAsAcceptor(
+  actor: { id?: string | null; roles?: string[]; clientIds?: string[] },
+  sr:
+    | {
+        requesterId?: string | null;
+        clientId?: string | null;
+        requesterIsInternal?: boolean | null;
+      }
+    | null
+    | undefined
+): boolean {
+  const requesterId = sr?.requesterId;
+  if (!requesterId || !actor.id) return false;
+  if (requesterId === actor.id) return true;
+
+  return (
+    sr?.requesterIsInternal === true &&
+    !!sr.clientId &&
+    (actor.roles ?? []).includes('CLIENT_ADMIN') &&
+    (actor.clientIds ?? []).includes(sr.clientId)
+  );
+}
+
+/**
+ * 화면의 '확인 완료' 버튼을 보일지 — 서버가 거부하는 순서를 그대로 따른다:
+ *   1. `ensureCanUpdateSR`(403) → canViewerUpdateSR
+ *   2. `validateTransition`(역할·권한 표 + 신원 검사) → 같은 함수를 그대로 호출
+ * 예전에는 화면이 "신청자인가" 만 보고 버튼을 보여 줘서, 자기 이름으로 SR 을 등록한 MANAGER 에게는
+ * 누르면 반드시 거부되는 버튼이 떴다.
+ */
+export function canViewerConfirmSR(
+  viewer: ReopenViewer,
+  sr: {
+    status: string;
+    clientId?: string | null;
+    requesterId?: string | null;
+    assigneeId?: string | null;
+    requesterIsInternal?: boolean | null;
+  }
+): boolean {
+  if (sr.status !== 'COMPLETED') return false;
+  if (!canViewerUpdateSR(viewer, sr)) return false;
+  return validateTransition(
+    'COMPLETED',
+    'CONFIRMED',
+    viewer.roles,
+    sr,
+    {},
+    viewer.permissions,
+    viewer.id,
+    viewer.clientIds
+  ).valid;
+}
+
+/**
  * 재오픈 버튼의 노출·비활성·이유를 한 번에 판정한다.
  *
  * 서버가 거부하는 순서를 그대로 따른다 — 같은 SR 에 대해 화면이 말하는 이유와 서버 응답이
@@ -616,4 +702,138 @@ export function getReopenAvailability(
   }
 
   return { visible: true, block: getReopenBlock(status, sr, now) };
+}
+
+/**
+ * SR 의 **운영자**인가 — 접수 이후 SR 내용과 운영자 소유 값(접수 결과·완료 내용·거절 사유)을 쓸 수 있는
+ * 사람. 내부 역할(ADMIN·MANAGER·ENGINEER) 또는 SR:ASSIGN 보유자(외부 커스텀 운영 역할 포함).
+ *
+ * 서버(policies.canWriteSROperatorFields)와 화면(SR 상세·수정 다이얼로그)이 **이 함수 하나**를 쓴다.
+ * 이 모듈은 화면도 import 하므로 여기 둔다(policies.ts 는 서버 전용이다).
+ * SR:ASSIGN 은 prisma/seed.ts 에 실제로 시딩된 권한이다 — 시딩되지 않은 이름을 쓰면 아무도 보유할 수
+ * 없어 조용히 전원이 차단된다.
+ */
+export function isSROperator(viewer: { roles?: string[]; permissions?: string[] }): boolean {
+  const isInternal = (viewer.roles ?? []).some((role) => INTERNAL_ROLE_NAMES.includes(role));
+  return isInternal || holdsPermission(viewer, 'SR:ASSIGN');
+}
+
+/** 권한 보유 여부. 전이 판정(validateTransition)과 같게 대소문자를 무시한다. */
+function holdsPermission(viewer: { permissions?: string[] }, permission: string): boolean {
+  return (viewer.permissions ?? []).some((granted) => granted.toUpperCase() === permission);
+}
+
+/**
+ * 종결된 SR 상태 — 감사 추적 대상이라 첨부를 붙일 수 없다. 서버(policies.ensureCanAttachToSR)와 화면
+ * (첨부 업로드 버튼)이 이 목록 하나를 쓴다.
+ */
+export const SR_CLOSED_STATUSES: readonly string[] = ['COMPLETED', 'CONFIRMED', 'REJECTED'];
+
+/**
+ * 이 SR 에 첨부를 올릴 수 있는가 — policies.ensureCanAttachToSR 의 클라이언트 사본(canViewerUpdateSR 과
+ * 같은 이유로 사본이다). 수정 권한 + ATTACHMENT:CREATE(ADMIN 은 암묵) + 종결 상태가 아님.
+ * 예전에는 업로드 버튼을 누구에게나 보여 줘서, 종결 SR 이나 수정 권한이 없는 사용자는 누르면 반드시 403 이었다.
+ * ⚠️ 사본이므로 sr-reopen-availability.test.ts 가 서버 판정과 전 조합에서 대조한다.
+ */
+export function canViewerAttachToSR(
+  viewer: ReopenViewer,
+  sr: {
+    status: string;
+    clientId?: string | null;
+    requesterId?: string | null;
+    assigneeId?: string | null;
+  }
+): boolean {
+  if (SR_CLOSED_STATUSES.includes(sr.status)) return false;
+  if (!canViewerUpdateSR(viewer, sr)) return false;
+  return (
+    (viewer.roles ?? []).includes('ADMIN') ||
+    (viewer.permissions ?? []).includes('ATTACHMENT:CREATE')
+  );
+}
+
+/** 운영 관리자 역할 — 접수(트리아지)와 담당자 배정을 맡는다(헌법 §1.1·§4). */
+const OPERATIONS_MANAGER_ROLES = ['ADMIN', 'MANAGER'];
+
+/**
+ * SR 을 접수할 수 있는가 — ADMIN·MANAGER, 또는 SR:INTAKE 를 받은 커스텀 역할.
+ * 소유자 결정(2026-09-18, D1): ENGINEER 는 접수하지 않는다. 서버(policies.canIntakeSR)와 화면(접수
+ * 페이지·목록의 접수 버튼·대시보드 접수 대기 카드)이 이 함수 하나를 쓴다.
+ */
+export function canViewerIntakeSR(viewer: { roles?: string[]; permissions?: string[] }): boolean {
+  const isManager = (viewer.roles ?? []).some((role) => OPERATIONS_MANAGER_ROLES.includes(role));
+  return isManager || holdsPermission(viewer, 'SR:INTAKE');
+}
+
+/**
+ * SR 담당자를 배정·변경할 수 있는가 — ADMIN·MANAGER, 또는 SR:ASSIGN 을 받은 커스텀 역할(D1).
+ * 서버는 policies.canAssignSR 로 이 함수를 쓴다.
+ */
+export function canViewerAssignSR(viewer: { roles?: string[]; permissions?: string[] }): boolean {
+  const isManager = (viewer.roles ?? []).some((role) => OPERATIONS_MANAGER_ROLES.includes(role));
+  return isManager || holdsPermission(viewer, 'SR:ASSIGN');
+}
+
+/** 한 번 완료된 SR 의 거절을 막을 때의 안내. 서버 거부와 화면이 같은 문장을 쓴다. */
+export const SR_REJECT_AFTER_COMPLETION_MESSAGE =
+  '한 번 완료된 SR은 거절로 끝낼 수 없습니다. 재작업을 마치면 다시 완료 처리하세요.';
+
+/** 한 번이라도 완료된 SR(재오픈 포함)인가 — 거절 금지(D9)의 판정. `wasCompleted` 는 서버가 채운다. */
+export function isRejectBlockedAfterCompletion(
+  sr: { wasCompleted?: boolean } | null | undefined
+): boolean {
+  return sr?.wasCompleted === true;
+}
+
+/** 종결된 SR 의 SLA 근거(마감일·서비스 카테고리·실제 우선순위)를 바꾸려 할 때의 안내. */
+export const SR_SLA_BASIS_LOCKED_MESSAGE =
+  '종결된 SR의 마감일·서비스 카테고리·실제 우선순위는 바꿀 수 없습니다. 고쳐야 하면 SR을 다시 연 뒤 수정하세요.';
+
+/**
+ * 이 상태에서 SLA 근거(마감일·서비스 카테고리·실제 우선순위)를 바꿀 수 있는가(D9).
+ * 종결(완료·확인완료·거절)된 SR 은 SLA 판정이 끝났다. 판정 뒤 근거를 바꾸면 위반을 준수로 소급해 바꿀 수 있고,
+ * 종결 SR 상세는 마감일 칸을 보여 주지 않아 아무도 알아채지 못한다.
+ */
+export function canChangeSLABasisAt(status: string): boolean {
+  return !SR_CLOSED_STATUSES.includes(status);
+}
+
+/**
+ * SLA 시계가 돌고 있는 상태 — 접수 전에는 시계가 돌지 않고, 종결 뒤에는 판정이 끝났다.
+ * 마감일 조정 가능 상태이자 '지연 중' 지표(헌법 §3, 결정 D10)의 대상 상태다. 서버 집계 SQL 도 같은 목록을 쓴다.
+ */
+export const SR_SLA_OPEN_STATUSES: readonly string[] = ['INTAKE', 'IN_PROGRESS', 'ON_HOLD'];
+const DUE_DATE_ADJUSTABLE_STATUSES = SR_SLA_OPEN_STATUSES;
+
+/**
+ * 이 SR 의 SLA 마감일을 직접 조정할 수 있는가(헌법 §2·§3, 2026-09-18 소유자 결정 D9).
+ *  - 접수·진행중·보류 상태에서만 한다.
+ *  - 기본은 운영자(isSROperator)다.
+ *  - 한 번 완료된 적 있는 SR(재오픈 포함)은 접수 권한자(ADMIN·MANAGER 또는 SR:INTAKE)만 한다. 재작업 당사자가
+ *    기준 마감일을 옮기면 '재작업은 서비스 실패로 계상'이 무력화된다. `wasCompleted` 는 서버가 채운다.
+ * 서버(sr.service.updateSR)는 상태 잠금(canChangeSLABasisAt)과 완료 이력 규칙을 같은 뜻으로 판정한다.
+ */
+export function canViewerAdjustDueDate(
+  viewer: { roles?: string[]; permissions?: string[] },
+  sr: { status: string; wasCompleted?: boolean }
+): boolean {
+  if (!DUE_DATE_ADJUSTABLE_STATUSES.includes(sr.status)) return false;
+  if (sr.wasCompleted) return canViewerIntakeSR(viewer);
+  return isSROperator(viewer);
+}
+
+/** 접수 이후 운영자가 아닌 사람이 SR 내용을 고치려 할 때의 안내. 서버 거부와 화면 안내가 같은 문장을 쓴다. */
+export const SR_CONTENT_LOCKED_MESSAGE =
+  'SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다. 변경이 필요하면 댓글로 담당자에게 알려주세요.';
+
+/**
+ * 이 상태의 SR 내용을 고칠 수 있는가(소유자 결정, 2026-09-18). 접수 전(REQUESTED)에는 SR 을 수정할 수
+ * 있는 사람 누구나, 접수 이후에는 운영자만. 서버의 상세 규칙(만족도·추가 의견 예외, 전이 요청 처리)은
+ * policies.ensureCanEditSRContent 에 있고, 이 함수는 화면이 수정 버튼을 켤지 정하는 데 쓴다.
+ */
+export function canEditSRContentAt(
+  status: string,
+  viewer: { roles?: string[]; permissions?: string[] }
+): boolean {
+  return status === 'REQUESTED' || isSROperator(viewer);
 }

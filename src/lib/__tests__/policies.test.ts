@@ -207,7 +207,19 @@ describe('Policy Functions', () => {
       expect(policies.canDeleteSR(outsider, sr)).toBe(false);
     });
 
-    it('canDeleteSR: 내부 사용자는 권한만으로 통과한다', () => {
+    it('canDeleteSR: MANAGER 는 권한만으로 통과한다', () => {
+      const manager = {
+        ...userNoPerms,
+        id: 'u-mgr',
+        roles: ['MANAGER'],
+        permissions: [PERMISSIONS.SR.DELETE],
+        clientIds: [],
+      };
+      expect(policies.canDeleteSR(manager, sr)).toBe(true);
+    });
+
+    it('canDeleteSR: SR:DELETE 를 받은 ENGINEER 도 자기에게 배정된 SR 만 지운다', () => {
+      // 역할별 권한은 ADMIN 이 조정하는 기본값이지만(헌법 §1.4) 배정 격리(§1.2)는 권한으로 풀리지 않는다.
       const engineer = {
         ...userNoPerms,
         id: 'u-eng',
@@ -215,7 +227,9 @@ describe('Policy Functions', () => {
         permissions: [PERMISSIONS.SR.DELETE],
         clientIds: [],
       };
-      expect(policies.canDeleteSR(engineer, sr)).toBe(true);
+      expect(policies.canDeleteSR(engineer, { ...sr, assigneeId: 'u-eng' })).toBe(true);
+      expect(policies.canDeleteSR(engineer, { ...sr, assigneeId: 'u-other' })).toBe(false);
+      expect(policies.canDeleteSR(engineer, { ...sr, assigneeId: null })).toBe(false);
     });
 
     it('ensureCan... throws ForbiddenError on failure', () => {
@@ -469,6 +483,21 @@ describe('Policy Functions', () => {
       );
     });
 
+    // 운영 계정(ADMIN·MANAGER)은 삭제 경로로 다루지 않는다 — 예전에는 이 규칙이 화면에만 있어 ADMIN 이 API 를 직접
+    // 부르면 다른 ADMIN·MANAGER 를 영구 삭제할 수 있었다(2026-09-18 소유자 결정 D11).
+    it('ADMIN 도 운영 계정(ADMIN·MANAGER)은 삭제 경로로 지울 수 없다', () => {
+      const manager = { id: 'mgr-9', roles: [{ role: { name: 'MANAGER' } }] } as never;
+      const otherAdmin = { id: 'adm-9', roles: [{ role: { name: 'ADMIN' } }] } as never;
+      const engineer = { id: 'eng-9', roles: [{ role: { name: 'ENGINEER' } }] } as never;
+
+      expect(policies.canDeleteUser(adminUser, manager)).toBe(false);
+      expect(() => policies.ensureCanDeleteUser(adminUser, otherAdmin)).toThrow(
+        '시스템 관리자 계정은 삭제할 수 없습니다.'
+      );
+      // 대조군: 다른 계정은 그대로 지울 수 있다.
+      expect(policies.canDeleteUser(adminUser, engineer)).toBe(true);
+    });
+
     it('ensureCanDeleteUser throws correctly', () => {
       const self = { ...adminUser, id: 'self' };
       const target = { id: 'self' } as any;
@@ -481,7 +510,7 @@ describe('Policy Functions', () => {
 
   describe('Role Policies', () => {
     const adminRole = { name: 'ADMIN' } as any;
-    const userRole = { name: 'USER' } as any;
+    const managerRole = { name: 'MANAGER' } as any;
     const customRole = { name: 'CUSTOM' } as any;
 
     it('canUpdateRole: cannot update ADMIN role', () => {
@@ -489,8 +518,8 @@ describe('Policy Functions', () => {
       expect(policies.canUpdateRole(adminUser, customRole)).toBe(true);
     });
 
-    it('canDeleteRole: cannot delete system roles', () => {
-      expect(policies.canDeleteRole(adminUser, userRole)).toBe(false);
+    it('canDeleteRole: cannot delete canonical roles', () => {
+      expect(policies.canDeleteRole(adminUser, managerRole)).toBe(false);
       expect(policies.canDeleteRole(adminUser, customRole)).toBe(true);
     });
 
@@ -506,12 +535,388 @@ describe('Policy Functions', () => {
       expect(() => policies.ensureCanUpdateRole(adminUser, adminRole)).toThrow(
         'ADMIN 역할은 수정할 수 없습니다.'
       );
-      expect(() => policies.ensureCanDeleteRole(adminUser, userRole)).toThrow(
-        '시스템 역할은 삭제할 수 없습니다.'
+      expect(() => policies.ensureCanDeleteRole(adminUser, managerRole)).toThrow(
+        '기본 역할은 삭제할 수 없습니다.'
       );
       expect(() => policies.ensureCanAssignRole(regularUser, adminRole)).toThrow(
         'ADMIN 역할 할당은 ADMIN만 가능합니다.'
       );
     });
+  });
+});
+
+/**
+ * 내부 댓글 가시성 — 상세·댓글 탭·REST GET·목록 댓글 수·내 요청 댓글 수가 **모두** 이 판정을 쓴다.
+ * 예전에는 세 경로가 같은 삼항식을 각자 복제했고, 목록·내 요청의 댓글 수는 아예 필터가 없어
+ * 내부 댓글이 생기면 고객사 사용자의 목록에 그 개수가 섞일 상태였다.
+ */
+describe('visibleCommentsWhere', () => {
+  const base = {
+    id: 'u-1',
+    email: 'u@example.com',
+    name: null,
+    image: null,
+    permissions: [],
+    // 판정은 역할로만 한다 — 소속 고객사가 있어도 내부 역할이면 내부 사용자다.
+    clientIds: ['c1'],
+  };
+
+  it.each(['ADMIN', 'MANAGER', 'ENGINEER'])('내부 사용자(%s)에게는 걸러 내지 않는다', (role) => {
+    expect(policies.visibleCommentsWhere({ ...base, roles: [role] })).toEqual({});
+  });
+
+  it.each(['CLIENT_ADMIN', 'CLIENT_USER', 'USER'])(
+    '외부 사용자(%s)에게는 내부 댓글을 뺀다',
+    (role) => {
+      expect(policies.visibleCommentsWhere({ ...base, roles: [role] })).toEqual({
+        isInternal: false,
+      });
+    }
+  );
+
+  it('역할이 비어 있으면 외부 사용자로 닫힌다(fail-closed)', () => {
+    expect(policies.visibleCommentsWhere({ ...base, roles: [] })).toEqual({ isInternal: false });
+  });
+});
+
+/**
+ * 남에게 배정된 SR 을 접수로 가져가기 — 헌법 §1.1 "타 엔지니어에게 할당된 SR은 임의로 변경할 수 없다".
+ * 판정은 목록·상세와 같은 담당자 스코프(resolveAssigneeScope)를 따른다.
+ */
+describe('canIntakeAssignedSR', () => {
+  const user = (roles: string[], permissions: string[] = ['SR:READ']) => ({
+    id: 'me',
+    email: 'me@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions,
+    clientIds: [],
+  });
+
+  it('미배정 SR 은 이 함수가 막지 않는다(접수 범위는 역할 게이트가 판정)', () => {
+    expect(policies.canIntakeAssignedSR(user(['ENGINEER']), { assigneeId: null })).toBe(true);
+  });
+
+  it('ENGINEER 는 자기 배정분만 접수하고, 남의 배정분은 가져갈 수 없다', () => {
+    expect(policies.canIntakeAssignedSR(user(['ENGINEER']), { assigneeId: 'me' })).toBe(true);
+    expect(policies.canIntakeAssignedSR(user(['ENGINEER']), { assigneeId: 'other' })).toBe(false);
+    expect(() =>
+      policies.ensureCanIntakeAssignedSR(user(['ENGINEER']), { assigneeId: 'other' })
+    ).toThrow('다른 담당자에게 배정된 SR은 접수할 수 없습니다.');
+  });
+
+  it.each([['ADMIN'], ['MANAGER']])('%s 는 남에게 배정된 SR 도 재배정할 수 있다', (role) => {
+    expect(policies.canIntakeAssignedSR(user([role]), { assigneeId: 'other' })).toBe(true);
+  });
+});
+
+/**
+ * 외부 사용자의 SR **내용 수정** — PRD §특수 권한 규칙 "SR 소유자: SR을 생성한 사용자는 REQUESTED
+ * 상태에서만 수정 가능". 이 규칙은 화면(수정 버튼·다이얼로그)에만 있어서, API 로는 접수·완료 뒤에도
+ * 제목·본문과 운영자가 쓴 완료 내용·거절 사유를 덮어쓰거나 지울 수 있었다.
+ *  - 신청자가 아닌 외부 사용자의 접수 후 수정 범위는 정책 미결이라 여기서 막지 않는다.
+ *  - 운영자(내부 사용자·SR:ASSIGN 보유자)의 접수 후 수정 범위도 정책 미결이라 막지 않는다.
+ *  - 상태 전이 요청도 지나되, 전이 전용 값만 빼고 본다(전이에 내용 수정을 끼워 넣는 우회 차단).
+ */
+describe('ensureCanEditSRContent', () => {
+  const user = (roles: string[], permissions: string[] = [], id = 'u') => ({
+    id,
+    email: 'u@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions,
+    clientIds: ['c1'],
+  });
+  const requester = user(['CLIENT_USER']);
+  const own = (status: string) => ({ status, requesterId: requester.id });
+
+  it('신청자는 접수 전(REQUESTED) SR 의 요청 내용을 고칠 수 있다', () => {
+    expect(() =>
+      policies.ensureCanEditSRContent(requester, own('REQUESTED'), { title: '새 제목' })
+    ).not.toThrow();
+  });
+
+  it.each(['INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED'])(
+    '신청자는 %s 상태 SR 의 내용을 고칠 수 없다',
+    (status) => {
+      expect(() =>
+        policies.ensureCanEditSRContent(requester, own(status), { title: '새 제목' })
+      ).toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+    }
+  );
+
+  it.each([['resolutionDescription'], ['rejectionReason']])(
+    '외부 사용자는 REQUESTED 에서도 운영자 필드 %s 를 쓸 수 없다',
+    (field) => {
+      expect(() =>
+        policies.ensureCanEditSRContent(requester, own('REQUESTED'), { [field]: '임의 값' })
+      ).toThrow('완료 내용과 거절 사유는 운영 담당자만 작성할 수 있습니다.');
+    }
+  );
+
+  it('만족도·추가 의견은 고객 소유 값이라 접수 후에도 남길 수 있다', () => {
+    expect(() =>
+      policies.ensureCanEditSRContent(requester, own('COMPLETED'), {
+        satisfactionRating: 5,
+        additionalFeedback: '감사합니다',
+      })
+    ).not.toThrow();
+  });
+
+  it('피드백에 다른 필드를 섞으면 접수 후에는 막는다', () => {
+    expect(() =>
+      policies.ensureCanEditSRContent(requester, own('COMPLETED'), {
+        satisfactionRating: 5,
+        title: '제목도 바꾸기',
+      })
+    ).toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+  });
+
+  it('상태 값이 현재와 같으면(전이 아님) 내용 수정으로 치지 않는다', () => {
+    expect(() =>
+      policies.ensureCanEditSRContent(requester, own('COMPLETED'), { status: 'COMPLETED' })
+    ).not.toThrow();
+  });
+
+  describe('상태 전이 요청', () => {
+    // status 라우트가 전이마다 싣는 값 그대로다. 전이 권한 자체는 상태머신이 판정한다.
+    it.each([
+      ['확인', 'COMPLETED', { status: 'CONFIRMED', changeReason: '상태 변경' }],
+      ['확인 + 만족도', 'COMPLETED', { status: 'CONFIRMED', satisfactionRating: 5 }],
+      ['재오픈', 'COMPLETED', { status: 'IN_PROGRESS', changeReason: '재발', assigneeId: 'e1' }],
+      ['거절', 'REQUESTED', { status: 'REJECTED', rejectionReason: '중복 요청' }],
+      ['거절(접수 후)', 'INTAKE', { status: 'REJECTED', rejectionReason: '범위 밖' }],
+      ['완료', 'IN_PROGRESS', { status: 'COMPLETED', resolutionDescription: '조치함' }],
+      ['보류', 'IN_PROGRESS', { status: 'ON_HOLD', expectedHoldReleaseDate: '2026-10-01' }],
+      ['재개', 'ON_HOLD', { status: 'IN_PROGRESS', expectedHoldReleaseDate: null }],
+    ])('%s 전이에 실린 전이 전용 값은 이 함수가 막지 않는다', (_label, from, changes) => {
+      expect(() => policies.ensureCanEditSRContent(requester, own(from), changes)).not.toThrow();
+    });
+
+    it('전이에 제목 수정을 끼워 넣으면 막는다', () => {
+      expect(() =>
+        policies.ensureCanEditSRContent(requester, own('COMPLETED'), {
+          status: 'CONFIRMED',
+          title: '확인하면서 제목도 바꾸기',
+        })
+      ).toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+    });
+
+    it('다른 전이의 전용 값은 끼워 넣을 수 없다 — 확인하면서 완료 내용을 덮어쓰기', () => {
+      expect(() =>
+        policies.ensureCanEditSRContent(requester, own('COMPLETED'), {
+          status: 'CONFIRMED',
+          resolutionDescription: '고객이 바꾼 완료 내용',
+        })
+      ).toThrow('완료 내용과 거절 사유는 운영 담당자만 작성할 수 있습니다.');
+    });
+  });
+
+  // 소유자 결정(2026-09-18): 접수 이후 SR 내용은 운영자만 고친다. 신청자가 아닌 고객사 관리자도 예외가
+  // 아니다 — 요구 범위가 조용히 바뀌면 접수 시점에 산정한 SLA 의 근거가 흔들린다.
+  it('신청자가 아닌 외부 사용자(고객사 관리자)도 접수 후에는 내용을 고칠 수 없다', () => {
+    const clientAdmin = user(['CLIENT_ADMIN'], ['SR:UPDATE'], 'client-admin');
+    expect(() =>
+      policies.ensureCanEditSRContent(clientAdmin, own('IN_PROGRESS'), { title: '새 제목' })
+    ).toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+    expect(() =>
+      policies.ensureCanEditSRContent(clientAdmin, own('REQUESTED'), { title: '새 제목' })
+    ).not.toThrow();
+    // 운영자 값은 신청자 여부와 무관하게 막는다.
+    expect(() =>
+      policies.ensureCanEditSRContent(clientAdmin, own('IN_PROGRESS'), {
+        resolutionDescription: '임의 값',
+      })
+    ).toThrow('완료 내용과 거절 사유는 운영 담당자만 작성할 수 있습니다.');
+  });
+
+  it.each([['ADMIN'], ['MANAGER'], ['ENGINEER']])(
+    '운영자(%s)는 접수 후에도 내용을 고칠 수 있다(ENGINEER 의 배정 범위는 ensureCanUpdateSR 이 본다)',
+    (role) => {
+      expect(() =>
+        policies.ensureCanEditSRContent(user([role], [], 'u'), own('IN_PROGRESS'), {
+          title: '새 제목',
+          resolutionDescription: '내용',
+        })
+      ).not.toThrow();
+    }
+  );
+
+  it('SR:ASSIGN 을 받은 외부 운영 역할은 운영자 필드 규칙과 같게 운영자로 본다', () => {
+    const externalOperator = user(['CLIENT_USER'], ['SR:ASSIGN']);
+    expect(policies.canWriteSROperatorFields(externalOperator)).toBe(true);
+    expect(() =>
+      policies.ensureCanEditSRContent(externalOperator, own('IN_PROGRESS'), {
+        resolutionDescription: '조치 내용',
+      })
+    ).not.toThrow();
+  });
+});
+
+describe('canWriteSROperatorFields', () => {
+  const user = (roles: string[], permissions: string[] = []) => ({
+    id: 'u',
+    email: 'u@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions,
+    clientIds: [],
+  });
+
+  it.each([['ADMIN'], ['MANAGER'], ['ENGINEER']])('내부 사용자(%s)는 운영자다', (role) => {
+    expect(policies.canWriteSROperatorFields(user([role]))).toBe(true);
+  });
+
+  it.each([['CLIENT_USER'], ['CLIENT_ADMIN']])('SR:ASSIGN 없는 %s 는 운영자가 아니다', (role) => {
+    expect(policies.canWriteSROperatorFields(user([role], ['SR:UPDATE']))).toBe(false);
+  });
+});
+
+/**
+ * 고객사 화면의 SR 요약·건수와 사용자 명부 — 헌법 §1.2: ENGINEER 는 고객사 명부·서비스 카테고리는
+ * 전체를 보지만 "SR 본문·고객사 사용자 정보·SR 통계는 자신에게 배정된 범위로 제한". 예전에는 고객사
+ * 상세·목록·조직도가 ENGINEER 에게 전 고객사의 사용자(이름·이메일·역할)와 최근 SR·SR 건수를 보여 줬다.
+ * 판정은 목록·상세와 같은 담당자 스코프(resolveAssigneeScope)를 따른다.
+ */
+describe('고객사 화면의 SR 스코프·사용자 명부', () => {
+  const user = (roles: string[], permissions: string[] = ['SR:READ']) => ({
+    id: 'me',
+    email: 'me@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions,
+    clientIds: [],
+  });
+
+  it('ENGINEER 는 자기 배정 SR 만 세고, 사용자 명부를 받지 않는다', () => {
+    expect(policies.clientSrScopeWhere(user(['ENGINEER']))).toEqual({ assigneeId: 'me' });
+    expect(policies.canViewClientRoster(user(['ENGINEER']))).toBe(false);
+  });
+
+  it.each([['ADMIN'], ['MANAGER']])('%s 는 스코프를 걸지 않고 명부를 받는다', (role) => {
+    expect(policies.clientSrScopeWhere(user([role]))).toEqual({});
+    expect(policies.canViewClientRoster(user([role]))).toBe(true);
+  });
+
+  // 외부 사용자는 담당자 축을 걸지 않는다 — 고객사 경계는 canReadClient 가 이미 판정한다.
+  // 명부(canViewClientRoster)는 여기서 단언하지 않는다. 지금은 자사 명부를 받지만, PRD 권한표는
+  // CLIENT_USER 에게 고객사 조회 ❌·사용자 조회는 본인만으로 적고 있어 **정책 미결**이다. 결정 전에
+  // 테스트로 현재 동작을 계약처럼 못박지 않는다.
+  it.each([['CLIENT_ADMIN'], ['CLIENT_USER']])('%s 에게 SR 담당자 스코프를 걸지 않는다', (role) => {
+    expect(policies.clientSrScopeWhere(user([role]))).toEqual({});
+  });
+});
+
+/**
+ * 실시간 이벤트 수신 자격(SSE 연결별). 내부 노트(D7)는 이벤트가 왔다는 사실만으로도 고객에게 존재가
+ * 드러나므로 내부 사용자에게만 흘린다.
+ */
+describe('canReceiveRealtimeEvent', () => {
+  const viewer = (roles: string[], id = 'viewer', clientIds: string[] = ['c1']) => ({
+    id,
+    email: 'v@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions: ['SR:READ'],
+    clientIds,
+  });
+  const event = {
+    srId: 'sr-1',
+    clientId: 'c1',
+    requesterId: 'req',
+    assigneeId: 'eng',
+    actorId: 'actor',
+  };
+
+  it('내부 전용 이벤트는 외부 사용자에게 흘리지 않는다', () => {
+    expect(
+      policies.canReceiveRealtimeEvent(viewer(['CLIENT_USER']), { ...event, internalOnly: true })
+    ).toBe(false);
+    expect(
+      policies.canReceiveRealtimeEvent(viewer(['MANAGER']), { ...event, internalOnly: true })
+    ).toBe(true);
+  });
+
+  it('대조군: 공개 이벤트는 같은 고객사 외부 사용자도 받는다', () => {
+    expect(policies.canReceiveRealtimeEvent(viewer(['CLIENT_USER']), event)).toBe(true);
+  });
+
+  it('자기가 유발한 이벤트는 받지 않는다(에코 방지)', () => {
+    expect(policies.canReceiveRealtimeEvent(viewer(['MANAGER'], 'actor'), event)).toBe(false);
+  });
+
+  it('다른 고객사 SR 의 이벤트는 받지 않는다(테넌트 격리)', () => {
+    expect(policies.canReceiveRealtimeEvent(viewer(['CLIENT_USER'], 'viewer', ['c2']), event)).toBe(
+      false
+    );
+  });
+});
+
+/**
+ * 라우트가 역할 문자열을 직접 비교하던 판정을 옮긴 것(헌법 §1.2 — 인가 판정은 policies.ts 한 곳).
+ * 동작은 옮기기 전과 같아야 한다.
+ */
+describe('라우트에서 옮겨 온 인가 판정', () => {
+  const user = (roles: string[], permissions: string[] = [], clientIds: string[] = []) => ({
+    id: 'u',
+    email: 'u@example.com',
+    name: null,
+    image: null,
+    roles,
+    permissions,
+    clientIds,
+  });
+
+  it('ADMIN 전용 기능은 ADMIN 만 통과한다(시스템 설정·알림 아웃박스·사용자 완전 삭제)', () => {
+    expect(policies.isSystemAdmin(user(['ADMIN']))).toBe(true);
+    for (const role of ['MANAGER', 'ENGINEER', 'CLIENT_ADMIN', 'CLIENT_USER']) {
+      expect(policies.isSystemAdmin(user([role], ['SETTINGS:UPDATE']))).toBe(false);
+    }
+    expect(() => policies.ensureSystemAdmin(user(['MANAGER']), '관리자 전용')).toThrow(
+      '관리자 전용'
+    );
+  });
+
+  it('ADMIN 은 모든 권한을 암묵적으로 가진다 — 그 외에는 권한 플래그가 있어야 한다', () => {
+    expect(policies.hasEffectivePermission(user(['ADMIN']), 'ANY:THING')).toBe(true);
+    expect(policies.hasEffectivePermission(user(['MANAGER'], ['SR:READ']), 'SR:READ')).toBe(true);
+    expect(policies.hasEffectivePermission(user(['MANAGER'], ['SR:READ']), 'SR:DELETE')).toBe(
+      false
+    );
+  });
+
+  it('역할 부여는 ADMIN 또는 ROLE:ASSIGN 만(D5 — MANAGER 는 역할만으로 통과하지 않는다)', () => {
+    expect(() => policies.ensureCanAssignRoles(user(['ADMIN']))).not.toThrow();
+    expect(() => policies.ensureCanAssignRoles(user(['CUSTOM'], ['ROLE:ASSIGN']))).not.toThrow();
+    expect(() => policies.ensureCanAssignRoles(user(['MANAGER'], ['USER:UPDATE']))).toThrow(
+      '역할을 할당할 권한이 없습니다.'
+    );
+  });
+
+  it('고객사 소속 배정·해제는 운영 관리자(ADMIN·MANAGER)만', () => {
+    expect(policies.canManageUserClientAssignment(user(['ADMIN']))).toBe(true);
+    expect(policies.canManageUserClientAssignment(user(['MANAGER']))).toBe(true);
+    expect(policies.canManageUserClientAssignment(user(['ENGINEER']))).toBe(false);
+    expect(policies.canManageUserClientAssignment(user(['CLIENT_ADMIN'], [], ['c1']))).toBe(false);
+  });
+
+  it('가입 승인은 운영 관리자는 모든 고객사, CLIENT_ADMIN 은 자기 고객사만', () => {
+    expect(policies.canApproveMembership(user(['MANAGER']), 'c9')).toBe(true);
+    expect(policies.canApproveMembership(user(['CLIENT_ADMIN'], [], ['c1']), 'c1')).toBe(true);
+    expect(policies.canApproveMembership(user(['CLIENT_ADMIN'], [], ['c1']), 'c9')).toBe(false);
+    expect(policies.canApproveMembership(user(['CLIENT_USER'], [], ['c1']), 'c1')).toBe(false);
+    expect(() => policies.ensureCanApproveMembership(user(['ENGINEER']), 'c1')).toThrow(
+      '이 고객사 소속을 승인/거절할 권한이 없습니다.'
+    );
+  });
+
+  it('CSV 내보내기는 내부 사용자만', () => {
+    expect(policies.canExportSRs(user(['ENGINEER']))).toBe(true);
+    expect(policies.canExportSRs(user(['CLIENT_ADMIN'], ['SR:READ'], ['c1']))).toBe(false);
   });
 });

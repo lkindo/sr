@@ -25,6 +25,9 @@ vi.mock('@/lib/prisma', () => {
     auditLog: {
       create: vi.fn(),
     },
+    sR: {
+      count: vi.fn().mockResolvedValue(0),
+    },
     $transaction: vi.fn((cb: any) => cb(mockPrisma)),
   };
   return { default: mockPrisma };
@@ -50,7 +53,7 @@ describe('ServiceCategoryService', () => {
       const rows = [{ id: '1' }];
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue(rows as never);
 
-      const result = await service.getAll();
+      const result = await service.getAll({ clientIds: null });
 
       expect(result).toBe(rows);
       expect(prisma.serviceCategory.findMany).toHaveBeenCalledWith(

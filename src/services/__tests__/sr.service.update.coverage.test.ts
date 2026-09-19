@@ -19,6 +19,8 @@ vi.mock('@/lib/prisma', () => ({
     client: { findUnique: vi.fn() },
     serviceCategory: { findUnique: vi.fn() },
     sRActivity: { create: vi.fn() },
+    // 한 번 완료된 적 있는가(D9 — sr.service.wasEverCompleted). 기본은 없음.
+    sRStatusHistory: { findFirst: vi.fn().mockResolvedValue(null) },
     // 담당자 배정 검증(assertAssignable) 및 배정 가능 사용자 목록 조회에 사용된다.
     user: { findUnique: vi.fn(), findMany: vi.fn() },
     role: { findMany: vi.fn() },
@@ -156,6 +158,9 @@ describe('SRService.updateSR Branches', () => {
     expect(vi.mocked(txMock.sR.update).mock.calls[0]![0].data.clientId).toBe('own-c');
   });
 
+  // 카테고리의 고객사 경계(ensureCategoryBelongsToClient)를 본다. 예전에는 외부 사용자로 불렀는데, 카테고리는
+  // 운영자 소유 값이라 운영자 필드 규칙이 먼저 거부해서 이 경계 검사에는 도달하지도 않은 채 통과했다.
+  // 카테고리를 바꿀 수 있는 운영자로 불러야 경계 검사 자체를 검증한다.
   it('타 고객사 전용 서비스 카테고리로 변경하면 ForbiddenError', async () => {
     vi.mocked(prisma.sR.findUnique).mockResolvedValue({
       id: 'sr-1',
@@ -169,8 +174,8 @@ describe('SRService.updateSR Branches', () => {
     vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
     await expect(
-      srService.updateSR('sr-1', { serviceCategoryId: 'cat-of-other-c' }, externalUser)
-    ).rejects.toThrow(ForbiddenError);
+      srService.updateSR('sr-1', { serviceCategoryId: 'cat-of-other-c' }, internalUser)
+    ).rejects.toThrow('다른 고객사의 서비스 카테고리는 사용할 수 없습니다.');
 
     // 경계 위반은 갱신 트랜잭션 이전에 차단되어야 한다.
     expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -268,13 +273,24 @@ describe('SRService.updateSR Branches', () => {
     it('외부 사용자가 dueDate를 바꾸면 ForbiddenError이며 갱신이 실행되지 않는다', async () => {
       await expect(
         srService.updateSR('sr-1', { dueDate: '2030-01-01' }, externalUser)
-      ).rejects.toThrow(ForbiddenError);
+      ).rejects.toThrow('접수 담당자만 변경할 수 있는 항목입니다');
+      // (문구로 단언한다. externalUser 는 이 SR 의 신청자라서, ForbiddenError 만 보면 내용 수정
+      //  규칙 — 신청자의 접수 후 수정 차단 — 이 대신 던져도 통과한다.)
 
       expect(prisma.$transaction).not.toHaveBeenCalled();
       expect(txMock.sR.update).not.toHaveBeenCalled();
     });
 
-    it('POSITIVE: 외부 사용자는 본인 고객사 SR의 제목/설명을 계속 수정할 수 있다', async () => {
+    // 신청자의 제목·설명 수정은 접수 전(REQUESTED)에만 된다(PRD §특수 권한 규칙 "SR 소유자",
+    // policies.ensureCanEditSRContent). externalUser(u2)는 이 SR 의 신청자다.
+    // 예전 이 테스트는 접수된 SR 에서도 "계속 수정할 수 있다" 로 고정했는데, 그것이 API 로 접수·완료 뒤
+    // 요청 내용을 덮어쓸 수 있던 결함이었다. 이 테스트의 목적(운영 전용 필드가 요청에 없으면 그대로
+    // 남는다)은 접수 전 SR 에서도 똑같이 성립한다.
+    it('POSITIVE: 외부 사용자는 접수 전 본인 고객사 SR 의 제목·설명을 수정할 수 있다', async () => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+        ...intakedSR,
+        status: 'REQUESTED',
+      } as never);
       await srService.updateSR(
         'sr-1',
         { title: '수정된 제목', description: '수정된 설명입니다.' },

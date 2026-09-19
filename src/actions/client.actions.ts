@@ -156,7 +156,7 @@ export async function getClientsForSelection(includeId?: string) {
 
     // 내부 사용자인지 확인하여 필터링 적용
     const isInternal = isInternalUser(session.user);
-    const clientIds = isInternal ? undefined : session.user.clientIds || [];
+    const clientIds = isInternal ? null : session.user.clientIds || [];
 
     // 필요한 정보만 선택적으로 조회 (보안 강화)
     const clients = await clientService.getClientsForSelection(clientIds, { includeId });
@@ -170,9 +170,12 @@ export async function getClientsForSelection(includeId?: string) {
   } catch (error) {
     logger.error('❌ [getClientsForSelection] 고객사 목록 조회 실패:', error as Error);
 
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : '고객사 목록을 불러오는데 실패했습니다.',
-    };
+    // 도메인 에러(권한 등)는 그 문구를, 분류하지 못한 예외는 운영 환경에서 고정 문구를 준다(errorToResult).
+    // Error 가 아닌 거부값은 이 화면의 기본 문구로 알린다(기존 계약).
+    const message =
+      error instanceof Error
+        ? errorToResult(error).error
+        : '고객사 목록을 불러오는데 실패했습니다.';
+    return { success: false, error: message };
   }
 }

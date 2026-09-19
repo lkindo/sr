@@ -14,6 +14,16 @@ type PublicSRAttachment = Pick<
 export type SRDetails = SR & {
   client: { id: string; code: string; name: string };
   requester: { id: string; name: string; email: string };
+  /**
+   * 신청자가 운영자(ADMIN·MANAGER·ENGINEER)인가 — 운영자가 자기 이름으로 등록한 SR 은 그 고객사의
+   * CLIENT_ADMIN 도 확인할 수 있다(sr-state-machine.canConfirmAsAcceptor). 서버가 신청자 역할로 계산한다.
+   */
+  requesterIsInternal: boolean;
+  /**
+   * 한 번이라도 완료된 적이 있는가(재오픈 포함). 마감일 조정은 접수 권한자만, 거절은 불가(D9 —
+   * sr-state-machine.canViewerAdjustDueDate·isRejectBlockedAfterCompletion). 서버가 상태 이력으로 계산한다.
+   */
+  wasCompleted: boolean;
   assignee: { id: string; name: string; email: string } | null;
   intakeBy: { id: string; name: string; email: string; image: string | null } | null;
   serviceCategory: {
@@ -149,8 +159,10 @@ export interface SRBadgeCounts {
   inProgress: number;
   /** 긴급(CRITICAL·HIGH) */
   urgent: number;
-  /** 오늘 마감이면서 아직 닫히지 않은 것 */
+  /** 지금 이후 오늘 자정 전에 마감이 오면서 아직 닫히지 않은 것(이미 지난 것은 overdue 에서 센다) */
   dueToday: number;
+  /** '지연 중' — 마감을 넘긴 진행 중(접수·진행중·보류) SR(헌법 §3, 결정 D10) */
+  overdue: number;
   /** 내가 담당인 것 */
   myAssigned: number;
 }

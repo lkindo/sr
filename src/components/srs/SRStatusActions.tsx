@@ -35,7 +35,11 @@ interface SRStatusActionsProps {
   srNumber: string;
   status: SRStatus;
   userRoles: string[];
-  isRequestor: boolean;
+  /**
+   * '확인 완료' 버튼을 보일지 — 호출부가 `sr-state-machine.canViewerConfirmSR` 로 서버와 같은 규칙으로
+   * 판정해 넘긴다(신청자 본인, 또는 운영자가 등록한 SR 의 해당 고객사 CLIENT_ADMIN).
+   */
+  canConfirm: boolean;
   /**
    * 재오픈 버튼의 노출·비활성·이유. `getReopenAvailability`(sr-state-machine)로 계산해 넘긴다.
    * 커스텀 역할도 권한으로 재오픈할 수 있으므로(감사 4.3) 그 계산에 사용자 권한이 들어간다.
@@ -46,6 +50,11 @@ interface SRStatusActionsProps {
    * 페이지가 한 번 계산해 버튼과 안내(`SRReopenBlockedNotice`)에 같은 값을 준다.
    */
   reopen: ReopenAvailability;
+  /**
+   * 거절 버튼을 감출지 — 한 번 완료된 SR 은 거절로 끝내지 않는다(D9). 호출부가
+   * `sr-state-machine.isRejectBlockedAfterCompletion` 으로 서버와 같은 규칙으로 판정해 넘긴다.
+   */
+  rejectBlocked?: boolean;
 }
 
 /**
@@ -96,8 +105,9 @@ export function SRStatusActions({
   srNumber,
   status,
   userRoles,
-  isRequestor,
+  canConfirm,
   reopen,
+  rejectBlocked = false,
 }: SRStatusActionsProps) {
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [holdDialogOpen, setHoldDialogOpen] = useState(false);
@@ -211,23 +221,38 @@ export function SRStatusActions({
         );
 
       case 'INTAKE':
-        // 접수됨 상태: 진행 시작, 보류(접수단계에선 보류불가?), 거절
+        // 접수됨 상태: 진행 시작, 거절. 보류는 진행 중에만 된다(상태머신 INTAKE → IN_PROGRESS·REJECTED).
+        // 거절 버튼이 없어서 접수 뒤 범위 밖으로 판명된 SR 을 화면으로는 거절할 수 없었다 — 전이표·
+        // status 라우트·헌법은 모두 허용한다.
         if (!canManage) return null;
         return (
-          <Button
-            onClick={() => handleSimpleStatusChange('start')}
-            disabled={!!loadingAction}
-            aria-label="진행 시작"
-            className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-            title="진행 시작"
-          >
-            {loadingAction === 'start' ? (
-              <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
-            ) : (
-              <Play className="h-4 w-4 md:mr-2" />
-            )}
-            <span className="hidden md:inline">진행 시작</span>
-          </Button>
+          <>
+            <Button
+              onClick={() => handleSimpleStatusChange('start')}
+              disabled={!!loadingAction}
+              aria-label="진행 시작"
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="진행 시작"
+            >
+              {loadingAction === 'start' ? (
+                <Loader2 className="h-4 w-4 md:mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 md:mr-2" />
+              )}
+              <span className="hidden md:inline">진행 시작</span>
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setRejectDialogOpen(true)}
+              disabled={!!loadingAction}
+              aria-label="거절"
+              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+              title="거절"
+            >
+              <XCircle className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">거절</span>
+            </Button>
+          </>
         );
       case 'IN_PROGRESS':
         // 진행중 상태: 완료 처리, 보류
@@ -277,25 +302,28 @@ export function SRStatusActions({
               )}
               <span className="hidden md:inline">진행 재개</span>
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => setRejectDialogOpen(true)}
-              disabled={!!loadingAction}
-              aria-label="거절"
-              className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
-              title="거절"
-            >
-              <XCircle className="h-4 w-4 md:mr-2" />
-              <span className="hidden md:inline">거절</span>
-            </Button>
+            {/* 한 번 완료된 SR 은 거절로 끝내지 않는다(D9) — 재작업을 마치면 다시 완료로 종결한다. */}
+            {!rejectBlocked && (
+              <Button
+                variant="destructive"
+                onClick={() => setRejectDialogOpen(true)}
+                disabled={!!loadingAction}
+                aria-label="거절"
+                className="h-8 w-8 p-0 md:h-9 md:w-auto md:px-3"
+                title="거절"
+              >
+                <XCircle className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">거절</span>
+              </Button>
+            )}
           </>
         );
 
       case 'COMPLETED':
-        // 완료 상태: 확인 완료 (신청자만), 재오픈 (관리자/신청자)
+        // 완료 상태: 확인 완료 (canConfirm — 신청자, 또는 운영자가 등록한 SR 의 고객사 관리자), 재오픈
         return (
           <>
-            {isRequestor && (
+            {canConfirm && (
               <Button
                 onClick={() => handleSimpleStatusChange('confirm')}
                 disabled={!!loadingAction}

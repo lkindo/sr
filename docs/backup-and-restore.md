@@ -25,6 +25,13 @@ uploads_20260703_030000.tar.gz
 
 > 필요 시크릿: `SERVER_HOST`, `SERVER_USER`, `SERVER_KEY` (배포 워크플로와 동일).
 
+> **DB 사용자·DB 이름**: `backup.sh`·`restore.sh` 는 호출자가 `POSTGRES_USER` 를 넘기지 않으면
+> 저장소 루트의 `.env.prod`(배포가 매번 새로 쓰는 운영 보간 파일)에서 `POSTGRES_USER`·`POSTGRES_DB` 를
+> 읽는다. 파일이 없으면 기본값(`lkind`/`sr_db`)을 쓰고, 파일이 **있는데** 읽을 수 없거나
+> `POSTGRES_USER` 가 비어 있으면 오류로 멈춘다(엉뚱한 DB 를 백업·복구하지 않도록). 그래서 아래 cron·수동
+> 명령도 별도 설정 없이 운영 값을 따른다. 다른 파일을 쓰려면 `ENV_FILE=경로` 로 지정한다.
+> 이 동작은 main 에 병합된 뒤부터다(야간 백업은 main 의 스크립트를 서버에 복사해 실행한다).
+
 ### cron 대안 (GitHub 의존 없이)
 
 서버 crontab 에 직접 등록해도 된다:
@@ -68,7 +75,7 @@ health 상태를 확인한다. 긴급 상황에서 현재 상태 백업을 의�
 `scripts/restore-rehearsal.sh` 가 **일회용 Postgres 컨테이너**에 최신 백업을 복구하고
 스키마·행 수를 단언한다. **프로덕션 DB 는 건드리지 않는다.**
 
-`.github/workflows/restore-rehearsal.yml` 이 매월 1일(KST 04:00) 자동 실행하며,
+`.github/workflows/restore-rehearsal.yml` 이 매월 2일 KST 04:00(cron `0 19 1 * *` = UTC 1일 19:00, 야간 백업 직후) 자동 실행하며,
 `workflow_dispatch` 로 수동 실행도 가능하다.
 
 ```bash
@@ -135,7 +142,10 @@ OFFSITE_CMD='rclone copy /home/opc/sr/backups sr-backups:sr/backups --max-age 25
 | -------------------------- | ---------------------------------------------- |
 | `BACKUP_ENCRYPT_RECIPIENT` | age 공개키 또는 gpg 키 ID. 미설정 시 평문 저장 |
 | `BACKUP_OFFSITE_CMD`       | 오프호스트 복제 명령. 미설정 시 복제 안 함     |
-| `BACKUP_AGE_IDENTITY_FILE` | (리허설용) 서버상의 age 개인키 파일 경로       |
+
+복구 리허설이 쓰는 개인키 경로 `BACKUP_AGE_IDENTITY_FILE` 은 **시크릿이 아니다** —
+`restore-rehearsal.yml` 이 `/home/opc/sr/var/backup-age.key` 를 직접 들고 있다(경로는 비밀이 아니고,
+시크릿으로 두면 로그에서 가려져 진단이 막힌다). 키 파일을 그 경로에 두기만 하면 된다.
 
 > **두 시크릿 모두 등록해야 3.31 이 실제로 닫힌다.** 코드 경로는 준비되어 있지만,
 > 값이 없으면 백업은 여전히 평문으로 같은 디스크에만 남는다.

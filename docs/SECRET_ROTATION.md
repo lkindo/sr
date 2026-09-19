@@ -42,9 +42,11 @@
    ```bash
    ssh opc@<SERVER_HOST>
    cd /home/opc/sr
-   # backup.sh 는 POSTGRES_USER/POSTGRES_PASSWORD 를 환경에서 읽는다(기본값 lkind).
-   set -a; . ./.env 2>/dev/null; set +a
-   ./scripts/backup.sh
+   # backup.sh 는 POSTGRES_USER/POSTGRES_DB 를 환경에서, 없으면 .env.prod 에서 읽는다(파일이 없으면 기본값 lkind).
+   # 운영 compose 보간 값은 `.env.prod` 에 있다(배포가 매번 새로 쓴다). `.env` 가 아니다 — 4절 2번.
+   # 서브셸로 감싼다(deploy.yml 의 백업 호출과 같은 형태). 감싸지 않으면 POSTGRES_* 가 이 셸에
+   # 남아, 나중에 같은 셸에서 부르는 compose 가 파일 대신 그 값으로 보간한다(셸이 우선).
+   ( set -a; . ./.env.prod; set +a; ./scripts/backup.sh )
    ```
 
 3. 현재 운영 `.env.docker` 사본을 안전한 곳(패스워드 매니저)에 보관한다. 이 파일은 저장소에
@@ -92,7 +94,7 @@ Repository → Settings → Secrets and variables → Actions → **New reposito
 | ------------------------- | ----------------------------------------------------------------------------- |
 | `PROD_ENV_DOCKER_B64`     | 새 운영 `.env.docker` 전체를 base64 인코딩한 문자열                           |
 | `STAGING_ENV_DOCKER_B64`  | 새 스테이징 `.env.docker.test` 전체를 base64 인코딩한 문자열                  |
-| `PROD_COMPOSE_ENV_B64`    | 운영 compose 보간용 `.env`(`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`) |
+| `PROD_COMPOSE_ENV_B64`    | 운영 compose 보간용 `.env.prod`(`POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`) |
 | `STAGING_COMPOSE_ENV_B64` | 스테이징 compose 보간용 `.env.staging`                                        |
 
 인코딩 방법:
@@ -131,17 +133,23 @@ POSTGRES_DB=sr_db
    추적 해제 후에는 체크아웃에 존재하지 않으므로 scp 대상이 될 수 없다.
 
 2. `Deploy to Remote VM via SSH` 가 브랜치에 따라 시크릿을 골라 서버에 직접 기록한다.
-   `main` → `.env.docker` + `.env`, `dev` → `.env.docker.test` + `.env.staging`.
+   `main` → `.env.docker` + `.env.prod`, `dev` → `.env.docker.test` + `.env.staging`.
+   **운영도 `.env` 를 쓰지 않는다.** 서버의 `/home/opc/sr/.env` 는 Docker 이전 배포에서 남은
+   파일로 EMAIL/VAPID 자격증명의 유일한 사본을 담고 있어, 덮어쓰면 복구할 수 없다
+   (`deploy.yml` 의 같은 자리 주석, 커밋 `c37ac67`).
    `umask 077` 로 생성하고 `chmod 600` 을 건다.
 
 3. **보간용 env 파일 분리.** `docker compose` 는 프로젝트 디렉터리의 `.env` 하나만 기본으로
-   읽는다. 운영과 스테이징이 같은 `/home/opc/sr` 를 공유하므로, 스테이징은 `--env-file` 로
-   `.env.staging` 을 명시해 운영 DB 자격증명이 새어 들어가지 않게 한다. 워크플로는 분기 시점에
-   `COMPOSE_ARGS` 를 확정하고 `pull` / `down` / `up` / `image prune` 전부에 동일하게 사용한다.
+   읽는다. 운영과 스테이징이 같은 `/home/opc/sr` 를 공유하고 그 `.env` 는 레거시 파일이므로,
+   **두 환경 모두** `--env-file` 로 보간 파일을 명시한다(운영 `.env.prod`, 스테이징
+   `.env.staging`). `--env-file` 을 빼고 compose 를 부르면 레거시 `.env` 로 보간된다. 워크플로는 분기 시점에
+   `COMPOSE_ARGS` 를 확정하고 그 뒤의 compose 호출(`config` / `pull` / `up`, 스테이징은 `down` 포함) 전부에
+   동일하게 사용한다. 운영은 `down` 없이 앱만 교체하고, 이미지 정리는 compose 가 아니라
+   `docker image prune` 이다(배포 순서의 정본은 `docs/SERVER_RUNBOOK_2026-08-01.md` 5절).
 
    ```bash
    COMPOSE_ARGS="--env-file .env.staging -p sr-test -f docker-compose.test.yml"   # dev
-   COMPOSE_ARGS="--env-file .env -f docker-compose.prod.yml"                      # main
+   COMPOSE_ARGS="--env-file .env.prod -f docker-compose.prod.yml"                 # main
    ```
 
    `--env-file` 은 **최상위 플래그**라 하위 명령 앞에 와야 한다.
@@ -154,7 +162,8 @@ POSTGRES_DB=sr_db
    두 검사 모두 `down` 보다 앞에 있으므로, 실패해도 **현재 서비스는 계속 살아 있다.**
 
 5. `env_file: .env.docker` 는 **컨테이너 환경변수**일 뿐 compose 보간에는 쓰이지 않는다.
-   `${POSTGRES_PASSWORD:?...}` 는 `.env`(또는 `--env-file` 로 지정한 파일)에서만 읽힌다.
+   `${POSTGRES_PASSWORD:?...}` 는 `--env-file` 로 지정한 파일(운영 `.env.prod`, 스테이징 `.env.staging`)과
+   셸 환경변수에서 읽히며 **셸이 우선**한다. `env_file:` 로는 읽히지 않는다.
    이 둘을 혼동해 보간용 파일을 만들지 않으면 4번의 `config -q` 가 다음 메시지로 배포를
    중단시킨다(의도된 동작).
 
@@ -191,13 +200,19 @@ docker exec -it sr-db psql -U lkind -d sr_db \
 
 > `ALTER USER ... RENAME TO` 는 해당 롤의 MD5 비밀번호를 무효화하므로 **반드시 이름 변경 후
 > 비밀번호를 다시 설정**한다. 위 순서를 지킬 것.
+>
+> 사용자 이름을 바꾸면 백업·복구 스크립트도 새 이름을 써야 한다. 이 변경이 **main 에 병합된 뒤의**
+> 두 스크립트는 `.env.prod` 의 `POSTGRES_USER` 를 읽으므로, 아래에서 `.env.prod` 를 갱신하면 함께
+> 반영된다(야간 백업은 매번 main 의 `scripts/backup.sh` 를 서버에 복사해 실행한다). 그 전 판은 이 값을
+> 읽지 않고 `lkind` 로 접속하므로, 그 판이 도는 동안 이름을 바꾸면 야간 백업이 실패한다.
 > 비밀번호에 `'` 가 들어가지 않도록 hex 생성값을 쓴다.
 
-그다음 `.env`(compose 보간)와 `.env.docker`(`DATABASE_URL`/`DIRECT_URL`)를 새 값으로 갱신하고
-재기동한다.
+그다음 `.env.prod`(compose 보간)와 `.env.docker`(`DATABASE_URL`/`DIRECT_URL`)를 새 값으로 갱신하고
+재기동한다. `.env` 는 건드리지 않는다(4절 2번). 두 파일은 다음 배포 때 GitHub Secrets
+(`PROD_COMPOSE_ENV_B64`·`PROD_ENV_DOCKER_B64`)로 다시 쓰이므로 같은 값을 Secrets 에도 넣어야 한다(3단계).
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --force-recreate
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate
 ```
 
 ### 방법 B — 볼륨 재생성 (데이터 소실, 스테이징에만 권장)
@@ -206,7 +221,14 @@ docker compose -f docker-compose.prod.yml up -d --force-recreate
 # 백업 확인 후에만!
 docker compose -p sr-test --env-file .env.staging -f docker-compose.test.yml down -v
 docker compose -p sr-test --env-file .env.staging -f docker-compose.test.yml up -d
-docker compose -p sr-test exec -T app-test npx tsx prisma/seed.ts
+```
+
+기준 데이터(권한·역할) 시딩은 따로 할 필요가 없다 — 컨테이너가 기동할 때마다 `docker-entrypoint.sh` 가
+`node prisma/seed.bundle.cjs` 로 수행하고, 실패하면 컨테이너가 뜨지 않는다(`docs/BOOTSTRAP.md` 3절).
+러너 이미지에는 `tsx` 가 없으므로 `npx tsx prisma/seed.ts` 는 쓸 수 없다. 다시 돌려야 하면 다음을 쓴다.
+
+```bash
+docker compose -p sr-test --env-file .env.staging -f docker-compose.test.yml exec -T app-test node prisma/seed.bundle.cjs
 ```
 
 ---
@@ -225,7 +247,7 @@ git commit -m "chore(security): untrack .env.docker* (secrets moved to GitHub Ac
 
 ```bash
 git ls-files | grep -i env       # .env.example 만 남아야 한다
-git check-ignore -v .env.docker .env.docker.test   # .gitignore:30 규칙에 걸려야 한다
+git check-ignore -v .env.docker .env.docker.test   # .gitignore 의 .env.* / .env.docker* 규칙에 걸려야 한다
 ```
 
 > 추적 해제만으로는 **이력에 남은 값이 지워지지 않는다.** 7절의 퍼지까지 마쳐야 하며,
@@ -302,17 +324,27 @@ git push --force
 
 ## 8. 실행 순서 요약
 
+> **2026-09-18 갱신 — 지금 로테이션한다면.** 4단계(`deploy.yml` 이 Secrets 를 서버에 쓰는 구조)와
+> 6단계(`.env.docker*` 추적 해제)는 이미 반영돼 있으므로 확인만 한다. 이제 배포는 **매번**
+> GitHub Secrets 로 서버의 `.env.prod`·`.env.docker` 를 다시 쓴다. 그래서 서버 파일과 Secrets 를
+> **같은 값으로 함께** 바꿔야 하고, 둘 중 하나만 바뀐 상태에서 main 배포가 돌면 안 된다.
+
 1. 백업 (DB + 현재 `.env.docker` 사본)
 2. 새 값 생성 — **운영/스테이징/로컬 각각 다른 값** (2단계)
-3. GitHub Actions Secrets 등록 (3단계)
-4. `deploy.yml` 수정 후 커밋 (4단계) — 아직 push 하지 않는다
-5. 서버에서 DB 비밀번호 교체 (5단계 방법 A) + `/home/opc/sr/.env`, `.env.docker` 갱신
-6. `docker compose -f docker-compose.prod.yml up -d --force-recreate` 로 수동 검증
-7. `git rm --cached` 커밋 (6단계) → push → 배포 파이프라인 정상 동작 확인
+3. GitHub Actions Secrets 갱신 (3단계) — 5번에서 서버에 넣을 값과 **같은 값**
+4. `deploy.yml` 확인만 (4단계, 이미 반영됨)
+5. 서버에서 DB 비밀번호 교체 (5단계 방법 A) + `/home/opc/sr/.env.prod`, `.env.docker` 갱신 (`.env` 아님)
+6. `docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --force-recreate` 로 수동 검증
+7. 추적 해제 확인만 (6단계, 이미 반영됨: `git ls-files | grep -i env`) → 다음 main 배포가 새 값으로 정상 동작하는지 확인
 8. 안정화 후 이력 재작성 (7단계) + 협업자 재클론 공지
 
-> 5번을 4번보다 먼저 하면 다음 배포가 옛 비밀번호로 올라와 앱이 DB 연결에 실패한다.
-> 7번을 5번보다 먼저 하면 서버에 `.env.docker` 가 없는 상태로 배포가 돌아 크래시 루프가 된다.
+> **3번부터 6번까지는 main push 없이 이어서 한다.** 3번 뒤 5번 전에 배포가 돌면 앱이 새
+> 비밀번호로 올라와 아직 옛 비밀번호인 DB 에 붙지 못한다. 반대로 5번만 하고 3번을 빠뜨리면
+> 다음 배포가 서버 파일을 옛 Secrets 값으로 덮어써 같은 장애가 난다.
+>
+> **서명키(`NEXTAUTH_SECRET`/`AUTH_SECRET`)만 바꾸는 경우**는 DB 와 얽히지 않는다.
+> `PROD_ENV_DOCKER_B64` 를 새 값으로 갱신하고 서버 `.env.docker` 를 같은 값으로 바꾼 뒤 6번으로
+> 재기동하면 된다. 기존 세션이 전부 무효화되므로 9절의 재로그인 공지와 교차 환경 검증을 함께 한다.
 
 ---
 
@@ -327,10 +359,13 @@ git push --force
 - [ ] `gitleaks detect --source . --config .gitleaks.toml --redact` 가 clean 이다.
       (이력 재작성 전이라면 과거 커밋에서 여전히 검출된다 — 정상.)
 - [ ] `gitleaks dir . --no-git --config .gitleaks.toml --redact` 로 작업 트리도 확인한다.
-- [ ] `docker compose -f docker-compose.prod.yml config` 가 `POSTGRES_PASSWORD` 없이
-      **실패**하는지 확인한다(fail-fast 가 살아 있다는 증거).
+- [ ] `env -u POSTGRES_PASSWORD POSTGRES_USER=probe docker compose --env-file /dev/null -f docker-compose.prod.yml config`
+      가 **실패**하고, 오류 메시지에 `POSTGRES_PASSWORD is required` 가 들어 있는지 확인한다
+      (fail-fast 가 살아 있다는 증거). 세 부분이 모두 필요하다 — `--env-file /dev/null` 이 없으면
+      레거시 `.env` 가, `env -u` 가 없으면 셸에 남은 변수가 값을 채우고, `POSTGRES_USER=probe`
+      가 없으면 `POSTGRES_USER` 가 먼저 실패해 `POSTGRES_PASSWORD` 가드를 지워도 검사가 통과한다.
 - [ ] 백업/복구 스크립트가 새 자격증명으로 동작한다:
-      `set -a; . ./.env; set +a; ./scripts/backup.sh`
+      `( set -a; . ./.env.prod; set +a; ./scripts/backup.sh )`
 - [ ] GitHub Actions 캐시 삭제: `cache-to: type=gha,mode=max` 로 옛 `.env.docker` 가 담긴
       빌드 레이어가 캐시에 남아 있다. Actions → Caches 에서 전부 삭제한다.
       (`.dockerignore` 에 `.env.docker*` 가 추가되어 이후 빌드부터는 유입되지 않는다.)
@@ -341,6 +376,12 @@ git push --force
 ---
 
 ## 10. 이 커밋에서 처리되지 않은 후속 작업
+
+> **2026-09-18 확인: 아래 네 항목은 모두 이후 커밋에서 처리됐다.** `docker-compose.test.yml` 은
+> `${POSTGRES_USER:?...}`·`${POSTGRES_PASSWORD:?...}` 와 새 healthcheck 를 쓰고, `deploy.yml` 은 4절대로
+> 동작하며, `ci-cd.yml` 의 `security` 잡이 gitleaks 를 돌리고(`Scan for committed secrets`),
+> `src/lib/env-validation.ts` 가 `AUTH_SECRET`·VAPID·EMAIL 변수를 선언하고 플레이스홀더를 거부한다.
+> 기록으로 남긴다.
 
 - **`docker-compose.test.yml:35-37`** 이 여전히 `POSTGRES_USER=lkind` /
   `POSTGRES_PASSWORD=sr1234` / `POSTGRES_DB=sr_db_test` 를 리터럴로 갖고 있다.

@@ -5,14 +5,21 @@ import { RouteContext, validateRequestBody } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { ensureCanReadSR, INTERNAL_ROLES, isInternalUser } from '@/lib/policies';
+import {
+  canIntakeSR,
+  ensureCanIntakeAssignedSR,
+  ensureCanIntakeSR,
+  ensureCanReadSR,
+  isInternalUser,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
+import { formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
 import { serviceCategoryService } from '@/services/service-category.service';
-import { assertAssignable } from '@/services/sr.service';
+import { assertAssignable, srService } from '@/services/sr.service';
 import { enqueueSRAssignedEmail, enqueueSRStatusChangedEmail } from '@/services/sr-email-outbox';
 
 // POST(접수)와 PATCH(접수정보 수정)의 응답 include. 두 곳에 31줄이 축자 복제돼 있었다.
@@ -41,17 +48,9 @@ export const POST = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    // 권한 체크: 접수(Intake)는 담당 엔지니어 배정·SLA 산정 등 운영팀의 트리아지 행위이므로
-    const userRoles = session.user?.roles || [];
-    const hasIntakePermission =
-      session.user?.permissions?.some((p: string) => p.toUpperCase() === 'SR:INTAKE') ?? false;
-    const hasIntakeRole = userRoles.some((role: string) => INTERNAL_ROLES.includes(role));
-
-    if (!hasIntakePermission && !hasIntakeRole) {
-      throw new ForbiddenError(
-        'SR 접수 권한이 없습니다. SR:INTAKE 권한 또는 ADMIN/MANAGER/ENGINEER 역할이 필요합니다.'
-      );
-    }
+    // 권한 체크: 접수(Intake)는 담당 엔지니어 배정·SLA 산정 등 운영 관리자의 트리아지 행위다
+    // (policies.canIntakeSR — ADMIN·MANAGER 또는 SR:INTAKE, 소유자 결정 2026-09-18).
+    ensureCanIntakeSR(session.user);
 
     // 1. 요청 바디 검증
     const validated = await validateRequestBody(request, intakeSchema);
@@ -94,13 +93,22 @@ export const POST = withAuthAndRateLimit(
     //    담당자로 지정될 수 있었다.)
     const assignee = await assertAssignable(validated.assigneeId);
 
+    // 남에게 이미 배정된 SR 을 담당자 스코프 사용자가 가로채지 못하게 한다(헌법 §1.1).
+    // 담당자 검증 **뒤**에 둔다 — 앞에 두면 존재하지 않는 담당자 id 하나로 403(남에게 배정됨)과
+    // 404(담당자 없음)가 갈려, 쓰기 없이도 SR 의 배정 여부를 떠볼 수 있다.
+    ensureCanIntakeAssignedSR(session.user, sr);
+
     // 4. SLA 기반 마감일 자동 계산
     //    계산은 serviceCategoryService 한 곳에만 둔다 — 예전에는 같은 구문이 네 곳에
     //    복제돼 있었고, 그 구현이 `setHours` 로 소수 시간을 절삭했다(감사 4.3).
-    const dueDate = serviceCategoryService.calculateDueDateFromHours(
-      sr.serviceCategory.slaHours,
-      validated.actualPriority
-    );
+    //    접수 전에 운영자가 마감일을 직접 지정해 두었다면(due_date_manual) 그 값을 유지한다(헌법 §3).
+    const dueDate =
+      sr.dueDateManual && sr.dueDate
+        ? sr.dueDate
+        : serviceCategoryService.calculateDueDateFromHours(
+            sr.serviceCategory.slaHours,
+            validated.actualPriority
+          );
 
     // 5. SR 업데이트 (REQUESTED → INTAKE) — 하나의 트랜잭션에서 원자적으로 처리
     //    상태 변경 + 상태 이력 + 활동 로그를 함께 커밋하여 중간 실패 시
@@ -189,6 +197,7 @@ export const POST = withAuthAndRateLimit(
         requesterId: result.requesterId,
         previousStatus: 'REQUESTED',
         currentStatus: result.status,
+        actorId: session.user.id,
       });
       await enqueueSRAssignedEmail(tx, {
         srId: result.id,
@@ -212,6 +221,8 @@ export const POST = withAuthAndRateLimit(
       requesterId: updatedSR.requesterId,
       previousStatus: 'REQUESTED',
       currentStatus: updatedSR.status,
+      actorId: session.user.id,
+      assigneeId: updatedSR.assigneeId,
     });
 
     domainEvents.emit('sr:assigned', {
@@ -349,11 +360,9 @@ export const PATCH = withAuthAndRateLimit(
   ) => {
     const { id } = await params;
 
-    // 1. 권한 확인: MANAGER 또는 ADMIN만 접수 정보 수정 가능
-    const userRoles = session.user?.roles || [];
-    const hasPermission = userRoles.some((role: string) => role === 'ADMIN' || role === 'MANAGER');
-
-    if (!hasPermission) {
+    // 1. 권한 확인: 접수 정보 수정은 접수와 같은 권한이다(policies.canIntakeSR — ADMIN·MANAGER 또는
+    //    SR:INTAKE). 예전에는 여기만 역할 문자열을 직접 비교해 접수 화면·POST 와 기준이 달랐다.
+    if (!canIntakeSR(session.user)) {
       throw new ForbiddenError(
         '접수 정보를 수정할 권한이 없습니다. MANAGER 또는 ADMIN 권한이 필요합니다.'
       );
@@ -399,6 +408,7 @@ export const PATCH = withAuthAndRateLimit(
 
     // 4. 변경 전 값 저장 (이력 추적용)
     const previousValues = {
+      dueDate: sr.dueDate,
       actualPriority: sr.actualPriority,
       estimatedHours: sr.estimatedHours,
       estimatedCompletionDate: sr.estimatedCompletionDate,
@@ -407,9 +417,16 @@ export const PATCH = withAuthAndRateLimit(
       assigneeName: sr.assignee?.name || null,
     };
 
-    // 5. SLA 재계산 (우선순위 변경 시)
+    // 5. SLA 재계산 (우선순위 변경 시). 운영자가 마감일을 직접 지정한 SR(due_date_manual)은 자동
+    //    재산출이 덮어쓰지 않는다(헌법 §3) — updateSR 과 같은 규칙이다.
+    //    한 번 완료된 SR(재오픈되어 진행중)은 최초 마감일을 유지한다(헌법 §2, 2026-09-18 소유자 결정 D9).
+    //    마감일을 옮겨야 하면 사유를 남기는 수동 조정으로 한다.
     let dueDate = sr.dueDate;
-    if (validated.actualPriority && validated.actualPriority !== sr.actualPriority) {
+    const priorityChanging =
+      !!validated.actualPriority && validated.actualPriority !== sr.actualPriority;
+    const recalculateDueDate =
+      priorityChanging && !sr.dueDateManual && !(await srService.wasEverCompleted(sr));
+    if (recalculateDueDate && validated.actualPriority) {
       dueDate = serviceCategoryService.calculateDueDateFromHours(
         sr.serviceCategory.slaHours,
         validated.actualPriority,
@@ -459,7 +476,7 @@ export const PATCH = withAuthAndRateLimit(
     if (validated.assigneeId !== undefined) {
       updateData.assigneeId = validated.assigneeId;
     }
-    if (dueDate && validated.actualPriority && validated.actualPriority !== sr.actualPriority) {
+    if (dueDate && recalculateDueDate) {
       updateData.dueDate = dueDate;
     }
 
@@ -469,6 +486,7 @@ export const PATCH = withAuthAndRateLimit(
     //    newAssignee, validated)은 모두 이 시점에 확정돼 있고 tx 결과에 의존하지 않는다.
     const changes: string[] = [];
     const newValues: {
+      dueDate?: string;
       actualPriority?: string;
       estimatedHours?: number;
       estimatedCompletionDate?: string;
@@ -480,6 +498,14 @@ export const PATCH = withAuthAndRateLimit(
     if (validated.actualPriority && validated.actualPriority !== previousValues.actualPriority) {
       changes.push(`우선순위: ${previousValues.actualPriority} → ${validated.actualPriority}`);
       newValues.actualPriority = validated.actualPriority;
+    }
+    // 자동 재산출로 마감일이 움직였으면 전후 값을 남긴다. 예전에는 '우선순위: A → B' 만 남아 마감일이
+    // 얼마에서 얼마로 바뀌었는지 알 수 없었다(D9).
+    if (recalculateDueDate && dueDate && dueDate.getTime() !== sr.dueDate?.getTime()) {
+      changes.push(
+        `마감일: ${sr.dueDate ? `${formatAppZoneDate(sr.dueDate)} ${formatAppZoneTime(sr.dueDate)}` : '없음'} → ${formatAppZoneDate(dueDate)} ${formatAppZoneTime(dueDate)}`
+      );
+      newValues.dueDate = dueDate.toISOString();
     }
     const prevEstimatedHours =
       previousValues.estimatedHours !== null && previousValues.estimatedHours !== undefined

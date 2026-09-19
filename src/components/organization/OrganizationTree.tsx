@@ -20,6 +20,7 @@ import { Building2, ChevronDown, ChevronRight, GripVertical, Plus, Users } from 
 import { InlineSpinner } from '@/components/common/InlineSpinner';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
+import { CLIENT_ROSTER_HIDDEN_NOTE } from '@/lib/constants/client';
 import { cn, escapeRegExp } from '@/lib/utils';
 
 import { ClientCardContextMenu } from './ClientCardContextMenu';
@@ -54,7 +55,8 @@ interface OrganizationTreeProps {
   expandedClients: Set<string>;
   clientUsers: Record<string, User[]>;
   onToggleClient: (clientId: string) => void;
-  onAddUser: (clientId: string) => void;
+  /** 없으면 '사용자 추가' 버튼을 그리지 않는다(사용자 생성 권한이 없는 사람). */
+  onAddUser?: (clientId: string) => void;
   onToggleClientStatus?: (clientId: string) => Promise<void>;
   /**
    * 두 번째 인자는 **현재 상태**다(UserCardContextMenu 주석 참조). 트리는 값을 만들지 않고
@@ -65,6 +67,11 @@ interface OrganizationTreeProps {
   onDragStart?: (event: DragStartEvent) => void;
   onDragOver?: (event: DragOverEvent) => void;
   searchQuery: string;
+  /**
+   * 서버가 사용자 명부를 싣지 않았는가(GET /api/clients/{id} 의 viewerScope='assigned').
+   * 헌법 §1.2 에 따라 담당 엔지니어에게는 고객사 사용자 정보를 주지 않는다 — 그때 빈 칸 대신 안내를 보인다.
+   */
+  rosterHidden?: boolean;
 }
 
 // 검색어 하이라이트 헬퍼 함수
@@ -178,7 +185,8 @@ interface DroppableClientHeaderProps {
   client: Client;
   isExpanded: boolean;
   onToggleClient: (clientId: string) => void;
-  onAddUser: (clientId: string) => void;
+  /** 없으면 '사용자 추가' 버튼을 그리지 않는다(사용자 생성 권한이 없는 사람). */
+  onAddUser?: (clientId: string) => void;
   onToggleClientStatus?: (clientId: string) => Promise<void>;
   searchQuery: string;
   userCount: number;
@@ -272,18 +280,20 @@ function DroppableClientHeader({
             <Users className="h-3 w-3" />
             {userCount}명
           </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddUser(client.id);
-            }}
-            className="hidden sm:flex"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            사용자 추가
-          </Button>
+          {onAddUser && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddUser(client.id);
+              }}
+              className="hidden sm:flex"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              사용자 추가
+            </Button>
+          )}
         </div>
       </div>
     </ClientCardContextMenu>
@@ -302,6 +312,7 @@ export function OrganizationTree({
   onDragStart,
   onDragOver,
   searchQuery,
+  rosterHidden = false,
 }: OrganizationTreeProps) {
   // DnD Sensors
   const sensors = useSensors(
@@ -399,7 +410,11 @@ export function OrganizationTree({
               {/* 사용자 목록 */}
               {isExpanded && (
                 <div className="border-t bg-gradient-to-b from-muted/5 to-transparent">
-                  {userCount === 0 ? (
+                  {rosterHidden ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">
+                      {CLIENT_ROSTER_HIDDEN_NOTE}
+                    </p>
+                  ) : userCount === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-8">
                       등록된 사용자가 없습니다.
                     </p>

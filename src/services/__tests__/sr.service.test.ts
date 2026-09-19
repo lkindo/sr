@@ -6,8 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, BusinessRuleError, ForbiddenError, NotFoundError } from '@/lib/errors';
-import { ensureCanCreateSR, ensureCanDeleteSR, ensureCanUpdateSR } from '@/lib/policies';
+import {
+  ensureCanCreateSR,
+  ensureCanDeleteSR,
+  ensureCanUpdateSR,
+  srViewerScopeWhere,
+} from '@/lib/policies';
 import prisma from '@/lib/prisma';
+import { validateTransition } from '@/lib/sr-state-machine';
 import { deleteAttachmentBlob } from '@/lib/storage';
 import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
 import { pushService } from '@/services/push.service';
@@ -44,12 +50,15 @@ const { mockPrisma } = vi.hoisted(() => {
     },
     sRComment: {
       deleteMany: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
     },
     sRAttachment: {
       deleteMany: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
     },
     sRStatusHistory: {
+      // 한 번 완료된 적 있는가(D9 — sr.service.wasEverCompleted). 기본은 없음.
+      findFirst: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
       findMany: vi.fn().mockResolvedValue([]),
@@ -92,9 +101,11 @@ vi.mock('@/lib/policies', async (importOriginal) => {
   };
 });
 
-vi.mock('@/lib/sr-state-machine', () => ({
+// 전이 판정만 스텁한다. 나머지(getRequiredFields·isSROperator 등)는 policies 가 실제로 쓰는
+// 판정 함수라 실물을 둔다 — 통째로 대체하면 운영자·내용 수정 규칙이 사라진 채로 테스트가 돈다.
+vi.mock('@/lib/sr-state-machine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/sr-state-machine')>()),
   validateTransition: vi.fn().mockReturnValue({ valid: true }),
-  getRequiredFields: vi.fn().mockReturnValue([]),
   isReopenTransition: vi.fn().mockReturnValue(false),
 }));
 
@@ -228,7 +239,7 @@ describe('SRService', () => {
 
       const result = await srService.createSR(data, foreignUser);
 
-      expect(result).toEqual(createdSR);
+      expect(result).toEqual({ ...createdSR, requesterIsInternal: false, wasCompleted: false });
       expect(prisma.client.findUnique).toHaveBeenCalledWith({ where: { id: 'client-foreign' } });
     });
 
@@ -278,17 +289,60 @@ describe('SRService', () => {
 
       // 1) 전역 카테고리
       vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({ clientId: null } as any);
-      await expect(srService.createSR(data, mockUser)).resolves.toEqual(createdSR);
+      await expect(srService.createSR(data, mockUser)).resolves.toEqual({
+        ...createdSR,
+        requesterIsInternal: false,
+        wasCompleted: false,
+      });
 
       // 2) 동일 고객사 전용 카테고리
       vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
         clientId: 'client-1',
       } as any);
-      await expect(srService.createSR(data, mockUser)).resolves.toEqual(createdSR);
+      await expect(srService.createSR(data, mockUser)).resolves.toEqual({
+        ...createdSR,
+        requesterIsInternal: false,
+        wasCompleted: false,
+      });
     });
   });
 
   describe('updateSR', () => {
+    // 외부 사용자의 내용 수정 규칙(판정 자체는 policies.test.ts 의 ensureCanEditSRContent 가 고정한다).
+    // 여기서는 배선만 본다: 상태 전이가 아닌 수정에는 적용되고, 전이(확인·재오픈 등)에는 적용되지 않는다.
+    describe('외부 사용자의 접수 후 내용 수정', () => {
+      const inProgress = {
+        id: 'sr-1',
+        status: 'IN_PROGRESS',
+        clientId: 'c-1',
+        requesterId: 'user-1',
+      };
+
+      it('상태 전이가 아닌 수정은 막고 아무것도 쓰지 않는다', async () => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue(inProgress as never);
+
+        await expect(
+          srService.updateSR('sr-1', { title: '접수 뒤 제목 덮어쓰기' }, mockUser)
+        ).rejects.toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+        expect(prisma.sR.updateMany).not.toHaveBeenCalled();
+      });
+
+      it('상태 전이 요청에는 이 규칙을 걸지 않는다(전이 규칙은 상태머신이 판정)', async () => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+          ...inProgress,
+          status: 'COMPLETED',
+        } as never);
+
+        const error = await srService
+          .updateSR('sr-1', { status: 'CONFIRMED' }, mockUser)
+          .catch((e: Error) => e);
+
+        expect(String((error as Error | undefined)?.message ?? '')).not.toContain(
+          '요청 내용을 직접 수정할 수 없습니다'
+        );
+      });
+    });
+
     it('should throw NotFoundError if SR does not exist', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
 
@@ -454,7 +508,13 @@ describe('SRService', () => {
               select: expect.not.objectContaining({ storagePath: true }),
             }),
             statusHistory: expect.objectContaining({ take: 50 }),
-            _count: { select: { comments: { where: { isInternal: false } }, attachments: true } },
+            _count: {
+              select: {
+                comments: { where: { isInternal: false } },
+                attachments: true,
+                statusHistory: { where: { currentStatus: 'COMPLETED' } },
+              },
+            },
           }),
         })
       );
@@ -479,7 +539,13 @@ describe('SRService', () => {
         expect.objectContaining({
           include: expect.objectContaining({
             comments: expect.objectContaining({ where: {} }),
-            _count: { select: { comments: { where: {} }, attachments: true } },
+            _count: {
+              select: {
+                comments: { where: {} },
+                attachments: true,
+                statusHistory: { where: { currentStatus: 'COMPLETED' } },
+              },
+            },
           }),
         })
       );
@@ -492,6 +558,37 @@ describe('SRService', () => {
 
       expect(result).toBeNull();
     });
+  });
+
+  // 상세 화면의 댓글 탭은 getSRDetailsById 가 아니라 이 함수(getSRCommentsAction 경유)로
+  // 댓글을 읽는다. 내부 댓글 필터가 상세 조회와 REST GET 에만 있고 여기에는 없어서,
+  // 내부 노트를 쓰는 기능이 생기는 순간 고객사 사용자의 댓글 탭에 그대로 섞일 상태였다.
+  //
+  // 판정 기준은 getSRDetailsById·REST GET 과 같은 isInternalUser(역할) 여야 한다. 그래서
+  // 픽스처는 **역할만** 바꾸고 clientIds 는 그대로 둔다 — 둘을 함께 바꾸면
+  // `roles.includes('ADMIN')` 이나 `clientIds.length === 0` 같은 틀린 기준도 통과한다.
+  describe('getSRComments', () => {
+    it.each(['USER', 'CLIENT_USER', 'CLIENT_ADMIN'])(
+      '외부 사용자(%s)에게는 내부 댓글을 제외한다',
+      async (role) => {
+        await srService.getSRComments('sr-1', { ...mockUser, roles: [role] });
+
+        expect(prisma.sRComment.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { srId: 'sr-1', isInternal: false } })
+        );
+      }
+    );
+
+    it.each(['ADMIN', 'MANAGER', 'ENGINEER'])(
+      '내부 사용자(%s)는 내부 댓글까지 조회한다',
+      async (role) => {
+        await srService.getSRComments('sr-1', { ...mockUser, roles: [role] });
+
+        expect(prisma.sRComment.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { srId: 'sr-1' } })
+        );
+      }
+    );
   });
 
   describe('deleteSR', () => {
@@ -547,45 +644,102 @@ describe('SRService', () => {
     });
   });
 
+  /**
+   * 건수·목록의 스코프는 필수 인자인 viewer 에서 직접 건다(policies.srViewerScopeWhere, 헌법 §1.2).
+   * 예전에는 스코프를 호출부의 where 에 맡겨서 호출부가 빠뜨리면 전 테넌트를 셌다. 호출부의 where 는 그 위에
+   * AND 로 더해질 뿐 스코프를 덮어쓰지 못한다(같은 clientId 키를 보내도).
+   */
   describe('countSRs', () => {
-    it('should return count of SRs', async () => {
-      vi.mocked(prisma.sR.count).mockResolvedValue(5);
+    const viewerOf = (roles: string[], clientIds: string[] = [], id = 'viewer-1') =>
+      ({ ...mockUser, id, roles, permissions: ['SR:READ'], clientIds }) as never;
 
-      const result = await srService.countSRs();
-
-      expect(result).toBe(5);
-    });
-
-    it('should return filtered count', async () => {
+    it('내부 운영자(ADMIN)는 호출부 필터만 걸린다', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(3);
-      const filter = { where: { status: 'IN_PROGRESS' as const } };
+      const where = { status: 'IN_PROGRESS' as const };
 
-      const result = await srService.countSRs(filter);
+      const result = await srService.countSRs({ viewer: viewerOf(['ADMIN']), where });
 
       expect(prisma.sR.count).toHaveBeenCalledWith({
-        where: { deletedAt: null, ...filter.where },
+        where: { AND: [{ deletedAt: null }, {}, where] },
       });
       expect(result).toBe(3);
     });
 
-    it('should pass complex where clauses to count', async () => {
+    it('외부 사용자는 호출부가 스코프를 빠뜨려도 소속 고객사로만 센다', async () => {
       vi.mocked(prisma.sR.count).mockResolvedValue(1);
-      const params = {
-        where: {
-          AND: [{ clientId: 'c-1' }, { status: 'REQUESTED' as const }],
-        },
-      };
 
-      const result = await srService.countSRs(params);
+      await srService.countSRs({ viewer: viewerOf(['CLIENT_USER'], ['c-1']) });
 
       expect(prisma.sR.count).toHaveBeenCalledWith({
-        where: { deletedAt: null, ...params.where },
+        where: { AND: [{ deletedAt: null }, { clientId: { in: ['c-1'] } }, {}] },
       });
-      expect(result).toBe(1);
+    });
+
+    it('호출부가 다른 고객사를 지정해도 스코프를 덮어쓰지 못한다(AND)', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+      const where = { clientId: 'c-other' };
+
+      await srService.countSRs({ viewer: viewerOf(['CLIENT_ADMIN'], ['c-1']), where });
+
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { clientId: { in: ['c-1'] } }, where] },
+      });
+    });
+
+    it('ENGINEER 는 자기 배정분만 센다', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(2);
+
+      await srService.countSRs({ viewer: viewerOf(['ENGINEER'], [], 'eng-1') });
+
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { assigneeId: 'eng-1' }, {}] },
+      });
+    });
+
+    it('소속이 없는 외부 사용자는 아무것도 세지 않는다(빈 IN)', async () => {
+      vi.mocked(prisma.sR.count).mockResolvedValue(0);
+
+      await srService.countSRs({ viewer: viewerOf(['CLIENT_USER'], []) });
+
+      expect(prisma.sR.count).toHaveBeenCalledWith({
+        where: { AND: [{ deletedAt: null }, { clientId: { in: [] } }, {}] },
+      });
     });
   });
 
   describe('getAllSRs', () => {
+    // 목록의 댓글 수도 상세·댓글 탭과 같은 가시성 판정을 따라야 한다. 예전에는 전부 셌으므로
+    // 내부 댓글이 생기면 고객사 사용자의 목록에만 그 개수가 섞여, 상세와 숫자가 달라졌다.
+    it.each(['USER', 'CLIENT_USER', 'CLIENT_ADMIN'])(
+      '외부 사용자(%s)의 댓글 수에서 내부 댓글을 뺀다',
+      async (role) => {
+        await srService.getAllSRs({ viewer: { ...mockUser, roles: [role] } });
+
+        expect(prisma.sR.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            select: expect.objectContaining({
+              _count: { select: { comments: { where: { isInternal: false } }, attachments: true } },
+            }),
+          })
+        );
+      }
+    );
+
+    it.each(['ADMIN', 'MANAGER', 'ENGINEER'])(
+      '내부 사용자(%s)의 댓글 수는 내부 댓글까지 센다',
+      async (role) => {
+        await srService.getAllSRs({ viewer: { ...mockUser, roles: [role] } });
+
+        expect(prisma.sR.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            select: expect.objectContaining({
+              _count: { select: { comments: { where: {} }, attachments: true } },
+            }),
+          })
+        );
+      }
+    );
+
     it('should return all SRs with default params', async () => {
       const mockSRs = [
         { id: 'sr-1', title: 'SR 1', status: 'REQUESTED' },
@@ -593,7 +747,7 @@ describe('SRService', () => {
       ];
       vi.mocked(prisma.sR.findMany).mockResolvedValue(mockSRs as any);
 
-      const result = await srService.getAllSRs();
+      const result = await srService.getAllSRs({ viewer: mockUser });
 
       expect(result).toEqual(mockSRs);
       expect(prisma.sR.findMany).toHaveBeenCalled();
@@ -608,10 +762,15 @@ describe('SRService', () => {
         take: 10,
       };
 
-      const result = await srService.getAllSRs(params);
+      const result = await srService.getAllSRs({ viewer: mockUser, ...params });
 
+      // 스코프는 viewer 에서 건다(srViewerScopeWhere) — 호출부 where 는 그 위에 AND 로 더해진다.
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ ...params, where: { deletedAt: null, ...params.where } })
+        expect.objectContaining({
+          skip: 0,
+          take: 10,
+          where: { AND: [{ deletedAt: null }, srViewerScopeWhere(mockUser), params.where] },
+        })
       );
       expect(result).toEqual(mockSRs);
     });
@@ -623,11 +782,14 @@ describe('SRService', () => {
         orderBy: { createdAt: 'desc' as const },
       };
 
-      await srService.getAllSRs(params);
+      await srService.getAllSRs({ viewer: mockUser, ...params });
 
       // where 를 주지 않아도 soft delete 필터는 항상 붙는다(db-rules §2).
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ ...params, where: { deletedAt: null } })
+        expect.objectContaining({
+          ...params,
+          where: { AND: [{ deletedAt: null }, srViewerScopeWhere(mockUser), {}] },
+        })
       );
     });
 
@@ -645,10 +807,12 @@ describe('SRService', () => {
         },
       };
 
-      await srService.getAllSRs(params);
+      await srService.getAllSRs({ viewer: mockUser, ...params });
 
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ ...params, where: { deletedAt: null, ...params.where } })
+        expect.objectContaining({
+          where: { AND: [{ deletedAt: null }, srViewerScopeWhere(mockUser), params.where] },
+        })
       );
     });
   });
@@ -662,9 +826,9 @@ describe('SRService', () => {
       };
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockDetails as any);
 
-      const result = await srService.getSRDetailsById('sr-1');
+      const result = await srService.getSRDetailsById('sr-1', { viewer: mockUser });
 
-      expect(result).toEqual(mockDetails);
+      expect(result).toEqual({ ...mockDetails, requesterIsInternal: false, wasCompleted: false });
       expect(prisma.sR.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'sr-1', deletedAt: null } })
       );
@@ -673,7 +837,7 @@ describe('SRService', () => {
     it('should return null if SR not found', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
 
-      const result = await srService.getSRDetailsById('non-existent');
+      const result = await srService.getSRDetailsById('non-existent', { viewer: mockUser });
       expect(result).toBeNull();
     });
   });
@@ -715,7 +879,7 @@ describe('SRService', () => {
 
       const result = await srService.createSR(data, mockUser);
 
-      expect(result).toEqual(mockCreatedSR);
+      expect(result).toEqual({ ...mockCreatedSR, requesterIsInternal: false, wasCompleted: false });
     });
 
     describe('deleteSR', () => {
@@ -881,6 +1045,11 @@ describe('SRService', () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(txMock));
     });
 
+    // 운영자 필드 규칙의 거부 문구. ForbiddenError 만 단언하면 **내용 수정 규칙**
+    // (policies.ensureCanEditSRContent — 신청자의 접수 후 수정 차단)이 대신 던져도 통과해서,
+    // 운영자 필드 규칙이 사라져도 이 스위트가 초록불로 남는다.
+    const OPERATOR_FIELD_DENIED = '접수 담당자만 변경할 수 있는 항목입니다';
+
     /** 갱신 트랜잭션이 아예 실행되지 않았음을 확인한다. (던지고 나서 쓰는 버그 방지) */
     const expectNoWrite = () => {
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -899,7 +1068,7 @@ describe('SRService', () => {
           },
           clientAdmin
         )
-      ).rejects.toThrow(ForbiddenError);
+      ).rejects.toThrow(OPERATOR_FIELD_DENIED);
 
       expectNoWrite();
       // 담당자 조회까지 가기 전에 인가 단계에서 차단되어야 한다.
@@ -917,7 +1086,7 @@ describe('SRService', () => {
       ['assignedToId(별칭)', { assignedToId: 'eng-2' }],
     ])('외부 CLIENT_ADMIN의 %s 변경은 개별적으로도 차단된다', async (_label, patch) => {
       await expect(srService.updateSR('sr-1', patch as any, clientAdmin)).rejects.toThrow(
-        ForbiddenError
+        OPERATOR_FIELD_DENIED
       );
       expectNoWrite();
     });
@@ -925,12 +1094,35 @@ describe('SRService', () => {
     it('요청자 본인(CLIENT_USER)도 SR:UPDATE_SELF로 접수 필드를 바꿀 수 없다', async () => {
       await expect(
         srService.updateSR('sr-1', { actualPriority: 'CRITICAL' }, clientUser)
-      ).rejects.toThrow(ForbiddenError);
+      ).rejects.toThrow(OPERATOR_FIELD_DENIED);
+      expectNoWrite();
+    });
+
+    // 접수 전(REQUESTED)은 내용 수정 규칙이 신청자의 수정을 허용하는 구간이라, 여기서의 거부는
+    // 오로지 운영자 필드 규칙에서 나온다. 서비스 카테고리는 SLA 산정 근거다(헌법 §3).
+    it.each([
+      ['serviceCategoryId', { serviceCategoryId: 'cat-2' }],
+      ['actualPriority', { actualPriority: 'CRITICAL' as const }],
+      ['dueDate', { dueDate: '2030-01-01' }],
+    ])('접수 전(REQUESTED)에도 신청자는 운영자 필드 %s 를 바꿀 수 없다', async (_label, patch) => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+        ...existingIntakeSR,
+        status: 'REQUESTED',
+      } as never);
+
+      await expect(srService.updateSR('sr-1', patch as any, clientUser)).rejects.toThrow(
+        OPERATOR_FIELD_DENIED
+      );
       expectNoWrite();
     });
 
     it('외부 사용자가 동일한 값을 재전송하면(변경 없음) 통과하고 일반 필드만 반영된다', async () => {
       // 수정 다이얼로그가 전체 객체를 그대로 다시 보내는 경우를 시뮬레이션한다.
+      // 외부 사용자가 수정 다이얼로그를 쓸 수 있는 것은 접수 전(REQUESTED)뿐이다(policies.ensureCanEditSRContent).
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+        ...existingIntakeSR,
+        status: 'REQUESTED',
+      } as never);
       await srService.updateSR(
         'sr-1',
         {
@@ -952,23 +1144,72 @@ describe('SRService', () => {
       expect(updateData.assigneeId).toBe('eng-1');
     });
 
-    it('POSITIVE: 외부 사용자는 본인 SR의 제목/설명/만족도를 계속 수정할 수 있다', async () => {
+    // 신청자의 제목·설명 수정은 접수 전(REQUESTED)에만 된다(PRD §특수 권한 규칙 "SR 소유자", 화면 규칙과
+    // 같다). clientUser 는 이 SR 의 신청자다. 신청자가 아닌 외부 사용자의 범위는 정책 미결이다.
+    // 예전 이 테스트는 접수(INTAKE) 상태에서도 제목·설명 수정을 "계속 수정할 수 있다" 로 고정했는데,
+    // 그 동작이 바로 API 로 접수·완료 뒤 요청 내용을 덮어쓸 수 있던 결함이었다.
+    it('POSITIVE: 신청자는 접수 전(REQUESTED) 본인 SR 의 제목·설명을 수정할 수 있다', async () => {
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+        ...existingIntakeSR,
+        status: 'REQUESTED',
+      } as never);
+
       await srService.updateSR(
         'sr-1',
-        {
-          title: '새 제목입니다',
-          description: '새 설명입니다. 충분히 깁니다.',
-          satisfactionRating: 5,
-          additionalFeedback: '감사합니다',
-        },
+        { title: '새 제목입니다', description: '새 설명입니다. 충분히 깁니다.' },
         clientUser
       );
 
       const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.title).toBe('새 제목입니다');
       expect(updateData.description).toBe('새 설명입니다. 충분히 깁니다.');
+    });
+
+    it('POSITIVE: 신청자는 접수 후에도 만족도·추가 의견을 남길 수 있다(고객 소유 값)', async () => {
+      await srService.updateSR(
+        'sr-1',
+        { satisfactionRating: 5, additionalFeedback: '감사합니다' },
+        clientUser
+      );
+
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.satisfactionRating).toBe(5);
       expect(updateData.additionalFeedback).toBe('감사합니다');
+    });
+
+    it('신청자는 접수 후 제목·설명을 수정할 수 없다', async () => {
+      await expect(
+        srService.updateSR('sr-1', { title: '접수 뒤 바꾼 제목' }, clientUser)
+      ).rejects.toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+      expect(txMock.sR.update).not.toHaveBeenCalled();
+    });
+
+    // 상태 전이 요청이라고 내용 수정 규칙을 통째로 건너뛰면, 확인(CONFIRMED) 요청에 제목을 실어
+    // 접수 후 수정 차단을 우회할 수 있었다. 전이 자체는 유효하므로(신청자의 확인) 거부는 내용 규칙에서 나온다.
+    it('신청자가 확인 전이에 제목 수정을 끼워 넣으면 막고, 확인만 보내면 통과한다', async () => {
+      const completedSR = {
+        ...existingIntakeSR,
+        status: 'COMPLETED',
+        resolutionDescription: '조치 완료',
+        completedAt: new Date(),
+      };
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(completedSR as never);
+
+      await expect(
+        srService.updateSR(
+          'sr-1',
+          { status: 'CONFIRMED', title: '확인하면서 바꾼 제목' },
+          clientUser
+        )
+      ).rejects.toThrow('SR이 접수된 뒤에는 요청 내용을 직접 수정할 수 없습니다');
+      expectNoWrite();
+
+      // 대조군: 같은 전이에서 전이 값만 보내면 통과한다(거부가 전이 자체 때문이 아님을 보인다).
+      txMock.sR.update.mockResolvedValue({ ...completedSR, status: 'CONFIRMED' });
+      await srService.updateSR('sr-1', { status: 'CONFIRMED', satisfactionRating: 5 }, clientUser);
+      const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
+      expect(updateData.status).toBe('CONFIRMED');
+      expect(updateData.title).toBeUndefined();
     });
 
     it('POSITIVE: 내부 MANAGER는 운영 전용 필드를 모두 기록할 수 있다', async () => {
@@ -987,6 +1228,8 @@ describe('SRService', () => {
         'sr-1',
         {
           dueDate: '2030-01-01',
+          // 마감일을 직접 바꿀 때는 사유가 필수다(헌법 §3 — sr.service.due-date.test.ts).
+          changeReason: '고객과 일정 협의',
           actualPriority: 'CRITICAL',
           estimatedHours: 12,
           estimatedCompletionDate: '2030-02-02',
@@ -1002,8 +1245,9 @@ describe('SRService', () => {
       expect(updateData.estimatedCompletionDate).toBeInstanceOf(Date);
       expect(updateData.intakeNotes).toBe('운영팀 메모');
       expect(updateData.assigneeId).toBe('eng-2');
-      // actualPriority 변경 시 SLA 기한이 재계산되므로 dueDate 는 Date 로 기록된다.
-      expect(updateData.dueDate).toBeInstanceOf(Date);
+      // 직접 지정한 마감일이 그대로 저장되고(우선순위 변경의 자동 재산출이 덮어쓰지 않는다) 수동 표식이 선다.
+      expect(updateData.dueDate).toEqual(new Date('2030-01-01'));
+      expect(updateData.dueDateManual).toBe(true);
     });
 
     it('POSITIVE: 내부 ADMIN도 접수 필드를 기록할 수 있다', async () => {
@@ -1013,6 +1257,68 @@ describe('SRService', () => {
 
       const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.intakeNotes).toBe('관리자 메모');
+    });
+
+    // 소유자 결정(2026-09-18): 운영자가 자기 이름으로 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인한다.
+    // 판정 자체는 sr-state-machine(canConfirmAsAcceptor)이 하고 여기서는 스텁이다 — 서비스가 그 판정에
+    // **신청자가 운영자인지**(DB 의 현재 역할)와 **행위자의 소속 고객사**를 넘기는지만 본다.
+    describe('확인완료 전이의 판정 재료', () => {
+      const completedByManager = {
+        ...existingIntakeSR,
+        status: 'COMPLETED',
+        requesterId: 'mgr-1',
+        resolutionDescription: '조치 완료',
+        completedAt: new Date(),
+      };
+
+      it('CONFIRMED 전이면 신청자의 역할을 읽어 requesterIsInternal 과 행위자 고객사를 넘긴다', async () => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue(completedByManager as never);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+          roles: [{ role: { name: 'MANAGER' } }],
+        } as never);
+        txMock.sR.update.mockResolvedValue({ ...completedByManager, status: 'CONFIRMED' });
+
+        await srService.updateSR('sr-1', { status: 'CONFIRMED' }, clientAdmin);
+
+        expect(prisma.user.findUnique).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'mgr-1' } })
+        );
+        const call = vi.mocked(validateTransition).mock.calls.at(-1)!;
+        expect(call[1]).toBe('CONFIRMED');
+        expect(call[3]).toEqual(
+          expect.objectContaining({ requesterId: 'mgr-1', requesterIsInternal: true })
+        );
+        expect(call[6]).toBe('client-admin-1');
+        expect(call[7]).toEqual(['c-1']);
+      });
+
+      it('신청자가 고객 사용자면 requesterIsInternal 은 false 다', async () => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue({
+          ...completedByManager,
+          requesterId: 'client-user-1',
+        } as never);
+        vi.mocked(prisma.user.findUnique).mockResolvedValue({
+          roles: [{ role: { name: 'CLIENT_USER' } }],
+        } as never);
+        txMock.sR.update.mockResolvedValue({ ...completedByManager, status: 'CONFIRMED' });
+
+        await srService.updateSR('sr-1', { status: 'CONFIRMED' }, clientAdmin);
+
+        const call = vi.mocked(validateTransition).mock.calls.at(-1)!;
+        expect(call[3]).toEqual(expect.objectContaining({ requesterIsInternal: false }));
+      });
+
+      it('확인이 아닌 전이에는 신청자 역할을 읽지 않는다', async () => {
+        vi.mocked(prisma.user.findUnique).mockClear();
+
+        await srService.updateSR('sr-1', { status: 'IN_PROGRESS' }, managerUser);
+
+        const call = vi.mocked(validateTransition).mock.calls.at(-1)!;
+        expect(call[3]).not.toHaveProperty('requesterIsInternal');
+        expect(prisma.user.findUnique).not.toHaveBeenCalledWith(
+          expect.objectContaining({ select: { roles: expect.anything() } })
+        );
+      });
     });
   });
 
@@ -1133,6 +1439,48 @@ describe('SRService', () => {
       expect(prisma.user.findUnique).not.toHaveBeenCalled();
       const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.assigneeId).toBeNull();
+    });
+
+    // 담당자 배정·변경은 운영 관리자(ADMIN·MANAGER 또는 SR:ASSIGN) 업무다(소유자 결정 2026-09-18,
+    // policies.canAssignSR). 예전에는 배정된 ENGINEER 가 일반 수정으로 자기 SR 을 다른 엔지니어에게
+    // 넘기거나 배정을 풀 수 있었다.
+    describe('ENGINEER 의 담당자 변경', () => {
+      const engineer = {
+        id: 'eng-self',
+        email: 'eng@example.com',
+        name: 'Engineer',
+        image: null,
+        roles: ['ENGINEER'],
+        permissions: ['SR:READ', 'SR:UPDATE', 'SR:STATUS_CHANGE'],
+        clientIds: [],
+      };
+      const ownSR = { ...existingSR, status: 'IN_PROGRESS', assigneeId: 'eng-self' };
+
+      beforeEach(() => {
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue(ownSR as any);
+      });
+
+      it.each([
+        ['다른 엔지니어에게 넘기기', { assigneeId: 'eng-2' }],
+        ['배정 풀기', { assignedToId: null }],
+      ])('%s 는 거부되고 아무것도 쓰지 않는다', async (_label, patch) => {
+        await expect(srService.updateSR('sr-1', patch as any, engineer)).rejects.toThrow(
+          '담당자 배정은 운영 관리자만 할 수 있습니다'
+        );
+        expect(prisma.user.findUnique).not.toHaveBeenCalled();
+        expect(txMock.sR.update).not.toHaveBeenCalled();
+      });
+
+      it('같은 담당자를 다시 보내는 것(변경 없음)은 막지 않는다', async () => {
+        await srService.updateSR(
+          'sr-1',
+          { assigneeId: 'eng-self', title: '엔지니어가 정리한 제목' },
+          engineer
+        );
+
+        const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
+        expect(updateData.title).toBe('엔지니어가 정리한 제목');
+      });
     });
   });
 });

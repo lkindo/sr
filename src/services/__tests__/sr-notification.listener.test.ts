@@ -7,7 +7,7 @@ import { backgroundTask } from '@/lib/wait-until';
 import { pushService } from '@/services/push.service';
 
 vi.mock('@/lib/prisma', () => ({
-  default: { user: { findMany: vi.fn() } },
+  default: { user: { findMany: vi.fn(), findUnique: vi.fn() } },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -139,6 +139,99 @@ describe('SR 알림 리스너', () => {
       'Failed to handle sr:created notification',
       expect.any(Error),
       { srId: 'sr-4' }
+    );
+  });
+});
+
+/** 재오픈 푸시와 행위자 제외(2026-09-18 소유자 결정 D15). */
+describe('SR 알림 리스너 — 재오픈', () => {
+  const reopened = {
+    srId: 'sr-9',
+    srNumber: 'SR-009',
+    title: '재오픈',
+    requesterId: 'client-1',
+    previousStatus: 'COMPLETED' as const,
+    currentStatus: 'IN_PROGRESS' as const,
+    actorId: 'client-1',
+    assigneeId: 'eng-1',
+    reason: '여전히 오류',
+  };
+
+  it('재오픈되면 활성 담당자에게 사유를 실어 배정 알림 설정으로 푸시한다', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'eng-1', isActive: true } as never);
+
+    domainEvents.emit('sr:status_changed', reopened);
+    await flush();
+
+    expect(pushService.sendForEvent).toHaveBeenCalledWith(
+      'SR_ASSIGNED',
+      ['eng-1'],
+      expect.objectContaining({
+        tag: 'sr-reopened',
+        body: 'SR-009 이(가) 재오픈되었습니다 — 여전히 오류',
+      })
+    );
+    // 재오픈한 신청자 본인에게는 상태 변경 푸시를 보내지 않는다.
+    expect(pushService.sendForEvent).not.toHaveBeenCalledWith(
+      'SR_STATUS_CHANGED',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('담당자가 비활성이면 재배정할 운영 관리자(행위자 제외)에게 보낸다', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'eng-1', isActive: false } as never);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([{ id: 'mgr-1' }] as never);
+
+    domainEvents.emit('sr:status_changed', { ...reopened, actorId: 'mgr-2' });
+    await flush();
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isActive: true, NOT: { id: 'mgr-2' } }),
+      })
+    );
+    expect(pushService.sendForEvent).toHaveBeenCalledWith(
+      'SR_CREATED',
+      ['mgr-1'],
+      expect.objectContaining({ title: '재오픈 SR 재배정 필요' })
+    );
+    expect(pushService.sendForEvent).not.toHaveBeenCalledWith(
+      'SR_ASSIGNED',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('담당자 본인이 재오픈했으면 담당자에게 보내지 않는다', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'mgr-1', isActive: true } as never);
+
+    domainEvents.emit('sr:status_changed', { ...reopened, assigneeId: 'mgr-1', actorId: 'mgr-1' });
+    await flush();
+
+    expect(pushService.sendForEvent).not.toHaveBeenCalledWith(
+      'SR_ASSIGNED',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('상태 변경 푸시 본문은 코드가 아니라 한국어 상태 이름을 쓴다', async () => {
+    domainEvents.emit('sr:status_changed', {
+      srId: 'sr-3',
+      srNumber: 'SR-003',
+      title: '상태 변경',
+      requesterId: 'client-1',
+      previousStatus: 'INTAKE',
+      currentStatus: 'IN_PROGRESS',
+      actorId: 'eng-1',
+    });
+    await flush();
+
+    expect(pushService.sendForEvent).toHaveBeenCalledWith(
+      'SR_STATUS_CHANGED',
+      ['client-1'],
+      expect.objectContaining({ body: 'SR-003 상태가 진행중(으)로 변경되었습니다.' })
     );
   });
 });

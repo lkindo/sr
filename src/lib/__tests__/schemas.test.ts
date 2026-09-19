@@ -7,6 +7,9 @@ import {
   intakeSchema,
   intakeUpdateSchema,
   loginSchema,
+  PASSWORD_POLICY_DESCRIPTION,
+  PASSWORD_SPECIAL_CHAR_PATTERN,
+  PASSWORD_SPECIAL_CHARS,
   passwordSchema,
   registerSchema,
   roleCreateSchema,
@@ -73,6 +76,32 @@ describe('passwordSchema', () => {
     if (!r.success) {
       expect(r.error.issues.some((i) => i.message.includes('특수문자'))).toBe(true);
     }
+  });
+
+  // 안내 문구·회원가입 체크리스트가 보여 주는 목록(PASSWORD_SPECIAL_CHARS)과 실제 검증 정규식이
+  // 문자 단위로 같아야 한다. 한쪽에만 문자를 더하면 여기서 깨진다.
+  it('특수문자 목록과 검증 정규식이 출력 가능한 ASCII 전체에서 일치한다', () => {
+    const mismatched: string[] = [];
+    for (let code = 33; code <= 126; code++) {
+      const ch = String.fromCharCode(code);
+      if (/[A-Za-z0-9]/.test(ch)) continue;
+      if (PASSWORD_SPECIAL_CHAR_PATTERN.test(ch) !== PASSWORD_SPECIAL_CHARS.includes(ch)) {
+        mismatched.push(ch);
+      }
+    }
+    expect(mismatched).toEqual([]);
+  });
+
+  it('목록에 있는 특수문자는 모두 받고, 없는 문자(~)는 특수문자로 치지 않는다', () => {
+    for (const ch of PASSWORD_SPECIAL_CHARS) {
+      expect(passwordSchema.safeParse(`Abcdefg1${ch}`).success).toBe(true);
+    }
+    const tilde = passwordSchema.safeParse('Abcdefg1~');
+    expect(tilde.success).toBe(false);
+    if (!tilde.success) {
+      expect(tilde.error.issues[0]?.message).toContain(PASSWORD_SPECIAL_CHARS);
+    }
+    expect(PASSWORD_POLICY_DESCRIPTION).toContain(PASSWORD_SPECIAL_CHARS);
   });
 
   it('rejects a non-string input', () => {
@@ -546,6 +575,22 @@ describe('srPatchSchema', () => {
 
   it('rejects status transitions on the general edit endpoint', () => {
     const result = srPatchSchema.safeParse({ status: 'COMPLETED' });
+    expect(result.success).toBe(false);
+  });
+
+  // 마감일 수동 조정(헌법 §3, D8)은 사유가 필수다. 예전에는 이 스키마가 changeReason 까지 빼 버려서
+  // '마감일 조정' 다이얼로그의 요청이 알 수 없는 키로 400 이 됐고, 조정할 방법이 없었다.
+  it('accepts a manual due-date adjustment with its reason', () => {
+    const result = srPatchSchema.safeParse({
+      dueDate: '2026-10-01T09:00:00.000Z',
+      changeReason: '고객 요청으로 일정 협의',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.changeReason).toBe('고객 요청으로 일정 협의');
+  });
+
+  it('still rejects a status transition even when a reason is attached', () => {
+    const result = srPatchSchema.safeParse({ status: 'CONFIRMED', changeReason: '확인' });
     expect(result.success).toBe(false);
   });
 });

@@ -139,10 +139,10 @@ describe('GET — 내부 노트 격리', () => {
   });
 });
 
-const postRequest = (content: string) =>
+const postRequest = (content: string, extra: Record<string, unknown> = {}) =>
   new NextRequest('http://localhost/x', {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, ...extra }),
     headers: { 'content-type': 'application/json' },
   });
 
@@ -263,5 +263,85 @@ describe('POST — 알림', () => {
         actorId: 'user-admin',
       })
     );
+  });
+});
+
+/**
+ * 내부 노트(D7, 소유자 결정 2026-09-18) — 고객에게 보이지 않는 댓글. 헌법 §1.1 "ENGINEER·MANAGER·ADMIN만
+ * 작성 및 조회". 읽기 필터는 위 'GET — 내부 노트 격리' 가 본다. 여기서는 쓰기와, 노트의 **존재 자체**가
+ * 고객에게 드러나지 않는지(알림·활동 로그·실시간 이벤트)를 본다.
+ */
+describe('POST — 내부 노트', () => {
+  // 신청자가 메일 수신을 켜 둔 상태 — 공개 댓글이면 메일이 나가는 조건이다.
+  const SR_WITH_EMAIL = {
+    ...SR,
+    requester: { ...SR.requester, notificationPreference: { emailCommentAdded: true } },
+    assignee: { ...SR.assignee, notificationPreference: { emailCommentAdded: true } },
+  };
+  const outboxRoles = () =>
+    (mocks.enqueueEmails.mock.calls[0]![0] as Array<{ metadata: { role: string } }>).map(
+      (mail) => mail.metadata.role
+    );
+
+  beforeEach(() => {
+    mocks.findUnique.mockResolvedValue(SR_WITH_EMAIL);
+  });
+
+  it('내부 사용자가 세우면 내부 노트로 저장한다', async () => {
+    await (POST as any)(
+      postRequest('충분히 긴 내부 메모', { isInternal: true }),
+      ctx(internalUser)
+    );
+
+    expect(mocks.commentCreate.mock.calls[0]![0].data.isInternal).toBe(true);
+  });
+
+  it('외부 사용자가 보낸 isInternal 은 공개로 강제한다', async () => {
+    await (POST as any)(
+      postRequest('충분히 긴 댓글 내용', { isInternal: true }),
+      ctx(externalUser)
+    );
+
+    expect(mocks.commentCreate.mock.calls[0]![0].data.isInternal).toBe(false);
+  });
+
+  it('신청자에게 메일·푸시를 보내지 않고, 담당자(내부)에게는 보낸다', async () => {
+    await (POST as any)(
+      postRequest('충분히 긴 내부 메모', { isInternal: true }),
+      ctx(internalUser)
+    );
+
+    expect(outboxRoles()).toEqual(['assignee']);
+    expect(mocks.sendForEvent.mock.calls[0]![1]).toEqual(['user-engineer']);
+  });
+
+  it('대조군: 공개 댓글은 신청자에게도 메일·푸시가 간다', async () => {
+    await (POST as any)(postRequest('충분히 긴 댓글 내용'), ctx(internalUser));
+
+    expect(outboxRoles()).toEqual(['requester', 'assignee']);
+    expect(mocks.sendForEvent.mock.calls[0]![1]).toEqual(
+      expect.arrayContaining(['user-requester', 'user-engineer'])
+    );
+  });
+
+  it('고객도 보는 활동 로그에 남기지 않는다', async () => {
+    await (POST as any)(
+      postRequest('충분히 긴 내부 메모', { isInternal: true }),
+      ctx(internalUser)
+    );
+
+    expect(mocks.commentCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.activityCreate).not.toHaveBeenCalled();
+  });
+
+  it('실시간 이벤트를 내부 전용으로 표시한다(공개 댓글은 표시하지 않는다)', async () => {
+    await (POST as any)(
+      postRequest('충분히 긴 내부 메모', { isInternal: true }),
+      ctx(internalUser)
+    );
+    await (POST as any)(postRequest('충분히 긴 댓글 내용'), ctx(internalUser));
+
+    expect(mocks.emitRealtimeEvent.mock.calls[0]![1].internalOnly).toBe(true);
+    expect(mocks.emitRealtimeEvent.mock.calls[1]![1].internalOnly).toBe(false);
   });
 });
