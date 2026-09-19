@@ -348,7 +348,7 @@ export default function UserDetailPage() {
           )}
           <PermissionGuard roles={['ADMIN']}>
             <Button
-              variant="outline"
+              variant="destructive"
               onClick={async () => {
                 // 세션 업데이트 시도
                 await update();
@@ -399,7 +399,7 @@ export default function UserDetailPage() {
                   deleteUser.mutate({ hard: isHardDelete });
                 }
               }}
-              className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4 text-destructive border-destructive hover:bg-destructive hover:text-white"
+              className="h-9 w-9 p-0 md:h-10 md:w-auto md:px-4"
               title={user.isActive ? '비활성화' : '완전 삭제'}
             >
               <UserX className="h-4 w-4 md:mr-2" />
@@ -422,7 +422,7 @@ export default function UserDetailPage() {
               </div>
               <div>
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">이메일</h3>
-                <p className="text-sm">{user.email}</p>
+                <p className="text-sm break-all">{user.email}</p>
                 {user.emailVerified !== undefined && (
                   <p className="text-xs text-muted-foreground">
                     {user.emailVerified

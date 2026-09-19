@@ -14,6 +14,9 @@ const auth = vi.hoisted(() => vi.fn());
 const ClientLayoutStub = vi.hoisted(() => () => null);
 
 vi.mock('@/auth', () => ({ auth }));
+vi.mock('next/headers', () => ({
+  headers: vi.fn().mockResolvedValue(new Headers({ 'x-nonce': 'theme-test-nonce' })),
+}));
 
 vi.mock('@/components/providers/ClientLayout', () => ({ default: ClientLayoutStub }));
 
@@ -48,5 +51,23 @@ describe('RootLayout 세션 배선', () => {
     const clientLayout = findElement(tree, ClientLayoutStub);
     expect(clientLayout, 'ClientLayout 을 트리에서 못 찾음').not.toBeNull();
     expect(clientLayout?.props.session).toBe(session);
+  });
+
+  it('첫 화면 테마 스크립트는 head 안에 요청의 CSP nonce와 함께 놓는다', async () => {
+    auth.mockResolvedValue(null);
+    const { default: RootLayout } = await import('../layout');
+    const { THEME_INIT_SCRIPT } = await import('@/lib/theme');
+    const tree = await RootLayout({ children: null });
+    const head = findElement(tree, 'head');
+    const script = findElement(head?.props.children, 'script');
+
+    expect(script?.props.id).toBe('theme-init');
+    expect(script?.props.nonce).toBe('theme-test-nonce');
+    expect(script?.props.dangerouslySetInnerHTML).toEqual({ __html: THEME_INIT_SCRIPT });
+  });
+
+  it('경로 이동으로 수동 테마를 덮는 Next theme-color metadata를 만들지 않는다', async () => {
+    const { viewport } = await import('../layout');
+    expect(viewport).not.toHaveProperty('themeColor');
   });
 });

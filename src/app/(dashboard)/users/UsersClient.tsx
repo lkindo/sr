@@ -544,7 +544,7 @@ export default function UsersClient() {
                 서버와 **같은 규칙**(USER:CREATE, ADMIN 은 우회)으로 판정한다.
               */}
               {canCreateUser && (
-                <Button onClick={handleCreateUser} className="sr-btn-template-primary">
+                <Button onClick={handleCreateUser}>
                   <Plus className="mr-2 h-4 w-4" />
                   사용자 등록
                 </Button>
@@ -563,10 +563,11 @@ export default function UsersClient() {
               ].map((tab) => (
                 <button
                   key={tab.value}
+                  aria-pressed={statusFilter === tab.value}
                   onClick={() => handleStatusChange(tab.value)}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap transition-all border ${
+                  className={`min-h-9 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     statusFilter === tab.value
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-black border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                       : 'bg-card text-muted-foreground border-border hover:bg-muted'
                   }`}
                 >
@@ -589,8 +590,8 @@ export default function UsersClient() {
               <Button
                 type="submit"
                 size="sm"
-                variant="secondary"
-                className="h-9 px-4 rounded-full bg-[hsl(var(--sr-primary-dark))] text-black hover:bg-[hsl(var(--sr-primary-dark))]/90 shrink-0"
+                variant="default"
+                className="h-9 px-4 rounded-full shrink-0"
               >
                 검색
               </Button>

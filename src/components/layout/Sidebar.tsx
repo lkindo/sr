@@ -77,6 +77,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                   <Link
                     key={item.href}
                     href={item.href}
+                    aria-current={isActive ? 'page' : undefined}
                     className={cn(
                       'flex items-center h-10 px-8 pl-12 text-sm sr-sidebar-submenu-item relative text-muted-foreground hover:text-foreground',
                       isActive && 'text-foreground font-semibold bg-muted/50'
@@ -119,7 +120,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
       className={cn(
         'z-40 h-full w-full sr-sidebar-bg overflow-y-auto',
         !isMobile &&
-          'fixed left-0 top-[104px] h-[calc(100vh-104px)] w-64 border-r border-border hidden md:block'
+          'fixed left-0 top-20 h-[calc(100dvh-80px)] w-64 border-r border-border hidden lg:block'
       )}
     >
       <nav aria-label="사이드바 메뉴" className="flex flex-col pt-5 pb-20">
@@ -135,6 +136,7 @@ export function Sidebar({ isMobile = false, showAllSections = false }: SidebarPr
                   {/* Top Level Link (acts as header) */}
                   <Link
                     href={topItem.href}
+                    aria-current={isActiveTop ? 'page' : undefined}
                     className={cn(
                       'flex items-center px-6 py-3 text-base font-semibold transition-colors',
                       isActiveTop

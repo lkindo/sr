@@ -352,15 +352,15 @@ export default function ClientDetailPage() {
   return (
     <div className="space-y-6">
       {/* 페이지 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild>
             {/* 아이콘뿐인 링크라 이름을 준다(axe link-name). */}
             <Link href="/clients" aria-label="고객사 목록으로 돌아가기">
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             </Link>
           </Button>
-          <div>
+          <div className="min-w-0 break-words">
             {/* 화면 제목이다 — h2 였을 때 페이지에 h1 이 없었다(axe page-has-heading-one, 결정 D16 에서 접근성 검사 대상에 넣음). */}
             <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--sr-primary-dark))]">
               {client.name}
@@ -374,7 +374,7 @@ export default function ClientDetailPage() {
           어느 것을 가리키는지 모호하다. 실제로 E2E 의 getByRole('button', {name:/수정/})
           이 8개에 걸려 실패했다. 고객사 자체를 대상으로 한다는 것을 이름에 명시한다.
         */}
-        <div className="flex gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {canUpdateClient && (
             <Button
               onClick={() => setIsEditDialogOpen(true)}
@@ -555,7 +555,7 @@ export default function ClientDetailPage() {
       </div>
 
       <Tabs defaultValue="categories" className="w-full">
-        <TabsList>
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
           <TabsTrigger value="categories">
             서비스 카테고리 ({client.serviceCategories.length})
           </TabsTrigger>

@@ -88,7 +88,7 @@ describe('SRStatusTimeline — 상태값 전수', () => {
   // 상태별 의미색(결정 D16 2단계 — 시안 A). 확인완료는 완료와 같은 초록에 테두리를 더한다.
   const expected = {
     REQUESTED: 'text-status-neutral',
-    INTAKE: 'bg-primary/10',
+    INTAKE: 'bg-muted',
     IN_PROGRESS: 'text-status-info',
     ON_HOLD: 'text-status-warning',
     COMPLETED: 'text-status-success',

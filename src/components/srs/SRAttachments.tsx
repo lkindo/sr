@@ -211,7 +211,7 @@ export function SRAttachments({ srId, canDelete = false, canUpload = true }: SRA
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <CardTitle>첨부파일</CardTitle>
             <CardDescription>{attachments.length}개의 파일</CardDescription>
@@ -258,7 +258,7 @@ export function SRAttachments({ srId, canDelete = false, canUpload = true }: SRA
             {attachments.map((attachment) => (
               <div
                 key={attachment.id}
-                className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50"
+                className="flex flex-col gap-2 p-3 border rounded-lg hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <FileIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -270,7 +270,7 @@ export function SRAttachments({ srId, canDelete = false, canUpload = true }: SRA
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex shrink-0 items-center justify-end gap-1">
                   <Button
                     variant="ghost"
                     size="sm"

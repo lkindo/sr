@@ -98,6 +98,7 @@ export function ClientBadgeWithActions({
               variant="ghost"
               size="sm"
               className="h-6 w-6 p-0 hover:bg-blue-100 hover:text-blue-600"
+              aria-label={`${userName} 고객사 변경`}
               disabled={isProcessing}
             >
               <RefreshCw className="h-3 w-3" />
@@ -130,6 +131,7 @@ export function ClientBadgeWithActions({
           variant="ghost"
           size="sm"
           className="h-6 w-6 p-0 hover:bg-red-100 hover:text-red-600"
+          aria-label={`${userName} 고객사 소속 해제`}
           onClick={() => setShowRemoveDialog(true)}
           disabled={isProcessing}
         >

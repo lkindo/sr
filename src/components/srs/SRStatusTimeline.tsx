@@ -113,8 +113,8 @@ export function SRStatusTimeline({ statusHistory, currentStatus }: SRStatusTimel
                   </div>
 
                   {/* 내용 */}
-                  <div className="flex-1 pb-4">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="min-w-0 flex-1 pb-4">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       <SRStatusBadge
                         status={history.currentStatus}
                         className={cn(isCurrentStatus && 'ring-2 ring-primary ring-offset-2')}
@@ -127,10 +127,12 @@ export function SRStatusTimeline({ statusHistory, currentStatus }: SRStatusTimel
                     </div>
 
                     {history.changeReason && (
-                      <p className="text-sm text-foreground mb-2">{history.changeReason}</p>
+                      <p className="text-sm text-foreground mb-2 break-words">
+                        {history.changeReason}
+                      </p>
                     )}
 
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground break-words">
                       <User className="h-3 w-3" />
                       <span>{history.user.name}</span>
                       <span>•</span>

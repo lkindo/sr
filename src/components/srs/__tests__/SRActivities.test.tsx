@@ -213,17 +213,17 @@ describe('SRActivities — 활동 유형', () => {
 
   /** 실물 Badge 의 cva 정의에서 따온 variant 별 대표 클래스. */
   const colors = {
-    CREATED: 'bg-primary/10',
-    STATUS_CHANGED: 'bg-primary/10',
+    CREATED: 'bg-muted',
+    STATUS_CHANGED: 'bg-muted',
     PRIORITY_CHANGED: 'bg-secondary',
-    ASSIGNED: 'bg-primary/10',
+    ASSIGNED: 'bg-muted',
     REASSIGNED: 'bg-secondary',
     COMMENTED: 'bg-secondary',
     ATTACHMENT_ADDED: 'bg-secondary',
     ATTACHMENT_REMOVED: 'bg-secondary',
     // 재오픈은 정상 전이다. 거절과 같은 빨강이면 실패로 읽힌다.
     REOPENED: 'bg-secondary',
-    COMPLETED: 'bg-primary/10',
+    COMPLETED: 'bg-muted',
     REJECTED: 'bg-destructive',
     INTAKE_UPDATED: 'bg-secondary',
   } as const;

@@ -255,7 +255,7 @@ export default function ClientsPage() {
             </h3>
             {/* 위 사용자 등록 버튼과 같은 이유 — 서버와 같은 규칙(CLIENT:CREATE)으로 판정한다. */}
             {canCreateClient && (
-              <Button onClick={handleCreateClient} className="sr-btn-template-primary">
+              <Button onClick={handleCreateClient}>
                 <Plus className="mr-2 h-4 w-4" />
                 등록
               </Button>
@@ -276,13 +276,14 @@ export default function ClientsPage() {
               ].map((tab) => (
                 <button
                   key={tab.value}
+                  aria-pressed={industryFilter === tab.value}
                   onClick={() => {
                     setIndustryFilter(tab.value);
                     setPage(1);
                   }}
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
+                  className={`min-h-9 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                     industryFilter === tab.value
-                      ? 'bg-[hsl(var(--sr-primary-dark))] text-black border-[hsl(var(--sr-primary-dark))]'
+                      ? 'bg-primary text-primary-foreground border-primary'
                       : 'bg-card text-muted-foreground border-border hover:bg-muted'
                   }`}
                 >
@@ -301,13 +302,14 @@ export default function ClientsPage() {
                 ].map((tab) => (
                   <button
                     key={tab.value}
+                    aria-pressed={statusFilter === tab.value}
                     onClick={() => {
                       setStatusFilter(tab.value);
                       setPage(1);
                     }}
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap transition-all border ${
+                    className={`min-h-9 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                       statusFilter === tab.value
-                        ? 'bg-[hsl(var(--sr-primary-dark))] text-black border-[hsl(var(--sr-primary-dark))] shadow-sm'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                         : 'bg-card text-muted-foreground border-border hover:bg-muted'
                     }`}
                   >

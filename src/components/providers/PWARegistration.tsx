@@ -137,7 +137,7 @@ export function PWARegistration() {
           제목 '앱으로 설치' 가 보이지 않았다. */}
       <div className="bg-card p-3 rounded-lg shadow-2xl border border-border text-card-foreground animate-in slide-in-from-bottom-5 duration-500">
         <div className="flex items-center gap-3">
-          <div className="bg-[hsl(var(--sr-accent-orange))] p-2 rounded-md shrink-0">
+          <div className="bg-primary text-primary-foreground p-2 rounded-md shrink-0">
             <Download className="h-4 w-4" />
           </div>
           <div className="min-w-0">
@@ -148,8 +148,9 @@ export function PWARegistration() {
               설치
             </Button>
             <button
+              aria-label="앱 설치 안내 닫기"
               onClick={handleDismiss}
-              className="text-muted-foreground hover:text-white transition-colors p-1"
+              className="text-muted-foreground hover:text-foreground transition-colors p-1"
             >
               <X className="h-4 w-4" />
             </button>

@@ -468,6 +468,22 @@ describe('proxy (middleware)', () => {
       expect(csp).toContain("'unsafe-eval'");
     });
 
+    it('개발 HTTP 화면은 Safari가 자산을 HTTPS로 강제 변경하지 않게 한다', async () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const { csp } = await cspOf();
+
+      expect(csp).not.toContain('upgrade-insecure-requests');
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toMatch(/script-src 'self' 'nonce-[^']+'/);
+    });
+
+    it.each([['production'], ['test']])('%s 에서는 HTTPS 강제 변경을 유지한다', async (env) => {
+      vi.stubEnv('NODE_ENV', env);
+      const { csp } = await cspOf();
+
+      expect(csp).toContain('upgrade-insecure-requests;');
+    });
+
     it.each([['production'], ['test']])("%s 에서는 'unsafe-eval' 이 없다", async (env) => {
       vi.stubEnv('NODE_ENV', env);
       const { csp } = await cspOf();

@@ -1,16 +1,13 @@
 // Service Worker for Web Push Notifications
 // This file must be placed in the public directory to be accessible at /sw.js
 
-const SW_VERSION = '1.0.4';
-const CACHE_NAME = 'sr-mgt-cache-v4';
+const SW_VERSION = '1.0.5';
+const CACHE_PREFIX = 'sr-mgt-cache-';
+const CACHE_NAME = `${CACHE_PREFIX}v5`;
 
 // Assets to cache immediately on install
-const PRECACHE_ASSETS = [
-  '/manifest.json',
-  '/dashboard',
-  '/login',
-  // Note: Next.js has complex hashed assets, so we usually rely on dynamic caching for them
-];
+const PRECACHE_ASSETS = ['/favicon.ico', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
+const STATIC_ASSETS = new Set(PRECACHE_ASSETS);
 
 // Install event - cache assets if needed
 self.addEventListener('install', (event) => {
@@ -40,92 +37,53 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME) {
+            if (cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME) {
               return caches.delete(cacheName);
             }
           })
         );
       }),
-      // Navigation Preload 활성화
+      // HTML은 브라우저가 직접 조회한다. 이전 버전이 켠 preload도 해제한다.
       self.registration.navigationPreload
-        ? self.registration.navigationPreload.enable()
+        ? self.registration.navigationPreload.disable()
         : Promise.resolve(),
     ]).then(() => self.clients.claim())
   );
 });
 
-// Fetch event - serving cached content
+// Next RSC 응답은 라우터 상태에 종속된다. 재사용하면 두 번째 화면 이동이 멈출 수 있다.
+// 인증 HTML·API·개발 번들·동적 manifest는 건드리지 않고 공개 이미지 목록만 캐시한다.
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests for now
   if (event.request.method !== 'GET') return;
-
-  // Skip API requests and external resources for basic precaching
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api') || url.origin !== self.location.origin) return;
-
-  // Document (HTML) requests: Network First + Navigation Preload
   if (
+    url.origin !== self.location.origin ||
     event.request.mode === 'navigate' ||
-    event.request.headers.get('accept')?.includes('text/html')
-  ) {
-    event.respondWith(
-      (async () => {
-        try {
-          // Preload된 응답 사용 시도
-          const preloadResponse = await event.preloadResponse;
-          if (preloadResponse) return preloadResponse;
-
-          // 네트워크 요청
-          const networkResponse = await fetch(event.request);
-
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            networkResponse.type === 'basic'
-          ) {
-            const responseToCache = networkResponse.clone();
-            const cache = await caches.open(CACHE_NAME);
-            cache.put(event.request, responseToCache);
-          }
-
-          return networkResponse;
-        } catch (error) {
-          // 오프라인 시 캐시 확인
-          const cache = await caches.open(CACHE_NAME);
-          const cachedResponse = await cache.match(event.request);
-          return cachedResponse || cache.match('/dashboard') || cache.match('/login');
-        }
-      })()
-    );
+    event.request.headers.get('accept')?.includes('text/html') ||
+    event.request.headers.get('RSC') === '1' ||
+    url.searchParams.has('_rsc') ||
+    !STATIC_ASSETS.has(url.pathname)
+  )
     return;
-  }
 
-  // Other assets (static files): Cache First
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
+      const cachedResponse = await cache.match(event.request);
+      if (cachedResponse) return cachedResponse;
+
+      const response = await fetch(event.request);
+      if (
+        response.ok &&
+        response.type === 'basic' &&
+        !response.redirected &&
+        response.headers.get('content-type')?.startsWith('image/') &&
+        !/no-store|private/i.test(response.headers.get('cache-control') || '')
+      ) {
+        event.waitUntil(cache.put(event.request, response.clone()).catch(() => undefined));
       }
-
-      return fetch(event.request).then((response) => {
-        // Only cache successful dynamic requests
-        if (
-          !response ||
-          response.status !== 200 ||
-          response.type === 'error' ||
-          response.type === 'opaque'
-        ) {
-          return response;
-        }
-
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-
-        return response;
-      });
-    })
+      return response;
+    })()
   );
 });
 

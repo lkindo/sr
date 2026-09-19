@@ -90,7 +90,7 @@ export default auth(async (req) => {
    * (`app-render` 의 `getScriptNonceFromHeader`) 자기가 렌더링하는 모든 부트스트랩·
    * 하이드레이션 인라인 스크립트에 그 nonce 를 붙인다. 실측으로 확인했다 —
    * `/login` 의 `<script>` 20개 전부가 CSP 헤더와 **동일한** nonce 를 갖는다.
-   * 앱 코드에는 직접 작성한 인라인 스크립트도 `next/script` 사용처도 없다.
+   * 루트 레이아웃의 테마 초기화 인라인 스크립트도 요청의 x-nonce를 명시적으로 사용한다.
    *
    * 감사는 "nonce 가 x-nonce 헤더에만 놓이고 어떤 script 태그에도 적용되지 않는다"고
    * 기술했으나, 실행해 보면 그렇지 않다. 다만 `'unsafe-inline'` 이 정책에 남아 있던 것은
@@ -106,6 +106,7 @@ export default auth(async (req) => {
    * 심각도가 다르다. 이걸 지우려면 `style-src-attr` 분리와 인라인 스타일 제거가 선행돼야
    * 하며, 그건 별도 작업이다.
    */
+  // Safari는 HTTP localhost의 자산도 HTTPS로 바꾼다. 개발 서버에서만 upgrade를 제외한다.
   const isDev = process.env.NODE_ENV === 'development';
   const cspHeader = `
     default-src 'self';
@@ -118,7 +119,7 @@ export default auth(async (req) => {
     form-action 'self';
     frame-ancestors 'none';
     block-all-mixed-content;
-    upgrade-insecure-requests;
+    ${isDev ? '' : 'upgrade-insecure-requests;'}
   `
     .replace(/\s{2,}/g, ' ')
     .trim();

@@ -46,7 +46,14 @@ export function UserTable({
       <TableHeader>
         <TableRow>
           <TableHead className="w-12">
-            <Button variant="ghost" size="sm" onClick={onToggleAll} className="h-8 w-8 p-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleAll}
+              className="h-8 w-8 p-0"
+              aria-label="사용자 전체 선택"
+              aria-pressed={selectedUserIds.size === users.length && users.length > 0}
+            >
               {selectedUserIds.size === users.length && users.length > 0 ? (
                 <CheckSquare className="h-4 w-4" />
               ) : (
@@ -90,6 +97,8 @@ export function UserTable({
                     onToggleUser(user.id);
                   }}
                   className="h-8 w-8 p-0"
+                  aria-label={`${user.name} 선택`}
+                  aria-pressed={selectedUserIds.has(user.id)}
                 >
                   {selectedUserIds.has(user.id) ? (
                     <CheckSquare className="h-4 w-4 text-primary" />

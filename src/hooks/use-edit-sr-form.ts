@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -40,7 +40,6 @@ export function useEditSRForm({
   const [clientId, setClientId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
-  const [priority, setPriority] = useState('');
   const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<SRAttachmentView[]>([]);
@@ -149,7 +148,6 @@ export function useEditSRForm({
     setClientId(sr.clientId || sr.client?.id || '');
     setCategoryId(sr.serviceCategory?.id || sr.category?.id || '');
     setRequestedPriority(sr.requestedPriority || 'MEDIUM');
-    setPriority(sr.actualPriority || 'MEDIUM');
     setRequestedCompletionDate(
       sr.requestedCompletionDate
         ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
@@ -170,25 +168,14 @@ export function useEditSRForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, srId]);
 
-  // 고객사를 바꾸면 카테고리를 다시 불러온다.
-  // 초기 로드는 위 effect 가 처리하므로, 여기서는 "실제로 바뀐 경우"만 다룬다.
-  const previousClientIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!open) {
-      previousClientIdRef.current = null;
-      return;
-    }
-    if (previousClientIdRef.current === null) {
-      previousClientIdRef.current = clientId;
-      return;
-    }
-    if (previousClientIdRef.current === clientId) return;
-
-    previousClientIdRef.current = clientId;
-    // 바뀐 고객사에 없는 카테고리 id 가 그대로 제출되지 않도록 선택을 비운다.
+  // 초기 고객사 설정을 사용자 변경으로 오인하면 기존 카테고리까지 지워진다.
+  // 선택을 비우는 동작은 실제 고객사 선택 이벤트에서만 수행한다.
+  const handleClientChange = (nextClientId: string) => {
+    if (nextClientId === clientId) return;
+    setClientId(nextClientId);
     setCategoryId('');
-    fetchCategories(clientId);
-  }, [open, clientId, fetchCategories]);
+    fetchCategories(nextClientId);
+  };
 
   const handleDeleteAttachmentClick = (attachmentId: string) => setFileToDelete(attachmentId);
 
@@ -294,8 +281,8 @@ export function useEditSRForm({
     const formData = new FormData();
     formData.append('title', title);
     formData.append('description', description);
-    if (priority && priority.trim() !== '') formData.append('priority', priority);
-    formData.append('serviceCategoryId', categoryId || '');
+    // 잠긴 운영자 필드는 전송하지 않는다. 실제 우선순위는 접수 화면에서만 편집한다.
+    if (canChangeCategory) formData.append('serviceCategoryId', categoryId || '');
     if (requestedPriority && requestedPriority.trim() !== '')
       formData.append('requestedPriority', requestedPriority);
     if (requestedCompletionDate)
@@ -351,7 +338,6 @@ export function useEditSRForm({
       clientId,
       categoryId,
       requestedPriority,
-      priority,
       requestedCompletionDate,
       files,
       existingAttachments,
@@ -366,10 +352,9 @@ export function useEditSRForm({
     actions: {
       setTitle,
       setDescription,
-      setClientId,
+      setClientId: handleClientChange,
       setCategoryId,
       setRequestedPriority,
-      setPriority,
       setRequestedCompletionDate,
       setFiles,
       setFileToDelete,

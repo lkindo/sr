@@ -112,7 +112,9 @@ vi.mock('@/components/ui/select', () => ({
       >
         <option value="">Select option</option>
         <option value="client-1">Client 1</option>
+        <option value="client-2">Client 2</option>
         <option value="cat-1">Category 1</option>
+        <option value="cat-2">Category 2</option>
         <option value="MEDIUM">MEDIUM</option>
       </select>
       {children}
@@ -358,6 +360,65 @@ describe('EditSRDialog Component', () => {
       },
       { timeout: 5000 }
     );
+  });
+
+  it('수정 폼을 처음 열 때 기존 서비스 카테고리를 유지한다', async () => {
+    render(<EditSRDialog {...defaultProps} />);
+
+    const category = screen.getByTestId('trigger-category').parentElement!.querySelector('select');
+    await waitFor(() => expect(category).toHaveValue('cat-1'));
+  });
+
+  it('사용자가 고객사를 바꾸면 이전 카테고리 선택을 지우고 해당 고객사 목록을 조회한다', async () => {
+    render(<EditSRDialog {...defaultProps} />);
+
+    const category = screen.getByTestId('trigger-category').parentElement!.querySelector('select');
+    const client = screen.getByTestId('trigger-client').parentElement!.querySelector('select')!;
+    await waitFor(() => expect(category).toHaveValue('cat-1'));
+    fireEvent.change(client, { target: { value: 'client-2' } });
+
+    await waitFor(() => {
+      expect(category).toHaveValue('');
+      expect(getServiceCategoriesForSelection).toHaveBeenLastCalledWith('client-2');
+    });
+  });
+
+  it('고객이 설명을 수정할 때 운영자 카테고리와 숨은 우선순위를 전송하지 않는다', async () => {
+    vi.mocked(usePermissions).mockReturnValue({
+      hasAnyRole: vi.fn().mockImplementation((roles: string[]) => roles.includes('CLIENT_USER')),
+      roles: ['CLIENT_USER'],
+      permissions: ['SR:UPDATE_SELF'],
+    } as never);
+    mockUpdateMutateAsync.mockResolvedValue({ success: true });
+    render(<EditSRDialog {...defaultProps} />);
+
+    const description = await screen.findByDisplayValue(mockSR.description);
+    fireEvent.change(description, {
+      target: { value: '고객이 접수 전에 수정한 요청 상세 내용입니다.' },
+    });
+    fireEvent.submit(screen.getByTestId('edit-sr-form'));
+
+    await waitFor(() => expect(mockOnUpdated).toHaveBeenCalledOnce());
+    const payload = mockUpdateMutateAsync.mock.calls[0]![0] as FormData;
+    expect(payload.get('description')).toBe('고객이 접수 전에 수정한 요청 상세 내용입니다.');
+    expect(payload.has('serviceCategoryId')).toBe(false);
+    expect(payload.has('priority')).toBe(false);
+    expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('운영자가 선택한 서비스 카테고리는 저장하되 숨은 우선순위는 전송하지 않는다', async () => {
+    mockUpdateMutateAsync.mockResolvedValue({ success: true });
+    render(<EditSRDialog {...defaultProps} />);
+
+    await screen.findByDisplayValue(mockSR.title);
+    const category = screen.getByTestId('trigger-category').parentElement!.querySelector('select')!;
+    fireEvent.change(category, { target: { value: 'cat-2' } });
+    fireEvent.submit(screen.getByTestId('edit-sr-form'));
+
+    await waitFor(() => expect(mockOnUpdated).toHaveBeenCalledOnce());
+    const payload = mockUpdateMutateAsync.mock.calls[0]![0] as FormData;
+    expect(payload.get('serviceCategoryId')).toBe('cat-2');
+    expect(payload.has('priority')).toBe(false);
   });
 
   it('handles submit failure', async () => {

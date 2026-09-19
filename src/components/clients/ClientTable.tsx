@@ -85,6 +85,8 @@ export function ClientTable({
                       size="sm"
                       onClick={() => onToggleRowExpansion(client.id)}
                       className="h-8 w-8 p-0"
+                      aria-label={`${client.name} 사용자 목록 ${isExpanded ? '접기' : '펼치기'}`}
+                      aria-expanded={isExpanded}
                     >
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4" />

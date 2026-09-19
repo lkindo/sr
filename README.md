@@ -17,8 +17,8 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
   - **통합 디자인 시스템**: 모바일 목록 카드는 공용 셸(`MobileListCard`)로 같은 배치(2열 정보 그리드)를 쓴다
   - **콤팩트 필터**: 모바일 화면 활용도를 높이기 위한 탭/칩 스타일 필터 시스템
 - **PWA & 성능**:
-  - **오프라인 대비(모바일)**: 모바일 기기에서만 앱 설치·서비스 워커를 켠다(PC 는 웹 푸시를 구독할 때만 등록된다). 네트워크가 끊기면 마지막으로 연 화면과 정적 자원을 캐시에서 보여 주지만, API 응답은 캐시하지 않으므로 오프라인에서 SR 을 조회·작성할 수는 없다.
-  - **속도 최적화**: `navigationPreload` 활성화 및 미들웨어 리다이렉트 서버화로 렌더링 지연 최소화
+  - **모바일 설치·알림**: 모바일 기기에서 앱 설치·서비스 워커를 켠다(PC 는 웹 푸시를 구독할 때 등록된다). 공개 아이콘만 캐시하며, 로그인·업무 화면과 API 조회에는 네트워크 연결이 필요하다.
+  - **화면 갱신**: Next 라우터 응답은 서비스 워커 캐시를 거치지 않아 재방문 시 최신 화면을 조회한다.
 - **보안**: 역할 기반 권한 제어(RBAC), 환경 변수 기반 Rate Limiting
 
 ---
@@ -178,10 +178,13 @@ pnpm test:coverage     # 커버리지 리포트 확인
 ### E2E 테스트 (Playwright)
 
 ```bash
-pnpm test:e2e          # 전체 E2E 테스트 (Headless)
+pnpm test:e2e          # 기본 E2E 테스트 (Headless)
+pnpm test:e2e:mobile   # Chromium/WebKit 모바일 업무 흐름 (로컬 DB·시드 계정 필요)
 pnpm test:e2e:ui       # UI 모드 (디버깅)
 pnpm test:e2e:debug    # 디버깅 모드
 ```
+
+모바일 테스트의 실행 조건·검증 범위·실기기 확인 항목은 [모바일 업무 흐름 검증](docs/MOBILE_WORKFLOW_QA.md)을 참고하세요.
 
 ### 뮤테이션 테스트 (Stryker)
 
@@ -206,7 +209,7 @@ pnpm test:mutation
 - [SR_Management_System_PRD.md](./docs/SR_Management_System_PRD.md): 제품 요구사항 정의서(v1.4). 초기판이 기술했던 미채택 스택(Vercel/Upstash/Resend/Inngest 등)을 실제 구현 기준으로 정정했습니다.
 - [TRD.md](./docs/TRD.md): 기술 요구사항 문서(v1.5). 자체 서버(Oracle Cloud VM) + Docker Compose + nginx + PostgreSQL 16 구성을 실측 기반으로 기술합니다. 기술 규칙이 `.gemini/rules/` 와 다르면 규칙이 이깁니다.
 - [LLD.md](./docs/LLD.md): 상세 설계 문서(v1.3). Next.js 16 + PostgreSQL 16 컨테이너 + 자체 서버 기준이며, 초안이 전제했던 Vercel/Upstash/Blob 스택 미채택을 정정 배너로 명시합니다.
-- [DESIGN.md](./docs/DESIGN.md): 색상 팔레트의 정본(다크 캔버스). 치수(반경·간격·폭)의 정본은 `.gemini/rules/fe-rules.md` §3 입니다.
+- [DESIGN.md](./docs/DESIGN.md): 주간·야간·시스템 테마, 화면 구성, 업무 흐름 개선안. 실제 색상 값은 `src/app/globals.css`가 정본입니다.
 
 ### 데이터베이스
 

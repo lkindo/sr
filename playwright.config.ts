@@ -11,6 +11,8 @@ const workerCount =
  */
 export default defineConfig({
   testDir: './e2e',
+  // Mobile workflows have isolated device contexts and their own local test server configuration.
+  testIgnore: '**/mobile/**',
 
   /* 테스트 timeout 설정 */
   timeout: 60 * 1000, // 30초 → 60초로 증가 (Profile 페이지 로딩 고려)

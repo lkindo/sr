@@ -62,6 +62,8 @@ describe('Badge Component', () => {
 
   it('badgeVariants returns correct class string', () => {
     const classes = badgeVariants({ variant: 'default' });
-    expect(classes).toContain('bg-primary');
+    // 접수 배지는 브랜드 파랑(진행중)과 구별되는 중립 표면을 쓴다.
+    expect(classes).toContain('bg-muted');
+    expect(classes).toContain('text-foreground');
   });
 });

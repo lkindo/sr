@@ -9,6 +9,7 @@ import { Menu } from 'lucide-react';
 
 // Removed unused SheetPrimitive import
 import { Sidebar } from '@/components/layout/Sidebar';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Button } from '@/components/ui';
 import {
   Sheet,
@@ -63,13 +64,13 @@ export function Header({ user: initialUser }: HeaderProps) {
   const activeMenu = getActiveMenu();
 
   return (
-    <header className="sticky top-0 z-[60] w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-16 md:h-[104px] items-center">
-        {/* 모바일 햄버거 메뉴 (md 미만 표시) */}
-        <div className="flex md:hidden items-center px-4">
+    <header className="sticky top-0 z-[60] w-full border-b border-border bg-card text-card-foreground">
+      <div className="flex h-16 lg:h-20 items-center">
+        {/* 모바일·태블릿 메뉴 (lg 미만 표시) */}
+        <div className="flex lg:hidden items-center pl-3 pr-1">
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
+              <Button variant="ghost" size="icon" className="h-11 w-11 lg:hidden">
                 <Menu className="h-6 w-6" />
                 <span className="sr-only">메뉴 열기</span>
               </Button>
@@ -88,9 +89,9 @@ export function Header({ user: initialUser }: HeaderProps) {
           </Sheet>
         </div>
 
-        {/* 데스크톱 로고 영역 (md 이상 표시) */}
-        <div className="hidden md:flex w-64 flex-col items-center justify-center px-6 border-r border-border h-full bg-background text-center">
-          <Link href="/dashboard" className="flex flex-col items-center space-y-1 group">
+        {/* 데스크톱 로고 영역 (lg 이상 표시) */}
+        <div className="hidden lg:flex w-64 shrink-0 flex-col items-start justify-center px-6 border-r border-border h-full">
+          <Link href="/dashboard" className="flex flex-col items-start space-y-1 group">
             <span className="font-bold text-lg text-foreground group-hover:opacity-90 transition-opacity">
               SR Management
             </span>
@@ -98,16 +99,19 @@ export function Header({ user: initialUser }: HeaderProps) {
           </Link>
         </div>
 
-        {/* 모바일 로고 (md 미만 중앙 표시) */}
-        <div className="flex md:hidden flex-1 justify-center">
-          <Link href="/dashboard" className="font-bold text-base text-primary">
+        {/* 모바일·태블릿 로고 */}
+        <div className="flex lg:hidden min-w-0 flex-1">
+          <Link
+            href="/dashboard"
+            className="truncate font-bold text-sm sm:text-base text-foreground"
+          >
             SR Management
           </Link>
         </div>
 
         {/* 메뉴 및 사용자 정보 영역 */}
-        <div className="flex items-center justify-end md:justify-between px-4 md:px-8 flex-1 md:flex-[1]">
-          <nav aria-label="주 메뉴" className="hidden md:flex items-center gap-1">
+        <div className="flex shrink-0 items-center justify-end lg:justify-between px-3 lg:px-6 lg:flex-1 min-w-0">
+          <nav aria-label="주 메뉴" className="hidden lg:flex items-center gap-1">
             {/*
               위에서 서버 props 와 병합해 둔 `user` 를 넘긴다.
               예전에는 `hasAnyRole()` 을 직접 불렀는데, 그 훅은 클라이언트 세션만 보므로
@@ -122,10 +126,11 @@ export function Header({ user: initialUser }: HeaderProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={activeMenu === item.href ? 'page' : undefined}
                 className={cn(
-                  'px-4 py-2 rounded text-sm transition-colors font-medium',
+                  'px-3 py-2.5 rounded-md text-sm transition-colors font-medium',
                   activeMenu === item.href
-                    ? 'bg-muted text-foreground font-semibold'
+                    ? 'bg-accent text-accent-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                 )}
               >
@@ -134,7 +139,8 @@ export function Header({ user: initialUser }: HeaderProps) {
             ))}
           </nav>
 
-          <nav aria-label="사용자 메뉴" className="flex items-center gap-3">
+          <nav aria-label="사용자 메뉴" className="flex items-center gap-1 sm:gap-3">
+            <ThemeToggle />
             {isLoading ? (
               <div className="flex gap-2">
                 <div className="h-9 w-16 rounded bg-muted animate-pulse" />

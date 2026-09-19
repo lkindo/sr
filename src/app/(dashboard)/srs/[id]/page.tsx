@@ -260,9 +260,9 @@ export default function SRDetailPage() {
         {reopen && <SRReopenBlockedNotice reopen={reopen} />}
       </div>
 
-      <div className="grid gap-4 md:gap-6 md:grid-cols-3 md:items-stretch">
+      <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-3 md:items-stretch">
         {/* Details Card */}
-        <div className="md:col-span-2 space-y-4 md:space-y-6 flex flex-col">
+        <div className="min-w-0 md:col-span-2 space-y-4 md:space-y-6 flex flex-col">
           <div className="p-4 md:p-6 bg-card rounded-lg shadow border flex-1">
             {/* 페이지 제목이 h1 이므로 섹션 제목은 h2 여야 한다. h1 → h3 로 건너뛰면
                 낭독기 사용자가 구조를 잘못 파악한다(axe: heading-order). */}
@@ -272,10 +272,21 @@ export default function SRDetailPage() {
                 <h3 className="text-xs md:text-sm font-medium text-muted-foreground mb-1">
                   요청 내용
                 </h3>
-                <p className="text-sm md:text-base text-foreground whitespace-pre-line leading-relaxed">
+                <p className="text-sm md:text-base text-foreground whitespace-pre-line break-words leading-relaxed">
                   {sr.description}
                 </p>
               </div>
+
+              {['COMPLETED', 'CONFIRMED'].includes(sr.status) && sr.resolutionDescription && (
+                <div>
+                  <h3 className="text-xs md:text-sm font-medium text-muted-foreground mb-1">
+                    해결 내용
+                  </h3>
+                  <p className="text-sm md:text-base text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                    {sr.resolutionDescription}
+                  </p>
+                </div>
+              )}
 
               {/* Mobile: Use 2 columns for better density */}
               <div className="grid grid-cols-2 gap-x-2 gap-y-3 md:gap-4">
@@ -354,9 +365,9 @@ export default function SRDetailPage() {
         </div>
 
         {/* Tabs for comments, activities, attachments */}
-        <div className="md:col-span-1 space-y-4">
+        <div className="min-w-0 md:col-span-1 space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList>
+            <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
               <TabsTrigger value="comments" className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" /> 댓글{' '}
                 {sr._count?.comments > 0 && `(${sr._count.comments})`}

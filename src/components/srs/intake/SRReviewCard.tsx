@@ -16,14 +16,14 @@ interface SRReviewCardProps {
 
 export function SRReviewCard({ sr }: SRReviewCardProps) {
   return (
-    <div className="sr-card-template">
+    <div className="sr-card-template min-w-0 [overflow-wrap:anywhere]">
       {/* 카드 헤더 */}
       <div className="px-6 py-5 border-b border-[hsl(var(--sr-border))]">
         <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
+          <div className="flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">
             1
           </div>
-          <div>
+          <div className="min-w-0">
             <h3 className="text-xl font-semibold text-[hsl(var(--sr-primary-dark))]">
               SR 정보 검토
             </h3>
@@ -37,13 +37,13 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
       {/* 카드 내용 */}
       <div className="px-6 py-5 space-y-4">
         {/* SR 번호 및 상태 */}
-        <div className="flex items-center gap-4">
-          <div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">SR 번호</p>
             <p className="text-2xl font-bold">{sr.srNumber}</p>
           </div>
-          <Separator orientation="vertical" className="h-12" />
-          <div>
+          <Separator orientation="vertical" className="hidden h-12 sm:block" />
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">요청 우선순위</p>
             <Badge variant={priorityBadgeVariantOf(sr.requestedPriority)}>
               {priorityLabels[sr.requestedPriority]}
@@ -51,8 +51,8 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
           </div>
           {sr.requestedCompletionDate && (
             <>
-              <Separator orientation="vertical" className="h-12" />
-              <div>
+              <Separator orientation="vertical" className="hidden h-12 sm:block" />
+              <div className="min-w-0">
                 <p className="text-sm text-muted-foreground">희망 완료일</p>
                 <p className="font-medium">
                   {format(new Date(sr.requestedCompletionDate), 'PPP', { locale: ko })}
@@ -110,11 +110,11 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
                 {sr.attachments.map((file) => (
                   <div
                     key={file.id}
-                    className="flex items-center justify-between p-2 bg-muted rounded"
+                    className="flex flex-wrap items-center justify-between gap-2 p-2 bg-muted rounded"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{file.fileName}</span>
-                      <span className="text-xs text-muted-foreground">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+                      <span className="min-w-0 text-sm font-medium">{file.fileName}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         ({(Number(file.fileSize) / 1024).toFixed(1)} KB)
                       </span>
                     </div>
@@ -122,7 +122,7 @@ export function SRReviewCard({ sr }: SRReviewCardProps) {
                       href={file.fileUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline"
+                      className="shrink-0 text-sm text-primary hover:underline"
                     >
                       다운로드
                     </a>
