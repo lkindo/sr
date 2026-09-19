@@ -39,6 +39,7 @@
     "verify": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1",
     "verify:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1 -fast",
     "check:e2e-assertions": "tsx scripts/check-e2e-assertions.ts",
+    "check:e2e-projects": "tsx scripts/check-e2e-projects.ts",
     "check:standalone-secrets": "tsx scripts/check-standalone-secrets.ts",
     "check:dead": "knip --max-issues 4",
     "test:integration": "vitest run --project=integration"

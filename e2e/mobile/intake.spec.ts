@@ -187,12 +187,21 @@ test('light: 모바일 접수 달력 선택·접수 수정·마감일 조정과 
       });
       expect(denied.status()).toBe(403);
       expect((await readSR(client, id)).dueDate).toBe(before.dueDate);
-      await client.goto(`/srs/${id}/intake`);
-      await expect(
-        client.getByText('SR 접수 처리 권한이 없습니다.', { exact: true })
-      ).toBeVisible();
-      await expect(client.getByRole('button', { name: '저장', exact: true })).toHaveCount(0);
-      await assertViewport(client);
+      // Probe the forbidden URL in the same authenticated context without replacing
+      // the customer's live detail page with a route they cannot use.
+      const forbiddenPage = await client.context().newPage();
+      try {
+        await forbiddenPage.goto(`/srs/${id}/intake`);
+        await expect(
+          forbiddenPage.getByText('SR 접수 처리 권한이 없습니다.', { exact: true })
+        ).toBeVisible();
+        await expect(forbiddenPage.getByRole('button', { name: '저장', exact: true })).toHaveCount(
+          0
+        );
+        await assertViewport(forbiddenPage);
+      } finally {
+        await forbiddenPage.close();
+      }
     });
 
     await test.step('관리자가 사유를 입력하여 마감일을 조정하고 우선순위 변경 후에도 유지한다', async () => {
@@ -228,7 +237,8 @@ test('light: 모바일 접수 달력 선택·접수 수정·마감일 조정과 
       expect(after.actualPriority).toBe('CRITICAL');
       expect(after.dueDate).toBe(expectedDueDate);
       expect(after.dueDateManual).toBe(true);
-      await client.goto(`/srs/${id}`);
+      // Keep the customer's detail open and observe SSE updates. A document navigation
+      // here races the refresh triggered by the manager's update in WebKit.
       await expect(client.getByText('직접 지정', { exact: true })).toBeVisible();
       await expect(client.getByTestId('sr-due-date')).toContainText('09:30');
       await assertViewport(client);

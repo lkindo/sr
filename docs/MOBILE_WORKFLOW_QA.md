@@ -13,6 +13,16 @@
 - 기존 로컬 시드의 ADMIN·MANAGER·ENGINEER·CLIENT_USER·CLIENT_ADMIN 계정이 필요하다. 계정/암호를 보고서에 기록하지 않는다. 운영 DB를 연결한 서버에서는 실행하지 않는다.
 - 결과: `playwright-report/mobile/index.html`, `test-results/mobile-workflow/`.
 
+### CI 실행 구성 (2026-09-20)
+
+`CI/CD Pipeline`의 E2E 작업은 desktop/mobile matrix로 실행하며 각 작업은 별도의 임시 PostgreSQL과 시드를 사용한다. 데스크톱은 기존 production 서버 3000, 모바일은 위 전용 설정의 개발 서버 3100에서 Chromium·WebKit 전체 16개를 실행한다. 어느 작업이 실패해도 전체 CI가 실패해 배포를 차단한다. 모바일 검증은 개발 서버 기준이며 운영 HTTPS 환경 검증과 구분한다.
+
+`pnpm check:e2e-projects`는 서버·DB를 시작하지 않고 Playwright의 실제 수집 결과를 검사한다. 데스크톱에 모바일 스펙이 섞이거나 모바일 시나리오가 두 브라우저 중 하나에서 빠지면 실패한다. 프로젝트의 `testIgnore`가 공통 설정을 덮어써 모바일 8개가 데스크톱으로 잘못 실행되던 CI 실패를 이 검사로 재현했다. 보고서는 작업별 `playwright-report-desktop` / `playwright-report-mobile` artifact에 보관한다.
+
+CI WebKit에서는 관리자 일정 변경의 SSE 갱신과 고객의 강제 페이지 이동이 겹치는 테스트 경합도 확인했다. 권한 차단 URL은 같은 고객 세션의 별도 탭에서 검증하고 닫는다. 고객 업무 상세는 계속 열어 두고 변경된 마감일이 실시간 반영되는지 검사한다. 기존 저장값·권한·시간 단언은 유지한다.
+
+보류·완료·재오픈·거절 후 목록으로 돌아오면 화면의 SR 링크로 상세를 다시 연다. 상태 변경 직후 문서 전체를 강제 이동하던 WebKit 경합을 피하면서 목록 복귀와 상세 재진입을 실제 UI로 검증한다. 상세 URL·상태 배지·저장된 API 값·화면 크기 검증과 다른 사용자의 실시간 갱신 검사는 유지한다.
+
 ## 검증 범위
 
 | 영역 | 확인한 동작 |

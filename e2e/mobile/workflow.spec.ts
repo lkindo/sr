@@ -15,6 +15,7 @@ async function detail(page: Page, id: string, status: string) {
   // An open detail screen receives real SSE updates. A second document navigation can
   // race that refresh in WebKit; observe the user-visible update instead.
   if (new URL(page.url()).pathname !== `/srs/${id}`) await page.goto(`/srs/${id}`);
+  await expect(page).toHaveURL(new RegExp(`/srs/${id}$`));
   await expect(page.getByTestId('sr-status-badge')).toHaveText(status);
   const states: Record<string, string> = {
     요청됨: 'REQUESTED',
@@ -70,6 +71,14 @@ async function createRequest(page: Page, title: string, created: string[]) {
   return created.at(-1)!;
 }
 
+async function returnToDetail(page: Page, id: string) {
+  await expect(page).toHaveURL(/\/srs$/);
+  // Re-enter through the app after its status-change redirect. A hard navigation
+  // here competes with the pending SSE refresh in WebKit.
+  await page.locator(`a[href="/srs/${id}"]:visible`).first().click();
+  await expect(page).toHaveURL(new RegExp(`/srs/${id}$`));
+}
+
 async function statusDialog(
   page: Page,
   id: string,
@@ -90,7 +99,7 @@ async function statusDialog(
   await dialog.getByRole('button', { name: submit, exact: true }).click();
   expect((await response).ok()).toBe(true);
   await expect(dialog).toBeHidden();
-  await expect(page).toHaveURL(/\/srs$/);
+  await returnToDetail(page, id);
 }
 
 async function directStatus(page: Page, id: string, action: string) {
@@ -308,6 +317,7 @@ for (const theme of ['light', 'dark'] as const) {
         expect((await held).ok()).toBe(true);
         await expect(engineer).toHaveURL(/\/srs$/);
         await engineer.setViewportSize(use.viewport!);
+        await returnToDetail(engineer, id);
         await detail(engineer, id, '보류');
         await directStatus(engineer, id, '진행 재개');
       });
