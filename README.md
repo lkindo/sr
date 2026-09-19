@@ -40,7 +40,7 @@ Service Request(SR) 관리 시스템 - 고객 요청을 효율적으로 접수, 
 - **캐시**: `next/cache`의 `unstable_cache` 기반. 별도의 Redis 인스턴스를 사용하지 않습니다. (`src/lib/cache.ts`)
 - **Rate Limiting**: 애플리케이션 인메모리 구현(`MemoryRateLimiter`). (`src/lib/rate-limiter.ts`)
 - **데이터베이스**: Prisma `provider = "postgresql"` + `DATABASE_URL`. 실제 인스턴스는 Compose의 PostgreSQL 컨테이너입니다.
-- Vercel 관련 패키지는 `@vercel/functions` 하나가 의존성에 남아 있습니다. `src/lib/wait-until.ts` 가 `waitUntil` 을 호출하지만 자체 서버에는 Vercel 요청 컨텍스트가 없어 아무 동작도 하지 않습니다. Vercel GitHub 연동과 `vercel.json` 은 2026-09-19 정리했습니다.
+- Vercel 관련 패키지·설정은 없습니다(2026-09-19 Vercel GitHub 연동 해제, `vercel.json`·`@vercel/functions` 제거).
 
 ---
 

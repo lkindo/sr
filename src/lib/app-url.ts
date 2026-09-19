@@ -4,8 +4,9 @@
  * 환경 변수 의존성을 줄이기 위해 여러 소스에서 앱 URL을 결정합니다.
  * 우선순위:
  * 1. NEXT_PUBLIC_APP_URL 환경 변수
- * 2. 프로덕션 기본값 (Vercel 배포 시)
- * 3. 로컬 기본값
+ * 2. 브라우저에서는 현재 접속한 Origin
+ * 3. 운영 빌드(NODE_ENV=production)의 서버에서는 운영 기본 도메인
+ * 4. 로컬 기본값
  */
 
 // 프로덕션 기본 URL (환경 변수가 없을 때 사용)
@@ -26,8 +27,9 @@ export function getAppUrl(): string {
     return window.location.origin;
   }
 
-  // 3. 프로덕션 환경이면 기본 프로덕션 URL (VERCEL_URL 대신 하드코딩된 도메인 사용)
-  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+  // 3. 운영 빌드면 기본 운영 도메인. Docker 이미지는 NODE_ENV=production 이다(Dockerfile).
+  //    예전에는 process.env.VERCEL 도 봤지만 Vercel 은 채택되지 않았다(2026-09-19 제거 — 운영·스테이징 결과 동일).
+  if (process.env.NODE_ENV === 'production') {
     return PRODUCTION_DEFAULT_URL;
   }
 

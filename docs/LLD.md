@@ -2237,7 +2237,7 @@ export class SRService {
 
 ```typescript
 export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
-  const tracked = promise
+  void promise
     .then((result) => {
       logger.info(`[BackgroundTask] ${label || 'Task'} completed successfully`);
       return result;
@@ -2245,17 +2245,11 @@ export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
     .catch((error) => {
       logger.error(`[BackgroundTask] ${label || 'Task'} failed:`, error as Error);
     });
-
-  try {
-    waitUntil(tracked); // @vercel/functions. 요청 컨텍스트가 있을 때만 의미가 있다.
-  } catch {
-    // 상시 구동 Node 프로세스(현재 배포 형태)에서는 fire-and-forget 으로 자연히 완료된다.
-  }
 }
 ```
 
-> `@vercel/functions` 는 아직 의존성에 남아 있으나(`package.json`), 자체 서버에는 Vercel 요청 컨텍스트가 없어
-> `waitUntil` 은 예외 없이 아무 일도 하지 않는다(catch 에 들어가지 않는다). 작업은 fire-and-forget 으로 끝난다.
+> 예전에는 `@vercel/functions` 의 `waitUntil` 에 프로미스를 등록했지만, 자체 서버에는 Vercel 요청 컨텍스트가 없어
+> 아무 일도 하지 않는 호출이었으므로 2026-09-19 제거했다(동작 변화 없음). 작업은 fire-and-forget 으로 끝난다.
 > 즉 이 함수의 실효는 "실패를 삼키지 않고 로그로 남긴다" 는 쪽이다.
 
 **이 설계가 보장하지 않는 것 (알려진 한계)**
@@ -3265,9 +3259,9 @@ async headers() {
 같은 파일은 Docker 배포를 위해 `output: 'standalone'` 을, pino 번들링 회피를 위해
 `serverExternalPackages: ['pino', 'thread-stream']` 을 설정한다.
 
-> **잔재 주의**: `next.config.ts` 의 `images.remotePatterns` 에는 아직
-> `**.public.blob.vercel-storage.com` 이 남아 있다. Vercel Blob 은 채택되지 않았으므로
-> 이 패턴은 실제로 매칭될 일이 없는 미채택 스택의 흔적이다(코드 정리 대상).
+> `images.remotePatterns` 는 두지 않는다(외부 이미지 호스트 없음, `next/image` 미사용). 미채택 Vercel Blob 의 흔적이던
+> `**.public.blob.vercel-storage.com` 패턴은 2026-09-19 제거했다 — 남아 있는 동안 `/_next/image` 가 누구의 Vercel Blob
+> 이미지든 대신 받아 오는 쓰이지 않는 경로였다.
 
 ### CSRF 방지
 
