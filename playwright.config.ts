@@ -164,6 +164,8 @@ export default defineConfig({
       dependencies: ['setup', 'multi-user-setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
       testIgnore: [
+        // Project-level testIgnore replaces the root value instead of extending it.
+        '**/mobile/**',
         '**/roles/**',
         '**/08-*.spec.ts',
         '**/09-*.spec.ts',

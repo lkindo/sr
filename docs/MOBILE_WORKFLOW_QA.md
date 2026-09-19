@@ -13,6 +13,12 @@
 - 기존 로컬 시드의 ADMIN·MANAGER·ENGINEER·CLIENT_USER·CLIENT_ADMIN 계정이 필요하다. 계정/암호를 보고서에 기록하지 않는다. 운영 DB를 연결한 서버에서는 실행하지 않는다.
 - 결과: `playwright-report/mobile/index.html`, `test-results/mobile-workflow/`.
 
+### CI 실행 구성 (2026-09-20)
+
+`CI/CD Pipeline`의 E2E 작업은 desktop/mobile matrix로 실행하며 각 작업은 별도의 임시 PostgreSQL과 시드를 사용한다. 데스크톱은 기존 production 서버 3000, 모바일은 위 전용 설정의 개발 서버 3100에서 Chromium·WebKit 전체 16개를 실행한다. 어느 작업이 실패해도 전체 CI가 실패해 배포를 차단한다. 모바일 검증은 개발 서버 기준이며 운영 HTTPS 환경 검증과 구분한다.
+
+`pnpm check:e2e-projects`는 서버·DB를 시작하지 않고 Playwright의 실제 수집 결과를 검사한다. 데스크톱에 모바일 스펙이 섞이거나 모바일 시나리오가 두 브라우저 중 하나에서 빠지면 실패한다. 프로젝트의 `testIgnore`가 공통 설정을 덮어써 모바일 8개가 데스크톱으로 잘못 실행되던 CI 실패를 이 검사로 재현했다. 보고서는 작업별 `playwright-report-desktop` / `playwright-report-mobile` artifact에 보관한다.
+
 ## 검증 범위
 
 | 영역 | 확인한 동작 |
