@@ -674,8 +674,8 @@
 
 - `backgroundTask(promise, label)` 이 프로미스를 받아 성공/실패를 로깅하고, 응답 반환 이후에
   같은 Node 프로세스에서 계속 실행되도록 한다.
-- `@vercel/functions` 의 `waitUntil` 을 시도하지만, 상시 구동 Node 서버에서는 호출이 실패하고
-  일반 fire-and-forget 으로 완료된다(의도된 폴백).
+- `@vercel/functions` 의 `waitUntil` 을 호출하지만, 자체 서버에는 Vercel 요청 컨텍스트가 없어 예외 없이 아무 동작도
+  하지 않는다(호출이 실패해 catch 로 가는 것이 아니다). 작업은 일반 fire-and-forget 으로 완료된다.
 - **한계(반드시 인지할 것)**: 큐가 아니다. 컨테이너가 종료·재시작되면 진행 중인 작업은 **유실**되고
   재시도되지 않는다.
 - **이메일은 이 한계에서 벗어나 있다**: 알림 이메일은 `backgroundTask` 로 직접 발송하지 않고
@@ -1573,7 +1573,8 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 | **Staging**     | `dev` 브랜치 | `:dev` 이미지 → `docker-compose.test.yml` (compose 프로젝트 `sr-test`) | `https://test.lkindo.kr`                                    |
 | **Production**  | 운영         | 커밋 SHA 태그 이미지(`APP_IMAGE_TAG`) → `docker-compose.prod.yml`      | `https://sr.lkindo.kr` (그 외 `lkindo.kr`, `www.lkindo.kr`) |
 
-**PR 단위 Preview 환경은 없다.** 운영과 스테이징이 **같은 VM·같은 Docker 데몬·같은 디렉터리
+**PR 단위 Preview 환경은 없다.** 저장소에 연결돼 PR 마다 실패하던 Vercel GitHub 연동(`Vercel` 체크)은 2026-09-19
+해제했고 `vercel.json`·`.vercelignore` 도 지웠다. 운영과 스테이징이 **같은 VM·같은 Docker 데몬·같은 디렉터리
 (`/home/opc/sr`)** 를 공유하므로, `deploy.yml` 의 concurrency 그룹이 두 배포를 직렬화한다.
 
 ### CI/CD 파이프라인

@@ -2254,8 +2254,8 @@ export function backgroundTask<T>(promise: Promise<T>, label?: string): void {
 }
 ```
 
-> `@vercel/functions` 는 아직 의존성에 남아 있으나(`package.json`), 자체 서버 배포에서는
-> `waitUntil` 이 요청 컨텍스트를 찾지 못해 catch 로 빠지고 fire-and-forget 이 된다.
+> `@vercel/functions` 는 아직 의존성에 남아 있으나(`package.json`), 자체 서버에는 Vercel 요청 컨텍스트가 없어
+> `waitUntil` 은 예외 없이 아무 일도 하지 않는다(catch 에 들어가지 않는다). 작업은 fire-and-forget 으로 끝난다.
 > 즉 이 함수의 실효는 "실패를 삼키지 않고 로그로 남긴다" 는 쪽이다.
 
 **이 설계가 보장하지 않는 것 (알려진 한계)**
