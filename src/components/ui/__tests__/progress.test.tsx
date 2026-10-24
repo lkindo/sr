@@ -5,19 +5,20 @@ import { Progress } from '../progress';
 
 describe('Progress Component', () => {
   it('renders progress bar with role', () => {
-    render(<Progress value={50} />);
-    const progress = screen.getByRole('progressbar');
+    render(<Progress value={50} aria-label="요청 진행률" />);
+    const progress = screen.getByRole('progressbar', { name: '요청 진행률' });
     expect(progress).toBeInTheDocument();
+    expect(progress).toHaveAttribute('aria-valuenow', '50');
   });
 
   it('renders with 0 value', () => {
-    const { container } = render(<Progress value={0} />);
-    expect(container.firstChild).toBeInTheDocument();
+    render(<Progress value={0} />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
   });
 
   it('renders with 100 value', () => {
-    const { container } = render(<Progress value={100} />);
-    expect(container.firstChild).toBeInTheDocument();
+    render(<Progress value={100} />);
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
   });
 
   it('applies custom className', () => {

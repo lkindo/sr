@@ -373,7 +373,7 @@ describe('Sidebar - isMobile 레이아웃 분기', () => {
     const { container } = render(<Sidebar />);
 
     expect(asideOf(container)?.className).toContain('fixed');
-    expect(asideOf(container)?.className).toContain('md:block');
+    expect(asideOf(container)?.className).toContain('lg:block');
   });
 
   it('isMobile 이면 고정 클래스를 빼고 시트 안에 맞춘다', () => {

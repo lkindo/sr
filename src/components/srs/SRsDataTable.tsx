@@ -378,19 +378,20 @@ export function SRsDataTable({
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
                 <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
                   <button
+                    aria-pressed={activeQuickFilter === 'waiting'}
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
                     }
-                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
+                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                       activeQuickFilter === 'waiting'
-                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
+                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <Clock className="h-2.5 w-2.5" />
+                    <Clock className="h-3.5 w-3.5" />
                     <span>접수</span>
                     <span
-                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
+                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
                         activeQuickFilter === 'waiting'
                           ? 'bg-background text-foreground font-bold'
                           : // --destructive(#ef4444) 위 흰 글씨는 3.76:1 로 AA(4.5:1) 미달이다.
@@ -403,19 +404,20 @@ export function SRsDataTable({
                     </span>
                   </button>
                   <button
+                    aria-pressed={activeQuickFilter === 'myAssigned'}
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
                     }
-                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
+                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                       activeQuickFilter === 'myAssigned'
-                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
+                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <User className="h-2.5 w-2.5" />
+                    <User className="h-3.5 w-3.5" />
                     <span>담당</span>
                     <span
-                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
+                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
                         activeQuickFilter === 'myAssigned'
                           ? 'bg-background text-foreground font-bold'
                           : 'bg-muted text-foreground'
@@ -425,19 +427,20 @@ export function SRsDataTable({
                     </span>
                   </button>
                   <button
+                    aria-pressed={activeQuickFilter === 'urgent'}
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
                     }
-                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
+                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                       activeQuickFilter === 'urgent'
-                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
+                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <AlertTriangle className="h-2.5 w-2.5" />
+                    <AlertTriangle className="h-3.5 w-3.5" />
                     <span>긴급</span>
                     <span
-                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
+                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
                         activeQuickFilter === 'urgent'
                           ? 'bg-background text-foreground font-bold'
                           : // --destructive(#ef4444) 위 흰 글씨는 3.76:1 로 AA(4.5:1) 미달이다.
@@ -451,19 +454,20 @@ export function SRsDataTable({
                   </button>
                   {/* '지연 중'(헌법 §3, 결정 D10) — 마감을 넘긴 진행 중 SR. 내부 사용자 전용 영역이다. */}
                   <button
+                    aria-pressed={activeQuickFilter === 'overdue'}
                     onClick={() =>
                       handleQuickFilter(activeQuickFilter === 'overdue' ? null : 'overdue')
                     }
-                    className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full border text-[10px] whitespace-nowrap transition-all ${
+                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                       activeQuickFilter === 'overdue'
-                        ? 'bg-muted text-foreground border-[rgba(255,255,255,0.1)] shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-[rgba(255,255,255,0.05)] hover:bg-muted font-medium'
+                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
+                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
                     }`}
                   >
-                    <AlertCircle className="h-2.5 w-2.5" />
+                    <AlertCircle className="h-3.5 w-3.5" />
                     <span>지연</span>
                     <span
-                      className={`px-1 rounded-full text-[8px] min-w-[14px] text-center ${
+                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
                         activeQuickFilter === 'overdue'
                           ? 'bg-background text-foreground font-bold'
                           : counts.overdue > 0

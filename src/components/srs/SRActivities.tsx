@@ -156,8 +156,8 @@ export function SRActivities({ srId }: SRActivitiesProps) {
                     <AvatarImage src={activity.user.image || ''} alt={activity.user.name} />
                     <AvatarFallback>{getInitials(activity.user.name)}</AvatarFallback>
                   </Avatar>
-                  <div className="flex-1 space-y-1 pt-1">
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1 space-y-1 pt-1">
+                    <div className="flex flex-wrap items-center gap-2 break-words">
                       <span className="text-sm font-medium">{activity.user.name}</span>
                       <Badge
                         variant={
@@ -175,10 +175,12 @@ export function SRActivities({ srId }: SRActivitiesProps) {
                         {new Date(activity.createdAt).toLocaleString('ko-KR')}
                       </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{activity.description}</p>
+                    <p className="text-sm text-muted-foreground break-words">
+                      {activity.description}
+                    </p>
                     {/* 마감일 조정 사유 — 서버가 고객에게는 지워 보낸다(D9). */}
                     {internalReasonOf(activity) && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground break-words">
                         사유(내부): {internalReasonOf(activity)}
                       </p>
                     )}

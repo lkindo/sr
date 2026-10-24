@@ -210,12 +210,7 @@ export default function ProfilePage() {
               {error ? PROFILE_LOAD_ERROR_MESSAGE : '프로필 정보를 불러올 수 없습니다.'}
             </p>
           </div>
-          <Button
-            onClick={() => void refetch()}
-            className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
-          >
-            다시 시도
-          </Button>
+          <Button onClick={() => void refetch()}>다시 시도</Button>
         </div>
       </div>
     );

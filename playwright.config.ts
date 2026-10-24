@@ -11,6 +11,8 @@ const workerCount =
  */
 export default defineConfig({
   testDir: './e2e',
+  // Mobile workflows have isolated device contexts and their own local test server configuration.
+  testIgnore: '**/mobile/**',
 
   /* 테스트 timeout 설정 */
   timeout: 60 * 1000, // 30초 → 60초로 증가 (Profile 페이지 로딩 고려)
@@ -162,6 +164,8 @@ export default defineConfig({
       dependencies: ['setup', 'multi-user-setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
       testIgnore: [
+        // Project-level testIgnore replaces the root value instead of extending it.
+        '**/mobile/**',
         '**/roles/**',
         '**/08-*.spec.ts',
         '**/09-*.spec.ts',

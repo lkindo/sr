@@ -26,6 +26,7 @@
     "test:mutation": "stryker run",
     "test:mutation:ci": "tsx scripts/stryker-ci.ts",
     "test:e2e": "playwright test",
+    "test:e2e:mobile": "playwright test --config=playwright.mobile.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:multi-user": "playwright test --project=multi-user",
@@ -38,6 +39,7 @@
     "verify": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1",
     "verify:fast": "powershell -ExecutionPolicy Bypass -File ./scripts/run-verification.ps1 -fast",
     "check:e2e-assertions": "tsx scripts/check-e2e-assertions.ts",
+    "check:e2e-projects": "tsx scripts/check-e2e-projects.ts",
     "check:standalone-secrets": "tsx scripts/check-standalone-secrets.ts",
     "check:dead": "knip --max-issues 4",
     "test:integration": "vitest run --project=integration"

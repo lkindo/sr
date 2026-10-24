@@ -78,6 +78,8 @@ export function UserMobileList({
                     onToggleUser(user.id);
                   }}
                   className="h-7 w-7 p-0 shrink-0 mt-0.5"
+                  aria-label={`${user.name} 선택`}
+                  aria-pressed={selectedUserIds.has(user.id)}
                 >
                   {selectedUserIds.has(user.id) ? (
                     <CheckSquare className="h-4 w-4 text-primary" />
@@ -158,7 +160,7 @@ export function UserMobileList({
                     );
                     if (isSystemTeam)
                       return (
-                        <span className="text-muted-foreground/80 italic font-medium">
+                        <span className="text-muted-foreground italic font-medium">
                           시스템 운영팀
                         </span>
                       );

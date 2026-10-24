@@ -64,6 +64,8 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
 
   // SR 및 사용자 목록 조회
   useEffect(() => {
+    // 이전 화면이나 Strict Mode의 정리된 effect가 늦게 끝나도 작성 중인 값을 덮지 않는다.
+    let active = true;
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -73,6 +75,7 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
         // 일이 없으므로 서버가 준 이유를 세분해 봐야 사용자가 할 행동이 달라지지 않는다.
         // (제출 실패는 반대다. 거기서는 이유마다 다음 행동이 다르므로 아래에서 풀어 쓴다.)
         const srData = await apiGet<SRDetails>(`/api/srs/${srId}/intake`);
+        if (!active) return;
 
         // 상태에 따라 모드 결정
         if (srData.status === 'REQUESTED') {
@@ -95,6 +98,7 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
         // 사용자 목록 조회 (담당자 선택용) - SR 처리 권한이 있는 사용자만
         try {
           const usersResult = await getSRHandlersForSelection();
+          if (!active) return;
           if (usersResult.success && usersResult.data) {
             setUsers(usersResult.data);
           } else {
@@ -109,6 +113,7 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
             });
           }
         } catch {
+          if (!active) return;
           // 에러 발생 시 빈 배열로 설정, toast로 사용자에게 알림
           setUsers([]);
           toast({
@@ -155,17 +160,21 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
           form.setValue('estimatedCompletionDate', defaultDate);
         }
       } catch {
+        if (!active) return;
         toast({
           title: '오류',
           description: '데이터를 불러오는데 실패했습니다.',
           variant: 'destructive',
         });
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchData();
+    return () => {
+      active = false;
+    };
   }, [srId, router, toast, form]);
 
   // 접수/수정 처리

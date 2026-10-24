@@ -2,16 +2,12 @@
 
 본 문서는 프론트엔드 레이어(Next.js App Router, Tailwind CSS)와 관련된 기술 헌법 및 UI 스타일 가이드이다.
 
-> **디자인 정본 선언(2026-08-15, 2026-09-18 소유자 결정 D16 으로 범위를 좁힘)**: **색상 팔레트**(의미색 포함)의
-> 정본은 **`docs/DESIGN.md`(다크 캔버스 체계)** 이고, 구현 진입점은 `src/app/globals.css`의 CSS 변수와
-> `tailwind.config.ts`다. 본 문서는 색상 값을 복제하지 않는다. **치수**(radius·간격·폭)·타이포 크기·컴포넌트 규격의
-> 정본은 본 문서 §3 과 그 구현(`globals.css`·`tailwind.config.ts`·`src/components/ui/`)이다. DESIGN.md 의
-> rounded·spacing·typography 스케일과 status-badge·text-input 토큰은 마케팅 사이트 분석 원본의 값이라 참고 자료다.
-> 상태·우선순위 배지의 variant 정본은 `src/lib/constants/sr.ts` 다(화면에 사본을 두지 않는다).
-> 과거 이 문서가 규정하던 `SaaSify-UI-Kit` 라이트 인디고 팔레트는 **폐기한다** — 실측 결과
-> 코드에 인디고 계열 사용은 0건이고 캔버스는 `#090909`다. 정본이 둘이던 동안 개발자가
-> 라이트 스펙을 그대로 옮겨 적으면서 다크 화면 위 흰 글씨·흰 상자 같은 **판독 불가 UI**가
-> 실제로 만들어졌다.
+> **2026-09-19 사용자 요청에 따른 디자인 개편**: 다크 캔버스 전용 팔레트를 폐기하고
+> **주간·야간·시스템 테마**를 사용한다. 설계 설명은 `docs/DESIGN.md`, 실제 색상 값의 정본은
+> `src/app/globals.css`, 클래스 매핑은 `tailwind.config.ts`다. 상태·우선순위 의미는
+> `src/lib/constants/sr.ts`를 유지한다. 아래 과거 다크 캔버스 관련 설명은 이 선언과 새 DESIGN.md보다
+> 우선하지 않는다. 반경은 컨트롤 8px·카드 12px, 헤더는 데스크톱 80px·모바일 64px이며
+> 데스크톱 탐색 전환점은 1024px다. 배경·전경 토큰을 짝으로 사용하고 두 테마를 함께 검증한다.
 
 ---
 
@@ -70,7 +66,7 @@ Linux Docker 빌드에서 module-not-found 로 터진다. 규칙을 하나로 �
 
 ---
 
-## 3. 디자인 시스템 명세 (다크 캔버스)
+## 3. 디자인 시스템 명세 (주간·야간 공통)
 
 표 중심 업무 앱의 규칙이다. 색은 §0 에 따라 DESIGN.md·`globals.css` 토큰을, 치수는 아래 규칙과 그 구현을 따른다.
 
@@ -80,7 +76,7 @@ Linux Docker 빌드에서 module-not-found 로 터진다. 규칙을 하나로 �
 - **모서리 반경**(실제 체계, 2026-09-18 재측정): 컨트롤(버튼·입력란·SelectTrigger) 8px, 카드 12px(`rounded-card-md`),
   칩·배지 알약(`rounded-full`). 대화상자·탭·알림·모바일 목록 카드는 shadcn 기본 `rounded-lg`(10px)이고, 작은 내부
   요소는 `rounded`(4px)·`rounded-sm`(6px)를 쓴다.
-  ⚠️ 목록·상세의 주 컨테이너가 쓰는 `.sr-card-template` 은 반경이 없다(0px, 각진 모서리) — 정리 대상이다.
+  목록·상세의 `.sr-card-template`도 12px 카드 반경과 공통 표면을 사용한다.
 - 부드럽고 자연스럽게 스며드는 레이어 그림자(Elevation) 처리.
 - **간격**: Tailwind 기본 4px 스케일을 쓴다. 조밀한 표·배지는 4px 단위(`gap-1`, `py-0.5` 등)가 필요하므로 8px 배수를
   강제하지 않는다(예전 "8px 배수 엄격" 규정은 코드와 맞지 않아 2026-09-18 결정 D16 으로 폐기).

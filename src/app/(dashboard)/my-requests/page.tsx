@@ -154,7 +154,9 @@ export default function MyRequestsPage() {
   const {
     data: myRequests,
     isPending: loading,
+    isFetching,
     error,
+    refetch,
   } = useQuery({
     queryKey: qk.myRequests.list(listParams),
     queryFn: ({ signal }) =>
@@ -220,6 +222,33 @@ export default function MyRequestsPage() {
     );
   }
 
+  const errorNotice = error ? (
+    <div role="alert" className="rounded-lg border border-destructive/30 bg-card p-6 space-y-3">
+      <div className="flex items-center gap-2 font-semibold text-destructive">
+        <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
+        요청 목록을 불러오지 못했습니다
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {myRequests
+          ? '목록을 갱신하지 못해 이전 결과를 표시하고 있습니다. 다시 시도해 주세요.'
+          : '연결 상태를 확인한 뒤 다시 시도해 주세요.'}
+      </p>
+      <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+        {isFetching ? '다시 불러오는 중...' : '다시 시도'}
+      </Button>
+    </div>
+  ) : null;
+
+  // 조회하지 못한 데이터를 0건 통계나 최초 요청 안내로 표현하지 않는다.
+  if (error && !myRequests) {
+    return (
+      <div className="sr-content-area space-y-6">
+        <h1 className="sr-list-title text-3xl">내 요청 SR</h1>
+        {errorNotice}
+      </div>
+    );
+  }
+
   return (
     <div className="sr-content-area space-y-6 sr-fade-in">
       {/* 헤더 */}
@@ -228,15 +257,10 @@ export default function MyRequestsPage() {
           <h1 className="sr-list-title text-3xl">내 요청 SR</h1>
           <p className="text-muted-foreground mt-1">내가 요청한 SR의 진행 상황을 확인하세요.</p>
         </div>
-        {canCreateSR && (
-          <Button
-            onClick={() => setCreateDialogOpen(true)}
-            className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
-          >
-            새 SR 요청
-          </Button>
-        )}
+        {canCreateSR && <Button onClick={() => setCreateDialogOpen(true)}>새 SR 요청</Button>}
       </div>
+
+      {errorNotice}
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -330,19 +354,32 @@ export default function MyRequestsPage() {
 
       {/* SR 목록 */}
       <div className="space-y-4">
-        {srs.length === 0 ? (
+        {srs.length === 0 && !error ? (
           <div className="sr-empty-state">
             <FileText className="sr-empty-state-icon" />
-            <h2 className="sr-empty-state-title">요청한 SR이 없습니다</h2>
-            <p className="sr-empty-state-description">
-              아직 요청한 SR이 없습니다. 첫 SR을 요청하여 업무를 시작하세요.
-            </p>
-            <Button
-              onClick={() => setCreateDialogOpen(true)}
-              className="bg-[hsl(var(--sr-primary-dark))] hover:bg-[hsl(var(--sr-primary-darker))]"
-            >
-              첫 SR 요청하기
-            </Button>
+            {statusFilter !== 'all' || page > 1 || stats.total > 0 ? (
+              <>
+                <h2 className="sr-empty-state-title">조건에 맞는 요청이 없습니다</h2>
+                <p className="sr-empty-state-description">
+                  조회 조건을 초기화하여 전체 요청을 확인해 보세요.
+                </p>
+                <Button variant="outline" onClick={() => handleStatusFilterChange('all')}>
+                  조건 초기화
+                </Button>
+              </>
+            ) : (
+              <>
+                <h2 className="sr-empty-state-title">요청한 SR이 없습니다</h2>
+                <p className="sr-empty-state-description">
+                  {canCreateSR
+                    ? '아직 요청한 SR이 없습니다. 첫 SR을 요청하여 업무를 시작하세요.'
+                    : '내 이름으로 등록된 요청이 이곳에 표시됩니다.'}
+                </p>
+                {canCreateSR && (
+                  <Button onClick={() => setCreateDialogOpen(true)}>첫 SR 요청하기</Button>
+                )}
+              </>
+            )}
           </div>
         ) : (
           srs.map((sr) => (
@@ -377,7 +414,11 @@ export default function MyRequestsPage() {
                         {sr.progressPercentage}%
                       </span>
                     </div>
-                    <Progress value={sr.progressPercentage} className="h-2" />
+                    <Progress
+                      value={sr.progressPercentage}
+                      aria-label={`${sr.srNumber} 진행률`}
+                      className="h-2"
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -410,9 +451,9 @@ export default function MyRequestsPage() {
                         </>
                       ) : (
                         <div className="flex items-center gap-2 text-sm">
-                          <AlertCircle className="h-4 w-4 text-orange-600" />
+                          <AlertCircle className="h-4 w-4 text-status-caution" />
                           {/* 상태 이름이 아니라 "아직 접수되지 않았다" 는 서술이다 — 정본 라벨과 별개. */}
-                          <span className="text-orange-600">접수 대기 중</span>
+                          <span className="text-status-caution">접수 대기 중</span>
                         </div>
                       )}
                     </div>
@@ -430,7 +471,7 @@ export default function MyRequestsPage() {
                         </span>
                       </div>
                       {sr.status === 'REQUESTED' && sr.waitingHours > 0 && (
-                        <div className="flex items-center gap-2 text-sm text-orange-600">
+                        <div className="flex items-center gap-2 text-sm text-status-caution">
                           <AlertCircle className="h-4 w-4" />
                           <span>대기 중: {sr.waitingHours.toFixed(1)}시간</span>
                         </div>

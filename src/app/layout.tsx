@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 
 import { auth } from '@/auth';
 import ClientLayout from '@/components/providers/ClientLayout';
+import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
 import './globals.css';
 
@@ -22,12 +24,11 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': '#2a3053',
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#2a3053',
+  // theme-color는 사용자 선택에 맞춰 head의 bootstrap/ThemeProvider가 직접 관리한다.
   width: 'device-width',
   initialScale: 1,
 };
@@ -39,10 +40,18 @@ export default async function RootLayout({
 }>) {
   // 서버가 이미 알고 있는 세션을 클라이언트 첫 렌더에 그대로 전달한다.
   // 이게 없으면 권한 기반 UI 가 전부 "빈 세션 → 권한 없음" 으로 한 번 그려진다.
-  const session = await auth();
+  const [session, requestHeaders] = await Promise.all([auth(), headers()]);
+  const nonce = requestHeaders.get('x-nonce') ?? undefined;
 
   return (
     <html lang="ko" suppressHydrationWarning>
+      <head>
+        <script
+          id="theme-init"
+          nonce={nonce}
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
+      </head>
       <body className="antialiased">
         <ClientLayout session={session}>{children}</ClientLayout>
       </body>

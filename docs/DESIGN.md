@@ -1,741 +1,104 @@
----
-version: alpha
-name: Framer-design-analysis
-description: 'A confident dark-canvas builder marketing site that treats the page like a working artboard — pure black surfaces, white display type set in GT Walsheim Medium with aggressive negative tracking, and a single confident blue (#0099ff) reserved for hyperlinks and selection states. The page rhythm is broken by oversized vibrant gradient atmosphere panels — magenta, violet, orange spotlights — that act as living showcase tiles, not decoration. Every CTA is a white pill on dark; every card is a translucent or charcoal surface; every section title pulls letter-spacing tight enough to feel like a poster.'
+# SR Management UI/UX 디자인 기준
+
+검증 기준일: 2026-09-19. 기존 다크 캔버스 전용 디자인을 대체한다.
+이 문서는 현재 업무 앱의 주간·야간 디자인과 개선 방향을 설명한다. 실제 색상 값의 정본은
+`src/app/globals.css`, 클래스 매핑은 `tailwind.config.ts`, 상태·우선순위의 의미는
+`src/lib/constants/sr.ts`다. 업무 상태·권한·SLA 정책은 변경하지 않는다.
+
+## 1. 목표와 화면 구성
+
+장시간 목록을 읽고 요청을 처리하는 업무 환경에 맞춘다. 장식보다 요청 제목, 상태, 담당자,
+마감일, 다음 행동을 먼저 보여준다. 본문은 밝기 단계로 구분하고 파랑은 주요 행동과 진행 상태에
+사용한다. 색상만으로 상태를 구분하지 않고 라벨·선택 표시·아이콘을 함께 제공한다.
+
+- **주간**: 밝은 회색 바탕, 흰 카드, 짙은 본문, 파란 주요 버튼.
+- **야간**: 짙은 남색 바탕, 한 단계 밝은 카드, 밝은 본문, 밝은 파란 주요 버튼.
+- **시스템 설정**: 운영체제의 밝기 설정을 따르며 실행 중 변경도 반영한다. 최초 기본값이다.
+- 로그인·회원가입과 업무 화면 상단에서 동일한 테마 메뉴에 접근한다.
+- 선택은 브라우저에 저장한다. 저장이 차단된 환경에서도 현재 화면 전환은 가능하다.
+- 테마는 현재 화면의 필터·작성 내용·로그인 상태를 바꾸지 않는다.
+
+## 2. 공통 색상 계약
+
+| 용도           | 주간                | 야간                  | 구현 토큰                                     |
+| -------------- | ------------------- | --------------------- | --------------------------------------------- |
+| 화면 바탕      | 밝은 회색 `#f8fafc` | 짙은 남색 `#0c111d`   | `background`                                  |
+| 본문 표면      | 흰색                | 바탕보다 밝은 남색    | `card`, `card-foreground`                     |
+| 메뉴·팝오버    | 흰색                | 카드보다 밝은 남색    | `popover`, `popover-foreground`               |
+| 주요 행동      | 짙은 파랑 + 흰 글자 | 밝은 파랑 + 짙은 글자 | `primary`, `primary-foreground`               |
+| 보조 정보      | 슬레이트            | 밝은 슬레이트         | `muted`, `muted-foreground`                   |
+| 호버·선택      | 옅은 파랑           | 밝기 차가 있는 남색   | `accent`, `accent-foreground`                 |
+| 삭제·위험 행동 | 짙은 빨강 + 흰 글자 | 짙은 빨강 + 흰 글자   | `destructive-solid`, `destructive-foreground` |
+
+배경과 전경은 반드시 짝으로 사용한다. 컴포넌트에 검정·흰색·불투명한 RGB 테두리를 직접
+지정하지 않는다. 다이얼로그의 검정 오버레이와 고정된 채움색 위의 검증된 흰 글자는 예외다.
+레거시 `--sr-*` 색상도 공통 토큰을 참조한다.
+
+### 상태 표시
+
+요청됨·접수는 중립색, 진행중은 파랑, 보류는 황갈색, 완료·확인완료는 초록, 거절·긴급·지연은
+빨강이다. 높음 우선순위는 주황이다. 같은 의미를 유지하되 주간에는 더 짙은 색, 야간에는
+더 밝은 색을 사용한다. 상태 배지는 해당 색의 15% 배경 위에 글자를 놓으며 두 테마에서
+대비를 검증한다. 접수의 기본 배지는 중립 표면을 사용해 진행중의 파랑과 구별한다.
+
+## 3. 배치·밀도·접근성
+
+- 데스크톱 헤더 높이 80px, 모바일·태블릿 64px. 1024px 미만에서는 메뉴를 서랍에 넣어
+  테마·사용자 메뉴와 겹치지 않게 한다. 데스크톱 사이드바는 256px다.
+- 카드·목록 컨테이너 반경은 12px, 컨트롤은 8px, 상태 배지는 알약 모양을 유지한다.
+- 주요 본문은 14~16px, 보조 정보·필터는 12px 이상을 권장한다. 작은 수치는 11px 이상이다.
+- 상단 테마·사용자·메뉴 버튼은 충분한 터치 영역을 제공한다. 빠른 필터는 최소 36px 높이와
+  간격을 확보한다. 모바일의 핵심 업무 액션은 향후 40~44px 및 짧은 텍스트를 적용한다.
+- 일반 텍스트와 배지 대비는 4.5:1 이상을 목표로 한다. 포커스 링과 `aria-current`,
+  `aria-pressed`로 키보드·스크린리더에도 현재 위치와 선택을 전달한다.
+- 본문 바로가기, 줄어든 모션 설정, 기존 권한별 메뉴 표시를 유지한다.
+- 전역 글자 크기 덮어쓰기와 카드 hover 시 이동을 사용하지 않는다.
+
+## 4. 이번 구현 범위
+
+| 항목                                      | 적용                                                                                |
+| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| 주간·야간·시스템 선택, 저장, OS 설정 추적 | 테마 프로바이더와 공통 메뉴                                                         |
+| 첫 표시 테마 및 브라우저 색상             | CSP nonce를 사용한 초기화와 색상 연동                                               |
+| 카드·입력·배지·레거시 스타일              | 두 테마의 의미 토큰                                                                 |
+| 헤더·사이드바                             | 높이 축소, 태블릿 메뉴 전환, 현재 메뉴 접근성                                       |
+| SR·사용자·고객사 빠른 필터                | 글자·버튼 크기, 테마 테두리, 선택 상태                                              |
+| 내 요청 목록                              | 초기 오류·갱신 오류·검색 결과 없음·최초 빈 목록 구분, 재시도·초기화, 생성 권한 반영 |
+
+사용자 선택·고객사 변경·소속 해제·행 펼치기 아이콘에는 접근성 이름과 선택·확장 상태를
+제공한다. 내 요청의 진행 표시에는 요청별 이름과 현재 값을 연결하고 대기 문구도 의미색 토큰을 쓴다.
+
+기존 빠른 필터의 조건 누적 방식이나 업무 처리 흐름은 이 변경에서 재설계하지 않는다.
+아래 개선안은 **후속 제안**이며 구현 완료로 취급하지 않는다.
+
+## 5. 업무 흐름 개선 제안
+
+현재 코드 조사에 기반한 가설이다. 실제 사용자 인터뷰나 행동 측정 결과로 단정하지 않는다.
+
+| 우선순위 | 현재 문제와 근거                                                                                   | 제안                                                                            | 확인할 결과                               |
+| -------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| P1       | `SRsDataTable.tsx`: 빠른 필터는 조건이 누적되지만 선택은 하나만 표시, 해제 시 검색·정렬까지 초기화 | 필터별 독립 선택과 해당 조건만 해제, 적용 조건 칩                               | 원치 않는 검색 초기화 없이 조건 수정 가능 |
+| P1       | `use-create-sr-form.ts`·`CreateSRDialog.tsx`: 다시 열면 작성 내용 초기화                           | 닫기 전 작성 내용 안내 또는 세션 내 임시 보관                                   | 실수로 닫은 요청의 재작성 감소            |
+| P1       | `my-requests/route.ts`: 상태를 10·25·50·100%로 고정 표시, 보류는 10%                               | 작업량으로 오해할 수 있는 진행률을 상태 단계로 대체, 완료에 고객 확인 대기 안내 | 보류·처리 완료·확인 완료 구별             |
+| P1       | `SRStatusActions.tsx`: 모바일 주요 작업이 작은 아이콘 중심                                         | 접수·완료는 텍스트 버튼, 보조 작업은 메뉴                                       | 작업 탐색 시간과 오조작 감소              |
+| P1       | `dashboard/page.tsx`: 통계 조회 실패 시 skeleton 유지                                              | 오류 설명과 다시 시도                                                           | 사용자가 대기와 실패를 구별               |
+| P2       | `use-intake-form.ts`·상세 화면: 처리 후 전체 `/srs`로 이동                                         | 필터가 포함된 복귀 경로 보존, 접수 후 다음 요청 연결                            | 반복 접수의 탐색 단계 감소                |
+| P2       | `use-create-sr-form.ts`: 요청 생성과 첨부 실패 결과가 분리되고 창이 닫힘                           | 성공한 요청 번호와 실패 파일을 한 결과에 표시, 첨부 재시도                      | 요청 중복 생성 없이 파일 복구             |
+| P2       | `SRComments.tsx`: 공개가 기본이며 작은 내부 노트 체크박스로 대상 선택                              | 작성창 위에 공개 범위 선택, 전송 버튼에 대상 표시                               | 공개 댓글과 내부 노트 혼동 감소           |
+| P2       | 대시보드가 전체 현황 중심                                                                          | 운영자: 접수 대기·오늘 마감·지연, 고객: 답변 필요·완료 확인 대기를 먼저 표시    | 역할별 다음 행동을 바로 찾음              |
+
+임시 저장에 개인정보가 포함될 수 있으므로 서버 영구 저장·공유 단말 보관 정책은 기능 설계 시
+별도로 정한다. 상태 단계 개선은 API 계약과 여러 화면을 함께 확인한 뒤 적용한다.
+
+## 6. UI/UX 개선 작업 방식
+
+1. 역할별 핵심 시나리오를 고정한다: 고객 요청 등록, 운영자 접수·배정, 담당자 처리,
+   고객 완료 확인. 각 시나리오의 성공·빈 상태·오류·권한 없음 사례를 포함한다.
+2. 공통 토큰과 컴포넌트를 먼저 수정하고 대표 화면에서 주간·야간을 함께 확인한다.
+3. PC·태블릿·모바일에서 키보드 이동, 메뉴 겹침, 표 스크롤, 글자 대비를 검증한다.
+4. 기능 변경은 의미 있는 사용자 동작 테스트를 추가하고 실패해야 할 조건이 실제로 실패하는지 확인한다.
+5. 변경 결과에는 구현 완료·후속 제안·검증하지 못한 범위를 분리한다. 광범위한 디자인 전환을
+   운영 배포와 동일시하지 않는다.
 
-colors:
-  primary: '#ffffff'
-  on-primary: '#000000'
-  accent-blue: '#0099ff'
-  ink: '#ffffff'
-  ink-muted: '#999999'
-  canvas: '#090909'
-  surface-1: '#141414'
-  surface-2: '#1c1c1c'
-  hairline: '#262626'
-  hairline-soft: '#1a1a1a'
-  inverse-canvas: '#ffffff'
-  inverse-ink: '#000000'
-  gradient-magenta: '#d44df0'
-  gradient-violet: '#6a4cf5'
-  gradient-orange: '#ff7a3d'
-  gradient-coral: '#ff5577'
-  semantic-success: '#22c55e'
-  semantic-warning: '#f59e0b'
-  semantic-error: '#ef4444'
-  semantic-info: '#0099ff'
-  semantic-pending: '#a3a3a3'
-
-typography:
-  display-xxl:
-    fontFamily: GT Walsheim Framer Medium
-    fontSize: 110px
-    fontWeight: 500
-    lineHeight: 0.85
-    letterSpacing: -5.5px
-  display-xl:
-    fontFamily: GT Walsheim Medium
-    fontSize: 85px
-    fontWeight: 500
-    lineHeight: 0.95
-    letterSpacing: -4.25px
-    fontFeature: ss02
-  display-lg:
-    fontFamily: GT Walsheim Medium
-    fontSize: 62px
-    fontWeight: 500
-    lineHeight: 1.00
-    letterSpacing: -3.1px
-    fontFeature: ss02
-  display-md:
-    fontFamily: GT Walsheim Medium
-    fontSize: 32px
-    fontWeight: 500
-    lineHeight: 1.13
-    letterSpacing: -1.0px
-  headline:
-    fontFamily: Inter
-    fontSize: 22px
-    fontWeight: 700
-    lineHeight: 1.20
-    letterSpacing: -0.8px
-    fontFeature: cv05
-  subhead:
-    fontFamily: Inter Variable
-    fontSize: 24px
-    fontWeight: 400
-    lineHeight: 1.30
-    letterSpacing: -0.01px
-    fontFeature: cv11
-  body-lg:
-    fontFamily: Inter Variable
-    fontSize: 18px
-    fontWeight: 400
-    lineHeight: 1.30
-    letterSpacing: -0.18px
-    fontFeature: cv11
-  body:
-    fontFamily: Inter Variable
-    fontSize: 15px
-    fontWeight: 400
-    lineHeight: 1.30
-    letterSpacing: -0.15px
-    fontFeature: cv11
-  body-sm:
-    fontFamily: Inter Variable
-    fontSize: 14px
-    fontWeight: 500
-    lineHeight: 1.40
-    letterSpacing: -0.14px
-    fontFeature: cv11
-  caption:
-    fontFamily: Inter Variable
-    fontSize: 13px
-    fontWeight: 500
-    lineHeight: 1.20
-    letterSpacing: -0.13px
-    fontFeature: cv11
-  micro:
-    fontFamily: Inter Variable
-    fontSize: 12px
-    fontWeight: 400
-    lineHeight: 1.20
-    letterSpacing: -0.12px
-    fontFeature: cv11
-  button:
-    fontFamily: Inter Variable
-    fontSize: 14px
-    fontWeight: 500
-    lineHeight: 1.0
-    letterSpacing: -0.14px
-    fontFeature: cv11
-
-rounded:
-  xs: 4px
-  sm: 6px
-  md: 10px
-  lg: 15px
-  xl: 20px
-  xxl: 30px
-  pill: 100px
-  full: 9999px
-
-spacing:
-  hair: 1px
-  xxs: 4px
-  xs: 8px
-  sm: 12px
-  md: 15px
-  lg: 20px
-  xl: 30px
-  xxl: 40px
-  section: 96px
-
-components:
-  button-primary:
-    backgroundColor: '{colors.primary}'
-    textColor: '{colors.on-primary}'
-    typography: '{typography.button}'
-    rounded: '{rounded.pill}'
-    padding: 10px 15px
-  button-primary-pressed:
-    backgroundColor: '{colors.primary}'
-    textColor: '{colors.on-primary}'
-    typography: '{typography.button}'
-    rounded: '{rounded.pill}'
-  button-secondary:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.button}'
-    rounded: '{rounded.pill}'
-    padding: 10px 15px
-  button-translucent:
-    backgroundColor: '{colors.surface-2}'
-    textColor: '{colors.ink}'
-    typography: '{typography.button}'
-    rounded: '{rounded.xxl}'
-    padding: 8px 14px
-  button-icon-circular:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.button}'
-    rounded: '{rounded.full}'
-    size: 40px
-  pricing-tab-default:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink-muted}'
-    typography: '{typography.button}'
-    rounded: '{rounded.pill}'
-    padding: 8px 14px
-  pricing-tab-selected:
-    backgroundColor: '{colors.surface-2}'
-    textColor: '{colors.ink}'
-    typography: '{typography.button}'
-    rounded: '{rounded.pill}'
-    padding: 8px 14px
-  text-input:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body}'
-    rounded: '{rounded.md}'
-    padding: 10px 14px
-  text-input-focused:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body}'
-    rounded: '{rounded.md}'
-    padding: 10px 14px
-  text-input-invalid:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    borderColor: '{colors.semantic-error}'
-    typography: '{typography.body}'
-    rounded: '{rounded.md}'
-    padding: 10px 14px
-  text-input-disabled:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink-muted}'
-    opacity: 0.5
-    typography: '{typography.body}'
-    rounded: '{rounded.md}'
-    padding: 10px 14px
-  status-badge-requested:
-    backgroundColor: 'rgba(163, 163, 163, 0.1)'
-    textColor: '{colors.semantic-pending}'
-    typography: '{typography.micro}'
-    rounded: '{rounded.sm}'
-    padding: 4px 8px
-  status-badge-intake:
-    backgroundColor: 'rgba(0, 153, 255, 0.1)'
-    textColor: '{colors.accent-blue}'
-    typography: '{typography.micro}'
-    rounded: '{rounded.sm}'
-    padding: 4px 8px
-  status-badge-in-progress:
-    backgroundColor: 'rgba(0, 153, 255, 0.15)'
-    textColor: '{colors.accent-blue}'
-    typography: '{typography.micro}'
-    rounded: '{rounded.sm}'
-    padding: 4px 8px
-  status-badge-completed:
-    backgroundColor: 'rgba(34, 197, 94, 0.1)'
-    textColor: '{colors.semantic-success}'
-    typography: '{typography.micro}'
-    rounded: '{rounded.sm}'
-    padding: 4px 8px
-  status-badge-rejected:
-    backgroundColor: 'rgba(239, 68, 68, 0.1)'
-    textColor: '{colors.semantic-error}'
-    typography: '{typography.micro}'
-    rounded: '{rounded.sm}'
-    padding: 4px 8px
-  status-badge-on-hold:
-    backgroundColor: 'rgba(245, 158, 11, 0.1)'
-    textColor: '{colors.semantic-warning}'
-    typography: '{typography.micro}'
-    rounded: '{rounded.sm}'
-    padding: 4px 8px
-  data-table-container:
-    backgroundColor: '{colors.surface-1}'
-    rounded: '{rounded.xl}'
-    border: '1px solid {colors.hairline}'
-    overflow: 'hidden'
-  data-table-header:
-    backgroundColor: '{colors.surface-2}'
-    textColor: '{colors.ink}'
-    typography: '{typography.caption}'
-    padding: 12px 16px
-    borderBottom: '1px solid {colors.hairline}'
-  data-table-row:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body-sm}'
-    padding: 16px
-    borderBottom: '1px solid {colors.hairline-soft}'
-  data-table-row-hover:
-    backgroundColor: '{colors.surface-2}'
-    textColor: '{colors.ink}'
-  pagination-button-default:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink-muted}'
-    typography: '{typography.body-sm}'
-    rounded: '{rounded.md}'
-    padding: 6px 12px
-  pagination-button-active:
-    backgroundColor: '{colors.surface-2}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body-sm}'
-    rounded: '{rounded.md}'
-    padding: 6px 12px
-    border: '1px solid {colors.accent-blue}'
-  pricing-card:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body}'
-    rounded: '{rounded.xl}'
-    padding: 24px
-  pricing-card-featured:
-    backgroundColor: '{colors.surface-2}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body}'
-    rounded: '{rounded.xl}'
-    padding: 24px
-  template-card:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body-sm}'
-    rounded: '{rounded.lg}'
-    padding: 12px
-  gradient-spotlight-card:
-    backgroundColor: '{colors.gradient-violet}'
-    textColor: '{colors.ink}'
-    typography: '{typography.subhead}'
-    rounded: '{rounded.xl}'
-    padding: 32px
-  gradient-spotlight-card-magenta:
-    backgroundColor: '{colors.gradient-magenta}'
-    textColor: '{colors.ink}'
-    typography: '{typography.subhead}'
-    rounded: '{rounded.xl}'
-    padding: 32px
-  gradient-spotlight-card-orange:
-    backgroundColor: '{colors.gradient-orange}'
-    textColor: '{colors.ink}'
-    typography: '{typography.subhead}'
-    rounded: '{rounded.xl}'
-    padding: 32px
-  product-mockup-tile:
-    backgroundColor: '{colors.surface-1}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body-sm}'
-    rounded: '{rounded.xl}'
-    padding: 16px
-  feature-row:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body}'
-    rounded: '{rounded.xs}'
-  comparison-row:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink-muted}'
-    typography: '{typography.body-sm}'
-    rounded: '{rounded.xs}'
-  top-nav:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body-sm}'
-    rounded: '{rounded.xs}'
-    height: 56px
-  faq-row:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink}'
-    typography: '{typography.body}'
-    rounded: '{rounded.md}'
-    padding: 24px
-  footer:
-    backgroundColor: '{colors.canvas}'
-    textColor: '{colors.ink-muted}'
-    typography: '{typography.caption}'
-    rounded: '{rounded.xs}'
-    padding: 64px 32px
----
-
-## 이 문서의 적용 범위 (2026-08-15)
-
-> **이 문서는 Framer 마케팅 사이트를 분석한 원본이다.** SR 관리 앱의 화면 명세가 아니다.
->
-> 그럼에도 **색상 팔레트의 정본은 이 문서다**(fe-rules §0). 앱이 실제로 채택한 것은
-> 아래 범위이며, 구현 진입점은 `src/app/globals.css` 의 CSS 변수와 `tailwind.config.ts` 다.
->
-> **채택한 것**
-> - `colors` 팔레트 — 특히 canvas `#090909`, ink `#ffffff` (다크 캔버스 체계)와 semantic 상태색
->
-> **참고로만 두는 것**(2026-09-18 소유자 결정 D16 — 적용된 적이 없고, 치수의 정본은 fe-rules §3 과 그 구현이다)
-> - `rounded` · `spacing` · `typography` 스케일 — 앱은 8px(컨트롤)/12px(카드)/알약 반경, Tailwind 4px 간격,
->   Tailwind 기본 글자 크기를 쓴다.
-> - `status-badge` · `text-input` 토큰 — 배지는 알약형 `Badge`(variant 정본 `src/lib/constants/sr.ts`), 입력란은
->   `bg-transparent`·8px 다. 아래 status-badge 목록에는 CONFIRMED(확인완료)가 없고 INTAKE·IN_PROGRESS 가 같은
->   파랑의 명도 차뿐이라 그대로 옮기지 않았다. 앱의 상태 의미색은 D16 2단계에서 소유자가 고른 시안 A 이며, 정의는
->   fe-rules §3.4 와 `globals.css` 의 `--status-*` 토큰에 있다(요청됨 테두리·접수 회색·진행중 파랑·보류 노랑·
->   완료 초록·확인완료 초록+체크·거절 빨강). 상태 의미색은 아래 "크로마틱 액센트는 하나" 원칙의 예외다.
->
-> **채택하지 않은 것 (마케팅 사이트 전용 어휘)**
-> - `pricing-*`, `template-card`, `product-mockup-tile`
-> - `feature-row`, `comparison-row`, `faq-row`
-> - `top-nav`, `footer`
->
-> **주의할 불일치**
-> - 원본은 "모든 CTA 는 흰색 pill" 이라고 규정하지만, 이 앱의 버튼은 `rounded-[8px]` 다
->   (`src/components/ui/button.tsx`). pill 은 마케팅 사이트 어휘이며 SR 화면에 적용하지 않는다.
-> - 원본이 지정하는 `GT Walsheim` 등 웹폰트는 **이 앱에 하나도 로드되어 있지 않다**
->   (`src/app/layout.tsx` 에 next/font 선언이 없고 `tailwind.config.ts` 에 fontFamily 확장이 없다).
->   따라서 타이포그래피는 크기·행간·자간 **스케일만** 참조 대상이다.
-> - `gradient-spotlight` 변형은 이 문서가 3종, `globals.css` 가 2종을 정의하고 실사용은 0건이다.
-
-
-## Overview
-
-Framer's marketing canvas is a near-pure black artboard. The dominant surface is `{colors.canvas}` — almost pure black with a faint warmth — and on top of it sits oversized white display type set in **GT Walsheim Medium** with letter-spacing pulled to extreme negative values (-5.5px on the 110px display, -4.25px on the 85px hero). The page reads like a poster: one assertive statement per band, generous breathing room above and below.
-
-The single accent is `{colors.accent-blue}` — used scarcely, mostly for hyperlinks, selection halos, and a subtle blue-tinted shadow ring on focused inputs. The brand chrome itself is monochrome: white pill buttons, charcoal cards, gray secondary text. What makes Framer distinctive is the rhythm break — every few sections the page drops in a **vibrant gradient atmosphere card**: a magenta-violet spotlight, a sunset-orange wash, a coral-pink panel. These aren't section backgrounds; they're individual cards arranged in a card grid, each one a small living poster that shows what Framer can produce.
-
-Body type is **Inter Variable**, with Framer leaning hard into Inter's character variants (`cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07`, `dlig`) — the result is a body voice that feels custom-tuned, with single-storey "a", straight-leg "l", and tabular figures. There's no light mode on the marketing site; the brand IS dark.
-
-**Key Characteristics:**
-
-- Black-canvas marketing system: `{colors.canvas}` is the surface for hero, body, pricing, FAQ, and footer alike — no light interludes.
-- Massive negative letter-spacing on display sizes (-5.5px / -4.25px / -3.1px) creates a poster-grade headline cadence.
-- White pill (`{components.button-primary}`) is the only primary CTA shape across the site; secondary actions live as charcoal pills (`{components.button-secondary}`) or text links.
-- Oversized **gradient spotlight cards** (violet, magenta, orange, coral) act as showcase tiles inside the dark grid; they are individual cards, not section backgrounds.
-- Inter Variable with bespoke OpenType character variants (`cv01/05/09/11`, `ss03/ss07`, `dlig`) used everywhere body type appears — the typographic voice is unmistakable.
-- Border radius scale runs from 4px utility chips up to 100px pills and full circles, with 15–20px the default for cards and 30px for atmospheric gradient cards.
-- A single chromatic accent `{colors.accent-blue}` reserved for hyperlinks, focus, and selection — never decorative.
-
-## Colors
-
-> Source pages: framer.com (home), /ai/, /startups/, /marketplace/templates/nudge/, /gallery/a16z-speedrun-×-tonik, /pricing.
-
-### Brand & Accent
-
-- **Pure White** ({colors.primary}): The brand primary surface. Every primary CTA pill, every display headline, every body line on canvas.
-- **Sky Blue** ({colors.accent-blue}): The single chromatic accent. Hyperlinks, focused-input rings, and a few selection states. Never used for backgrounds or as a brand fill.
-
-### Surface
-
-- **Canvas** ({colors.canvas}): Default page background — near-black with a faint warmth. Footer, pricing, hero, and FAQ all sit on it.
-- **Surface 1** ({colors.surface-1}): One step above canvas — pricing cards, secondary buttons, mockup tiles.
-- **Surface 2** ({colors.surface-2}): Two steps above — featured pricing card, hero pill backdrop, selected pricing tab.
-- **Hairline** ({colors.hairline}): 1px borders on input groups, comparison-table dividers.
-- **Hairline Soft** ({colors.hairline-soft}): Subtler dividers — between FAQ rows and footer column rules.
-- **Inverse Canvas** ({colors.inverse-canvas}): Pure white — used as the surface of light-on-dark pill CTAs and a small set of light-mode template thumbnails embedded in the showcase grid.
-
-### Text
-
-- **Ink** ({colors.ink}): All headline and emphasized body type — pure white.
-- **Ink Muted** ({colors.ink-muted}): Secondary type — gray (#999999) used for meta info, footer columns, comparison-row labels, deselected pricing tabs. Hierarchy on the dark canvas is carried by ink → ink-muted contrast, not by weight changes.
-
-### Semantic
-
-- **Success Green** ({colors.semantic-success}): Pricing comparison-table checkmarks. Glyph fill, not surface.
-- **Warning Orange** ({colors.semantic-warning}): On-hold status indicator. (#f59e0b)
-- **Error Red** ({colors.semantic-error}): Rejected status indicator and input error states. (#ef4444)
-- **Info Blue** ({colors.semantic-info}): Active or processing status indicator. (#0099ff)
-- **Pending Gray** ({colors.semantic-pending}): Requested status indicator. (#a3a3a3)
-
-### Brand Gradient (signature)
-
-- **Gradient Magenta** ({colors.gradient-magenta}): Spotlight card variant.
-- **Gradient Violet** ({colors.gradient-violet}): Spotlight card variant — most common.
-- **Gradient Orange** ({colors.gradient-orange}): Spotlight card variant — sunset wash.
-- **Gradient Coral** ({colors.gradient-coral}): Spotlight card variant — coral/pink.
-
-These four sit as oversized atmospheric tiles inside otherwise monochrome card grids — a dark canvas with one or two glowing spotlight cards is a recurring page signature.
-
-## Typography
-
-### Font Family
-
-- **GT Walsheim Framer Medium** / **GT Walsheim Medium** — Framer's display typeface. Geometric, slightly humanist, very confident at large sizes with extreme negative tracking. Fallbacks: `GT Walsheim Medium Placeholder` system font.
-- **Inter Variable** — System body typeface. Used with extensive OpenType character variants: `cv01` (alternate "1"), `cv05` (alternate "g"), `cv09` (alternate "i" / "l"), `cv11` (alternate "0"), `ss03` / `ss07` stylistic sets, `dlig` discretionary ligatures, and `tnum` for numerics in tabular contexts. The result is a body voice that feels bespoke without commissioning a custom face.
-- **Inter** — Used selectively for `{typography.headline}` (the 22px / 20px tier). The non-variable cut catches small tracking targets that the variable file rounds.
-
-### Hierarchy
-
-| Token                      | Size  | Weight | Line Height | Letter Spacing | Use                                         |
-| -------------------------- | ----- | ------ | ----------- | -------------- | ------------------------------------------- |
-| `{typography.display-xxl}` | 110px | 500    | 0.85        | -5.5px         | Largest hero headline (home, AI page)       |
-| `{typography.display-xl}`  | 85px  | 500    | 0.95        | -4.25px        | Section opener headlines                    |
-| `{typography.display-lg}`  | 62px  | 500    | 1.00        | -3.1px         | Sub-section openers                         |
-| `{typography.display-md}`  | 32px  | 500    | 1.13        | -1.0px         | Card titles, smaller display                |
-| `{typography.headline}`    | 22px  | 700    | 1.20        | -0.8px         | Pricing tier headlines, FAQ category titles |
-| `{typography.subhead}`     | 24px  | 400    | 1.30        | -0.01px        | Lead body next to display headlines         |
-| `{typography.body-lg}`     | 18px  | 400    | 1.30        | -0.18px        | Hero subhead, lead paragraphs               |
-| `{typography.body}`        | 15px  | 400    | 1.30        | -0.15px        | Default body, card descriptions             |
-| `{typography.body-sm}`     | 14px  | 500    | 1.40        | -0.14px        | Pricing comparison rows, dense data         |
-| `{typography.caption}`     | 13px  | 500    | 1.20        | -0.13px        | Eyebrows, footer columns, meta              |
-| `{typography.micro}`       | 12px  | 400    | 1.20        | -0.12px        | Disclaimer, footnote                        |
-| `{typography.button}`      | 14px  | 500    | 1.0         | -0.14px        | Pill buttons                                |
-
-### Principles
-
-- **Letter-spacing scales with size, hard.** Display-xxl pulls -5.5px (5% of size); body sticks to about -1% (-0.15px on 15px). The result: posters at the top, comfortable reading at body.
-- **OpenType character variants are the brand voice.** Switching off `cv11`, `ss03`, etc. visibly changes the body voice — the brand depends on them.
-- **Weight stays in a narrow band.** Display sits at 500, body at 400, body-sm/caption at 500. Hierarchy is carried by size + tracking, not by 700/900 ramps.
-- **Tight line-heights everywhere.** Even body runs at 1.30 — Framer's editorial tone is denser than typical SaaS marketing.
-
-### Note on Font Substitutes
-
-If implementing without GT Walsheim Medium, suitable open-source substitutes include **Mona Sans**, **Geist**, or **Inter** at weight 600–700 with manually tightened tracking.
-
-When using substitutes, apply the following tracking adjustment formulas to mimic the poster-grade negative letter-spacing:
-
-- **Mona Sans / Geist**:
-  - Display-XXL (110px): `letter-spacing: -0.06em; font-weight: 600;`
-  - Display-XL (85px): `letter-spacing: -0.05em; font-weight: 600;`
-  - Display-LG (62px): `letter-spacing: -0.04em; font-weight: 600;`
-- **Inter (Non-Variable)**:
-  - Display-XXL (110px): `letter-spacing: -0.055em; font-weight: 700;`
-  - Display-XL (85px): `letter-spacing: -0.045em; font-weight: 700;`
-
-Inter Variable is open-source — keep it as-is and preserve the documented OpenType variants (`cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07`, `dlig`).
-
-## Layout
-
-### Spacing System
-
-- **Base unit**: 5px (Framer uses non-standard 5/10/15/20/30 increments rather than the more common 4/8/16/24).
-- **Tokens (front matter)**: `{spacing.hair}` 1px · `{spacing.xxs}` 4px · `{spacing.xs}` 8px · `{spacing.sm}` 12px · `{spacing.md}` 15px · `{spacing.lg}` 20px · `{spacing.xl}` 30px · `{spacing.xxl}` 40px · `{spacing.section}` 96px.
-- Card interior padding: `{spacing.lg}` 20px on pricing cards; `{spacing.xl}` 30px on gradient spotlight cards.
-- Pill button padding: 10px vertical · 15px horizontal — `{components.button-primary}`.
-- Section padding (vertical): roughly `{spacing.section}` 96px on home; tighter (~64px) on pricing comparison.
-
-### Grid & Container
-
-- Max content width sits around the 1199px breakpoint, with side gutters that scale toward `{spacing.xl}` on desktop.
-- Card grids on the home gallery use 2-up at desktop, collapsing to 1-up below 810px.
-- Pricing tier grid is 4-up across the documented breakpoints; comparison table beneath it uses fixed-width left column with horizontally scrolling tier columns at narrow widths.
-
-### Whitespace Philosophy
-
-The dark canvas IS the whitespace. Where lighter brands lean on white air to separate sections, Framer leans on long stretches of black with a single oversized statement floating in the middle. Sections separate by mode change: a band of charcoal cards, then a band of black with a gradient spotlight, then back to charcoal — like cuts in a dark film.
-
-## Elevation & Depth
-
-| Level          | Treatment                                                                       | Use                                                       |
-| -------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| 0 (flat)       | No shadow, no border                                                            | Default for canvas-mounted display type, FAQ rows, footer |
-| 1 (charcoal)   | `{colors.surface-1}` lift on canvas                                             | Pricing cards, mockup tiles, secondary buttons            |
-| 2 (light-edge) | `rgba(255,255,255,0.10)` 0.5px top edge + `rgba(0,0,0,0.25)` 0px 10px 30px drop | Floating product cards, modal cards                       |
-| 3 (selected)   | `rgba(0,153,255,0.15)` 0px 0px 0px 1px ring                                     | Focused inputs, selected option                           |
-
-Four shadow signatures recur across the homepage: a 1px subtle drop, a translucent blue ring, a thick near-black 2px outline (used as the active-element marker on sub-nav), and the layered light-edge + drop-shadow used for floating cards.
-
-### Decorative Depth
-
-- **Gradient spotlight cards** are the dominant depth device — color saturation against black canvas substitutes for shadow-driven elevation.
-- **Layered product mockups** (browser frames containing live Framer-built sites) sit inside `{colors.surface-1}` cards with the level-2 light-edge treatment.
-- **Subtle blue ring (focus / selected)** is the only chromatic depth signal — used to mark the active state of input groups and pricing tier toggles without changing the underlying surface.
-
-## Shapes
-
-### Border Radius Scale
-
-Framer's extracted radius set is unusually granular (1px, 4px, 5px, 6px, 8px, 10px, 12px, 15px, 20px, 30px, 40px, 100px). The named scale below picks the levels the marketing surface actually consumes.
-
-| Token            | Value  | Use                                        |
-| ---------------- | ------ | ------------------------------------------ |
-| `{rounded.xs}`   | 4px    | Small chip / utility radius                |
-| `{rounded.sm}`   | 6px    | Inline tag, badge                          |
-| `{rounded.md}`   | 10px   | Form input, list item                      |
-| `{rounded.lg}`   | 15px   | Template card thumbnails                   |
-| `{rounded.xl}`   | 20px   | Pricing cards, mockup tiles                |
-| `{rounded.xxl}`  | 30px   | Gradient spotlight cards, oversized panels |
-| `{rounded.pill}` | 100px  | All primary text CTAs                      |
-| `{rounded.full}` | 9999px | Circular icon buttons, avatar circles      |
-
-### Photography & Illustration Geometry
-
-- Embedded site mockups (browser-chromed previews of Framer-built sites) sit in `{rounded.xl}` 20px tiles with `{spacing.md}` 15px interior padding.
-- Gradient spotlight cards use `{rounded.xxl}` 30px corners — softer than the 20px content cards by design, to make them feel like atmospheric panels rather than tighter UI.
-- Icon glyphs and sub-nav glyphs render in `{rounded.full}` circles at 32–40px sizes.
-
-## Components
-
-### Buttons
-
-**`button-primary`** — White pill on dark canvas. The primary CTA across home, pricing, AI, and gallery pages.
-
-- Background `{colors.primary}`, text `{colors.on-primary}`, type `{typography.button}`, padding 10px 15px, rounded `{rounded.pill}`.
-- Pressed state lives in `button-primary-pressed` (the live site uses a transform-scale shrink rather than a darkened fill).
-
-**`button-secondary`** — Charcoal pill. Used for secondary navigation actions ("Sign in", "Talk to sales") and as the visual counterpart to the primary pill.
-
-- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.button}`, padding 10px 15px, rounded `{rounded.pill}`.
-
-**`button-translucent`** — Translucent / lifted secondary used on top of busy backgrounds (gallery hero, gradient cards).
-
-- Background `{colors.surface-2}`, text `{colors.ink}`, type `{typography.button}`, rounded `{rounded.xxl}`, padding 8px 14px.
-
-**`button-icon-circular`** — 40px circle for inline icon actions (carousel arrows, social links).
-
-- Background `{colors.surface-1}`, text `{colors.ink}`, rounded `{rounded.full}`, size 40px.
-
-### Pricing Tabs
-
-**`pricing-tab-default`** + **`pricing-tab-selected`** — The pill-toggle that switches between Basic / Pro / Business / Enterprise on `/pricing`.
-
-- Default: `{colors.canvas}` background, `{colors.ink-muted}` text, rounded `{rounded.pill}`.
-- Selected: `{colors.surface-2}` background, `{colors.ink}` text — selected = lift, not color. Surface depth communicates "active" without needing a chromatic fill.
-
-### Inputs & Forms
-
-**`text-input`** + **`text-input-focused`** — Form fields on `/pricing` (seat-count, currency switcher) and the in-product preview surfaces.
-
-- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.md}`, padding 10px 14px.
-- Focused state retains the same surface; the focus ring is the level-3 blue-tinted shadow `rgba(0,153,255,0.15)` 0 0 0 1px.
-
-### Cards & Containers
-
-**`pricing-card`** — Each tier on `/pricing`.
-
-- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.xl}`, padding 24px.
-
-**`pricing-card-featured`** — The Pro tier (visually emphasized).
-
-- Background `{colors.surface-2}`, otherwise identical structure. The lift is one surface step up — no chromatic outline.
-
-**`template-card`** — Thumbnail tile in the home "Built with Framer" gallery and `/marketplace`.
-
-- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body-sm}`, rounded `{rounded.lg}`, padding 12px.
-
-**`product-mockup-tile`** — Larger tile that frames a live product UI mock (Framer canvas, Workshop video, AI translate panel).
-
-- Background `{colors.surface-1}`, text `{colors.ink}`, type `{typography.body-sm}`, rounded `{rounded.xl}`, padding 16px.
-
-### Gradient Spotlight Cards (signature)
-
-The defining decorative surface of Framer's marketing — oversized atmospheric tiles dropped into otherwise monochrome card grids. Variants:
-
-**`gradient-spotlight-card`** — violet ground (most common).
-
-- Background `{colors.gradient-violet}`, text `{colors.ink}`, type `{typography.subhead}`, rounded `{rounded.xl}`, padding 32px. (The on-site card often pushes to `{rounded.xxl}` 30px when it spans a wider tile.)
-
-**`gradient-spotlight-card-magenta`** — magenta-pink ground.
-
-- Background `{colors.gradient-magenta}`, otherwise identical.
-
-**`gradient-spotlight-card-orange`** — sunset-orange wash.
-
-- Background `{colors.gradient-orange}`, otherwise identical.
-
-(Coral pink follows the same shape with `{colors.gradient-coral}`.)
-
-### Comparison & FAQ
-
-**`feature-row`** + **`comparison-row`** — Single rows inside the pricing comparison table.
-
-- `feature-row`: `{colors.canvas}` background, `{colors.ink}` text. Header rows.
-- `comparison-row`: `{colors.canvas}` background, `{colors.ink-muted}` text. Data rows with `{typography.body-sm}` and 1px `{colors.hairline-soft}` underlines.
-
-**`faq-row`** — Each accordion line in the pricing-page FAQ.
-
-- Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body}`, rounded `{rounded.md}`, padding 24px.
-
-### Navigation
-
-**`top-nav`** — Sticky bar on `{colors.canvas}` with the Framer wordmark left, primary nav links centered, and a `button-secondary` ("Sign in") + `button-primary` ("Get started for free") pair right.
-
-- Background `{colors.canvas}`, text `{colors.ink}`, type `{typography.body-sm}`, height 56px.
-- Mobile: collapses primary links into a hamburger; the two pill CTAs collapse into a single primary pill on the bar.
-
-### Footer
-
-**`footer`** — Dense link grid on `{colors.canvas}` with the Framer wordmark left and 5–6 columns of caption-sized links.
-
-- Background `{colors.canvas}`, text `{colors.ink-muted}`, type `{typography.caption}`, padding 64px 32px.
-
-## Do's and Don'ts
-
-### Do
-
-- Reserve `{colors.primary}` (white) and `{colors.canvas}` (near-black) as the system's two anchor surfaces. Every band of the page chooses one or the other.
-- Push display-size letter-spacing aggressively negative — `{typography.display-xxl}` at -5.5px is the brand signature, not a stylistic accident.
-- Use `{colors.accent-blue}` only for hyperlinks, focus rings, and selected indicators. Never as a background or button fill.
-- Drop one or two `gradient-spotlight-card` variants into a card grid; they are the brand's atmosphere device. Don't overdo it — three or more in the same viewport reads as a moodboard, not a system.
-- Compose every CTA as a pill (`{rounded.pill}`); secondary actions live as charcoal pills, never as bordered ghost buttons.
-- Keep body type Inter Variable with character variants `cv01`, `cv05`, `cv09`, `cv11`, `ss03`, `ss07` enabled — the brand voice depends on them.
-- Use surface lift (canvas → surface-1 → surface-2) to mark hierarchy on dark, not opacity changes on white type.
-
-### Don't
-
-- Don't ship a light-mode marketing page. Framer's identity is dark.
-- Don't introduce mid-tone gray text outside `{colors.ink-muted}`. The hierarchy is binary: `ink` or `ink-muted`.
-- Don't use `{colors.accent-blue}` as a brand fill (e.g., a blue CTA pill). The blue is a signal color, not a surface.
-- Don't square off CTAs. Pill (`{rounded.pill}`) or full circle is the brand vocabulary.
-- Don't reduce the negative letter-spacing on display sizes "for accessibility". The compression is intrinsic to the brand voice; reduce the SIZE if needed, but keep the percentage.
-- Don't apply gradient backgrounds to whole sections. Gradients are CARDS, not section grounds.
-- Don't combine more than one chromatic accent. The palette is monochrome plus one blue plus the gradient family — not "blue, green, and red".
-
-## Responsive Behavior
-
-### Breakpoints
-
-| Name      | Width  | Key Changes                                               |
-| --------- | ------ | --------------------------------------------------------- |
-| Desktop   | 1199px | Default desktop layout                                    |
-| Tablet    | 810px  | Card grids collapse 4-up → 2-up; nav becomes hamburger    |
-| Mobile-Lg | 809px  | Pricing comparison table becomes per-tier accordion       |
-| Mobile-XS | 98px   | Smallest documented breakpoint — single-column everything |
-
-### Touch Targets
-
-- Pill buttons (`button-primary`, `button-secondary`) maintain a minimum 44px tap height across all viewports — combine `{typography.button}` 14px line-height with the documented 10px vertical padding.
-- Circular icon buttons (`button-icon-circular`) are 40px on desktop and grow to 44px on touch viewports.
-- Pricing-tab pills hold ≥40px tap height; below 810px they may collapse into a horizontal-scroll row instead of stacking.
-
-### Collapsing Strategy
-
-- **Nav**: horizontal nav with a centered link group + right-anchored pill pair collapses to a hamburger overlay below 810px. The `button-primary` stays visible on the bar.
-- **Card grids**: the gallery and template-card grids go 2-up on desktop → 1-up on mobile. Gradient spotlight cards retain `{rounded.xxl}` corners at every viewport — they don't bleed.
-- **Pricing comparison table**: collapses into per-tier accordions below 810px to avoid horizontal scroll.
-- **Display type**: `{typography.display-xxl}` 110px scales down toward `{typography.display-lg}` 62px on tablet and `{typography.display-md}` 32px on mobile, preserving the percentage-negative letter-spacing.
-
-### Image Behavior
-
-- Embedded product mockups (browser frames containing live Framer-built sites) maintain their aspect ratio and never crop.
-- Gradient spotlight cards keep their gradient orientations across breakpoints — the gradient direction is part of the brand spec.
-
-## Iteration Guide
-
-1. Focus on ONE component at a time and reference it by its `components:` token name (e.g., `{components.button-primary}`, `{components.gradient-spotlight-card}`).
-2. When introducing a new section on the dark canvas, decide first which surface lift it lives on — `{colors.canvas}` for hero/FAQ, `{colors.surface-1}` for cards, `{colors.surface-2}` for featured cards. The depth choice is the most consequential decision.
-3. Default body to `{typography.body}` with all the documented OpenType variants; reach for `{typography.subhead}` only inside spotlight cards.
-4. Run `npx @google/design.md lint DESIGN.md` after edits — `broken-ref`, `contrast-ratio`, and `orphaned-tokens` warnings flag issues automatically.
-5. Add new variants as separate component entries (`-pressed`, `-featured`, `-selected`) — do not bury them in prose.
-6. Treat `{colors.accent-blue}` as a single-shot signal color: hyperlinks, focus, and selection — that's it. If you find yourself reaching for a second blue, the brand is drifting.
-7. Gradient spotlight cards are scarce by design. One or two per long page is the spec; three is a moodboard.
-
-## Gradient Spotlight Implementation Spec
-
-To achieve the seamless glowing atmosphere on the dark canvas without breaking design token consistency, implement the gradient spotlight cards using the following CSS pattern:
-
-```css
-.gradient-spotlight-card-violet {
-  position: relative;
-  background: #141414; /* Fallback surface */
-  overflow: hidden;
-}
-
-.gradient-spotlight-card-violet::before {
-  content: '';
-  position: absolute;
-  top: -40%;
-  left: -30%;
-  width: 150%;
-  height: 150%;
-  background: radial-gradient(
-    circle at 30% 30%,
-    rgba(106, 76, 245, 0.25) 0%,
-    /* colors.gradient-violet with 25% opacity */ rgba(106, 76, 245, 0.05) 40%,
-    transparent 70%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* For premium glassmorphic atmosphere */
-.gradient-spotlight-card-glass {
-  background: rgba(20, 20, 20, 0.7) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-```
-
----
-
-## Known Gaps
-
-- The exact gradient stops for the spotlight cards are derived from screenshot pixels rather than from CSS variables — the production gradients are likely defined as `linear-gradient` strings on individual elements rather than as design tokens. Treat the documented `{colors.gradient-*}` hex values as base anchors, not as exact gradient specs.
-- Dark mode is the only mode — no light-mode adaptation is documented because the marketing site does not ship one.
-- The marketplace template detail page returned sparser CSS variable data than the other pages; surface tokens for that page were inferred from the matching home / gallery treatment rather than extracted directly.
+정량 검증 후보는 요청 등록 완료 시간, 접수 완료 시간, 검색 조건 재입력 횟수, 첨부 재시도 성공률이다.
+측정 데이터가 없으므로 개선율이나 목표 수치를 임의로 선언하지 않는다.

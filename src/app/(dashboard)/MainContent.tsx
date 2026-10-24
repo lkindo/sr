@@ -19,8 +19,8 @@ export default function MainContent({ children }: { children: React.ReactNode })
         tabIndex={-1}
         className={
           isDashboard
-            ? 'flex-1 px-3 py-4 md:p-8 sr-content-bg focus-visible:outline-none'
-            : 'flex-1 md:ml-64 px-3 py-4 md:p-8 sr-content-bg focus-visible:outline-none'
+            ? 'flex-1 min-w-0 px-3 py-4 md:p-8 sr-content-bg focus-visible:outline-none'
+            : 'flex-1 min-w-0 lg:ml-64 px-3 py-4 md:p-8 sr-content-bg focus-visible:outline-none'
         }
       >
         <div className="w-full mx-auto">{children}</div>

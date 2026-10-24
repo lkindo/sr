@@ -140,10 +140,10 @@ describe('IntakeInfoCard — 접수자', () => {
 describe('IntakeInfoCard — 우선순위', () => {
   /** 실물 Badge 의 cva 정의에서 따온 variant 별 대표 클래스. */
   const priorityColor = {
-    // 빨강은 긴급에만, 높음은 주황, 낮음은 색 없는 테두리(결정 D16 2단계).
+    // 긴급은 빨강, 높음은 주황, 보통은 주야 공통 중립 표면, 낮음은 색 없는 테두리.
     CRITICAL: 'text-status-danger',
     HIGH: 'text-status-caution',
-    MEDIUM: 'bg-primary/10',
+    MEDIUM: 'bg-muted',
     LOW: 'text-status-neutral',
   } as const;
 

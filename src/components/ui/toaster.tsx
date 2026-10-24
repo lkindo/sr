@@ -23,7 +23,7 @@ export function Toaster() {
             type={props.variant === 'destructive' ? 'foreground' : 'background'}
             {...props}
           >
-            <div className="grid gap-1">
+            <div className="grid min-w-0 flex-1 gap-1 break-words">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && <ToastDescription>{description}</ToastDescription>}
             </div>

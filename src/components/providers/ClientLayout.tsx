@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { IdleTimeoutProvider } from '@/components/providers/IdleTimeoutProvider';
 import { PWARegistration } from '@/components/providers/PWARegistration';
 import { RealtimeProvider } from '@/components/providers/RealtimeProvider';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { Toaster } from '@/components/ui';
 
 // Devtools를 전용 컴포넌트로 분리하여 HMR 안정성 확보
@@ -50,17 +51,19 @@ export default function ClientLayout({ children, session }: ClientLayoutProps) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <SessionProvider session={session}>
-        <RealtimeProvider>
-          <IdleTimeoutProvider>
-            {children}
-            <Toaster />
-            <PWARegistration />
-          </IdleTimeoutProvider>
-        </RealtimeProvider>
-      </SessionProvider>
-      {process.env.NODE_ENV === 'development' && <QueryDevtools />}
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <SessionProvider session={session}>
+          <RealtimeProvider>
+            <IdleTimeoutProvider>
+              {children}
+              <Toaster />
+              <PWARegistration />
+            </IdleTimeoutProvider>
+          </RealtimeProvider>
+        </SessionProvider>
+        {process.env.NODE_ENV === 'development' && <QueryDevtools />}
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

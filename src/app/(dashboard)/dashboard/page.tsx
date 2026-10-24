@@ -210,13 +210,7 @@ export default function DashboardPage() {
                   </CardDescription>
                 </div>
               </div>
-              {/* 밝은 액센트(#0099ff) 위의 흰 글씨는 2.99:1 로 WCAG AA(4.5:1)에 못 미쳤다.
-                  같은 배경에 검은 글씨는 약 7:1 이라 색을 바꾸지 않고 대비만 올릴 수 있다. */}
-              <Button
-                variant="default"
-                className="bg-[hsl(var(--sr-accent-orange))] hover:bg-[hsl(var(--sr-accent-orange))]/90 text-black"
-                onClick={() => router.push('/srs?status=REQUESTED')}
-              >
+              <Button variant="default" onClick={() => router.push('/srs?status=REQUESTED')}>
                 접수하기
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>

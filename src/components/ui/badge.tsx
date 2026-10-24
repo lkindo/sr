@@ -8,7 +8,7 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary/10 text-primary shadow-none',
+        default: 'border-transparent bg-muted text-foreground shadow-none',
         // 전경색을 하드코딩하면 테마 토큰이 무시된다. `--secondary` 는 #141414(어두운
         // 표면)인데 #475569(어두운 슬레이트)를 얹어 대비가 2.43:1 이었다 — 상태 배지가
         // 사실상 판독 불가였다(axe color-contrast). 토큰 짝(흰색)으로 되돌린다.
@@ -22,9 +22,8 @@ const badgeVariants = cva(
         // 분기를 없애고 variant 하나가 최종 색을 갖게 한다.
         destructive: 'border-transparent bg-destructive/10 text-destructive',
         outline: 'border-input text-foreground bg-transparent',
-        // 의미색(결정 D16 2단계) — 값은 globals.css 의 --status-* 토큰이다. 같은 색을 글자와 15% 배경에 함께 써서
-        // 카드(#141414) 위 대비가 모두 4.5:1 이상이다. 예전 success·warning 은 팔레트 클래스(emerald·amber)를
-        // 직접 썼다(fe-rules §3.2 '토큰만').
+        // 의미색은 globals.css의 --status-* 토큰이다. 15% 배경 위 텍스트 대비는
+        // theme-contrast.test.ts에서 주간·야간의 카드·보조 표면 모두 검증한다.
         neutral: 'border-status-neutral-border bg-transparent text-status-neutral',
         info: 'border-transparent bg-status-info/15 text-status-info',
         success: 'border-transparent bg-status-success/15 text-status-success',

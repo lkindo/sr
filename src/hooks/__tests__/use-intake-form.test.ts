@@ -82,6 +82,32 @@ afterEach(() => {
 });
 
 describe('useIntakeForm — 모드 판정', () => {
+  it('이전 초기 조회가 늦게 끝나도 이미 작성 중인 예상 작업 시간을 덮어쓰지 않는다', async () => {
+    let resolveStale: (response: ReturnType<typeof okSR>) => void = () => undefined;
+    const staleRequest = new Promise<ReturnType<typeof okSR>>((resolve) => {
+      resolveStale = resolve;
+    });
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(staleRequest)
+      .mockResolvedValue(okSR(srPayload()));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useIntakeForm({ srId: 'sr-1' }), {
+      wrapper,
+      reactStrictMode: true,
+    });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.form.setValue('estimatedHours', 8, { shouldDirty: true }));
+    await act(async () => {
+      resolveStale(okSR(srPayload()));
+      await staleRequest;
+    });
+
+    expect(result.current.form.getValues('estimatedHours')).toBe(8);
+  });
+
   it('REQUESTED 는 접수 모드이고 카테고리 담당자를 미리 채운다', async () => {
     stubFetch([okSR(srPayload())]);
 

@@ -168,7 +168,7 @@ export function SRComments({ srId }: SRCommentsProps) {
               disabled={submitting}
               className="resize-none w-full"
             />
-            <div className="flex items-center justify-end gap-4">
+            <div className="flex flex-wrap items-center justify-end gap-4">
               {canWriteInternalNote && (
                 <div className="flex items-center gap-2 mr-auto">
                   <Checkbox
@@ -218,8 +218,8 @@ export function SRComments({ srId }: SRCommentsProps) {
                       <AvatarImage src={comment.user.image || ''} alt={comment.user.name} />
                       <AvatarFallback>{getInitials(comment.user.name)}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2 break-words">
                         <span className="text-sm font-medium">{comment.user.name}</span>
                         <span className="text-xs text-muted-foreground">
                           {new Date(comment.createdAt).toLocaleString('ko-KR')}
@@ -231,7 +231,7 @@ export function SRComments({ srId }: SRCommentsProps) {
                           </Badge>
                         )}
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words">{comment.content}</p>
                     </div>
                   </li>
                 ))}

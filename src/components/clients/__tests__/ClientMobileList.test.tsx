@@ -157,7 +157,7 @@ describe('ClientMobileList — 카드의 값', () => {
   it('활성 여부에 따라 배지의 문구와 variant 가 함께 갈린다', () => {
     renderList();
 
-    expect(screen.getByText('활성').className).toContain('bg-primary/10');
+    expect(screen.getByText('활성').className).toContain('bg-muted');
     expect(screen.getByText('비활성').className).toContain('bg-secondary');
   });
 
