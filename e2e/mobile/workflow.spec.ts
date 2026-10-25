@@ -26,7 +26,7 @@ async function detail(page: Page, id: string, status: string) {
     확인완료: 'CONFIRMED',
     거절: 'REJECTED',
   };
-  const persisted = await page.request.get(`/api/srs/${id}`);
+  const persisted = await page.request.get(`/api/srs/${id}`, { maxRetries: 2 });
   expect(persisted.ok()).toBe(true);
   expect((await persisted.json()).status).toBe(states[status]);
   await assertViewport(page);
@@ -56,7 +56,8 @@ async function createRequest(page: Page, title: string, created: string[]) {
   await expect
     .poll(async () => {
       const response = await page.request.get(
-        '/api/srs?pageSize=100&sortBy=createdAt&sortOrder=desc'
+        '/api/srs?pageSize=100&sortBy=createdAt&sortOrder=desc',
+        { maxRetries: 2 }
       );
       expect(response.ok()).toBe(true);
       const body = await response.json();
@@ -217,7 +218,7 @@ for (const theme of ['light', 'dark'] as const) {
         await manager.getByRole('button', { name: '저장', exact: true }).click();
         expect((await intake).ok()).toBe(true);
         await expect(manager).toHaveURL(/\/srs$/);
-        const savedIntake = await manager.request.get(`/api/srs/${id}`);
+        const savedIntake = await manager.request.get(`/api/srs/${id}`, { maxRetries: 2 });
         expect(savedIntake.ok()).toBe(true);
         const intakeValues = await savedIntake.json();
         expect(intakeValues.actualPriority).toBe('HIGH');
@@ -395,11 +396,11 @@ for (const theme of ['light', 'dark'] as const) {
       }
       for (const id of created) {
         try {
-          const response = await admin.request.get(`/api/srs/${id}`);
+          const response = await admin.request.get(`/api/srs/${id}`, { maxRetries: 2 });
           expect(response.ok()).toBe(true);
           const sr = await response.json();
           expect(sr.title === prefix || sr.title === `${prefix}-REJECT`).toBe(true);
-          const removed = await admin.request.delete(`/api/srs/${id}`);
+          const removed = await admin.request.delete(`/api/srs/${id}`, { maxRetries: 2 });
           expect(removed.ok(), 'Cleanup of the newly created mobile test SR').toBe(true);
         } catch (error) {
           cleanupErrors.push(error);

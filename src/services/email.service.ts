@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 
 import { logger } from '@/lib/logger';
 
@@ -61,7 +61,7 @@ export function smtpServer(): {
 }
 
 class EmailService {
-  private transporter: nodemailer.Transporter;
+  private transporter: Transporter;
 
   constructor() {
     const { host, port } = smtpServer();
