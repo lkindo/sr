@@ -1,5 +1,5 @@
 # Stage 1: Dependency 설치
-FROM node:22 AS deps
+FROM node:22.23.4 AS deps
 WORKDIR /app
 
 # Corepack 활성화하여 pnpm 사용 준비.
@@ -21,7 +21,7 @@ ENV NODE_OPTIONS="--dns-result-order=ipv4first"
 RUN pnpm config set registry https://registry.npmjs.org/ && pnpm install --frozen-lockfile --ignore-scripts
 
 # Stage 2: Application 빌드
-FROM node:22 AS builder
+FROM node:22.23.4 AS builder
 WORKDIR /app
 
 # 버전은 package.json 의 packageManager 가 결정한다(위 deps 스테이지 주석 참고).
@@ -52,7 +52,7 @@ RUN pnpm exec esbuild prisma/seed.ts \
   --outfile=prisma/seed.bundle.cjs
 
 # Stage 3: Runner
-FROM node:22-slim AS runner
+FROM node:22.23.4-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
