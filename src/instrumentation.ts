@@ -53,11 +53,12 @@ export async function register() {
  * 도커가 먼저 SIGKILL 을 보내지 않는다.
  */
 function registerGracefulShutdown(...cleanups: Array<() => void>) {
-  const graceMs = Number(process.env.SHUTDOWN_GRACE_MS ?? 15_000);
+  const nodeProcess = globalThis.process;
+  const graceMs = Number(nodeProcess.env.SHUTDOWN_GRACE_MS ?? 15_000);
   let shuttingDown = false;
 
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-    process.on(signal, () => {
+    nodeProcess.on(signal, () => {
       // 두 번째 신호는 무시한다 — 재진입하면 유예가 초기화되거나 정리가 중복된다.
       if (shuttingDown) return;
       shuttingDown = true;
@@ -73,7 +74,7 @@ function registerGracefulShutdown(...cleanups: Array<() => void>) {
 
       const timer = setTimeout(() => {
         console.log('[shutdown] 유예 종료 — 프로세스를 내립니다.');
-        process.exit(0);
+        nodeProcess.exit(0);
       }, graceMs);
       // 진행 중인 작업이 모두 끝나 이벤트 루프가 비면 이 타이머 때문에 살아 있지 않게 한다.
       timer.unref?.();

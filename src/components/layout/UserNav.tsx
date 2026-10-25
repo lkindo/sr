@@ -43,11 +43,8 @@ export function UserNav({ user }: UserNavProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="relative h-11 w-11 rounded-full"
-          aria-label="사용자 메뉴"
-        >
+        <Button variant="ghost" className="relative h-11 w-11 rounded-full">
+          <span className="sr-only">사용자 메뉴</span>
           <Avatar className="h-9 w-9" aria-hidden="true">
             <AvatarImage src={user.image || undefined} alt={user.name || ''} />
             <AvatarFallback>{initials}</AvatarFallback>

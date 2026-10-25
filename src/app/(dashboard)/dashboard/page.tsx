@@ -464,8 +464,9 @@ export default function DashboardPage() {
             '지연 중'(헌법 §3, 결정 D10) — 준수율은 끝난 SR 만 세는 후행 지표라 적체가 쌓이는 동안에도 높게
             유지된다. 능동 경고를 두지 않는 대신 이 숫자로 감시한다. 누르면 같은 건수의 목록(/srs?overdue=1)이 뜬다.
           */}
-          <Link href="/srs?overdue=1" className="block" aria-label="지연 중인 SR 목록 보기">
-            <Card className="sr-card h-full">
+          <Link href="/srs?overdue=1" className="block">
+            <span className="sr-only">지연 중인 SR 목록 보기</span>
+            <Card className="sr-card h-full" aria-hidden="true">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">지연 중</CardTitle>
                 <AlertTriangle
