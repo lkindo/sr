@@ -23,7 +23,7 @@ export async function login(page: Page, persona: Persona) {
   await page.locator('#password').fill(persona.password);
   await page.getByRole('button', { name: '로그인', exact: true }).click();
   await expect(page).toHaveURL(/\/(dashboard|srs)(?:\?|$)/);
-  const response = await page.request.get('/api/auth/session');
+  const response = await page.request.get('/api/auth/session', { maxRetries: 2 });
   expect(response.ok()).toBe(true);
   const session = await response.json();
   expect(session.user.email === persona.email, `Authenticated account for ${persona.name}`).toBe(

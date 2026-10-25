@@ -100,7 +100,8 @@ test('light: 모바일 접수 달력 선택·접수 수정·마감일 조정과 
       await expect
         .poll(async () => {
           const response = await client.request.get(
-            '/api/srs?pageSize=100&sortBy=createdAt&sortOrder=desc'
+            '/api/srs?pageSize=100&sortBy=createdAt&sortOrder=desc',
+            { maxRetries: 2 }
           );
           expect(response.ok()).toBe(true);
           const body = await response.json();
@@ -184,6 +185,7 @@ test('light: 모바일 접수 달력 선택·접수 수정·마감일 조정과 
       const before = await readSR(client, id);
       const denied = await client.request.patch(`/api/srs/${id}`, {
         data: { dueDate: expectedDueDate, changeReason: '모바일 권한 차단 검증' },
+        maxRetries: 2,
       });
       expect(denied.status()).toBe(403);
       expect((await readSR(client, id)).dueDate).toBe(before.dueDate);
@@ -256,7 +258,7 @@ test('light: 모바일 접수 달력 선택·접수 수정·마감일 조정과 
       try {
         const record = await readSR(admin, id);
         expect(record.title).toBe(prefix);
-        expect((await admin.request.delete(`/api/srs/${id}`)).ok()).toBe(true);
+        expect((await admin.request.delete(`/api/srs/${id}`, { maxRetries: 2 })).ok()).toBe(true);
       } catch (error) {
         cleanupErrors.push(error);
       }
