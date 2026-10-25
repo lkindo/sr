@@ -328,7 +328,7 @@ jobs:
       # test 잡이 만든 커버리지 맵. stryker-ci.ts 가 이걸로 "테스트가 있는 파일"만 고른다.
       # 없으면 스크립트가 경고 후 전체 변경 파일을 대상으로 삼는다(게이트는 계속 동작).
       - name: Download coverage map
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         continue-on-error: true # 아티팩트 부재는 스크립트가 처리한다
         with:
           name: coverage-final
@@ -384,7 +384,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download shard mutation reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: mutation-report-*
           path: mutation-reports
