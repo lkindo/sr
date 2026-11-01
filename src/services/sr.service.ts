@@ -621,6 +621,40 @@ export class SRService {
            * 바꾸는 행위이므로 "누가 · 언제 · 무엇에서 무엇으로 · 왜" 가 남아야 한다.
            * 남기지 않으면 준수율이 왜 그 값인지 사후에 설명할 수 없다.
            */
+          // 카테고리·우선순위 변경의 자동 재산출도 SLA 기준을 옮긴다. 기록이 없으면 지연 중인 SR 을
+          // 기한이 긴 카테고리로 바꿔 지연에서 빼도 누가 언제 했는지 알 수 없다.
+          const dueDateRecalculated =
+            !dueDateManuallySet &&
+            updateData.dueDate !== undefined &&
+            currentSR.dueDate?.getTime() !== existingSR.dueDate?.getTime();
+
+          if (dueDateRecalculated) {
+            await auditService.createLog(tx, {
+              userId: sessionUser.id,
+              actionType: 'UPDATE',
+              targetEntity: 'SR_DUE_DATE',
+              targetId: id,
+              changes: {
+                srNumber: existingSR.srNumber,
+                before: existingSR.dueDate?.toISOString() ?? null,
+                after: currentSR.dueDate?.toISOString() ?? null,
+                reason: 'SLA 기준 변경에 따른 자동 재산출',
+              },
+            });
+            await tx.sRActivity.create({
+              data: {
+                srId: id,
+                userId: sessionUser.id,
+                type: 'INTAKE_UPDATED',
+                description: `SLA 마감일 자동 재산출: ${formatDueForActivity(existingSR.dueDate)} → ${formatDueForActivity(currentSR.dueDate)}`,
+                metadata: {
+                  dueDateBefore: existingSR.dueDate?.toISOString() ?? null,
+                  dueDateAfter: currentSR.dueDate?.toISOString() ?? null,
+                },
+              },
+            });
+          }
+
           if (dueDateManuallySet) {
             await auditService.createLog(tx, {
               userId: sessionUser.id,

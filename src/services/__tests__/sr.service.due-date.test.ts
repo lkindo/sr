@@ -221,6 +221,28 @@ describe('수동 지정된 마감일과 자동 재산출', () => {
  * 위반을 준수로 소급해 바꿀 수 있었고, 재작업 당사자(배정 ENGINEER)가 사유 한 줄로 자기 마감일을
  * 미룰 수 있었고, 재오픈 → 보류 → 거절로 끝내면 준수율 표본에서 빠졌다.
  */
+describe('마감일 자동 재산출의 기록', () => {
+  // 기록이 없으면 지연 중인 SR 을 기한이 긴 카테고리로 바꿔 지연에서 빼도 알 수 없다.
+  it('재산출로 마감일이 바뀌면 감사 로그와 활동을 남긴다', async () => {
+    await srService.updateSR('sr-1', { serviceCategoryId: 'cat-2' }, manager);
+
+    expect(dueDateAudits()).toHaveLength(1);
+    expect(JSON.stringify(dueDateAudits()[0].changes)).toContain('자동 재산출');
+    const activity = tx.sRActivity.create.mock.calls[0]![0].data;
+    expect(activity).toMatchObject({ srId: 'sr-1', userId: 'mgr-1', type: 'INTAKE_UPDATED' });
+    expect(activity.description).toMatch(/^SLA 마감일 자동 재산출: .+ → .+$/);
+  });
+
+  it('재산출 결과가 같으면 기록하지 않는다', async () => {
+    calculateDueDate.mockResolvedValue(AUTO_DUE);
+
+    await srService.updateSR('sr-1', { serviceCategoryId: 'cat-2' }, manager);
+
+    expect(dueDateAudits()).toHaveLength(0);
+    expect(tx.sRActivity.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('한 번 완료된 SR 의 마감일(D9)', () => {
   const engineer = {
     id: 'eng-1',
