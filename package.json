@@ -128,7 +128,8 @@
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.5",
     "vitest": "^5.0.5",
-    "vitest-mock-extended": "^5.1.1"
+    "vitest-mock-extended": "^5.1.1",
+    "yaml": "2.9.1"
   },
   "trustedDependencies": [
     "@prisma/client",
