@@ -3,7 +3,7 @@ import { Prisma, SRStatus } from '@prisma/client';
 
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { usePagination } from '@/lib/pagination';
-import { visibleCommentsWhere } from '@/lib/policies';
+import { srViewerScopeWhere, visibleCommentsWhere } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SR_ALIVE } from '@/lib/prisma-selects';
 import { serializeResponse } from '@/lib/serialization';
@@ -44,10 +44,14 @@ export const GET = withAuthAndRateLimit(
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const orderBy = ORDER_BY.get(sortBy) ?? DEFAULT_ORDER_BY;
 
-    const where: Prisma.SRWhereInput = {
+    // 신청자 본인이어도 지금 볼 수 있는 범위로 좁힌다. 소속이 바뀐 뒤에는 상세가 403 인데
+    // 목록에는 이전 고객사 SR 의 제목과 담당자 이메일이 남아 있었다.
+    const ownRequests: Prisma.SRWhereInput = {
       ...SR_ALIVE,
       requesterId: session.user.id,
+      AND: [srViewerScopeWhere(session.user)],
     };
+    const where: Prisma.SRWhereInput = { ...ownRequests };
 
     // 상태 필터링. 알 수 없는 값은 필터 없음으로 취급한다(Prisma 런타임 오류 방지).
     if (status && status !== 'all' && VALID_STATUSES.has(status)) {
@@ -120,7 +124,7 @@ export const GET = withAuthAndRateLimit(
         by: ['status'],
         // 상태 필터는 일부러 빼지만 soft delete 필터는 뺄 수 없다 —
         // 목록에서 사라진 SR 이 통계 카드에만 남으면 사용자가 합계를 맞춰 볼 수 없다.
-        where: { ...SR_ALIVE, requesterId: session.user.id },
+        where: ownRequests,
         _count: { _all: true },
       }),
     ]);

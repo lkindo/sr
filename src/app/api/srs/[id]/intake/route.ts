@@ -6,11 +6,12 @@ import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { domainEvents } from '@/lib/domain-events';
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 import {
+  canAssignSR,
   canIntakeSR,
   ensureCanIntakeAssignedSR,
+  ensureCanIntakeClientSR,
   ensureCanIntakeSR,
   ensureCanReadSR,
-  isInternalUser,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
@@ -75,13 +76,7 @@ export const POST = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
-    // Multi-tenant Isolation: External users can only intake their own client's SR
-    if (!isInternalUser(session.user)) {
-      const userClientIds = session.user.clientIds || [];
-      if (!userClientIds.includes(sr.clientId)) {
-        throw new ForbiddenError('해당 고객사의 SR을 접수 처리할 권한이 없습니다.');
-      }
-    }
+    ensureCanIntakeClientSR(session.user, sr);
 
     if (sr.status !== 'REQUESTED') {
       throw new BadRequestError('이미 접수된 SR입니다');
@@ -402,6 +397,8 @@ export const PATCH = withAuthAndRateLimit(
       throw new NotFoundError('SR');
     }
 
+    ensureCanIntakeClientSR(session.user, sr);
+
     if (sr.status !== 'INTAKE' && sr.status !== 'IN_PROGRESS') {
       throw new BadRequestError('접수되었거나 진행 중인 SR만 접수 정보를 수정할 수 있습니다');
     }
@@ -455,6 +452,17 @@ export const PATCH = withAuthAndRateLimit(
       validated.assigneeId !== undefined && validated.assigneeId !== sr.assigneeId
         ? await assertAssignable(validated.assigneeId)
         : null;
+
+    // POST 와 같은 이유로 담당자 검증 **뒤**에 둔다. 앞에 두면 404 와 403 이 갈려 쓰기 없이도
+    // SR 의 배정 여부를 떠볼 수 있다.
+    ensureCanIntakeAssignedSR(session.user, sr);
+
+    // 담당자 변경은 접수 수정이 아니라 배정이다. updateSR 과 같은 권한을 요구한다.
+    if (newAssignee && !canAssignSR(session.user)) {
+      throw new ForbiddenError(
+        '담당자 배정은 운영 관리자만 할 수 있습니다. 변경이 필요한 경우 운영 관리자에게 요청하세요.'
+      );
+    }
 
     // 7. SR 업데이트
     const updateData: Prisma.SRUncheckedUpdateInput = {};

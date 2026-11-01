@@ -752,6 +752,67 @@ describe('PATCH /api/srs/[id]/intake — 권한 게이트', () => {
   });
 });
 
+describe('PATCH /api/srs/[id]/intake — 객체 인가', () => {
+  // SR:INTAKE 는 역할 편집으로 외부 커스텀 역할에도 줄 수 있다.
+  const external = (clientIds: string[], permissions = ['SR:INTAKE']) =>
+    session({ id: 'ext-1', roles: ['CLIENT_USER'], permissions, clientIds });
+
+  beforeEach(() => {
+    mocks.findUnique.mockResolvedValue(patchSR());
+  });
+
+  it('소속 고객사의 SR 이면 외부 사용자도 접수 정보를 고칠 수 있다', async () => {
+    const response = await patch({ actualPriority: 'HIGH' }, external(['client-1']));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('다른 고객사의 SR 이면 403 이고 저장하지 않는다', async () => {
+    const response = await patch({ actualPriority: 'HIGH' }, external(['client-9']));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe('해당 고객사의 SR을 접수 처리할 권한이 없습니다.');
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('담당자 스코프 사용자는 남에게 배정된 SR 을 고치지 못한다', async () => {
+    const engineer = session({
+      id: 'eng-9',
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ actualPriority: 'HIGH' }, engineer);
+
+    expect(response.status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('SR:ASSIGN 없이는 담당자를 바꾸지 못한다', async () => {
+    mocks.assertAssignable.mockResolvedValue(OTHER_ASSIGNEE);
+
+    const response = await patch({ assigneeId: OTHER_ASSIGNEE.id }, external(['client-1']));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toContain('담당자 배정은 운영 관리자만');
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('SR:ASSIGN 이 있으면 담당자를 바꿀 수 있다', async () => {
+    mocks.assertAssignable.mockResolvedValue(OTHER_ASSIGNEE);
+
+    const response = await patch(
+      { assigneeId: OTHER_ASSIGNEE.id },
+      external(['client-1'], ['SR:INTAKE', 'SR:ASSIGN'])
+    );
+
+    expect(response.status).toBe(200);
+  });
+});
+
 describe('PATCH /api/srs/[id]/intake — 수정 필드 유무', () => {
   beforeEach(() => {
     mocks.findUnique.mockResolvedValue(patchSR());

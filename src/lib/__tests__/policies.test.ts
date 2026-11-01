@@ -920,3 +920,63 @@ describe('라우트에서 옮겨 온 인가 판정', () => {
     expect(policies.canExportSRs(user(['CLIENT_ADMIN'], ['SR:READ'], ['c1']))).toBe(false);
   });
 });
+
+describe('srViewerScopeWhere', () => {
+  type Scope = {
+    clientId?: { in: string[] };
+    assigneeId?: string;
+    requesterId?: string;
+    id?: { in: string[] };
+  };
+
+  /** 스코프 조건을 SR 한 건에 적용한다. 쓰는 조건의 형태가 늘면 여기서 바로 실패하게 둔다. */
+  const matches = (scope: Scope, sr: { id: string } & Record<string, unknown>) =>
+    Object.entries(scope).every(([key, value]) => {
+      if (typeof value === 'string') return sr[key] === value;
+      return value.in.includes(sr[key] as string);
+    });
+
+  const roleSets = [
+    ['ADMIN'],
+    ['MANAGER'],
+    ['ENGINEER'],
+    ['ENGINEER', 'MANAGER'],
+    ['ENGINEER', 'ADMIN'],
+    ['CLIENT_ADMIN'],
+    ['CLIENT_USER'],
+    [],
+  ];
+  const permissionSets = [[], ['SR:READ'], ['SR:UPDATE_SELF'], ['SR:READ', 'SR:UPDATE_SELF']];
+  const clientSets = [[], ['c1'], ['c2']];
+  const srs = [
+    { id: 'mine', clientId: 'c1', requesterId: 'me', assigneeId: null },
+    { id: 'assigned', clientId: 'c1', requesterId: 'other', assigneeId: 'me' },
+    { id: 'others', clientId: 'c1', requesterId: 'other', assigneeId: 'other' },
+    { id: 'other-tenant', clientId: 'c9', requesterId: 'me', assigneeId: 'me' },
+  ];
+
+  const viewers = roleSets.flatMap((roles) =>
+    permissionSets.flatMap((permissions) =>
+      clientSets.map((clientIds) => ({ id: 'me', roles, permissions, clientIds }))
+    )
+  );
+
+  // 규칙이 갈라지면 상세는 403 인데 목록에는 제목과 담당자가 보인다.
+  it('모든 역할·권한·소속 조합에서 목록 스코프가 canReadSR 과 일치한다', () => {
+    for (const viewer of viewers) {
+      for (const sr of srs) {
+        const context = `${JSON.stringify(viewer)} / ${sr.id}`;
+
+        expect(matches(policies.srViewerScopeWhere(viewer as never) as Scope, sr), context).toBe(
+          policies.canReadSR(viewer as never, sr as never)
+        );
+      }
+    }
+  });
+
+  it('SR:READ 를 회수당한 MANAGER 에게는 전사 SR 을 주지 않는다', () => {
+    const manager = { id: 'me', roles: ['MANAGER'], permissions: [], clientIds: [] };
+
+    expect(policies.srViewerScopeWhere(manager as never)).toEqual({ id: { in: [] } });
+  });
+});
