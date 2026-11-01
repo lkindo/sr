@@ -186,6 +186,56 @@ describe('SRComments — 렌더', () => {
   });
 });
 
+describe('SRComments — 조회 실패', () => {
+  const refetch = vi.fn();
+
+  const failedQuery = (data: unknown) =>
+    vi.mocked(useSRCommentsInfinite).mockReturnValue({
+      isLoading: false,
+      data,
+      hasNextPage: false,
+      error: new Error('network'),
+      refetch,
+    } as never);
+
+  // 댓글 탭은 언마운트되지 않으므로, 탭을 옮겨 다시 불러오는 복구 경로가 없다.
+  it('불러온 내용이 있으면 재조회가 실패해도 쓰던 댓글을 유지하고 다시 시도할 수 있다', () => {
+    listed([]);
+    const { wrapper } = setup();
+    const { rerender } = render(<SRComments srId="test-sr-id" />, { wrapper });
+    write('쓰던 댓글');
+
+    failedQuery({ pages: [{ comments: [] }] });
+    rerender(<SRComments srId="test-sr-id" />);
+
+    expect(screen.getByLabelText('댓글 작성')).toHaveValue('쓰던 댓글');
+    expect(screen.getByRole('alert')).toHaveTextContent('최신 댓글을 불러오지 못했습니다');
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('보여 줄 내용이 없으면 오류 화면에서 다시 시도할 수 있다', () => {
+    failedQuery(undefined);
+    const { wrapper } = setup();
+    render(<SRComments srId="test-sr-id" />, { wrapper });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('댓글을 불러오는데 실패했습니다.');
+    expect(screen.queryByLabelText('댓글 작성')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('정상이면 알리지 않는다', () => {
+    listed([]);
+    const { wrapper } = setup();
+    render(<SRComments srId="test-sr-id" />, { wrapper });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
 describe('SRComments — 작성', () => {
   beforeEach(() => {
     listed([]);
