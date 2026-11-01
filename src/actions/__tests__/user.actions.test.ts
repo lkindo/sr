@@ -35,6 +35,7 @@ const userService = {
   changePassword: vi.fn(),
   getUserById: vi.fn(),
   getUsersWithSRHandlingPermission: vi.fn(),
+  revokeSessions: vi.fn(),
 };
 
 vi.mock('@/services/service-registry', () => ({
@@ -59,7 +60,11 @@ import { ForbiddenError } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
 import { ensureCanReadUser } from '@/lib/policies';
 
-import { getProfileAction, getSRHandlersForSelection } from '../user.actions';
+import {
+  getProfileAction,
+  getSRHandlersForSelection,
+  revokeMySessionsAction,
+} from '../user.actions';
 
 const session = { user: { id: 'user-1' } };
 
@@ -69,6 +74,24 @@ beforeEach(() => {
   (getAuthenticatedSession as Mock).mockResolvedValue(session);
   (requireRateLimit as Mock).mockResolvedValue(undefined);
   (ensureCanReadUser as Mock).mockReturnValue(undefined);
+});
+
+describe('revokeMySessionsAction', () => {
+  it('세션의 본인 세션만 무효화한다', async () => {
+    const result = await revokeMySessionsAction();
+
+    expect(result.success).toBe(true);
+    expect(userService.revokeSessions).toHaveBeenCalledWith('user-1');
+  });
+
+  it('인증되지 않으면 무효화하지 않는다', async () => {
+    (getAuthenticatedSession as Mock).mockRejectedValue(new ForbiddenError('권한 없음'));
+
+    const result = await revokeMySessionsAction();
+
+    expect(result.success).toBe(false);
+    expect(userService.revokeSessions).not.toHaveBeenCalled();
+  });
 });
 
 describe('getProfileAction', () => {

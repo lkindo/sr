@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { LOGIN_LOCK_POLICY } from '@/lib/constants/session';
 import {
@@ -23,6 +23,20 @@ function fail(email: string, times: number, now = T0) {
 
 beforeEach(() => {
   resetLoginThrottleForTests();
+});
+
+describe('login-throttle 공유', () => {
+  // 로그인 라우트와 잠금 해제 경로가 다른 모듈 그래프여도 같은 기록을 봐야 한다.
+  it('다른 모듈 그래프에서 푼 잠금이 이쪽에 반영된다', async () => {
+    fail('shared@example.com', 10);
+    expect(loginLockRemainingMs('shared@example.com', T0)).toBeGreaterThan(0);
+
+    vi.resetModules();
+    const anotherGraph = await import('@/lib/login-throttle');
+    anotherGraph.clearLoginFailures('shared@example.com');
+
+    expect(loginLockRemainingMs('shared@example.com', T0)).toBe(0);
+  });
 });
 
 describe('login-throttle', () => {

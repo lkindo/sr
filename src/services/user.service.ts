@@ -375,6 +375,14 @@ export class UserService {
     return excludePassword(updatedUser);
   }
 
+  /**
+   * 이 사용자에게 발급된 세션을 모두 무효화한다. 다음 클레임 재조회(최대 60초)에서 끊긴다.
+   * 쿠키만 지우면 복사된 토큰이 수명이 끝날 때까지 유효하다.
+   */
+  async revokeSessions(id: string): Promise<void> {
+    await prisma.user.update({ where: { id }, data: { sessionVersion: { increment: 1 } } });
+  }
+
   async updateProfile(
     userId: string,
     profileData: {

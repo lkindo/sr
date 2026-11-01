@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { signOut } from 'next-auth/react';
 import { LogOut, Settings, User } from 'lucide-react';
 
+import { revokeMySessionsAction } from '@/actions/user.actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui';
 import { Button } from '@/components/ui';
 import {
@@ -29,6 +30,8 @@ export function UserNav({ user }: UserNavProps) {
     // NextAuth 의 redirect:true 는 서버 base URL 로 콜백을 절대화하는데,
     // 리버스 프록시(nginx) 뒤 컨테이너에서는 내부 주소(0.0.0.0:3000)로 잘못 이동한다.
     // 세션만 정리한 뒤, 실제 접속 origin 기준으로 초기 화면(/)으로 직접 이동시킨다.
+    // 무효화가 실패해도 로그아웃은 진행한다. 이 기기의 세션은 어쨌든 끝나야 한다.
+    await revokeMySessionsAction().catch(() => undefined);
     await signOut({ redirect: false });
     window.location.href = '/';
   };

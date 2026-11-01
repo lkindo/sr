@@ -21,6 +21,7 @@ import {
   apiGet,
   apiList,
   apiPatch,
+  apiPost,
   buildQuery,
   retryUnlessClientError,
 } from '@/lib/api-client';
@@ -349,6 +350,20 @@ export default function UsersClient() {
     },
   });
 
+  const { mutate: unlockLogin } = useMutation({
+    mutationFn: (userId: string) => apiPost(`/api/users/${userId}/unlock`, {}),
+    onSuccess: () => {
+      toast({ title: '잠금 해제 완료', description: '로그인 잠금을 풀었습니다.' });
+    },
+    onError: (error) => {
+      toast({
+        title: '오류 발생',
+        description: error instanceof Error ? error.message : '잠금 해제에 실패했습니다.',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleToggleActive = (userId: string, currentStatus: boolean) => {
     // 카운터는 여기서 올린다. onMutate 안이 아니라 mutate 호출부인 이유는, 일괄 버튼의
     // forEach 가 N번 도는 **동안** 이미 N 이 되어 있어야 첫 응답이 성급하게 무효화하지
@@ -500,6 +515,16 @@ export default function UsersClient() {
                           일괄 비활성화
                         </Button>
                       )}
+
+                      {/* 로그인 실패로 잠긴 계정을 푼다. 잠금은 15분 뒤 자동으로도 풀린다. */}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => selectedUsers.forEach((u) => unlockLogin(u.id))}
+                      >
+                        로그인 잠금 해제
+                      </Button>
 
                       {/* 삭제 - 비활성 사용자만 선택 시 활성화 */}
                       <Button

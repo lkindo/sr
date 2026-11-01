@@ -9,7 +9,7 @@
  *  - 존재하지 않는 이메일도 똑같이 센다 — 잠금 여부로 계정 존재를 알아낼 수 없게 한다.
  *
  * 한계: 공격자가 일부러 틀려서 특정 사용자를 막을 수 있고, 15분마다 다시 틀리면 잠금을 계속 이어 갈 수도 있다
- * (PRD 의 3회 잠금안도 같은 성질이다 — 10회로 잡아 실수로 막히는 일을 줄였다). 그럴 때는 서버를 재시작하면 풀린다.
+ * (PRD 의 3회 잠금안도 같은 성질이다 — 10회로 잡아 실수로 막히는 일을 줄였다). 그럴 때는 관리자가 사용자 목록에서 풀 수 있다.
  * 여러 계정에 흔한 비밀번호를 한두 번씩 시도하는 공격은 막지 못한다(2FA 영역).
  * 상태는 프로세스 메모리에 있다 — 앱이 한 대라는 전제는 다른 요청 제한과 같다(rate-limiter.ts).
  */
@@ -28,7 +28,12 @@ interface Entry {
   lockedUntil: number;
 }
 
-const entries = new Map<string, Entry>();
+declare const globalThis: {
+  loginThrottleEntriesGlobal?: Map<string, Entry>;
+} & typeof global;
+
+/** 프로세스 전역이다. 로그인 라우트와 잠금 해제 경로가 같은 기록을 봐야 한다(domain-events.ts 참고). */
+const entries = (globalThis.loginThrottleEntriesGlobal ??= new Map<string, Entry>());
 
 const keyOf = (email: string) => email.trim().toLowerCase();
 
@@ -56,7 +61,7 @@ export function recordLoginFailure(email: string, now = Date.now()): void {
   }
 }
 
-/** 로그인에 성공하면 그 계정의 실패 기록을 지운다. */
+/** 로그인에 성공하거나 관리자가 잠금을 풀면 그 계정의 실패 기록을 지운다. */
 export function clearLoginFailures(email: string): void {
   entries.delete(keyOf(email));
 }
