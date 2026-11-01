@@ -58,8 +58,10 @@ bash scripts/restore.sh backups/db_20260703_030000.dump
 # DB + 첨부 함께 복구
 bash scripts/restore.sh backups/db_20260703_030000.dump backups/uploads_20260703_030000.tar.gz
 
-# 암호화된 백업은 복호화 키를 함께 지정한다. 키가 없으면 아무것도 건드리지 않고 멈춘다.
+# 암호화된 백업은 복호화 키를 함께 지정한다. 사전 안전 백업도 암호화해야 하므로 수신자도 넘긴다.
+# 둘 중 하나라도 없으면 아무것도 건드리지 않고 멈춘다.
 BACKUP_AGE_IDENTITY_FILE=/home/opc/sr/var/backup-age.key \
+BACKUP_ENCRYPT_RECIPIENT='age1...' \
   bash scripts/restore.sh backups/db_20260703_030000.dump.age backups/uploads_20260703_030000.tar.gz.age
 # 복구 후 앱 재시작 권장
 docker restart sr-app

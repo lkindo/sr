@@ -31,6 +31,7 @@ PG_IMAGE="${PG_IMAGE:-postgres:16-alpine}"
 REHEARSAL_DB="${REHEARSAL_DB:-sr_rehearsal}"
 REHEARSAL_USER="${REHEARSAL_USER:-rehearsal}"
 REHEARSAL_PASSWORD="${REHEARSAL_PASSWORD:-rehearsal-local-only}"
+UPLOADS_DIR="${UPLOADS_DIR:-/app/var/uploads}"
 CONTAINER_NAME="sr-restore-rehearsal-$$"
 
 # 복구 후 반드시 존재하고 비어 있지 않아야 하는 테이블.
@@ -41,14 +42,16 @@ REQUIRED_TABLES="${REQUIRED_TABLES:-srs clients service_categories sr_activities
 
 log() { echo "[rehearsal] $*"; }
 
+TMP_FILES=()
+
 cleanup() {
   if docker ps -aq -f "name=^${CONTAINER_NAME}$" | grep -q .; then
     log "일회용 컨테이너 정리: $CONTAINER_NAME"
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
   fi
-  # 공백 없는 mktemp 경로만 담으므로 단어 분리를 일부러 쓴다.
-  # shellcheck disable=SC2086
-  [ -z "${TMP_FILES:-}" ] || rm -f $TMP_FILES
+  if [ "${#TMP_FILES[@]}" -gt 0 ]; then
+    rm -f -- "${TMP_FILES[@]}"
+  fi
   return 0
 }
 trap cleanup EXIT
@@ -67,7 +70,6 @@ log "대상 덤프: $dump_file"
 
 # ── 2. 필요 시 복호화 ─────────────────────────────────────────────────────────
 # 평문 경로를 decrypted_path 에 담는다. 키가 없으면 "검증 못 했음"이므로 실패한다.
-TMP_FILES=""
 decrypt_backup() {
   decrypted_path="$1"
   case "$1" in
@@ -78,7 +80,7 @@ decrypt_backup() {
         exit 1
       fi
       decrypted_path="$(mktemp)"
-      TMP_FILES="$TMP_FILES $decrypted_path"
+      TMP_FILES+=("$decrypted_path")
       age -d -i "$BACKUP_AGE_IDENTITY_FILE" -o "$decrypted_path" "$1"
       log "복호화 완료(age): $1"
       ;;
@@ -88,7 +90,7 @@ decrypt_backup() {
         exit 1
       fi
       decrypted_path="$(mktemp)"
-      TMP_FILES="$TMP_FILES $decrypted_path"
+      TMP_FILES+=("$decrypted_path")
       GNUPGHOME="$BACKUP_GPG_HOME" gpg --batch --yes --decrypt --output "$decrypted_path" "$1"
       log "복호화 완료(gpg): $1"
       ;;
@@ -206,21 +208,33 @@ if [ -z "$uploads_file" ]; then
 else
   decrypt_backup "$uploads_file"
   archive_list="$(tar tzf "$decrypted_path" | sed 's#^\./##')"
-  checked=0
-  missing=0
-  while IFS= read -r stored_path; do
-    [ -n "$stored_path" ] || continue
-    checked=$((checked + 1))
-    if ! printf '%s\n' "$archive_list" | grep -Fxq "$stored_path"; then
-      log "FAIL: 첨부 파일 없음 — $stored_path"
-      missing=$((missing + 1))
-    fi
-  done < <(psql_q "SELECT storage_path FROM public.sr_attachments WHERE storage_path IS NOT NULL;")
 
-  if [ "$missing" -gt 0 ]; then
-    failures=$((failures + missing))
+  # 다운로드 라우트와 같은 값(storage_path 가 없으면 file_url)을 본다.
+  if ! attachment_rows="$(psql_q "SELECT COALESCE(storage_path, file_url) FROM public.sr_attachments;")"; then
+    log "FAIL: 첨부 행을 조회하지 못했습니다"
+    failures=$((failures + 1))
   else
-    log "OK  : 첨부 $checked 건이 모두 아카이브에 있습니다"
+    checked=0
+    missing=0
+    while IFS= read -r stored_path; do
+      [ -n "$stored_path" ] || continue
+      checked=$((checked + 1))
+      # 앱의 resolveAttachmentFilePath 와 같은 규칙으로 저장소 기준 상대 경로를 만든다.
+      relative_path="${stored_path#"$UPLOADS_DIR"/}"
+      relative_path="${relative_path#/}"
+      relative_path="${relative_path#uploads/}"
+      # grep -q 는 찾는 즉시 끝나 printf 가 SIGPIPE 를 받고, pipefail 이 이를 "없음"으로 뒤집는다.
+      if ! printf '%s\n' "$archive_list" | grep -Fx -- "$relative_path" >/dev/null; then
+        log "FAIL: 첨부 파일 없음 — $stored_path"
+        missing=$((missing + 1))
+      fi
+    done <<<"$attachment_rows"
+
+    if [ "$missing" -gt 0 ]; then
+      failures=$((failures + missing))
+    else
+      log "OK  : 첨부 $checked 건이 모두 아카이브에 있습니다"
+    fi
   fi
 fi
 

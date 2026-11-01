@@ -89,6 +89,17 @@ decrypt_if_needed() {
   echo "[restore] decrypted: $1"
 }
 
+# 사전 안전 백업은 현재 DB 와 첨부를 담는다. 암호화 백업으로 복구하면서 이것만 평문으로 남기면
+# 암호화한 의미가 없으므로, 수신자가 없으면 시작하지 않는다.
+case "$db_file" in
+  *.age | *.gpg)
+    if [ "${SKIP_PRE_RESTORE_BACKUP:-}" != "1" ] && [ -z "${BACKUP_ENCRYPT_RECIPIENT:-}" ]; then
+      echo "[restore] ERROR: 암호화 복구의 사전 백업에 쓸 BACKUP_ENCRYPT_RECIPIENT 가 없습니다." >&2
+      exit 1
+    fi
+    ;;
+esac
+
 decrypt_if_needed "$db_file"
 db_file="$decrypted_path"
 if [ -n "$up_file" ]; then

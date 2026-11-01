@@ -170,8 +170,8 @@ echo "[backup] OK  db=${db_size}  uploads=${up_size}  dir=${BACKUP_DIR}"
 # 예: OFFSITE_CMD='rclone copy /home/opc/sr/backups remote:sr-backups'
 if [ -n "${OFFSITE_CMD:-}" ]; then
   echo "[backup] offsite: $OFFSITE_CMD"
-  if ! eval "$OFFSITE_CMD"; then
-    echo "[backup] ERROR: 오프호스트 복제 실패. 로컬 백업은 보존했습니다: $BACKUP_DIR" >&2
-    exit 1
-  fi
+  # 조건문 안에서 eval 하면 훅 내부의 errexit 가 꺼져 중간 실패를 놓친다. 그대로 실행하고 trap 으로 알린다.
+  trap 'echo "[backup] ERROR: 오프호스트 복제 실패. 로컬 백업은 보존했습니다: $BACKUP_DIR" >&2' EXIT
+  eval "$OFFSITE_CMD"
+  trap - EXIT
 fi
