@@ -29,6 +29,20 @@ interface ServiceCategory {
   categoryName: string;
 }
 
+/** 다이얼로그를 열 때 폼에 채우는 값. 입력 여부도 이 값과 비교해서 판단한다. */
+function editFormValuesOf(sr: EditableSR) {
+  return {
+    title: sr.title,
+    description: sr.description,
+    clientId: sr.clientId || sr.client?.id || '',
+    categoryId: sr.serviceCategory?.id || sr.category?.id || '',
+    requestedPriority: sr.requestedPriority || 'MEDIUM',
+    requestedCompletionDate: sr.requestedCompletionDate
+      ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
+      : '',
+  };
+}
+
 export function useEditSRForm({
   sr,
   open,
@@ -52,6 +66,9 @@ export function useEditSRForm({
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [loadedValues, setLoadedValues] = useState<ReturnType<typeof editFormValuesOf> | null>(
+    null
+  );
 
   const { toast } = useToast();
   const router = useRouter();
@@ -67,6 +84,16 @@ export function useEditSRForm({
   const isOperator = isSROperator({ roles, permissions });
   const categoryLockedByStatus = isOperator && !!sr && !canChangeSLABasisAt(sr.status);
   const canChangeCategory = isOperator && !categoryLockedByStatus;
+  // 다른 사용자의 수정으로 sr 이 다시 들어와도 내가 고친 것처럼 보이지 않게, 연 시점의 값과 비교한다.
+  const hasUnsavedInput =
+    files.length > 0 ||
+    (loadedValues !== null &&
+      (title !== loadedValues.title ||
+        description !== loadedValues.description ||
+        clientId !== loadedValues.clientId ||
+        categoryId !== loadedValues.categoryId ||
+        requestedPriority !== loadedValues.requestedPriority ||
+        requestedCompletionDate !== loadedValues.requestedCompletionDate));
 
   const fetchClients = useCallback(async () => {
     if (isClientUser) {
@@ -148,16 +175,14 @@ export function useEditSRForm({
       return;
     }
 
-    setTitle(sr.title);
-    setDescription(sr.description);
-    setClientId(sr.clientId || sr.client?.id || '');
-    setCategoryId(sr.serviceCategory?.id || sr.category?.id || '');
-    setRequestedPriority(sr.requestedPriority || 'MEDIUM');
-    setRequestedCompletionDate(
-      sr.requestedCompletionDate
-        ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
-        : ''
-    );
+    const values = editFormValuesOf(sr);
+    setLoadedValues(values);
+    setTitle(values.title);
+    setDescription(values.description);
+    setClientId(values.clientId);
+    setCategoryId(values.categoryId);
+    setRequestedPriority(values.requestedPriority);
+    setRequestedCompletionDate(values.requestedCompletionDate);
     setFiles([]);
 
     if (sr.attachments && sr.attachments.length > 0) {
@@ -166,7 +191,7 @@ export function useEditSRForm({
       fetchExistingAttachments(sr.id);
     }
     fetchClients();
-    fetchCategories(sr.clientId || sr.client?.id || '');
+    fetchCategories(values.clientId);
     // 다이얼로그가 열릴 때 폼을 SR 값으로 한 번 채우는 초기화다.
     // sr 객체나 fetcher 를 deps 에 넣으면 사용자가 입력 중일 때 부모 리렌더마다
     // 폼이 서버 값으로 되돌아간다.
@@ -329,6 +354,7 @@ export function useEditSRForm({
       canSelectClient,
       canChangeCategory,
       categoryLockedByStatus,
+      hasUnsavedInput,
     },
     actions: {
       setTitle,

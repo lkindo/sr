@@ -27,6 +27,7 @@ import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { useEditSRForm } from '@/hooks/use-edit-sr-form';
+import { keepOpenWhileEditing } from '@/lib/dialog-dismiss';
 import type { SRAttachmentView } from '@/types/sr.types';
 
 export interface EditableSR {
@@ -86,6 +87,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
     canSelectClient,
     canChangeCategory,
     categoryLockedByStatus,
+    hasUnsavedInput,
   } = state;
   const {
     setTitle,
@@ -112,7 +114,10 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        {...keepOpenWhileEditing(hasUnsavedInput)}
+      >
         <DialogHeader>
           <DialogTitle>SR 수정</DialogTitle>
           <DialogDescription>

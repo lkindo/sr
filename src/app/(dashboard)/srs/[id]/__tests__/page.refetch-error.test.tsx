@@ -107,3 +107,21 @@ describe('SR 상세의 조회 실패', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
+
+describe('SR 상세의 탭 전환', () => {
+  it('다른 탭을 보고 돌아와도 쓰던 댓글이 남고, 보는 동안에는 숨겨진다', () => {
+    mocks.useSRDetails.mockReturnValue(query({ data: SR }));
+    render(<SRDetailPage />);
+
+    const draft = screen.getByLabelText('댓글 초안');
+    fireEvent.change(draft, { target: { value: '쓰던 댓글' } });
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /활동/ }), { button: 0 });
+    const panel = screen.getByLabelText('댓글 초안').closest('[role="tabpanel"]');
+    expect(panel).toHaveAttribute('data-state', 'inactive');
+    expect(panel).toHaveClass('data-[state=inactive]:hidden');
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /댓글/ }), { button: 0 });
+    expect(screen.getByLabelText('댓글 초안')).toHaveValue('쓰던 댓글');
+  });
+});

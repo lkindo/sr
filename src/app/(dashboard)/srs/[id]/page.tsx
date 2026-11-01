@@ -393,7 +393,8 @@ export default function SRDetailPage() {
                 {sr._count?.attachments > 0 && `(${sr._count.attachments})`}
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="comments" className="mt-6">
+            {/* 언마운트하면 쓰던 댓글 초안이 사라지므로, 탭을 옮겨도 숨기기만 한다. */}
+            <TabsContent value="comments" forceMount className="mt-6 data-[state=inactive]:hidden">
               <SRComments srId={sr.id} />
             </TabsContent>
             <TabsContent value="activities" className="mt-6">

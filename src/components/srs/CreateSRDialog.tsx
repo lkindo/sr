@@ -15,6 +15,7 @@ import { Label } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { REQUESTER_SELF, useCreateSRForm } from '@/hooks/use-create-sr-form';
+import { keepOpenWhileEditing } from '@/lib/dialog-dismiss';
 
 interface CreateSRDialogProps {
   open: boolean;
@@ -39,6 +40,7 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
     requesterId,
     requesters,
     canRegisterOnBehalf,
+    hasUnsavedInput,
   } = state;
   const {
     setTitle,
@@ -55,7 +57,10 @@ export function CreateSRDialog({ open, onOpenChange, onCreated }: CreateSRDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[90vh] overflow-y-auto"
+        {...keepOpenWhileEditing(hasUnsavedInput)}
+      >
         <DialogHeader>
           <DialogTitle>새 SR 요청</DialogTitle>
           <DialogDescription>

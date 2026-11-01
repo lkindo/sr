@@ -17,6 +17,7 @@ import type { ClientSummary } from '@/types/client.types';
 /** 신청자 선택의 '본인' 값. Radix Select 는 빈 문자열을 값으로 쓸 수 없어 표식을 둔다. */
 export const REQUESTER_SELF = 'SELF';
 
+const DEFAULT_PRIORITY = 'MEDIUM';
 const MIN_TITLE_LENGTH = 5;
 const MIN_DESCRIPTION_LENGTH = 10;
 
@@ -25,7 +26,7 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
   const [description, setDescription] = useState('');
   const [clientId, setClientId] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [requestedPriority, setRequestedPriority] = useState<string>('MEDIUM');
+  const [requestedPriority, setRequestedPriority] = useState<string>(DEFAULT_PRIORITY);
   const [requestedCompletionDate, setRequestedCompletionDate] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -41,6 +42,16 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
   const canSelectClient = hasAnyRole(['ADMIN', 'MANAGER', 'ENGINEER']);
   // 대리 등록은 내부 사용자만 한다(서버: policies.canRegisterSROnBehalf).
   const canRegisterOnBehalf = canSelectClient;
+  // 외부 사용자의 고객사는 자동으로 채워지므로 입력으로 치지 않는다.
+  const hasUnsavedInput =
+    !!title ||
+    !!description ||
+    !!categoryId ||
+    !!requestedCompletionDate ||
+    files.length > 0 ||
+    requestedPriority !== DEFAULT_PRIORITY ||
+    requesterId !== REQUESTER_SELF ||
+    (canSelectClient && !!clientId);
 
   const fetchClients = useCallback(async () => {
     if (isClientUser) {
@@ -117,7 +128,7 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       setDescription('');
       if (!isClientUser) setClientId('');
       setCategoryId('');
-      setRequestedPriority('MEDIUM');
+      setRequestedPriority(DEFAULT_PRIORITY);
       setRequestedCompletionDate('');
       setFiles([]);
       setCategories([]);
@@ -289,6 +300,7 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       requesterId,
       requesters,
       canRegisterOnBehalf,
+      hasUnsavedInput,
     },
     actions: {
       setTitle,
