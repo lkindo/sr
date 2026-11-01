@@ -28,14 +28,14 @@ function read(file: string): string {
   return fs.readFileSync(file, 'utf8');
 }
 
-function statementsOf(source: string): readonly ts.Statement[] {
-  return ts.createSourceFile('file.tsx', source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TSX)
-    .statements;
+/** 확장자로 문법을 고른다. `.ts` 를 TSX 로 읽으면 `<number>1` 같은 형변환에서 이후 문장을 놓친다. */
+function statementsOf(source: string, file: string): readonly ts.Statement[] {
+  return ts.createSourceFile(file, source, ts.ScriptTarget.Latest).statements;
 }
 
 /** 지시문은 파일 맨 앞에 이어지는 문자열 문장이다. 주석은 문장이 아니므로 영향을 주지 않는다. */
-function isClientModule(source: string): boolean {
-  for (const statement of statementsOf(source)) {
+function isClientModule(source: string, file = 'file.tsx'): boolean {
+  for (const statement of statementsOf(source, file)) {
     if (!ts.isExpressionStatement(statement) || !ts.isStringLiteral(statement.expression)) {
       return false;
     }
@@ -44,28 +44,35 @@ function isClientModule(source: string): boolean {
   return false;
 }
 
+const allTypeOnly = (names: ts.NamedImports | ts.NamedExports) =>
+  names.elements.length > 0 && names.elements.every((element) => element.isTypeOnly);
+
 /** 컴파일에서 사라지는 import. `import type` 과 전부 `type` 인 이름 목록이다. */
 function isErasedImport(node: ts.ImportDeclaration): boolean {
   const clause = node.importClause;
   if (!clause) return false;
   if (clause.isTypeOnly) return true;
   const names = clause.namedBindings;
-  return (
-    !clause.name &&
-    names !== undefined &&
-    ts.isNamedImports(names) &&
-    names.elements.length > 0 &&
-    names.elements.every((element) => element.isTypeOnly)
-  );
+  return !clause.name && names !== undefined && ts.isNamedImports(names) && allTypeOnly(names);
+}
+
+function isErasedExport(node: ts.ExportDeclaration): boolean {
+  if (node.isTypeOnly) return true;
+  const names = node.exportClause;
+  return names !== undefined && ts.isNamedExports(names) && allTypeOnly(names);
 }
 
 /** 번들에 실제로 들어가는 모듈 경로. 재수출도 포함한다. */
-function valueModulesOf(source: string): string[] {
-  return statementsOf(source).flatMap((statement) => {
+function valueModulesOf(source: string, file = 'file.tsx'): string[] {
+  return statementsOf(source, file).flatMap((statement) => {
     if (ts.isImportDeclaration(statement) && !isErasedImport(statement)) {
       return [(statement.moduleSpecifier as ts.StringLiteral).text];
     }
-    if (ts.isExportDeclaration(statement) && statement.moduleSpecifier && !statement.isTypeOnly) {
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier &&
+      !isErasedExport(statement)
+    ) {
       return [(statement.moduleSpecifier as ts.StringLiteral).text];
     }
     return [];
@@ -74,7 +81,7 @@ function valueModulesOf(source: string): string[] {
 
 const relative = (file: string) => path.relative(process.cwd(), file).split(path.sep).join('/');
 
-const clientFiles = sourceFiles(SRC_ROOT).filter((file) => isClientModule(read(file)));
+const clientFiles = sourceFiles(SRC_ROOT).filter((file) => isClientModule(read(file), file));
 
 describe('검사기 자체', () => {
   it.each([
@@ -104,14 +111,25 @@ describe('검사기 자체', () => {
     ['부수 효과 import', `import 'zod';`],
     ['type 과 값이 섞임', `import { type ZodType, z } from 'zod';`],
     ['재수출', `export { z } from 'zod';`],
+    ['전체 재수출', `export * from 'zod';`],
+    ['type 과 값이 섞인 재수출', `export { type ZodType, z } from 'zod';`],
   ])('값 import 로 본다: %s', (_name, source) => {
     expect(valueModulesOf(source)).toEqual(['zod']);
+  });
+
+  it('.ts 파일은 TS 문법으로 읽어 형변환 뒤의 import 도 찾는다', () => {
+    const source = `const n = <number>1;
+import { z } from 'zod';
+console.log(n, z);`;
+
+    expect(valueModulesOf(source, 'client.ts')).toEqual(['zod']);
   });
 
   it.each([
     ['import type', `import type { z } from 'zod';`],
     ['전부 type 인 이름', `import { type z, type ZodType } from 'zod';`],
     ['export type', `export type { z } from 'zod';`],
+    ['전부 type 인 재수출', `export { type ZodType } from 'zod';`],
   ])('값 import 로 보지 않는다: %s', (_name, source) => {
     expect(valueModulesOf(source)).toEqual([]);
   });
@@ -133,12 +151,16 @@ describe('클라이언트 번들 경계', () => {
   });
 
   it.each(FORBIDDEN_IN_CLIENT)("'use client' 파일은 %s 를 값으로 가져오지 않는다", (module) => {
-    const offenders = clientFiles.filter((file) => valueModulesOf(read(file)).includes(module));
+    const offenders = clientFiles.filter((file) =>
+      valueModulesOf(read(file), file).includes(module)
+    );
 
     expect(offenders.map(relative)).toEqual([]);
   });
 
   it.each(['field-limits.ts', 'password-policy.ts'])('%s 는 zod 를 들이지 않는다', (file) => {
-    expect(valueModulesOf(read(path.join(SRC_ROOT, 'lib', file)))).not.toContain('zod');
+    const full = path.join(SRC_ROOT, 'lib', file);
+
+    expect(valueModulesOf(read(full), full)).not.toContain('zod');
   });
 });
