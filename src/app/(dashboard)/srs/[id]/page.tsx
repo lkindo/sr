@@ -74,7 +74,9 @@ export default function SRDetailPage() {
     return <TableSkeleton columns={5} />;
   }
 
-  if (error || !sr) {
+  // 전체 화면 오류는 보여 줄 내용이 없을 때만 쓴다. 실시간 갱신의 재조회가 한 번 실패했다고 화면을
+  // 통째로 바꾸면 작성 중인 댓글과 열린 수정 창이 함께 사라진다.
+  if (!sr) {
     return (
       <div className="text-center p-8">
         <AlertCircle className="mx-auto h-12 w-12 text-destructive" />
@@ -127,6 +129,17 @@ export default function SRDetailPage() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
+          <span>최신 내용을 불러오지 못했습니다. 화면의 내용이 이전 상태일 수 있습니다.</span>
+          <Button onClick={() => refetch()} variant="outline" size="sm">
+            다시 시도
+          </Button>
+        </div>
+      )}
       <div className="flex flex-col gap-4">
         {/* Header Section */}
         <div className="flex items-start justify-between gap-3">
