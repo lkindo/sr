@@ -1,4 +1,4 @@
-import { beforeEach, expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import prisma from '@/lib/prisma';
 import { srService } from '@/services/sr.service';
@@ -11,6 +11,20 @@ import {
   requireRole,
   resetDatabase,
 } from './helpers';
+
+const emailOutbox = vi.hoisted(() => ({ fail: false }));
+
+// 트랜잭션의 마지막 단계에서 실패를 주입한다. 앞선 쓰기가 전부 되돌아가야 한다.
+vi.mock('@/services/sr-email-outbox', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/sr-email-outbox')>();
+  return {
+    ...actual,
+    enqueueSRCreatedEmails: (...args: Parameters<typeof actual.enqueueSRCreatedEmails>) =>
+      emailOutbox.fail
+        ? Promise.reject(new Error('의도적 실패'))
+        : actual.enqueueSRCreatedEmails(...args),
+  };
+});
 
 /**
  * 감사 3.37 — 트랜잭션 원자성 (실제 Postgres).
@@ -36,6 +50,10 @@ describeDb('트랜잭션 원자성 (실제 DB)', () => {
     requesterId = (await createUserRow({ roleName: 'ADMIN' })).id;
   });
 
+  afterEach(() => {
+    emailOutbox.fail = false;
+  });
+
   const sessionUser = () =>
     ({
       id: requesterId,
@@ -59,6 +77,32 @@ describeDb('트랜잭션 원자성 (실제 DB)', () => {
 
     const activities = await prisma.sRActivity.findMany({ where: { srId: sr.id } });
     expect(activities.length).toBeGreaterThan(0);
+  });
+
+  // 아래의 직접 만든 트랜잭션은 Prisma 를 검증할 뿐이다. 서비스가 트랜잭션을 쓰는지는 여기서 본다.
+  it('createSR 의 알림 적재가 실패하면 SR·활동·채번이 모두 되돌아간다', async () => {
+    const counts = async () => ({
+      srs: await prisma.sR.count(),
+      activities: await prisma.sRActivity.count(),
+      sequences: await prisma.sRSequence.count(),
+    });
+    const before = await counts();
+    emailOutbox.fail = true;
+
+    await expect(
+      srService.createSR(
+        {
+          title: '알림 실패로 되돌아갈 SR',
+          description: '알림 적재가 실패하면 이 SR 은 커밋되면 안 됩니다.',
+          clientId,
+          serviceCategoryId: categoryId,
+          requestedPriority: 'MEDIUM',
+        },
+        sessionUser()
+      )
+    ).rejects.toThrow('의도적 실패');
+
+    expect(await counts()).toEqual(before);
   });
 
   it('트랜잭션 중간에 실패하면 SR 도 시퀀스도 남지 않는다', async () => {
