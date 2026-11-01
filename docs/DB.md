@@ -95,6 +95,7 @@ CI(`.github/workflows/ci-cd.yml`)가 `prisma migrate deploy` 후
 | Connection Pooler | **없음.** PgBouncer·Prisma Data Proxy 모두 미사용                               |
 | Character Set     | UTF-8                                                                           |
 | 타임스탬프 타입   | `timestamptz` (UTC 저장)                                                        |
+| 서버 시간대       | `Asia/Seoul`. compose 기동 인자 `timezone`·`log_timezone` 으로 지정             |
 | ORM               | Prisma 6.19 (`@prisma/client` + `prisma`)                                       |
 
 정의는 `docker-compose.prod.yml` 의 `db` 서비스에 있다. `POSTGRES_USER` /

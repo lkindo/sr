@@ -49,18 +49,22 @@ describe('PushService', () => {
     // 따라서 값을 바꾼 뒤 vi.resetModules() + 동적 import로 새 모듈 인스턴스를 얻어야
     // 실제 판정 로직을 검증할 수 있다. (email.service.test.ts와 동일한 패턴)
     // isConfigured는 비밀키에서 공개점을 유도해 짝이 맞는지까지 확인하므로,
-    // 길이만 맞춘 합성 문자열로는 통과할 수 없다. 실제 P-256 키쌍을 생성해 쓴다.
-    function generateVapidKeyPair() {
+    // 길이만 맞춘 합성 문자열로는 통과할 수 없다. 실제 P-256 키쌍을 쓴다.
+    // 단, generateKeys()로 매번 새로 만들면 안 된다. getPrivateKey()는 앞자리 0 바이트를
+    // 잘라서 돌려주므로 약 1/256 확률로 42자 키가 나와 길이 검사에 걸린다(간헐 실패).
+    // 고정된 32바이트 스칼라에서 키쌍을 유도해 결정적으로 만든다.
+    function deriveVapidKeyPair(privateKey: Buffer) {
       const ecdh = createECDH('prime256v1');
-      ecdh.generateKeys();
+      ecdh.setPrivateKey(privateKey);
       return {
         publicKey: ecdh.getPublicKey().toString('base64url'), // 87자
-        privateKey: ecdh.getPrivateKey().toString('base64url'), // 43자
+        privateKey: privateKey.toString('base64url'), // 32바이트면 43자
       };
     }
 
-    const REAL_PAIR = generateVapidKeyPair();
-    const OTHER_PAIR = generateVapidKeyPair();
+    const LEADING_ZERO_SCALAR = Buffer.concat([Buffer.alloc(1), Buffer.alloc(31, 0x33)]);
+    const REAL_PAIR = deriveVapidKeyPair(Buffer.alloc(32, 0x11));
+    const OTHER_PAIR = deriveVapidKeyPair(Buffer.alloc(32, 0x22));
     const VALID_PUBLIC_KEY = REAL_PAIR.publicKey;
     const VALID_PRIVATE_KEY = REAL_PAIR.privateKey;
     const originalPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -132,6 +136,23 @@ describe('PushService', () => {
     it('유효한 키 쌍이면 true를 반환한다', async () => {
       const FreshPushService = await loadPushService(VALID_PUBLIC_KEY, VALID_PRIVATE_KEY);
       expect(FreshPushService.isConfigured()).toBe(true);
+    });
+
+    it('앞자리가 0 바이트여도 32바이트로 인코딩된 비밀키면 true를 반환한다', async () => {
+      // web-push의 generateVAPIDKeys는 이런 키를 32바이트로 패딩해 발급한다.
+      const pair = deriveVapidKeyPair(LEADING_ZERO_SCALAR);
+      const FreshPushService = await loadPushService(pair.publicKey, pair.privateKey);
+      expect(FreshPushService.isConfigured()).toBe(true);
+    });
+
+    it('앞자리 0 바이트가 잘린 31바이트 비밀키면 false를 반환한다', async () => {
+      // 곡선 위의 짝은 맞지만 web-push가 32바이트가 아니면 거부하므로 발송이 불가능하다.
+      const pair = deriveVapidKeyPair(LEADING_ZERO_SCALAR);
+      const FreshPushService = await loadPushService(
+        pair.publicKey,
+        LEADING_ZERO_SCALAR.subarray(1).toString('base64url')
+      );
+      expect(FreshPushService.isConfigured()).toBe(false);
     });
 
     it('형식은 맞지만 짝이 아닌 키 조합이면 false를 반환한다', async () => {

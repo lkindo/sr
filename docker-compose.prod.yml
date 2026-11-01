@@ -3,6 +3,8 @@ services:
     image: nginx:alpine
     container_name: sr-nginx
     restart: always
+    environment:
+      - TZ=Asia/Seoul
     ports:
       - '80:80'
       - '443:443'
@@ -100,11 +102,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       # DB 이름은 비밀이 아니므로 기존 볼륨 호환을 위해 현재 값을 기본값으로 남긴다.
       - POSTGRES_DB=${POSTGRES_DB:-sr_db}
-      # 세션 타임존. 저장은 timestamptz(UTC)로 그대로이고, `DATE(x AT TIME ZONE ...)`
-      # 처럼 명시적으로 변환하는 쿼리도 영향받지 않는다. 타임존을 명시하지 않은
-      # 임시 쿼리(psql 수동 조회 등)가 KST 로 보이게 하는 용도다.
-      - PGTZ=Asia/Seoul
       - TZ=Asia/Seoul
+    # 서버 기본 시간대. 기존 볼륨의 postgresql.conf 는 최초 기동 때 값(UTC)으로 남으므로
+    # `TZ` 로는 바뀌지 않아 기동 인자로 명시한다. timestamptz 저장 값은 영향받지 않는다.
+    command: ['postgres', '-c', 'timezone=Asia/Seoul', '-c', 'log_timezone=Asia/Seoul']
     # 보안: DB 포트를 호스트로 공개하지 않는다. app 컨테이너는 내부 브리지(sr-net)로 접근한다.
     # 관리 접근이 필요하면 SSH 터널 또는 `docker exec`를 사용한다.
     # ports:

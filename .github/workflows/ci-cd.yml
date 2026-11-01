@@ -328,7 +328,7 @@ jobs:
       # test 잡이 만든 커버리지 맵. stryker-ci.ts 가 이걸로 "테스트가 있는 파일"만 고른다.
       # 없으면 스크립트가 경고 후 전체 변경 파일을 대상으로 삼는다(게이트는 계속 동작).
       - name: Download coverage map
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         continue-on-error: true # 아티팩트 부재는 스크립트가 처리한다
         with:
           name: coverage-final
@@ -384,7 +384,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download shard mutation reports
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: mutation-report-*
           path: mutation-reports
@@ -728,10 +728,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
 
       - name: Build image (no push)
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
           push: false
@@ -814,7 +814,7 @@ jobs:
       # SARIF 업로드는 GitHub Advanced Security 가 켜져 있어야 성공한다.
       # 리포트 발행 실패로 파이프라인을 막지 않는다(의도된 비게이팅).
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         if: always()
         continue-on-error: true
         with:
