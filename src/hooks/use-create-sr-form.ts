@@ -7,6 +7,11 @@ import { getProfileAction } from '@/actions/user.actions';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useToast } from '@/hooks/use-toast';
 import { apiPost } from '@/lib/api-client';
+import {
+  type AttachmentUploadOutcome,
+  attachmentUploadToast,
+  NO_ATTACHMENT_UPLOAD,
+} from '@/lib/attachment-upload-toast';
 import type { ClientSummary } from '@/types/client.types';
 
 /** 신청자 선택의 '본인' 값. Radix Select 는 빈 문자열을 값으로 쓸 수 없어 표식을 둔다. */
@@ -174,11 +179,6 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
    * 검증에 걸린 파일은 `data.errors[]` 에 담기고 나머지만 저장된다.
    * (전부 실패한 경우에만 400 이다.)
    */
-  interface AttachmentUploadOutcome {
-    uploaded: number;
-    rejected: Array<{ fileName: string; error: string }>;
-  }
-
   const uploadAttachments = async (
     srId: string,
     filesToUpload: File[]
@@ -204,14 +204,10 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
       return {
         uploaded: body.data?.attachments?.length ?? 0,
         rejected: body.data?.errors ?? [],
+        failed: false,
       };
     } catch {
-      toast({
-        title: '경고',
-        description: 'SR은 생성되었으나 첨부파일 업로드에 실패했습니다.',
-        variant: 'destructive',
-      });
-      return { uploaded: 0, rejected: [] };
+      return { ...NO_ATTACHMENT_UPLOAD, failed: true };
     }
   };
 
@@ -262,26 +258,9 @@ export function useCreateSRForm({ onCreated, open }: { onCreated: () => void; op
 
       const createdSR = result.data;
       const upload =
-        files.length > 0
-          ? await uploadAttachments(createdSR.id, files)
-          : { uploaded: 0, rejected: [] };
+        files.length > 0 ? await uploadAttachments(createdSR.id, files) : NO_ATTACHMENT_UPLOAD;
 
-      // 거부된 파일이 있으면 성공 토스트로 덮지 않고 사유를 그대로 보여 준다.
-      // 사용자가 다시 올릴지 판단하려면 어떤 파일이 왜 걸렸는지가 필요하다.
-      if (upload.rejected.length > 0) {
-        toast({
-          title: '일부 첨부파일이 업로드되지 않았습니다',
-          description: `SR은 생성되었습니다. ${upload.uploaded}개 업로드 / ${upload.rejected.length}개 실패 — ${upload.rejected
-            .map((r) => `${r.fileName}: ${r.error}`)
-            .join(', ')}`,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: '성공',
-          description: `SR이 생성되었습니다.${upload.uploaded > 0 ? ` (첨부파일 ${upload.uploaded}개 업로드)` : ''}`,
-        });
-      }
+      toast(attachmentUploadToast('생성', upload));
       onCreated();
     } catch (error) {
       toast({

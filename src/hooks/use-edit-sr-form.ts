@@ -11,6 +11,11 @@ import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import {
+  type AttachmentUploadOutcome,
+  attachmentUploadToast,
+  NO_ATTACHMENT_UPLOAD,
+} from '@/lib/attachment-upload-toast';
+import {
   canChangeSLABasisAt,
   canEditSRContentAt,
   isSROperator,
@@ -207,11 +212,6 @@ export function useEditSRForm({
    * 생성 폼(`use-create-sr-form.ts`)과 **동일한 계약**이다. 두 폼이 같은 라우트를
    * 부르므로 결과를 다루는 방식도 갈라지면 안 된다.
    */
-  interface AttachmentUploadOutcome {
-    uploaded: number;
-    rejected: Array<{ fileName: string; error: string }>;
-  }
-
   const uploadAttachments = async (
     srId: string,
     filesToUpload: File[]
@@ -236,15 +236,11 @@ export function useEditSRForm({
       return {
         uploaded: body?.data?.attachments?.length ?? 0,
         rejected: body?.data?.errors ?? [],
+        failed: false,
       };
     } catch {
-      // 전부 실패(400)·네트워크 오류. 여기서만 "업로드에 실패했습니다" 를 띄운다.
-      toast({
-        title: '경고',
-        description: 'SR은 수정되었으나 첨부파일 업로드에 실패했습니다.',
-        variant: 'destructive',
-      });
-      return { uploaded: 0, rejected: [] };
+      // 전부 실패(400)·네트워크 오류.
+      return { ...NO_ATTACHMENT_UPLOAD, failed: true };
     }
   };
 
@@ -291,28 +287,13 @@ export function useEditSRForm({
     try {
       await updateSR(formData);
 
-      let upload: AttachmentUploadOutcome = { uploaded: 0, rejected: [] };
+      let upload = NO_ATTACHMENT_UPLOAD;
       if (files.length > 0) {
         upload = await uploadAttachments(sr.id, files);
         await fetchExistingAttachments(sr.id);
       }
 
-      // 거부된 파일이 있으면 성공 토스트로 덮지 않고 사유를 그대로 보여 준다.
-      // 사용자가 다시 올릴지 판단하려면 어떤 파일이 왜 걸렸는지가 필요하다.
-      if (upload.rejected.length > 0) {
-        toast({
-          title: '일부 첨부파일이 업로드되지 않았습니다',
-          description: `SR은 수정되었습니다. ${upload.uploaded}개 업로드 / ${upload.rejected.length}개 실패 — ${upload.rejected
-            .map((r) => `${r.fileName}: ${r.error}`)
-            .join(', ')}`,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: '성공',
-          description: `SR이 수정되었습니다.${upload.uploaded > 0 ? ` (첨부파일 ${upload.uploaded}개 업로드)` : ''}`,
-        });
-      }
+      toast(attachmentUploadToast('수정', upload));
       onOpenChange(false);
 
       await Promise.all([
