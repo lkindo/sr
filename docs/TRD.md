@@ -1534,7 +1534,7 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 - **잡 구성**: `code-quality`(ESLint + `tsc --noEmit` + knip 데드 코드 + E2E 단언 검사 + Actions SHA 고정 검사) /
   `test`(마이그레이션·드리프트·시드 + 커버리지 게이트) / `mutation-test`(PR 전용, 4분할 matrix) + `mutation-summary`
   (분할 결과 합산·판정) / `build` / `e2e-test` /
-  `docker-build`(PR 전용, 푸시 없이 이미지 빌드만) / `security`(gitleaks + gating `pnpm audit --prod
+  `docker-build`(푸시 없이 이미지를 빌드해 실제로 띄우고 로그인까지 확인) / `security`(gitleaks + gating `pnpm audit --prod
 --audit-level=critical` + Trivy 리포트) / `deployment-ready`
 - **뮤테이션 분할**(2026-09-19): PR 이 대상 브랜치 대비 바꾼 파일(테스트가 닿는 것)만 검사한다. dev 를 main 에 모아
   반영하는 PR 은 한 작업으로 60분을 넘어(PR #279: 뮤턴트 8,535개) 대상 파일을 크기 기준으로 4개 작업에 나눠 동시에 돌린다
@@ -1597,7 +1597,7 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 │   build        : pnpm build (standalone)    │
 │   e2e-test     : Playwright 전체 스위트      │
 │                  (push main·dev, PR)        │
-│   docker-build : 이미지 빌드 확인(PR 전용)   │
+│   docker-build : 이미지 빌드·기동 스모크     │
 │   security     : gitleaks + pnpm audit(게이트)│
 │                  + Trivy                    │
 └──────┬─────────────────────────────────────┘
