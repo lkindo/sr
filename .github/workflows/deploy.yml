@@ -359,8 +359,11 @@ jobs:
                     # ssh-action 이 실패한 SHA 를 APP_IMAGE_TAG 로 export 해 두었고, compose 는
                     # 셸 값을 --env-file 보다 우선한다. 셸 값도 바꾸지 않으면 실패한 이미지를 다시 고른다.
                     export APP_IMAGE_TAG=rollback
-                    docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || true
-                    if wait_healthy sr-app 240; then
+                    # 교체가 실패했는데 남은 컨테이너가 healthy 면 복구되지 않았어도 성공으로
+                    # 보고하게 된다. 교체 명령의 결과도 성공 조건에 넣는다.
+                    ROLLBACK_UP_STATUS=0
+                    docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || ROLLBACK_UP_STATUS=$?
+                    if [ "$ROLLBACK_UP_STATUS" -eq 0 ] && wait_healthy sr-app 240; then
                       echo "롤백 성공 — 이전 이미지로 서비스가 복구되었습니다."
                       echo "주의: 다음 배포가 다시 새 이미지로 덮어씁니다. 원인을 먼저 고치세요."
                     else
