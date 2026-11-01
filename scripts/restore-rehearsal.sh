@@ -227,6 +227,8 @@ else
         uploads/*) relative_path="${stored_path#uploads/}" ;;
         *) relative_path="$stored_path" ;;
       esac
+      # 앱은 path.resolve 로 겹친 슬래시를 정규화한다.
+      relative_path="${relative_path#"${relative_path%%[!/]*}"}"
       # grep -q 는 찾는 즉시 끝나 printf 가 SIGPIPE 를 받고, pipefail 이 이를 "없음"으로 뒤집는다.
       if [ -z "$relative_path" ] ||
         ! printf '%s\n' "$archive_list" | grep -Fx -- "$relative_path" >/dev/null; then
