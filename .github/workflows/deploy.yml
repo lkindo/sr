@@ -331,11 +331,13 @@ jobs:
               docker compose $COMPOSE_ARGS up -d --no-deps --wait --wait-timeout 120 db
 
               # 앱은 이미지가 바뀌었으므로 명시적으로 재생성한다.
-              # 실패해도 여기서 끝내지 않는다. 판정과 롤백은 헬스 게이트가 맡는다.
-              docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || true
+              # 실패해도 여기서 끝내지 않는다. 교체에 실패하면 구 컨테이너가 살아 있어 헬스
+              # 검사를 통과하므로, 종료 코드를 남겨 롤백 판정에 함께 쓴다.
+              APP_UP_STATUS=0
+              docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || APP_UP_STATUS=$?
 
               # 5-1. 헬스 게이트 — running 이 아니라 healthy 를 기다린다.
-              if ! wait_healthy sr-app 240; then
+              if [ "$APP_UP_STATUS" -ne 0 ] || ! wait_healthy sr-app 240; then
                 echo "ERROR: 새 이미지가 healthy 상태에 도달하지 못했습니다."
                 docker logs sr-app --tail 80 2>&1 || true
 
