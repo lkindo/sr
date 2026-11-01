@@ -220,11 +220,16 @@ else
       [ -n "$stored_path" ] || continue
       checked=$((checked + 1))
       # 앱의 resolveAttachmentFilePath 와 같은 규칙으로 저장소 기준 상대 경로를 만든다.
-      relative_path="${stored_path#"$UPLOADS_DIR"/}"
-      relative_path="${relative_path#/}"
-      relative_path="${relative_path#uploads/}"
+      # 저장 루트 밖의 절대 경로는 앱이 404 로 거부하므로 아카이브에 있어도 복구된 것이 아니다.
+      case "$stored_path" in
+        "$UPLOADS_DIR"/*) relative_path="${stored_path#"$UPLOADS_DIR"/}" ;;
+        /*) relative_path="" ;;
+        uploads/*) relative_path="${stored_path#uploads/}" ;;
+        *) relative_path="$stored_path" ;;
+      esac
       # grep -q 는 찾는 즉시 끝나 printf 가 SIGPIPE 를 받고, pipefail 이 이를 "없음"으로 뒤집는다.
-      if ! printf '%s\n' "$archive_list" | grep -Fx -- "$relative_path" >/dev/null; then
+      if [ -z "$relative_path" ] ||
+        ! printf '%s\n' "$archive_list" | grep -Fx -- "$relative_path" >/dev/null; then
         log "FAIL: 첨부 파일 없음 — $stored_path"
         missing=$((missing + 1))
       fi

@@ -43,11 +43,14 @@ const toastVariants = cva(
 const Toast = React.forwardRef<
   React.ElementRef<typeof ToastPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> & VariantProps<typeof toastVariants>
->(({ className, variant, ...props }, ref) => {
+>(({ className, variant, style, ...props }, ref) => {
   return (
     <ToastPrimitives.Root
       ref={ref}
       className={cn(toastVariants({ variant }), className)}
+      // 모달이 열리면 Radix 가 아래 레이어에 인라인 pointer-events: none 을 건다. 클래스로는 이길 수
+      // 없어서, 위에 보이는 토스트의 닫기 버튼이 눌리지 않게 된다.
+      style={{ pointerEvents: 'auto', ...style }}
       {...props}
     />
   );

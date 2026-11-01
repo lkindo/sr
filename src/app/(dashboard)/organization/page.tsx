@@ -141,7 +141,8 @@ export default function OrganizationPage() {
     isPending,
     error: clientsError,
   } = useQuery({
-    queryKey: qk.clients.list(CLIENT_LIST_PARAMS),
+    // 첫 페이지만 읽는 UserDialog 와 키가 같으면 전체 목록이 첫 100개로 덮어써진다.
+    queryKey: qk.clients.list({ ...CLIENT_LIST_PARAMS, allPages: true }),
     queryFn: ({ signal }) => fetchAllClients(signal),
     placeholderData: keepPreviousData,
     staleTime: 0,

@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { qk } from '@/lib/query-keys';
+
 import OrganizationPage from '../page';
 
 /**
@@ -110,12 +112,15 @@ vi.mock('@/hooks/use-toast', () => ({
  * 실물 Provider 로 감싼다. `@tanstack/react-query` 를 통째로 목킹하면 useQueries·
  * useQueryClient 가 없어서 죽는다.
  */
+let queryClient: QueryClient;
+
 function renderPage() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   });
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(QueryClientProvider, { client }, children);
+  queryClient = client;
   return render(<OrganizationPage />, { wrapper });
 }
 
@@ -220,6 +225,16 @@ describe('OrganizationPage', () => {
     renderPage();
 
     expect(await screen.findByTestId('client-count')).toHaveTextContent('3');
+  });
+
+  // 첫 페이지만 읽는 UserDialog 와 키를 공유하면 전체 목록이 덮어써진다.
+  it('전 페이지 목록은 첫 페이지 조회와 다른 캐시 키를 쓴다', async () => {
+    stubFetch();
+
+    renderPage();
+    await screen.findByTestId('client-count');
+
+    expect(queryClient.getQueryData(qk.clients.list({ pageSize: 100 }))).toBeUndefined();
   });
 
   it('행을 펼친 고객사만 사용자를 지연 조회한다', async () => {
