@@ -46,14 +46,25 @@ describeDb('알림 아웃박스 (실제 DB)', () => {
     expect(results.reduce((sum, r) => sum + r.sent, 0)).toBe(recipients.length);
   });
 
-  it('임대 중인 행은 다시 집지 않는다', async () => {
+  // 발송은 잠금이 풀린 뒤에 일어난다. 임대가 없으면 발송 중인 행을 다른 디스패처가 또 집는다.
+  it('발송 중인 행은 다른 디스패처가 다시 집지 않는다', async () => {
+    let finishSending = () => {};
+    sendMail.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishSending = resolve;
+        })
+    );
     await enqueueEmails([email('a@example.com')]);
-    await prisma.notification.updateMany({
-      data: { nextAttemptAt: new Date(Date.now() + 60_000) },
-    });
+
+    const first = dispatchPendingNotifications();
+    await vi.waitFor(() => expect(sendMail).toHaveBeenCalledTimes(1));
 
     expect(await dispatchPendingNotifications()).toEqual({ sent: 0, failed: 0, deadLettered: 0 });
-    expect(sendMail).not.toHaveBeenCalled();
+
+    finishSending();
+    expect((await first).sent).toBe(1);
+    expect(sendMail).toHaveBeenCalledTimes(1);
   });
 
   it('발송이 실패하면 사유를 남기고 나중에 다시 시도한다', async () => {

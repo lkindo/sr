@@ -163,17 +163,24 @@ test.describe('실시간 갱신 (SSE)', () => {
     await expect(page.getByRole('heading', { name: 'SR 목록', exact: true })).toBeVisible();
 
     const managerContext = await browser.newContext({ storageState: PERSONA_AUTH_FILES.manager });
+    let srNumber: string;
     try {
       const srId = await createTestSR(await managerContext.newPage(), {
         title: `서버 액션 실시간 확인 ${Date.now()}`,
         description: '서버 액션으로 등록한 SR 이 SSE 로 도달하는지 확인합니다.',
       });
       seededSRIds.push(srId);
+      // 병렬 실행 중 다른 테스트의 이벤트로 통과하지 않도록 이 SR 의 번호로 확인한다.
+      const response = await managerContext.request.get(`/api/srs/${srId}`);
+      expect(response.status()).toBe(200);
+      srNumber = (await response.json()).srNumber;
     } finally {
       await managerContext.close();
     }
 
-    await expect(page.getByText(/^새로운 SR #.+가 등록되었습니다.$/)).toBeVisible();
+    await expect(
+      page.getByText(`새로운 SR #${srNumber}가 등록되었습니다.`, { exact: true })
+    ).toBeVisible();
     await expectSSEResponse(streamRequest);
   });
 
