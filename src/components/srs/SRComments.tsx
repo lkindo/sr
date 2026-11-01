@@ -39,8 +39,9 @@ export function SRComments({ srId }: SRCommentsProps) {
     useSRCommentsInfinite(srId);
 
   // Intersection Observer로 자동 로딩
+  // 실패한 동안에는 멈춘다. 관찰 영역이 화면에 남아 있어 조회가 끝날 때마다 다시 호출되기 때문이다.
   useEffect(() => {
-    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage || error) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -54,7 +55,7 @@ export function SRComments({ srId }: SRCommentsProps) {
     observer.observe(loadMoreRef.current);
 
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, error]);
 
   /**
    * 댓글 작성.
