@@ -3498,7 +3498,7 @@ concurrency:
 | `db`    | `postgres:16-alpine`       | 호스트 포트 **비공개**. `POSTGRES_*` 는 `:?` 문법으로 미설정 시 즉시 실패. 볼륨 `sr_db_data`, `pg_isready` healthcheck                             |
 
 세 서비스 모두 로깅은 `json-file` 드라이버, `max-size: 10m` × `max-file: 3` 이다.
-네트워크는 내부 브리지 `sr-net`(MTU 1400). 스테이징(dev)은 같은 서버에서
+네트워크는 내부 브리지 `sr-net`(MTU 1400). 스테이징(dev)은 전용 브리지 `sr_test_net`(MTU 1400)을 쓰고, nginx 만 양쪽에 붙는다. 같은 서버에서
 `docker-compose.test.yml` + 프로젝트명 `sr-test` 로 분리 구동한다.
 
 ### 환경 변수
