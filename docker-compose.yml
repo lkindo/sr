@@ -32,6 +32,10 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-lkind}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-sr1234} # gitleaks:allow (로컬 전용 기본값)
       - POSTGRES_DB=${POSTGRES_DB:-sr_db}
+      - TZ=Asia/Seoul
+    # 서버 기본 시간대. 기존 볼륨의 postgresql.conf 는 최초 기동 때 값(UTC)으로 남으므로
+    # `TZ` 로는 바뀌지 않아 기동 인자로 명시한다. timestamptz 저장 값은 영향받지 않는다.
+    command: ['postgres', '-c', 'timezone=Asia/Seoul', '-c', 'log_timezone=Asia/Seoul']
     ports:
       - '5432:5432'
     volumes:

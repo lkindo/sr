@@ -57,6 +57,10 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       # DB 이름은 비밀이 아니므로 기존 볼륨 호환을 위해 현재 값을 기본값으로 남긴다.
       - POSTGRES_DB=${POSTGRES_DB:-sr_db_test}
+      - TZ=Asia/Seoul
+    # 서버 기본 시간대. 기존 볼륨의 postgresql.conf 는 최초 기동 때 값(UTC)으로 남으므로
+    # `TZ` 로는 바뀌지 않아 기동 인자로 명시한다. timestamptz 저장 값은 영향받지 않는다.
+    command: ['postgres', '-c', 'timezone=Asia/Seoul', '-c', 'log_timezone=Asia/Seoul']
     # 보안: DB 포트를 호스트로 공개하지 않는다(과거 '5433:5432'). app-test 는 내부
     # 브리지(sr-net)로 접근한다. 호스트에서 직접 붙어야 하면 SSH 터널을 사용한다.
     #   ssh -L 5433:127.0.0.1:5433 opc@<server>  (아래 loopback 바인딩을 함께 활성화)
