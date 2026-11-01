@@ -790,6 +790,35 @@ describe('PATCH /api/srs/[id]/intake — 객체 인가', () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  // 담당자가 해제된 SR 도 INTAKE 상태로 남는다. 접수용 예외를 그대로 쓰면 범위 밖 사용자가 고친다.
+  it('담당자 스코프 사용자는 미배정 SR 도 고치지 못한다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ assigneeId: null, assignee: null }));
+    const engineer = session({
+      id: 'eng-9',
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ intakeNotes: '메모' }, engineer);
+
+    expect(response.status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('담당자 스코프 사용자도 자기 배정분은 고칠 수 있다', async () => {
+    const engineer = session({
+      id: ASSIGNEE.id,
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ intakeNotes: '메모' }, engineer);
+
+    expect(response.status).toBe(200);
+  });
+
   it('SR:ASSIGN 없이는 담당자를 바꾸지 못한다', async () => {
     mocks.assertAssignable.mockResolvedValue(OTHER_ASSIGNEE);
 

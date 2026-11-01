@@ -1077,6 +1077,21 @@ export function ensureCanIntakeAssignedSR(
 }
 
 /**
+ * 접수 정보 수정은 이미 접수된 SR 을 고치는 일이다. 미배정 SR 을 허용하는 접수 판정
+ * (canIntakeAssignedSR)을 그대로 쓰면, 담당자가 해제된 SR 을 범위 밖 사용자가 고치고 본문까지 받는다.
+ * 담당자 스코프 사용자는 자기 배정분만 고친다.
+ */
+export function ensureCanUpdateIntake(
+  user: AuthenticatedUser,
+  sr: { assigneeId: string | null }
+): void {
+  const scope = resolveAssigneeScope(user);
+  if (scope !== undefined && sr.assigneeId !== scope) {
+    throw new ForbiddenError('자신에게 배정된 SR의 접수 정보만 수정할 수 있습니다.');
+  }
+}
+
+/**
  * 고객사 화면(상세의 최근 SR·SR 건수, 목록의 SR 건수)에 거는 **담당자 스코프**.
  *
  * 헌법 §1.2: ENGINEER 는 고객사 명부·서비스 카테고리는 전체를 보지만 "SR 본문·고객사 사용자

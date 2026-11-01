@@ -12,6 +12,7 @@ import {
   ensureCanIntakeClientSR,
   ensureCanIntakeSR,
   ensureCanReadSR,
+  ensureCanUpdateIntake,
 } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
@@ -455,7 +456,7 @@ export const PATCH = withAuthAndRateLimit(
 
     // POST 와 같은 이유로 담당자 검증 **뒤**에 둔다. 앞에 두면 404 와 403 이 갈려 쓰기 없이도
     // SR 의 배정 여부를 떠볼 수 있다.
-    ensureCanIntakeAssignedSR(session.user, sr);
+    ensureCanUpdateIntake(session.user, sr);
 
     // 담당자 변경은 접수 수정이 아니라 배정이다. updateSR 과 같은 권한을 요구한다.
     if (newAssignee && !canAssignSR(session.user)) {
