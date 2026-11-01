@@ -19,6 +19,10 @@
 #   리허설을 하려면 `BACKUP_AGE_IDENTITY_FILE` 또는 `BACKUP_GPG_HOME` 을 지정해야 한다.
 #   지정이 없으면 명확히 실패한다 — "검증 못 했음"을 성공으로 보고하지 않는다.
 #
+# 첨부파일:
+#   덤프와 같은 시각의 uploads 아카이브에 DB 의 첨부 행이 가리키는 파일이 모두 있는지 대조한다.
+#   행만 살아나고 파일이 없으면 복구돼도 다운로드가 전부 실패한다.
+#
 # 종료코드 0=복구 검증 성공.
 set -euo pipefail
 
@@ -42,7 +46,9 @@ cleanup() {
     log "일회용 컨테이너 정리: $CONTAINER_NAME"
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
   fi
-  [ -n "${TMP_PLAIN:-}" ] && rm -f "$TMP_PLAIN"
+  # 공백 없는 mktemp 경로만 담으므로 단어 분리를 일부러 쓴다.
+  # shellcheck disable=SC2086
+  [ -z "${TMP_FILES:-}" ] || rm -f $TMP_FILES
   return 0
 }
 trap cleanup EXIT
@@ -60,30 +66,38 @@ fi
 log "대상 덤프: $dump_file"
 
 # ── 2. 필요 시 복호화 ─────────────────────────────────────────────────────────
-TMP_PLAIN=""
-case "$dump_file" in
-  *.age)
-    if [ -z "${BACKUP_AGE_IDENTITY_FILE:-}" ]; then
-      log "ERROR: 암호화된 백업인데 BACKUP_AGE_IDENTITY_FILE 이 없습니다."
-      log "       복호화 키 없이는 복구 검증을 할 수 없습니다(검증 실패로 처리)."
-      exit 1
-    fi
-    TMP_PLAIN="$(mktemp)"
-    age -d -i "$BACKUP_AGE_IDENTITY_FILE" -o "$TMP_PLAIN" "$dump_file"
-    dump_file="$TMP_PLAIN"
-    log "복호화 완료(age)"
-    ;;
-  *.gpg)
-    if [ -z "${BACKUP_GPG_HOME:-}" ]; then
-      log "ERROR: 암호화된 백업인데 BACKUP_GPG_HOME 이 없습니다."
-      exit 1
-    fi
-    TMP_PLAIN="$(mktemp)"
-    GNUPGHOME="$BACKUP_GPG_HOME" gpg --batch --yes --decrypt --output "$TMP_PLAIN" "$dump_file"
-    dump_file="$TMP_PLAIN"
-    log "복호화 완료(gpg)"
-    ;;
-esac
+# 평문 경로를 decrypted_path 에 담는다. 키가 없으면 "검증 못 했음"이므로 실패한다.
+TMP_FILES=""
+decrypt_backup() {
+  decrypted_path="$1"
+  case "$1" in
+    *.age)
+      if [ -z "${BACKUP_AGE_IDENTITY_FILE:-}" ]; then
+        log "ERROR: 암호화된 백업인데 BACKUP_AGE_IDENTITY_FILE 이 없습니다."
+        log "       복호화 키 없이는 복구 검증을 할 수 없습니다(검증 실패로 처리)."
+        exit 1
+      fi
+      decrypted_path="$(mktemp)"
+      TMP_FILES="$TMP_FILES $decrypted_path"
+      age -d -i "$BACKUP_AGE_IDENTITY_FILE" -o "$decrypted_path" "$1"
+      log "복호화 완료(age): $1"
+      ;;
+    *.gpg)
+      if [ -z "${BACKUP_GPG_HOME:-}" ]; then
+        log "ERROR: 암호화된 백업인데 BACKUP_GPG_HOME 이 없습니다."
+        exit 1
+      fi
+      decrypted_path="$(mktemp)"
+      TMP_FILES="$TMP_FILES $decrypted_path"
+      GNUPGHOME="$BACKUP_GPG_HOME" gpg --batch --yes --decrypt --output "$decrypted_path" "$1"
+      log "복호화 완료(gpg): $1"
+      ;;
+  esac
+}
+
+source_dump="$dump_file"
+decrypt_backup "$dump_file"
+dump_file="$decrypted_path"
 
 # ── 3. 일회용 Postgres 기동 ───────────────────────────────────────────────────
 # 호스트 포트를 열지 않고 네트워크도 붙이지 않는다 — docker exec 로만 접근한다.
@@ -171,6 +185,44 @@ for table in $REQUIRED_NONEMPTY_TABLES; do
     log "OK  : $table = ${count}행"
   fi
 done
+
+# ── 6. 첨부파일 대조 ──────────────────────────
+backup_ts="$(basename "$source_dump")"
+backup_ts="${backup_ts#db_}"
+backup_ts="${backup_ts%%.dump*}"
+uploads_file=""
+for candidate in "$BACKUP_DIR/uploads_${backup_ts}.tar.gz" \
+  "$BACKUP_DIR/uploads_${backup_ts}.tar.gz.age" \
+  "$BACKUP_DIR/uploads_${backup_ts}.tar.gz.gpg"; do
+  if [ -f "$candidate" ]; then
+    uploads_file="$candidate"
+    break
+  fi
+done
+
+if [ -z "$uploads_file" ]; then
+  log "FAIL: 덤프와 짝이 맞는 첨부 아카이브가 없습니다(uploads_${backup_ts}.tar.gz)"
+  failures=$((failures + 1))
+else
+  decrypt_backup "$uploads_file"
+  archive_list="$(tar tzf "$decrypted_path" | sed 's#^\./##')"
+  checked=0
+  missing=0
+  while IFS= read -r stored_path; do
+    [ -n "$stored_path" ] || continue
+    checked=$((checked + 1))
+    if ! printf '%s\n' "$archive_list" | grep -Fxq "$stored_path"; then
+      log "FAIL: 첨부 파일 없음 — $stored_path"
+      missing=$((missing + 1))
+    fi
+  done < <(psql_q "SELECT storage_path FROM public.sr_attachments WHERE storage_path IS NOT NULL;")
+
+  if [ "$missing" -gt 0 ]; then
+    failures=$((failures + missing))
+  else
+    log "OK  : 첨부 $checked 건이 모두 아카이브에 있습니다"
+  fi
+fi
 
 if [ "$failures" -gt 0 ]; then
   log "복구 리허설 실패: ${failures}건"

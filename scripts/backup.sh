@@ -140,6 +140,9 @@ else
   echo "[backup]       오프사이트 복제 전에 반드시 설정하세요(docs/backup-and-restore.md)."
 fi
 
+# 여기까지 왔으면 이번 백업은 완성본이다. 이후 단계가 실패해도 이 산출물을 지우면 안 된다.
+trap - EXIT
+
 echo "[backup] pruning backups older than ${RETENTION_DAYS} days"
 # 암호화 산출물(.age/.gpg)까지 포함해야 한다. 평문 패턴만 지우면 암호화 파일이
 # 영원히 쌓여 디스크를 채운다.
@@ -167,5 +170,8 @@ echo "[backup] OK  db=${db_size}  uploads=${up_size}  dir=${BACKUP_DIR}"
 # 예: OFFSITE_CMD='rclone copy /home/opc/sr/backups remote:sr-backups'
 if [ -n "${OFFSITE_CMD:-}" ]; then
   echo "[backup] offsite: $OFFSITE_CMD"
-  eval "$OFFSITE_CMD"
+  if ! eval "$OFFSITE_CMD"; then
+    echo "[backup] ERROR: 오프호스트 복제 실패. 로컬 백업은 보존했습니다: $BACKUP_DIR" >&2
+    exit 1
+  fi
 fi

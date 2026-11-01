@@ -10,6 +10,10 @@
 #
 # 주의: 대상 DB의 기존 객체를 덮어쓴다(파괴적). 기본적으로 확인 입력을 요구한다.
 #       자동화에서는 FORCE=1 로 확인을 생략할 수 있다.
+#
+# 암호화된 백업(.age/.gpg)은 복호화 키를 지정해야 한다.
+#   BACKUP_AGE_IDENTITY_FILE=/경로/backup-age.key  (age)
+#   BACKUP_GPG_HOME=/경로/gnupg                    (gpg)
 set -euo pipefail
 
 # 운영 DB 사용자·DB 이름의 정본은 배포가 매번 새로 쓰는 `.env.prod` 다(docs/SECRET_ROTATION.md 4절).
@@ -45,6 +49,52 @@ db_file="${1:?db dump file required}"
 up_file="${2:-}"
 
 [ -f "$db_file" ] || { echo "not found: $db_file" >&2; exit 1; }
+[ -z "$up_file" ] || [ -f "$up_file" ] || { echo "not found: $up_file" >&2; exit 1; }
+
+# 복호화한 평문은 소유자만 읽는 임시 디렉터리에 두고 끝나면 지운다.
+work_dir=""
+remove_work_dir() {
+  if [ -n "$work_dir" ]; then
+    rm -rf "$work_dir"
+  fi
+}
+trap remove_work_dir EXIT
+
+# 암호화된 백업이면 평문 경로를 decrypted_path 에 담는다. 파괴적 작업 전에 불러서, 키가 없거나
+# 복호화가 실패하면 아무것도 건드리지 않고 멈춘다.
+decrypt_if_needed() {
+  decrypted_path="$1"
+  case "$1" in
+    *.age)
+      if [ -z "${BACKUP_AGE_IDENTITY_FILE:-}" ]; then
+        echo "[restore] ERROR: 암호화된 백업인데 BACKUP_AGE_IDENTITY_FILE 이 없습니다: $1" >&2
+        exit 1
+      fi
+      ;;
+    *.gpg)
+      if [ -z "${BACKUP_GPG_HOME:-}" ]; then
+        echo "[restore] ERROR: 암호화된 백업인데 BACKUP_GPG_HOME 이 없습니다: $1" >&2
+        exit 1
+      fi
+      ;;
+    *) return 0 ;;
+  esac
+
+  [ -n "$work_dir" ] || work_dir="$(mktemp -d)"
+  decrypted_path="$work_dir/$(basename "${1%.*}")"
+  case "$1" in
+    *.age) age -d -i "$BACKUP_AGE_IDENTITY_FILE" -o "$decrypted_path" "$1" ;;
+    *.gpg) GNUPGHOME="$BACKUP_GPG_HOME" gpg --batch --yes --decrypt --output "$decrypted_path" "$1" ;;
+  esac
+  echo "[restore] decrypted: $1"
+}
+
+decrypt_if_needed "$db_file"
+db_file="$decrypted_path"
+if [ -n "$up_file" ]; then
+  decrypt_if_needed "$up_file"
+  up_file="$decrypted_path"
+fi
 
 # 파괴적 작업 전에 입력 자체를 검증한다. 잘못된 파일로 앱부터 내리지 않는다.
 if ! docker exec -i "$DB_CONTAINER" pg_restore -l >/dev/null 2>&1 <"$db_file"; then
@@ -54,7 +104,6 @@ fi
 
 app_image="$(docker inspect -f '{{.Config.Image}}' "$APP_CONTAINER" 2>/dev/null || true)"
 if [ -n "$up_file" ]; then
-  [ -f "$up_file" ] || { echo "not found: $up_file" >&2; exit 1; }
   [ -n "$app_image" ] || { echo "[restore] ERROR: app container/image not found" >&2; exit 1; }
   archive_entries="$(docker run --rm -i --entrypoint tar "$app_image" tzf - <"$up_file")" || {
     echo "[restore] ERROR: invalid uploads archive: $up_file" >&2
@@ -90,7 +139,7 @@ restart_app() {
     docker start "$APP_CONTAINER" >/dev/null || true
   fi
 }
-trap restart_app EXIT
+trap 'restart_app; remove_work_dir' EXIT
 
 if [ "$app_was_running" = "true" ]; then
   echo "[restore] stopping app to prevent writes during restore"
@@ -127,7 +176,7 @@ if [ -n "$up_file" ]; then
 fi
 
 restart_app
-trap - EXIT
+trap remove_work_dir EXIT
 
 if [ "$app_was_running" = "true" ]; then
   waited=0

@@ -118,12 +118,14 @@ jobs:
           ENV_DOCKER_B64: ${{ github.event.workflow_run.head_branch == 'main' && secrets.PROD_ENV_DOCKER_B64 || secrets.STAGING_ENV_DOCKER_B64 }}
           # compose 보간용 env(POSTGRES_USER/PASSWORD/DB) 를 base64 로 담은 시크릿.
           COMPOSE_ENV_B64: ${{ github.event.workflow_run.head_branch == 'main' && secrets.PROD_COMPOSE_ENV_B64 || secrets.STAGING_COMPOSE_ENV_B64 }}
+          # 배포 전 백업도 야간 백업과 같은 수신자로 암호화한다. 이 값이 없으면 평문 덤프가 남는다.
+          BACKUP_ENCRYPT_RECIPIENT: ${{ secrets.BACKUP_ENCRYPT_RECIPIENT }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_KEY }}
           port: 22
-          envs: BRANCH_NAME, GITHUB_ACTOR, GITHUB_TOKEN, ENV_DOCKER_B64, COMPOSE_ENV_B64, APP_IMAGE_TAG
+          envs: BRANCH_NAME, GITHUB_ACTOR, GITHUB_TOKEN, ENV_DOCKER_B64, COMPOSE_ENV_B64, APP_IMAGE_TAG, BACKUP_ENCRYPT_RECIPIENT
           script: |
             # 실패를 조용히 넘기지 않는다. 이 스크립트는 과거 `set -e` 가 없어
             # 이미지 pull 실패가 이전 이미지 재배포(= 성공으로 보고되는 no-op)로 이어졌다.
