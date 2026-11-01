@@ -76,7 +76,10 @@ function handlersOf(source: ts.SourceFile): Handler[] {
         const method = declaration.name.getText(source);
         if (!HTTP_METHODS.has(method)) continue;
         const init = declaration.initializer;
+        // let 은 뒤에서 다른 함수로 바꿔 끼울 수 있으므로 const 만 인정한다.
+        const isConst = (statement.declarationList.flags & ts.NodeFlags.Const) !== 0;
         const wrapped =
+          isConst &&
           init &&
           ts.isCallExpression(init) &&
           ts.isIdentifier(init.expression) &&
@@ -178,6 +181,12 @@ describe('검사기 자체', () => {
     ['동기 함수', `export function GET() {}`],
     ['HEAD', `export function HEAD() {}`],
     ['다시 내보내기', `export { unsafe as POST } from './handlers';`],
+    [
+      '재할당할 수 있는 선언',
+      `import { withAuth } from '@/lib/auth-wrapper';
+       export let POST = withAuth(async () => {});
+       POST = unsafe;`,
+    ],
     ['export *', `export * from './handlers';`],
     [
       '인증이 아닌 래퍼를 별칭으로',

@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   emitRealtime: vi.fn(),
   findUnique: vi.fn(),
   transaction: vi.fn(),
+  auditCreate: vi.fn(),
   // 트랜잭션 클라이언트(tx)의 활동 생성과 루트 클라이언트(prisma)의 활동 생성을 **다른 목**으로
   // 둔다. 하나로 합치면 활동 로그가 트랜잭션 안에 있는지 밖에 있는지를 테스트가 구분하지
   // 못한다 — PATCH 가 커밋 이후에 활동을 만들던 버그가 바로 그렇게 통과했다.
@@ -196,6 +197,7 @@ beforeEach(() => {
       const result = await cb({
         sR: { updateMany: mocks.updateMany, update: mocks.txUpdate },
         sRActivity: { create: mocks.activityCreate },
+        auditLog: { create: mocks.auditCreate },
       });
       order.push('tx:commit');
       return result;
@@ -935,6 +937,19 @@ describe('PATCH /api/srs/[id]/intake — SLA 재계산', () => {
 
     // intakeAt 2026-08-01T00:00Z + 24h × 0.5 = 12h
     expect(lastUpdateData().dueDate).toEqual(new Date('2026-08-01T12:00:00.000Z'));
+  });
+
+  it('자동 재산출로 마감일이 바뀌면 감사 로그를 남긴다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR());
+
+    await patch({ actualPriority: 'HIGH' });
+
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditCreate.mock.calls[0]![0].data).toMatchObject({
+      actionType: 'UPDATE',
+      targetEntity: 'SR_DUE_DATE',
+      targetId: 'sr-1',
+    });
   });
 
   it('우선순위가 같으면 마감일을 건드리지 않는다', async () => {

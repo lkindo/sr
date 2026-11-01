@@ -33,8 +33,6 @@ import { PERSONA_AUTH_FILES } from './helpers/auth-helpers';
  * 비밀번호 관련 테스트는 매번 전용 계정을 만들고 afterAll 에서 완전 삭제한다.
  */
 
-const ADMIN_EMAIL = process.env.TEST_USER_EMAIL || 'admin@example.com';
-
 /** 존재하지 않는 리소스 id. 익명 쓰기가 인가 이전에 막히는지 보기 위한 값이다. */
 const NONEXISTENT_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -70,17 +68,24 @@ test.describe('로그아웃', () => {
 
   test('로그아웃하면 세션이 파기되고 보호 라우트가 로그인으로 튕긴다', async ({ browser }) => {
     // 세션을 실제로 파기하는 유일한 테스트다. 컨텍스트를 직접 열어 격리한다(파일 상단 주석 참조).
-    const context = await browser.newContext({ storageState: PERSONA_AUTH_FILES.admin });
-    const page = await context.newPage();
+    // 직접 로그아웃은 그 계정의 모든 세션을 끊는다. 공유 계정으로 하면 병렬로 도는 다른 테스트가
+    // 401 이 되므로 일회용 계정을 쓴다.
+    const account = await createDisposableUser(browser);
+    const { context, page, callbackUrl } = await submitLoginForm(
+      browser,
+      account.email,
+      INITIAL_PASSWORD
+    );
 
     try {
+      expect(callbackUrl).not.toContain('error=');
       await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
       // 로그아웃 "전" 에 세션이 있었음을 먼저 확정한다. 이게 없으면 아래 null 단언이
       // "원래부터 세션이 없었다" 로도 통과해 아무것도 검증하지 못한다.
       const before = await page.request.get('/api/auth/session');
       expect(before.status()).toBe(200);
-      expect(((await before.json()) as SessionBody)?.user?.email).toBe(ADMIN_EMAIL);
+      expect(((await before.json()) as SessionBody)?.user?.email).toBe(account.email);
 
       await page.getByRole('button', { name: '사용자 메뉴' }).click();
       const signOutItem = page.getByRole('menuitem', { name: '로그아웃' });
@@ -106,6 +111,7 @@ test.describe('로그아웃', () => {
       await expect(page).toHaveURL(/\/login/);
     } finally {
       await context.close();
+      await deleteDisposableUser(browser, account.id);
     }
   });
 });
@@ -272,6 +278,16 @@ async function createDisposableUser(browser: Browser): Promise<{ id: string; ema
 
     const user = JSON.parse(raw) as { id: string };
     return { id: user.id, email };
+  } finally {
+    await admin.close();
+  }
+}
+
+async function deleteDisposableUser(browser: Browser, id: string): Promise<void> {
+  const admin = await browser.newContext({ storageState: PERSONA_AUTH_FILES.admin });
+  try {
+    const deleted = await admin.request.delete(`/api/users/${id}?hard=true`);
+    expect(deleted.status(), `전용 계정 정리 실패: ${id}`).toBe(200);
   } finally {
     await admin.close();
   }

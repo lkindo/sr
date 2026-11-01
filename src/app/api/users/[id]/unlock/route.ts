@@ -11,7 +11,7 @@ import { getClientIp } from '@/lib/rate-limiter';
 import { auditService } from '@/services/audit.service';
 import { UserService } from '@/services/user.service';
 
-// POST /api/users/[id]/unlock - 로그인 잠금 해제 (Rate Limit: 엄격)
+// POST /api/users/[id]/unlock - 로그인 잠금 해제 (Rate Limit: 표준)
 // 타인 계정의 민감 정보를 관리할 수 있는 사람만 푼다. 이메일만 알면 누구나 잠글 수 있으므로,
 // 없으면 잠긴 관리자를 푸는 방법이 15분 대기나 서버 재시작뿐이다.
 export const POST = withAuthAndRateLimit(
@@ -51,5 +51,6 @@ export const POST = withAuthAndRateLimit(
 
     return NextResponse.json({ success: true });
   },
-  { preset: 'strict' }
+  // 사용자 목록에서 여러 명을 한 번에 풀 수 있다. strict(분당 5회)면 여섯 번째부터 429 로 남는다.
+  { preset: 'standard' }
 );

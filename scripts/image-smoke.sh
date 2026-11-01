@@ -22,7 +22,8 @@ APP="sr-smoke-app-${SUFFIX}"
 COOKIES="$(mktemp)"
 
 # 일회용 값이다. 이 컨테이너들은 스크립트가 끝나면 사라진다.
-DB_URL="postgresql://smoke:smoke-local-only@${DB}:5432/sr_smoke"
+# sr_ci 는 .gitleaks.toml 이 허용하는 CI 전용 계정 이름이다.
+DB_URL="postgresql://sr_ci:sr_ci@${DB}:5432/sr_ci"
 SMOKE_SECRET="smoke-only-secret-0123456789abcdef0123456789"
 ADMIN_EMAIL="smoke-admin@example.com"
 ADMIN_PASSWORD="smoke-only-password-123"
@@ -46,13 +47,13 @@ docker network create "$NETWORK" >/dev/null
 
 log "Postgres 기동"
 docker run -d --name "$DB" --network "$NETWORK" \
-  -e POSTGRES_USER=smoke -e POSTGRES_PASSWORD=smoke-local-only -e POSTGRES_DB=sr_smoke \
+  -e POSTGRES_USER=sr_ci -e POSTGRES_PASSWORD=sr_ci -e POSTGRES_DB=sr_ci \
   "$PG_IMAGE" >/dev/null
 
 # pg_isready 만 보면 초기화용 임시 서버에 속는다. 초기화 완료 로그 뒤의 준비 상태를 본다.
 waited=0
 until docker logs "$DB" 2>&1 | grep -q 'init process complete' &&
-  docker exec "$DB" pg_isready -U smoke -d sr_smoke >/dev/null 2>&1; do
+  docker exec "$DB" pg_isready -U sr_ci -d sr_ci >/dev/null 2>&1; do
   sleep 2
   waited=$((waited + 2))
   [ "$waited" -lt 120 ] || fail "Postgres 가 120초 안에 준비되지 않았습니다"
@@ -87,7 +88,15 @@ status_of() {
 }
 
 [ "$(status_of /login)" = "200" ] || fail "/login 이 200 이 아닙니다"
-log "OK  : 로그인 화면"
+
+# standalone 은 정적 자산을 자동으로 복사하지 않는다. 빠지면 HTML 과 API 는 멀쩡한데 화면만 깨진다.
+login_html="$(curl -s --max-time 20 "$BASE/login")"
+for pattern in '/_next/static/[^"]+[.]js' '/_next/static/[^"]+[.]css'; do
+  asset="$(printf '%s' "$login_html" | grep -oE "$pattern" | head -1 || true)"
+  [ -n "$asset" ] || fail "로그인 화면에서 정적 자산을 찾지 못했습니다: $pattern"
+  [ "$(status_of "$asset")" = "200" ] || fail "정적 자산이 200 이 아닙니다: $asset"
+done
+log "OK  : 로그인 화면과 정적 자산"
 
 [ "$(status_of /api/srs)" = "401" ] || fail "미인증 /api/srs 가 401 이 아닙니다"
 log "OK  : 미인증 API 는 401"

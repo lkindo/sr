@@ -14,6 +14,7 @@ import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/pris
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import type { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
 import { formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
+import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
 import { assertAssignable, srService } from '@/services/sr.service';
 import { enqueueSRAssignedEmail, enqueueSRStatusChangedEmail } from '@/services/sr-email-outbox';
@@ -438,6 +439,22 @@ export async function updateIntakeInfo(
       data: updateData,
       include: SR_INTAKE_INCLUDE,
     });
+
+    // 마감일이 실제로 움직였으면 updateSR 의 자동 재산출과 같은 감사 기록을 남긴다.
+    if (newValues.dueDate) {
+      await auditService.createLog(tx, {
+        userId: user.id,
+        actionType: 'UPDATE',
+        targetEntity: 'SR_DUE_DATE',
+        targetId: id,
+        changes: {
+          srNumber: result.srNumber,
+          before: previousValues.dueDate?.toISOString() ?? null,
+          after: newValues.dueDate,
+          reason: 'SLA 기준 변경에 따른 자동 재산출',
+        },
+      });
+    }
 
     // 접수 수정 Activity 로그
     if (changes.length > 0) {
