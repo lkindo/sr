@@ -195,7 +195,8 @@ jobs:
             chmod 600 .env.prod .env.staging .env.docker .env.docker.test 2>/dev/null || true
 
             # test 스택과 nginx 가 함께 쓰는 네트워크. 두 compose 모두 external 로 쓰므로 먼저 만든다.
-            docker network inspect sr_test_net >/dev/null 2>&1 || \n              docker network create --opt com.docker.network.driver.mtu=1400 sr_test_net
+            docker network inspect sr_test_net >/dev/null 2>&1 ||
+              docker network create --opt com.docker.network.driver.mtu=1400 sr_test_net
 
             # 보간이 성립하는지 먼저 확인한다. 여기서 실패하면 아직 아무것도 내리지 않은
             # 상태이므로 현재 서비스는 계속 살아 있다.
