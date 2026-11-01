@@ -325,11 +325,14 @@ jobs:
               #    DB(sr_db_data)/업로드(sr_uploads)는 named volume 이라 어느 쪽이든 보존된다.
               docker compose $COMPOSE_ARGS pull
 
-              # nginx·db 는 설정이 바뀐 경우에만 compose 가 알아서 재생성한다(대개 no-op).
-              docker compose $COMPOSE_ARGS up -d --remove-orphans
+              # 여기서 전체 `up` 을 돌리면 안 된다. nginx 가 앱의 service_healthy 에 의존하므로
+              # 새 앱이 unhealthy 면 compose 가 실패하고, `set -e` 로 스크립트가 끝나 아래 롤백에
+              # 닿지 못한 채 구 컨테이너만 사라진다. DB → 앱 → 헬스 게이트 → 나머지 순서로 올린다.
+              docker compose $COMPOSE_ARGS up -d --no-deps --wait --wait-timeout 120 db
 
               # 앱은 이미지가 바뀌었으므로 명시적으로 재생성한다.
-              docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app
+              # 실패해도 여기서 끝내지 않는다. 판정과 롤백은 헬스 게이트가 맡는다.
+              docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || true
 
               # 5-1. 헬스 게이트 — running 이 아니라 healthy 를 기다린다.
               if ! wait_healthy sr-app 240; then
@@ -351,6 +354,9 @@ jobs:
                   if docker tag "$PREVIOUS_IMAGE_ID" "${IMAGE_REPO}:rollback"; then
                     sed -i '/^APP_IMAGE_TAG=/d' .env.prod
                     printf '\nAPP_IMAGE_TAG=rollback\n' >> .env.prod
+                    # ssh-action 이 실패한 SHA 를 APP_IMAGE_TAG 로 export 해 두었고, compose 는
+                    # 셸 값을 --env-file 보다 우선한다. 셸 값도 바꾸지 않으면 실패한 이미지를 다시 고른다.
+                    export APP_IMAGE_TAG=rollback
                     docker compose $COMPOSE_ARGS up -d --force-recreate --no-deps app || true
                     if wait_healthy sr-app 240; then
                       echo "롤백 성공 — 이전 이미지로 서비스가 복구되었습니다."
@@ -367,6 +373,10 @@ jobs:
                 fi
                 exit 1
               fi
+
+              # 5-2. 앱이 healthy 가 된 뒤 nginx 등 나머지를 맞춘다.
+              #      설정이 바뀐 서비스만 재생성하며, 앱은 방금 올린 그대로 둔다.
+              docker compose $COMPOSE_ARGS up -d --remove-orphans
 
               # 6. Let's Encrypt 발급 스크립트 실행
               chmod +x scripts/setup-letsencrypt.sh
