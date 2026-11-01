@@ -38,7 +38,7 @@ describe('PushService Performance', () => {
       if (args?.where?.userId?.in) {
         const ids = args.where.userId.in as string[];
         return ids.map((id) => ({
-          endpoint: `endpoint-${id}`,
+          endpoint: `https://fcm.googleapis.com/fcm/send/endpoint-${id}`,
           p256dh: '65-byte-key-placeholder-which-is-long-enough-for-mocking-purposes-here',
           auth: 'auth',
           userId: id,
@@ -52,7 +52,7 @@ describe('PushService Performance', () => {
       if (typeof args?.where?.userId === 'string') {
         return [
           {
-            endpoint: `endpoint-${args.where.userId}`,
+            endpoint: `https://fcm.googleapis.com/fcm/send/endpoint-${args.where.userId}`,
             p256dh: '65-byte-key-placeholder-which-is-long-enough-for-mocking-purposes-here',
             auth: 'auth',
             userId: args.where.userId,
