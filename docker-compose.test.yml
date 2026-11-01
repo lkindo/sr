@@ -38,7 +38,7 @@ services:
       start_period: 60s
     mem_limit: 768m
     networks:
-      - sr-net
+      - sr-test-net
     logging:
       driver: 'json-file'
       options:
@@ -62,7 +62,7 @@ services:
     # `TZ` 로는 바뀌지 않아 기동 인자로 명시한다. timestamptz 저장 값은 영향받지 않는다.
     command: ['postgres', '-c', 'timezone=Asia/Seoul', '-c', 'log_timezone=Asia/Seoul']
     # 보안: DB 포트를 호스트로 공개하지 않는다(과거 '5433:5432'). app-test 는 내부
-    # 브리지(sr-net)로 접근한다. 호스트에서 직접 붙어야 하면 SSH 터널을 사용한다.
+    # 브리지(sr-test-net)로 접근한다. 호스트에서 직접 붙어야 하면 SSH 터널을 사용한다.
     #   ssh -L 5433:127.0.0.1:5433 opc@<server>  (아래 loopback 바인딩을 함께 활성화)
     # ports:
     #   - '127.0.0.1:5433:5432'
@@ -77,7 +77,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - sr-net
+      - sr-test-net
     logging:
       driver: 'json-file'
       options:
@@ -89,6 +89,9 @@ volumes:
   sr_uploads_test:
 
 networks:
-  sr-net:
+  # 운영 네트워크(sr_sr-net)를 공유하면 안 된다. 스테이징 이미지가 운영 db:5432 와 app:3000 에
+  # 직접 닿고, nginx 를 거치지 않아 X-Real-IP 까지 위조할 수 있다.
+  # nginx 만 양쪽에 붙어 test.lkindo.kr 을 중계한다.
+  sr-test-net:
     external: true
-    name: sr_sr-net
+    name: sr_test_net
