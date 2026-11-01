@@ -70,14 +70,15 @@ test.describe('로그아웃', () => {
     // 세션을 실제로 파기하는 유일한 테스트다. 컨텍스트를 직접 열어 격리한다(파일 상단 주석 참조).
     // 직접 로그아웃은 그 계정의 모든 세션을 끊는다. 공유 계정으로 하면 병렬로 도는 다른 테스트가
     // 401 이 되므로 일회용 계정을 쓴다.
-    const account = await createDisposableUser(browser);
-    const { context, page, callbackUrl } = await submitLoginForm(
-      browser,
-      account.email,
-      INITIAL_PASSWORD
-    );
+    // 접두사를 따로 둔다. 비밀번호 테스트의 정리 훅이 로그인 중인 이 계정을 지우면 안 된다.
+    const account = await createDisposableUser(browser, LOGOUT_EMAIL_PREFIX);
+    let context: BrowserContext | undefined;
 
     try {
+      const login = await submitLoginForm(browser, account.email, INITIAL_PASSWORD);
+      context = login.context;
+      const { page, callbackUrl } = login;
+
       expect(callbackUrl).not.toContain('error=');
       await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
 
@@ -110,7 +111,7 @@ test.describe('로그아웃', () => {
       await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
       await expect(page).toHaveURL(/\/login/);
     } finally {
-      await context.close();
+      await context?.close();
       await deleteDisposableUser(browser, account.id);
     }
   });
@@ -253,6 +254,7 @@ const WEAK_PASSWORD = 'short';
  * 영구히 남는다(실제로 두 건이 남았다). 접두사로 훑으면 그 유실분까지 회수된다.
  */
 const DISPOSABLE_EMAIL_PREFIX = 'e2e-auth-session-';
+const LOGOUT_EMAIL_PREFIX = 'e2e-auth-logout-';
 
 /**
  * 비밀번호를 마음대로 바꿔도 되는 일회용 계정을 ADMIN 세션으로 만든다.
@@ -263,11 +265,14 @@ const DISPOSABLE_EMAIL_PREFIX = 'e2e-auth-session-';
  * 테스트 본문에서 부르는 이유(beforeAll 이 아니라): 재시도 시에도 매번 새 계정이 생겨
  * "앞선 시도가 이미 비밀번호를 바꿔 둔" 상태에 걸리지 않는다.
  */
-async function createDisposableUser(browser: Browser): Promise<{ id: string; email: string }> {
+async function createDisposableUser(
+  browser: Browser,
+  emailPrefix = DISPOSABLE_EMAIL_PREFIX
+): Promise<{ id: string; email: string }> {
   const admin = await browser.newContext({ storageState: PERSONA_AUTH_FILES.admin });
   try {
     const stamp = `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    const email = `${DISPOSABLE_EMAIL_PREFIX}${stamp}@example.com`;
+    const email = `${emailPrefix}${stamp}@example.com`;
 
     const response = await admin.request.post('/api/users', {
       data: { name: 'E2E 세션 테스트', email, password: INITIAL_PASSWORD },
