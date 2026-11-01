@@ -107,4 +107,6 @@ const safePrisma = prisma ?? ({} as PrismaClient);
 export default safePrisma;
 
 // 확장 **이전** 인스턴스를 캐시한다. 확장된 것을 넣으면 HMR 마다 확장이 중첩된다.
-if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = basePrisma;
+// 운영에서도 캐시한다. 운영 빌드는 모듈 그래프가 여럿이라 캐시하지 않으면 그래프마다
+// 연결 풀이 따로 생긴다.
+globalThis.prismaGlobal = basePrisma;

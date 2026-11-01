@@ -13,7 +13,15 @@ class RealtimeEventEmitter extends EventEmitter {
   }
 }
 
-export const realtimeEmitter = new RealtimeEventEmitter();
+declare const globalThis: {
+  realtimeEmitterGlobal?: RealtimeEventEmitter;
+} & typeof global;
+
+/**
+ * 프로세스 전역 싱글톤이다. 모듈 변수로 두면 서버 액션이 발행한 이벤트가
+ * 라우트 그래프의 SSE 리스너에 닿지 않는다(domain-events.ts 와 같은 이유).
+ */
+export const realtimeEmitter = (globalThis.realtimeEmitterGlobal ??= new RealtimeEventEmitter());
 
 /**
  * 이벤트 타입 정의
