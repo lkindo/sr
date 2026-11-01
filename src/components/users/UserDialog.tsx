@@ -19,8 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { apiList, apiPatch, apiPost, buildQuery, retryUnlessClientError } from '@/lib/api-client';
 import { logger } from '@/lib/logger';
+import { firstPasswordIssue } from '@/lib/password-policy';
 import { qk } from '@/lib/query-keys';
-import { passwordSchema } from '@/lib/schemas';
 import type { ClientSummary } from '@/types/client.types';
 
 /** 서버 `passwordSchema` 가 실제로 요구하는 규칙. 입력 힌트와 검증을 한 곳에서 맞춘다. */
@@ -257,13 +257,9 @@ export function UserDialog({
     // 서버(`passwordSchema`)와 같은 규칙으로 미리 걸러 준다.
     // 예전에는 여기서 "최소 8자"만 보고 통과시켜, 서버 거절 사유를 사용자가 알 수 없었다.
     if (!isEditMode || password) {
-      const passwordCheck = passwordSchema.safeParse(password);
-      if (!passwordCheck.success) {
-        toast({
-          title: '오류',
-          description: passwordCheck.error.issues[0]?.message ?? PASSWORD_RULE_HINT,
-          variant: 'destructive',
-        });
+      const passwordIssue = firstPasswordIssue(password);
+      if (passwordIssue) {
+        toast({ title: '오류', description: passwordIssue, variant: 'destructive' });
         return;
       }
     }

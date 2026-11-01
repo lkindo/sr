@@ -18,8 +18,8 @@ import { Label } from '@/components/ui';
 import { Textarea } from '@/components/ui';
 import { useToast } from '@/hooks/use-toast';
 import { apiPatch } from '@/lib/api-client';
+import { FIELD_LIMITS } from '@/lib/field-limits';
 import { qk } from '@/lib/query-keys';
-import { FIELD_LIMITS } from '@/lib/schemas';
 import { fromAppZoneDateTimeInput, toAppZoneDateTimeInput } from '@/lib/timezone';
 
 interface DueDateAdjustDialogProps {

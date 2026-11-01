@@ -1438,8 +1438,9 @@ app/
    - 차트 라이브러리는 없다(대시보드 차트 제거)
 
 2. **Tree Shaking**
-   - ESM import/export. `package.json` 에 `sideEffects` 선언은 **없다**
-   - `components/ui` 는 배럴 import 를 쓴다(`.gemini/rules/fe-rules.md` §1.2)
+   - ESM import/export. 루트 `package.json` 에 `sideEffects` 선언은 **없다**
+   - `components/ui` 는 배럴 import 를 쓴다(`.gemini/rules/fe-rules.md` §1.2). 폴더 안의 `package.json` 이 `sideEffects: false` 를 선언해 쓰지 않는 컴포넌트를 번들에서 뺀다. 이 폴더에는 모듈 수준 부수 효과를 두지 않는다
+   - `'use client'` 파일은 `zod`, `@/lib/schemas`, `@prisma/client` 를 값으로 가져오지 않는다. 필드 상한은 `lib/field-limits`, 비밀번호 규칙은 `lib/password-policy` 에서 읽는다(`tests/scripts/client-bundle-guards.unit.test.ts` 가 검사)
 
 3. **Image Optimization**
    - `next/image` 를 쓰는 곳이 없다(이미지 자산이 거의 없다). 도입하면 자체 서버의 이미지 최적화 캐시를 함께 고려한다

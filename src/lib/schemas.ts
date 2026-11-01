@@ -1,86 +1,31 @@
 import { z } from 'zod';
 
+import { FIELD_LIMITS } from '@/lib/field-limits';
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_PATTERN_RULES,
+  PASSWORD_TOO_LONG_MESSAGE,
+  PASSWORD_TOO_SHORT_MESSAGE,
+} from '@/lib/password-policy';
+
+export { FIELD_LIMITS } from '@/lib/field-limits';
+export {
+  PASSWORD_POLICY_DESCRIPTION,
+  PASSWORD_SPECIAL_CHAR_PATTERN,
+  PASSWORD_SPECIAL_CHARS,
+} from '@/lib/password-policy';
+
 const emptyStringToUndefined = (val: unknown) => (val === '' ? undefined : val);
 const emptyStringToNull = (val: unknown) => (val === '' ? null : val);
 
-/**
- * 문자열 필드 길이 상한 (감사 4.3).
- *
- * 대부분의 텍스트 필드에 `min` 만 있고 `max` 가 없어, 인증된 단일 POST 로 거대한 텍스트를
- * Postgres 에 영속시킬 수 있었다.
- *
- * **값은 `prisma/schema.prisma` 의 컬럼 폭에서 도출한다.** zod 상한이 컬럼보다 크면
- * 검증은 통과하고 DB 가 거부해, 사용자에게는 원인을 알 수 없는 500 으로 보인다.
- * (실제로 `registerSchema.name` / `userCreateSchema.name` 이 `.max(100)` 인데
- *  `users.name` 은 varchar(50) 이라 51~100자 이름이 정확히 그 경로를 밟고 있었다.)
- *
- * 컬럼이 무제한 TEXT 인 필드(description, 코멘트, 메모 등)는 DB 제약이 없으므로
- * 여기서 정하는 값이 유일한 상한이다.
- */
-export const FIELD_LIMITS = {
-  // varchar(50) — users.name, roles.name, clients.contactPerson
-  NAME: 50,
-  // varchar(100) — clients.name, clients.industry, service_categories.categoryName
-  DISPLAY_NAME: 100,
-  // varchar(50) — clients.code, permissions.resource/action
-  CODE: 50,
-  // varchar(255) — users.email, clients.contactEmail
-  EMAIL: 255,
-  // varchar(30) — clients.contactPhone
-  PHONE: 30,
-  // varchar(500) — clients.address
-  ADDRESS: 500,
-  // varchar(255) — roles.description, service_categories.description
-  SHORT_TEXT: 255,
-  // varchar(255) — srs.title (여유를 두고 200)
-  TITLE: 200,
-  // varchar(1024) — users.image
-  URL: 1024,
-  // TEXT (DB 무제한) — srs.description
-  LONG_TEXT: 10_000,
-  // TEXT (DB 무제한) — sr_comments.content, intake_notes, resolution/rejection 등
-  NOTE: 5_000,
-} as const;
-
-/**
- * 비밀번호 복잡도 검증 스키마
- *
- * 보안 요구사항:
- * - 최소 8자 이상
- * - 대문자 1개 이상 포함 (A-Z)
- * - 소문자 1개 이상 포함 (a-z)
- * - 숫자 1개 이상 포함 (0-9)
- * - 특수문자 1개 이상 포함 (!@#$%^&*()_+-=[]{}|;:,.<>?)
- */
-const PASSWORD_MIN_LENGTH = 8;
-const PASSWORD_MAX_LENGTH = 100;
-
-/**
- * 특수문자로 인정하는 문자 — **정본**. 목록에 없는 문자(`~`, `/`, `'` 등)는 특수문자로 치지 않는다.
- * 안내 문구가 "특수문자" 라고만 하면 `~` 를 넣은 사용자는 이유를 모른 채 거부된다.
- */
-export const PASSWORD_SPECIAL_CHARS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
-
-/**
- * `PASSWORD_SPECIAL_CHARS` 중 하나를 포함하는지. 정규식 리터럴로 두고(문자열로 조립하면
- * `new RegExp` 가 된다) 목록과의 일치는 schemas.test.ts 가 문자 단위로 검증한다.
- */
-export const PASSWORD_SPECIAL_CHAR_PATTERN = /[!@#$%^&*()_+\-=[\]{}|;:,.<>?]/;
-
-/** 사람이 읽는 비밀번호 정책. 아래 스키마와 같은 상수에서 만들어 둘이 갈라지지 않게 한다. */
-export const PASSWORD_POLICY_DESCRIPTION = `${PASSWORD_MIN_LENGTH}~${PASSWORD_MAX_LENGTH}자, 대문자·소문자·숫자·특수문자를 각각 1개 이상 포함(특수문자: ${PASSWORD_SPECIAL_CHARS})`;
-
-export const passwordSchema = z
-  .string()
-  .min(PASSWORD_MIN_LENGTH, `비밀번호는 최소 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다.`)
-  .max(PASSWORD_MAX_LENGTH, `비밀번호는 ${PASSWORD_MAX_LENGTH}자를 초과할 수 없습니다.`)
-  .regex(/[A-Z]/, '비밀번호는 대문자를 최소 1개 이상 포함해야 합니다.')
-  .regex(/[a-z]/, '비밀번호는 소문자를 최소 1개 이상 포함해야 합니다.')
-  .regex(/[0-9]/, '비밀번호는 숫자를 최소 1개 이상 포함해야 합니다.')
-  .regex(
-    PASSWORD_SPECIAL_CHAR_PATTERN,
-    `비밀번호는 특수문자(${PASSWORD_SPECIAL_CHARS})를 최소 1개 이상 포함해야 합니다.`
-  );
+export const passwordSchema = PASSWORD_PATTERN_RULES.reduce(
+  (schema, rule) => schema.regex(rule.pattern, rule.message),
+  z
+    .string()
+    .min(PASSWORD_MIN_LENGTH, PASSWORD_TOO_SHORT_MESSAGE)
+    .max(PASSWORD_MAX_LENGTH, PASSWORD_TOO_LONG_MESSAGE)
+);
 
 /**
  * 회원가입 필드 (refine 이전의 base object).
