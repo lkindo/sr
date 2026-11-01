@@ -71,8 +71,23 @@ interface ReassignVariables {
   force: boolean;
 }
 
-/** 조직 트리는 페이지네이션 없이 전량을 그린다. 키와 URL 이 같은 객체에서 나오도록 묶어 둔다. */
-const CLIENT_LIST_PARAMS = { pageSize: 1000 };
+/** 키와 URL 이 같은 객체에서 나오도록 묶어 둔다. 값은 API 상한(MAX_PAGE_SIZE)이다. */
+const CLIENT_LIST_PARAMS = { pageSize: 100 };
+
+/**
+ * 조직 트리는 전량을 그린다. 상한을 넘는 pageSize 는 서버가 기본값(20)으로 되돌려 고객사가
+ * 조용히 빠지므로, 페이지를 끝까지 읽는다.
+ */
+async function fetchAllClients(signal?: AbortSignal): Promise<Client[]> {
+  const fetchPage = (page: number) =>
+    apiList<Client>(`/api/clients${buildQuery({ ...CLIENT_LIST_PARAMS, page })}`, { signal });
+
+  const first = await fetchPage(1);
+  const rest = await Promise.all(
+    Array.from({ length: first.meta.totalPages - 1 }, (_, index) => fetchPage(index + 2))
+  );
+  return [first, ...rest].flatMap((page) => page.data);
+}
 
 /**
  * 목록이 아직 없을 때 쓰는 빈 배열. **상수여야 한다.**
@@ -117,26 +132,22 @@ export default function OrganizationPage() {
    * 채 배경에서 다시 가져오므로 트리가 보이는 상태 그대로 갱신된다.
    *
    * `placeholderData: keepPreviousData` + `staleTime: 0` 은 목록 관례다. 이 화면은 파라미터가
-   * 고정(pageSize=1000)이라 키가 바뀔 일이 없지만, 재조회 동안 이전 data 를 그대로 들고 있는
+   * 고정이라 키가 바뀔 일이 없지만, 재조회 동안 이전 data 를 그대로 들고 있는
    * 성질이 아래 소속 변경 성공 경로가 `Promise.all` 로 전부 모아 한 번에 setState 하며 막던
    * 그 깜빡임을 대신 막아 준다.
    */
   const {
-    data: clientPage,
+    data: clients = EMPTY_CLIENTS,
     isPending,
     error: clientsError,
   } = useQuery({
     queryKey: qk.clients.list(CLIENT_LIST_PARAMS),
-    // 예전 `Array.isArray(result) ? result : result.data || []` 삼항식은 apiList 가 흡수했다.
-    queryFn: ({ signal }) =>
-      apiList<Client>(`/api/clients${buildQuery(CLIENT_LIST_PARAMS)}`, { signal }),
+    queryFn: ({ signal }) => fetchAllClients(signal),
     placeholderData: keepPreviousData,
     staleTime: 0,
     // 4xx 는 다시 물어봐도 같다. 전역 기본값 retry:1 이면 오류 토스트가 한 박자 늦게 뜬다.
     retry: retryUnlessClientError,
   });
-
-  const clients = clientPage?.data ?? EMPTY_CLIENTS;
 
   /**
    * 조회 실패 토스트. v5 의 `useQuery` 에는 `onError` 가 없어 effect 로 옮겼다.

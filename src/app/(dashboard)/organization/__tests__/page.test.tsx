@@ -128,6 +128,8 @@ function jsonResponse(status: number, body: unknown) {
   } as unknown as Response;
 }
 
+const CLIENT_LIST_URL = '/api/clients?pageSize=100&page=1';
+
 const CLIENTS = [
   { id: 'c1', code: 'ALPHA', name: '알파', isActive: true, _count: { users: 1, srs: 0 } },
   { id: 'c2', code: 'BETA', name: '베타', isActive: true, _count: { users: 0, srs: 0 } },
@@ -139,7 +141,7 @@ function clientListResponse() {
     data: CLIENTS,
     meta: {
       currentPage: 1,
-      pageSize: 1000,
+      pageSize: 100,
       totalItems: CLIENTS.length,
       totalPages: 1,
       hasPreviousPage: false,
@@ -195,10 +197,29 @@ describe('OrganizationPage', () => {
 
     expect(await screen.findByTestId('client-count')).toHaveTextContent('2');
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/clients?pageSize=1000',
+      CLIENT_LIST_URL,
       expect.objectContaining({ method: 'GET' })
     );
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  // 상한을 넘는 pageSize 는 서버가 기본값으로 되돌려, 고객사가 조용히 빠졌다.
+  it('고객사가 한 페이지를 넘으면 끝까지 읽어 전부 그린다', async () => {
+    const pageOf = (data: typeof CLIENTS, currentPage: number) =>
+      jsonResponse(200, {
+        data,
+        meta: { currentPage, pageSize: 100, totalItems: 3, totalPages: 2 },
+      });
+    const third = { ...CLIENTS[0]!, id: 'c3', code: 'GAMMA', name: '감마' };
+    stubFetch((url) => {
+      if (url === CLIENT_LIST_URL) return pageOf(CLIENTS, 1);
+      if (url === '/api/clients?pageSize=100&page=2') return pageOf([third], 2);
+      return undefined;
+    });
+
+    renderPage();
+
+    expect(await screen.findByTestId('client-count')).toHaveTextContent('3');
   });
 
   it('행을 펼친 고객사만 사용자를 지연 조회한다', async () => {
@@ -223,7 +244,7 @@ describe('OrganizationPage', () => {
     fireEvent.click(await screen.findByText('toggle-c1'));
     await screen.findByText('홍길동');
 
-    const listCallsBefore = callsTo(fetchMock, '/api/clients?pageSize=1000');
+    const listCallsBefore = callsTo(fetchMock, CLIENT_LIST_URL);
     const c1CallsBefore = callsTo(fetchMock, '/api/clients/c1');
 
     fireEvent.click(screen.getByText('toggle-active-user'));
@@ -235,7 +256,7 @@ describe('OrganizationPage', () => {
       })
     );
 
-    expect(callsTo(fetchMock, '/api/clients?pageSize=1000')).toBeGreaterThan(listCallsBefore);
+    expect(callsTo(fetchMock, CLIENT_LIST_URL)).toBeGreaterThan(listCallsBefore);
     expect(callsTo(fetchMock, '/api/clients/c1')).toBeGreaterThan(c1CallsBefore);
     // 접혀 있는 고객사는 무효화돼도 다시 가져오지 않는다(비활성 쿼리).
     expect(callsTo(fetchMock, '/api/clients/c2')).toBe(0);
