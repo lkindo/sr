@@ -45,6 +45,24 @@ beforeEach(() => {
   mocks.getSRBadgeCounts.mockResolvedValue({});
 });
 
+describe('SRsPage — 등록일 필터', () => {
+  // 날짜 입력은 KST 달력일이다. UTC 자정으로 읽으면 시작일 오전이 빠지고 종료일 09시 이후가 누락된다.
+  it('시작일과 종료일을 KST 하루 전체로 거른다', async () => {
+    await render({ dateFrom: '2026-11-01', dateTo: '2026-11-02' });
+
+    const { createdAt } = mocks.getAllSRs.mock.calls[0]![0].where;
+    expect(createdAt.gte.toISOString()).toBe('2026-10-31T15:00:00.000Z');
+    expect(createdAt.lt.toISOString()).toBe('2026-11-02T15:00:00.000Z');
+    expect(createdAt.lte).toBeUndefined();
+  });
+
+  it('형식이 맞지 않는 날짜는 조건으로 쓰지 않는다', async () => {
+    await render({ dateFrom: 'not-a-date' });
+
+    expect(mocks.getAllSRs.mock.calls[0]![0].where.createdAt).toBeUndefined();
+  });
+});
+
 describe('SRsPage — 지연 중 필터(D10)', () => {
   it('overdue=1 이면 진행 중 상태이면서 마감을 넘긴 SR 만 거른다', async () => {
     const before = Date.now();
