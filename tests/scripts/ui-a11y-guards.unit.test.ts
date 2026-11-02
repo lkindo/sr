@@ -22,6 +22,15 @@ const ALLOWED = new Set([
   'src/components/organization/OrganizationTree.tsx:div:onClick={(e) => e.stopPropagation',
 ]);
 
+/** 값이 비어 있거나 음수면 속성이 있어도 키보드로 쓸 수 없다. */
+function hasUsableValue(attr: ts.JsxAttribute | undefined, tree: ts.SourceFile): boolean {
+  const init = attr?.initializer;
+  if (!init) return false;
+  if (!ts.isJsxExpression(init)) return true; // role="checkbox"
+  const value = init.expression?.getText(tree) ?? '';
+  return value !== '' && value !== 'undefined' && value !== 'null' && !value.startsWith('-');
+}
+
 /** 역할과 키보드 포커스를 함께 갖췄으면 직접 처리한 것으로 본다. */
 function findKeyboardlessClicks(file: string, source: string): string[] {
   const tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -35,7 +44,7 @@ function findKeyboardlessClicks(file: string, source: string): string[] {
       if (
         onClick &&
         !INTERACTIVE_TAG.test(tag) &&
-        !(named('role') && named('tabIndex') && named('onKeyDown'))
+        !['role', 'tabIndex', 'onKeyDown'].every((name) => hasUsableValue(named(name), tree))
       ) {
         found.push(`${file}:${tag}:${onClick.getText(tree).slice(0, 40).replace(/\s+/g, ' ')}`);
       }
@@ -78,6 +87,11 @@ describe('키보드 접근', () => {
       ['Badge', '<Badge onClick={f} />'],
       ['역할만 있는 div', '<div role="button" onClick={f}>x</div>'],
       ['포커스 없는 div', '<div role="button" onKeyDown={f} onClick={f}>x</div>'],
+      ['Tab 에서 빠진 div', '<div role="button" tabIndex={-1} onKeyDown={f} onClick={f}>x</div>'],
+      [
+        '키 처리가 빈 div',
+        '<div role="button" tabIndex={0} onKeyDown={undefined} onClick={f}>x</div>',
+      ],
     ])('%s 를 잡는다', (_name, jsx) => {
       expect(check(jsx)).toHaveLength(1);
     });
@@ -110,6 +124,9 @@ function contrast(a: number[], b: number[]): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
+/** 글자용 토큰을 배경으로 쓰는 클래스. 옅은 틴트(/10 등)는 위에 흰 글자를 올리지 않으므로 허용한다. */
+const TEXT_TOKEN_BACKGROUND = /(?:^|[\s'"`:])bg-destructive(?:\/(?:[5-9]\d|100))?(?=[\s'"`])/;
+
 describe('색 대비', () => {
   const css = readFileSync('src/app/globals.css', 'utf8');
   const darkAt = css.indexOf('.dark');
@@ -133,6 +150,23 @@ describe('색 대비', () => {
     expect(contrast(token(theme, 'input'), token(theme, 'background'))).toBeGreaterThanOrEqual(3);
   });
 
+  it.each([
+    ['기본', 'className="bg-destructive"'],
+    ['상태 접두사', 'className="hover:bg-destructive"'],
+    ['다크 접두사', 'className="dark:hover:bg-destructive p-1"'],
+    ['진한 불투명도', 'className="hover:bg-destructive/90"'],
+  ])('색 검사기가 %s 를 잡는다', (_name, line) => {
+    expect(TEXT_TOKEN_BACKGROUND.test(line)).toBe(true);
+  });
+
+  it.each([
+    ['전용 토큰', 'className="bg-destructive-solid"'],
+    ['옅은 배경', 'className="bg-destructive/10 text-destructive"'],
+    ['글자색', 'className="text-destructive"'],
+  ])('색 검사기가 %s 는 통과시킨다', (_name, line) => {
+    expect(TEXT_TOKEN_BACKGROUND.test(line)).toBe(false);
+  });
+
   // 다크 모드의 --destructive 는 글자용으로 밝다. 그 위에 흰 글자를 올리면 2.3:1 이 된다.
   it('글자용 --destructive 를 글자 배경으로 쓰지 않는다', () => {
     // 주석은 뺀다. 옛 조합을 설명하는 글에 걸리면 안 된다.
@@ -140,7 +174,7 @@ describe('색 대비', () => {
       readFileSync(file, 'utf8')
         .split(/\r?\n/)
         .filter((line) => !/^\s*(\/\/|\*|\{\/\*)/.test(line))
-        .some((line) => /(?:^|[\s'"`])bg-destructive(?=[\s'"`])/.test(line));
+        .some((line) => TEXT_TOKEN_BACKGROUND.test(line));
     const offenders = sourceFiles.filter(usesTextTokenAsBackground);
 
     expect(offenders).toEqual([]);

@@ -289,7 +289,7 @@ export function AssignRolesDialog({
                       }
                     }}
                     className={cn(
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-card',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring cursor-pointer rounded-lg border p-4 transition-all duration-200 hover:shadow-md relative overflow-hidden bg-card',
                       isSelected
                         ? 'border-primary bg-primary/5 ring-1 ring-primary'
                         : 'hover:border-primary/50'

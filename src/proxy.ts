@@ -8,6 +8,7 @@ import { authConfig, isAuthPagePath } from '@/auth.config';
 const { auth } = NextAuth(authConfig);
 
 // Rate Limiter 인스턴스 (메모리 유지 - 람다/엣지에서는 인스턴스마다 별도일 수 있음)
+import { RATE_LIMITED_MESSAGE } from '@/lib/rate-limit-message';
 import { getClientIp, rateLimiters } from '@/lib/rate-limiter';
 const ratelimit = rateLimiters.middleware;
 
@@ -48,14 +49,18 @@ export default auth(async (req) => {
     const { allowed, limit, resetTime, remaining } = await ratelimit.check(ip);
 
     if (!allowed) {
-      return new NextResponse('Too Many Requests', {
-        status: 429,
-        headers: {
-          'X-RateLimit-Limit': limit.toString(),
-          'X-RateLimit-Remaining': remaining.toString(),
-          'X-RateLimit-Reset': resetTime.toString(),
-        },
-      });
+      // api-client 는 JSON 의 error 만 읽는다. 일반 텍스트면 재시도 안내가 화면에 나오지 않는다.
+      return NextResponse.json(
+        { error: RATE_LIMITED_MESSAGE },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': limit.toString(),
+            'X-RateLimit-Remaining': remaining.toString(),
+            'X-RateLimit-Reset': resetTime.toString(),
+          },
+        }
+      );
     }
   }
 
