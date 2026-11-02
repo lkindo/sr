@@ -12,6 +12,20 @@ import type { UserService } from '@/services/user.service';
 
 type UserWithDetails = NonNullable<Awaited<ReturnType<UserService['getUserById']>>>;
 
+/**
+ * 사용자가 직접 로그아웃할 때 부른다. 유휴 자동 로그아웃에는 쓰지 않는다. sessionVersion 은 사용자
+ * 단위라, 쓰면 한 기기가 유휴 상태가 되는 순간 다른 기기의 작업까지 끊긴다.
+ */
+export async function revokeMySessionsAction(): Promise<Result<void>> {
+  try {
+    const session = await getAuthenticatedSession();
+    await services.userService.revokeSessions(session.user.id);
+    return ok(undefined);
+  } catch (error) {
+    return errorToResult(error);
+  }
+}
+
 export async function getProfileAction(): Promise<Result<UserWithDetails>> {
   try {
     const session = await getAuthenticatedSession();

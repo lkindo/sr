@@ -121,6 +121,19 @@ describe('POST /api/push/subscribe', () => {
     expect(mockSave).not.toHaveBeenCalled();
   });
 
+  // 서버가 이 주소로 POST 한다. 허용하면 로그인 사용자가 서버를 경유해 임의 주소를 호출한다.
+  it('푸시 서비스가 아닌 endpoint 는 저장하지 않고 400 으로 막는다', async () => {
+    mockParseJsonBody.mockResolvedValue({
+      ...VALID,
+      endpoint: 'https://attacker.example.com/collect',
+    });
+
+    const res = await callPost(postReq());
+
+    expect(res.status).toBe(400);
+    expect(mockSave).not.toHaveBeenCalled();
+  });
+
   it('저장이 실패하면 500 과 일반 문구만 준다', async () => {
     mockSave.mockRejectedValue(new Error('unique constraint push_subscriptions_endpoint_key'));
 

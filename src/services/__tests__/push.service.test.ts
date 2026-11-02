@@ -180,7 +180,7 @@ describe('PushService', () => {
     it('sends notification and handles success', async () => {
       vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([
         {
-          endpoint: 'ep1',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/ep1',
           p256dh: 'd',
           auth: 'a',
         },
@@ -197,7 +197,7 @@ describe('PushService', () => {
     it('removes invalid subscription on 410 error', async () => {
       vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([
         {
-          endpoint: 'ep-invalid',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/ep-invalid',
           p256dh: 'd',
           auth: 'a',
         },
@@ -209,8 +209,27 @@ describe('PushService', () => {
       await pushService.sendToUser('u1', { title: 'T', body: 'B' });
       expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { endpoint: 'ep-invalid' },
+          where: { endpoint: 'https://fcm.googleapis.com/fcm/send/ep-invalid' },
         })
+      );
+    });
+
+    // 검사가 생기기 전에 저장된 행이 있을 수 있으므로 발송 시점에도 막는다.
+    it('저장된 구독이 푸시 서비스 주소가 아니면 요청을 보내지 않고 제거한다', async () => {
+      const stored = 'https://attacker.example.com/collect';
+      vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([
+        { endpoint: stored, p256dh: 'd', auth: 'a' },
+      ] as any);
+
+      const { sendNotification } = await import('web-push');
+      vi.mocked(sendNotification).mockClear();
+
+      const results = await pushService.sendToUser('u1', { title: 'T', body: 'B' });
+
+      expect(sendNotification).not.toHaveBeenCalled();
+      expect(results).toEqual([]);
+      expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { endpoint: stored } })
       );
     });
   });

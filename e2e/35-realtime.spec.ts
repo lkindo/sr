@@ -2,6 +2,7 @@ import { APIRequestContext, Browser, expect, Page, Request, test } from '@playwr
 
 import { deleteSeededSRs, seedSR } from './fixtures/sr';
 import { PERSONA_AUTH_FILES } from './helpers/auth-helpers';
+import { createTestSR } from './helpers/test-helpers';
 
 /**
  * 실시간(SSE) 갱신.
@@ -149,6 +150,37 @@ test.describe('실시간 갱신 (SSE)', () => {
     await expect(srRow(page, sr.srNumber)).toBeVisible({ timeout: 20000 });
 
     // 이벤트가 도착했으므로 이제 응답 헤더도 확정되어 있다.
+    await expectSSEResponse(streamRequest);
+  });
+
+  // 시드는 REST 로 만들지만 화면의 등록은 서버 액션이다. 운영 빌드는 두 경로의 모듈 그래프가 달라서,
+  // 이벤트 버스가 갈라지면 REST 경로만 보는 위 테스트는 통과하고 이 경로만 조용히 끊긴다.
+  test('화면에서 등록한 SR(서버 액션)도 다른 사용자에게 실시간으로 도달한다', async ({
+    page,
+    browser,
+  }) => {
+    const streamRequest = await connectRealtime(page, '/srs');
+    await expect(page.getByRole('heading', { name: 'SR 목록', exact: true })).toBeVisible();
+
+    const managerContext = await browser.newContext({ storageState: PERSONA_AUTH_FILES.manager });
+    let srNumber: string;
+    try {
+      const srId = await createTestSR(await managerContext.newPage(), {
+        title: `서버 액션 실시간 확인 ${Date.now()}`,
+        description: '서버 액션으로 등록한 SR 이 SSE 로 도달하는지 확인합니다.',
+      });
+      seededSRIds.push(srId);
+      // 병렬 실행 중 다른 테스트의 이벤트로 통과하지 않도록 이 SR 의 번호로 확인한다.
+      const response = await managerContext.request.get(`/api/srs/${srId}`);
+      expect(response.status()).toBe(200);
+      srNumber = (await response.json()).srNumber;
+    } finally {
+      await managerContext.close();
+    }
+
+    await expect(
+      page.getByText(`새로운 SR #${srNumber}가 등록되었습니다.`, { exact: true })
+    ).toBeVisible();
     await expectSSEResponse(streamRequest);
   });
 

@@ -32,7 +32,13 @@ export const POST = withAuthAndRateLimit(
     });
 
     logger.debug('[Test API] Send results', { custom_count: results.length });
-    return NextResponse.json({ success: true, count: subscriptions.length, results });
+    // 푸시 서비스의 응답 본문은 돌려주지 않는다. 호출 대상이 달라졌을 때 응답을 읽어 가는
+    // 통로가 되므로, 건수만 알린다.
+    return NextResponse.json({
+      success: true,
+      count: subscriptions.length,
+      delivered: results.length,
+    });
   },
   { preset: 'strict' }
 );

@@ -6,7 +6,6 @@ import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { SORTABLE_FIELDS, usePagination } from '@/lib/pagination';
 import { ensureCanCreateSR, resolveAssigneeScope, resolveClientIdFilter } from '@/lib/policies';
-import prisma from '@/lib/prisma';
 import { SR_ALIVE } from '@/lib/prisma-selects';
 import { srCreateSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
@@ -77,7 +76,8 @@ export const GET = withAuthAndRateLimit(
         take,
         orderBy: orderBy as import('@prisma/client').Prisma.SROrderByWithRelationInput,
       }),
-      prisma.sR.count({ where: filters }),
+      // 목록과 같은 스코프로 센다. 따로 세면 목록 1건에 총건수 100건처럼 어긋나고 권한 밖 건수가 샌다.
+      srService.countSRs({ viewer: session.user, where: filters }),
     ]);
 
     const result = createResponse(srs, totalCount);

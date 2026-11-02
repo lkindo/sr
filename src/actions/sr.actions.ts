@@ -10,7 +10,7 @@ import {
 } from '@/lib/action-helpers';
 import { errorToResult } from '@/lib/errors';
 import { PERMISSIONS } from '@/lib/permission-helpers';
-import { canRegisterSROnBehalf, ensureCanReadSR } from '@/lib/policies';
+import { canRegisterSROnBehalf, ensureCanCreateSR, ensureCanReadSR } from '@/lib/policies';
 import { fail, ok, Result } from '@/lib/result';
 import { srCreateSchema, srPatchSchema } from '@/lib/schemas';
 import { serializeResponse } from '@/lib/serialization';
@@ -53,6 +53,9 @@ export async function getSRRequesterCandidatesAction(
     if (!canRegisterSROnBehalf(session.user)) {
       return fail('대리 등록 권한이 없습니다.', 'FORBIDDEN');
     }
+    // 후보 목록은 고객 이름·이메일이다. SR 을 등록할 수 없는 내부 사용자(ENGINEER)에게 주면
+    // 고객사 명부 차단(canViewClientRoster)을 이 경로로 우회하게 된다.
+    ensureCanCreateSR(session.user);
     return ok(await srService.getRequesterCandidates(clientId));
   } catch (error) {
     return errorToResult(error);

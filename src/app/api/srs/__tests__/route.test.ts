@@ -2,15 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mock functions
-const { mockGetAllSRs, mockCreateSR, mockCheckPermission, mockHandleApiError } = vi.hoisted(() => ({
-  mockGetAllSRs: vi.fn(),
-  mockCreateSR: vi.fn(),
-  mockCheckPermission: vi.fn(),
-  mockHandleApiError: vi.fn((error) => {
-    const status = error.statusCode || (error.name === 'ForbiddenError' ? 403 : 500);
-    return NextResponse.json({ error: error.message || 'Error' }, { status });
-  }),
-}));
+const { mockGetAllSRs, mockCountSRs, mockCreateSR, mockCheckPermission, mockHandleApiError } =
+  vi.hoisted(() => ({
+    mockGetAllSRs: vi.fn(),
+    mockCountSRs: vi.fn(),
+    mockCreateSR: vi.fn(),
+    mockCheckPermission: vi.fn(),
+    mockHandleApiError: vi.fn((error) => {
+      const status = error.statusCode || (error.name === 'ForbiddenError' ? 403 : 500);
+      return NextResponse.json({ error: error.message || 'Error' }, { status });
+    }),
+  }));
 
 // Mock api-error-handler
 vi.mock('@/lib/api-error-handler', () => ({
@@ -62,6 +64,7 @@ vi.mock('@/services/sr.service', () => ({
   SRService: vi.fn(),
   srService: {
     getAllSRs: mockGetAllSRs,
+    countSRs: mockCountSRs,
     createSR: mockCreateSR,
   },
 }));
@@ -99,7 +102,7 @@ describe('API Route: /api/srs (Integration)', () => {
     it('should return SR list with 200 OK', async () => {
       const mockSrs = [{ id: 'sr-1', title: 'Test SR' }];
       mockGetAllSRs.mockResolvedValue(mockSrs as any);
-      vi.mocked(prisma.sR.count).mockResolvedValue(1);
+      mockCountSRs.mockResolvedValue(1);
 
       const req = new NextRequest('http://localhost/api/srs');
       const res = await GET(req, { params: Promise.resolve({}) } as any);

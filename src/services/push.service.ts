@@ -10,6 +10,7 @@ import { createECDH } from 'node:crypto';
 import { isPlaceholderValue } from '@/lib/env-validation';
 import { logger } from '@/lib/logger';
 import prisma from '@/lib/prisma';
+import { isAllowedPushEndpoint } from '@/lib/push-endpoint';
 
 // WebPush subscription interface (matches web-push library expectations)
 interface WebPushSubscription {
@@ -218,6 +219,16 @@ export class PushService {
     sub: DBPushSubscription,
     payload: PushPayload
   ): Promise<{ statusCode: number; body: string } | null> {
+    // 모든 발송이 지나는 지점에서 다시 막는다. 구독 저장 때의 검사만으로는
+    // 검사가 생기기 전에 저장된 행으로 나가는 요청을 막지 못한다.
+    if (!isAllowedPushEndpoint(sub.endpoint)) {
+      logger.warn('[PushService] 허용되지 않은 endpoint 의 구독을 제거합니다.', {
+        subscriptionId: sub.id,
+      });
+      await this.removeSubscription(sub.endpoint);
+      return null;
+    }
+
     try {
       const webPushSub: WebPushSubscription = {
         endpoint: sub.endpoint,

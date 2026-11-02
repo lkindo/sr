@@ -35,12 +35,13 @@ export function SRComments({ srId }: SRCommentsProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   // React Query 무한 스크롤
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error } =
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, error, refetch } =
     useSRCommentsInfinite(srId);
 
   // Intersection Observer로 자동 로딩
+  // 실패한 동안에는 멈춘다. 관찰 영역이 화면에 남아 있어 조회가 끝날 때마다 다시 호출되기 때문이다.
   useEffect(() => {
-    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage) return;
+    if (!loadMoreRef.current || !hasNextPage || isFetchingNextPage || error) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -54,7 +55,7 @@ export function SRComments({ srId }: SRCommentsProps) {
     observer.observe(loadMoreRef.current);
 
     return () => observer.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, error]);
 
   /**
    * 댓글 작성.
@@ -141,11 +142,18 @@ export function SRComments({ srId }: SRCommentsProps) {
     );
   }
 
-  if (error) {
+  // 불러온 내용이 있으면 재조회가 실패해도 화면을 유지한다. 오류 화면으로 바꾸면 쓰던 댓글이
+  // 가려지고, 복구하려고 새로고침하면 초안을 잃는다.
+  if (error && !data) {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-destructive py-8">댓글을 불러오는데 실패했습니다.</p>
+          <div role="alert" className="flex flex-col items-center gap-3 py-8">
+            <p className="text-center text-destructive">댓글을 불러오는데 실패했습니다.</p>
+            <Button type="button" onClick={() => refetch()} variant="outline" size="sm">
+              다시 시도
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -153,6 +161,17 @@ export function SRComments({ srId }: SRCommentsProps) {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
+          <span>최신 댓글을 불러오지 못했습니다. 목록이 이전 상태일 수 있습니다.</span>
+          <Button type="button" onClick={() => refetch()} variant="outline" size="sm">
+            다시 시도
+          </Button>
+        </div>
+      )}
       <Card className="w-full max-w-full overflow-hidden">
         <CardHeader className="p-4 md:p-6">
           <CardTitle className="text-lg">새 댓글 작성</CardTitle>

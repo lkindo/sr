@@ -34,8 +34,8 @@ import { Label } from '@/components/ui';
 import { RadioGroup, RadioGroupItem } from '@/components/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { apiList, retryUnlessClientError } from '@/lib/api-client';
+import { PASSWORD_SPECIAL_CHAR_PATTERN, PASSWORD_SPECIAL_CHARS } from '@/lib/password-policy';
 import { qk } from '@/lib/query-keys';
-import { PASSWORD_SPECIAL_CHAR_PATTERN, PASSWORD_SPECIAL_CHARS } from '@/lib/schemas';
 import type { ClientSummary } from '@/types/client.types';
 
 /** `calculatePasswordStrength` 가 돌려주는 개별 규칙 충족 여부. */

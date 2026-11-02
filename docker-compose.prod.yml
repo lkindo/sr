@@ -22,6 +22,8 @@ services:
     mem_limit: 128m
     networks:
       - sr-net
+      # test.lkindo.kr 을 app-test 로 중계하기 위해서다. 운영 앱·DB 는 이 네트워크에 붙지 않는다.
+      - sr-test-net
     logging:
       driver: 'json-file'
       options:
@@ -131,6 +133,9 @@ volumes:
   sr_uploads:
 
 networks:
+  sr-test-net:
+    external: true
+    name: sr_test_net
   sr-net:
     driver: bridge
     driver_opts:

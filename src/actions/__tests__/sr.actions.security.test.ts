@@ -202,6 +202,19 @@ describe('getSRRequesterCandidatesAction', () => {
     expect(mockSRService.getRequesterCandidates).not.toHaveBeenCalled();
   });
 
+  // 후보 목록은 고객 이름·이메일이다. ENGINEER 의 명부 차단을 이 경로로 우회하지 못해야 한다.
+  it('SR 을 등록할 수 없는 내부 사용자는 거부하고 목록을 조회하지 않는다', async () => {
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: 'eng', roles: ['ENGINEER'], permissions: ['SR:READ'], clientIds: [] },
+      expires: '2099-01-01',
+    } as never);
+
+    const result = await getSRRequesterCandidatesAction('client-1');
+
+    expect(result.success).toBe(false);
+    expect(mockSRService.getRequesterCandidates).not.toHaveBeenCalled();
+  });
+
   it('내부 사용자에게는 그 고객사의 후보를 준다', async () => {
     vi.mocked(auth).mockResolvedValue({
       user: { id: 'mgr', roles: ['MANAGER'], permissions: ['SR:CREATE'], clientIds: [] },

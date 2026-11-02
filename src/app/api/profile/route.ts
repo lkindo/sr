@@ -36,12 +36,14 @@ const updateProfileSchema = z.object({
 // GET /api/profile - 현재 사용자 프로필 조회 (Rate Limit: 표준)
 export const GET = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       throw new UnauthorizedError('유효하지 않은 세션입니다. 다시 로그인해주세요.');
     }
 
+    // 이메일로 찾으면 안 된다. JWT 의 이메일은 로그인 때 값이라, 이메일이 바뀐 뒤 그 주소를
+    // 다른 계정이 쓰면 기존 세션이 그 계정의 프로필을 보게 된다.
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       select: {
         id: true,
         name: true,
@@ -86,7 +88,7 @@ export const GET = withAuthAndRateLimit(
 // PATCH /api/profile - 프로필 업데이트 (Rate Limit: 엄격)
 export const PATCH = withAuthAndRateLimit(
   async (request: NextRequest, { session }) => {
-    if (!session?.user?.email) {
+    if (!session?.user?.id) {
       throw new UnauthorizedError('유효하지 않은 세션입니다. 다시 로그인해주세요.');
     }
 
@@ -97,7 +99,7 @@ export const PATCH = withAuthAndRateLimit(
     if (validated.image !== undefined) updateData.image = validated.image || null;
 
     const user = await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: session.user.id },
       data: updateData,
       select: {
         id: true,

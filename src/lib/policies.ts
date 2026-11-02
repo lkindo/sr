@@ -1014,6 +1014,16 @@ export function canIntakeSR(user: AuthenticatedUser): boolean {
   return canViewerIntakeSR(user);
 }
 
+/**
+ * 접수 정보는 자기 고객사 SR 만 다룬다(POST·PATCH 공용). SR:INTAKE 를 받은 외부 커스텀 역할이
+ * 다른 고객사 SR 을 건드리지 못하게 한다. 내부 사용자에게는 고객사 경계가 없다.
+ */
+export function ensureCanIntakeClientSR(user: AuthenticatedUser, sr: { clientId: string }): void {
+  if (!isInternalUser(user) && !(user.clientIds ?? []).includes(sr.clientId)) {
+    throw new ForbiddenError('해당 고객사의 SR을 접수 처리할 권한이 없습니다.');
+  }
+}
+
 export function ensureCanIntakeSR(user: AuthenticatedUser): void {
   if (!canIntakeSR(user)) {
     throw new ForbiddenError(
@@ -1067,6 +1077,21 @@ export function ensureCanIntakeAssignedSR(
 }
 
 /**
+ * 접수 정보 수정은 이미 접수된 SR 을 고치는 일이다. 미배정 SR 을 허용하는 접수 판정
+ * (canIntakeAssignedSR)을 그대로 쓰면, 담당자가 해제된 SR 을 범위 밖 사용자가 고치고 본문까지 받는다.
+ * 담당자 스코프 사용자는 자기 배정분만 고친다.
+ */
+export function ensureCanUpdateIntake(
+  user: AuthenticatedUser,
+  sr: { assigneeId: string | null }
+): void {
+  const scope = resolveAssigneeScope(user);
+  if (scope !== undefined && sr.assigneeId !== scope) {
+    throw new ForbiddenError('자신에게 배정된 SR의 접수 정보만 수정할 수 있습니다.');
+  }
+}
+
+/**
  * 고객사 화면(상세의 최근 SR·SR 건수, 목록의 SR 건수)에 거는 **담당자 스코프**.
  *
  * 헌법 §1.2: ENGINEER 는 고객사 명부·서비스 카테고리는 전체를 보지만 "SR 본문·고객사 사용자
@@ -1074,20 +1099,38 @@ export function ensureCanIntakeAssignedSR(
  * 고객사의 최근 SR(번호·제목·상태)과 SR 건수를 보여 줬다. 목록·상세와 같은 resolveAssigneeScope 를 쓴다.
  * 고객사 경계 자체는 canReadClient 가 판정하므로 여기서는 담당자 축만 더한다.
  */
+/** 어떤 SR 과도 일치하지 않는 조건. */
+const NO_SR_MATCH: Prisma.SRWhereInput = { id: { in: [] } };
+
 /**
  * SR 목록·건수 조회의 기본 스코프 — 보는 사람이 볼 수 있는 SR 만.
- *  - 외부 사용자: 소속(승인된) 고객사의 SR 만. 소속이 없으면 아무것도 보지 않는다(빈 IN).
- *  - 담당자 스코프 사용자(ENGINEER): 자기 배정분만(resolveAssigneeScope).
- *  - 그 외 내부 사용자: 제한 없음.
+ *
+ * canReadSR 과 **같은 판정 순서**를 조건식으로 옮긴 것이다. 규칙이 갈라지면 상세는 403 인데
+ * 목록에는 제목과 담당자가 보이는 상태가 된다. 한쪽을 고치면 다른 쪽도 함께 고친다.
+ *  - ADMIN, SR:READ 가 있는 MANAGER: 제한 없음.
+ *  - ENGINEER: SR:READ 가 있으면 자기 배정분만, 없으면 없음.
+ *  - 그 외: 소속 고객사의 SR. SR:READ 없이 SR:UPDATE_SELF 만 있으면 그중 본인이 신청한 것만.
  *
  * 헌법 §1.2: 스코프는 선택 인자로 두지 않는다. 예전에는 srService.getAllSRs/countSRs 가 스코프를 호출부의
  * `where` 에 맡겨서, 호출부가 빠뜨리면 전 테넌트가 반환됐다. 이제 두 함수가 필수 인자인 viewer 로부터 이
  * 스코프를 직접 건다(호출부의 where 는 그 위에 AND 로 더해질 뿐이다).
  */
 export function srViewerScopeWhere(user: AuthenticatedUser): Prisma.SRWhereInput {
-  if (!isInternalUser(user)) return { clientId: { in: user.clientIds ?? [] } };
-  const assigneeId = resolveAssigneeScope(user);
-  return assigneeId ? { assigneeId } : {};
+  if (user.roles?.includes('ADMIN')) return {};
+
+  const canRead = hasPermissionFlag(user, PERMISSIONS.SR.READ);
+  if (user.roles?.includes('MANAGER') && canRead) return {};
+
+  if (user.roles?.includes('ENGINEER')) {
+    return canRead ? { assigneeId: user.id } : NO_SR_MATCH;
+  }
+
+  const clientScope = { clientId: { in: user.clientIds ?? [] } };
+  if (canRead) return clientScope;
+
+  return hasPermissionFlag(user, PERMISSIONS.SR.UPDATE_SELF)
+    ? { ...clientScope, requesterId: user.id }
+    : NO_SR_MATCH;
 }
 
 export function clientSrScopeWhere(user: AuthenticatedUser): Prisma.SRWhereInput {

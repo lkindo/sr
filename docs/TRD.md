@@ -1438,8 +1438,9 @@ app/
    - 차트 라이브러리는 없다(대시보드 차트 제거)
 
 2. **Tree Shaking**
-   - ESM import/export. `package.json` 에 `sideEffects` 선언은 **없다**
-   - `components/ui` 는 배럴 import 를 쓴다(`.gemini/rules/fe-rules.md` §1.2)
+   - ESM import/export. 루트 `package.json` 에 `sideEffects` 선언은 **없다**
+   - `components/ui` 는 배럴 import 를 쓴다(`.gemini/rules/fe-rules.md` §1.2). 폴더 안의 `package.json` 이 `sideEffects: false` 를 선언해 쓰지 않는 컴포넌트를 번들에서 뺀다. 이 폴더에는 모듈 수준 부수 효과를 두지 않는다
+   - `'use client'` 파일은 `zod`, `@/lib/schemas`, `@prisma/client` 를 값으로 가져오지 않는다. 필드 상한은 `lib/field-limits`, 비밀번호 규칙은 `lib/password-policy` 에서 읽는다(`tests/scripts/client-bundle-guards.unit.test.ts` 가 검사)
 
 3. **Image Optimization**
    - `next/image` 를 쓰는 곳이 없다(이미지 자산이 거의 없다). 도입하면 자체 서버의 이미지 최적화 캐시를 함께 고려한다
@@ -1534,7 +1535,7 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 - **잡 구성**: `code-quality`(ESLint + `tsc --noEmit` + knip 데드 코드 + E2E 단언 검사 + Actions SHA 고정 검사) /
   `test`(마이그레이션·드리프트·시드 + 커버리지 게이트) / `mutation-test`(PR 전용, 4분할 matrix) + `mutation-summary`
   (분할 결과 합산·판정) / `build` / `e2e-test` /
-  `docker-build`(PR 전용, 푸시 없이 이미지 빌드만) / `security`(gitleaks + gating `pnpm audit --prod
+  `docker-build`(푸시 없이 이미지를 빌드해 실제로 띄우고 로그인까지 확인) / `security`(gitleaks + gating `pnpm audit --prod
 --audit-level=critical` + Trivy 리포트) / `deployment-ready`
 - **뮤테이션 분할**(2026-09-19): PR 이 대상 브랜치 대비 바꾼 파일(테스트가 닿는 것)만 검사한다. dev 를 main 에 모아
   반영하는 PR 은 한 작업으로 60분을 넘어(PR #279: 뮤턴트 8,535개) 대상 파일을 크기 기준으로 4개 작업에 나눠 동시에 돌린다
@@ -1597,7 +1598,7 @@ statements 79.5 / branches 71.5 / functions 73.5 / lines 80.0 이고, 로컬 실
 │   build        : pnpm build (standalone)    │
 │   e2e-test     : Playwright 전체 스위트      │
 │                  (push main·dev, PR)        │
-│   docker-build : 이미지 빌드 확인(PR 전용)   │
+│   docker-build : 이미지 빌드·기동 스모크     │
 │   security     : gitleaks + pnpm audit(게이트)│
 │                  + Trivy                    │
 └──────┬─────────────────────────────────────┘

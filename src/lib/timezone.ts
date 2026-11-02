@@ -101,6 +101,20 @@ export function startOfAppZoneDay(value: string | Date | number = new Date()): D
 }
 
 /**
+ * `YYYY-MM-DD` 로 받은 KST 달력일의 범위를 돌려준다. 끝은 포함하지 않는 다음 날 00:00 이다.
+ * 형식이 맞지 않으면 null 이다.
+ *
+ * `new Date('2026-11-01')` 은 UTC 자정, 곧 09:00 KST 다. 날짜 필터에 그대로 쓰면 시작일의
+ * 오전이 빠지고 종료일 09시 이후가 누락된다.
+ */
+export function appZoneDayRange(date: string): { start: Date; nextDayStart: Date } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const start = new Date(`${date}T00:00:00+09:00`);
+  if (Number.isNaN(start.getTime())) return null;
+  return { start, nextDayStart: new Date(start.getTime() + MS_PER_DAY) };
+}
+
+/**
  * KST 기준 `HH:mm`.
  *
  * 마감이 24시간 안으로 들어온 SR 에 "오늘/내일 마감" 대신 정확한 시각을 붙이기 위한 것이다.

@@ -8,7 +8,7 @@ import { paginationSchema } from '@/lib/pagination';
 import { INTERNAL_ROLES, resolveAssigneeScope } from '@/lib/policies';
 import { getEnumParams } from '@/lib/search-params';
 import { SR_SLA_OPEN_STATUSES } from '@/lib/sr-state-machine';
-import { startOfAppZoneDay } from '@/lib/timezone';
+import { appZoneDayRange, startOfAppZoneDay } from '@/lib/timezone';
 import { srService } from '@/services/sr.service';
 
 type Props = {
@@ -138,15 +138,17 @@ export default async function SRsPage({ searchParams }: Props) {
     where.assigneeId = assigneeId === 'unassigned' ? null : assigneeId;
   }
   // Handle date filtering
-  if (dateFrom || dateTo) {
+  const fromDay = dateFrom ? appZoneDayRange(dateFrom) : null;
+  const toDay = dateTo ? appZoneDayRange(dateTo) : null;
+  if (fromDay || toDay) {
     if (!where.createdAt) {
       where.createdAt = {};
     }
-    if (dateFrom) {
-      (where.createdAt as Prisma.DateTimeFilter<'SR'>).gte = new Date(dateFrom);
+    if (fromDay) {
+      (where.createdAt as Prisma.DateTimeFilter<'SR'>).gte = fromDay.start;
     }
-    if (dateTo) {
-      (where.createdAt as Prisma.DateTimeFilter<'SR'>).lte = new Date(dateTo);
+    if (toDay) {
+      (where.createdAt as Prisma.DateTimeFilter<'SR'>).lt = toDay.nextDayStart;
     }
   }
   if (overdueOnly) {

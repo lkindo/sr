@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getAllSRs: vi.fn(),
+  countSRs: vi.fn().mockResolvedValue(0),
   checkPermission: vi.fn(),
   isInternalUser: vi.fn(),
 }));
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/sr.service', () => ({
   srService: {
     getAllSRs: mocks.getAllSRs,
+    countSRs: mocks.countSRs,
   },
 }));
 
@@ -91,6 +93,11 @@ describe('API Route Security: /api/srs', () => {
     // 목록의 댓글 수는 viewer 로 판정한다(visibleCommentsWhere). tsc 는 AuthenticatedUser 타입까지만
     // 보장하므로, 세션 사용자 **그 자체**를 넘기는 배선을 여기서 고정한다.
     expect(mocks.getAllSRs.mock.calls[0]![0].viewer).toBe(mockSession.user);
+    // 총건수도 목록과 같은 viewer·조건으로 센다. 따로 세면 권한 밖 건수가 샌다.
+    expect(mocks.countSRs).toHaveBeenCalledWith({
+      viewer: mockSession.user,
+      where: mocks.getAllSRs.mock.calls[0]![0].where,
+    });
   });
 
   it('should allow internal users to see all SRs (no forced filter)', async () => {

@@ -75,5 +75,14 @@ class DomainEventEmitter extends EventEmitter {
   }
 }
 
-// 싱글톤 도메인 이벤트 버스
-export const domainEvents = new DomainEventEmitter();
+declare const globalThis: {
+  domainEventsGlobal?: DomainEventEmitter;
+} & typeof global;
+
+/**
+ * 프로세스 전역 싱글톤 도메인 이벤트 버스.
+ *
+ * 모듈 변수로 두면 운영 빌드에서 그래프마다 다른 인스턴스가 생긴다. 리스너는 계측 쪽
+ * 인스턴스에 붙는데 라우트는 자기 인스턴스로 발행해서, 이벤트가 리스너 0개로 사라졌다.
+ */
+export const domainEvents = (globalThis.domainEventsGlobal ??= new DomainEventEmitter());

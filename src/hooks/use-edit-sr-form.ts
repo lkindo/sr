@@ -11,6 +11,11 @@ import { useUpdateSR } from '@/hooks/use-sr';
 import { useToast } from '@/hooks/use-toast';
 import { apiDelete, apiGet, apiPost } from '@/lib/api-client';
 import {
+  type AttachmentUploadOutcome,
+  attachmentUploadToast,
+  NO_ATTACHMENT_UPLOAD,
+} from '@/lib/attachment-upload-toast';
+import {
   canChangeSLABasisAt,
   canEditSRContentAt,
   isSROperator,
@@ -22,6 +27,20 @@ import type { SRAttachmentView } from '@/types/sr.types';
 interface ServiceCategory {
   id: string;
   categoryName: string;
+}
+
+/** 다이얼로그를 열 때 폼에 채우는 값. 입력 여부도 이 값과 비교해서 판단한다. */
+function editFormValuesOf(sr: EditableSR) {
+  return {
+    title: sr.title,
+    description: sr.description,
+    clientId: sr.clientId || sr.client?.id || '',
+    categoryId: sr.serviceCategory?.id || sr.category?.id || '',
+    requestedPriority: sr.requestedPriority || 'MEDIUM',
+    requestedCompletionDate: sr.requestedCompletionDate
+      ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
+      : '',
+  };
 }
 
 export function useEditSRForm({
@@ -47,6 +66,9 @@ export function useEditSRForm({
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<string | null>(null);
+  const [loadedValues, setLoadedValues] = useState<ReturnType<typeof editFormValuesOf> | null>(
+    null
+  );
 
   const { toast } = useToast();
   const router = useRouter();
@@ -62,6 +84,16 @@ export function useEditSRForm({
   const isOperator = isSROperator({ roles, permissions });
   const categoryLockedByStatus = isOperator && !!sr && !canChangeSLABasisAt(sr.status);
   const canChangeCategory = isOperator && !categoryLockedByStatus;
+  // 다른 사용자의 수정으로 sr 이 다시 들어와도 내가 고친 것처럼 보이지 않게, 연 시점의 값과 비교한다.
+  const hasUnsavedInput =
+    files.length > 0 ||
+    (loadedValues !== null &&
+      (title !== loadedValues.title ||
+        description !== loadedValues.description ||
+        clientId !== loadedValues.clientId ||
+        categoryId !== loadedValues.categoryId ||
+        requestedPriority !== loadedValues.requestedPriority ||
+        requestedCompletionDate !== loadedValues.requestedCompletionDate));
 
   const fetchClients = useCallback(async () => {
     if (isClientUser) {
@@ -143,16 +175,14 @@ export function useEditSRForm({
       return;
     }
 
-    setTitle(sr.title);
-    setDescription(sr.description);
-    setClientId(sr.clientId || sr.client?.id || '');
-    setCategoryId(sr.serviceCategory?.id || sr.category?.id || '');
-    setRequestedPriority(sr.requestedPriority || 'MEDIUM');
-    setRequestedCompletionDate(
-      sr.requestedCompletionDate
-        ? (new Date(sr.requestedCompletionDate).toISOString().split('T')[0] ?? '')
-        : ''
-    );
+    const values = editFormValuesOf(sr);
+    setLoadedValues(values);
+    setTitle(values.title);
+    setDescription(values.description);
+    setClientId(values.clientId);
+    setCategoryId(values.categoryId);
+    setRequestedPriority(values.requestedPriority);
+    setRequestedCompletionDate(values.requestedCompletionDate);
     setFiles([]);
 
     if (sr.attachments && sr.attachments.length > 0) {
@@ -161,7 +191,7 @@ export function useEditSRForm({
       fetchExistingAttachments(sr.id);
     }
     fetchClients();
-    fetchCategories(sr.clientId || sr.client?.id || '');
+    fetchCategories(values.clientId);
     // 다이얼로그가 열릴 때 폼을 SR 값으로 한 번 채우는 초기화다.
     // sr 객체나 fetcher 를 deps 에 넣으면 사용자가 입력 중일 때 부모 리렌더마다
     // 폼이 서버 값으로 되돌아간다.
@@ -207,11 +237,6 @@ export function useEditSRForm({
    * 생성 폼(`use-create-sr-form.ts`)과 **동일한 계약**이다. 두 폼이 같은 라우트를
    * 부르므로 결과를 다루는 방식도 갈라지면 안 된다.
    */
-  interface AttachmentUploadOutcome {
-    uploaded: number;
-    rejected: Array<{ fileName: string; error: string }>;
-  }
-
   const uploadAttachments = async (
     srId: string,
     filesToUpload: File[]
@@ -236,15 +261,11 @@ export function useEditSRForm({
       return {
         uploaded: body?.data?.attachments?.length ?? 0,
         rejected: body?.data?.errors ?? [],
+        failed: false,
       };
     } catch {
-      // 전부 실패(400)·네트워크 오류. 여기서만 "업로드에 실패했습니다" 를 띄운다.
-      toast({
-        title: '경고',
-        description: 'SR은 수정되었으나 첨부파일 업로드에 실패했습니다.',
-        variant: 'destructive',
-      });
-      return { uploaded: 0, rejected: [] };
+      // 전부 실패(400)·네트워크 오류.
+      return { ...NO_ATTACHMENT_UPLOAD, failed: true };
     }
   };
 
@@ -291,28 +312,13 @@ export function useEditSRForm({
     try {
       await updateSR(formData);
 
-      let upload: AttachmentUploadOutcome = { uploaded: 0, rejected: [] };
+      let upload = NO_ATTACHMENT_UPLOAD;
       if (files.length > 0) {
         upload = await uploadAttachments(sr.id, files);
         await fetchExistingAttachments(sr.id);
       }
 
-      // 거부된 파일이 있으면 성공 토스트로 덮지 않고 사유를 그대로 보여 준다.
-      // 사용자가 다시 올릴지 판단하려면 어떤 파일이 왜 걸렸는지가 필요하다.
-      if (upload.rejected.length > 0) {
-        toast({
-          title: '일부 첨부파일이 업로드되지 않았습니다',
-          description: `SR은 수정되었습니다. ${upload.uploaded}개 업로드 / ${upload.rejected.length}개 실패 — ${upload.rejected
-            .map((r) => `${r.fileName}: ${r.error}`)
-            .join(', ')}`,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: '성공',
-          description: `SR이 수정되었습니다.${upload.uploaded > 0 ? ` (첨부파일 ${upload.uploaded}개 업로드)` : ''}`,
-        });
-      }
+      toast(attachmentUploadToast('수정', upload));
       onOpenChange(false);
 
       await Promise.all([
@@ -348,6 +354,7 @@ export function useEditSRForm({
       canSelectClient,
       canChangeCategory,
       categoryLockedByStatus,
+      hasUnsavedInput,
     },
     actions: {
       setTitle,

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   APP_TIME_ZONE,
   appZoneDateStamp,
+  appZoneDayRange,
   diffCalendarDaysInAppZone,
   formatAppZoneDate,
   formatAppZoneShortDate,
@@ -120,6 +121,22 @@ describe('diffCalendarDaysInAppZone', () => {
     vi.setSystemTime(MORNING_KST);
     expect(diffCalendarDaysInAppZone('2026-07-31T05:00:00.000Z')).toBe(1);
   });
+});
+
+describe('appZoneDayRange', () => {
+  it('KST 달력일의 시작과 다음 날 시작을 돌려준다', () => {
+    const range = appZoneDayRange('2026-11-01');
+
+    expect(range?.start.toISOString()).toBe('2026-10-31T15:00:00.000Z');
+    expect(range?.nextDayStart.toISOString()).toBe('2026-11-01T15:00:00.000Z');
+  });
+
+  it.each(['', '2026-11', '2026-13-01', 'not-a-date', '2026-11-01T00:00:00Z'])(
+    '%s 는 null 이다',
+    (value) => {
+      expect(appZoneDayRange(value)).toBeNull();
+    }
+  );
 });
 
 describe('APP_TIME_ZONE', () => {

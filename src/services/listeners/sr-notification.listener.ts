@@ -8,9 +8,12 @@ import { pushService } from '@/services/push.service';
 
 /**
  * SR 관련 도메인 이벤트 리스너를 등록합니다.
- * 이 모듈은 애플리케이션 초기화 시 한 번만 로드되어야 합니다.
+ * 운영 빌드는 모듈 그래프마다 이 함수를 부르지만 이벤트 버스는 프로세스 전역이다.
+ * 두 번 등록하면 같은 푸시가 두 번 나가므로 이미 붙어 있으면 건너뛴다.
  */
 export function registerSRNotificationListeners() {
+  if (domainEvents.listenerCount('sr:created') > 0) return;
+
   logger.info('SR Notification Listeners registered');
 
   // 1. SR 생성 이벤트 리스너

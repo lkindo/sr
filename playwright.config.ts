@@ -161,7 +161,8 @@ export default defineConfig({
       //   - sr-permissions.spec.ts: beforeAll 이 manager.json, ENGINEER describe 가 engineer.json
       // 두 파일은 multi-user-setup 이 만든다. 의존을 적지 않으면 순서 보장이 없어
       // 없거나 만료된 인증 파일로 돌 수 있다.
-      dependencies: ['setup', 'multi-user-setup'],
+      // manager-role.json 은 role-persona-setup 이 만든다(35-realtime.spec.ts).
+      dependencies: ['setup', 'multi-user-setup', 'role-persona-setup'],
       // 멀티 유저 테스트 파일 제외 (중복 실행 방지)
       testIgnore: [
         // Project-level testIgnore replaces the root value instead of extending it.

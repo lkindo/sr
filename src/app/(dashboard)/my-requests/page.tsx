@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { SRStatus } from '@prisma/client';
+import type { SRStatus } from '@prisma/client';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -93,21 +93,22 @@ interface MyRequestsResponse {
 }
 
 /**
- * 상태 목록은 Prisma `SRStatus` enum 에서 도출한다.
+ * 상태 목록은 Prisma `SRStatus` enum 을 타입으로 검사한다. enum 값을 import 하면 Prisma 의
+ * 브라우저 런타임이 이 화면의 번들에 실린다.
  *
  * 이전에는 스키마에 없는 RESOLVED/CANCELLED 를 필터에 노출하고
  * 실재하는 INTAKE/ON_HOLD/REJECTED 는 빠뜨려, 선택 시 Prisma 가 알 수 없는 enum 값을
  * 받아 500 이 났고 REJECTED SR 은 이름 없는 배지로 렌더링됐다.
  */
 const STATUS_ORDER = [
-  SRStatus.REQUESTED,
-  SRStatus.INTAKE,
-  SRStatus.IN_PROGRESS,
-  SRStatus.ON_HOLD,
-  SRStatus.COMPLETED,
-  SRStatus.CONFIRMED,
-  SRStatus.REJECTED,
-] as const;
+  'REQUESTED',
+  'INTAKE',
+  'IN_PROGRESS',
+  'ON_HOLD',
+  'COMPLETED',
+  'CONFIRMED',
+  'REJECTED',
+] as const satisfies readonly SRStatus[];
 
 /**
  * 상태·우선순위의 라벨과 배지 색은 정본(@/lib/constants/sr)을 쓴다. 라벨은 2026-08-10 에, 색은 2026-09-18

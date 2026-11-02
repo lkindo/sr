@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ClientService } from '@/services/client.service';
-import { registerSRNotificationListeners } from '@/services/listeners/sr-notification.listener';
 import { PermissionService } from '@/services/permission.service';
 import { RoleService } from '@/services/role.service';
 import { services } from '@/services/service-registry';
@@ -20,10 +19,14 @@ describe('service-registry', () => {
     services.clear();
   });
 
-  it('registers SR notification listeners exactly once on module load', () => {
-    // The singleton `services` instance is created at import time, so its
-    // constructor should have invoked the listener registration once.
-    expect(registerSRNotificationListeners).toHaveBeenCalledTimes(1);
+  it('registers SR notification listeners exactly once on module load', async () => {
+    // 전역 mockReset 이 import 시점의 호출 기록을 지우므로 모듈을 새로 평가해 확인한다.
+    vi.resetModules();
+    const { registerSRNotificationListeners: fresh } =
+      await import('@/services/listeners/sr-notification.listener');
+    await import('@/services/service-registry');
+
+    expect(fresh).toHaveBeenCalledTimes(1);
   });
 
   it('exposes a userService that is the correct type', () => {

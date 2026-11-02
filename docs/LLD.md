@@ -3442,7 +3442,7 @@ Node 22 / pnpm 10 기준이다(초안은 Node 18 + `npm install -g pnpm` 이었�
 | `mutation-test`    | PR 에서만. `pnpm test:mutation:ci` (변경 파일만, `break: 45`)                                                                                                                  |
 | `build`            | `pnpm build` 후 `.next` 존재 확인                                                                                                                                              |
 | `e2e-test`         | push(main·dev)·PR 모두 전체 선택, dev→main PR 은 제외 (위 "E2E 실행 범위" 참고)                                                                                                |
-| `docker-build`     | PR 에서만. 이미지 빌드가 되는지만 본다(푸시하지 않는다) — Dependabot PR 의 도커 빌드를 머지 전에 검증 |
+| `docker-build`     | PR 과 push 모두. 이미지를 빌드해 빈 DB 에 띄우고 관리자 로그인까지 확인한다(`scripts/image-smoke.sh`, 푸시하지 않는다). 실패하면 배포가 시작되지 않는다 |
 | `security`         | gitleaks 커밋 시크릿 스캔 + `pnpm audit --prod --audit-level=critical` (**게이트**) + Trivy SARIF/table(리포트 전용) |
 | `deployment-ready` | main push 에서 위 잡들이 모두 성공했을 때만 성공 로그를 남긴다                                                                                                                 |
 
@@ -3498,7 +3498,7 @@ concurrency:
 | `db`    | `postgres:16-alpine`       | 호스트 포트 **비공개**. `POSTGRES_*` 는 `:?` 문법으로 미설정 시 즉시 실패. 볼륨 `sr_db_data`, `pg_isready` healthcheck                             |
 
 세 서비스 모두 로깅은 `json-file` 드라이버, `max-size: 10m` × `max-file: 3` 이다.
-네트워크는 내부 브리지 `sr-net`(MTU 1400). 스테이징(dev)은 같은 서버에서
+네트워크는 내부 브리지 `sr-net`(MTU 1400). 스테이징(dev)은 전용 브리지 `sr_test_net`(MTU 1400)을 쓰고, nginx 만 양쪽에 붙는다. 같은 서버에서
 `docker-compose.test.yml` + 프로젝트명 `sr-test` 로 분리 구동한다.
 
 ### 환경 변수

@@ -14,8 +14,13 @@ const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   count: vi.fn(),
   groupBy: vi.fn(),
-  // 세션 사용자. 기본은 역할 없는 신청자이며, 댓글 수 가시성 테스트만 역할을 바꾼다.
-  sessionUser: { id: 'user-1' } as { id: string; roles?: string[]; clientIds?: string[] },
+  // 세션 사용자. 기본은 소속 고객사가 있는 신청자이며, 일부 테스트만 역할을 바꾼다.
+  sessionUser: { id: 'user-1' } as {
+    id: string;
+    roles?: string[];
+    permissions?: string[];
+    clientIds?: string[];
+  },
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -39,6 +44,20 @@ vi.mock('@/lib/serialization', () => ({
 
 import { GET } from '../route';
 
+const CLIENT_REQUESTER = {
+  id: 'user-1',
+  roles: ['CLIENT_USER'],
+  permissions: ['SR:READ'],
+  clientIds: ['c-1'],
+};
+
+/** 기본 세션(CLIENT_REQUESTER)의 "내 요청" 범위. */
+const OWN_REQUESTS = {
+  deletedAt: null,
+  requesterId: 'user-1',
+  AND: [{ clientId: { in: ['c-1'] } }],
+};
+
 const call = async (query = '') => {
   const response = await (GET as any)(
     new NextRequest(`http://localhost:3000/api/srs/my-requests${query}`)
@@ -49,7 +68,7 @@ const call = async (query = '') => {
 describe('GET /api/srs/my-requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.sessionUser = { id: 'user-1' };
+    mocks.sessionUser = CLIENT_REQUESTER;
     mocks.findMany.mockResolvedValue([]);
     mocks.count.mockResolvedValue(0);
     mocks.groupBy.mockResolvedValue([]);
@@ -92,9 +111,7 @@ describe('GET /api/srs/my-requests', () => {
 
     const { body } = await call();
 
-    expect(mocks.count).toHaveBeenCalledWith({
-      where: { deletedAt: null, requesterId: 'user-1' },
-    });
+    expect(mocks.count).toHaveBeenCalledWith({ where: OWN_REQUESTS });
     expect(body.meta.totalItems).toBe(1234);
     expect(body.data).toHaveLength(1);
   });
@@ -103,18 +120,26 @@ describe('GET /api/srs/my-requests', () => {
     await call();
 
     // 삭제된 SR 은 내 요청 목록에서도 빠진다(db-rules §2).
-    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
-      deletedAt: null,
-      requesterId: 'user-1',
-    });
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual(OWN_REQUESTS);
+  });
+
+  // 상세는 403 인데 목록에 제목과 담당자 이메일이 남으면 소속 철회가 무의미해진다.
+  it('소속이 바뀌어 지금 볼 수 없는 고객사의 SR 은 목록·건수·통계에서 모두 뺀다', async () => {
+    mocks.sessionUser = { ...CLIENT_REQUESTER, clientIds: ['c-2'] };
+    const scoped = { ...OWN_REQUESTS, AND: [{ clientId: { in: ['c-2'] } }] };
+
+    await call();
+
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual(scoped);
+    expect(mocks.count).toHaveBeenCalledWith({ where: scoped });
+    expect(mocks.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: scoped }));
   });
 
   it('유효한 상태 필터를 where 에 반영한다', async () => {
     await call('?status=IN_PROGRESS');
 
     expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
-      deletedAt: null,
-      requesterId: 'user-1',
+      ...OWN_REQUESTS,
       status: 'IN_PROGRESS',
     });
   });
@@ -122,10 +147,7 @@ describe('GET /api/srs/my-requests', () => {
   it('알 수 없는 상태 값은 필터로 쓰지 않는다', async () => {
     await call('?status=NOT_A_STATUS');
 
-    expect(mocks.findMany.mock.calls[0]![0].where).toEqual({
-      deletedAt: null,
-      requesterId: 'user-1',
-    });
+    expect(mocks.findMany.mock.calls[0]![0].where).toEqual(OWN_REQUESTS);
   });
 
   it.each(['client', 'constructor', '__proto__', 'toString'])(
@@ -157,9 +179,7 @@ describe('GET /api/srs/my-requests', () => {
     // 상태 필터가 걸려 있어도 통계는 전체 기준이어야 한다.
     const { body } = await call('?status=REQUESTED');
 
-    expect(mocks.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { deletedAt: null, requesterId: 'user-1' } })
-    );
+    expect(mocks.groupBy).toHaveBeenCalledWith(expect.objectContaining({ where: OWN_REQUESTS }));
     expect(body.stats).toEqual({ total: 15, requested: 3, inProgress: 2, completed: 5 });
   });
 

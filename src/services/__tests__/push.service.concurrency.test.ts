@@ -54,7 +54,7 @@ describe('PushService Concurrency Benchmark', () => {
       for (let i = 0; i < SUBS_PER_USER; i++) {
         allSubscriptions.push({
           userId,
-          endpoint: `endpoint-${userId}-${i}`,
+          endpoint: `https://fcm.googleapis.com/fcm/send/endpoint-${userId}-${i}`,
           p256dh: 'key',
           auth: 'auth',
           id: `id-${userId}-${i}`,
@@ -95,7 +95,7 @@ describe('PushService Concurrency Benchmark', () => {
 
     // Create multiple subscriptions for the user
     const subscriptions = Array.from({ length: SUBSCRIPTION_COUNT }, (_, i) => ({
-      endpoint: `endpoint-${i}`,
+      endpoint: `https://fcm.googleapis.com/fcm/send/endpoint-${i}`,
       p256dh: 'key',
       auth: 'auth',
       userId: 'user1',

@@ -55,7 +55,7 @@ describe('PushService', () => {
     it('should upsert subscription', async () => {
       const userId = 'user-1';
       const subData = {
-        endpoint: 'https://push.example.com/test',
+        endpoint: 'https://fcm.googleapis.com/fcm/send/test',
         keys: { p256dh: 'p256', auth: 'auth' },
       };
 
@@ -78,7 +78,7 @@ describe('PushService', () => {
 
       // Mock subscription for user-2
       (prisma.pushSubscription.findMany as any).mockResolvedValue([
-        { endpoint: 'ep-2', p256dh: 'key', auth: 'auth' },
+        { endpoint: 'https://fcm.googleapis.com/fcm/send/ep-2', p256dh: 'key', auth: 'auth' },
       ]);
 
       // Mock web-push send (success)
@@ -133,7 +133,7 @@ describe('PushService', () => {
       const payload = { title: 'T', body: 'B' };
 
       (prisma.pushSubscription.findMany as any).mockResolvedValue([
-        { endpoint: 'ep-gone', p256dh: 'k', auth: 'a' },
+        { endpoint: 'https://fcm.googleapis.com/fcm/send/ep-gone', p256dh: 'k', auth: 'a' },
       ]);
 
       mockWebPush.sendNotification.mockRejectedValue({ statusCode: 410 });

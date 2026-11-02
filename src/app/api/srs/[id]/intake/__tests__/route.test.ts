@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   emitRealtime: vi.fn(),
   findUnique: vi.fn(),
   transaction: vi.fn(),
+  auditCreate: vi.fn(),
   // 트랜잭션 클라이언트(tx)의 활동 생성과 루트 클라이언트(prisma)의 활동 생성을 **다른 목**으로
   // 둔다. 하나로 합치면 활동 로그가 트랜잭션 안에 있는지 밖에 있는지를 테스트가 구분하지
   // 못한다 — PATCH 가 커밋 이후에 활동을 만들던 버그가 바로 그렇게 통과했다.
@@ -196,6 +197,7 @@ beforeEach(() => {
       const result = await cb({
         sR: { updateMany: mocks.updateMany, update: mocks.txUpdate },
         sRActivity: { create: mocks.activityCreate },
+        auditLog: { create: mocks.auditCreate },
       });
       order.push('tx:commit');
       return result;
@@ -752,6 +754,96 @@ describe('PATCH /api/srs/[id]/intake — 권한 게이트', () => {
   });
 });
 
+describe('PATCH /api/srs/[id]/intake — 객체 인가', () => {
+  // SR:INTAKE 는 역할 편집으로 외부 커스텀 역할에도 줄 수 있다.
+  const external = (clientIds: string[], permissions = ['SR:INTAKE']) =>
+    session({ id: 'ext-1', roles: ['CLIENT_USER'], permissions, clientIds });
+
+  beforeEach(() => {
+    mocks.findUnique.mockResolvedValue(patchSR());
+  });
+
+  it('소속 고객사의 SR 이면 외부 사용자도 접수 정보를 고칠 수 있다', async () => {
+    const response = await patch({ actualPriority: 'HIGH' }, external(['client-1']));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('다른 고객사의 SR 이면 403 이고 저장하지 않는다', async () => {
+    const response = await patch({ actualPriority: 'HIGH' }, external(['client-9']));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toBe('해당 고객사의 SR을 접수 처리할 권한이 없습니다.');
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('담당자 스코프 사용자는 남에게 배정된 SR 을 고치지 못한다', async () => {
+    const engineer = session({
+      id: 'eng-9',
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ actualPriority: 'HIGH' }, engineer);
+
+    expect(response.status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  // 담당자가 해제된 SR 도 INTAKE 상태로 남는다. 접수용 예외를 그대로 쓰면 범위 밖 사용자가 고친다.
+  it('담당자 스코프 사용자는 미배정 SR 도 고치지 못한다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR({ assigneeId: null, assignee: null }));
+    const engineer = session({
+      id: 'eng-9',
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ intakeNotes: '메모' }, engineer);
+
+    expect(response.status).toBe(403);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('담당자 스코프 사용자도 자기 배정분은 고칠 수 있다', async () => {
+    const engineer = session({
+      id: ASSIGNEE.id,
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ intakeNotes: '메모' }, engineer);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('SR:ASSIGN 없이는 담당자를 바꾸지 못한다', async () => {
+    mocks.assertAssignable.mockResolvedValue(OTHER_ASSIGNEE);
+
+    const response = await patch({ assigneeId: OTHER_ASSIGNEE.id }, external(['client-1']));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body.error).toContain('담당자 배정은 운영 관리자만');
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it('SR:ASSIGN 이 있으면 담당자를 바꿀 수 있다', async () => {
+    mocks.assertAssignable.mockResolvedValue(OTHER_ASSIGNEE);
+
+    const response = await patch(
+      { assigneeId: OTHER_ASSIGNEE.id },
+      external(['client-1'], ['SR:INTAKE', 'SR:ASSIGN'])
+    );
+
+    expect(response.status).toBe(200);
+  });
+});
+
 describe('PATCH /api/srs/[id]/intake — 수정 필드 유무', () => {
   beforeEach(() => {
     mocks.findUnique.mockResolvedValue(patchSR());
@@ -845,6 +937,19 @@ describe('PATCH /api/srs/[id]/intake — SLA 재계산', () => {
 
     // intakeAt 2026-08-01T00:00Z + 24h × 0.5 = 12h
     expect(lastUpdateData().dueDate).toEqual(new Date('2026-08-01T12:00:00.000Z'));
+  });
+
+  it('자동 재산출로 마감일이 바뀌면 감사 로그를 남긴다', async () => {
+    mocks.findUnique.mockResolvedValue(patchSR());
+
+    await patch({ actualPriority: 'HIGH' });
+
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditCreate.mock.calls[0]![0].data).toMatchObject({
+      actionType: 'UPDATE',
+      targetEntity: 'SR_DUE_DATE',
+      targetId: 'sr-1',
+    });
   });
 
   it('우선순위가 같으면 마감일을 건드리지 않는다', async () => {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { parseJsonBody } from '@/lib/api-helpers';
 import { withAuthAndRateLimit } from '@/lib/auth-wrapper';
+import { isAllowedPushEndpoint } from '@/lib/push-endpoint';
 import { pushService, PushSubscriptionData } from '@/services/push.service';
 
 /**
@@ -16,7 +17,7 @@ import { pushService, PushSubscriptionData } from '@/services/push.service';
  */
 
 const subscriptionSchema = z.object({
-  endpoint: z.string().url(),
+  endpoint: z.string().refine(isAllowedPushEndpoint, '지원하지 않는 푸시 서비스 주소입니다.'),
   keys: z.object({
     p256dh: z.string().min(1),
     auth: z.string().min(1),

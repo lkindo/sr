@@ -40,6 +40,14 @@ describe('SR 알림 리스너', () => {
     expect(domainEvents.listenerCount('sr:assigned')).toBe(1);
   });
 
+  it('여러 모듈 그래프가 등록을 시도해도 리스너는 한 번만 붙는다', () => {
+    registerSRNotificationListeners();
+
+    expect(domainEvents.listenerCount('sr:created')).toBe(1);
+    expect(domainEvents.listenerCount('sr:status_changed')).toBe(1);
+    expect(domainEvents.listenerCount('sr:assigned')).toBe(1);
+  });
+
   it('SR 생성 시 활성 관리자·매니저에게 설정 존중 푸시를 예약한다', async () => {
     vi.mocked(prisma.user.findMany).mockResolvedValue([
       { id: 'admin-1' },
