@@ -5,10 +5,13 @@ import { Readable } from 'stream';
 import { RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { NotFoundError } from '@/lib/errors';
+import { logger } from '@/lib/logger';
 import { ensureCanReadSR } from '@/lib/policies';
 import prisma from '@/lib/prisma';
 import { SR_ACCESS_SELECT, SR_ALIVE } from '@/lib/prisma-selects';
+import { getClientIp } from '@/lib/rate-limiter';
 import { resolveAttachmentFilePath } from '@/lib/storage';
+import { auditService } from '@/services/audit.service';
 
 // 파일 시스템 접근이 필요하므로 Node.js 런타임
 export const runtime = 'nodejs';
@@ -61,6 +64,23 @@ export const GET = withAuthAndRateLimit(
     const fileType = attachment.fileType || 'application/octet-stream';
     const disposition = isInlineSafe(fileType) ? 'inline' : 'attachment';
     const encodedName = encodeURIComponent(attachment.fileName);
+
+    // 권한을 통과하고 파일이 있을 때만 남긴다. 기록 실패로 업무 파일을 못 받게 하지는 않는다.
+    await auditService
+      .createLog(null, {
+        userId: session.user.id,
+        actionType: 'DOWNLOAD',
+        targetEntity: 'SRAttachment',
+        targetId: id,
+        changes: { srId: attachment.srId, fileName: attachment.fileName, disposition },
+        ipAddress: getClientIp(request.headers),
+      })
+      .catch((error: unknown) => {
+        logger.warn('[Attachment] 다운로드 기록을 남기지 못했습니다.', {
+          custom_attachmentId: id,
+          custom_error: error instanceof Error ? error.message : String(error),
+        });
+      });
 
     const nodeStream = fs.createReadStream(filePath);
     const webStream = Readable.toWeb(nodeStream) as unknown as ReadableStream<Uint8Array>;

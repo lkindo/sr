@@ -24,6 +24,7 @@ const {
   mockTransaction,
   mockHash,
   mockEnqueueVerification,
+  mockAuditCreate,
 } = vi.hoisted(() => ({
   mockGetUserByEmail: vi.fn(),
   mockRoleFindFirst: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockTransaction: vi.fn(),
   mockHash: vi.fn(),
   mockEnqueueVerification: vi.fn(),
+  mockAuditCreate: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -49,6 +51,10 @@ vi.mock('@/services/user.service', () => ({
 }));
 
 vi.mock('bcryptjs', () => ({ hash: mockHash }));
+
+vi.mock('next/headers', () => ({
+  headers: async () => new Headers({ 'x-real-ip': '5.6.7.8' }),
+}));
 
 vi.mock('@/services/email-verification.service', () => ({
   enqueueEmailVerificationEmail: mockEnqueueVerification,
@@ -96,8 +102,44 @@ beforeEach(() => {
       },
       userRole: { create: vi.fn() },
       userClient: { create: mockUserClientCreate },
+      auditLog: { create: mockAuditCreate },
     })
   );
+});
+
+describe('registerUser — 감사 기록', () => {
+  it('가입 트랜잭션 안에서 유형, 역할, IP 를 남기고 비밀번호는 남기지 않는다', async () => {
+    const result = await registerUser(form());
+
+    expect(result.success).toBe(true);
+    expect(mockAuditCreate).toHaveBeenCalledOnce();
+    const { data } = mockAuditCreate.mock.calls[0]![0];
+    expect(data).toMatchObject({
+      userId: 'u-1',
+      actionType: 'USER_REGISTER',
+      targetEntity: 'User',
+      targetId: 'u-1',
+      ipAddress: '5.6.7.8',
+      changes: { accountType: 'ENGINEER', role: 'ENGINEER', clientId: null },
+    });
+    expect(JSON.stringify(data)).not.toContain(VALID_PASSWORD);
+    expect(JSON.stringify(data)).not.toContain('hashed');
+  });
+
+  // 관리자 없이 계정이 생기는 유일한 경로라 기록 없는 가입을 남기지 않는다.
+  it('기록에 실패하면 가입도 실패한다', async () => {
+    mockAuditCreate.mockRejectedValueOnce(new Error('감사 로그 실패'));
+
+    const result = await registerUser(form());
+
+    expect(result.success).toBe(false);
+  });
+
+  it('검증에 실패하면 기록하지 않는다', async () => {
+    await registerUser(form({ name: str(51) }));
+
+    expect(mockAuditCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe('registerUser — DB 컬럼 폭 경계', () => {

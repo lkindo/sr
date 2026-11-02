@@ -1,5 +1,6 @@
 'use server';
 
+import { headers } from 'next/headers';
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
 
@@ -7,7 +8,9 @@ import { requireRateLimit } from '@/lib/action-helpers';
 import { SECURITY } from '@/lib/constants';
 import { firstZodIssueMessage } from '@/lib/errors';
 import prisma from '@/lib/prisma';
+import { getClientIp } from '@/lib/rate-limiter';
 import { passwordsMatch, registerFieldsSchema } from '@/lib/schemas';
+import { auditService } from '@/services/audit.service';
 import { enqueueEmailVerificationEmail } from '@/services/email-verification.service';
 import { UserService } from '@/services/user.service';
 
@@ -108,6 +111,8 @@ export async function registerUser(formData: FormData) {
       };
     }
 
+    const ipAddress = getClientIp(await headers());
+
     // 트랜잭션으로 원자적 처리
     await prisma.$transaction(async (tx) => {
       // 1. 사용자 생성
@@ -142,7 +147,22 @@ export async function registerUser(formData: FormData) {
         });
       }
 
-      // 4. 이메일 인증 링크(결정 D13 B+) — 같은 트랜잭션의 아웃박스에 적재한다. 승인 화면이 인증 여부를 보인다.
+      // 4. 셀프 가입 기록 — 관리자 없이 계정, 역할, 고객사 소속이 생기는 유일한 경로다.
+      await auditService.createLog(tx, {
+        userId: user.id,
+        actionType: 'USER_REGISTER',
+        targetEntity: 'User',
+        targetId: user.id,
+        changes: {
+          accountType: validated.accountType,
+          role: defaultRole.name,
+          clientId,
+          isActive: user.isActive,
+        },
+        ipAddress,
+      });
+
+      // 5. 이메일 인증 링크(결정 D13 B+) — 같은 트랜잭션의 아웃박스에 적재한다. 승인 화면이 인증 여부를 보인다.
       await enqueueEmailVerificationEmail(tx, {
         id: user.id,
         email: user.email,
