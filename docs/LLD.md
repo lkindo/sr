@@ -2800,9 +2800,11 @@ export class MemoryRateLimiter {
 
 **버킷 키** (2026-09-18 재대조 — 예전 서술은 "IP 단일 키" 였다):
 
-- 라우트·미들웨어(`resolveRateLimitKeys`): 세션 쿠키가 있으면 **세션 해시(`s:<hash>`)가 주 버킷**이고,
-  같은 요청에 **발신 IP 천장**(`ip:<ip>`, 프리셋 × 배수)을 함께 건다 — 쿠키를 갈아 끼우는 단일 발신지를
-  막기 위해서다. 세션이 없으면 IP 가 주 버킷이다.
+- 인증 라우트(`withAuthAndRateLimit`, `userRateLimitKeys`): 인증을 먼저 한 뒤
+  **`u:<userId>:<method>:<route>` 가 주 버킷**이고(라우트는 `/api/srs/:id/comments` 같은 템플릿),
+  **발신 IP 천장**(`ip:<ip>`, 프리셋 × 배수)을 함께 건다. 세션 쿠키로는 키를 만들지 않는다. Auth.js 가
+  응답마다 쿠키를 다시 발급해 요청마다 새 버킷이 되기 때문이다.
+- 공개 라우트(`rateLimit`, `ipRateLimitKeys`)와 미들웨어: IP 만 쓴다.
 - Server Action(`src/lib/action-helpers.ts`): 로그인 사용자는 `<namespace>:user:<userId>`, 아니면
   `<namespace>:ip:<ip>` 가 주 버킷이고, 모든 액션이 공유하는 IP 천장을 따로 검사한다.
 - 로그인(`/api/auth/[...nextauth]`)은 `login:<email>:<ip>` 로 계정·발신지 조합을 센다. 초과하면 429 본문에

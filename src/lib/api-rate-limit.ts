@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import {
+  ipRateLimitKeys,
   MemoryRateLimiter,
   rateLimiters,
+  type RateLimitKeys,
   RateLimitResult,
-  resolveRateLimitKeys,
 } from './rate-limiter';
 
 export interface RateLimitOptions {
   limiter: MemoryRateLimiter;
   includeHeaders?: boolean; // Default: true
   keyGenerator?: (req: NextRequest) => string;
+  /** 버킷 키를 정한다. 없으면 발신 IP 로만 제한한다. */
+  resolveKeys?: (req: NextRequest) => RateLimitKeys;
   onRateLimitExceeded?: (
     req: NextRequest,
     context: { params: any },
@@ -26,7 +29,13 @@ export function withRateLimit<
   T extends NextRequest = NextRequest,
   P = Promise<Record<string, string>>,
 >(handler: (req: T, context: { params: P }) => Promise<NextResponse>, options: RateLimitOptions) {
-  const { limiter, includeHeaders = true, keyGenerator, onRateLimitExceeded } = options;
+  const {
+    limiter,
+    includeHeaders = true,
+    keyGenerator,
+    resolveKeys,
+    onRateLimitExceeded,
+  } = options;
 
   return async (req: T, context: { params: P }): Promise<NextResponse> => {
     // 테스트 환경에서는 제한 비활성화 (환경 변수로 제어 가능)
@@ -34,31 +43,19 @@ export function withRateLimit<
       return handler(req, context);
     }
 
-    /**
-     * 키가 두 개인 이유 (감사 D-1).
-     *
-     * 주 버킷은 세션별이라 NAT 뒤 사무실이 예산을 나눠 쓰지 않는다. 그런데 세션 쿠키 값은
-     * 서명 검증 없이 쓰이므로 **클라이언트가 키를 무한히 갈아 끼울 수 있다** — 유효 계정
-     * 하나로 CSV 내보내기(5만 행 스캔)와 첨부 업로드(50MB)의 제한을 통째로 우회할 수 있었다.
-     *
-     * 그래서 세션 키로 잡힌 요청에는 발신 IP 천장을 **함께** 건다. 둘 중 하나라도 거부하면
-     * 요청은 거부된다. 정상 사무실은 천장(= preset × 배수)에 닿지 않고, 쿠키를 회전시키는
-     * 단일 발신지는 무한이 아니라 그 천장에서 멈춘다.
-     *
-     * `keyGenerator` 를 넘기면(테스트 전용) 천장 검사는 건너뛴다.
-     */
-    let result: RateLimitResult;
-    if (keyGenerator) {
-      result = await limiter.check(keyGenerator(req));
-    } else {
-      const keys = resolveRateLimitKeys(req);
-      result = await limiter.check(keys.primary);
-      if (result.allowed && keys.ceiling) {
-        const ceiling = await limiter.check(keys.ceiling.key, keys.ceiling.multiplier);
-        // 천장에 걸리면 그 결과를 그대로 돌려준다 — 남은 토큰·리셋 시각이 실제로
-        // 요청을 막고 있는 쪽의 값이어야 클라이언트가 언제 재시도할지 알 수 있다.
-        if (!ceiling.allowed) result = ceiling;
-      }
+    // `keyGenerator` 는 테스트 전용이라 천장을 검사하지 않는다.
+    const keys: RateLimitKeys = keyGenerator
+      ? { primary: keyGenerator(req), ceiling: null }
+      : resolveKeys
+        ? resolveKeys(req)
+        : ipRateLimitKeys(req.headers);
+
+    let result = await limiter.check(keys.primary);
+    if (result.allowed && keys.ceiling) {
+      const ceiling = await limiter.check(keys.ceiling.key, keys.ceiling.multiplier);
+      // 천장에 걸리면 그 결과를 그대로 돌려준다. 남은 횟수와 리셋 시각은
+      // 요청을 막고 있는 쪽의 값이어야 클라이언트가 언제 재시도할지 알 수 있다.
+      if (!ceiling.allowed) result = ceiling;
     }
 
     const headers = new Headers();

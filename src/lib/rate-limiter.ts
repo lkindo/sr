@@ -317,111 +317,72 @@ export function getClientIp(headers: { get(name: string): string | null }): stri
 }
 
 /**
- * Auth.js **v5** 가 실제로 읽는 세션 쿠키 이름. 프로덕션(HTTPS)에서는 `__Secure-` 접두사가 붙는다.
+ * 로그인 사용자의 버킷에 **함께** 적용하는 IP 버킷의 배수.
  *
- * v4 호환 이름(`next-auth.session-token`, `__Secure-next-auth.session-token`)은 **의도적으로 뺐다.**
- * Auth.js v5 는 그 이름을 읽지 않으므로 인증에는 아무 영향이 없는데, 아래 파서는 읽고 있었다.
- * 그래서 유효 세션 보유자가
- *
- *     Cookie: next-auth.session-token=<매 요청 난수>; __Secure-authjs.session-token=<진짜 세션>
- *
- * 처럼 보내면 **인증은 정상 성립한 채 버킷만 매 요청 새로 발급**됐다. 읽지 않는 이름을
- * 키 재료로 삼는 것은 순수한 공격 표면이다.
- */
-const SESSION_COOKIE_NAMES = ['__Secure-authjs.session-token', 'authjs.session-token'];
-
-/**
- * 세션 키로 잡히는 요청에 **함께** 적용하는 IP 버킷의 배수.
- *
- * 세션 키잉은 NAT 뒤 사무실 전체가 하나의 예산을 나눠 쓰던 문제를 풀기 위한 것이라
- * 되돌릴 수 없다. 하지만 쿠키 값은 서명 검증 없이 쓰이므로(비용 문제로 여기서 검증하지
- * 않는다) 키를 갈아 끼우는 것 자체는 여전히 가능하다.
- *
- * 그래서 IP 버킷을 **넉넉한 배수로** 함께 검사한다. 정상적인 사무실은 이 천장에 닿지 않고,
- * 쿠키를 회전시키는 단일 발신지는 무한이 아니라 `preset × 배수` 에서 멈춘다.
- * 두 버킷 중 하나라도 거부하면 요청은 거부된다.
+ * 주 버킷을 사용자별로 나누면 한 발신지가 계정 수만큼 한도를 늘릴 수 있다. 그래서 IP 버킷을
+ * 넉넉한 배수로 함께 검사한다. 정상적인 사무실은 이 천장에 닿지 않고, 한 발신지의 총량은
+ * `preset × 배수` 에서 멈춘다. 두 버킷 중 하나라도 거부하면 요청은 거부된다.
  */
 const SESSION_IP_CEILING_MULTIPLIER = Number(process.env.RATE_LIMIT_IP_CEILING_MULTIPLIER ?? 20);
 
-/** 쿠키 헤더에서 세션 토큰 값을 꺼낸다. 서명 검증은 하지 않는다(키로만 쓴다). */
-function getSessionCookieValue(headers: { get(name: string): string | null }): string | null {
-  const raw = headers.get('cookie');
-  if (!raw) return null;
-
-  for (const part of raw.split(';')) {
-    const eq = part.indexOf('=');
-    if (eq === -1) continue;
-    const name = part.slice(0, eq).trim();
-    if (SESSION_COOKIE_NAMES.includes(name)) {
-      const value = part.slice(eq + 1).trim();
-      if (value) return value;
-    }
-  }
-  return null;
-}
-
-/**
- * 레이트리밋 버킷 키를 만든다.
- *
- * 세션이 있으면 **세션별**로, 없으면 IP 로 키잉한다.
- *
- * 예전에는 항상 IP 였다. `withAuthAndRateLimit` 은 `rateLimit(withAuth(handler))` 로 합성되어
- * 인증 **이전에** 토큰을 소비하므로 세션 사용자 id 를 쓸 수 없었고, 그 결과 NAT 뒤 사무실
- * 전체가 댓글·SR 수정 같은 핵심 쓰기에서 strict 예산(1분 5회)을 공유했다(감사 4.1).
- *
- * 쿠키 값은 그대로 쓰지 않고 해시해 키 길이를 고정한다. **서명 검증은 하지 않는다** —
- * 그래서 이 키만으로는 위조를 막지 못하며, 반드시 `resolveRateLimitKeys` 가 함께 돌려주는
- * IP 천장과 **같이** 검사해야 한다. 이 함수만 단독으로 쓰면 감사에서 지적된
- * "쿠키를 회전시켜 전 제한을 무한 우회" 가 되살아난다.
- *
- * 익명 요청은 그대로 IP 로 묶이므로 로그인 시도 폭주 방어는 영향을 받지 않는다.
- */
-export function getClientIdentifier(request: Request): string {
-  const session = getSessionCookieValue(request.headers);
-  if (session) {
-    return `s:${fastHash(session)}`;
-  }
-  return getClientIp(request.headers);
-}
-
-/** `resolveRateLimitKeys` 의 결과. `ceiling` 이 null 이면 IP 천장 검사가 필요 없다. */
+/** 한 요청에 적용할 버킷 키들. `ceiling` 이 null 이면 IP 천장 검사가 필요 없다. */
 export interface RateLimitKeys {
   /** 실제 예산을 소비하는 주 버킷 키. */
   primary: string;
-  /**
-   * 함께 검사할 IP 천장. 세션 키로 잡힌 요청에만 존재한다.
-   * 이미 IP 로 키잉된 익명 요청은 주 버킷이 곧 IP 버킷이므로 중복 검사하지 않는다.
-   */
+  /** 함께 검사할 IP 천장. 주 버킷이 이미 IP 인 익명 요청에는 없다. */
   ceiling: { key: string; multiplier: number } | null;
 }
 
 /**
- * 한 요청에 적용할 버킷 키들을 정한다.
- *
- * 세션 쿠키는 클라이언트가 100% 통제하는 값이라 키를 무한히 갈아 끼울 수 있다.
- * 그래서 세션 키로 잡힌 요청에는 **발신 IP 천장을 함께** 건다 — 정상 사무실은 닿지 않고,
- * 쿠키를 회전시키는 단일 발신지는 `preset × 배수` 에서 멈춘다.
+ * 익명 요청의 키. 세션 쿠키로 키를 만들지 않는다. 검증하지 않은 쿠키는 클라이언트가 마음대로
+ * 바꿀 수 있고, 정상 브라우저의 쿠키도 Auth.js 가 응답마다 다시 발급해 매번 달라진다.
  */
-export function resolveRateLimitKeys(request: Request): RateLimitKeys {
-  const session = getSessionCookieValue(request.headers);
-  if (!session) {
-    return { primary: getClientIp(request.headers), ceiling: null };
-  }
+export function ipRateLimitKeys(headers: { get(name: string): string | null }): RateLimitKeys {
+  return { primary: getClientIp(headers), ceiling: null };
+}
+
+/**
+ * 경로의 값을 파라미터 이름으로 바꾼다. `/api/srs/abc/comments` → `/api/srs/:id/comments`.
+ * 값을 그대로 키에 넣으면 ID 를 바꿔 가며 새 버킷을 얻을 수 있다.
+ */
+function routeTemplateOf(pathname: string, params: Record<string, unknown>): string {
+  const nameByValue = new Map(
+    Object.entries(params).flatMap(([name, value]) =>
+      typeof value === 'string' ? [[value, name] as const] : []
+    )
+  );
+  return pathname
+    .split('/')
+    .map((segment) => {
+      let decoded = segment;
+      try {
+        decoded = decodeURIComponent(segment);
+      } catch {
+        // 잘못된 인코딩은 그대로 비교한다. 이런 경로는 파라미터와 일치하지 않는다.
+      }
+      const name = nameByValue.get(decoded);
+      return name ? `:${name}` : segment;
+    })
+    .join('/');
+}
+
+/**
+ * 인증을 통과한 요청의 키. 주 버킷은 사용자 × 메서드 × 라우트다.
+ *
+ * 라우트를 나누지 않으면 한 사람의 댓글, 수정, 접수가 한 예산을 나눠 쓰다 서로를 막는다
+ * (서버 액션의 `requireRateLimit` 과 같은 이유). 그만큼 늘어난 총량은 IP 천장이 묶는다.
+ */
+export function userRateLimitKeys(
+  request: { method: string; url: string; headers: { get(name: string): string | null } },
+  params: Record<string, unknown>,
+  userId: string
+): RateLimitKeys {
+  const route = routeTemplateOf(new URL(request.url).pathname, params);
   return {
-    primary: `s:${fastHash(session)}`,
+    primary: `u:${userId}:${request.method}:${route}`,
     ceiling: {
       key: `ip:${getClientIp(request.headers)}`,
       multiplier: SESSION_IP_CEILING_MULTIPLIER,
     },
   };
-}
-
-/** 키 길이를 고정하기 위한 비암호학적 해시(FNV-1a). 보안 용도가 아니다. */
-function fastHash(value: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return (hash >>> 0).toString(36);
 }
