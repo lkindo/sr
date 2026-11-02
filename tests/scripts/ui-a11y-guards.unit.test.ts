@@ -22,13 +22,24 @@ const ALLOWED = new Set([
   'src/components/organization/OrganizationTree.tsx:div:onClick={(e) => e.stopPropagation',
 ]);
 
-/** 값이 비어 있거나 음수면 속성이 있어도 키보드로 쓸 수 없다. */
-function hasUsableValue(attr: ts.JsxAttribute | undefined, tree: ts.SourceFile): boolean {
+/** 값이 비어 있거나, 음수이거나, 본문이 빈 함수면 속성이 있어도 키보드로 쓸 수 없다. */
+function hasUsableValue(attr: ts.JsxAttribute | undefined): boolean {
   const init = attr?.initializer;
   if (!init) return false;
   if (!ts.isJsxExpression(init)) return true; // role="checkbox"
-  const value = init.expression?.getText(tree) ?? '';
-  return value !== '' && value !== 'undefined' && value !== 'null' && !value.startsWith('-');
+  if (!init.expression) return false;
+
+  const value = ts.skipOuterExpressions(init.expression);
+  if (value.kind === ts.SyntaxKind.NullKeyword) return false;
+  if (ts.isIdentifier(value) && value.text === 'undefined') return false;
+  if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.MinusToken) {
+    return false;
+  }
+  if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) {
+    const { body } = value;
+    return !(ts.isBlock(body) && body.statements.length === 0);
+  }
+  return true;
 }
 
 /** 역할과 키보드 포커스를 함께 갖췄으면 직접 처리한 것으로 본다. */
@@ -44,7 +55,7 @@ function findKeyboardlessClicks(file: string, source: string): string[] {
       if (
         onClick &&
         !INTERACTIVE_TAG.test(tag) &&
-        !['role', 'tabIndex', 'onKeyDown'].every((name) => hasUsableValue(named(name), tree))
+        !['role', 'tabIndex', 'onKeyDown'].every((name) => hasUsableValue(named(name)))
       ) {
         found.push(`${file}:${tag}:${onClick.getText(tree).slice(0, 40).replace(/\s+/g, ' ')}`);
       }
@@ -87,6 +98,15 @@ describe('키보드 접근', () => {
       ['Badge', '<Badge onClick={f} />'],
       ['역할만 있는 div', '<div role="button" onClick={f}>x</div>'],
       ['포커스 없는 div', '<div role="button" onKeyDown={f} onClick={f}>x</div>'],
+      ['괄호로 감싼 음수', '<div role="button" tabIndex={(-1)} onKeyDown={f} onClick={f}>x</div>'],
+      [
+        '본문 없는 화살표 함수',
+        '<div role="button" tabIndex={0} onKeyDown={() => {}} onClick={f}>x</div>',
+      ],
+      [
+        '본문 없는 함수',
+        '<div role="button" tabIndex={0} onKeyDown={function () {}} onClick={f}>x</div>',
+      ],
       ['Tab 에서 빠진 div', '<div role="button" tabIndex={-1} onKeyDown={f} onClick={f}>x</div>'],
       [
         '키 처리가 빈 div',
@@ -101,6 +121,10 @@ describe('키보드 접근', () => {
       ['Button', '<Button onClick={f}>x</Button>'],
       ['Link', '<Link href="/" onClick={f}>x</Link>'],
       ['직접 처리한 div', '<div role="checkbox" tabIndex={0} onKeyDown={f} onClick={f}>x</div>'],
+      [
+        '화살표 함수로 처리한 div',
+        '<div role="button" tabIndex={0} onKeyDown={(e) => g(e)} onClick={f}>x</div>',
+      ],
       ['클릭 없는 div', '<div>x</div>'],
     ])('%s 는 통과한다', (_name, jsx) => {
       expect(check(jsx)).toEqual([]);
