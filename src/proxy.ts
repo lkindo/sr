@@ -146,7 +146,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, manifest.json, sw.js (root static files)
+     * - API 가 아닌 이미지 경로. /api/x.png 처럼 확장자가 붙어도 API 는 IP 제한을 받아야 한다.
      */
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|(?!api/).*\\.(?:png|jpg|jpeg|gif|svg|webp)$).*)',
   ],
 };

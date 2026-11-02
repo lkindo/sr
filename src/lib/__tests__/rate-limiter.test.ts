@@ -332,6 +332,13 @@ describe('userRateLimitKeys', () => {
     for (const other of others) expect(other.primary).not.toBe(base.primary);
   });
 
+  it('HEAD 는 GET 과 예산을 함께 쓴다', () => {
+    const get = userRateLimitKeys(request('/api/reports/export', 'GET'), {}, 'user-1');
+    const head = userRateLimitKeys(request('/api/reports/export', 'HEAD'), {}, 'user-1');
+
+    expect(head.primary).toBe(get.primary);
+  });
+
   it('다른 사용자여도 같은 IP 면 천장을 함께 쓴다', () => {
     const a = userRateLimitKeys(request('/api/a'), {}, 'user-1');
     const b = userRateLimitKeys(request('/api/b'), {}, 'user-2');

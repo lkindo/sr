@@ -378,8 +378,10 @@ export function userRateLimitKeys(
   userId: string
 ): RateLimitKeys {
   const route = routeTemplateOf(new URL(request.url).pathname, params);
+  // Next 는 HEAD 를 GET 핸들러로 처리한다. 나누면 CSV 내보내기 같은 무거운 GET 의 예산이 두 배가 된다.
+  const method = request.method === 'HEAD' ? 'GET' : request.method;
   return {
-    primary: `u:${userId}:${request.method}:${route}`,
+    primary: `u:${userId}:${method}:${route}`,
     ceiling: {
       key: `ip:${getClientIp(request.headers)}`,
       multiplier: SESSION_IP_CEILING_MULTIPLIER,

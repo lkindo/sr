@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { TooManyRequestsError } from './errors';
 import {
   ipRateLimitKeys,
   MemoryRateLimiter,
@@ -76,7 +77,8 @@ export function withRateLimit<
 
       return NextResponse.json(
         {
-          error: 'Too Many Requests',
+          // 이 문구는 화면의 토스트에 그대로 나온다.
+          error: new TooManyRequestsError().message,
           limit: result.limit,
           remaining: result.remaining,
           reset: result.resetTime,

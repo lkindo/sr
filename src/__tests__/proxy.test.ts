@@ -497,12 +497,18 @@ describe('proxy (middleware)', () => {
   describe('matcher 설정', () => {
     const matcher = new RegExp(`^${config.matcher[0]!}$`);
 
-    it.each([['/dashboard'], ['/api/sr'], ['/'], ['/login'], ['/report.pdf']])(
-      '%s 는 미들웨어를 태운다',
-      (path) => {
-        expect(matcher.test(path)).toBe(true);
-      }
-    );
+    it.each([
+      ['/dashboard'],
+      ['/api/sr'],
+      ['/'],
+      ['/login'],
+      ['/report.pdf'],
+      // 인증에 실패한 요청은 라우트 한도에 닿지 않아 여기서 막아야 한다.
+      ['/api/srs/missing.png'],
+      ['/api/clients/a.svg'],
+    ])('%s 는 미들웨어를 태운다', (path) => {
+      expect(matcher.test(path)).toBe(true);
+    });
 
     it.each([
       ['/_next/static/chunks/main.js'],

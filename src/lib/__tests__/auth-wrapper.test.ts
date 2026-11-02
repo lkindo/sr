@@ -308,12 +308,14 @@ describe('withAuthAndRateLimit', () => {
       mockedAuth.mockResolvedValue(sessionOf(`id-rotating-${sequence}`) as any);
       const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
 
+      // 쿠키도 함께 바꾼다. 같은 쿠키면 예전의 쿠키 버킷에서도 통과해 ID 를 시험하지 못한다.
       for (let i = 0; i < LIMIT; i++) {
-        await wrapped(requestWith('c', `/api/srs/sr-${i}/comments`), {
+        const allowed = await wrapped(requestWith(`cookie-${i}`, `/api/srs/sr-${i}/comments`), {
           params: Promise.resolve({ id: `sr-${i}` }),
         });
+        expect(allowed.status).toBe(200);
       }
-      const blocked = await wrapped(requestWith('c', '/api/srs/sr-next/comments'), {
+      const blocked = await wrapped(requestWith('cookie-next', '/api/srs/sr-next/comments'), {
         params: Promise.resolve({ id: 'sr-next' }),
       });
 

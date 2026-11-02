@@ -115,7 +115,7 @@ describe('withRateLimit', () => {
     expect(response.status).toBe(429);
 
     const json = await response.json();
-    expect(json.error).toBe('Too Many Requests');
+    expect(json.error).toBe('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
     expect(json.limit).toBe(100);
     expect(json.remaining).toBe(0);
   });
