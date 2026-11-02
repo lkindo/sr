@@ -290,7 +290,7 @@ describe('withAuthAndRateLimit', () => {
     });
 
     it('쿠키가 요청마다 달라도 같은 사용자면 한도에 걸린다', async () => {
-      mockedAuth.mockResolvedValue(sessionOf(`rotating-${sequence}`) as any);
+      mockedAuth.mockResolvedValue(sessionOf(`rotating-${sequence}`) as never);
       const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
       const params = { params: Promise.resolve({ id: 'sr-1' }) };
 
@@ -305,7 +305,7 @@ describe('withAuthAndRateLimit', () => {
     });
 
     it('SR ID 를 바꿔도 한도를 넘을 수 없다', async () => {
-      mockedAuth.mockResolvedValue(sessionOf(`id-rotating-${sequence}`) as any);
+      mockedAuth.mockResolvedValue(sessionOf(`id-rotating-${sequence}`) as never);
       const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
 
       // 쿠키도 함께 바꾼다. 같은 쿠키면 예전의 쿠키 버킷에서도 통과해 ID 를 시험하지 못한다.
@@ -326,11 +326,11 @@ describe('withAuthAndRateLimit', () => {
       const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
       const params = { params: Promise.resolve({ id: 'sr-1' }) };
 
-      mockedAuth.mockResolvedValue(sessionOf(`busy-${sequence}`) as any);
+      mockedAuth.mockResolvedValue(sessionOf(`busy-${sequence}`) as never);
       for (let i = 0; i < LIMIT; i++) await wrapped(requestWith('c'), params);
       expect((await wrapped(requestWith('c'), params)).status).toBe(429);
 
-      mockedAuth.mockResolvedValue(sessionOf(`colleague-${sequence}`) as any);
+      mockedAuth.mockResolvedValue(sessionOf(`colleague-${sequence}`) as never);
       expect((await wrapped(requestWith('c'), params)).status).toBe(200);
     });
 
@@ -339,12 +339,12 @@ describe('withAuthAndRateLimit', () => {
       const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
       const params = { params: Promise.resolve({ id: 'sr-1' }) };
 
-      mockedAuth.mockResolvedValue(null as any);
+      mockedAuth.mockResolvedValue(null as never);
       for (let i = 0; i < LIMIT + 1; i++) {
         expect((await wrapped(requestWith('c'), params)).status).toBe(401);
       }
 
-      mockedAuth.mockResolvedValue(sessionOf(userId) as any);
+      mockedAuth.mockResolvedValue(sessionOf(userId) as never);
       expect((await wrapped(requestWith('c'), params)).status).toBe(200);
     });
   });
