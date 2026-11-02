@@ -247,7 +247,7 @@ describe('SRService Mutation Tests', () => {
       expect(prisma.sR.delete).not.toHaveBeenCalled();
       expect(prisma.sR.updateMany).toHaveBeenCalledWith({
         where: { id: 'sr-1', deletedAt: null },
-        data: { deletedAt: expect.any(Date) },
+        data: { deletedAt: expect.any(Date), version: { increment: 1 } },
       });
     });
 

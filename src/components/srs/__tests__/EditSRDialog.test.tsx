@@ -144,6 +144,7 @@ describe('EditSRDialog Component', () => {
 
   const mockSR = {
     id: 'sr-123',
+    version: 3,
     title: 'Existing SR Title',
     description: 'Existing SR Description which is long enough.',
     status: 'REQUESTED',
@@ -381,6 +382,20 @@ describe('EditSRDialog Component', () => {
       expect(category).toHaveValue('');
       expect(getServiceCategoriesForSelection).toHaveBeenLastCalledWith('client-2');
     });
+  });
+
+  // 열어 둔 사이 다시 조회된 버전을 보내면, 보지 못한 변경을 덮어쓰게 된다.
+  it('열어 둔 사이 SR 이 다시 조회돼도 연 시점의 버전을 보낸다', async () => {
+    mockUpdateMutateAsync.mockResolvedValue({ success: true });
+    const { rerender } = render(<EditSRDialog {...defaultProps} />);
+    await screen.findByDisplayValue(mockSR.description);
+
+    rerender(<EditSRDialog {...defaultProps} sr={{ ...mockSR, version: 4 } as never} />);
+    fireEvent.submit(screen.getByTestId('edit-sr-form'));
+
+    await waitFor(() => expect(mockUpdateMutateAsync).toHaveBeenCalledOnce());
+    const payload = mockUpdateMutateAsync.mock.calls[0]![0] as FormData;
+    expect(payload.get('expectedVersion')).toBe('3');
   });
 
   it('고객이 설명을 수정할 때 운영자 카테고리와 숨은 우선순위를 전송하지 않는다', async () => {

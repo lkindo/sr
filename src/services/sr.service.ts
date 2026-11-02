@@ -41,6 +41,7 @@ import {
   SR_SLA_BASIS_LOCKED_MESSAGE,
   validateTransition,
 } from '@/lib/sr-state-machine';
+import { assertVersionUnchanged } from '@/lib/sr-version';
 import { appZoneDateStamp, formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
@@ -374,11 +375,13 @@ export class SRService {
     sessionUser: AuthenticatedUser
   ): Promise<SRUpdateResult> {
     try {
-      const validated = srUpdateSchema.parse(data);
+      // expectedVersion 은 SR 의 값이 아니다. 내용 수정 판정에 섞이지 않게 여기서 떼어 낸다.
+      const { expectedVersion, ...validated } = srUpdateSchema.parse(data);
       const existingSR = await prisma.sR.findUnique({ where: { id, ...SR_ALIVE } });
       if (!existingSR) throw new NotFoundError('SR');
 
       ensureCanUpdateSR(sessionUser, existingSR);
+      assertVersionUnchanged(expectedVersion, existingSR.version);
 
       // 고객사 변경 검증 (REQUESTED 상태에서만 허용)
       if (validated.clientId && validated.clientId !== existingSR.clientId) {
@@ -1396,9 +1399,10 @@ export class SRService {
       //    (테스트 목이 불완전하다는 이유로 prisma 로 폴백하면 삭제가 트랜잭션 밖으로
       //     새어나가 원자성이 깨진다. 목 쪽을 고칠 일이다.)
       //    `updateMany` + `deletedAt: null` 조건이라 동시에 두 번 눌러도 두 번째는 0건이다.
+      //    version 을 올려야, 삭제 전에 SR 을 읽고 진행 중이던 수정이 가드에 걸린다.
       await tx.sR.updateMany({
         where: { id, deletedAt: null },
-        data: { deletedAt: new Date() },
+        data: { deletedAt: new Date(), version: { increment: 1 } },
       });
     });
 

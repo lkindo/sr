@@ -33,6 +33,7 @@ function renderDialog(client = new QueryClient({ defaultOptions: { mutations: { 
       srId="sr-1"
       srNumber="SR-001"
       currentDueDate={CURRENT_DUE}
+      version={7}
       open
       onOpenChange={onOpenChange}
     />,
@@ -97,6 +98,7 @@ describe('DueDateAdjustDialog', () => {
     expect(JSON.parse(init.body)).toEqual({
       dueDate: '2026-09-25T01:30:00.000Z',
       changeReason: '고객과 일정 협의',
+      expectedVersion: 7,
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: qk.sr.detail('sr-1') });
   });

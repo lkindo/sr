@@ -69,6 +69,7 @@ export function useEditSRForm({
   const [loadedValues, setLoadedValues] = useState<ReturnType<typeof editFormValuesOf> | null>(
     null
   );
+  const [loadedVersion, setLoadedVersion] = useState<number | null>(null);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -177,6 +178,7 @@ export function useEditSRForm({
 
     const values = editFormValuesOf(sr);
     setLoadedValues(values);
+    setLoadedVersion(sr.version);
     setTitle(values.title);
     setDescription(values.description);
     setClientId(values.clientId);
@@ -300,6 +302,9 @@ export function useEditSRForm({
     setLoading(true);
 
     const formData = new FormData();
+    // 지금의 sr.version 이 아니라 연 시점의 값을 보낸다. 열어 둔 사이 다시 조회된 값을 보내면
+    // 내가 보지 못한 변경을 덮어쓴다.
+    if (loadedVersion !== null) formData.append('expectedVersion', String(loadedVersion));
     formData.append('title', title);
     formData.append('description', description);
     // 잠긴 운영자 필드는 전송하지 않는다. 실제 우선순위는 접수 화면에서만 편집한다.

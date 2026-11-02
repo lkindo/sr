@@ -236,9 +236,15 @@ describe('useIntakeForm — 제출', () => {
     expect(router.push).toHaveBeenCalledWith('/srs');
   });
 
-  it('수정 모드는 PATCH 로 보낸다', async () => {
+  it('수정 모드는 불러온 시점의 버전과 함께 PATCH 로 보낸다', async () => {
     const fetchMock = stubFetch([
-      okSR(srPayload({ status: 'INTAKE', serviceCategory: { slaHours: 24, handler: null } })),
+      okSR(
+        srPayload({
+          status: 'INTAKE',
+          version: 4,
+          serviceCategory: { slaHours: 24, handler: null },
+        })
+      ),
       okSR({ ok: true }),
     ]);
 
@@ -253,9 +259,27 @@ describe('useIntakeForm — 제출', () => {
       '/api/srs/sr-1/intake',
       expect.objectContaining({ method: 'PATCH' })
     );
+    const init = fetchMock.mock.lastCall?.[1] as RequestInit;
+    expect(JSON.parse(init.body as string).expectedVersion).toBe(4);
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ description: '접수 정보가 수정되었습니다.' })
     );
+  });
+
+  // 첫 접수의 입력 스키마에는 이 필드가 없다. 중복 접수는 상태 조건이 막는다.
+  it('첫 접수(POST)에는 버전을 보내지 않는다', async () => {
+    const fetchMock = stubFetch([okSR(srPayload({ version: 4 })), okSR({ ok: true })]);
+
+    const { result } = renderHook(() => useIntakeForm({ srId: 'sr-1' }), { wrapper });
+    await waitFor(() => expect(result.current.sr).not.toBeNull());
+
+    await act(async () => {
+      await result.current.onSubmit(values);
+    });
+
+    const init = fetchMock.mock.lastCall?.[1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('expectedVersion');
   });
 
   // 서버가 주는 이유를 그대로 보여 줘야 사용자가 다음 행동을 정할 수 있다.

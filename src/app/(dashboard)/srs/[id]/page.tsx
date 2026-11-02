@@ -439,6 +439,7 @@ export default function SRDetailPage() {
           srId={srId}
           srNumber={sr.srNumber}
           currentDueDate={sr.dueDate}
+          version={sr.version}
           open={isDueDateDialogOpen}
           onOpenChange={setIsDueDateDialogOpen}
         />

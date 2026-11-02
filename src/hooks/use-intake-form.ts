@@ -188,6 +188,8 @@ export function useIntakeForm({ srId }: UseIntakeFormOptions) {
       estimatedCompletionDate: values.estimatedCompletionDate.toISOString(),
       intakeNotes: values.intakeNotes || '',
       assigneeId: values.assigneeId,
+      // 첫 접수(POST)는 상태 조건이 중복 처리를 막는다. 값을 덮어쓰는 수정만 연 시점과 비교한다.
+      ...(isEditMode && sr ? { expectedVersion: sr.version } : {}),
     };
 
     try {

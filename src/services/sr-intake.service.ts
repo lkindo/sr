@@ -13,6 +13,7 @@ import prisma from '@/lib/prisma';
 import { CLIENT_SUMMARY_SELECT, SR_ALIVE, USER_SUMMARY_SELECT } from '@/lib/prisma-selects';
 import { emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtime-events';
 import type { intakeSchema, intakeUpdateSchema } from '@/lib/schemas';
+import { assertVersionUnchanged } from '@/lib/sr-version';
 import { formatAppZoneDate, formatAppZoneTime } from '@/lib/timezone';
 import { auditService } from '@/services/audit.service';
 import { serviceCategoryService } from '@/services/service-category.service';
@@ -269,6 +270,7 @@ export async function updateIntakeInfo(
   }
 
   ensureCanIntakeClientSR(user, sr);
+  assertVersionUnchanged(validated.expectedVersion, sr.version);
 
   if (sr.status !== 'INTAKE' && sr.status !== 'IN_PROGRESS') {
     throw new BadRequestError('접수되었거나 진행 중인 SR만 접수 정보를 수정할 수 있습니다');
