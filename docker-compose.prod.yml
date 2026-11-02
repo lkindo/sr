@@ -56,6 +56,10 @@ services:
       - TZ=Asia/Seoul
       # 첨부파일 저장 위치(웹루트 밖). 아래 명명 볼륨이 이 경로에 마운트된다.
       - STORAGE_DIR=/app/var/uploads
+      # 미들웨어의 IP 당 분당 한도. 같은 IP 의 사무실 전체가 나눠 쓰고 화면 하나가 API 를 여러 번
+      # 부르므로 코드 기본값과 같은 100 으로 둔다. env_file 보다 우선한다. .env.docker 는 배포 때마다
+      # 시크릿에서 다시 쓰이므로 서버 파일을 고쳐도 남지 않는다.
+      - RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS=100
     volumes:
       # 첨부파일 영속화 (재배포 시 유실 방지 + 웹루트 밖 보관)
       - sr_uploads:/app/var/uploads

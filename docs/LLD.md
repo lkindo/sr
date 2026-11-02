@@ -2795,8 +2795,8 @@ export class MemoryRateLimiter {
 | `FILE_UPLOAD` | 1시간당 20회 | 파일 업로드              | `RATE_LIMIT_FILE_UPLOAD_*` |
 | `MIDDLEWARE`  | 1분당 100회  | 미들웨어(`src/proxy.ts`) | `RATE_LIMIT_MIDDLEWARE_*`  |
 
-> `.env.example` 은 `MIDDLEWARE` 를 1분당 20회로 예시하지만, 코드의 **기본값은 100회**다
-> (`RateLimitPresets.MIDDLEWARE`). 환경 변수를 설정하지 않으면 100이 적용된다.
+> 운영은 `docker-compose.prod.yml` 의 `environment` 가 100 으로 고정한다. `.env.docker` 는 배포 때마다
+> 시크릿에서 다시 쓰이므로, 시크릿이나 서버 파일의 값은 이 설정을 이기지 못한다.
 
 **버킷 키** (2026-09-18 재대조 — 예전 서술은 "IP 단일 키" 였다):
 
