@@ -57,6 +57,11 @@ jobs:
       # 스위트가 스스로 걸린다. E2E 가 검증하는 대상이 아니므로 한도를 사실상 해제한다.
       RATE_LIMIT_MIDDLEWARE_WINDOW_MS: '60000'
       RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS: '1000000'
+      # 라우트 한도도 같은 이유로 푼다. 시드 계정 하나가 스위트 전체를 수행한다.
+      RATE_LIMIT_STRICT_MAX_REQUESTS: '1000000'
+      RATE_LIMIT_STANDARD_MAX_REQUESTS: '1000000'
+      RATE_LIMIT_RELAXED_MAX_REQUESTS: '1000000'
+      RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS: '1000000'
       # 서버는 이 워크플로가 직접 띄운다. playwright.config.ts 의 webServer(3000 포트,
       # CI 에서 reuseExistingServer=false)와 포트가 충돌하지 않도록 반드시 꺼 둔다.
       SKIP_WEBSERVER: '1'

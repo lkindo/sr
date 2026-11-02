@@ -6,7 +6,9 @@ import { priorityLabels, statusLabelOf } from '@/lib/constants/sr';
 import { logger } from '@/lib/logger';
 import { canExportSRs, resolveAssigneeScope } from '@/lib/policies';
 import { SR_ALIVE } from '@/lib/prisma-selects';
+import { getClientIp } from '@/lib/rate-limiter';
 import { formatAppZoneDate, formatISODateInAppZone } from '@/lib/timezone';
+import { auditService } from '@/services/audit.service';
 import { srService } from '@/services/sr.service';
 
 export const runtime = 'nodejs';
@@ -77,7 +79,7 @@ function toCsvLine(sr: ExportRow): string {
 
 // GET /api/reports/export - SR 목록 CSV 내보내기 (Rate Limit: 엄격)
 export const GET = withAuthAndRateLimit(
-  async (_request: NextRequest, { session }) => {
+  async (request: NextRequest, { session }) => {
     if (!canExportSRs(session.user)) {
       return new NextResponse('Forbidden', { status: 403 });
     }
@@ -88,6 +90,16 @@ export const GET = withAuthAndRateLimit(
     const where: Prisma.SRWhereInput = assigneeScope
       ? { ...SR_ALIVE, assigneeId: assigneeScope }
       : { ...SR_ALIVE };
+
+    // 스트림을 시작하기 전에 남긴다. 끝난 뒤에 남기면 중간에 끊긴 내보내기가 기록되지 않는다.
+    // 쓰기에 실패하면 내보내지 않는다. 대량 반출 경로라 기록 없는 반출을 허용하지 않는다.
+    await auditService.createLog(null, {
+      userId: session.user.id,
+      actionType: 'EXPORT',
+      targetEntity: 'SR',
+      changes: { format: 'csv', scope: assigneeScope ? 'ASSIGNED' : 'ALL' },
+      ipAddress: getClientIp(request.headers),
+    });
 
     const encoder = new TextEncoder();
     const userId = session.user.id;

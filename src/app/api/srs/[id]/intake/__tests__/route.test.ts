@@ -754,6 +754,59 @@ describe('PATCH /api/srs/[id]/intake — 권한 게이트', () => {
   });
 });
 
+describe('PATCH /api/srs/[id]/intake — 폼을 연 시점의 버전', () => {
+  beforeEach(() => {
+    mocks.findUnique.mockResolvedValue(patchSR());
+  });
+
+  it('그사이 SR 이 바뀌었으면 409 이고 쓰지 않는다', async () => {
+    const response = await patch({ actualPriority: 'HIGH', expectedVersion: 2 });
+
+    expect(response.status).toBe(409);
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.txUpdate).not.toHaveBeenCalled();
+  });
+
+  it('같으면 저장하고, SR 의 값으로 쓰지 않는다', async () => {
+    const response = await patch({ actualPriority: 'HIGH', expectedVersion: 3 });
+
+    expect(response.status).toBe(200);
+    expect(mocks.txUpdate.mock.calls[0]![0].data).not.toHaveProperty('expectedVersion');
+  });
+
+  // 응답이 갈리면 수정 권한이 없는 SR 의 버전을 떠볼 수 있다.
+  it.each([
+    ['다른 버전', 2],
+    ['같은 버전', 3],
+  ])('수정 권한이 없으면 %s 이어도 403 이다', async (_label, expectedVersion) => {
+    const engineer = session({
+      id: 'eng-9',
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ actualPriority: 'HIGH', expectedVersion }, engineer);
+
+    expect(response.status).toBe(403);
+  });
+
+  it('버전만 보내면 수정할 값이 없는 요청이다', async () => {
+    const response = await patch({ expectedVersion: 3 });
+
+    expect(response.status).toBe(400);
+  });
+
+  // select 에서 빠지면 폼이 버전을 받지 못해 충돌 검사가 조용히 건너뛰어진다.
+  it('조회 응답이 폼에 돌려줄 버전을 싣는다', async () => {
+    mocks.findUnique.mockResolvedValue(GET_SR);
+
+    await get();
+
+    expect(mocks.findUnique.mock.calls[0]![0].select.version).toBe(true);
+  });
+});
+
 describe('PATCH /api/srs/[id]/intake — 객체 인가', () => {
   // SR:INTAKE 는 역할 편집으로 외부 커스텀 역할에도 줄 수 있다.
   const external = (clientIds: string[], permissions = ['SR:INTAKE']) =>

@@ -573,6 +573,23 @@ describe('srPatchSchema', () => {
     expect(srPatchSchema.safeParse({ title: 'Updated SR title' }).success).toBe(true);
   });
 
+  // 서버 액션은 FormData 로 문자열을, REST 는 JSON 으로 숫자를 보낸다.
+  it.each([
+    [7, 7],
+    ['7', 7],
+    [0, 0],
+    ['0', 0],
+  ])('expectedVersion %j 를 숫자 %d 로 받는다', (input, expected) => {
+    expect(srPatchSchema.parse({ expectedVersion: input }).expectedVersion).toBe(expected);
+  });
+
+  it.each([[null], [-1], [1.5], ['abc'], ['-1'], ['']])(
+    'expectedVersion %j 는 거절한다',
+    (input) => {
+      expect(srPatchSchema.safeParse({ expectedVersion: input }).success).toBe(false);
+    }
+  );
+
   it('rejects status transitions on the general edit endpoint', () => {
     const result = srPatchSchema.safeParse({ status: 'COMPLETED' });
     expect(result.success).toBe(false);

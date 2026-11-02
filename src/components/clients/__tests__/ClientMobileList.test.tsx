@@ -194,10 +194,19 @@ describe('ClientMobileList — 펼침', () => {
     expect(screen.getByText('lee.u@example.com')).toBeInTheDocument();
   });
 
+  it('사용자 수 배지는 이름 있는 버튼이다', () => {
+    renderList();
+
+    const button = within(cardOf('다라 주식회사')).getByRole('button', {
+      name: /사용자 .*명 보기/,
+    });
+    expect(button.tagName).toBe('BUTTON');
+  });
+
   it('토글 버튼은 자기 id 를 부모로 되돌릴 뿐이다', () => {
     renderList();
 
-    fireEvent.click(within(cardOf('다라 주식회사')).getByRole('button'));
+    fireEvent.click(within(cardOf('다라 주식회사')).getByRole('button', { name: /펼치기/ }));
 
     expect(onToggleRowExpansion).toHaveBeenCalledWith('c-2');
     expect(screen.queryByTestId('icon-chevron-down')).not.toBeInTheDocument();

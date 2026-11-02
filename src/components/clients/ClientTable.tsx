@@ -108,13 +108,19 @@ export function ClientTable({
                   <TableCell className="text-center">{client.contactPerson || '-'}</TableCell>
                   <TableCell>{client.contactEmail || '-'}</TableCell>
                   <TableCell className="text-center">
-                    <Badge
-                      variant="secondary"
-                      className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                    <button
+                      type="button"
+                      className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`${client.name} 사용자 ${client._count?.users || 0}명 보기`}
                       onClick={(e) => onUsersClick(client, e)}
                     >
-                      {client._count?.users || 0}명
-                    </Badge>
+                      <Badge
+                        variant="secondary"
+                        className="cursor-pointer hover:bg-secondary/80 transition-colors"
+                      >
+                        {client._count?.users || 0}명
+                      </Badge>
+                    </button>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="secondary">{client._count?.srs || 0}건</Badge>

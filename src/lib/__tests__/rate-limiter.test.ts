@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  getClientIdentifier,
+  getClientIp,
+  ipRateLimitKeys,
   MemoryRateLimiter,
   RateLimitPresets,
-  resolveRateLimitKeys,
+  userRateLimitKeys,
 } from '../rate-limiter';
 
 describe('MemoryRateLimiter', () => {
@@ -225,7 +226,7 @@ describe('RateLimitPresets', () => {
   });
 });
 
-describe('getClientIdentifier', () => {
+describe('getClientIp', () => {
   it('X-Forwarded-For에서 신뢰 프록시가 추가한 마지막(실제 클라이언트) IP를 사용해야 함', () => {
     // 클라이언트가 첫 항목(1.2.3.4)을 위조하더라도, nginx가 마지막에 실제 IP(5.6.7.8)를 추가한다.
     const request = new Request('http://localhost', {
@@ -234,7 +235,7 @@ describe('getClientIdentifier', () => {
       },
     });
 
-    const ip = getClientIdentifier(request);
+    const ip = getClientIp(request.headers);
     expect(ip).toBe('5.6.7.8');
   });
 
@@ -245,7 +246,7 @@ describe('getClientIdentifier', () => {
       },
     });
 
-    const ip = getClientIdentifier(request);
+    const ip = getClientIp(request.headers);
     expect(ip).toBe('9.10.11.12');
   });
 
@@ -257,78 +258,92 @@ describe('getClientIdentifier', () => {
       },
     });
 
-    const ip = getClientIdentifier(request);
+    const ip = getClientIp(request.headers);
     expect(ip).toBe('9.10.11.12');
   });
 
   it('헤더가 없으면 기본값을 반환해야 함', () => {
     const request = new Request('http://localhost');
 
-    const ip = getClientIdentifier(request);
+    const ip = getClientIp(request.headers);
     expect(ip).toBe('unknown');
   });
 });
 
-/**
- * 감사 D-1 회귀 방어.
- *
- * 세션 쿠키 값은 서명 검증 없이 버킷 키가 된다 — 즉 클라이언트가 키를 갈아 끼울 수 있다.
- * 이 스위트는 ① 읽지 않는 레거시 쿠키 이름이 키 재료가 되지 않고 ② 세션 키에는 반드시
- * IP 천장이 함께 붙는다는 두 가지를 고정한다. 둘 중 하나라도 풀리면 유효 계정 하나로
- * 전 제한을 무한 우회할 수 있다.
- */
-describe('resolveRateLimitKeys — 쿠키 위조 방어', () => {
-  const withCookie = (cookie: string, ip = '5.6.7.8') =>
-    new Request('http://localhost', { headers: { cookie, 'x-real-ip': ip } });
+describe('ipRateLimitKeys', () => {
+  const withCookie = (cookie: string) => new Headers({ cookie, 'x-real-ip': '5.6.7.8' });
 
-  it('세션이 없으면 IP 로만 키잉하고 천장을 두지 않는다', () => {
-    const keys = resolveRateLimitKeys(
-      new Request('http://localhost', {
-        headers: { 'x-real-ip': '5.6.7.8' },
-      })
+  // 익명도 가짜 쿠키를 바꿔 가며 새 버킷을 얻던 경로다.
+  it('세션 쿠키가 달라도 같은 IP 면 같은 키다', () => {
+    const a = ipRateLimitKeys(withCookie('__Secure-authjs.session-token=aaa'));
+    const b = ipRateLimitKeys(withCookie('__Secure-authjs.session-token=bbb'));
+
+    expect(a).toEqual({ primary: '5.6.7.8', ceiling: null });
+    expect(b).toEqual(a);
+  });
+});
+
+describe('userRateLimitKeys', () => {
+  const request = (path: string, method = 'POST', ip = '5.6.7.8') => ({
+    method,
+    url: `https://sr.example.com${path}`,
+    headers: new Headers({ 'x-real-ip': ip }),
+  });
+
+  it('사용자, 메서드, 라우트로 주 버킷을 잡고 IP 천장을 함께 건다', () => {
+    const keys = userRateLimitKeys(request('/api/srs/sr-1/comments'), { id: 'sr-1' }, 'user-1');
+
+    expect(keys.primary).toBe('u:user-1:POST:/api/srs/:id/comments');
+    expect(keys.ceiling?.key).toBe('ip:5.6.7.8');
+    expect(keys.ceiling?.multiplier).toBeGreaterThan(1);
+  });
+
+  it('ID 를 바꿔도 같은 버킷이다', () => {
+    const a = userRateLimitKeys(request('/api/srs/sr-1/comments'), { id: 'sr-1' }, 'user-1');
+    const b = userRateLimitKeys(request('/api/srs/sr-2/comments'), { id: 'sr-2' }, 'user-1');
+
+    expect(a.primary).toBe(b.primary);
+  });
+
+  it('파라미터가 여럿이거나 인코딩돼 있어도 템플릿으로 바꾼다', () => {
+    const nested = userRateLimitKeys(
+      request('/api/clients/c-1/categories/cat%201', 'PATCH'),
+      { id: 'c-1', categoryId: 'cat 1' },
+      'user-1'
     );
 
-    expect(keys.primary).toBe('5.6.7.8');
-    // 주 버킷이 곧 IP 버킷이므로 중복 검사하지 않는다.
-    expect(keys.ceiling).toBeNull();
+    expect(nested.primary).toBe('u:user-1:PATCH:/api/clients/:id/categories/:categoryId');
   });
 
-  it('Auth.js v5 세션 쿠키는 세션 키 + IP 천장을 함께 만든다', () => {
-    const keys = resolveRateLimitKeys(withCookie('__Secure-authjs.session-token=real-token'));
-
-    expect(keys.primary).toMatch(/^s:/);
-    expect(keys.ceiling).not.toBeNull();
-    expect(keys.ceiling!.key).toBe('ip:5.6.7.8');
-    expect(keys.ceiling!.multiplier).toBeGreaterThan(1);
+  it('잘못된 인코딩이 있어도 던지지 않는다', () => {
+    expect(() =>
+      userRateLimitKeys(request('/api/srs/%E0%A4%A/comments'), { id: 'sr-1' }, 'user-1')
+    ).not.toThrow();
   });
 
-  it('v5 가 읽지 않는 레거시 v4 쿠키 이름은 키 재료가 되지 않는다', () => {
-    // 이것이 실제 익스플로잇이었다: v4 이름을 **앞에** 끼워 넣으면 파서가 그 난수를
-    // 먼저 만나 키로 썼고, Auth.js v5 는 그 이름을 읽지 않으므로 인증은 그대로 성립했다.
-    // 결과적으로 인증된 사용자가 요청마다 새 버킷을 얻었다.
-    const forged = resolveRateLimitKeys(
-      withCookie('next-auth.session-token=RANDOM-1; __Secure-authjs.session-token=real-token')
-    );
-    const clean = resolveRateLimitKeys(withCookie('__Secure-authjs.session-token=real-token'));
+  it('사용자, 메서드, 라우트가 다르면 버킷이 나뉜다', () => {
+    const base = userRateLimitKeys(request('/api/srs/sr-1/comments'), { id: 'sr-1' }, 'user-1');
+    const others = [
+      userRateLimitKeys(request('/api/srs/sr-1/comments'), { id: 'sr-1' }, 'user-2'),
+      userRateLimitKeys(request('/api/srs/sr-1/comments', 'GET'), { id: 'sr-1' }, 'user-1'),
+      userRateLimitKeys(request('/api/srs/sr-1/intake'), { id: 'sr-1' }, 'user-1'),
+    ];
 
-    // 위조 쿠키를 앞에 붙여도 키가 달라지지 않는다.
-    expect(forged.primary).toBe(clean.primary);
+    for (const other of others) expect(other.primary).not.toBe(base.primary);
   });
 
-  it('레거시 쿠키만 있으면 세션으로 인정하지 않는다 (IP 키로 떨어진다)', () => {
-    const keys = resolveRateLimitKeys(withCookie('next-auth.session-token=RANDOM-2'));
+  it('HEAD 는 GET 과 예산을 함께 쓴다', () => {
+    const get = userRateLimitKeys(request('/api/reports/export', 'GET'), {}, 'user-1');
+    const head = userRateLimitKeys(request('/api/reports/export', 'HEAD'), {}, 'user-1');
 
-    expect(keys.primary).toBe('5.6.7.8');
-    expect(keys.ceiling).toBeNull();
+    expect(head.primary).toBe(get.primary);
   });
 
-  it('세션 값이 바뀌면 주 키는 달라지지만 IP 천장은 같다', () => {
-    const a = resolveRateLimitKeys(withCookie('authjs.session-token=aaa'));
-    const b = resolveRateLimitKeys(withCookie('authjs.session-token=bbb'));
+  it('다른 사용자여도 같은 IP 면 천장을 함께 쓴다', () => {
+    const a = userRateLimitKeys(request('/api/a'), {}, 'user-1');
+    const b = userRateLimitKeys(request('/api/b'), {}, 'user-2');
 
-    expect(a.primary).not.toBe(b.primary);
-    // 키를 회전시켜도 이 천장이 같으므로 무한 우회가 되지 않는다.
-    expect(a.ceiling!.key).toBe(b.ceiling!.key);
+    expect(a.ceiling?.key).toBe(b.ceiling?.key);
   });
 });
 

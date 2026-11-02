@@ -105,6 +105,11 @@ export default defineConfig({
           // 여기서도 제한을 끄지는 않는다 — 끄면 API 스로틀 회귀를 E2E 가 놓친다.
           RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS:
             process.env.RATE_LIMIT_MIDDLEWARE_MAX_REQUESTS ?? '2000',
+          // 라우트 한도는 사용자별이다. 시드 계정 하나가 스위트 전체를 수행하므로 함께 올린다.
+          RATE_LIMIT_STANDARD_MAX_REQUESTS: process.env.RATE_LIMIT_STANDARD_MAX_REQUESTS ?? '2000',
+          RATE_LIMIT_RELAXED_MAX_REQUESTS: process.env.RATE_LIMIT_RELAXED_MAX_REQUESTS ?? '2000',
+          RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS:
+            process.env.RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS ?? '2000',
         },
       },
 

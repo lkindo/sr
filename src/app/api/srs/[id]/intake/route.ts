@@ -57,6 +57,8 @@ export const GET = withAuthAndRateLimit(
       where: { id, ...SR_ALIVE },
       select: {
         id: true,
+        // 접수 수정 폼이 연 시점의 값으로 돌려보낸다. 빠지면 충돌 검사가 조용히 건너뛰어진다.
+        version: true,
         clientId: true,
         requesterId: true,
         assigneeId: true,

@@ -27,6 +27,8 @@ interface DueDateAdjustDialogProps {
   srNumber: string;
   /** 지금 마감일. 없으면 입력란을 비워 둔다. */
   currentDueDate: string | Date | null;
+  /** 지금 SR 버전. 연 뒤로 SR 이 바뀌면 서버가 거절한다. */
+  version: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -44,6 +46,7 @@ export function DueDateAdjustDialog({
   srId,
   srNumber,
   currentDueDate,
+  version,
   open,
   onOpenChange,
 }: DueDateAdjustDialogProps) {
@@ -53,6 +56,8 @@ export function DueDateAdjustDialog({
   const [dateValue, setDateValue] = useState(initialValue);
   const [reason, setReason] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
+  // 열려 있는 동안 SR 이 다시 조회돼도 입력의 기준은 연 시점의 값이다.
+  const [openedVersion] = useState(version);
 
   const { mutate, isPending } = useMutation({
     mutationFn: () =>
@@ -61,6 +66,7 @@ export function DueDateAdjustDialog({
         {
           dueDate: fromAppZoneDateTimeInput(dateValue).toISOString(),
           changeReason: reason.trim(),
+          expectedVersion: openedVersion,
         },
         { fallbackMessage: '마감일을 조정하지 못했습니다.' }
       ),

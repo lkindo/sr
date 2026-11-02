@@ -43,6 +43,33 @@ describe('withRateLimit', () => {
     vi.unstubAllEnvs();
   });
 
+  // 공개 라우트는 세션을 쓰지 않는다. 가짜 쿠키를 바꿔 가며 새 버킷을 얻지 못해야 한다.
+  it('키를 정하지 않으면 쿠키와 무관하게 IP 로 제한한다', async () => {
+    const { limiter, checkMock } = createMockRateLimiter();
+    checkMock.mockResolvedValue({
+      allowed: true,
+      current: 1,
+      limit: 100,
+      resetTime: 60000,
+      remaining: 99,
+    });
+    const wrappedHandler = withRateLimit(mockHandler, { limiter });
+
+    for (const token of ['fake-1', 'fake-2']) {
+      await wrappedHandler(
+        new NextRequest('http://localhost/api/test', {
+          headers: {
+            cookie: `__Secure-authjs.session-token=${token}`,
+            'x-real-ip': '5.6.7.8',
+          },
+        }),
+        { params: {} }
+      );
+    }
+
+    expect(checkMock.mock.calls).toEqual([['5.6.7.8'], ['5.6.7.8']]);
+  });
+
   it('Rate limit 내에서는 핸들러를 실행해야 함', async () => {
     const { limiter, checkMock } = createMockRateLimiter();
 
@@ -88,7 +115,7 @@ describe('withRateLimit', () => {
     expect(response.status).toBe(429);
 
     const json = await response.json();
-    expect(json.error).toBe('Too Many Requests');
+    expect(json.error).toBe('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
     expect(json.limit).toBe(100);
     expect(json.remaining).toBe(0);
   });

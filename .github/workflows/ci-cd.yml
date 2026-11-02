@@ -542,6 +542,10 @@ jobs:
       # 로그인 스로틀을 검증하는 E2E 는 없고 rate limiter 는 단위 테스트가 검증한다.
       RATE_LIMIT_STRICT_WINDOW_MS: '60000'
       RATE_LIMIT_STRICT_MAX_REQUESTS: '1000000'
+      # 라우트 한도도 같은 이유로 푼다. 시드 계정 하나가 스위트 전체를 수행한다.
+      RATE_LIMIT_STANDARD_MAX_REQUESTS: '1000000'
+      RATE_LIMIT_RELAXED_MAX_REQUESTS: '1000000'
+      RATE_LIMIT_FILE_UPLOAD_MAX_REQUESTS: '1000000'
       # playwright.config.ts 의 webServer 는 쓰지 않는다(아래 "포트 충돌" 주석 참고).
       SKIP_WEBSERVER: '1'
       BASE_URL: 'http://localhost:3000'

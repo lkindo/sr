@@ -99,13 +99,19 @@ export function ClientMobileList({
                 {/* Stats & Actions */}
                 <div className="flex items-center justify-between pt-1">
                   <div className="flex gap-1.5">
-                    <Badge
-                      variant="secondary"
-                      className="text-[10px] h-5 px-1.5 cursor-pointer hover:bg-secondary/80"
+                    <button
+                      type="button"
+                      className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`${client.name} 사용자 ${client._count?.users || 0}명 보기`}
                       onClick={(e) => onUsersClick(client, e)}
                     >
-                      사용자 {client._count?.users || 0}
-                    </Badge>
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] h-5 px-1.5 cursor-pointer hover:bg-secondary/80"
+                      >
+                        사용자 {client._count?.users || 0}
+                      </Badge>
+                    </button>
                     <Badge variant="outline" className="text-[10px] h-5 px-1.5">
                       {rosterHidden ? '내 배정 SR' : 'SR'} {client._count?.srs || 0}
                     </Badge>

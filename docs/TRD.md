@@ -965,10 +965,10 @@ TRD의 역할에 맞게 구체적인 구현 코드는 제거하고 전략적인 
      예전 예시의 `hasPermission(user, 'sr:read')` 는 존재하지 않는 서버 API 와 카탈로그에 없는 소문자 표기였다
 
 6. **Rate Limiting** (`src/lib/rate-limiter.ts` — **프로세스 내 메모리**, Redis 미사용)
-   - 미들웨어(`src/proxy.ts`)가 `/api/*` 및 Server Action POST 에 적용한다. **주 버킷은 세션**(세션 쿠키 해시)이고
-     같은 요청에 **발신 IP 천장**(프리셋 × 배수)을 함께 건다. 세션이 없으면 IP 가 주 버킷이다
-     (`resolveRateLimitKeys`). Server Action 은 `action-helpers` 가 사용자 ID 버킷 + 공유 IP 천장으로,
-     로그인은 `이메일+IP` 조합으로 센다
+   - 미들웨어(`src/proxy.ts`)가 `/api/*` 및 Server Action POST 에 IP 기준으로 적용한다.
+     인증 라우트는 인증 뒤에 **사용자 × 메서드 × 라우트**를 주 버킷으로 삼고 **발신 IP 천장**(프리셋 × 배수)을
+     함께 건다(`userRateLimitKeys`). 공개 라우트는 IP 만 쓴다. Server Action 은 `action-helpers` 가
+     사용자 ID 버킷 + 공유 IP 천장으로, 로그인은 `이메일+IP` 조합으로 센다
    - 신뢰 IP 해석: nginx 가 설정하는 `X-Real-IP` 우선, 없으면 `X-Forwarded-For` 의 **마지막** 항목
      (클라이언트가 위조 가능한 첫 항목은 사용하지 않는다)
    - 기본 프리셋(모두 환경 변수로 조정 가능):

@@ -59,6 +59,7 @@ vi.mock('@/actions/user.actions', () => ({
 
 const SR = {
   id: 'sr-1',
+  version: 0,
   title: '기존 제목입니다',
   description: '기존 설명입니다. 열 글자가 넘습니다.',
   status: 'REQUESTED',

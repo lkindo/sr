@@ -168,6 +168,107 @@ export const VALID_TRANSITIONS: Record<SRStatus, SRStatus[]> = {
 };
 
 /**
+ * 상태 변경 액션의 값. 액션은 전이보다 좁다. 시작, 재개, 재오픈은 모두 진행중으로 가지만
+ * 출발 상태가 다르다. 각 항목이 `VALID_TRANSITIONS` 안에 있는지는 테스트가 검사한다.
+ */
+export type SRStatusAction =
+  'start' | 'complete' | 'hold' | 'resume' | 'reject' | 'confirm' | 'reopen';
+
+export interface SRStatusActionInput {
+  reason?: string;
+  resolutionDescription?: string;
+  expectedHoldReleaseDate?: string;
+}
+
+interface SRStatusActionFields {
+  resolutionDescription?: string;
+  rejectionReason?: string;
+  /** null 은 보류 해제로 지난 약속을 비운다는 뜻이다. */
+  expectedHoldReleaseDate?: string | null;
+}
+
+interface SRStatusActionRule {
+  from: SRStatus[];
+  to: SRStatus;
+  wrongStatusMessage: string;
+  required?: Array<{ field: keyof SRStatusActionInput; message: string }>;
+  fields?: (input: SRStatusActionInput) => SRStatusActionFields;
+}
+
+export const SR_STATUS_ACTIONS: Record<SRStatusAction, SRStatusActionRule> = {
+  start: {
+    from: ['INTAKE'],
+    to: 'IN_PROGRESS',
+    wrongStatusMessage: '접수 상태에서만 진행을 시작할 수 있습니다.',
+  },
+  complete: {
+    from: ['IN_PROGRESS'],
+    to: 'COMPLETED',
+    wrongStatusMessage: '진행중 상태에서만 완료 처리할 수 있습니다.',
+    required: [{ field: 'resolutionDescription', message: '해결 내용을 입력해주세요.' }],
+    fields: ({ resolutionDescription }) => ({ resolutionDescription }),
+  },
+  hold: {
+    from: ['IN_PROGRESS'],
+    to: 'ON_HOLD',
+    wrongStatusMessage: '진행중 상태에서만 보류할 수 있습니다.',
+    // 헌법 §2: 보류는 사유 **와** 예상 해제일을 함께 명시한다.
+    required: [
+      { field: 'reason', message: '보류 사유를 입력해주세요.' },
+      { field: 'expectedHoldReleaseDate', message: '예상 해제일을 입력해주세요.' },
+    ],
+    fields: ({ expectedHoldReleaseDate }) => ({ expectedHoldReleaseDate }),
+  },
+  resume: {
+    from: ['ON_HOLD'],
+    to: 'IN_PROGRESS',
+    wrongStatusMessage: '보류 상태에서만 재개할 수 있습니다.',
+    // 남겨 두면 진행중 SR 에 지난 해제 예정일이 붙고, 다음 보류 때 그 값으로 필수 검사를 통과한다.
+    fields: () => ({ expectedHoldReleaseDate: null }),
+  },
+  reject: {
+    from: ['REQUESTED', 'INTAKE', 'ON_HOLD'],
+    to: 'REJECTED',
+    wrongStatusMessage: '요청됨, 접수, 보류 상태에서만 거절할 수 있습니다.',
+    required: [{ field: 'reason', message: '거절 사유를 입력해주세요.' }],
+    fields: ({ reason }) => ({ rejectionReason: reason }),
+  },
+  // 신원 판정은 validateTransition 의 canConfirmAsAcceptor 가 한다.
+  confirm: {
+    from: ['COMPLETED'],
+    to: 'CONFIRMED',
+    wrongStatusMessage: '완료 상태에서만 확인할 수 있습니다.',
+  },
+  // 7일 창은 validateTransition 이 단일 판정 지점이다. 사본을 두면 두 곳의 판정이 갈린다.
+  reopen: {
+    from: ['COMPLETED', 'CONFIRMED'],
+    to: 'IN_PROGRESS',
+    wrongStatusMessage: '완료 또는 확인완료 상태에서만 재오픈할 수 있습니다.',
+    required: [{ field: 'reason', message: '재오픈 사유를 입력해주세요.' }],
+  },
+};
+
+/**
+ * 액션을 목표 상태와 저장할 값으로 바꾼다. 출발 상태가 맞지 않거나 필수 입력이 없으면 이유를 돌려준다.
+ * 권한과 재오픈 창 같은 나머지 규칙은 저장 시점의 `validateTransition` 이 판정한다.
+ */
+export function planStatusAction(
+  action: SRStatusAction,
+  current: SRStatus,
+  input: SRStatusActionInput
+): { ok: true; to: SRStatus; fields: SRStatusActionFields } | { ok: false; message: string } {
+  const rule = SR_STATUS_ACTIONS[action];
+  if (!rule.from.includes(current)) {
+    return { ok: false, message: rule.wrongStatusMessage };
+  }
+  const missing = rule.required?.find(({ field }) => !input[field]);
+  if (missing) {
+    return { ok: false, message: missing.message };
+  }
+  return { ok: true, to: rule.to, fields: rule.fields?.(input) ?? {} };
+}
+
+/**
  * 상태 전이별 필요한 **권한**.
  *
  * 앱의 나머지 인가는 전부 permission 기반인데 전이만 리터럴 역할명으로 판정하고 있었다.

@@ -1,5 +1,7 @@
 import { logger } from '@/lib/logger';
 
+import { RATE_LIMITED_MESSAGE } from './rate-limit-message';
+
 /**
  * 커스텀 에러 클래스들
  * 비즈니스 로직에서 발생하는 다양한 에러를 표현합니다.
@@ -144,7 +146,7 @@ export class ConflictError extends ServiceError {
  * 너무 많은 요청 에러 (Rate Limit 초과)
  */
 export class TooManyRequestsError extends ServiceError {
-  constructor(message: string = '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.') {
+  constructor(message: string = RATE_LIMITED_MESSAGE) {
     super(message, 'TOO_MANY_REQUESTS', 429);
     this.name = 'TooManyRequestsError';
     Object.setPrototypeOf(this, TooManyRequestsError.prototype);

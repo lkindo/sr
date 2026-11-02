@@ -44,7 +44,7 @@ export default function GlobalError({
           페이지를 표시할 수 없습니다. 잠시 후 다시 시도해주세요.
         </p>
         {error.digest && (
-          <p style={{ margin: 0, fontSize: '0.75rem', color: '#a1a1aa' }}>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: '#71717a' }}>
             오류 코드: {error.digest}
           </p>
         )}

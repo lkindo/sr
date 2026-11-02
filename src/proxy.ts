@@ -8,6 +8,7 @@ import { authConfig, isAuthPagePath } from '@/auth.config';
 const { auth } = NextAuth(authConfig);
 
 // Rate Limiter 인스턴스 (메모리 유지 - 람다/엣지에서는 인스턴스마다 별도일 수 있음)
+import { RATE_LIMITED_MESSAGE } from '@/lib/rate-limit-message';
 import { getClientIp, rateLimiters } from '@/lib/rate-limiter';
 const ratelimit = rateLimiters.middleware;
 
@@ -42,22 +43,24 @@ export default auth(async (req) => {
   if (isApiRoute || isServerAction) {
     // 신뢰 프록시 기반 IP 해석 (조작 가능한 XFF 첫 항목 사용 금지).
     //
-    // **여기서는 반드시 IP 로만 키잉한다.** 예전에는 `getClientIdentifier` 를 썼는데,
-    // 그 함수는 세션 쿠키가 있으면 그 값으로 키를 만든다. 미들웨어는 인증 **이전** 단계라
-    // 쿠키를 검증할 수 없으므로, 클라이언트가 쿠키 값을 매 요청 바꾸는 것만으로
-    // 미들웨어 전역 제한(분당 100회)을 통째로 우회할 수 있었다(감사 D-1).
+    // **여기서는 반드시 IP 로만 키잉한다.** 미들웨어는 인증 전이라 세션 쿠키를 믿을 수 없다.
+    // 쿠키 값으로 키를 만들면, 값을 매 요청 바꾸는 것만으로 전역 제한(분당 100회)을 우회한다.
     const ip = getClientIp(req.headers);
     const { allowed, limit, resetTime, remaining } = await ratelimit.check(ip);
 
     if (!allowed) {
-      return new NextResponse('Too Many Requests', {
-        status: 429,
-        headers: {
-          'X-RateLimit-Limit': limit.toString(),
-          'X-RateLimit-Remaining': remaining.toString(),
-          'X-RateLimit-Reset': resetTime.toString(),
-        },
-      });
+      // api-client 는 JSON 의 error 만 읽는다. 일반 텍스트면 재시도 안내가 화면에 나오지 않는다.
+      return NextResponse.json(
+        { error: RATE_LIMITED_MESSAGE },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': limit.toString(),
+            'X-RateLimit-Remaining': remaining.toString(),
+            'X-RateLimit-Reset': resetTime.toString(),
+          },
+        }
+      );
     }
   }
 
@@ -148,7 +151,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico, manifest.json, sw.js (root static files)
+     * - API 가 아닌 이미지 경로. /api/x.png 처럼 확장자가 붙어도 API 는 IP 제한을 받아야 한다.
      */
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|(?!api/).*\\.(?:png|jpg|jpeg|gif|svg|webp)$).*)',
   ],
 };

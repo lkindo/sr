@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { RATE_LIMITED_MESSAGE } from '@/lib/rate-limit-message';
+
 /**
  * `src/proxy.ts` (Next.js 미들웨어) 의 분기 고정.
  *
@@ -229,7 +231,7 @@ describe('proxy (middleware)', () => {
       const res = await middleware(makeRequest({ path: '/api/sr' }));
 
       expect(res.status).toBe(429);
-      await expect(res.text()).resolves.toBe('Too Many Requests');
+      await expect(res.json()).resolves.toEqual({ error: RATE_LIMITED_MESSAGE });
       expect(res.headers.get('X-RateLimit-Limit')).toBe('20');
       expect(res.headers.get('X-RateLimit-Remaining')).toBe('0');
       expect(res.headers.get('X-RateLimit-Reset')).toBe('42000');
@@ -497,12 +499,18 @@ describe('proxy (middleware)', () => {
   describe('matcher 설정', () => {
     const matcher = new RegExp(`^${config.matcher[0]!}$`);
 
-    it.each([['/dashboard'], ['/api/sr'], ['/'], ['/login'], ['/report.pdf']])(
-      '%s 는 미들웨어를 태운다',
-      (path) => {
-        expect(matcher.test(path)).toBe(true);
-      }
-    );
+    it.each([
+      ['/dashboard'],
+      ['/api/sr'],
+      ['/'],
+      ['/login'],
+      ['/report.pdf'],
+      // 인증에 실패한 요청은 라우트 한도에 닿지 않아 여기서 막아야 한다.
+      ['/api/srs/missing.png'],
+      ['/api/clients/a.svg'],
+    ])('%s 는 미들웨어를 태운다', (path) => {
+      expect(matcher.test(path)).toBe(true);
+    });
 
     it.each([
       ['/_next/static/chunks/main.js'],

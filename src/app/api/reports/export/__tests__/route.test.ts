@@ -12,11 +12,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getAllSRs: vi.fn(),
+  createLog: vi.fn(),
   rateLimitPreset: undefined as string | undefined,
 }));
 
 vi.mock('@/services/sr.service', () => ({
   srService: { getAllSRs: mocks.getAllSRs },
+}));
+
+vi.mock('@/services/audit.service', () => ({
+  auditService: { createLog: mocks.createLog },
 }));
 
 vi.mock('@/lib/auth-wrapper', () => ({
@@ -62,6 +67,55 @@ const call = async () => {
   const body = await response.text();
   return { response, body };
 };
+
+describe('GET /api/reports/export 감사 기록', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.createLog.mockResolvedValue(undefined);
+    SESSION_USER = { id: 'admin-1', roles: ['ADMIN'] };
+    seedRows(1);
+  });
+
+  it('내보내기를 시작하기 전에 행위자, 범위, IP 를 남긴다', async () => {
+    const order: string[] = [];
+    mocks.createLog.mockImplementation(async () => void order.push('audit'));
+    mocks.getAllSRs.mockImplementationOnce(async () => {
+      order.push('query');
+      return [];
+    });
+
+    await (GET as any)(
+      new NextRequest('http://localhost:3000/api/reports/export', {
+        headers: { 'x-real-ip': '5.6.7.8' },
+      })
+    ).then((response: Response) => response.text());
+
+    expect(order).toEqual(['audit', 'query']);
+    expect(mocks.createLog).toHaveBeenCalledWith(null, {
+      userId: 'admin-1',
+      actionType: 'EXPORT',
+      targetEntity: 'SR',
+      changes: { format: 'csv', scope: 'ALL' },
+      ipAddress: '5.6.7.8',
+    });
+  });
+
+  it('기록에 실패하면 내보내지 않는다', async () => {
+    mocks.createLog.mockRejectedValue(new Error('감사 로그 실패'));
+
+    await expect(call()).rejects.toThrow('감사 로그 실패');
+    expect(mocks.getAllSRs).not.toHaveBeenCalled();
+  });
+
+  it('권한이 없으면 기록하지 않는다', async () => {
+    SESSION_USER = { id: 'client-1', roles: ['CLIENT_USER'] };
+
+    const { response } = await call();
+
+    expect(response.status).toBe(403);
+    expect(mocks.createLog).not.toHaveBeenCalled();
+  });
+});
 
 describe('GET /api/reports/export', () => {
   beforeEach(() => {

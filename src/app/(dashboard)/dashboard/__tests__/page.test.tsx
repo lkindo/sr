@@ -87,6 +87,22 @@ afterEach(() => {
 });
 
 describe('DashboardPage', () => {
+  // 링크여야 키보드로 포커스하고 Enter 로 연다. 새 탭으로 여는 것도 된다.
+  it.each([
+    [/총 SR/, '/srs'],
+    [/진행 중/, '/srs?status=IN_PROGRESS'],
+    [/완료/, '/srs?status=COMPLETED&status=CONFIRMED'],
+    [/대기 중/, '/srs?status=REQUESTED&status=INTAKE'],
+  ])('요약 카드 %s 는 %s 로 가는 링크다', async (name, href) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok(STATS)));
+    const { wrapper } = setup();
+
+    render(createElement(DashboardPage), { wrapper });
+
+    const link = await screen.findByRole('link', { name });
+    expect(link.getAttribute('href')).toBe(href);
+  });
+
   it('첫 로딩에는 스켈레톤을, 성공하면 통계를 그린다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(ok(STATS));
     vi.stubGlobal('fetch', fetchMock);

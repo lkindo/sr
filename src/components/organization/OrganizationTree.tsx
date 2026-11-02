@@ -232,6 +232,8 @@ function DroppableClientHeader({
           variant="ghost"
           size="sm"
           className="h-8 w-8 p-0 shrink-0"
+          aria-label={`${client.name} ${isExpanded ? '접기' : '펼치기'}`}
+          aria-expanded={isExpanded}
           onClick={(e) => {
             e.stopPropagation();
             onToggleClient(client.id);

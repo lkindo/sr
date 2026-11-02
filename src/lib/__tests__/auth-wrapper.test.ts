@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { auth } from '@/auth';
 
 import { withAuth, withAuthAndRateLimit, withErrorHandler } from '../auth-wrapper';
 import { NotFoundError, UnauthorizedError } from '../errors';
+import { RateLimitPresets } from '../rate-limiter';
 
 // Mock the NextAuth `auth()` function so we control the session.
 vi.mock('@/auth', () => ({
@@ -255,5 +256,96 @@ describe('withAuthAndRateLimit', () => {
 
     expect(handler).not.toHaveBeenCalled();
     expect(res.status).toBe(401);
+  });
+
+  /**
+   * 실제 리미터를 쓴다. Auth.js 가 응답마다 세션 쿠키를 다시 발급하므로, 요청마다 쿠키가 달라도
+   * 사용자 한도가 들어야 한다. 예전에는 쿠키 해시가 버킷 키라 정상 브라우저도 매번 새 버킷을 받았다.
+   */
+  describe('사용자별 한도', () => {
+    const LIMIT = RateLimitPresets.STRICT.maxRequests;
+    let sequence = 0;
+
+    const sessionOf = (id: string) => ({ ...fullSession, user: { ...fullSession.user, id } });
+    const requestWith = (cookieValue: string, path = '/api/srs/sr-1/comments') =>
+      new NextRequest(`https://example.com${path}`, {
+        method: 'POST',
+        headers: {
+          cookie: `__Secure-authjs.session-token=${cookieValue}`,
+          // 다른 테스트와 천장을 나눠 쓰지 않게 IP 를 나눈다.
+          'x-real-ip': `10.0.0.${sequence}`,
+        },
+      });
+    const handler = vi.fn(async () => NextResponse.json({ ok: true }));
+
+    beforeEach(() => {
+      sequence += 1;
+      handler.mockClear();
+      // 테스트 환경의 우회를 끈다.
+      vi.stubEnv('NODE_ENV', 'development');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('쿠키가 요청마다 달라도 같은 사용자면 한도에 걸린다', async () => {
+      mockedAuth.mockResolvedValue(sessionOf(`rotating-${sequence}`) as never);
+      const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
+      const params = { params: Promise.resolve({ id: 'sr-1' }) };
+
+      for (let i = 0; i < LIMIT; i++) {
+        const allowed = await wrapped(requestWith(`cookie-${i}`), params);
+        expect(allowed.status).toBe(200);
+      }
+      const blocked = await wrapped(requestWith('cookie-next'), params);
+
+      expect(blocked.status).toBe(429);
+      expect(handler).toHaveBeenCalledTimes(LIMIT);
+    });
+
+    it('SR ID 를 바꿔도 한도를 넘을 수 없다', async () => {
+      mockedAuth.mockResolvedValue(sessionOf(`id-rotating-${sequence}`) as never);
+      const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
+
+      // 쿠키도 함께 바꾼다. 같은 쿠키면 예전의 쿠키 버킷에서도 통과해 ID 를 시험하지 못한다.
+      for (let i = 0; i < LIMIT; i++) {
+        const allowed = await wrapped(requestWith(`cookie-${i}`, `/api/srs/sr-${i}/comments`), {
+          params: Promise.resolve({ id: `sr-${i}` }),
+        });
+        expect(allowed.status).toBe(200);
+      }
+      const blocked = await wrapped(requestWith('cookie-next', '/api/srs/sr-next/comments'), {
+        params: Promise.resolve({ id: 'sr-next' }),
+      });
+
+      expect(blocked.status).toBe(429);
+    });
+
+    it('한 사람이 한도에 걸려도 같은 IP 의 다른 사람은 막히지 않는다', async () => {
+      const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
+      const params = { params: Promise.resolve({ id: 'sr-1' }) };
+
+      mockedAuth.mockResolvedValue(sessionOf(`busy-${sequence}`) as never);
+      for (let i = 0; i < LIMIT; i++) await wrapped(requestWith('c'), params);
+      expect((await wrapped(requestWith('c'), params)).status).toBe(429);
+
+      mockedAuth.mockResolvedValue(sessionOf(`colleague-${sequence}`) as never);
+      expect((await wrapped(requestWith('c'), params)).status).toBe(200);
+    });
+
+    it('인증에 실패한 요청은 예산을 쓰지 않는다', async () => {
+      const userId = `after-login-${sequence}`;
+      const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });
+      const params = { params: Promise.resolve({ id: 'sr-1' }) };
+
+      mockedAuth.mockResolvedValue(null as never);
+      for (let i = 0; i < LIMIT + 1; i++) {
+        expect((await wrapped(requestWith('c'), params)).status).toBe(401);
+      }
+
+      mockedAuth.mockResolvedValue(sessionOf(userId) as never);
+      expect((await wrapped(requestWith('c'), params)).status).toBe(200);
+    });
   });
 });

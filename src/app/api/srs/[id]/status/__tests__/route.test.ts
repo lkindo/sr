@@ -47,19 +47,30 @@ function sr(overrides: Record<string, unknown> = {}) {
   };
 }
 
-const ctx = (userId = 'user-admin', roles = ['ADMIN'], clientIds: string[] = []) => ({
-  session: { user: { id: userId, roles, permissions: [], clientIds } },
+const ctx = (
+  userId = 'user-admin',
+  roles = ['ADMIN'],
+  clientIds: string[] = [],
+  permissions: string[] = []
+) => ({
+  session: { user: { id: userId, roles, permissions, clientIds } },
   params: Promise.resolve({ id: 'sr-1' }),
 });
 
-const call = (body: unknown, userId?: string, roles?: string[], clientIds?: string[]) =>
+const call = (
+  body: unknown,
+  userId?: string,
+  roles?: string[],
+  clientIds?: string[],
+  permissions?: string[]
+) =>
   (PATCH as any)(
     new NextRequest('http://localhost/x', {
       method: 'PATCH',
       body: JSON.stringify(body),
       headers: { 'content-type': 'application/json' },
     }),
-    ctx(userId, roles, clientIds)
+    ctx(userId, roles, clientIds, permissions)
   );
 
 /** 며칠 전 시각. */
@@ -145,23 +156,37 @@ describe('확인(confirm)은 요청자 전용', () => {
 
   // 소유자 결정(2026-09-18): 운영자가 자기 이름으로 등록한 SR 은 그 고객사의 CLIENT_ADMIN 도 확인한다.
   describe('운영자가 등록한 SR', () => {
+    // 시드의 CLIENT_ADMIN 권한. 라우트가 수정 권한을 먼저 보므로 있어야 신원 검사까지 간다.
+    const CLIENT_ADMIN_PERMISSIONS = ['SR:UPDATE', 'SR:CONFIRM'];
+
     it('그 고객사의 CLIENT_ADMIN 은 확인할 수 있다', async () => {
       mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
       mocks.isInternalRequester.mockResolvedValueOnce(true);
 
-      const res = await call({ action: 'confirm' }, 'user-ca', ['CLIENT_ADMIN'], ['client-1']);
+      const res = await call(
+        { action: 'confirm' },
+        'user-ca',
+        ['CLIENT_ADMIN'],
+        ['client-1'],
+        CLIENT_ADMIN_PERMISSIONS
+      );
 
       expect(res.status).toBe(200);
       expect(mocks.isInternalRequester).toHaveBeenCalledWith(REQUESTER_ID);
     });
 
-    it('다른 고객사의 CLIENT_ADMIN 은 403 이다', async () => {
+    it('다른 고객사의 CLIENT_ADMIN 은 수정 권한에서 거부된다', async () => {
       mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
-      mocks.isInternalRequester.mockResolvedValueOnce(true);
 
-      const res = await call({ action: 'confirm' }, 'user-ca', ['CLIENT_ADMIN'], ['client-2']);
-
-      expect(res.status).toBe(403);
+      await expect(
+        call(
+          { action: 'confirm' },
+          'user-ca',
+          ['CLIENT_ADMIN'],
+          ['client-2'],
+          CLIENT_ADMIN_PERMISSIONS
+        )
+      ).rejects.toThrow('SR 수정 권한이 없습니다.');
       expect(mocks.updateSR).not.toHaveBeenCalled();
     });
 
@@ -169,19 +194,35 @@ describe('확인(confirm)은 요청자 전용', () => {
       mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
       mocks.isInternalRequester.mockResolvedValueOnce(false);
 
-      const res = await call({ action: 'confirm' }, 'user-ca', ['CLIENT_ADMIN'], ['client-1']);
+      const res = await call(
+        { action: 'confirm' },
+        'user-ca',
+        ['CLIENT_ADMIN'],
+        ['client-1'],
+        CLIENT_ADMIN_PERMISSIONS
+      );
 
       expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe('신청자만 확인할 수 있습니다.');
       expect(mocks.updateSR).not.toHaveBeenCalled();
     });
 
-    it('같은 고객사라도 CLIENT_USER 는 403 이다', async () => {
+    // SR 을 읽을 수 있는 사용자이므로 왜 안 되는지 구체적으로 알려 준다.
+    it('같은 고객사의 CLIENT_USER 는 신청자만 확인할 수 있다는 안내를 받는다', async () => {
       mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
       mocks.isInternalRequester.mockResolvedValueOnce(true);
 
-      const res = await call({ action: 'confirm' }, 'user-cu', ['CLIENT_USER'], ['client-1']);
+      const res = await call(
+        { action: 'confirm' },
+        'user-cu',
+        ['CLIENT_USER'],
+        ['client-1'],
+        ['SR:READ', 'SR:UPDATE_SELF', 'SR:CONFIRM']
+      );
 
       expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe('신청자만 확인할 수 있습니다.');
+      expect(mocks.updateSR).not.toHaveBeenCalled();
     });
   });
 
@@ -269,6 +310,54 @@ describe('나머지 전이 사전조건', () => {
     const res = await call({ action: 'hold' });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// 상태별 문구가 갈리면 다른 고객사 SR 의 상태를 응답으로 알아낼 수 있다.
+describe('권한이 없으면 상태와 무관하게 거부한다', () => {
+  it.each(['REQUESTED', 'INTAKE', 'IN_PROGRESS', 'ON_HOLD', 'COMPLETED', 'CONFIRMED', 'REJECTED'])(
+    '다른 고객사 사용자에게 %s SR 은 같은 오류다',
+    async (status) => {
+      mocks.getSRById.mockResolvedValue(sr({ status }));
+
+      await expect(
+        call({ action: 'start' }, 'outsider', ['CLIENT_USER'], ['client-9'])
+      ).rejects.toThrow('SR 수정 권한이 없습니다.');
+      expect(mocks.updateSR).not.toHaveBeenCalled();
+    }
+  );
+
+  it('읽을 수 있는 사용자는 상태 안내를 그대로 받는다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'REQUESTED' }));
+
+    const res = await call(
+      { action: 'start' },
+      'colleague',
+      ['CLIENT_USER'],
+      ['client-1'],
+      ['SR:READ']
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('접수 상태에서만 진행을 시작할 수 있습니다.');
+  });
+
+  // 읽기 없이 쓰기만 준 커스텀 역할도 전이는 계속 할 수 있어야 한다.
+  it('읽기 권한 없이 수정 권한만 있어도 전이를 진행한다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'INTAKE' }));
+
+    const res = await call({ action: 'start' }, 'mgr', ['MANAGER'], [], ['SR:UPDATE']);
+
+    expect(res.status).toBe(200);
+    expect(mocks.updateSR).toHaveBeenCalledOnce();
+  });
+
+  it('필수 입력 누락도 권한 확인 뒤에 판정한다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'IN_PROGRESS' }));
+
+    await expect(
+      call({ action: 'complete' }, 'outsider', ['CLIENT_USER'], ['client-9'])
+    ).rejects.toThrow('SR 수정 권한이 없습니다.');
   });
 });
 

@@ -619,7 +619,7 @@ describe('SRService', () => {
       expect(prisma.sR.delete).not.toHaveBeenCalled();
       expect(prisma.sR.updateMany).toHaveBeenCalledWith({
         where: { id: 'sr-1', deletedAt: null },
-        data: { deletedAt: expect.any(Date) },
+        data: { deletedAt: expect.any(Date), version: { increment: 1 } },
       });
     });
 
@@ -907,7 +907,7 @@ describe('SRService', () => {
         // 물리 삭제가 아니라 deletedAt 을 채운다
         expect(prisma.sR.updateMany).toHaveBeenCalledWith({
           where: { id: 'sr-1', deletedAt: null },
-          data: { deletedAt: expect.any(Date) },
+          data: { deletedAt: expect.any(Date), version: { increment: 1 } },
         });
       });
 

@@ -10,9 +10,10 @@ import { auth } from '@/auth';
 import type { AuthenticatedSession } from '@/types/session';
 
 import { handleApiError } from './api-error-handler';
-import { rateLimit } from './api-rate-limit';
+import { withRateLimit } from './api-rate-limit';
 import { UnauthorizedError } from './errors';
 import { logger } from './logger';
+import { rateLimiters, userRateLimitKeys } from './rate-limiter';
 
 /**
  * 한 요청의 소요 시간을 재고 `logger.logRequest` 로 남긴다 (be-rules §1).
@@ -175,6 +176,17 @@ export function withAuthAndRateLimit<
     preset?: 'strict' | 'standard' | 'relaxed' | 'fileUpload';
   } = { preset: 'standard' }
 ) {
-  // Rate limiting을 먼저 적용하고, 그 다음 인증 체크
-  return rateLimit(withAuth(handler) as any, rateLimitOptions.preset);
+  const limiter = rateLimiters[rateLimitOptions.preset ?? 'standard'];
+
+  // 인증을 먼저 한다. 사용자 ID 로 버킷을 잡아야 하기 때문이다. 세션 쿠키로 키를 만들면
+  // Auth.js 가 응답마다 쿠키를 다시 발급해 요청마다 새 버킷이 되어 한도가 듣지 않는다.
+  // 인증에 실패한 요청은 여기까지 오지 않고, 미들웨어의 IP 제한이 막는다.
+  return withAuth<T, P>(async (request, context) => {
+    const params = ((await context.params) ?? {}) as Record<string, unknown>;
+    const limited = withRateLimit<T, P>((req) => handler(req, context), {
+      limiter,
+      resolveKeys: (req) => userRateLimitKeys(req, params, context.session.user.id),
+    });
+    return limited(request, { params: context.params });
+  });
 }

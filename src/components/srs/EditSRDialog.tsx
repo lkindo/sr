@@ -32,6 +32,8 @@ import type { SRAttachmentView } from '@/types/sr.types';
 
 export interface EditableSR {
   id: string;
+  /** 연 시점과 비교해 그사이의 변경을 덮어쓰지 않게 한다. */
+  version: number;
   title: string;
   description: string;
   status: string;
@@ -337,7 +339,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={executeDeleteAttachment}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive-solid text-destructive-foreground hover:bg-destructive-solid/90"
             >
               삭제
             </AlertDialogAction>

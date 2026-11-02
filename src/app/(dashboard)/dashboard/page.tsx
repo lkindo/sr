@@ -132,6 +132,10 @@ interface DashboardStats {
   }>;
 }
 
+/** 요약 카드는 다른 화면으로 가는 링크다. 키보드로 포커스하고 Enter 로 열 수 있어야 한다. */
+const SUMMARY_CARD_LINK =
+  'block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
+
 export default function DashboardPage() {
   const { toast } = useToast();
   const { hasAnyRole, roles, permissions } = usePermissions();
@@ -377,84 +381,82 @@ export default function DashboardPage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card
-          className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push('/srs')}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">총 SR</CardTitle>
-            <FileText className="h-5 w-5 text-[hsl(var(--sr-primary-dark))]" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">
-              {stats.summary.total}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">전체 SR 수</p>
-          </CardContent>
-        </Card>
+        <Link href="/srs" className={SUMMARY_CARD_LINK}>
+          <Card className="sr-card h-full transition-shadow hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">총 SR</CardTitle>
+              <FileText className="h-5 w-5 text-[hsl(var(--sr-primary-dark))]" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-[hsl(var(--sr-primary-dark))]">
+                {stats.summary.total}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">전체 SR 수</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card
-          className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push('/srs?status=IN_PROGRESS')}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">진행 중</CardTitle>
-            <Clock className="h-5 w-5 text-status-info" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-status-info">{stats.summary.inProgress}</div>
-            <p className="text-xs text-muted-foreground mt-1">처리 중인 SR</p>
-            {stats.summary.total > 0 && (
-              <Progress
-                value={(stats.summary.inProgress / stats.summary.total) * 100}
-                aria-label="전체 SR 중 진행 중 비율"
-                className="mt-2 h-1.5"
-              />
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/srs?status=IN_PROGRESS" className={SUMMARY_CARD_LINK}>
+          <Card className="sr-card h-full transition-shadow hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">진행 중</CardTitle>
+              <Clock className="h-5 w-5 text-status-info" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-status-info">{stats.summary.inProgress}</div>
+              <p className="text-xs text-muted-foreground mt-1">처리 중인 SR</p>
+              {stats.summary.total > 0 && (
+                <Progress
+                  value={(stats.summary.inProgress / stats.summary.total) * 100}
+                  aria-label="전체 SR 중 진행 중 비율"
+                  className="mt-2 h-1.5"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card
-          className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push('/srs?status=COMPLETED&status=CONFIRMED')}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">완료</CardTitle>
-            <CheckCircle className="h-5 w-5 text-status-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-status-success">{stats.summary.completed}</div>
-            <p className="text-xs text-muted-foreground mt-1">완료된 SR</p>
-            {stats.summary.total > 0 && (
-              <Progress
-                value={(stats.summary.completed / stats.summary.total) * 100}
-                aria-label="전체 SR 중 완료 비율"
-                className="mt-2 h-1.5"
-              />
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/srs?status=COMPLETED&status=CONFIRMED" className={SUMMARY_CARD_LINK}>
+          <Card className="sr-card h-full transition-shadow hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">완료</CardTitle>
+              <CheckCircle className="h-5 w-5 text-status-success" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-status-success">
+                {stats.summary.completed}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">완료된 SR</p>
+              {stats.summary.total > 0 && (
+                <Progress
+                  value={(stats.summary.completed / stats.summary.total) * 100}
+                  aria-label="전체 SR 중 완료 비율"
+                  className="mt-2 h-1.5"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card
-          className="sr-card cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push('/srs?status=REQUESTED&status=INTAKE')}
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">대기 중</CardTitle>
-            <AlertCircle className="h-5 w-5 text-status-neutral" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-status-neutral">{stats.summary.pending}</div>
-            <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
-            {stats.summary.total > 0 && (
-              <Progress
-                value={(stats.summary.pending / stats.summary.total) * 100}
-                aria-label="전체 SR 중 대기 중 비율"
-                className="mt-2 h-1.5"
-              />
-            )}
-          </CardContent>
-        </Card>
+        <Link href="/srs?status=REQUESTED&status=INTAKE" className={SUMMARY_CARD_LINK}>
+          <Card className="sr-card h-full transition-shadow hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">대기 중</CardTitle>
+              <AlertCircle className="h-5 w-5 text-status-neutral" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-status-neutral">{stats.summary.pending}</div>
+              <p className="text-xs text-muted-foreground mt-1">대기 중인 SR</p>
+              {stats.summary.total > 0 && (
+                <Progress
+                  value={(stats.summary.pending / stats.summary.total) * 100}
+                  aria-label="전체 SR 중 대기 중 비율"
+                  className="mt-2 h-1.5"
+                />
+              )}
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* 성능 지표 카드 (ADMIN/MANAGER/ENGINEER만) */}

@@ -167,7 +167,18 @@ export const srCreateSchema = z.object({
   requestedCompletionDate: z.string().optional(),
 });
 
+/**
+ * 폼을 연 시점의 SR 버전. 서버가 읽은 값끼리만 비교하면 오래 열어 둔 폼이 그사이의 변경을 덮어쓴다.
+ * 서버 액션은 FormData 로 문자열을, REST 는 JSON 으로 숫자를 보낸다.
+ * null 은 받지 않는다(숫자로 강제 변환하면 0 이 되어 엉뚱한 충돌을 낸다).
+ * 생략하면 비교하지 않는다. 상태 전이처럼 열어 둔 값을 덮어쓰지 않는 요청이 그렇다.
+ */
+const expectedVersionSchema = z
+  .union([z.number().int().nonnegative(), z.string().regex(/^\d+$/).transform(Number)])
+  .optional();
+
 export const srUpdateSchema = z.object({
+  expectedVersion: expectedVersionSchema,
   title: z.preprocess(
     emptyStringToUndefined,
     z
@@ -355,6 +366,7 @@ export const intakeSchema = z.object({
 
 // SR Intake Update Schema - 접수 정보 수정 전용
 export const intakeUpdateSchema = z.object({
+  expectedVersion: expectedVersionSchema,
   actualPriority: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']).optional(),
   estimatedHours: z
     .number()
