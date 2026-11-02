@@ -774,6 +774,23 @@ describe('PATCH /api/srs/[id]/intake — 폼을 연 시점의 버전', () => {
     expect(mocks.txUpdate.mock.calls[0]![0].data).not.toHaveProperty('expectedVersion');
   });
 
+  // 응답이 갈리면 수정 권한이 없는 SR 의 버전을 떠볼 수 있다.
+  it.each([
+    ['다른 버전', 2],
+    ['같은 버전', 3],
+  ])('수정 권한이 없으면 %s 이어도 403 이다', async (_label, expectedVersion) => {
+    const engineer = session({
+      id: 'eng-9',
+      roles: ['ENGINEER'],
+      permissions: ['SR:INTAKE'],
+      clientIds: [],
+    });
+
+    const response = await patch({ actualPriority: 'HIGH', expectedVersion }, engineer);
+
+    expect(response.status).toBe(403);
+  });
+
   it('버전만 보내면 수정할 값이 없는 요청이다', async () => {
     const response = await patch({ expectedVersion: 3 });
 

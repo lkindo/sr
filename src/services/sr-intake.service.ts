@@ -270,7 +270,6 @@ export async function updateIntakeInfo(
   }
 
   ensureCanIntakeClientSR(user, sr);
-  assertVersionUnchanged(validated.expectedVersion, sr.version);
 
   if (sr.status !== 'INTAKE' && sr.status !== 'IN_PROGRESS') {
     throw new BadRequestError('접수되었거나 진행 중인 SR만 접수 정보를 수정할 수 있습니다');
@@ -336,6 +335,10 @@ export async function updateIntakeInfo(
       '담당자 배정은 운영 관리자만 할 수 있습니다. 변경이 필요한 경우 운영 관리자에게 요청하세요.'
     );
   }
+
+  // 권한 판정을 모두 지난 뒤에 비교한다. 앞에 두면 409 와 403 이 갈려 수정 권한이 없는 SR 의
+  // 버전을 떠볼 수 있다.
+  assertVersionUnchanged(validated.expectedVersion, sr.version);
 
   // 7. SR 업데이트
   const updateData: Prisma.SRUncheckedUpdateInput = {};
