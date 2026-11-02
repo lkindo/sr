@@ -29,7 +29,8 @@ function hasUsableValue(attr: ts.JsxAttribute | undefined): boolean {
   if (!ts.isJsxExpression(init)) return true; // role="checkbox"
   if (!init.expression) return false;
 
-  const value = ts.skipOuterExpressions(init.expression);
+  let value: ts.Expression = init.expression;
+  while (ts.isParenthesizedExpression(value)) value = value.expression;
   if (value.kind === ts.SyntaxKind.NullKeyword) return false;
   if (ts.isIdentifier(value) && value.text === 'undefined') return false;
   if (ts.isPrefixUnaryExpression(value) && value.operator === ts.SyntaxKind.MinusToken) {
