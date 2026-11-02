@@ -339,7 +339,7 @@ export function EditSRDialog({ open, onOpenChange, sr, onUpdated }: EditSRDialog
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={executeDeleteAttachment}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive-solid text-destructive-foreground hover:bg-destructive-solid/90"
             >
               삭제
             </AlertDialogAction>

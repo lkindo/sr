@@ -198,11 +198,19 @@ describe('ClientTable — 펼침', () => {
     expect(screen.getByText('lee.u@example.com')).toBeInTheDocument();
   });
 
+  it('사용자 수 배지는 이름 있는 버튼이다', () => {
+    renderTable();
+
+    const button = within(rowOf('다라 주식회사')).getByRole('button', { name: /사용자 .*명 보기/ });
+    expect(button).toHaveAccessibleName(expect.stringContaining('다라 주식회사'));
+    expect(button.tagName).toBe('BUTTON');
+  });
+
   // 펼침은 부모가 들고 있다. 여기서 자체 state 를 두면 부모의 집합과 어긋난다.
   it('토글 버튼은 자기 id 를 부모로 되돌릴 뿐이다', () => {
     renderTable();
 
-    fireEvent.click(within(rowOf('다라 주식회사')).getByRole('button'));
+    fireEvent.click(within(rowOf('다라 주식회사')).getByRole('button', { name: /펼치기/ }));
 
     expect(onToggleRowExpansion).toHaveBeenCalledWith('c-2');
     // 부모가 다시 그려 주기 전까지는 접힌 그대로다.

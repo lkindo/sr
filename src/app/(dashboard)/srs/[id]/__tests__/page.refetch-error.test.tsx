@@ -109,6 +109,15 @@ describe('SR 상세의 조회 실패', () => {
 });
 
 describe('SR 상세의 탭 전환', () => {
+  it('첨부 개수는 첨부 탭으로 가는 버튼이다', () => {
+    mocks.useSRDetails.mockReturnValue(query({ data: { ...SR, _count: { attachments: 2 } } }));
+    render(<SRDetailPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: '첨부파일 2개, 첨부 탭으로 이동' }));
+
+    expect(screen.getByRole('tab', { name: /첨부/ })).toHaveAttribute('data-state', 'active');
+  });
+
   it('다른 탭을 보고 돌아와도 쓰던 댓글이 남고, 보는 동안에는 숨겨진다', () => {
     mocks.useSRDetails.mockReturnValue(query({ data: SR }));
     render(<SRDetailPage />);

@@ -338,7 +338,7 @@ export function SRAttachments({ srId, canDelete = false, canUpload = true }: SRA
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={executeDelete}
-              className="bg-destructive hover:bg-destructive/90"
+              className="bg-destructive-solid text-destructive-foreground hover:bg-destructive-solid/90"
             >
               삭제
             </AlertDialogAction>

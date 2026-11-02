@@ -356,13 +356,15 @@ export default function SRDetailPage() {
                 {/* Attachment Summary Inline for Mobile */}
                 <div>
                   <h3 className="text-xs md:text-sm font-medium text-muted-foreground">첨부파일</h3>
-                  <div
-                    className="mt-0.5 flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-sm"
+                  <button
+                    type="button"
+                    className="mt-0.5 flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`첨부파일 ${sr._count?.attachments || 0}개, 첨부 탭으로 이동`}
                     onClick={() => setActiveTab('attachments')}
                   >
                     <Paperclip className="h-3.5 w-3.5" />
                     <span className="font-medium">{sr._count?.attachments || 0}개</span>
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>

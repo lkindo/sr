@@ -131,6 +131,30 @@ describe('AssignRolesDialog — 표시', () => {
   });
 });
 
+describe('AssignRolesDialog — 키보드', () => {
+  it.each([[' '], ['Enter']])('역할 카드는 %j 키로 선택을 바꾼다', (key) => {
+    renderDialog();
+    const box = screen.getByRole('checkbox', { name: 'CLIENT_USER' });
+    expect(box).toHaveAttribute('aria-checked', 'false');
+    expect(box).toHaveAttribute('tabindex', '0');
+
+    fireEvent.keyDown(box, { key });
+    expect(box).toHaveAttribute('aria-checked', 'true');
+
+    fireEvent.keyDown(box, { key });
+    expect(box).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('다른 키로는 바뀌지 않는다', () => {
+    renderDialog();
+    const box = screen.getByRole('checkbox', { name: 'CLIENT_USER' });
+
+    fireEvent.keyDown(box, { key: 'a' });
+
+    expect(box).toHaveAttribute('aria-checked', 'false');
+  });
+});
+
 describe('AssignRolesDialog — 저장', () => {
   it('선택한 역할 id 로 POST 한다', async () => {
     renderDialog();
