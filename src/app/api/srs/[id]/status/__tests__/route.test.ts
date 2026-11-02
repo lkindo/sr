@@ -207,12 +207,22 @@ describe('확인(confirm)은 요청자 전용', () => {
       expect(mocks.updateSR).not.toHaveBeenCalled();
     });
 
-    it('같은 고객사라도 신청자가 아닌 CLIENT_USER 는 수정 권한에서 거부된다', async () => {
+    // SR 을 읽을 수 있는 사용자이므로 왜 안 되는지 구체적으로 알려 준다.
+    it('같은 고객사의 CLIENT_USER 는 신청자만 확인할 수 있다는 안내를 받는다', async () => {
       mocks.getSRById.mockResolvedValue(sr({ status: 'COMPLETED' }));
+      mocks.isInternalRequester.mockResolvedValueOnce(true);
 
-      await expect(
-        call({ action: 'confirm' }, 'user-cu', ['CLIENT_USER'], ['client-1'], ['SR:UPDATE_SELF'])
-      ).rejects.toThrow('SR 수정 권한이 없습니다.');
+      const res = await call(
+        { action: 'confirm' },
+        'user-cu',
+        ['CLIENT_USER'],
+        ['client-1'],
+        ['SR:READ', 'SR:UPDATE_SELF', 'SR:CONFIRM']
+      );
+
+      expect(res.status).toBe(403);
+      expect((await res.json()).error).toBe('신청자만 확인할 수 있습니다.');
+      expect(mocks.updateSR).not.toHaveBeenCalled();
     });
   });
 
@@ -316,6 +326,31 @@ describe('권한이 없으면 상태와 무관하게 거부한다', () => {
       expect(mocks.updateSR).not.toHaveBeenCalled();
     }
   );
+
+  it('읽을 수 있는 사용자는 상태 안내를 그대로 받는다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'REQUESTED' }));
+
+    const res = await call(
+      { action: 'start' },
+      'colleague',
+      ['CLIENT_USER'],
+      ['client-1'],
+      ['SR:READ']
+    );
+
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('접수 상태에서만 진행을 시작할 수 있습니다.');
+  });
+
+  // 읽기 없이 쓰기만 준 커스텀 역할도 전이는 계속 할 수 있어야 한다.
+  it('읽기 권한 없이 수정 권한만 있어도 전이를 진행한다', async () => {
+    mocks.getSRById.mockResolvedValue(sr({ status: 'INTAKE' }));
+
+    const res = await call({ action: 'start' }, 'mgr', ['MANAGER'], [], ['SR:UPDATE']);
+
+    expect(res.status).toBe(200);
+    expect(mocks.updateSR).toHaveBeenCalledOnce();
+  });
 
   it('필수 입력 누락도 권한 확인 뒤에 판정한다', async () => {
     mocks.getSRById.mockResolvedValue(sr({ status: 'IN_PROGRESS' }));

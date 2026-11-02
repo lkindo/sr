@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parseJsonBody, RouteContext } from '@/lib/api-helpers';
 import { AuthenticatedContext, withAuthAndRateLimit } from '@/lib/auth-wrapper';
 import { statusLabelOf } from '@/lib/constants/sr';
-import { ensureCanUpdateSR } from '@/lib/policies';
+import { canReadSR, ensureCanUpdateSR } from '@/lib/policies';
 import { statusActionSchema } from '@/lib/schemas';
 import { canConfirmAsAcceptor, planStatusAction } from '@/lib/sr-state-machine';
 import { srService } from '@/services/sr.service';
@@ -30,8 +30,11 @@ export const PATCH = withAuthAndRateLimit(
     }
 
     // 상태에 따라 갈리는 응답보다 먼저 확인한다. 뒤에 두면 권한 없는 사용자가 400 문구로
-    // 다른 고객사 SR 의 상태를 알아낼 수 있다.
-    ensureCanUpdateSR(session.user, currentSR);
+    // 다른 고객사 SR 의 상태를 알아낼 수 있다. 읽을 수 있는 사용자에게 상태는 비밀이 아니므로
+    // "신청자만 확인할 수 있습니다." 같은 구체적인 안내를 그대로 받게 하고, 쓰기 권한은 updateSR 가 본다.
+    if (!canReadSR(session.user, currentSR)) {
+      ensureCanUpdateSR(session.user, currentSR);
+    }
 
     const currentStatus = currentSR.status;
     const plan = planStatusAction(action, currentStatus, {
