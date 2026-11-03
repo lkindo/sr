@@ -6,16 +6,11 @@ import { useSession } from 'next-auth/react';
 import {
   AlertCircle,
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   Clock,
   Filter,
-  Inbox,
   Loader2,
   Plus,
   Search,
-  SearchX,
   TrendingUp,
   User,
   X,
@@ -26,21 +21,26 @@ import { CreateSRDialog } from '@/components/srs/CreateSRDialog';
 import { Badge } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
-import { Label } from '@/components/ui';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui';
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui';
 import { usePermissions } from '@/hooks/use-permissions';
 import { canViewerIntakeSR } from '@/lib/sr-state-machine';
 import type { SRListItem } from '@/types/sr.types';
 
-import { priorityLabels, statusLabels } from './constants';
+import {
+  type ClientListItem,
+  type PaginationInfo,
+  QUICK_FILTER_ALERT_BADGE,
+  QUICK_FILTER_QUIET_BADGE,
+  QuickFilterButton,
+  SortableTableHead,
+  type SortField,
+  type SortOrder,
+  SRAdvancedFilters,
+  SRListEmptyState,
+  SRListPagination,
+  type UserListItem,
+} from './SRListControls';
+import { SRCardItem, SRTableRow } from './SRListItem';
 
 /** 배지 '긴급' 의 범위 — 서버 배지 집계(getSRBadgeCounts)와 같다. */
 const URGENT_PRIORITIES = ['CRITICAL', 'HIGH'] as const;
@@ -52,56 +52,6 @@ const URGENT_PRIORITIES = ['CRITICAL', 'HIGH'] as const;
 function multiValueFilter(params: URLSearchParams | null, key: string): string {
   const values = params?.getAll(key) ?? [];
   return values.length === 0 ? 'all' : values.join(',');
-}
-
-function multiValueLabel(value: string, labels: Record<string, string>): string {
-  const byValue = new Map(Object.entries(labels));
-  return value
-    .split(',')
-    .map((item) => byValue.get(item) ?? item)
-    .join('·');
-}
-import { SRCardItem, SRTableRow } from './SRListItem';
-
-const ITEMS_PER_PAGE_OPTIONS = [10, 20, 30, 50, 100];
-
-type SortField = 'srNumber' | 'title' | 'client' | 'priority' | 'status' | 'createdAt' | 'dueDate';
-type SortOrder = 'asc' | 'desc';
-type ClientListItem = { id: string; code: string; name: string };
-// 담당자 필터는 id 와 name 만 렌더링한다. email 을 요구하면 서버가 그것을
-// RSC 페이로드로 실어 보내야 하고, 그게 정확히 감사 4.2 가 지적한 유출이었다.
-type UserListItem = { id: string; name: string };
-type PaginationInfo = {
-  currentPage: number;
-  itemsPerPage: number;
-  totalCount: number;
-  totalPages: number;
-  hasPrevPage: boolean;
-  hasNextPage: boolean;
-};
-
-// Empty State Component
-function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-}: {
-  icon: React.ElementType;
-  title: string;
-  description: string;
-  action?: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 mb-4">
-        <Icon className="h-6 w-6 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-medium text-foreground">{title}</h3>
-      <p className="text-sm text-muted-foreground mt-1 mb-6 max-w-sm">{description}</p>
-      {action}
-    </div>
-  );
 }
 
 // This component now receives data fetched from the server as props
@@ -274,15 +224,6 @@ export function SRsDataTable({
     });
   };
 
-  const getSortIcon = (field: SortField) => {
-    if (sortField !== field) return <ArrowUpDown className="ml-2 h-4 w-4" />;
-    return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-2 h-4 w-4" />
-    ) : (
-      <ArrowDown className="ml-2 h-4 w-4" />
-    );
-  };
-
   const handleSRCreated = () => {
     // Instead of invalidating queries, we just navigate to refresh the server component
     startTransition(() => {
@@ -335,6 +276,20 @@ export function SRsDataTable({
     }
   };
 
+  const toggleQuickFilter = (filterType: 'waiting' | 'myAssigned' | 'urgent' | 'overdue') => {
+    handleQuickFilter(activeQuickFilter === filterType ? null : filterType);
+  };
+
+  const sortProps = { sortField, sortOrder, onSort: handleSort };
+
+  const emptyState = (
+    <SRListEmptyState
+      hasActiveFilters={hasActiveFilters}
+      canCreateSR={canCreateSR}
+      onReset={resetFilters}
+      onCreate={() => setIsCreateDialogOpen(true)}
+    />
+  );
   return (
     <div className="space-y-6">
       <div className="sr-card-template bg-card">
@@ -377,107 +332,41 @@ export function SRsDataTable({
             <>
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
                 <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
-                  <button
-                    aria-pressed={activeQuickFilter === 'waiting'}
-                    onClick={() =>
-                      handleQuickFilter(activeQuickFilter === 'waiting' ? null : 'waiting')
-                    }
-                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      activeQuickFilter === 'waiting'
-                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
-                    }`}
-                  >
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>접수</span>
-                    <span
-                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
-                        activeQuickFilter === 'waiting'
-                          ? 'bg-background text-foreground font-bold'
-                          : // --destructive(#ef4444) 위 흰 글씨는 3.76:1 로 AA(4.5:1) 미달이다.
-                            // 채움 배경에는 --destructive-solid 를 쓴다 — Button 의 destructive
-                            // variant 가 같은 이유로 이미 그렇게 바뀌어 있다(ui/button.tsx).
-                            'bg-destructive-solid text-destructive-foreground'
-                      }`}
-                    >
-                      {counts.waiting}
-                    </span>
-                  </button>
-                  <button
-                    aria-pressed={activeQuickFilter === 'myAssigned'}
-                    onClick={() =>
-                      handleQuickFilter(activeQuickFilter === 'myAssigned' ? null : 'myAssigned')
-                    }
-                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      activeQuickFilter === 'myAssigned'
-                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
-                    }`}
-                  >
-                    <User className="h-3.5 w-3.5" />
-                    <span>담당</span>
-                    <span
-                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
-                        activeQuickFilter === 'myAssigned'
-                          ? 'bg-background text-foreground font-bold'
-                          : 'bg-muted text-foreground'
-                      }`}
-                    >
-                      {counts.myAssigned}
-                    </span>
-                  </button>
-                  <button
-                    aria-pressed={activeQuickFilter === 'urgent'}
-                    onClick={() =>
-                      handleQuickFilter(activeQuickFilter === 'urgent' ? null : 'urgent')
-                    }
-                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      activeQuickFilter === 'urgent'
-                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
-                    }`}
-                  >
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    <span>긴급</span>
-                    <span
-                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
-                        activeQuickFilter === 'urgent'
-                          ? 'bg-background text-foreground font-bold'
-                          : // --destructive(#ef4444) 위 흰 글씨는 3.76:1 로 AA(4.5:1) 미달이다.
-                            // 채움 배경에는 --destructive-solid 를 쓴다 — Button 의 destructive
-                            // variant 가 같은 이유로 이미 그렇게 바뀌어 있다(ui/button.tsx).
-                            'bg-destructive-solid text-destructive-foreground'
-                      }`}
-                    >
-                      {counts.urgent}
-                    </span>
-                  </button>
+                  <QuickFilterButton
+                    active={activeQuickFilter === 'waiting'}
+                    onToggle={() => toggleQuickFilter('waiting')}
+                    icon={Clock}
+                    label="접수"
+                    count={counts.waiting}
+                    idleBadgeClassName={QUICK_FILTER_ALERT_BADGE}
+                  />
+                  <QuickFilterButton
+                    active={activeQuickFilter === 'myAssigned'}
+                    onToggle={() => toggleQuickFilter('myAssigned')}
+                    icon={User}
+                    label="담당"
+                    count={counts.myAssigned}
+                    idleBadgeClassName={QUICK_FILTER_QUIET_BADGE}
+                  />
+                  <QuickFilterButton
+                    active={activeQuickFilter === 'urgent'}
+                    onToggle={() => toggleQuickFilter('urgent')}
+                    icon={AlertTriangle}
+                    label="긴급"
+                    count={counts.urgent}
+                    idleBadgeClassName={QUICK_FILTER_ALERT_BADGE}
+                  />
                   {/* '지연 중'(헌법 §3, 결정 D10) — 마감을 넘긴 진행 중 SR. 내부 사용자 전용 영역이다. */}
-                  <button
-                    aria-pressed={activeQuickFilter === 'overdue'}
-                    onClick={() =>
-                      handleQuickFilter(activeQuickFilter === 'overdue' ? null : 'overdue')
+                  <QuickFilterButton
+                    active={activeQuickFilter === 'overdue'}
+                    onToggle={() => toggleQuickFilter('overdue')}
+                    icon={AlertCircle}
+                    label="지연"
+                    count={counts.overdue}
+                    idleBadgeClassName={
+                      counts.overdue > 0 ? QUICK_FILTER_ALERT_BADGE : QUICK_FILTER_QUIET_BADGE
                     }
-                    className={`flex min-h-9 items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      activeQuickFilter === 'overdue'
-                        ? 'bg-primary/10 text-primary border-primary shadow-sm'
-                        : 'bg-transparent text-muted-foreground border-border hover:bg-muted font-medium'
-                    }`}
-                  >
-                    <AlertCircle className="h-3.5 w-3.5" />
-                    <span>지연</span>
-                    <span
-                      className={`px-1.5 rounded-full text-[11px] min-w-5 text-center ${
-                        activeQuickFilter === 'overdue'
-                          ? 'bg-background text-foreground font-bold'
-                          : counts.overdue > 0
-                            ? 'bg-destructive-solid text-destructive-foreground'
-                            : 'bg-muted text-foreground'
-                      }`}
-                    >
-                      {counts.overdue}
-                    </span>
-                  </button>
+                  />
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <span className="md:hidden text-xs text-muted-foreground font-medium">
@@ -499,145 +388,13 @@ export function SRsDataTable({
 
               {/* Advanced Filters (Collapsible) */}
               {showAdvancedFilters && (
-                <div
-                  id="advanced-filters-section"
-                  role="region"
-                  aria-label="상세 필터 옵션"
-                  className="mb-4 pb-4 border-b border-[hsl(var(--sr-border))] max-h-[280px] md:max-h-none overflow-y-auto no-scrollbar"
-                >
-                  {/* First Row: Status, Priority, Client, Assignee */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <Label htmlFor="filter-status" className="text-sm mb-2 block">
-                        상태
-                      </Label>
-                      <Select
-                        value={filters.status}
-                        onValueChange={(v) => handleFilterChange('status', v)}
-                      >
-                        <SelectTrigger id="filter-status" className="sr-input-template w-full">
-                          <SelectValue placeholder="모든 상태" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">모든 상태</SelectItem>
-                          {filters.status.includes(',') && (
-                            <SelectItem value={filters.status}>
-                              {multiValueLabel(filters.status, statusLabels)}
-                            </SelectItem>
-                          )}
-                          {Object.entries(statusLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="filter-priority" className="text-sm mb-2 block">
-                        우선순위
-                      </Label>
-                      <Select
-                        value={filters.priority}
-                        onValueChange={(v) => handleFilterChange('priority', v)}
-                      >
-                        <SelectTrigger id="filter-priority" className="sr-input-template w-full">
-                          <SelectValue placeholder="모든 우선순위" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">모든 우선순위</SelectItem>
-                          {filters.priority.includes(',') && (
-                            <SelectItem value={filters.priority}>
-                              {multiValueLabel(filters.priority, priorityLabels)}
-                            </SelectItem>
-                          )}
-                          {Object.entries(priorityLabels).map(([value, label]) => (
-                            <SelectItem key={value} value={value}>
-                              {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="filter-client" className="text-sm mb-2 block">
-                        고객사
-                      </Label>
-                      <Select
-                        value={filters.clientId}
-                        onValueChange={(v) => handleFilterChange('clientId', v)}
-                      >
-                        <SelectTrigger id="filter-client" className="sr-input-template w-full">
-                          <SelectValue placeholder="모든 고객사" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">모든 고객사</SelectItem>
-                          {clients.map((client) => (
-                            <SelectItem key={client.id} value={client.id}>
-                              {client.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="filter-assignee" className="text-sm mb-2 block">
-                        담당자
-                      </Label>
-                      <Select
-                        value={filters.assigneeId}
-                        onValueChange={(v) => handleFilterChange('assigneeId', v)}
-                      >
-                        <SelectTrigger id="filter-assignee" className="sr-input-template w-full">
-                          <SelectValue placeholder="모든 담당자" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">모든 담당자</SelectItem>
-                          <SelectItem value="unassigned">미배정</SelectItem>
-                          {users.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {/* Second Row: Date Range */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <Label htmlFor="filter-date-from" className="text-sm mb-2 block">
-                        생성일 시작
-                      </Label>
-                      <Input
-                        id="filter-date-from"
-                        type="date"
-                        value={filters.dateFrom}
-                        onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
-                        className="sr-input-template w-full"
-                        placeholder="년-월-일"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="filter-date-to" className="text-sm mb-2 block">
-                        생성일 종료
-                      </Label>
-                      <Input
-                        id="filter-date-to"
-                        type="date"
-                        value={filters.dateTo}
-                        onChange={(e) => handleFilterChange('dateTo', e.target.value)}
-                        className="sr-input-template w-full"
-                        placeholder="년-월-일"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button variant="outline" size="sm" onClick={resetFilters}>
-                      필터 초기화
-                    </Button>
-                  </div>
-                </div>
+                <SRAdvancedFilters
+                  filters={filters}
+                  clients={clients}
+                  users={users}
+                  onFilterChange={handleFilterChange}
+                  onReset={resetFilters}
+                />
               )}
             </>
           )}
@@ -696,101 +453,21 @@ export function SRsDataTable({
           <ResponsiveTableShell>
             <TableHeader>
               <TableRow>
-                <TableHead
-                  aria-sort={
-                    sortField === 'srNumber'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('srNumber')}>
-                    SR 번호{getSortIcon('srNumber')}
-                  </Button>
-                </TableHead>
-                <TableHead
+                <SortableTableHead field="srNumber" label="SR 번호" {...sortProps} />
+                <SortableTableHead
+                  field="title"
+                  label="제목"
                   className="min-w-[150px]"
-                  aria-sort={
-                    sortField === 'title'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('title')}>
-                    제목{getSortIcon('title')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'client'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('client')}>
-                    고객사{getSortIcon('client')}
-                  </Button>
-                </TableHead>
+                  {...sortProps}
+                />
+                <SortableTableHead field="client" label="고객사" {...sortProps} />
                 <TableHead>요청자</TableHead>
                 <TableHead>담당자</TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'priority'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('priority')}>
-                    우선순위{getSortIcon('priority')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'status'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('status')}>
-                    상태{getSortIcon('status')}
-                  </Button>
-                </TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'dueDate'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('dueDate')}>
-                    마감일{getSortIcon('dueDate')}
-                  </Button>
-                </TableHead>
+                <SortableTableHead field="priority" label="우선순위" {...sortProps} />
+                <SortableTableHead field="status" label="상태" {...sortProps} />
+                <SortableTableHead field="dueDate" label="마감일" {...sortProps} />
                 <TableHead>댓글/첨부</TableHead>
-                <TableHead
-                  aria-sort={
-                    sortField === 'createdAt'
-                      ? sortOrder === 'asc'
-                        ? 'ascending'
-                        : 'descending'
-                      : 'none'
-                  }
-                >
-                  <Button variant="ghost" onClick={() => handleSort('createdAt')}>
-                    생성일{getSortIcon('createdAt')}
-                  </Button>
-                </TableHead>
+                <SortableTableHead field="createdAt" label="생성일" {...sortProps} />
                 <TableHead>작업</TableHead>
               </TableRow>
             </TableHeader>
@@ -799,36 +476,7 @@ export function SRsDataTable({
                 srs.map((sr) => <SRTableRow key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11}>
-                    {hasActiveFilters ? (
-                      <EmptyState
-                        icon={SearchX}
-                        title="검색 결과가 없습니다"
-                        description="다른 검색어나 필터를 시도해보세요."
-                        action={
-                          <Button variant="outline" onClick={resetFilters}>
-                            필터 초기화
-                          </Button>
-                        }
-                      />
-                    ) : (
-                      <EmptyState
-                        icon={Inbox}
-                        title="SR이 없습니다"
-                        description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
-                        action={
-                          canCreateSR && (
-                            <Button
-                              onClick={() => setIsCreateDialogOpen(true)}
-                              className="sr-btn-template-primary"
-                            >
-                              <Plus className="mr-2 h-4 w-4" /> SR 등록
-                            </Button>
-                          )
-                        }
-                      />
-                    )}
-                  </TableCell>
+                  <TableCell colSpan={11}>{emptyState}</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -836,103 +484,17 @@ export function SRsDataTable({
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-3 p-3">
-            {srs && srs.length > 0 ? (
-              srs.map((sr) => <SRCardItem key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
-            ) : hasActiveFilters ? (
-              <EmptyState
-                icon={SearchX}
-                title="검색 결과가 없습니다"
-                description="다른 검색어나 필터를 시도해보세요."
-                action={
-                  <Button variant="outline" onClick={resetFilters}>
-                    필터 초기화
-                  </Button>
-                }
-              />
-            ) : (
-              <EmptyState
-                icon={Inbox}
-                title="SR이 없습니다"
-                description="새로운 SR을 생성하거나 나중에 다시 확인해주세요."
-                action={
-                  canCreateSR && (
-                    <Button
-                      onClick={() => setIsCreateDialogOpen(true)}
-                      className="sr-btn-template-primary"
-                    >
-                      <Plus className="mr-2 h-4 w-4" /> SR 등록
-                    </Button>
-                  )
-                }
-              />
-            )}
+            {srs && srs.length > 0
+              ? srs.map((sr) => <SRCardItem key={sr.id} sr={sr} canManageSRs={canManageSRs} />)
+              : emptyState}
           </div>
 
-          <div className="px-6 py-4 border-t border-[hsl(var(--sr-border))] flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Select value={itemsPerPage} onValueChange={handleItemsPerPageChange}>
-                <SelectTrigger
-                  className="w-[80px] h-9 sr-dropdown-template"
-                  aria-label="페이지당 항목 수"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={String(option)}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-sm text-[hsl(var(--sr-gray-medium))]">페이지당 항목 수</span>
-            </div>
-
-            {paginationInfo.totalPages > 1 && (
-              <Pagination className="w-auto mx-0">
-                <PaginationContent>
-                  <PaginationItem>
-                    <PaginationPrevious
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (paginationInfo.hasPrevPage)
-                          handlePageChange(paginationInfo.currentPage - 1);
-                      }}
-                      aria-disabled={!paginationInfo.hasPrevPage}
-                      className={
-                        !paginationInfo.hasPrevPage
-                          ? 'pointer-events-none opacity-50 cursor-not-allowed'
-                          : 'cursor-pointer'
-                      }
-                    />
-                  </PaginationItem>
-                  {/* PaginationContent 는 <ul> 이므로 직계 자식은 <li> 여야 한다.
-                      <div> 를 그대로 두면 axe 의 list/only-listitems 위반(serious)이 되고,
-                      낭독기는 목록 항목 수를 잘못 읽는다. PaginationItem 이 <li> 를 렌더한다. */}
-                  <PaginationItem className="flex items-center gap-1 text-sm font-medium mx-2">
-                    {paginationInfo.currentPage} / {paginationInfo.totalPages}
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        if (paginationInfo.hasNextPage)
-                          handlePageChange(paginationInfo.currentPage + 1);
-                      }}
-                      aria-disabled={!paginationInfo.hasNextPage}
-                      className={
-                        !paginationInfo.hasNextPage
-                          ? 'pointer-events-none opacity-50 cursor-not-allowed'
-                          : 'cursor-pointer'
-                      }
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            )}
-          </div>
+          <SRListPagination
+            itemsPerPage={itemsPerPage}
+            paginationInfo={paginationInfo}
+            onItemsPerPageChange={handleItemsPerPageChange}
+            onPageChange={handlePageChange}
+          />
         </div>
       </div>
 
