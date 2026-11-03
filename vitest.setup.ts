@@ -1,7 +1,7 @@
 // ⚠️ `/vitest` 서브패스여야 한다. 기본 진입점(`@testing-library/jest-dom`)의 타입은
 // **Jest 네임스페이스만** 증강해서, vitest 의 `Assertion` 에는 `toBeInTheDocument` 같은
 // 매처가 붙지 않는다. 예전에는 `vitest.shims.d.ts` 의
-// `/// <reference types="@vitest/browser-playwright" />` 가 그 타입을 간접적으로 끌어왔는데,
+// `@vitest/browser-playwright` 타입 참조가 그 타입을 간접적으로 끌어왔는데,
 // 그건 Storybook 브라우저 모드 때문에 있던 파일이었다. Storybook 을 걷어내면서
 // 매처 타입의 원천을 여기로 명시했다 — 이 줄을 기본 진입점으로 되돌리면
 // `pnpm type-check` 가 "Property 'toBeInTheDocument' does not exist" 로 222건 터진다.
