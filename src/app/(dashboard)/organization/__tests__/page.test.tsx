@@ -42,7 +42,9 @@ vi.mock('@/components/organization/OrganizationTree', () => ({
             {expandedClients.has(client.id) ? 'open' : 'closed'}
           </span>
           <span data-testid={`users-${client.id}`}>
-            {(clientUsers[client.id] ?? []).map((user: any) => user.name).join(',')}
+            {(clientUsers[client.id] ?? [])
+              .map((user: Record<string, unknown>) => user.name)
+              .join(',')}
           </span>
         </div>
       ))}
@@ -88,8 +90,10 @@ vi.mock('@/components/clients/ClientDialog', () => ({ ClientDialog: () => null }
 vi.mock('@/components/users/UserDialog', () => ({ UserDialog: () => null }));
 
 vi.mock('@/components/ui', () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Input: (props: any) => <input {...props} />,
+  Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button {...props}>{children}</button>
+  ),
+  Input: (props: Record<string, unknown>) => <input {...props} />,
 }));
 
 const toast = vi.fn();

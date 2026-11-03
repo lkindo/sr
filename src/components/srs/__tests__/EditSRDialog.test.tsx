@@ -81,24 +81,31 @@ vi.mock('@/components/ui/file-upload', () => ({
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (open ? <div data-testid="dialog">{children}</div> : null),
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
-  DialogDescription: ({ children }: any) => <div>{children}</div>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/alert-dialog', () => ({
-  AlertDialog: ({ children, open }: any) =>
+  AlertDialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
     open ? <div data-testid="alert-dialog">{children}</div> : null,
-  AlertDialogContent: ({ children }: any) => <div>{children}</div>,
-  AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
-  AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
-  AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
-  AlertDialogFooter: ({ children }: any) => <div>{children}</div>,
-  AlertDialogAction: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
-  AlertDialogCancel: ({ children }: any) => <button>{children}</button>,
+  AlertDialogContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogFooter: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogAction: ({
+    children,
+    onClick,
+  }: {
+    children?: React.ReactNode;
+    onClick?: React.MouseEventHandler<HTMLElement>;
+  }) => <button onClick={onClick}>{children}</button>,
+  AlertDialogCancel: ({ children }: { children?: React.ReactNode }) => <button>{children}</button>,
 }));
 
 vi.mock('@/components/ui/select', () => ({
@@ -120,10 +127,14 @@ vi.mock('@/components/ui/select', () => ({
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, id }: any) => <div data-testid={`trigger-${id}`}>{children}</div>,
-  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <div data-testid={`item-${value}`}>{children}</div>,
+  SelectTrigger: ({ children, id }: { children?: React.ReactNode; id?: string }) => (
+    <div data-testid={`trigger-${id}`}>{children}</div>
+  ),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
+  SelectContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children?: React.ReactNode; value?: string }) => (
+    <div data-testid={`item-${value}`}>{children}</div>
+  ),
 }));
 
 // Mock Lucide icons
@@ -165,28 +176,42 @@ describe('EditSRDialog Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useToast as any).mockReturnValue({ toast: mockToast });
-    (useSession as any).mockReturnValue({ data: { user: { id: 'user-1', roles: ['ADMIN'] } } });
-    (usePermissions as any).mockReturnValue({
+    vi.mocked(useToast as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      toast: mockToast,
+    });
+    vi.mocked(useSession as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      data: { user: { id: 'user-1', roles: ['ADMIN'] } },
+    });
+    vi.mocked(usePermissions as unknown as (...args: unknown[]) => unknown).mockReturnValue({
       hasAnyRole: vi.fn().mockReturnValue(true),
       roles: ['ADMIN'],
       permissions: [],
     });
-    (useRouter as any).mockReturnValue({ push: mockPush, refresh: mockRefresh });
-    (useQueryClient as any).mockReturnValue({ invalidateQueries: mockInvalidateQueries });
-    (useUpdateSR as any).mockReturnValue({ mutateAsync: mockUpdateMutateAsync, isPending: false });
+    vi.mocked(useRouter as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      push: mockPush,
+      refresh: mockRefresh,
+    });
+    vi.mocked(useQueryClient as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      invalidateQueries: mockInvalidateQueries,
+    });
+    vi.mocked(useUpdateSR as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      mutateAsync: mockUpdateMutateAsync,
+      isPending: false,
+    });
 
-    (getClientsForSelection as any).mockResolvedValue({
+    vi.mocked(getClientsForSelection).mockResolvedValue({
       success: true,
       data: [{ id: 'client-1', code: 'C1', name: 'Client 1' }],
     });
 
-    (getServiceCategoriesForSelection as any).mockResolvedValue({
+    vi.mocked(
+      getServiceCategoriesForSelection as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue({
       success: true,
       data: [{ id: 'cat-1', categoryName: 'Category 1' }],
     });
 
-    (getProfileAction as any).mockResolvedValue({
+    vi.mocked(getProfileAction as unknown as (...args: unknown[]) => unknown).mockResolvedValue({
       success: true,
       data: {
         clients: [{ client: { id: 'client-1', code: 'C1', name: 'Client 1' } }],
@@ -210,7 +235,7 @@ describe('EditSRDialog Component', () => {
   const defaultProps = {
     open: true,
     onOpenChange: mockOnOpenChange,
-    sr: mockSR as any,
+    sr: mockSR as never,
     onUpdated: mockOnUpdated,
   };
 
@@ -277,14 +302,14 @@ describe('EditSRDialog Component', () => {
   // 접수 이후 SR 내용은 운영자만 고친다(소유자 결정, 2026-09-18 — policies.ensureCanEditSRContent 와
   // 같은 판정 함수 sr-state-machine.canEditSRContentAt). 외부 사용자는 댓글로 요청한다.
   it('접수 이후에는 외부 사용자의 수정을 막고 서버와 같은 문구로 안내한다', async () => {
-    (usePermissions as any).mockReturnValue({
+    vi.mocked(usePermissions as unknown as (...args: unknown[]) => unknown).mockReturnValue({
       hasAnyRole: vi.fn().mockImplementation((roles) => roles.includes('CLIENT_USER')),
       roles: ['CLIENT_USER'],
       permissions: ['SR:UPDATE_SELF'],
     });
 
     const inProgressSR = { ...mockSR, status: 'IN_PROGRESS' };
-    render(<EditSRDialog {...defaultProps} sr={inProgressSR as any} />);
+    render(<EditSRDialog {...defaultProps} sr={inProgressSR as never} />);
 
     await waitFor(
       () => {
@@ -497,7 +522,7 @@ describe('EditSRDialog Component', () => {
     // 예전 수정 폼은 응답을 읽지 않고 `await` 만 해서, 3개 중 2개가 걸려도 사용자에게는
     // "SR이 수정되었습니다." 만 보였다. 아래 두 테스트가 그 회귀를 막는다.
     const mockAttachmentsPost = (body: unknown, status = 201) => {
-      vi.spyOn(global, 'fetch').mockImplementation(async (_url: any, init: any) => {
+      vi.spyOn(global, 'fetch').mockImplementation(async (_url, init) => {
         if (init?.method === 'POST') {
           return {
             ok: status < 400,
@@ -612,7 +637,9 @@ describe('EditSRDialog Component', () => {
   });
 
   it('fetches categories failure handles gracefully', async () => {
-    (getServiceCategoriesForSelection as any).mockResolvedValue({ success: false });
+    vi.mocked(
+      getServiceCategoriesForSelection as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue({ success: false });
     render(<EditSRDialog {...defaultProps} />);
     await waitFor(
       () => {

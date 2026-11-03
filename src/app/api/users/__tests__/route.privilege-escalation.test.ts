@@ -18,7 +18,7 @@ vi.mock('@/lib/api-error-handler', () => ({
 // Mock auth-wrapper - Implementation that actually calls the handler
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: vi.fn((handler) => {
-    return async (req: any, context: any) => {
+    return async (req: unknown, context: unknown) => {
       try {
         return await handler(req, context);
       } catch (error) {
@@ -85,10 +85,10 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
 
     // Mock Prisma to return ADMIN role
     vi.mocked(prisma.role.findMany).mockResolvedValue([
-      { id: 'admin-role-id', name: 'ADMIN', description: 'Administrator' } as any,
+      { id: 'admin-role-id', name: 'ADMIN', description: 'Administrator' } as never,
     ]);
 
-    const res = await POST(req, { session } as any);
+    const res = await POST(req, { session } as never);
 
     // EXPECTED BEHAVIOR: 403 Forbidden (Fix verified)
     expect(res.status).toBe(403);
@@ -117,7 +117,7 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
       }),
     });
 
-    const res = await POST(req, { session } as any);
+    const res = await POST(req, { session } as never);
 
     expect(res.status).toBe(403);
     const json = await res.json();
@@ -147,10 +147,10 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
 
     // Mock Prisma to return NON-ADMIN role
     vi.mocked(prisma.role.findMany).mockResolvedValue([
-      { id: 'engineer-role-id', name: 'ENGINEER', description: 'Engineer' } as any,
+      { id: 'engineer-role-id', name: 'ENGINEER', description: 'Engineer' } as never,
     ]);
 
-    const res = await POST(req, { session } as any);
+    const res = await POST(req, { session } as never);
 
     expect(res.status).toBe(201);
     expect(mockCreateUser).toHaveBeenCalled();
@@ -185,10 +185,10 @@ describe('API Route: /api/users (Privilege Escalation)', () => {
     // We still mock it just in case logic changes, but we don't expect it to be called
     // unless we change logic.
     vi.mocked(prisma.role.findMany).mockResolvedValue([
-      { id: 'admin-role-id', name: 'ADMIN' } as any,
+      { id: 'admin-role-id', name: 'ADMIN' } as never,
     ]);
 
-    const res = await POST(req, { session } as any);
+    const res = await POST(req, { session } as never);
 
     expect(res.status).toBe(201);
     expect(mockCreateUser).toHaveBeenCalled();

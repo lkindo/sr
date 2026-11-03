@@ -47,12 +47,13 @@ vi.mock('@/components/ui/file-upload', () => ({
 }));
 
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
-  DialogDescription: ({ children }: any) => <div>{children}</div>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+    open ? <div>{children}</div> : null,
+  DialogContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock('@/components/ui/select', () => ({
@@ -74,10 +75,14 @@ vi.mock('@/components/ui/select', () => ({
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, id }: any) => <div data-testid={`trigger-${id}`}>{children}</div>,
-  SelectValue: ({ placeholder }: any) => <span>{placeholder}</span>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <div data-testid={`item-${value}`}>{children}</div>,
+  SelectTrigger: ({ children, id }: { children?: React.ReactNode; id?: string }) => (
+    <div data-testid={`trigger-${id}`}>{children}</div>
+  ),
+  SelectValue: ({ placeholder }: { placeholder?: string }) => <span>{placeholder}</span>,
+  SelectContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children?: React.ReactNode; value?: string }) => (
+    <div data-testid={`item-${value}`}>{children}</div>
+  ),
 }));
 
 describe('CreateSRDialog Component', () => {
@@ -87,13 +92,17 @@ describe('CreateSRDialog Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useToast as any).mockReturnValue({ toast: mockToast });
-    (useSession as any).mockReturnValue({ data: { user: { id: 'user-1', roles: ['ADMIN'] } } });
-    (usePermissions as any).mockReturnValue({
+    vi.mocked(useToast as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      toast: mockToast,
+    });
+    vi.mocked(useSession as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      data: { user: { id: 'user-1', roles: ['ADMIN'] } },
+    });
+    vi.mocked(usePermissions as unknown as (...args: unknown[]) => unknown).mockReturnValue({
       hasAnyRole: vi.fn().mockReturnValue(true),
     });
 
-    (getClientsForSelection as any).mockResolvedValue({
+    vi.mocked(getClientsForSelection).mockResolvedValue({
       success: true,
       data: [{ id: 'client-1', code: 'C1', name: 'Client 1' }],
     });
@@ -103,12 +112,14 @@ describe('CreateSRDialog Component', () => {
       data: [{ id: 'cust-1', name: '김고객', email: 'kim@client.com' }],
     });
 
-    (getServiceCategoriesForSelection as any).mockResolvedValue({
+    vi.mocked(
+      getServiceCategoriesForSelection as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue({
       success: true,
       data: [{ id: 'cat-1', categoryName: 'Category 1' }],
     });
 
-    (getProfileAction as any).mockResolvedValue({
+    vi.mocked(getProfileAction as unknown as (...args: unknown[]) => unknown).mockResolvedValue({
       success: true,
       data: { clients: [{ client: { id: 'client-1', name: 'Client 1', code: 'C1' } }] },
     });
@@ -175,7 +186,7 @@ describe('CreateSRDialog Component', () => {
   });
 
   it('disables client selection for Client users', async () => {
-    (usePermissions as any).mockReturnValue({
+    vi.mocked(usePermissions as unknown as (...args: unknown[]) => unknown).mockReturnValue({
       hasAnyRole: vi.fn().mockImplementation((roles) => !roles.includes('ADMIN')),
     });
 
@@ -194,7 +205,7 @@ describe('CreateSRDialog Component', () => {
   });
 
   it('successfully submits form when all fields are valid', async () => {
-    (createSRAction as any).mockResolvedValue({
+    vi.mocked(createSRAction as unknown as (...args: unknown[]) => unknown).mockResolvedValue({
       success: true,
       data: { id: 'new-sr-123' },
     });
@@ -304,7 +315,7 @@ describe('CreateSRDialog Component', () => {
   });
 
   it('handles server side error during creation', async () => {
-    (createSRAction as any).mockResolvedValue({
+    vi.mocked(createSRAction).mockResolvedValue({
       success: false,
       error: 'Database constraint failed',
     });
@@ -399,7 +410,7 @@ describe('CreateSRDialog Component', () => {
   });
 
   it('shows error toast when fetching clients fails', async () => {
-    (getClientsForSelection as any).mockResolvedValue({
+    vi.mocked(getClientsForSelection).mockResolvedValue({
       success: false,
       error: 'Network error',
     });
@@ -417,7 +428,7 @@ describe('CreateSRDialog Component', () => {
   });
 
   it('shows error toast when fetching categories fails', async () => {
-    (getServiceCategoriesForSelection as any).mockResolvedValue({
+    vi.mocked(getServiceCategoriesForSelection).mockResolvedValue({
       success: false,
       error: 'Network error',
     });

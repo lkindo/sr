@@ -34,7 +34,9 @@ vi.mock('@/components/roles/PermissionBoard', () => ({ PermissionBoard: () => nu
 vi.mock('@/components/roles/DeleteRoleDialog', () => ({ DeleteRoleDialog: () => null }));
 
 vi.mock('@/components/ui', () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
+  Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button {...props}>{children}</button>
+  ),
 }));
 
 const toast = vi.fn();

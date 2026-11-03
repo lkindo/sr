@@ -68,7 +68,7 @@ describe('Audit Logging System Integration', () => {
     userService = new UserService();
 
     // Default $transaction behavior: pass back the mock prisma object itself as tx
-    vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(prisma));
+    vi.mocked(prisma.$transaction).mockImplementation(async (cb) => cb(prisma));
   });
 
   it('역할 생성(createRole) 시 감사 로그가 정상 적재되어야 한다', async () => {
@@ -106,7 +106,7 @@ describe('Audit Logging System Integration', () => {
       id: 'user-123',
       email: 'audit-test-user@example.com',
       name: 'Audit User',
-    } as any);
+    } as never);
 
     vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
       id: 'user-123',
@@ -114,7 +114,7 @@ describe('Audit Logging System Integration', () => {
       name: 'Audit User',
       roles: [],
       clients: [],
-    } as any);
+    } as never);
 
     const user = await userService.createUser(
       {
@@ -144,7 +144,7 @@ describe('Audit Logging System Integration', () => {
 
   it('Zod 에러 등으로 트랜잭션 실패 시 감사 로그가 호출되지 않아야 한다', async () => {
     await expect(
-      roleService.createRole({ name: '' } as any, 'actor-123', '192.168.1.100')
+      roleService.createRole({ name: '' } as never, 'actor-123', '192.168.1.100')
     ).rejects.toThrow();
 
     expect(prisma.role.create).not.toHaveBeenCalled();

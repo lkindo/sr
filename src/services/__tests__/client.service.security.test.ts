@@ -30,7 +30,7 @@ describe('ClientService Security', () => {
         clientHandlers: [],
       };
 
-      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as never);
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([]);
 
       await clientService.getClientWithDetailsAndCategories('c1', {

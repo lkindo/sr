@@ -64,7 +64,7 @@ describe('PushService Performance', () => {
         ];
       }
       return [];
-    }) as any);
+    }) as never);
 
     const { sendNotification } = await import('web-push');
     vi.mocked(sendNotification).mockResolvedValue({ statusCode: 201, body: 'ok', headers: {} });

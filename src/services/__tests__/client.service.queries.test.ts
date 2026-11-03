@@ -47,7 +47,7 @@ describe('ClientService Coverage', () => {
 
   describe('getClientByCode', () => {
     it('finds client by code', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', code: 'C1' } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', code: 'C1' } as never);
       const result = await clientService.getClientByCode('C1');
       expect(result).toEqual({ id: 'c1', code: 'C1' });
     });
@@ -57,7 +57,7 @@ describe('ClientService Coverage', () => {
     // 이 필터가 없던 시절, 비활성화한 고객사가 SR 등록·수정 다이얼로그의 선택지에
     // 그대로 남아 있었다. 고객사 비활성화가 신규 SR 에 대해 무의미해진다.
     it('비활성 고객사를 제외한다', async () => {
-      vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.client.findMany).mockResolvedValue([] as never);
 
       await clientService.getClientsForSelection(null);
 
@@ -67,7 +67,7 @@ describe('ClientService Coverage', () => {
     });
 
     it('includeId 로 지정한 고객사는 비활성이어도 남긴다', async () => {
-      vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.client.findMany).mockResolvedValue([] as never);
 
       await clientService.getClientsForSelection(null, { includeId: 'c-off' });
 
@@ -77,7 +77,7 @@ describe('ClientService Coverage', () => {
     });
 
     it('테넌트 스코프는 활성 조건과 AND 로 함께 걸린다', async () => {
-      vi.mocked(prisma.client.findMany).mockResolvedValue([] as any);
+      vi.mocked(prisma.client.findMany).mockResolvedValue([] as never);
 
       await clientService.getClientsForSelection(['c1', 'c2']);
 
@@ -91,7 +91,7 @@ describe('ClientService Coverage', () => {
 
   describe('getClientDetailsById', () => {
     it('fetches detailed client info', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as never);
       await clientService.getClientDetailsById('c1', MANAGER);
       expect(prisma.client.findUnique).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -120,7 +120,7 @@ describe('ClientService Coverage', () => {
 
     // 회귀 방지: SR 목록이 다시 무제한/전체 컬럼 조회로 되돌아가지 못하도록 고정한다.
     it('SR 조회는 명시적 select + 정렬 + take 상한으로 제한된다', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as never);
       await clientService.getClientDetailsById('c1', MANAGER);
 
       const args = vi.mocked(prisma.client.findUnique).mock.calls[0]![0] as any;
@@ -140,7 +140,7 @@ describe('ClientService Coverage', () => {
     });
 
     it('SR select 에 설명/처리결과/반려사유 등 민감 자유서술 컬럼이 포함되지 않는다', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c1', srs: [] } as never);
       await clientService.getClientDetailsById('c1', MANAGER);
 
       const args = vi.mocked(prisma.client.findUnique).mock.calls[0]![0] as any;
@@ -265,7 +265,7 @@ describe('ClientService Coverage', () => {
           { user: { id: 'user', roles: [{ role: { name: 'CLIENT_USER' } }] } },
         ],
       };
-      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as never);
       vi.mocked(prisma.serviceCategory.findMany).mockResolvedValue([]);
 
       const result = await clientService.getClientWithDetailsAndCategories('c1', MANAGER);

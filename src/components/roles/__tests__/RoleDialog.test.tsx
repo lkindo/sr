@@ -21,21 +21,26 @@ vi.mock('@/hooks/use-toast', () => ({
 vi.mock('@/components/ui', () => {
   const React = require('react');
   return {
-    Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-    DialogContent: ({ children }: any) => <div>{children}</div>,
-    DialogHeader: ({ children }: any) => <div>{children}</div>,
-    DialogTitle: ({ children }: any) => <div>{children}</div>,
-    DialogDescription: ({ children }: any) => <div>{children}</div>,
-    DialogFooter: ({ children }: any) => <div>{children}</div>,
-    Button: ({ children, onClick, disabled, type, ...props }: any) => (
+    Dialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+      open ? <div>{children}</div> : null,
+    DialogContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogFooter: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Button: ({ children, onClick, disabled, type, ...props }: React.ComponentProps<'button'>) => (
       <button onClick={onClick} disabled={disabled} type={type} {...props}>
         {children}
       </button>
     ),
-    Input: React.forwardRef(({ onChange, value, id, ...props }: any, ref: any) => (
-      <input ref={ref} id={id} onChange={onChange} value={value} {...props} />
-    )),
-    Label: ({ children, htmlFor }: any) => <label htmlFor={htmlFor}>{children}</label>,
+    Input: React.forwardRef(
+      ({ onChange, value, id, ...props }: React.ComponentProps<'input'>, ref: never) => (
+        <input ref={ref} id={id} onChange={onChange} value={value} {...props} />
+      )
+    ),
+    Label: ({ children, htmlFor }: React.ComponentProps<'label'>) => (
+      <label htmlFor={htmlFor}>{children}</label>
+    ),
   };
 });
 

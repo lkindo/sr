@@ -23,7 +23,7 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockCheckPermission = vi.fn().mockResolvedValue(true);
 vi.mock('@/services/permission.service', () => ({
-  PermissionService: vi.fn().mockImplementation(function (this: any) {
+  PermissionService: vi.fn().mockImplementation(function (this: unknown) {
     return {
       checkPermission: mockCheckPermission,
     };
@@ -34,15 +34,15 @@ const mockCreateSR = vi.fn();
 const mockGetAllSRs = vi.fn();
 
 vi.mock('@/services/sr.service', () => ({
-  SRService: vi.fn().mockImplementation(function (this: any) {
+  SRService: vi.fn().mockImplementation(function (this: unknown) {
     return {
       createSR: mockCreateSR,
       getAllSRs: mockGetAllSRs,
     };
   }),
   srService: {
-    createSR: (...args: any[]) => mockCreateSR(...args),
-    getAllSRs: (...args: any[]) => mockGetAllSRs(...args),
+    createSR: (...args: unknown[]) => mockCreateSR(...args),
+    getAllSRs: (...args: unknown[]) => mockGetAllSRs(...args),
   },
 }));
 
@@ -54,7 +54,7 @@ describe('SR API Integration', () => {
   });
 
   it('Create SR - Unauthenticated returns 401', async () => {
-    (auth as any).mockResolvedValue(null);
+    vi.mocked(auth as unknown as (...args: unknown[]) => unknown).mockResolvedValue(null);
     const req = new NextRequest('http://localhost/api/srs', {
       method: 'POST',
       body: JSON.stringify({}),
@@ -65,7 +65,7 @@ describe('SR API Integration', () => {
 
   it('Create SR - Valid request calls service', async () => {
     // Mock session
-    (auth as any).mockResolvedValue({
+    vi.mocked(auth as unknown as (...args: unknown[]) => unknown).mockResolvedValue({
       user: {
         id: 'user-1',
         roles: ['CLIENT_USER'],
@@ -102,7 +102,7 @@ describe('SR API Integration', () => {
   });
 
   it('Create SR - Validation Error returns 400', async () => {
-    (auth as any).mockResolvedValue({
+    vi.mocked(auth as unknown as (...args: unknown[]) => unknown).mockResolvedValue({
       user: {
         id: 'user-1',
         roles: ['CLIENT_USER'],

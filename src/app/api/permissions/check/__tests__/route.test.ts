@@ -55,7 +55,7 @@ describe('POST /api/permissions/check', () => {
 
     // Act
     const { POST } = await import('../route');
-    const response = await POST(request, { session } as any);
+    const response = await POST(request, { session } as never);
     const json = await response.json();
 
     // Assert
@@ -81,7 +81,7 @@ describe('POST /api/permissions/check', () => {
 
     // Act
     const { POST } = await import('../route');
-    const response = await POST(request, { session } as any);
+    const response = await POST(request, { session } as never);
     const json = await response.json();
 
     // Assert
@@ -108,7 +108,7 @@ describe('POST /api/permissions/check', () => {
     const { POST } = await import('../route');
 
     // Act
-    const response = await POST(request, { session } as any);
+    const response = await POST(request, { session } as never);
     const json = await response.json();
 
     // Assert
@@ -127,7 +127,7 @@ describe('POST /api/permissions/check', () => {
     // Act & Assert
     const { POST } = await import('../route');
     await expect(
-      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as any)
+      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as never)
     ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
   });
 
@@ -143,7 +143,7 @@ describe('POST /api/permissions/check', () => {
     // Act & Assert
     const { POST } = await import('../route');
     await expect(
-      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as any)
+      POST(request, { session: { user: { id: 'user123', roles: [], permissions: [] } } } as never)
     ).rejects.toThrow('리소스와 액션을 제공해야 합니다');
   });
 
@@ -197,7 +197,7 @@ describe('POST /api/permissions/check', () => {
       });
 
       // Act
-      const response = await POST(request, { session } as any);
+      const response = await POST(request, { session } as never);
       const json = await response.json();
 
       // Assert

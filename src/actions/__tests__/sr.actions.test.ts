@@ -82,7 +82,7 @@ describe('SR Server Actions', () => {
     await rateLimiters.strict.resetAll();
 
     // Setup generic mock implementations
-    vi.mocked(auth).mockResolvedValue(mockSession as any);
+    vi.mocked(auth).mockResolvedValue(mockSession as never);
     mockRequirePermission.mockResolvedValue(undefined); // Permission granted by default
   });
 
@@ -119,7 +119,7 @@ describe('SR Server Actions', () => {
     });
 
     it('should return error if authentication fails', async () => {
-      vi.mocked(auth).mockResolvedValue(null as any);
+      vi.mocked(auth).mockResolvedValue(null as never);
 
       const result = await createSRAction(validFormData);
 
@@ -164,7 +164,7 @@ describe('SR Server Actions', () => {
     });
 
     it('should return error if session invalid', async () => {
-      vi.mocked(auth).mockResolvedValue(null as any);
+      vi.mocked(auth).mockResolvedValue(null as never);
       const result = await updateSRAction('id', new FormData());
       expect(result.success).toBe(false);
       if (!result.success) expect(result.code).toBe('UNAUTHORIZED');

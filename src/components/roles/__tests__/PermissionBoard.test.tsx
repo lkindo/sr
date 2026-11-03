@@ -34,26 +34,33 @@ vi.mock('lucide-react', async (importOriginal) => {
 vi.mock('@/components/ui', () => {
   const React = require('react');
   return {
-    Badge: ({ children }: any) => <div>{children}</div>,
-    Button: ({ children, onClick, ...props }: any) => (
+    Badge: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => (
       <button onClick={onClick} {...props}>
         {children}
       </button>
     ),
-    Card: ({ children, className }: any) => <div className={className}>{children}</div>,
-    CardContent: ({ children }: any) => <div>{children}</div>,
-    CardHeader: ({ children }: any) => <div>{children}</div>,
-    CardTitle: ({ children }: any) => <div>{children}</div>,
-    Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-    DialogContent: ({ children }: any) => <div>{children}</div>,
-    DialogDescription: ({ children }: any) => <div>{children}</div>,
-    DialogFooter: ({ children }: any) => <div>{children}</div>,
-    DialogHeader: ({ children }: any) => <div>{children}</div>,
-    DialogTitle: ({ children }: any) => <div>{children}</div>,
-    Input: React.forwardRef(({ onChange, value, ...props }: any, ref: any) => (
-      <input ref={ref} onChange={onChange} value={value} {...props} />
-    )),
-    Label: ({ children, htmlFor }: any) => <label htmlFor={htmlFor}>{children}</label>,
+    Card: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+      <div className={className}>{children}</div>
+    ),
+    CardContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    CardHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    CardTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Dialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+      open ? <div>{children}</div> : null,
+    DialogContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogFooter: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Input: React.forwardRef(
+      ({ onChange, value, ...props }: React.ComponentProps<'input'>, ref: never) => (
+        <input ref={ref} onChange={onChange} value={value} {...props} />
+      )
+    ),
+    Label: ({ children, htmlFor }: React.ComponentProps<'label'>) => (
+      <label htmlFor={htmlFor}>{children}</label>
+    ),
     Switch: ({ checked, onCheckedChange, ...props }: any) => (
       <button
         onClick={() => onCheckedChange(!checked)}

@@ -20,7 +20,7 @@ vi.mock('@/services/sr-email-outbox', () => ({
 
 vi.mock('@/lib/prisma', () => ({
   default: {
-    $transaction: vi.fn((cb: any) => cb(prisma)),
+    $transaction: vi.fn((cb) => cb(prisma)),
     // updateMany 는 낙관적 잠금 가드(스냅샷 이후 상태가 안 바뀌었을 때만 진행)에 쓰인다.
     sR: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
     client: { findUnique: vi.fn() },

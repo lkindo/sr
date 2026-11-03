@@ -35,7 +35,7 @@ describe('PermissionService', () => {
         { id: 'perm2', resource: 'SR', action: 'READ' },
       ];
 
-      vi.mocked(prisma.permission.findMany).mockResolvedValue(mockPermissions as any);
+      vi.mocked(prisma.permission.findMany).mockResolvedValue(mockPermissions as never);
 
       const result = await permissionService.getAllPermissions();
 

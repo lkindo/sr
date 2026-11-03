@@ -92,7 +92,9 @@ describe('client.actions coverage', () => {
     it('creates a client on the happy path', async () => {
       const created = { id: 'c1', code: 'ACME', name: 'Acme Corp' };
       mockClientService.createClient.mockResolvedValue(created);
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'u1' } });
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({ user: { id: 'u1' } });
 
       const result = await createClientAction(buildCreateFormData());
 
@@ -112,7 +114,9 @@ describe('client.actions coverage', () => {
 
     it('handles optional fields being empty (undefined branch)', async () => {
       mockClientService.createClient.mockResolvedValue({ id: 'c2', code: 'XY', name: 'Y' });
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'u1' } });
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({ user: { id: 'u1' } });
 
       // Only required fields provided; optional ones empty -> undefined branches.
       const fd = new FormData();
@@ -156,7 +160,7 @@ describe('client.actions coverage', () => {
     });
 
     it('converts authorization errors to a failure result', async () => {
-      (authenticateAndAuthorize as any).mockRejectedValue(
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue(
         new ForbiddenError('고객사 생성 권한이 없습니다.')
       );
 
@@ -171,7 +175,9 @@ describe('client.actions coverage', () => {
     });
 
     it('converts service errors to a failure result', async () => {
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'u1' } });
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({ user: { id: 'u1' } });
       mockClientService.createClient.mockRejectedValue(new Error('db down'));
 
       const result = await createClientAction(buildCreateFormData());
@@ -188,7 +194,9 @@ describe('client.actions coverage', () => {
     it('updates a client on the happy path', async () => {
       const updated = { id: 'c1', name: 'New Name' };
       mockClientService.updateClient.mockResolvedValue(updated);
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'u1' } });
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({ user: { id: 'u1' } });
 
       const fd = new FormData();
       fd.set('name', 'New Name');
@@ -211,7 +219,7 @@ describe('client.actions coverage', () => {
       const fd = new FormData();
       fd.set('contactEmail', 'bad-email');
 
-      const result: any = await updateClientAction('c1', fd);
+      const result = await updateClientAction('c1', fd);
 
       expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
@@ -220,7 +228,7 @@ describe('client.actions coverage', () => {
     });
 
     it('converts errors thrown after validation into a result', async () => {
-      (authenticateAndAuthorize as any).mockRejectedValue(
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue(
         new ForbiddenError('고객사 수정 권한이 없습니다.')
       );
 
@@ -236,7 +244,9 @@ describe('client.actions coverage', () => {
 
   describe('deleteClientAction', () => {
     it('deletes a client on the happy path', async () => {
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'u1' } });
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({ user: { id: 'u1' } });
       mockClientService.deleteClient.mockResolvedValue(undefined);
 
       const result: any = await deleteClientAction('c1');
@@ -248,7 +258,7 @@ describe('client.actions coverage', () => {
     });
 
     it('converts authorization errors into a result', async () => {
-      (authenticateAndAuthorize as any).mockRejectedValue(
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue(
         new ForbiddenError('고객사 삭제 권한이 없습니다.')
       );
 
@@ -260,7 +270,9 @@ describe('client.actions coverage', () => {
     });
 
     it('converts service errors into a result', async () => {
-      (authenticateAndAuthorize as any).mockResolvedValue({ user: { id: 'u1' } });
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({ user: { id: 'u1' } });
       mockClientService.deleteClient.mockRejectedValue(new NotFoundError('고객사', 'c1'));
 
       const result: any = await deleteClientAction('c1');
@@ -273,13 +285,15 @@ describe('client.actions coverage', () => {
   describe('getClientsForSelection', () => {
     it('returns all clients (no filter) for internal users', async () => {
       const clients = [{ id: 'c1', name: 'C1' }];
-      (authenticateAndAuthorize as any).mockResolvedValue({
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'u1', roles: ['ADMIN'], clientIds: [] },
       });
-      (isInternalUser as any).mockReturnValue(true);
+      vi.mocked(isInternalUser).mockReturnValue(true);
       mockClientService.getClientsForSelection.mockResolvedValue(clients);
 
-      const result: any = await getClientsForSelection();
+      const result = await getClientsForSelection();
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual(clients);
@@ -293,13 +307,15 @@ describe('client.actions coverage', () => {
 
     it('filters by clientIds for external users', async () => {
       const clients = [{ id: 'c2', name: 'C2' }];
-      (authenticateAndAuthorize as any).mockResolvedValue({
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'u2', roles: [], clientIds: ['c2'] },
       });
-      (isInternalUser as any).mockReturnValue(false);
+      vi.mocked(isInternalUser).mockReturnValue(false);
       mockClientService.getClientsForSelection.mockResolvedValue(clients);
 
-      const result: any = await getClientsForSelection();
+      const result = await getClientsForSelection();
 
       expect(result.success).toBe(true);
       expect(mockClientService.getClientsForSelection).toHaveBeenCalledWith(['c2'], {
@@ -308,13 +324,15 @@ describe('client.actions coverage', () => {
     });
 
     it('falls back to empty array when external user has no clientIds', async () => {
-      (authenticateAndAuthorize as any).mockResolvedValue({
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'u3', roles: [] },
       });
-      (isInternalUser as any).mockReturnValue(false);
+      vi.mocked(isInternalUser).mockReturnValue(false);
       mockClientService.getClientsForSelection.mockResolvedValue([]);
 
-      const result: any = await getClientsForSelection();
+      const result = await getClientsForSelection();
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual([]);
@@ -324,10 +342,12 @@ describe('client.actions coverage', () => {
     });
 
     it('includeId 를 서비스에 그대로 넘긴다 — 비활성이 된 현재 고객사를 남기기 위한 것', async () => {
-      (authenticateAndAuthorize as any).mockResolvedValue({
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'u1', roles: ['ADMIN'], clientIds: [] },
       });
-      (isInternalUser as any).mockReturnValue(true);
+      vi.mocked(isInternalUser).mockReturnValue(true);
       mockClientService.getClientsForSelection.mockResolvedValue([]);
 
       await getClientsForSelection('c-inactive');
@@ -339,9 +359,9 @@ describe('client.actions coverage', () => {
     });
 
     it('returns a friendly error when an Error is thrown', async () => {
-      (authenticateAndAuthorize as any).mockRejectedValue(new Error('Unauthorized'));
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue(new Error('Unauthorized'));
 
-      const result: any = await getClientsForSelection();
+      const result = await getClientsForSelection();
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Unauthorized');
@@ -349,9 +369,9 @@ describe('client.actions coverage', () => {
     });
 
     it('returns the default message for a non-Error rejection', async () => {
-      (authenticateAndAuthorize as any).mockRejectedValue('boom');
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue('boom');
 
-      const result: any = await getClientsForSelection();
+      const result = await getClientsForSelection();
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('고객사 목록을 불러오는데 실패했습니다.');

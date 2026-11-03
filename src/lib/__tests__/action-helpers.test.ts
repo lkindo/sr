@@ -50,7 +50,7 @@ describe('Action Helpers', () => {
   describe('getAuthenticatedSession', () => {
     it('throws UnauthorizedError if no session', async () => {
       const { auth } = await import('@/auth');
-      vi.mocked(auth).mockResolvedValue(null as any);
+      vi.mocked(auth).mockResolvedValue(null as never);
       await expect(helpers.getAuthenticatedSession()).rejects.toThrow(UnauthorizedError);
     });
 
@@ -67,7 +67,7 @@ describe('Action Helpers', () => {
         },
         expires: '2099-01-01',
       };
-      vi.mocked(auth).mockResolvedValue(mockSession as any);
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
       const result = await helpers.getAuthenticatedSession();
       expect(result).toEqual(mockSession);
     });
@@ -102,7 +102,7 @@ describe('Action Helpers', () => {
         },
         expires: '2099-01-01',
       };
-      vi.mocked(auth).mockResolvedValue(mockSession as any);
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
       mockRequirePermission.mockResolvedValue(undefined);
 
       const result = await helpers.authenticateAndAuthorize('sr:read');
@@ -113,7 +113,7 @@ describe('Action Helpers', () => {
 
     it('throws UnauthorizedError when not authenticated', async () => {
       const { auth } = await import('@/auth');
-      vi.mocked(auth).mockResolvedValue(null as any);
+      vi.mocked(auth).mockResolvedValue(null as never);
 
       await expect(helpers.authenticateAndAuthorize('sr:read')).rejects.toThrow(UnauthorizedError);
     });
@@ -131,7 +131,7 @@ describe('Action Helpers', () => {
         },
         expires: '2099-01-01',
       };
-      vi.mocked(auth).mockResolvedValue(mockSession as any);
+      vi.mocked(auth).mockResolvedValue(mockSession as never);
       mockRequirePermission.mockRejectedValue(new ForbiddenError('Insufficient permissions'));
 
       await expect(helpers.authenticateAndAuthorize('sr:delete')).rejects.toThrow(ForbiddenError);
@@ -162,7 +162,7 @@ describe('Action Helpers', () => {
         parse: () => {
           throw new Error('Bug');
         },
-      } as any;
+      } as never;
       expect(() => helpers.validateWithSchema({}, buggedSchema)).toThrow('Bug');
     });
   });
@@ -181,7 +181,7 @@ describe('Action Helpers', () => {
           expected: 'string',
           path: ['id'],
           message: 'Expected string',
-        } as any,
+        } as never,
       ]);
       const action = vi.fn().mockRejectedValue(zodError);
 

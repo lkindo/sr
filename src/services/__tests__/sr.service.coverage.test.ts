@@ -31,7 +31,7 @@ vi.mock('@/lib/wait-until', () => ({
       /* ignore */
     }
   }),
-  backgroundTasks: vi.fn(async (tasks: any[]) => Promise.all(tasks.map((t: any) => t.promise))),
+  backgroundTasks: vi.fn(async (tasks: unknown[]) => Promise.all(tasks.map((t: any) => t.promise))),
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -112,7 +112,7 @@ describe('SRService - Expanded Coverage', () => {
   describe('updateSR - Validation Branches', () => {
     it('should throw error when missing required fields for status change', async () => {
       const existingSR = { id: 'sr-1', status: 'REQUESTED' };
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as never);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
       const { validateTransition } = await import('@/lib/sr-state-machine');
@@ -122,7 +122,7 @@ describe('SRService - Expanded Coverage', () => {
       });
 
       await expect(
-        srService.updateSR('sr-1', { status: 'IN_PROGRESS' }, mockUser as any)
+        srService.updateSR('sr-1', { status: 'IN_PROGRESS' }, mockUser as never)
       ).rejects.toThrow('담당자(assigneeId)');
     });
   });
@@ -130,7 +130,7 @@ describe('SRService - Expanded Coverage', () => {
   describe('createSR - Sequence Logic', () => {
     it('should handle sequential SR numbering correctly using SRSequence', async () => {
       vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as never);
 
       const txMock = {
         sR: {
@@ -140,7 +140,7 @@ describe('SRService - Expanded Coverage', () => {
         sRActivity: { create: vi.fn() },
       };
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) =>
-        callback(txMock as any)
+        callback(txMock as never)
       );
 
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({
@@ -149,7 +149,7 @@ describe('SRService - Expanded Coverage', () => {
         title: 'T',
         requester: { name: 'R', notificationPreference: {} },
         serviceCategory: { categoryName: 'C' },
-      } as any);
+      } as never);
 
       await srService.createSR(
         {
@@ -159,7 +159,7 @@ describe('SRService - Expanded Coverage', () => {
           serviceCategoryId: 'cat-1',
           requestedPriority: 'MEDIUM',
         },
-        mockUser as any
+        mockUser as never
       );
 
       // Verify queryRaw was called

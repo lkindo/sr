@@ -24,7 +24,7 @@ vi.mock('@/lib/api-error-handler', () => ({
 // Mock auth wrapper to inject session and handle errors
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: vi.fn((handler) => {
-    return async (req: any, context: any) => {
+    return async (req: unknown, context: unknown) => {
       try {
         return await handler(req, context);
       } catch (error) {
@@ -57,7 +57,7 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
       },
     };
 
-    const res = await POST(req, context as any);
+    const res = await POST(req, context as never);
 
     // Expect 400 Bad Request due to validation error
     // If it was 500, it would be "Error". If it was ValidationError, it maps to 400.
@@ -92,7 +92,7 @@ describe('API Route: /api/profile/password (Password Policy)', () => {
       },
     };
 
-    const res = await POST(req, context as any);
+    const res = await POST(req, context as never);
     const body = await res.json();
 
     expect(res.status).toBe(200);

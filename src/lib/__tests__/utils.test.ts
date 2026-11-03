@@ -67,8 +67,8 @@ describe('utils', () => {
   });
 
   it('convertSessionToPlainObject는 세션이 없을 때 undefined를 반환한다', () => {
-    expect(convertSessionToPlainObject(null as any)).toBeUndefined();
-    expect(convertSessionToPlainObject({} as any)).toBeUndefined();
+    expect(convertSessionToPlainObject(null as never)).toBeUndefined();
+    expect(convertSessionToPlainObject({} as never)).toBeUndefined();
   });
 
   it('convertSessionToPlainObject는 세션 유저를 순수 객체로 변환한다', () => {

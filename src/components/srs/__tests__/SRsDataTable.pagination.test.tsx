@@ -38,9 +38,11 @@ vi.mock('@/components/srs/CreateSRDialog', () => ({
 // disabled 로 보지 않는다). 여기서 검증하려는 것은 shadcn 프리미티브의 마크업이 아니라
 // "SRsDataTable 이 hasPrevPage/hasNextPage 를 올바로 전달하는가"다.
 vi.mock('@/components/ui', () => ({
-  Pagination: ({ children }: any) => <nav aria-label="페이지 탐색">{children}</nav>,
-  PaginationContent: ({ children }: any) => <ul>{children}</ul>,
-  PaginationItem: ({ children }: any) => <li>{children}</li>,
+  Pagination: ({ children }: { children?: React.ReactNode }) => (
+    <nav aria-label="페이지 탐색">{children}</nav>
+  ),
+  PaginationContent: ({ children }: { children?: React.ReactNode }) => <ul>{children}</ul>,
+  PaginationItem: ({ children }: { children?: React.ReactNode }) => <li>{children}</li>,
   PaginationPrevious: ({ onClick, 'aria-disabled': disabled }: any) => (
     <button onClick={onClick} disabled={disabled} aria-label="이전 페이지로 이동">
       이전
@@ -57,33 +59,47 @@ vi.mock('@/components/ui', () => ({
     </button>
   ),
   PaginationEllipsis: () => <span>...</span>,
-  Button: ({ children, onClick, ...props }: any) => (
+  Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => (
     <button onClick={onClick} {...props}>
       {children}
     </button>
   ),
-  Input: ({ ...props }: any) => <input {...props} />,
-  Select: ({ children, onValueChange, value }: any) => (
+  Input: ({ ...props }) => <input {...props} />,
+  Select: ({
+    children,
+    onValueChange,
+    value,
+  }: {
+    children?: React.ReactNode;
+    onValueChange?: (value: string) => void;
+    value?: string;
+  }) => (
     <div data-value={value} onClick={() => onValueChange && onValueChange('10')}>
       {children}
     </div>
   ),
-  SelectTrigger: ({ children, className, 'aria-label': ariaLabel }: any) => (
+  SelectTrigger: ({
+    children,
+    className,
+    'aria-label': ariaLabel,
+  }: React.ComponentProps<'div'>) => (
     <div className={className} aria-label={ariaLabel}>
       {children}
     </div>
   ),
   SelectValue: () => <div>Value</div>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
-  Badge: ({ children }: any) => <div>{children}</div>,
-  Table: ({ children }: any) => <table>{children}</table>,
-  TableHeader: ({ children }: any) => <thead>{children}</thead>,
-  TableBody: ({ children }: any) => <tbody>{children}</tbody>,
-  TableRow: ({ children }: any) => <tr>{children}</tr>,
-  TableHead: ({ children }: any) => <th>{children}</th>,
-  TableCell: ({ children }: any) => <td>{children}</td>,
-  Label: ({ children }: any) => <label>{children}</label>,
+  SelectContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children?: React.ReactNode; value?: string }) => (
+    <div data-value={value}>{children}</div>
+  ),
+  Badge: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Table: ({ children }: { children?: React.ReactNode }) => <table>{children}</table>,
+  TableHeader: ({ children }: { children?: React.ReactNode }) => <thead>{children}</thead>,
+  TableBody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
+  TableRow: ({ children }: { children?: React.ReactNode }) => <tr>{children}</tr>,
+  TableHead: ({ children }: { children?: React.ReactNode }) => <th>{children}</th>,
+  TableCell: ({ children }: { children?: React.ReactNode }) => <td>{children}</td>,
+  Label: ({ children }: { children?: React.ReactNode }) => <label>{children}</label>,
 }));
 
 // Mock Lucide icons
@@ -115,15 +131,15 @@ describe('SRsDataTable Pagination', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useRouter).mockReturnValue(mockRouter as any);
+    vi.mocked(useRouter).mockReturnValue(mockRouter as never);
     vi.mocked(usePathname).mockReturnValue('/srs');
-    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams as any);
-    vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as any);
+    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams as never);
+    vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as never);
     vi.mocked(usePermissions).mockReturnValue({
       hasAnyRole: () => true,
       hasPermission: () => true,
       isAdmin: () => true,
-    } as any);
+    } as never);
   });
 
   const defaultProps = {

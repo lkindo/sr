@@ -46,7 +46,9 @@ describe('FileValidator', () => {
         slice: vi.fn().mockReturnThis(),
       } as unknown as File;
 
-      (fileTypeFromBuffer as any).mockResolvedValue({ mime: 'image/png' });
+      vi.mocked(fileTypeFromBuffer as unknown as (...args: unknown[]) => unknown).mockResolvedValue(
+        { mime: 'image/png' }
+      );
 
       const result = await validateFile(mockFile);
       expect(result).toEqual({ mimeType: 'image/png', size: 1024 });
@@ -60,7 +62,9 @@ describe('FileValidator', () => {
         slice: vi.fn().mockReturnThis(),
       } as unknown as File;
 
-      (fileTypeFromBuffer as any).mockResolvedValue({ mime: 'application/unknown' });
+      vi.mocked(fileTypeFromBuffer as unknown as (...args: unknown[]) => unknown).mockResolvedValue(
+        { mime: 'application/unknown' }
+      );
 
       await expect(validateFile(mockFile)).rejects.toThrow('허용되지 않은 파일 형식입니다');
     });
@@ -74,7 +78,9 @@ describe('FileValidator', () => {
       } as unknown as File;
 
       // Content says png
-      (fileTypeFromBuffer as any).mockResolvedValue({ mime: 'image/png' });
+      vi.mocked(fileTypeFromBuffer as unknown as (...args: unknown[]) => unknown).mockResolvedValue(
+        { mime: 'image/png' }
+      );
 
       await expect(validateFile(mockFile)).rejects.toThrow(
         '파일 확장자(.jpg)와 실제 파일 형식(image/png)이 일치하지 않습니다'
@@ -90,7 +96,7 @@ describe('FileValidator', () => {
       } as unknown as File;
 
       // file-type returns undefined for text files
-      (fileTypeFromBuffer as any).mockResolvedValue(undefined);
+      vi.mocked(fileTypeFromBuffer).mockResolvedValue(undefined);
 
       const result = await validateFile(mockFile);
       expect(result).toEqual({ mimeType: 'text/plain', size: 1024 });

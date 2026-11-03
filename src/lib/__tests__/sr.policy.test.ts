@@ -16,7 +16,7 @@ const baseSR = {
   requesterId: 'user-1',
   status: 'REQUESTED',
   clientId: 'client-1',
-} as any;
+} as never;
 
 const admin = {
   id: 'admin',
@@ -25,14 +25,14 @@ const admin = {
   permissions: [],
   permissionsGrantedAt: {},
   clientIds: ['client-1'],
-} as any;
+} as never;
 const requester = {
   id: 'user-1',
   roles: [],
   permissions: ['SR:CREATE', 'SR:UPDATE_SELF'],
   permissionsGrantedAt: {},
   clientIds: ['client-1'],
-} as any;
+} as never;
 
 const noPerm = {
   id: 'user-2',
@@ -40,7 +40,7 @@ const noPerm = {
   permissions: [],
   permissionsGrantedAt: {},
   clientIds: ['client-1'],
-} as any;
+} as never;
 
 describe('SR Policy Functions', () => {
   it('관리자는 모든 권한을 가진다', () => {

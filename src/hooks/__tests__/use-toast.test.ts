@@ -18,8 +18,8 @@ afterEach(async () => {
 describe('useToast', () => {
   it('reducer는 토스트 추가/업데이트/삭제를 처리한다', async () => {
     const { reducer } = await loadModule();
-    const toastA = { id: 'a', title: 'A', open: true } as any;
-    const toastB = { id: 'b', title: 'B', open: true } as any;
+    const toastA = { id: 'a', title: 'A', open: true } as never;
+    const toastB = { id: 'b', title: 'B', open: true } as never;
 
     const afterAdd = reducer({ toasts: [] }, { type: 'ADD_TOAST', toast: toastA });
     expect(afterAdd.toasts).toHaveLength(1);

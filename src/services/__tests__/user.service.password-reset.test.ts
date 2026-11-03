@@ -23,7 +23,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-    $transaction: vi.fn((cb: any) => cb(prisma)),
+    $transaction: vi.fn((cb) => cb(prisma)),
   },
 }));
 
@@ -77,8 +77,13 @@ describe('UserService.updateUser — 비밀번호 재설정', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     userService = new UserService();
-    (prisma.user.findUnique as any).mockResolvedValue(existingUser);
-    (prisma.user.update as any).mockResolvedValue({ ...existingUser, password: 'new-hash' });
+    vi.mocked(
+      prisma.user.findUnique as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue(existingUser);
+    vi.mocked(prisma.user.update as unknown as (...args: unknown[]) => unknown).mockResolvedValue({
+      ...existingUser,
+      password: 'new-hash',
+    });
   });
 
   it('평문이 아니라 해시를 저장한다', async () => {

@@ -129,14 +129,14 @@ describe('SRService Mutation Tests', () => {
     it('should call prisma.create with correct data', async () => {
       vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
       // Use mocked prisma instance
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as any);
-      vi.mocked(prisma.sR.create).mockResolvedValue({ id: 'sr-1', srNumber: 'SR-001' } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'c-1', isActive: true } as never);
+      vi.mocked(prisma.sR.create).mockResolvedValue({ id: 'sr-1', srNumber: 'SR-001' } as never);
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({
         id: 'sr-1',
         srNumber: 'SR-001',
         title: 'Mutant Test',
         client: { id: 'c-1', name: 'Client' },
-      } as any);
+      } as never);
 
       const data = {
         title: 'Mutant Test',
@@ -146,7 +146,7 @@ describe('SRService Mutation Tests', () => {
         requestedPriority: 'MEDIUM' as const,
       };
 
-      await srService.createSR(data, mockUser as any);
+      await srService.createSR(data, mockUser as never);
 
       expect(prisma.sR.create).toHaveBeenCalled();
     });
@@ -157,7 +157,7 @@ describe('SRService Mutation Tests', () => {
         id: 'c-1',
         isActive: false,
         name: 'Inactive',
-      } as any);
+      } as never);
 
       const data = {
         title: 'Test Title',
@@ -167,7 +167,7 @@ describe('SRService Mutation Tests', () => {
         requestedPriority: 'MEDIUM' as const,
       };
 
-      await expect(srService.createSR(data, mockUser as any)).rejects.toThrow('비활성 상태');
+      await expect(srService.createSR(data, mockUser as never)).rejects.toThrow('비활성 상태');
     });
   });
 
@@ -183,7 +183,7 @@ describe('SRService Mutation Tests', () => {
         serviceCategoryId: 'cat-1',
         actualPriority: 'MEDIUM',
       };
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(existingSR as never);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
       // Mock transaction result
@@ -199,7 +199,7 @@ describe('SRService Mutation Tests', () => {
         client: { id: 'c-1' },
       };
 
-      vi.mocked(prisma.sR.update).mockResolvedValue(mockUpdateResult as any);
+      vi.mocked(prisma.sR.update).mockResolvedValue(mockUpdateResult as never);
 
       // Mock transaction execution
       vi.mocked(prisma.$transaction).mockImplementation(async (callback) => {
@@ -209,7 +209,7 @@ describe('SRService Mutation Tests', () => {
       });
 
       const data = { status: 'IN_PROGRESS' as const };
-      await srService.updateSR('sr-1', data, mockUser as any);
+      await srService.updateSR('sr-1', data, mockUser as never);
 
       expect(prisma.sR.update).toHaveBeenCalled();
       // Optimization: sRActivity.create should NOT be called directly, but via nested write
@@ -226,14 +226,16 @@ describe('SRService Mutation Tests', () => {
 
     it('should throw NotFoundError if SR does not exist', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
-      await expect(srService.updateSR('sr-1', {}, mockUser as any)).rejects.toThrow(NotFoundError);
+      await expect(srService.updateSR('sr-1', {}, mockUser as never)).rejects.toThrow(
+        NotFoundError
+      );
     });
   });
 
   describe('deleteSR', () => {
     it('should delete SR successfully', async () => {
       const mockSR = { id: 'sr-1', clientId: 'c-1', requesterId: 'user-1' };
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as never);
       vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
 
       // Mock transaction execution
@@ -241,7 +243,7 @@ describe('SRService Mutation Tests', () => {
         return callback(prisma);
       });
 
-      await srService.deleteSR('sr-1', mockUser as any);
+      await srService.deleteSR('sr-1', mockUser as never);
 
       // 물리 삭제가 아니라 soft delete 다(db-rules §2).
       expect(prisma.sR.delete).not.toHaveBeenCalled();
@@ -253,24 +255,24 @@ describe('SRService Mutation Tests', () => {
 
     it('should throw NotFoundError if SR does not exist', async () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue(null);
-      await expect(srService.deleteSR('sr-1', mockUser as any)).rejects.toThrow(NotFoundError);
+      await expect(srService.deleteSR('sr-1', mockUser as never)).rejects.toThrow(NotFoundError);
     });
 
     it('should throw ForbiddenError if user cannot delete', async () => {
       const mockSR = { id: 'sr-1', clientId: 'c-1' };
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as never);
       vi.mocked(ensureCanDeleteSR).mockImplementation(() => {
         throw new Error('전용 예외');
       });
 
-      await expect(srService.deleteSR('sr-1', mockUser as any)).rejects.toThrow('전용 예외');
+      await expect(srService.deleteSR('sr-1', mockUser as never)).rejects.toThrow('전용 예외');
     });
   });
 
   describe('getSRById', () => {
     it('should return SR by id', async () => {
       const mockSR = { id: 'sr-1', title: 'Test SR' };
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as never);
 
       const result = await srService.getSRById('sr-1');
 
@@ -293,7 +295,7 @@ describe('SRService Mutation Tests', () => {
         { id: 'sr-1', title: 'SR 1' },
         { id: 'sr-2', title: 'SR 2' },
       ];
-      vi.mocked(prisma.sR.findMany).mockResolvedValue(mockSRs as any);
+      vi.mocked(prisma.sR.findMany).mockResolvedValue(mockSRs as never);
       const result = await srService.getAllSRs({ viewer: mockUser, skip: 0, take: 10 });
       expect(result).toEqual(mockSRs);
       expect(prisma.sR.findMany).toHaveBeenCalledWith(
@@ -314,7 +316,7 @@ describe('SRService Mutation Tests', () => {
     describe('getSRDetailsById', () => {
       it('should return SR details', async () => {
         const mockSR = { id: 'sr-1', title: 'Details' };
-        vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as any);
+        vi.mocked(prisma.sR.findUnique).mockResolvedValue(mockSR as never);
         const result = await srService.getSRDetailsById('sr-1', { viewer: mockUser });
         expect(result).toEqual({ ...mockSR, requesterIsInternal: false, wasCompleted: false });
       });

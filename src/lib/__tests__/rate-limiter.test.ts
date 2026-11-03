@@ -157,7 +157,10 @@ describe('MemoryRateLimiter', () => {
         maxRequests: 5,
       });
 
-      const bucketsMap = (oomLimiter as any).buckets as Map<string, any>;
+      const bucketsMap = (oomLimiter as unknown as Record<string, unknown>).buckets as Map<
+        string,
+        any
+      >;
       for (let i = 0; i < 10005; i++) {
         bucketsMap.set(`key-${i}`, {
           tokens: 5,
@@ -185,7 +188,10 @@ describe('MemoryRateLimiter', () => {
         maxRequests: 5,
       });
 
-      const bucketsMap = (sampleLimiter as any).buckets as Map<string, any>;
+      const bucketsMap = (sampleLimiter as unknown as Record<string, unknown>).buckets as Map<
+        string,
+        unknown
+      >;
       const expiredTime = Date.now() - 2000;
       for (let i = 0; i < 10; i++) {
         bucketsMap.set(`expired-${i}`, {

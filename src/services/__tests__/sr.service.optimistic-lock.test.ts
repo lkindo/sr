@@ -9,7 +9,7 @@ vi.mock('@/services/sr-email-outbox', () => ({
 // Mock prisma with the delegates updateSR touches.
 const { mockPrisma } = vi.hoisted(() => {
   const mock = {
-    $transaction: vi.fn((cb: any) => cb(mock)),
+    $transaction: vi.fn((cb) => cb(mock)),
     sR: {
       findUnique: vi.fn(),
       updateMany: vi.fn(),
@@ -50,7 +50,7 @@ describe('SRService.updateSR — optimistic locking', () => {
     roles: ['ADMIN'],
     permissions: [],
     clientIds: [],
-  } as any;
+  } as never;
 
   const existingSR = {
     id: 'sr-1',
@@ -64,12 +64,12 @@ describe('SRService.updateSR — optimistic locking', () => {
     serviceCategoryId: 'cat-1',
     actualPriority: 'MEDIUM',
     intakeAt: new Date(),
-  } as any;
+  } as unknown as Record<string, unknown>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     srService = new SRService();
-    mockPrisma.$transaction.mockImplementation((cb: any) => cb(mockPrisma));
+    mockPrisma.$transaction.mockImplementation((cb) => cb(mockPrisma));
     mockPrisma.sR.findUnique.mockResolvedValue(existingSR);
   });
 

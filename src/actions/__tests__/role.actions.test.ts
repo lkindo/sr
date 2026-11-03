@@ -66,7 +66,7 @@ describe('role.actions', () => {
     it('유효성 검사 실패 시 에러를 반환해야 함', async () => {
       vi.mocked(validateWithSchema).mockReturnValue({
         success: false,
-        error: { name: ['역할 이름은 필수입니다.'] } as any,
+        error: { name: ['역할 이름은 필수입니다.'] } as never,
       });
 
       const formData = new FormData();
@@ -85,7 +85,7 @@ describe('role.actions', () => {
         success: true,
         data: { name: 'NEW_ROLE', description: 'desc' },
       });
-      mockRoleService.createRole.mockResolvedValue(mockRole as any);
+      mockRoleService.createRole.mockResolvedValue(mockRole as never);
 
       const formData = new FormData();
       formData.append('name', 'NEW_ROLE');
@@ -115,7 +115,7 @@ describe('role.actions', () => {
     it('유효성 검사 실패 시 에러를 반환해야 함', async () => {
       vi.mocked(validateWithSchema).mockReturnValue({
         success: false,
-        error: { name: ['유효하지 않은 역할 이름입니다.'] } as any,
+        error: { name: ['유효하지 않은 역할 이름입니다.'] } as never,
       });
 
       const formData = new FormData();
@@ -131,7 +131,7 @@ describe('role.actions', () => {
         success: true,
         data: { name: 'UPDATED_ROLE', description: 'new desc' },
       });
-      mockRoleService.updateRole.mockResolvedValue(mockRole as any);
+      mockRoleService.updateRole.mockResolvedValue(mockRole as never);
 
       const formData = new FormData();
       formData.append('name', 'UPDATED_ROLE');
@@ -155,7 +155,7 @@ describe('role.actions', () => {
 
   describe('deleteRoleAction', () => {
     it('성공적으로 역할을 삭제해야 함', async () => {
-      mockRoleService.deleteRole.mockResolvedValue(undefined as any);
+      mockRoleService.deleteRole.mockResolvedValue(undefined as never);
 
       const result = await deleteRoleAction('r1');
 
@@ -191,7 +191,7 @@ describe('role.actions', () => {
     it('실제 스키마 경계인 100개 권한을 업데이트한다', async () => {
       useActualSchemaValidation();
       const permissionIds = Array.from({ length: 100 }, (_, index) => `p${index}`);
-      mockRoleService.updateRolePermissions.mockResolvedValue(undefined as any);
+      mockRoleService.updateRolePermissions.mockResolvedValue(undefined as never);
 
       const result = await updateRolePermissionsAction('r1', permissionIds);
 

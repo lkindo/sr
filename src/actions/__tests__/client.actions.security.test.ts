@@ -38,13 +38,13 @@ describe('Client Actions Security', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
-    (ClientService.prototype.getClientsForSelection as any).mockResolvedValue(mockClientsSafe);
+    vi.mocked(ClientService.prototype.getClientsForSelection).mockResolvedValue(mockClientsSafe);
   });
 
   describe('getClientsForSelection', () => {
     it('should require authentication', async () => {
       // Mock authenticateAndAuthorize to throw Unauthorized error
-      (authenticateAndAuthorize as any).mockRejectedValue(new Error('Unauthorized'));
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue(new Error('Unauthorized'));
 
       const result = await getClientsForSelection();
 
@@ -56,7 +56,9 @@ describe('Client Actions Security', () => {
 
     it('should return limited fields using the safe service method', async () => {
       // Mock auth success
-      (authenticateAndAuthorize as any).mockResolvedValue({
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1', roles: ['ADMIN'], clientIds: [] },
       });
 

@@ -49,7 +49,7 @@ describe('SR Actions Coverage', () => {
     it('revalidates path on success', async () => {
       const { getAuthenticatedSession } = await import('@/lib/action-helpers');
       const { revalidatePath } = await import('next/cache');
-      vi.mocked(getAuthenticatedSession).mockResolvedValue({ user: { id: 'u1' } } as any);
+      vi.mocked(getAuthenticatedSession).mockResolvedValue({ user: { id: 'u1' } } as never);
       vi.mocked(SRService.prototype.deleteSR).mockResolvedValue(undefined);
 
       const result = await actions.deleteSRAction('sr-1');

@@ -49,9 +49,9 @@ beforeEach(() => {
 
 describe('withAuth', () => {
   it('invokes the handler with a fully-built AuthenticatedContext when authenticated', async () => {
-    mockedAuth.mockResolvedValue(fullSession as any);
+    mockedAuth.mockResolvedValue(fullSession as never);
 
-    const handler = vi.fn(async (_req: NextRequest, ctx: any) => {
+    const handler = vi.fn(async (_req: NextRequest, ctx) => {
       return NextResponse.json({ userId: ctx.session.user.id, params: await ctx.params });
     });
 
@@ -88,9 +88,9 @@ describe('withAuth', () => {
     mockedAuth.mockResolvedValue({
       user: { id: 'u-min' },
       expires: 'x',
-    } as any);
+    } as never);
 
-    const handler = vi.fn(async (_req: NextRequest, ctx: any) =>
+    const handler = vi.fn(async (_req: NextRequest, ctx) =>
       NextResponse.json({ ok: true, user: ctx.session.user })
     );
 
@@ -107,7 +107,7 @@ describe('withAuth', () => {
   });
 
   it('returns 401 and does not call handler when session is null', async () => {
-    mockedAuth.mockResolvedValue(null as any);
+    mockedAuth.mockResolvedValue(null as never);
 
     const handler = vi.fn(async () => NextResponse.json({ ok: true }));
     const wrapped = withAuth(handler);
@@ -123,7 +123,7 @@ describe('withAuth', () => {
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
-    mockedAuth.mockResolvedValue({ user: { email: 'noid@example.com' }, expires: 'x' } as any);
+    mockedAuth.mockResolvedValue({ user: { email: 'noid@example.com' }, expires: 'x' } as never);
 
     const handler = vi.fn(async () => NextResponse.json({ ok: true }));
     const wrapped = withAuth(handler);
@@ -135,7 +135,7 @@ describe('withAuth', () => {
   });
 
   it('routes handler-thrown ServiceError through handleApiError', async () => {
-    mockedAuth.mockResolvedValue(fullSession as any);
+    mockedAuth.mockResolvedValue(fullSession as never);
 
     const handler = vi.fn(async () => {
       throw new NotFoundError('SR', '42');
@@ -150,7 +150,7 @@ describe('withAuth', () => {
   });
 
   it('routes generic handler errors as 500 INTERNAL_ERROR', async () => {
-    mockedAuth.mockResolvedValue(fullSession as any);
+    mockedAuth.mockResolvedValue(fullSession as never);
 
     const handler = vi.fn(async () => {
       throw new Error('boom');
@@ -167,7 +167,7 @@ describe('withAuth', () => {
 
   it('reuses the resolved session in the catch block (does not call auth() a second time)', async () => {
     // auth() succeeds in the try block, then the handler throws.
-    mockedAuth.mockResolvedValue(fullSession as any);
+    mockedAuth.mockResolvedValue(fullSession as never);
 
     const handler = vi.fn(async () => {
       throw new UnauthorizedError();
@@ -183,7 +183,7 @@ describe('withAuth', () => {
 
 describe('withErrorHandler', () => {
   it('passes request and routeContext straight to the handler on success', async () => {
-    const handler = vi.fn(async (_req: NextRequest, ctx: { params: any }) =>
+    const handler = vi.fn(async (_req: NextRequest, ctx: { params: unknown }) =>
       NextResponse.json({ params: await ctx.params })
     );
     const wrapped = withErrorHandler(handler);
@@ -230,9 +230,9 @@ describe('withErrorHandler', () => {
 
 describe('withAuthAndRateLimit', () => {
   it('uses the default standard preset and runs the authed handler', async () => {
-    mockedAuth.mockResolvedValue(fullSession as any);
+    mockedAuth.mockResolvedValue(fullSession as never);
 
-    const handler = vi.fn(async (_req: NextRequest, ctx: any) =>
+    const handler = vi.fn(async (_req: NextRequest, ctx) =>
       NextResponse.json({ userId: ctx.session.user.id })
     );
 
@@ -247,7 +247,7 @@ describe('withAuthAndRateLimit', () => {
   });
 
   it('accepts an explicit preset and still enforces auth (401 when unauthenticated)', async () => {
-    mockedAuth.mockResolvedValue(null as any);
+    mockedAuth.mockResolvedValue(null as never);
 
     const handler = vi.fn(async () => NextResponse.json({ ok: true }));
     const wrapped = withAuthAndRateLimit(handler, { preset: 'strict' });

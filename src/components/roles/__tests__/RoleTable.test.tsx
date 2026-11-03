@@ -6,18 +6,20 @@ import { RoleTable } from '../RoleTable';
 // Mock UI components
 vi.mock('@/components/ui', () => {
   return {
-    Badge: ({ children }: any) => <div data-testid="badge">{children}</div>,
-    Button: ({ children, onClick, disabled, ...props }: any) => (
+    Badge: ({ children }: { children?: React.ReactNode }) => (
+      <div data-testid="badge">{children}</div>
+    ),
+    Button: ({ children, onClick, disabled, ...props }: React.ComponentProps<'button'>) => (
       <button onClick={onClick} disabled={disabled} {...props}>
         {children}
       </button>
     ),
-    Table: ({ children }: any) => <table>{children}</table>,
-    TableHeader: ({ children }: any) => <thead>{children}</thead>,
-    TableBody: ({ children }: any) => <tbody>{children}</tbody>,
-    TableRow: ({ children }: any) => <tr>{children}</tr>,
-    TableHead: ({ children }: any) => <th>{children}</th>,
-    TableCell: ({ children }: any) => <td>{children}</td>,
+    Table: ({ children }: { children?: React.ReactNode }) => <table>{children}</table>,
+    TableHeader: ({ children }: { children?: React.ReactNode }) => <thead>{children}</thead>,
+    TableBody: ({ children }: { children?: React.ReactNode }) => <tbody>{children}</tbody>,
+    TableRow: ({ children }: { children?: React.ReactNode }) => <tr>{children}</tr>,
+    TableHead: ({ children }: { children?: React.ReactNode }) => <th>{children}</th>,
+    TableCell: ({ children }: { children?: React.ReactNode }) => <td>{children}</td>,
   };
 });
 

@@ -50,7 +50,7 @@ describe('UserService', () => {
     vi.clearAllMocks();
     // clearAllMocks 는 구현체를 지우지 않는다. 개별 테스트가 건 $transaction 오버라이드가
     // 다음 테스트로 새지 않도록 기본 위임 동작(tx = 모듈 목)으로 되돌린다.
-    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(prisma));
+    vi.mocked(prisma.$transaction).mockImplementation((cb) => cb(prisma));
     userService = new UserService();
   });
 
@@ -84,14 +84,14 @@ describe('UserService', () => {
     it('throws ValidationError if user has active SRs', async () => {
       vi.mocked(prisma.sR.findMany).mockResolvedValue([
         { id: 'sr-1', srNumber: 'SR1', status: 'IN_PROGRESS' },
-      ] as any);
+      ] as never);
 
       await expect(userService.deactivateUser('u1')).rejects.toThrow(ValidationError);
     });
 
     it('deactivates user if no active SRs', async () => {
       vi.mocked(prisma.sR.findMany).mockResolvedValue([]);
-      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1', isActive: false } as any);
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1', isActive: false } as never);
 
       const result = await userService.deactivateUser('u1');
       expect(result.id).toBe('u1');
@@ -104,7 +104,7 @@ describe('UserService', () => {
 
   describe('hardDeleteUser', () => {
     beforeEach(() => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1' } as any);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: 'u1' } as never);
     });
 
     it('throws BusinessRuleError if related SR data exists', async () => {
@@ -125,7 +125,7 @@ describe('UserService', () => {
       vi.mocked(prisma.sRActivity.count).mockResolvedValue(0);
       vi.mocked(prisma.sRComment.count).mockResolvedValue(0);
       vi.mocked(prisma.sRStatusHistory.count).mockResolvedValue(0);
-      vi.mocked(prisma.user.delete).mockResolvedValue({ id: 'u1' } as any);
+      vi.mocked(prisma.user.delete).mockResolvedValue({ id: 'u1' } as never);
 
       const result = await userService.hardDeleteUser('u1');
       expect(result.id).toBe('u1');
@@ -192,9 +192,9 @@ describe('UserService', () => {
       vi.mocked(prisma.user.findUnique).mockResolvedValue({
         id: 'u1',
         password: 'hashed-old',
-      } as any);
+      } as never);
       const { compare } = await import('bcryptjs');
-      vi.mocked(compare).mockResolvedValue(false as any);
+      vi.mocked(compare).mockResolvedValue(false as never);
 
       await expect(userService.changePassword('u1', 'wrong', 'new')).rejects.toThrow(
         ValidationError
@@ -205,11 +205,11 @@ describe('UserService', () => {
       vi.mocked(prisma.user.findUnique).mockResolvedValue({
         id: 'u1',
         password: 'hashed-old',
-      } as any);
-      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1' } as any);
+      } as never);
+      vi.mocked(prisma.user.update).mockResolvedValue({ id: 'u1' } as never);
 
       const { compare, hash } = await import('bcryptjs');
-      vi.mocked(compare).mockResolvedValue(true as any);
+      vi.mocked(compare).mockResolvedValue(true as never);
 
       await userService.changePassword('u1', 'old', 'new');
 

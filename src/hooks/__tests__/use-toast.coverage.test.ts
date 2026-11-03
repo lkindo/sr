@@ -21,8 +21,8 @@ afterEach(async () => {
 describe('use-toast reducer', () => {
   it('ADD_TOAST는 토스트를 추가하고 TOAST_LIMIT(=1)을 적용한다', async () => {
     const { reducer } = await loadModule();
-    const a = { id: 'a', title: 'A', open: true } as any;
-    const b = { id: 'b', title: 'B', open: true } as any;
+    const a = { id: 'a', title: 'A', open: true } as never;
+    const b = { id: 'b', title: 'B', open: true } as never;
 
     const afterFirst = reducer({ toasts: [] }, { type: 'ADD_TOAST', toast: a });
     expect(afterFirst.toasts).toHaveLength(1);
@@ -38,8 +38,8 @@ describe('use-toast reducer', () => {
     const { reducer } = await loadModule();
     const state = {
       toasts: [
-        { id: 'x', title: 'X', open: true } as any,
-        { id: 'y', title: 'Y', open: true } as any,
+        { id: 'x', title: 'X', open: true } as never,
+        { id: 'y', title: 'Y', open: true } as never,
       ],
     };
 
@@ -53,7 +53,7 @@ describe('use-toast reducer', () => {
 
   it('DISMISS_TOAST는 특정 id를 open:false로 만들고 제거 큐에 등록한다', async () => {
     const { reducer } = await loadModule();
-    const state = { toasts: [{ id: 'd', title: 'D', open: true } as any] };
+    const state = { toasts: [{ id: 'd', title: 'D', open: true } as never] };
 
     const dismissed = reducer(state, { type: 'DISMISS_TOAST', toastId: 'd' });
     expect(dismissed.toasts[0]!.open).toBe(false);
@@ -69,8 +69,8 @@ describe('use-toast reducer', () => {
     // Need memoryState to have toasts so addToRemoveQueue does not early-return.
     const state = {
       toasts: [
-        { id: 'm1', title: 'M1', open: true } as any,
-        { id: 'm2', title: 'M2', open: true } as any,
+        { id: 'm1', title: 'M1', open: true } as never,
+        { id: 'm2', title: 'M2', open: true } as never,
       ],
     };
 
@@ -82,8 +82,8 @@ describe('use-toast reducer', () => {
     const { reducer } = await loadModule();
     const state = {
       toasts: [
-        { id: 'r1', title: 'R1', open: true } as any,
-        { id: 'r2', title: 'R2', open: true } as any,
+        { id: 'r1', title: 'R1', open: true } as never,
+        { id: 'r2', title: 'R2', open: true } as never,
       ],
     };
 
@@ -113,7 +113,7 @@ describe('toast() helper and useToast hook', () => {
 
     // update via returned helper
     act(() => {
-      handle?.update({ id: handle.id, title: '수정된 제목' } as any);
+      handle?.update({ id: handle.id, title: '수정된 제목' } as never);
     });
     expect(result.current.toasts[0]!.title).toBe('수정된 제목');
 

@@ -128,8 +128,8 @@ describe('domainEvents.emit (트랜잭션 컨텍스트 분기)', () => {
     domainEvents.on('sr:created', listener);
 
     const context = {
-      domainEvents: [] as Array<{ eventName: string; args: any[] }>,
-      realtimeEvents: [] as Array<{ event: string; data: any }>,
+      domainEvents: [] as Array<{ eventName: string; args: unknown[] }>,
+      realtimeEvents: [] as Array<{ event: string; data: unknown }>,
     };
 
     const result = transactionLocalStorage.run(context, () =>

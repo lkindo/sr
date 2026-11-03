@@ -50,11 +50,11 @@ describe('Dashboard Stats API', () => {
       .mockResolvedValueOnce([
         { status: 'REQUESTED', _count: { id: 5 } },
         { status: 'IN_PROGRESS', _count: { id: 3 } },
-      ] as any)
+      ] as never)
       // 2. By Priority
-      .mockResolvedValueOnce([{ priority: 'HIGH', _count: { id: 5 } }] as any)
+      .mockResolvedValueOnce([{ priority: 'HIGH', _count: { id: 5 } }] as never)
       // 3. By Client
-      .mockResolvedValueOnce([{ clientId: 'c-1', _count: { id: 5 } }] as any);
+      .mockResolvedValueOnce([{ clientId: 'c-1', _count: { id: 5 } }] as never);
 
     // 4. Counts Query + Trend (By Date) - Raw Query
     vi.mocked(prisma.$queryRaw)
@@ -69,15 +69,15 @@ describe('Dashboard Stats API', () => {
           myAssignedSRs: 0,
           myAssignedInProgress: 0,
         },
-      ] as any)
+      ] as never)
       .mockResolvedValueOnce([
         { date: new Date().toISOString().split('T')[0], count: BigInt(5) },
-      ] as any)
-      .mockResolvedValueOnce([{ avgProcessingHours: 2.5, slaComplianceRate: 95.5 }] as any);
+      ] as never)
+      .mockResolvedValueOnce([{ avgProcessingHours: 2.5, slaComplianceRate: 95.5 }] as never);
     vi.mocked(prisma.sR.findMany).mockResolvedValue([]); // For recent/waiting lists
     vi.mocked(prisma.client.findMany).mockResolvedValue([
       { id: 'c-1', name: 'Client 1', code: 'C1' },
-    ] as any);
+    ] as never);
 
     const req = new NextRequest('http://localhost/api/dashboard/stats');
     const response = await GET(req, { params: Promise.resolve({}) });

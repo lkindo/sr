@@ -15,7 +15,7 @@ vi.mock('@/lib/prisma', () => ({
   default: {
     client: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn() },
     serviceCategory: { create: vi.fn() },
-    $transaction: vi.fn((cb: any) => cb(prisma)),
+    $transaction: vi.fn((cb) => cb(prisma)),
   },
 }));
 
@@ -32,9 +32,13 @@ describe('ClientService.createClient — 기본 서비스 카테고리 시드', 
   beforeEach(() => {
     vi.clearAllMocks();
     service = new ClientService();
-    (prisma.client.findUnique as any).mockResolvedValue(null); // 코드 중복 없음
-    (prisma.client.create as any).mockResolvedValue(CREATED_CLIENT);
-    (prisma.serviceCategory.create as any).mockResolvedValue({ id: 'cat-default' });
+    vi.mocked(prisma.client.findUnique).mockResolvedValue(null); // 코드 중복 없음
+    vi.mocked(prisma.client.create as unknown as (...args: unknown[]) => unknown).mockResolvedValue(
+      CREATED_CLIENT
+    );
+    vi.mocked(
+      prisma.serviceCategory.create as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue({ id: 'cat-default' });
   });
 
   it('고객사를 만들면 기본 카테고리도 함께 생성한다', async () => {
@@ -69,7 +73,9 @@ describe('ClientService.createClient — 기본 서비스 카테고리 시드', 
   });
 
   it('코드가 중복이면 고객사도 카테고리도 만들지 않는다', async () => {
-    (prisma.client.findUnique as any).mockResolvedValue({ id: 'existing', code: 'ACME' });
+    vi.mocked(
+      prisma.client.findUnique as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue({ id: 'existing', code: 'ACME' });
 
     await expect(service.createClient(VALID_CLIENT)).rejects.toThrow();
 

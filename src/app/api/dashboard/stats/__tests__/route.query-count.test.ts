@@ -47,9 +47,9 @@ describe('Dashboard Stats API Performance', () => {
           myAssignedSRs: 2,
           myAssignedInProgress: 1,
         },
-      ] as any) // Counts query
-      .mockResolvedValueOnce([{ date: '2023-10-01', count: 5 }] as any) // Trend query
-      .mockResolvedValueOnce([{ avgProcessingHours: 2.5, slaComplianceRate: 95.5 }] as any); // Stats query
+      ] as never) // Counts query
+      .mockResolvedValueOnce([{ date: '2023-10-01', count: 5 }] as never) // Trend query
+      .mockResolvedValueOnce([{ avgProcessingHours: 2.5, slaComplianceRate: 95.5 }] as never); // Stats query
 
     const req = new NextRequest('http://localhost/api/dashboard/stats');
     const response = await GET(req, { params: Promise.resolve({}) });

@@ -48,27 +48,33 @@ describe('User Actions Security', () => {
   beforeEach(async () => {
     vi.resetAllMocks();
     const { UserService } = await import('@/services/user.service');
-    (UserService.prototype.getUserById as any).mockResolvedValue(mockUser);
-    (UserService.prototype.getUsersWithSRHandlingPermission as any).mockResolvedValue([
+    vi.mocked(
+      UserService.prototype.getUserById as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue(mockUser);
+    vi.mocked(UserService.prototype.getUsersWithSRHandlingPermission).mockResolvedValue([
       { id: 'handler-1', name: 'Handler', email: 'handler@example.com' },
     ]);
 
     // Default permission mock: allow nothing
-    (hasPermissionFlag as any).mockReturnValue(false);
-    (PERMISSIONS as any).USER = { READ: 'USER:READ' };
-    (PERMISSIONS as any).SR = { UPDATE: 'SR:UPDATE' };
+    vi.mocked(hasPermissionFlag).mockReturnValue(false);
+    (PERMISSIONS as unknown as Record<string, unknown>).USER = { READ: 'USER:READ' };
+    (PERMISSIONS as unknown as Record<string, unknown>).SR = { UPDATE: 'SR:UPDATE' };
   });
 
   describe('getProfileAction', () => {
     it('should NOT return password (fix verified)', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1' },
       });
 
       const result = await getProfileAction();
       expect(result.success).toBe(true);
       if (result.success) {
-        expect((result.data as any).password).toBeUndefined();
+        expect(
+          (result.data as unknown as Record<string, (...args: never[]) => unknown>).password
+        ).toBeUndefined();
       }
     });
   });
@@ -76,7 +82,7 @@ describe('User Actions Security', () => {
   describe('getSRHandlersForSelection', () => {
     it('should REJECT access without authentication or permission', async () => {
       // authenticateAndAuthorize throws if unauthorized
-      (authenticateAndAuthorize as any).mockRejectedValue(new Error('Unauthorized'));
+      vi.mocked(authenticateAndAuthorize).mockRejectedValue(new Error('Unauthorized'));
 
       const result = await getSRHandlersForSelection();
 
@@ -86,7 +92,9 @@ describe('User Actions Security', () => {
 
     it('should ALLOW access if authorized', async () => {
       // authenticateAndAuthorize succeeds
-      (authenticateAndAuthorize as any).mockResolvedValue({
+      vi.mocked(
+        authenticateAndAuthorize as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1' },
       });
 
