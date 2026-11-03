@@ -183,7 +183,7 @@ describe('AuditService.createLog', () => {
       })
     ).rejects.toThrow('fail');
 
-    const ctx = vi.mocked(logger.error).mock.calls[0]![2] as any;
+    const ctx = vi.mocked(logger.error).mock.calls[0]![2] as unknown as Record<string, unknown>;
     expect(ctx.targetId).toBeUndefined();
   });
 });

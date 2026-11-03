@@ -84,7 +84,7 @@ describe('SRService Concurrency Benchmark', () => {
       id: 'client-1',
       isActive: true,
       name: 'Test Client',
-    } as any);
+    } as never);
 
     // Mock SR.update (status history)
     mockPrisma.sR.update.mockResolvedValue({});
@@ -128,7 +128,7 @@ describe('SRService Concurrency Benchmark', () => {
             code: 'P2002',
             clientVersion: '5.0.0',
             meta: { target: ['srNumber'] },
-          } as any
+          } as never
         );
       }
       createdSrNumbers.add(srNumber);
@@ -138,7 +138,7 @@ describe('SRService Concurrency Benchmark', () => {
     const concurrency = 10;
     // 외부(고객사) 사용자이지만 'client-1' 에 소속되어 있으므로 테넌트 가드를 통과한다.
     // (clientIds 를 비워두면 매 요청이 ForbiddenError 로 끝나 벤치마크가 무의미해진다.)
-    const mockUser = { id: 'user-1', roles: [], clientIds: ['client-1'] } as any;
+    const mockUser = { id: 'user-1', roles: [], clientIds: ['client-1'] } as never;
     const inputData = {
       title: 'Test SR',
       description: 'Description must be long enough',

@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '@/lib/logger';
 
 describe('Logger Utility', () => {
-  let consoleErrorSpy: any;
-  let consoleWarnSpy: any;
-  let consoleInfoSpy: any;
+  let consoleErrorSpy: unknown;
+  let consoleWarnSpy: unknown;
+  let consoleInfoSpy: unknown;
 
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

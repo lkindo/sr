@@ -42,7 +42,7 @@ describe('UserService Security', () => {
     vi.clearAllMocks();
     // clearAllMocks 는 구현체를 지우지 않는다. 개별 테스트가 건 $transaction 오버라이드가
     // 다음 테스트로 새지 않도록 기본 위임 동작(tx = 모듈 목)으로 되돌린다.
-    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(prisma));
+    vi.mocked(prisma.$transaction).mockImplementation((cb) => cb(prisma));
     userService = new UserService();
   });
 
@@ -89,8 +89,8 @@ describe('UserService Security', () => {
         name: 'Test',
         password: 'hashed_password',
       };
-      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserWithPassword as any);
-      vi.mocked(prisma.user.update).mockResolvedValue(mockUserWithPassword as any);
+      vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUserWithPassword as never);
+      vi.mocked(prisma.user.update).mockResolvedValue(mockUserWithPassword as never);
 
       const result = await userService.updateUser('u1', { name: 'New Name' });
 

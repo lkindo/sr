@@ -41,7 +41,7 @@ vi.mock('lucide-react', async (importOriginal) => {
 
 // Mock UI components
 vi.mock('@/components/ui/button', () => ({
-  Button: ({ children, onClick, ...props }: any) => (
+  Button: ({ children, onClick, ...props }: React.ComponentProps<'button'>) => (
     <button onClick={onClick} {...props}>
       {children}
     </button>
@@ -51,9 +51,11 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/input', () => {
   const React = require('react');
   return {
-    Input: React.forwardRef(({ onChange, value, ...props }: any, ref: any) => (
-      <input ref={ref} onChange={onChange} value={value} {...props} />
-    )),
+    Input: React.forwardRef(
+      ({ onChange, value, ...props }: React.ComponentProps<'input'>, ref: never) => (
+        <input ref={ref} onChange={onChange} value={value} {...props} />
+      )
+    ),
   };
 });
 
@@ -64,17 +66,17 @@ describe('SRsDataTable Search Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(useRouter).mockReturnValue(mockRouter as any);
+    vi.mocked(useRouter).mockReturnValue(mockRouter as never);
     vi.mocked(usePathname).mockReturnValue('/srs');
-    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams as any);
+    vi.mocked(useSearchParams).mockReturnValue(mockSearchParams as never);
 
-    vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as any);
+    vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as never);
 
     vi.mocked(usePermissions).mockReturnValue({
       hasAnyRole: () => true,
       hasPermission: () => true,
       isAdmin: () => true,
-    } as any);
+    } as never);
   });
 
   const defaultProps = {
@@ -127,7 +129,7 @@ describe('SRsDataTable Search Component', () => {
     // Simulate active search param
     const params = new URLSearchParams();
     params.set('search', 'existing');
-    vi.mocked(useSearchParams).mockReturnValue(params as any);
+    vi.mocked(useSearchParams).mockReturnValue(params as never);
 
     render(<SRsDataTable {...defaultProps} />);
 
@@ -147,7 +149,7 @@ describe('SRsDataTable Search Component', () => {
 
   it('does NOT update URL if search was local only', () => {
     // No search param initially
-    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as any);
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as never);
 
     render(<SRsDataTable {...defaultProps} />);
 
@@ -174,7 +176,7 @@ describe('SRsDataTable Search Component', () => {
     it('renders "No results" state when list is empty and filters are active', () => {
       const params = new URLSearchParams();
       params.set('search', 'something');
-      vi.mocked(useSearchParams).mockReturnValue(params as any);
+      vi.mocked(useSearchParams).mockReturnValue(params as never);
 
       render(<SRsDataTable {...defaultProps} />);
       expect(screen.getAllByText('검색 결과가 없습니다')[0]).toBeInTheDocument();

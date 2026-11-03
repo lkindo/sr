@@ -88,6 +88,10 @@ jobs:
   #
   # 왜 임계 두 단계인가: 85% 는 "이번 주에 손 봐라", 95% 는 "지금 손 봐라" 다.
   # 한 단계만 두면 그 값이 곧 장애 시점이 되어 미리 아는 의미가 없다.
+  #
+  # 왜 85% 부터 잡을 실패인가: 사람에게 닿는 신호가 실패 알림뿐이다. `::warning::` 은 SSH 출력에
+  # `out: ` 접두사가 붙어 어노테이션으로 잡히지 않고, 잡은 성공으로 끝난다. 2026-11-02 에
+  # 85% 를 넘겼는데 실행 결과는 success 였고, 같은 날 배포로 90% 까지 찼다.
   disk-space:
     name: Server Disk Space
     runs-on: ubuntu-latest
@@ -118,13 +122,15 @@ jobs:
             echo "/home/opc/sr 사용률: ${USE}%"
 
             if [ "$USE" -ge 95 ]; then
-              echo "::error::디스크 사용률 ${USE}% — 즉시 조치가 필요합니다."
-              echo "확인: du -sh /home/opc/sr/backups (보존 14일), docker system prune 대상"
+              echo "디스크 사용률 ${USE}% — 즉시 조치가 필요합니다."
+              echo "확인: du -sh /home/opc/sr/backups (보존 14일), docker system df"
               exit 1
             fi
 
             if [ "$USE" -ge 85 ]; then
-              echo "::warning::디스크 사용률 ${USE}% — 이번 주 안에 정리하세요."
+              echo "디스크 사용률 ${USE}% — 이번 주 안에 정리하세요."
+              echo "확인: du -sh /home/opc/sr/backups (보존 14일), docker system df"
+              exit 1
             fi
 
       - name: Report disk check failure

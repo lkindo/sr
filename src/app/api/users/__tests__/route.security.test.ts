@@ -22,7 +22,7 @@ vi.mock('@/lib/api-error-handler', () => ({
 // We will mock the session dynamically in the tests
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: vi.fn((handler) => {
-    return async (req: any, context: any) => {
+    return async (req: unknown, context: unknown) => {
       try {
         // The session will be injected via context in our test setup
         // or we can just mock it here if we want to test specific scenarios
@@ -85,7 +85,7 @@ describe('API Route: /api/users (Security)', () => {
       },
     };
 
-    const res = await GET(req, context as any);
+    const res = await GET(req, context as never);
 
     expect(res.status).toBe(200);
     expect(mockGetAllUsers).toHaveBeenCalled();
@@ -101,7 +101,7 @@ describe('API Route: /api/users (Security)', () => {
       },
     };
 
-    const res = await GET(req, context as any);
+    const res = await GET(req, context as never);
 
     expect(res.status).toBe(200);
     expect(mockGetAllUsers).toHaveBeenCalled();
@@ -121,7 +121,7 @@ describe('API Route: /api/users (Security)', () => {
       },
     };
 
-    const res = await GET(req, context as any);
+    const res = await GET(req, context as never);
 
     // Check if handleApiError was called with ForbiddenError or status is 403
     // Since we mocked handleApiError to return JSON with status from error
@@ -147,7 +147,7 @@ describe('API Route: /api/users (Security)', () => {
         },
       };
 
-      const res = await POST(req, context as any);
+      const res = await POST(req, context as never);
 
       if (res.status === 201) {
         throw new Error('Security Vulnerability: Unauthorized user was able to create user');
@@ -178,7 +178,7 @@ describe('API Route: /api/users (Security)', () => {
         },
       };
 
-      const res = await POST(req, context as any);
+      const res = await POST(req, context as never);
 
       expect(res.status).toBe(403);
       expect(mockCreateUser).not.toHaveBeenCalled();
@@ -206,7 +206,7 @@ describe('API Route: /api/users (Security)', () => {
         },
       };
 
-      const res = await POST(req, context as any);
+      const res = await POST(req, context as never);
 
       expect(res.status).toBe(201);
       expect(mockCreateUser).toHaveBeenCalledWith(

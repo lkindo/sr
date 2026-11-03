@@ -60,7 +60,7 @@ describe('ClientService', () => {
         name: 'Test Client',
       };
 
-      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(mockClient as never);
 
       const result = await clientService.getClientById('client1');
 
@@ -85,11 +85,11 @@ describe('ClientService', () => {
       };
 
       vi.mocked(prisma.client.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.client.create).mockResolvedValue(mockCreatedClient as any);
+      vi.mocked(prisma.client.create).mockResolvedValue(mockCreatedClient as never);
       vi.mocked(prisma.serviceCategory.create).mockResolvedValue({
         id: 'cat1',
         categoryName: '일반 요청',
-      } as any);
+      } as never);
 
       const result = await clientService.createClient(clientData);
 
@@ -110,11 +110,11 @@ describe('ClientService', () => {
       const mockCreatedClient = { id: 'client1', ...clientData };
 
       vi.mocked(prisma.client.findUnique).mockResolvedValue(null);
-      vi.mocked(prisma.client.create).mockResolvedValue(mockCreatedClient as any);
+      vi.mocked(prisma.client.create).mockResolvedValue(mockCreatedClient as never);
       vi.mocked(prisma.serviceCategory.create).mockResolvedValue({
         id: 'cat1',
         categoryName: '일반 요청',
-      } as any);
+      } as never);
 
       await clientService.createClient(clientData, 'actor1', null);
 
@@ -148,8 +148,8 @@ describe('ClientService', () => {
         updatedAt: new Date(),
       };
 
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
-      vi.mocked(prisma.client.update).mockResolvedValue(mockUpdatedClient as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as never);
+      vi.mocked(prisma.client.update).mockResolvedValue(mockUpdatedClient as never);
 
       const result = await clientService.updateClient('client1', updateData);
 
@@ -164,8 +164,8 @@ describe('ClientService', () => {
       const before = { id: 'client1', name: 'Old Name' };
       const after = { id: 'client1', name: 'Updated Client' };
 
-      vi.mocked(prisma.client.findUnique).mockResolvedValue(before as any);
-      vi.mocked(prisma.client.update).mockResolvedValue(after as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(before as never);
+      vi.mocked(prisma.client.update).mockResolvedValue(after as never);
 
       await clientService.updateClient('client1', { name: 'Updated Client' }, 'actor1', null);
 
@@ -185,8 +185,8 @@ describe('ClientService', () => {
       const before = { id: 'client1', isActive: true };
       const after = { id: 'client1', isActive: false };
 
-      vi.mocked(prisma.client.findUnique).mockResolvedValue(before as any);
-      vi.mocked(prisma.client.update).mockResolvedValue(after as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(before as never);
+      vi.mocked(prisma.client.update).mockResolvedValue(after as never);
 
       await clientService.updateClient('client1', { isActive: false }, 'actor1', null);
 
@@ -196,8 +196,8 @@ describe('ClientService', () => {
     });
 
     it('생략한 계약일은 부분 수정 중 덮어쓰지 않는다', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
-      vi.mocked(prisma.client.update).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as never);
+      vi.mocked(prisma.client.update).mockResolvedValue({ id: 'client1' } as never);
 
       await clientService.updateClient('client1', { name: 'Updated Client' });
 
@@ -207,8 +207,8 @@ describe('ClientService', () => {
     });
 
     it('빈 계약일은 명시적인 삭제로 저장한다', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
-      vi.mocked(prisma.client.update).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as never);
+      vi.mocked(prisma.client.update).mockResolvedValue({ id: 'client1' } as never);
 
       await clientService.updateClient('client1', {
         contractStartDate: '',
@@ -232,12 +232,12 @@ describe('ClientService', () => {
 
   describe('deleteClient', () => {
     it('성공적으로 고객사를 삭제해야 함', async () => {
-      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue({ id: 'client1' } as never);
       vi.mocked(prisma.userClient.count).mockResolvedValue(0);
       vi.mocked(prisma.sR.count).mockResolvedValue(0);
       vi.mocked(prisma.serviceCategory.count).mockResolvedValue(0);
       vi.mocked(prisma.clientHandler.count).mockResolvedValue(0);
-      vi.mocked(prisma.client.delete).mockResolvedValue({} as any);
+      vi.mocked(prisma.client.delete).mockResolvedValue({} as never);
 
       await clientService.deleteClient('client1');
 
@@ -247,12 +247,12 @@ describe('ClientService', () => {
     it('삭제를 before 스냅샷과 함께 감사 로그에 남겨야 함', async () => {
       const before = { id: 'client1', code: 'CLI001', name: 'Test Client' };
 
-      vi.mocked(prisma.client.findUnique).mockResolvedValue(before as any);
+      vi.mocked(prisma.client.findUnique).mockResolvedValue(before as never);
       vi.mocked(prisma.userClient.count).mockResolvedValue(0);
       vi.mocked(prisma.sR.count).mockResolvedValue(0);
       vi.mocked(prisma.serviceCategory.count).mockResolvedValue(0);
       vi.mocked(prisma.clientHandler.count).mockResolvedValue(0);
-      vi.mocked(prisma.client.delete).mockResolvedValue(before as any);
+      vi.mocked(prisma.client.delete).mockResolvedValue(before as never);
 
       await clientService.deleteClient('client1', 'actor1', null);
 

@@ -59,7 +59,7 @@ describe('API Route: /api/users (Validation)', () => {
       body: JSON.stringify(body),
     });
 
-    await POST(req, {} as any);
+    await POST(req, {} as never);
 
     // FIX VERIFICATION:
     // The service should NOT be called because validation failed.

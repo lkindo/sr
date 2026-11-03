@@ -71,13 +71,17 @@ describe('PushService', () => {
       const payload = { title: 'Test', body: 'Body' };
 
       // Mock preferences: user-1 disabled, user-2 enabled
-      (prisma.notificationPreference.findMany as any).mockResolvedValue([
+      vi.mocked(
+        prisma.notificationPreference.findMany as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue([
         { userId: 'user-1', pushSRCreated: false },
         { userId: 'user-2', pushSRCreated: true },
       ]);
 
       // Mock subscription for user-2
-      (prisma.pushSubscription.findMany as any).mockResolvedValue([
+      vi.mocked(
+        prisma.pushSubscription.findMany as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue([
         { endpoint: 'https://fcm.googleapis.com/fcm/send/ep-2', p256dh: 'key', auth: 'auth' },
       ]);
 
@@ -106,7 +110,7 @@ describe('PushService', () => {
       const payload = { title: 'Test', body: 'Body' };
 
       // No preferences found
-      (prisma.notificationPreference.findMany as any).mockResolvedValue([]);
+      vi.mocked(prisma.notificationPreference.findMany).mockResolvedValue([]);
 
       const sendToUsersSpy = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
 
@@ -132,7 +136,9 @@ describe('PushService', () => {
       const userId = 'user-err';
       const payload = { title: 'T', body: 'B' };
 
-      (prisma.pushSubscription.findMany as any).mockResolvedValue([
+      vi.mocked(
+        prisma.pushSubscription.findMany as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue([
         { endpoint: 'https://fcm.googleapis.com/fcm/send/ep-gone', p256dh: 'k', auth: 'a' },
       ]);
 

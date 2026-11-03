@@ -70,8 +70,10 @@ vi.mock('@/components/clients/ClientDialog', () => ({
 vi.mock('@/components/clients/ClientUsersSheet', () => ({ ClientUsersSheet: () => null }));
 
 vi.mock('@/components/ui', () => ({
-  Button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
-  Input: (props: any) => <input {...props} />,
+  Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button {...props}>{children}</button>
+  ),
+  Input: (props: Record<string, unknown>) => <input {...props} />,
 }));
 
 vi.mock('@/hooks/use-permissions', () => ({

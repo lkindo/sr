@@ -50,7 +50,7 @@ const { mockPrisma } = vi.hoisted(() => {
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(null),
     },
-  } as any;
+  } as never;
   return { mockPrisma: mock };
 });
 
@@ -112,12 +112,12 @@ describe('SRService Extended Branches', () => {
       id: 'c1',
       name: 'Client 1',
       isActive: true,
-    } as any);
+    } as never);
     vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
       id: 'sc-1',
       categoryName: 'C1',
       slaHours: 24,
-    } as any);
+    } as never);
     vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
     vi.mocked(ensureCanCreateSR).mockReturnValue(undefined);
     vi.mocked(ensureCanDeleteSR).mockReturnValue(undefined);
@@ -130,7 +130,7 @@ describe('SRService Extended Branches', () => {
         status: 'INTAKE',
         requesterId: 'req-1',
         assigneeId: null,
-      } as any);
+      } as never);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
       const txMock = {
@@ -161,12 +161,12 @@ describe('SRService Extended Branches', () => {
         name: 'A1',
         email: 'a1@test.com',
         isActive: true,
-      } as any);
+      } as never);
 
       await srService.updateSR('sr-1', { status: 'IN_PROGRESS', assigneeId: 'a1' }, {
         id: 'u1',
         roles: ['ADMIN'],
-      } as any);
+      } as never);
 
       const { emailService } = await import('@/services/email.service');
       expect(emailService.buildSRStatusChanged).not.toHaveBeenCalled();
@@ -179,7 +179,7 @@ describe('SRService Extended Branches', () => {
       vi.mocked(prisma.sR.findUnique).mockResolvedValue({
         id: 'sr-1',
         status: 'IN_PROGRESS',
-      } as any);
+      } as never);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
 
       const txMock = {
@@ -197,7 +197,7 @@ describe('SRService Extended Branches', () => {
         name: 'A2',
         email: 'a2@test.com',
         isActive: true,
-      } as any);
+      } as never);
 
       // Use assignedToId and number estimatedHours
       // estimatedHours/assignedToId 는 운영 소유 필드이므로 내부 사용자(MANAGER)로 호출한다.
@@ -209,7 +209,7 @@ describe('SRService Extended Branches', () => {
           estimatedHours: 12.5,
           assignedToId: 'a2',
         },
-        { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as any
+        { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as never
       );
 
       let updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
@@ -224,7 +224,7 @@ describe('SRService Extended Branches', () => {
           expectedCompletionDate: null,
           intakeNotes: '',
         },
-        { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as any
+        { id: 'u1', roles: ['MANAGER'], permissions: [], clientIds: [] } as never
       );
 
       updateData = vi.mocked(txMock.sR.update).mock.calls[1]![0].data;
@@ -242,12 +242,12 @@ describe('SRService Extended Branches', () => {
         actualPriority: 'MEDIUM',
         serviceCategoryId: 'sc-1',
         intakeAt: null,
-      } as any);
+      } as never);
       vi.mocked(ensureCanUpdateSR).mockReturnValue(undefined);
       vi.mocked(prisma.serviceCategory.findUnique).mockResolvedValue({
         id: 'sc-1',
         slaHours: 24,
-      } as any);
+      } as never);
 
       const txMock = {
         sR: {
@@ -264,7 +264,7 @@ describe('SRService Extended Branches', () => {
         roles: ['MANAGER'],
         permissions: [],
         clientIds: [],
-      } as any);
+      } as never);
       const updateData = vi.mocked(txMock.sR.update).mock.calls[0]![0].data;
       expect(updateData.dueDate).toBeInstanceOf(Date);
     });
@@ -307,7 +307,7 @@ describe('SRService Extended Branches', () => {
       });
       expect(prisma.sR.count).toHaveBeenCalled();
 
-      vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: '1' } as any);
+      vi.mocked(prisma.sR.findUnique).mockResolvedValue({ id: '1' } as never);
       await srService.getSRById('1');
       expect(prisma.sR.findUnique).toHaveBeenCalledWith({
         where: { id: '1', deletedAt: null },

@@ -24,7 +24,7 @@ describe('permission-helpers', () => {
     });
 
     it('should return false if user has no permissions array', () => {
-      const userWithoutPerms = { ...mockUser, permissions: undefined } as any;
+      const userWithoutPerms = { ...mockUser, permissions: undefined } as never;
       expect(hasPermissionFlag(userWithoutPerms, PERMISSIONS.SR.READ)).toBe(false);
     });
   });

@@ -146,9 +146,16 @@ describe('SRStatusActions Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useRouter as any).mockReturnValue({ push: mockPush, refresh: mockRefresh });
-    (useToast as any).mockReturnValue({ toast: mockToast });
-    (useChangeSRStatus as any).mockReturnValue({ mutateAsync: mockMutateAsync });
+    vi.mocked(useRouter as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      push: mockPush,
+      refresh: mockRefresh,
+    });
+    vi.mocked(useToast as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      toast: mockToast,
+    });
+    vi.mocked(useChangeSRStatus as unknown as (...args: unknown[]) => unknown).mockReturnValue({
+      mutateAsync: mockMutateAsync,
+    });
 
     // Mock global fetch
     vi.spyOn(global, 'fetch').mockResolvedValue({

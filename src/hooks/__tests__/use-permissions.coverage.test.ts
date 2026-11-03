@@ -23,7 +23,7 @@ describe('usePermissions (coverage)', () => {
           roles: ['OPERATOR'],
         },
       },
-    } as any);
+    } as never);
 
     const { result } = renderHook(() => usePermissions());
 
@@ -78,7 +78,7 @@ describe('usePermissions (coverage)', () => {
           roles: ['ADMIN'],
         },
       },
-    } as any);
+    } as never);
 
     const { result } = renderHook(() => usePermissions());
 
@@ -90,7 +90,7 @@ describe('usePermissions (coverage)', () => {
   });
 
   it('세션 로딩 상태(undefined data)에서 안전한 기본값을 반환한다', () => {
-    mockedUseSession.mockReturnValue({ data: undefined } as any);
+    mockedUseSession.mockReturnValue({ data: undefined } as never);
 
     const { result } = renderHook(() => usePermissions());
 
@@ -107,7 +107,7 @@ describe('usePermissions (coverage)', () => {
   it('user에 permissions/roles 필드가 없으면 가드 분기를 탄다', () => {
     mockedUseSession.mockReturnValue({
       data: { user: { id: '1' } },
-    } as any);
+    } as never);
 
     const { result } = renderHook(() => usePermissions());
 

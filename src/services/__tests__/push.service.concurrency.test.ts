@@ -9,7 +9,7 @@ const mockFindMany = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   default: {
     pushSubscription: {
-      findMany: (...args: any[]) => mockFindMany(...args),
+      findMany: (...args: unknown[]) => mockFindMany(...args),
       deleteMany: vi.fn(),
     },
     notificationPreference: {
@@ -21,7 +21,7 @@ vi.mock('@/lib/prisma', () => ({
 // We need to mock the web-push module completely
 vi.mock('web-push', () => ({
   setVapidDetails: vi.fn(),
-  sendNotification: (...args: any[]) => mockSendNotification(...args),
+  sendNotification: (...args: unknown[]) => mockSendNotification(...args),
 }));
 
 describe('PushService Concurrency Benchmark', () => {
@@ -49,7 +49,7 @@ describe('PushService Concurrency Benchmark', () => {
     const userIds = Array.from({ length: NUM_USERS }, (_, i) => `user-${i}`);
 
     // Mock subscriptions
-    const allSubscriptions: any[] = [];
+    const allSubscriptions: unknown[] = [];
     userIds.forEach((userId) => {
       for (let i = 0; i < SUBS_PER_USER; i++) {
         allSubscriptions.push({

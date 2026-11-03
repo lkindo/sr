@@ -184,7 +184,7 @@ describe('PushService', () => {
           p256dh: 'd',
           auth: 'a',
         },
-      ] as any);
+      ] as never);
 
       const { sendNotification } = await import('web-push');
       vi.mocked(sendNotification).mockResolvedValue({ statusCode: 201, body: 'ok', headers: {} });
@@ -201,7 +201,7 @@ describe('PushService', () => {
           p256dh: 'd',
           auth: 'a',
         },
-      ] as any);
+      ] as never);
 
       const { sendNotification } = await import('web-push');
       vi.mocked(sendNotification).mockRejectedValue({ statusCode: 410 });
@@ -219,7 +219,7 @@ describe('PushService', () => {
       const stored = 'https://attacker.example.com/collect';
       vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([
         { endpoint: stored, p256dh: 'd', auth: 'a' },
-      ] as any);
+      ] as never);
 
       const { sendNotification } = await import('web-push');
       vi.mocked(sendNotification).mockClear();
@@ -247,7 +247,7 @@ describe('PushService', () => {
     it('filters users based on explicit false preference', async () => {
       vi.mocked(prisma.notificationPreference.findMany).mockResolvedValue([
         { userId: 'u1', pushSRCreated: false },
-      ] as any);
+      ] as never);
       const spySendToUsers = vi.spyOn(pushService, 'sendToUsers').mockResolvedValue(new Map());
 
       await pushService.sendForEvent('SR_CREATED', ['u1'], { title: 'T', body: 'B' });
@@ -272,7 +272,7 @@ describe('PushService', () => {
           pushSRStatusChanged: true,
           pushCommentAdded: true,
         },
-      ] as any);
+      ] as never);
 
       await pushService.sendForEvent('SR_ASSIGNED', ['u1'], { title: 'T', body: 'B' });
       await pushService.sendForEvent('SR_STATUS_CHANGED', ['u1'], { title: 'T', body: 'B' });

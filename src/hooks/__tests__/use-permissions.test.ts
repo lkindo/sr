@@ -29,7 +29,7 @@ describe('usePermissions', () => {
           roles: ['ADMIN', 'MANAGER'],
         },
       },
-    } as any);
+    } as never);
 
     const { result } = renderHook(() => usePermissions());
 
@@ -57,7 +57,7 @@ describe('usePermissions', () => {
   });
 
   it('세션이 없으면 안전한 기본값을 사용한다', () => {
-    mockedUseSession.mockReturnValue({ data: null } as any);
+    mockedUseSession.mockReturnValue({ data: null } as never);
 
     const { result } = renderHook(() => usePermissions());
 

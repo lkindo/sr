@@ -19,13 +19,21 @@ vi.mock('@/hooks/use-toast', () => ({
 // Mock UI components
 vi.mock('@/components/ui', () => {
   return {
-    Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-    DialogContent: ({ children }: any) => <div>{children}</div>,
-    DialogHeader: ({ children }: any) => <div>{children}</div>,
-    DialogTitle: ({ children }: any) => <div>{children}</div>,
-    DialogDescription: ({ children }: any) => <div>{children}</div>,
-    DialogFooter: ({ children }: any) => <div>{children}</div>,
-    Button: ({ children, onClick, disabled, type, className, ...props }: any) => (
+    Dialog: ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>
+      open ? <div>{children}</div> : null,
+    DialogContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogHeader: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogTitle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogDescription: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    DialogFooter: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    Button: ({
+      children,
+      onClick,
+      disabled,
+      type,
+      className,
+      ...props
+    }: React.ComponentProps<'button'>) => (
       <button onClick={onClick} disabled={disabled} type={type} className={className} {...props}>
         {children}
       </button>

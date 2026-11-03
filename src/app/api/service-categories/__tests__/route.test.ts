@@ -16,8 +16,8 @@ vi.mock('@/services/service-category.service', () => ({
 
 // Mock auth-wrapper — 세션은 각 테스트가 주입한다.
 vi.mock('@/lib/auth-wrapper', () => ({
-  withAuth: (handler: any) => handler,
-  withAuthAndRateLimit: (handler: any) => handler,
+  withAuth: (handler: unknown) => handler,
+  withAuthAndRateLimit: (handler: unknown) => handler,
 }));
 
 // `isInternalUser` 는 실물을 쓴다. 여기서 가짜로 덮으면 내부/외부 판정 자체가
@@ -36,7 +36,7 @@ const call = (session: unknown) =>
     {
       params: {},
       session,
-    } as any
+    } as never
   );
 
 describe('GET /api/service-categories', () => {

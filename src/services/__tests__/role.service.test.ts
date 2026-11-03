@@ -48,7 +48,7 @@ describe('RoleService', () => {
         updatedAt: new Date(),
       };
 
-      vi.mocked(prisma.role.create).mockResolvedValue(expectedRole as any);
+      vi.mocked(prisma.role.create).mockResolvedValue(expectedRole as never);
 
       const result = await roleService.createRole(validRoleData);
 
@@ -78,8 +78,8 @@ describe('RoleService', () => {
         description: 'Old description',
         createdAt: new Date(),
         updatedAt: new Date(),
-      } as any);
-      vi.mocked(prisma.role.update).mockResolvedValue(updatedRole as any);
+      } as never);
+      vi.mocked(prisma.role.update).mockResolvedValue(updatedRole as never);
 
       const result = await roleService.updateRole('1', updateData);
 
@@ -95,10 +95,10 @@ describe('RoleService', () => {
     it('관련 데이터가 없으면 성공적으로 삭제해야 함', async () => {
       const role = { id: '1', name: 'Test Role' };
 
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(role as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(role as never);
       vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       vi.mocked(prisma.rolePermission.count).mockResolvedValue(0);
-      vi.mocked(prisma.role.delete).mockResolvedValue(role as any);
+      vi.mocked(prisma.role.delete).mockResolvedValue(role as never);
 
       const result = await roleService.deleteRole('1');
 
@@ -113,7 +113,7 @@ describe('RoleService', () => {
     });
 
     it('관련 사용자가 있으면 ReferentialIntegrityError를 던져야 함', async () => {
-      vi.mocked(prisma.role.findUnique).mockResolvedValue({ id: '1' } as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue({ id: '1' } as never);
       vi.mocked(prisma.userRole.count).mockResolvedValue(5);
 
       await expect(roleService.deleteRole('1')).rejects.toThrow(ReferentialIntegrityError);
@@ -125,7 +125,7 @@ describe('RoleService', () => {
       const permissionIds = ['perm1', 'perm2'];
       const updatedRole = { id: '1', name: 'Test Role' };
 
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(updatedRole as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(updatedRole as never);
       vi.mocked(prisma.rolePermission.deleteMany).mockResolvedValue({ count: 2 });
       vi.mocked(prisma.rolePermission.createMany).mockResolvedValue({ count: 2 });
 

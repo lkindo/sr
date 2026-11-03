@@ -24,7 +24,7 @@ vi.mock('@/lib/logger', () => ({
 describe('api-error-handler', () => {
   it('should handle ServiceError correctly', () => {
     const error = new ServiceError('Custom Error', 'CUSTOM_CODE', 418);
-    const response = handleApiError(error) as any;
+    const response = handleApiError(error) as unknown as Record<string, unknown>;
 
     expect(response.status).toBe(418);
     expect(response.data).toEqual({

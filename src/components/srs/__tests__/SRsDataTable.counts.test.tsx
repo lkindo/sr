@@ -35,15 +35,15 @@ vi.mock('../SRListItem', () => ({
 describe('SRsDataTable Counts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useRouter).mockReturnValue({ push: vi.fn(), refresh: vi.fn() } as any);
+    vi.mocked(useRouter).mockReturnValue({ push: vi.fn(), refresh: vi.fn() } as never);
     vi.mocked(usePathname).mockReturnValue('/srs');
-    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as any);
-    vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as any);
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as never);
+    vi.mocked(useSession).mockReturnValue({ data: { user: { id: 'user-1' } } } as never);
     vi.mocked(usePermissions).mockReturnValue({
       hasAnyRole: () => true,
       hasPermission: () => true,
       isAdmin: () => true,
-    } as any);
+    } as never);
   });
 
   const today = new Date();

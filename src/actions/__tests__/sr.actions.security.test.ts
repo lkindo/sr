@@ -80,7 +80,7 @@ describe('SR Server Actions Security', () => {
 
   describe('getSRDetailsAction Security', () => {
     it('blocks unauthorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as any);
+      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as never);
       mockSRService.getSRDetailsById.mockResolvedValue(targetSR);
 
       const result = await getSRDetailsAction('sr-1');
@@ -89,7 +89,7 @@ describe('SR Server Actions Security', () => {
     });
 
     it('allows authorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as any);
+      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as never);
       mockSRService.getSRDetailsById.mockResolvedValue(targetSR);
 
       const result = await getSRDetailsAction('sr-1');
@@ -100,7 +100,7 @@ describe('SR Server Actions Security', () => {
 
   describe('getSRActivitiesAction Security', () => {
     it('blocks unauthorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as any);
+      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as never);
       mockSRService.getSRById.mockResolvedValue(targetSR); // SR exists
       const mockActivities = [{ id: 'act-1', description: 'Secret Activity' }];
       mockSRService.getSRActivities.mockResolvedValue({
@@ -114,7 +114,7 @@ describe('SR Server Actions Security', () => {
     });
 
     it('allows authorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as any);
+      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as never);
       mockSRService.getSRById.mockResolvedValue(targetSR);
       const mockActivities = [{ id: 'act-1', description: 'Secret Activity' }];
       mockSRService.getSRActivities.mockResolvedValue({
@@ -133,7 +133,7 @@ describe('SR Server Actions Security', () => {
 
   describe('getSRCommentsAction Security', () => {
     it('blocks unauthorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as any);
+      vi.mocked(auth).mockResolvedValue({ user: unauthorizedUser, expires: '2099-01-01' } as never);
       mockSRService.getSRById.mockResolvedValue(targetSR);
       const mockComments = [{ id: 'cmt-1', content: 'Secret Comment' }];
       mockSRService.getSRComments.mockResolvedValue({ comments: mockComments, nextCursor: null });
@@ -144,7 +144,7 @@ describe('SR Server Actions Security', () => {
     });
 
     it('allows authorized access', async () => {
-      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as any);
+      vi.mocked(auth).mockResolvedValue({ user: authorizedUser, expires: '2099-01-01' } as never);
       mockSRService.getSRById.mockResolvedValue(targetSR);
       const mockComments = [{ id: 'cmt-1', content: 'Secret Comment' }];
       mockSRService.getSRComments.mockResolvedValue({ comments: mockComments, nextCursor: null });

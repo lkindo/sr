@@ -3489,7 +3489,7 @@ concurrency:
   멱등)를 수행하고, 실패하면 컨테이너가 뜨지 않는다. 과거의 무조건 reseed(테스트 계정 비밀번호 초기화)는
   없앴다 — 지금 시드는 사용자 데이터를 건드리지 않는다.
 - main 배포는 추가로 443 방화벽 개방, 자가서명 인증서 폴백 생성, `scripts/setup-letsencrypt.sh` 실행,
-  **인증서 갱신 cron 멱등 설치**(`0 3 * * * scripts/renew-letsencrypt.sh`)를 한다. 7일이 지난 이미지만 prune 한다.
+  **인증서 갱신 cron 멱등 설치**(`0 3 * * * scripts/renew-letsencrypt.sh`)를 한다. 앱 이미지는 최근 2개만 남긴다(`scripts/prune-app-images.sh`).
 
 ### 런타임 구성 (`docker-compose.prod.yml`)
 

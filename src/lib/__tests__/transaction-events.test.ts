@@ -34,8 +34,8 @@ describe('Transaction-Aware Event Dispatching', () => {
 
   it('트랜잭션 내부에서 이벤트를 호출하면 즉시 발송되지 않고 큐에 적재되어야 함', () => {
     const context = {
-      domainEvents: [] as any[],
-      realtimeEvents: [] as any[],
+      domainEvents: [] as never[],
+      realtimeEvents: [] as never[],
     };
 
     transactionLocalStorage.run(context, () => {
@@ -59,8 +59,8 @@ describe('Transaction-Aware Event Dispatching', () => {
 
   it('트랜잭션 커밋 완료(성공) 시 큐에 적재된 이벤트가 한꺼번에 순차적으로 발송되어야 함', async () => {
     const context = {
-      domainEvents: [] as any[],
-      realtimeEvents: [] as any[],
+      domainEvents: [] as never[],
+      realtimeEvents: [] as never[],
     };
 
     // 가상의 트랜잭션 래퍼 실행 (성공 케이스)
@@ -101,8 +101,8 @@ describe('Transaction-Aware Event Dispatching', () => {
 
   it('트랜잭션 롤백(실패) 시 큐에 적재된 이벤트는 완전히 파기되고 전송되지 않아야 함', async () => {
     const context = {
-      domainEvents: [] as any[],
-      realtimeEvents: [] as any[],
+      domainEvents: [] as never[],
+      realtimeEvents: [] as never[],
     };
 
     const runMockTransaction = async () => {

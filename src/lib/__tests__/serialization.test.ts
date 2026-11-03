@@ -141,7 +141,7 @@ describe('serialization utility', () => {
     });
 
     it('should handle null values in specified fields', () => {
-      const input = { d1: null as any, other: 'v' };
+      const input = { d1: null as never, other: 'v' };
       const result = serializeDates(input, ['d1']);
       expect(result.d1).toBeNull();
     });

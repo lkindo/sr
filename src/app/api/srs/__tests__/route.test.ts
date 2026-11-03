@@ -22,7 +22,7 @@ vi.mock('@/lib/api-error-handler', () => ({
 // Mock auth-wrapper
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: vi.fn((handler) => {
-    return async (req: any, context: any) => {
+    return async (req: unknown, context: Record<string, unknown>) => {
       try {
         // Use provided session or default to basic user
         const session = context?.session || {
@@ -41,7 +41,7 @@ vi.mock('@/lib/auth-wrapper', () => ({
     };
   }),
   withAuth: vi.fn((handler) => {
-    return async (req: any, context: any) => {
+    return async (req: unknown, context: Record<string, unknown>) => {
       try {
         const session = context?.session || {
           user: {
@@ -101,11 +101,11 @@ describe('API Route: /api/srs (Integration)', () => {
   describe('GET', () => {
     it('should return SR list with 200 OK', async () => {
       const mockSrs = [{ id: 'sr-1', title: 'Test SR' }];
-      mockGetAllSRs.mockResolvedValue(mockSrs as any);
+      mockGetAllSRs.mockResolvedValue(mockSrs as never);
       mockCountSRs.mockResolvedValue(1);
 
       const req = new NextRequest('http://localhost/api/srs');
-      const res = await GET(req, { params: Promise.resolve({}) } as any);
+      const res = await GET(req, { params: Promise.resolve({}) } as never);
 
       expect(res.status).toBe(200);
       const data = await res.json();
@@ -117,7 +117,7 @@ describe('API Route: /api/srs (Integration)', () => {
     it('should create a new SR if user has permission', async () => {
       mockCheckPermission.mockResolvedValue(true);
       const mockSR = { id: 'sr-1', srNumber: 'SR-001', title: 'New SR' };
-      mockCreateSR.mockResolvedValue(mockSR as any);
+      mockCreateSR.mockResolvedValue(mockSR as never);
 
       const req = new NextRequest('http://localhost/api/srs', {
         method: 'POST',
@@ -139,7 +139,7 @@ describe('API Route: /api/srs (Integration)', () => {
         },
       };
 
-      const res = await POST(req, { params: Promise.resolve({}), session } as any);
+      const res = await POST(req, { params: Promise.resolve({}), session } as never);
 
       expect(res.status).toBe(201);
       const data = await res.json();
@@ -170,7 +170,7 @@ describe('API Route: /api/srs (Integration)', () => {
         },
       };
 
-      const res = await POST(req, { params: Promise.resolve({}), session } as any);
+      const res = await POST(req, { params: Promise.resolve({}), session } as never);
 
       expect(res.status).toBe(403);
       expect(mockHandleApiError).toHaveBeenCalled();

@@ -57,14 +57,18 @@ describe('Service Category Actions Security', () => {
     vi.resetAllMocks();
 
     // Mock service methods
-    (serviceCategoryService.getAll as any).mockResolvedValue(mockCategoriesFull);
-    (serviceCategoryService.getForSelection as any).mockResolvedValue(mockCategoriesSelection);
+    vi.mocked(
+      serviceCategoryService.getAll as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue(mockCategoriesFull);
+    vi.mocked(
+      serviceCategoryService.getForSelection as unknown as (...args: unknown[]) => unknown
+    ).mockResolvedValue(mockCategoriesSelection);
   });
 
   describe('getServiceCategoriesForSelection', () => {
     it('should REJECT access without authentication', async () => {
       // Mock getAuthenticatedSession to throw (simulating unauthenticated)
-      (getAuthenticatedSession as any).mockRejectedValue(new Error('Unauthorized'));
+      vi.mocked(getAuthenticatedSession).mockRejectedValue(new Error('Unauthorized'));
 
       const result = await getServiceCategoriesForSelection();
 
@@ -75,7 +79,9 @@ describe('Service Category Actions Security', () => {
 
     it('should ALLOW access if authenticated', async () => {
       // Mock getAuthenticatedSession to succeed
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1' },
       });
 
@@ -86,7 +92,9 @@ describe('Service Category Actions Security', () => {
     });
 
     it('should RETURN only safe fields (using getForSelection)', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1' },
       });
 
@@ -99,7 +107,7 @@ describe('Service Category Actions Security', () => {
         expect(serviceCategoryService.getAll).not.toHaveBeenCalled();
 
         // Verify data structure
-        const firstItem = result.data[0] as any;
+        const firstItem = result.data[0] as unknown as Record<string, unknown>;
         expect(firstItem.id).toBe('cat-1');
         expect(firstItem.categoryName).toBe('Category 1');
         expect(firstItem.handler).toBeUndefined(); // Sensitive data should be gone
@@ -114,7 +122,9 @@ describe('Service Category Actions Security', () => {
      * 열람하지 못하도록 소속을 검증한다.
      */
     it('내부 사용자는 전체 스코프로 조회한다', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1', roles: ['ADMIN'], permissions: [], clientIds: [] },
       });
 
@@ -126,7 +136,9 @@ describe('Service Category Actions Security', () => {
     });
 
     it('외부 사용자는 지정한 고객사로 스코프해 전달한다', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: {
           id: 'user-1',
           roles: ['CLIENT_ADMIN'],
@@ -151,7 +163,9 @@ describe('Service Category Actions Security', () => {
      * 전 고객사의 서비스 카탈로그와 SLA 시간을 받아 갔다.
      */
     it('외부 사용자가 인자 없이 불러도 전체가 나오지 않는다', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: {
           id: 'user-1',
           roles: ['CLIENT_USER'],
@@ -170,7 +184,9 @@ describe('Service Category Actions Security', () => {
     });
 
     it('소속 고객사가 없는 외부 사용자는 빈 스코프를 받는다 (fail-closed)', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: { id: 'user-1', roles: ['CLIENT_USER'], permissions: [], clientIds: [] },
       });
 
@@ -181,7 +197,9 @@ describe('Service Category Actions Security', () => {
 
     it('소속되지 않은 고객사의 카테고리 조회를 거부한다', async () => {
       // 외부 사용자(CLIENT_ADMIN): 자기 소속은 client-1 뿐이다.
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: {
           id: 'user-1',
           roles: ['CLIENT_ADMIN'],
@@ -197,7 +215,9 @@ describe('Service Category Actions Security', () => {
     });
 
     it('자기 소속 고객사는 허용한다', async () => {
-      (getAuthenticatedSession as any).mockResolvedValue({
+      vi.mocked(
+        getAuthenticatedSession as unknown as (...args: unknown[]) => unknown
+      ).mockResolvedValue({
         user: {
           id: 'user-1',
           roles: ['CLIENT_ADMIN'],

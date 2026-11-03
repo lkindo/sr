@@ -19,7 +19,7 @@ vi.mock('@/lib/api-error-handler', () => ({
 // Mock auth-wrapper
 vi.mock('@/lib/auth-wrapper', () => ({
   withAuthAndRateLimit: vi.fn((handler) => {
-    return async (req: any, context: any) => {
+    return async (req: unknown, context: Record<string, unknown>) => {
       try {
         const session = {
           user: { id: 'admin-1', roles: ['ADMIN'], permissions: ['USER:READ', 'USER:CREATE'] },
@@ -115,7 +115,7 @@ describe('API Route: /api/users (Integration)', () => {
         }),
       });
 
-      const res = await POST(req, { params: Promise.resolve({}) } as any);
+      const res = await POST(req, { params: Promise.resolve({}) } as never);
 
       expect(res.status).toBe(201);
       const data = await res.json();

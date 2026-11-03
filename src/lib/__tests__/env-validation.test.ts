@@ -75,7 +75,7 @@ describe('EnvValidation', () => {
         validateEnv();
       } catch (error: any) {
         expect(error).toBeInstanceOf(EnvValidationError);
-        const missingNames = error.missingVariables.map((v: any) => v.name);
+        const missingNames = error.missingVariables.map((v: Record<string, unknown>) => v.name);
         expect(missingNames).toContain('DATABASE_URL');
       }
     });

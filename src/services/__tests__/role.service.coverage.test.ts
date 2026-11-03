@@ -6,7 +6,7 @@ import prisma from '@/lib/prisma';
 import { RoleService } from '../role.service';
 
 vi.mock('@/lib/prisma', () => {
-  const mockPrisma: any = {
+  const mockPrisma = {
     auditLog: {
       create: vi.fn(),
     },
@@ -29,7 +29,7 @@ vi.mock('@/lib/prisma', () => {
     permission: {
       findMany: vi.fn(),
     },
-    $transaction: vi.fn((cb: any) => cb(mockPrisma)),
+    $transaction: vi.fn((cb) => cb(mockPrisma)),
   };
   return { default: mockPrisma };
 });
@@ -52,12 +52,12 @@ describe('RoleService coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new RoleService();
-    vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => cb(prisma));
+    vi.mocked(prisma.$transaction).mockImplementation(async (cb) => cb(prisma));
   });
 
   describe('getRoleById', () => {
     it('returns the role found by id', async () => {
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as never);
 
       const result = await service.getRoleById('role-1');
 
@@ -79,7 +79,7 @@ describe('RoleService coverage', () => {
       const rows = [
         { ...sampleRole, permissions: [{ permission: { id: 'p1' } }], _count: { users: 3 } },
       ];
-      vi.mocked(prisma.role.findMany).mockResolvedValue(rows as any);
+      vi.mocked(prisma.role.findMany).mockResolvedValue(rows as never);
 
       const result = await service.getAllRoles();
 
@@ -95,7 +95,7 @@ describe('RoleService coverage', () => {
 
   describe('createRole', () => {
     it('creates a role and writes an audit log', async () => {
-      vi.mocked(prisma.role.create).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.create).mockResolvedValue(sampleRole as never);
 
       const result = await service.createRole(
         { name: 'ADMIN', description: 'Administrator' },
@@ -121,7 +121,7 @@ describe('RoleService coverage', () => {
     });
 
     it('throws on invalid input and never touches the database', async () => {
-      await expect(service.createRole({ name: '' } as any)).rejects.toThrow();
+      await expect(service.createRole({ name: '' } as never)).rejects.toThrow();
       expect(prisma.role.create).not.toHaveBeenCalled();
       expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
@@ -129,9 +129,9 @@ describe('RoleService coverage', () => {
 
   describe('updateRole', () => {
     it('updates an existing role and audits the change', async () => {
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as never);
       const updated = { ...sampleRole, name: 'SUPERADMIN' };
-      vi.mocked(prisma.role.update).mockResolvedValue(updated as any);
+      vi.mocked(prisma.role.update).mockResolvedValue(updated as never);
 
       const result = await service.updateRole(
         'role-1',
@@ -157,17 +157,17 @@ describe('RoleService coverage', () => {
 
     it('throws an invalid-input error before any lookup', async () => {
       // name explicitly null fails schema (partial allows omission, not null)
-      await expect(service.updateRole('role-1', { name: 123 } as any)).rejects.toThrow();
+      await expect(service.updateRole('role-1', { name: 123 } as never)).rejects.toThrow();
       expect(prisma.role.update).not.toHaveBeenCalled();
     });
   });
 
   describe('deleteRole', () => {
     it('deletes a role with no references and audits it', async () => {
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as never);
       vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       vi.mocked(prisma.rolePermission.count).mockResolvedValue(0);
-      vi.mocked(prisma.role.delete).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.delete).mockResolvedValue(sampleRole as never);
 
       const result = await service.deleteRole('role-1', 'actor-3', '10.0.0.3');
 
@@ -181,10 +181,10 @@ describe('RoleService coverage', () => {
     });
 
     it('logs but still deletes when only permission references exist', async () => {
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as never);
       vi.mocked(prisma.userRole.count).mockResolvedValue(0);
       vi.mocked(prisma.rolePermission.count).mockResolvedValue(2);
-      vi.mocked(prisma.role.delete).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.delete).mockResolvedValue(sampleRole as never);
 
       const result = await service.deleteRole('role-1');
 
@@ -200,7 +200,7 @@ describe('RoleService coverage', () => {
     });
 
     it('throws ReferentialIntegrityError when users still use the role', async () => {
-      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as any);
+      vi.mocked(prisma.role.findUnique).mockResolvedValue(sampleRole as never);
       vi.mocked(prisma.userRole.count).mockResolvedValue(5);
       vi.mocked(prisma.rolePermission.count).mockResolvedValue(0);
 
@@ -212,13 +212,13 @@ describe('RoleService coverage', () => {
   describe('updateRolePermissions', () => {
     it('replaces permission mappings and returns the refreshed role', async () => {
       vi.mocked(prisma.role.findUnique)
-        .mockResolvedValueOnce(sampleRole as any) // initial existence check
-        .mockResolvedValueOnce(sampleRole as any); // getRoleById at the end
+        .mockResolvedValueOnce(sampleRole as never) // initial existence check
+        .mockResolvedValueOnce(sampleRole as never); // getRoleById at the end
       vi.mocked(prisma.rolePermission.findMany).mockResolvedValue([
         { permissionId: 'old-1' },
-      ] as any);
-      vi.mocked(prisma.rolePermission.deleteMany).mockResolvedValue({ count: 1 } as any);
-      vi.mocked(prisma.rolePermission.createMany).mockResolvedValue({ count: 2 } as any);
+      ] as never);
+      vi.mocked(prisma.rolePermission.deleteMany).mockResolvedValue({ count: 1 } as never);
+      vi.mocked(prisma.rolePermission.createMany).mockResolvedValue({ count: 2 } as never);
 
       const result = await service.updateRolePermissions(
         'role-1',
@@ -250,10 +250,10 @@ describe('RoleService coverage', () => {
 
     it('clears mappings without creating when no permissions given', async () => {
       vi.mocked(prisma.role.findUnique)
-        .mockResolvedValueOnce(sampleRole as any)
-        .mockResolvedValueOnce(sampleRole as any);
-      vi.mocked(prisma.rolePermission.findMany).mockResolvedValue([] as any);
-      vi.mocked(prisma.rolePermission.deleteMany).mockResolvedValue({ count: 0 } as any);
+        .mockResolvedValueOnce(sampleRole as never)
+        .mockResolvedValueOnce(sampleRole as never);
+      vi.mocked(prisma.rolePermission.findMany).mockResolvedValue([] as never);
+      vi.mocked(prisma.rolePermission.deleteMany).mockResolvedValue({ count: 0 } as never);
 
       const result = await service.updateRolePermissions('role-1', []);
 

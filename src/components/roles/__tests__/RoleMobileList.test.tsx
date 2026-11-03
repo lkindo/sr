@@ -6,12 +6,18 @@ import { RoleMobileList } from '../RoleMobileList';
 // Mock UI components
 vi.mock('@/components/ui', () => {
   return {
-    Badge: ({ children, className }: any) => (
+    Badge: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
       <div data-testid="badge" className={className}>
         {children}
       </div>
     ),
-    Button: ({ children, onClick, disabled, className, ...props }: any) => (
+    Button: ({
+      children,
+      onClick,
+      disabled,
+      className,
+      ...props
+    }: React.ComponentProps<'button'>) => (
       <button onClick={onClick} disabled={disabled} className={className} {...props}>
         {children}
       </button>

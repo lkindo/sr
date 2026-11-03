@@ -237,7 +237,7 @@ GHCR 에 민다. 운영 배포는 `.env.prod` 에 `APP_IMAGE_TAG=<SHA>` 를 덧�
    `up -d --force-recreate --no-deps app`. **`down` 은 하지 않는다** — 앱 컨테이너만 교체한다.
    마이그레이션과 기준 데이터 시딩은 컨테이너 기동 시 `docker-entrypoint.sh` 가 한다(`docs/BOOTSTRAP.md` 3절).
 6. 헬스 게이트: `sr-app` 이 240초 안에 `healthy` 가 되기를 기다린다.
-7. Let's Encrypt 발급 스크립트 실행, 갱신 cron 멱등 설치(3절), 7일(`until=168h`)이 지난 이미지와 빌드 캐시 정리.
+7. Let's Encrypt 발급 스크립트 실행, 갱신 cron 멱등 설치(3절), 앱 이미지를 최근 2개만 남기고 빌드 캐시 정리(`scripts/prune-app-images.sh`).
 
 **자동 롤백 (운영만).** 6에서 healthy 가 되지 않으면:
 
@@ -247,7 +247,7 @@ GHCR 에 민다. 운영 배포는 `.env.prod` 에 `APP_IMAGE_TAG=<SHA>` 를 덧�
   forward-fix 하거나 3번 백업으로 복구한다(`docs/backup-and-restore.md`).
 - 어느 경우든 배포 잡은 실패로 끝난다. 다음 배포가 다시 새 이미지로 덮어쓰므로 원인을 먼저 고친다.
 
-**수동 롤백.** 이전 커밋 SHA 이미지로 되돌린다(GHCR 에 있거나 서버에 7일 안쪽으로 남아 있어야 한다).
+**수동 롤백.** 이전 커밋 SHA 이미지로 되돌린다(서버에는 최근 2개만 남으므로, 그보다 오래된 이미지는 GHCR 에서 받는다).
 
 ```bash
 cd /home/opc/sr
