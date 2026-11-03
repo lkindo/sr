@@ -36,14 +36,14 @@ export function isDueDateChange(
 }
 
 /** 숫자 값(number/Decimal/문자열/null)을 비교 가능한 숫자로 정규화한다. 값이 없으면 null. */
-export function toNumberOrNull(value: unknown): number | null {
+function toNumberOrNull(value: unknown): number | null {
   if (value === undefined || value === null || value === '') return null;
   const num = typeof value === 'number' ? value : Number(String(value));
   return Number.isNaN(num) ? null : num;
 }
 
 /** 빈 문자열/undefined 를 null 로 정규화한다. (스키마의 emptyStringToNull 과 동일한 기준) */
-export function toStringOrNull(value: string | null | undefined): string | null {
+function toStringOrNull(value: string | null | undefined): string | null {
   if (value === undefined || value === null || value === '') return null;
   return value;
 }

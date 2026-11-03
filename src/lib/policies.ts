@@ -14,7 +14,6 @@ export {
 export {
   canRegisterSROnBehalf,
   canWriteInternalNote,
-  type ClientAccessFields,
   eligibleRequesterWhere,
   ensureCanViewAuditLogs,
   ensureSystemAdmin,
@@ -23,9 +22,7 @@ export {
   isInternalUser,
   isSystemAdmin,
   redactActivityForViewer,
-  type RoleGrantFields,
   type SRAccessFields,
-  type UserIdentity,
   visibleCommentsWhere,
 } from './policies/core';
 export {

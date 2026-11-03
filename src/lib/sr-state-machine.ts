@@ -17,7 +17,6 @@ export {
   REQUIRED_FIELDS,
   SR_STATUS_ACTIONS,
   type SRStatusAction,
-  type SRStatusActionInput,
   TRANSITION_PERMISSIONS,
   TRANSITION_ROLES,
   VALID_TRANSITIONS,
