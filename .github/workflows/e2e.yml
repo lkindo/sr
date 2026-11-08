@@ -165,7 +165,7 @@ jobs:
       # (기존 설정은 존재하지 않는 playwright-report/ 를 올려 항상 빈 아티팩트만 남겼다)
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
           path: test-results/
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload application server log
         if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-server-log
           path: server.log
