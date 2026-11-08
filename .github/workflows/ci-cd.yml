@@ -239,7 +239,7 @@ jobs:
       # mutation-test 잡이 "테스트가 존재하는 파일"만 뮤테이션 대상으로 고르는 데 사용한다.
       # 테스트가 아예 없는 파일은 커버리지 게이트가 담당하므로 뮤테이션 점수에서 제외한다.
       - name: Upload coverage map for mutation testing
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: success()
         with:
           name: coverage-final
@@ -340,7 +340,7 @@ jobs:
       # 합산 판정용. 배정 기록(shard-manifest.json)은 대상이 없던 분할도 늘 남기므로 파일이 하나도 없으면 오류다.
       # 합산 작업은 1..N 기록이 모두 와야 판정한다 — 결과가 빠졌는데 통과하는 일을 막는다.
       - name: Upload shard mutation report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: success()
         with:
           name: mutation-report-${{ matrix.shard }}
@@ -686,7 +686,7 @@ jobs:
 
       # Preserve screenshots/results and HTML reports for each independent suite.
       - name: Upload Playwright report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: playwright-report-${{ matrix.suite }}
@@ -697,7 +697,7 @@ jobs:
           retention-days: 7
 
       - name: Upload application server log
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: failure() && matrix.suite == 'desktop'
         with:
           name: e2e-server-log
